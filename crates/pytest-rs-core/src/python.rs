@@ -534,8 +534,8 @@ pub fn expand_fixture_params(
         }
 
         // Cartesian product over each parametrized fixture's values.
-        let mut variants: Vec<(String, Vec<(String, usize, Py<PyAny>)>)> =
-            vec![(String::new(), Vec::new())];
+        type Assignment = (String, usize, Py<PyAny>);
+        let mut variants: Vec<(String, Vec<Assignment>)> = vec![(String::new(), Vec::new())];
         for def in &parametrized {
             let values: Vec<Bound<'_, PyAny>> = def
                 .params
