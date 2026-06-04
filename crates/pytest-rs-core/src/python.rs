@@ -126,36 +126,323 @@ fn introspect_namespace(
 ) -> PyResult<()> {
     register_fixtures_from(py, module, &format!("{nodeid_base}::"), registry)?;
 
+    let inspect = py.import("inspect")?;
+    let isclass = inspect.getattr("isclass")?;
     let dict = module.dict();
-    let mut names: Vec<(String, Bound<'_, PyAny>)> = dict
-        .iter()
-        .filter_map(|(k, v)| k.extract::<String>().ok().map(|name| (name, v)))
-        .collect();
     // Module dicts preserve definition order in CPython; keep it.
-    for (name, value) in names.drain(..) {
-        if !name.starts_with("test_") || !value.is_callable() {
+    for (key, value) in dict.iter() {
+        let Ok(name) = key.extract::<String>() else {
+            continue;
+        };
+        if isclass.call1((&value,))?.extract::<bool>()? {
+            if name.starts_with("Test") {
+                collect_class(
+                    py,
+                    &value,
+                    &name,
+                    nodeid_base,
+                    module_name,
+                    path,
+                    items,
+                    registry,
+                )?;
+            }
             continue;
         }
-        // Only collect functions defined in (or imported into) this module
-        // that are not fixtures.
-        if value.hasattr("_pytestfixturefunction")? {
+        if !name.starts_with("test_")
+            || !value.is_callable()
+            || value.hasattr("_pytestfixturefunction")?
+        {
             continue;
         }
-        let flags = async_flags(py, &value)?;
-        let fixture_names = param_names(py, &value)?;
         let marks = read_marks(py, &value)?;
+        push_test_items(
+            py,
+            items,
+            nodeid_base,
+            module_name,
+            path,
+            &name,
+            &value,
+            None,
+            marks,
+        )?;
+    }
+    Ok(())
+}
+
+/// Collect test methods (and class-level fixtures) from a Test* class.
+#[allow(clippy::too_many_arguments)]
+fn collect_class(
+    py: Python<'_>,
+    cls: &Bound<'_, PyAny>,
+    cls_name: &str,
+    nodeid_base: &str,
+    module_name: &str,
+    path: &Path,
+    items: &mut Vec<TestItem>,
+    registry: &mut FixtureRegistry,
+) -> PyResult<()> {
+    // Classes with a custom __init__ are not collected (pytest behavior).
+    let cls_dict = cls.getattr("__dict__")?;
+    if cls_dict.contains("__init__")? {
+        return Ok(());
+    }
+    let class_nodeid = format!("{nodeid_base}::{cls_name}");
+    let class_marks = read_marks(py, cls)?;
+
+    for pair in cls_dict.call_method0("items")?.try_iter()? {
+        let (name, value): (String, Bound<'_, PyAny>) = pair?.extract()?;
+        if !value.is_callable() {
+            continue;
+        }
+        if value.hasattr("_pytestfixturefunction")? {
+            register_fixture_def(
+                py,
+                &name,
+                &value,
+                &format!("{class_nodeid}::"),
+                true,
+                registry,
+            )?;
+            continue;
+        }
+        if !name.starts_with("test_") {
+            continue;
+        }
+        let mut marks = read_marks(py, &value)?;
+        for mark in &class_marks {
+            marks.push(MarkData {
+                name: mark.name.clone(),
+                obj: mark.obj.clone_ref(py),
+            });
+        }
+        push_test_items(
+            py,
+            items,
+            &class_nodeid,
+            module_name,
+            path,
+            &name,
+            &value,
+            Some(cls),
+            marks,
+        )?;
+    }
+    Ok(())
+}
+
+/// Push the (possibly parametrize-expanded) items for one test function.
+#[allow(clippy::too_many_arguments)]
+fn push_test_items(
+    py: Python<'_>,
+    items: &mut Vec<TestItem>,
+    nodeid_prefix: &str,
+    module_name: &str,
+    path: &Path,
+    name: &str,
+    func: &Bound<'_, PyAny>,
+    cls: Option<&Bound<'_, PyAny>>,
+    marks: Vec<MarkData>,
+) -> PyResult<()> {
+    let flags = async_flags(py, func)?;
+    let mut fixture_names = param_names(py, func)?;
+    if cls.is_some() && fixture_names.first().map(String::as_str) == Some("self") {
+        fixture_names.remove(0);
+    }
+
+    let variants = expand_parametrize(py, &marks)?;
+    for variant in variants {
+        let nodeid = match &variant.id {
+            Some(id) => format!("{nodeid_prefix}::{name}[{id}]"),
+            None => format!("{nodeid_prefix}::{name}"),
+        };
+        let mut item_marks: Vec<MarkData> = marks
+            .iter()
+            .map(|m| MarkData {
+                name: m.name.clone(),
+                obj: m.obj.clone_ref(py),
+            })
+            .collect();
+        item_marks.extend(variant.extra_marks);
         items.push(TestItem {
-            nodeid: format!("{nodeid_base}::{name}"),
+            nodeid,
             path: path.to_path_buf(),
             module_name: module_name.to_string(),
-            func_name: name,
-            func: value.unbind(),
+            func_name: name.to_string(),
+            func: func.clone().unbind(),
+            cls: cls.map(|c| c.clone().unbind()),
             is_coroutine: flags.is_coroutine,
-            fixture_names,
-            marks,
+            fixture_names: fixture_names.clone(),
+            marks: item_marks,
+            callspec: variant.params,
         });
     }
     Ok(())
+}
+
+struct ParamVariant {
+    /// The "[...]" id suffix; None for unparametrized tests.
+    id: Option<String>,
+    params: Vec<(String, Py<PyAny>)>,
+    /// Marks attached via pytest.param(..., marks=...).
+    extra_marks: Vec<MarkData>,
+}
+
+/// Expand stacked @pytest.mark.parametrize marks into the cartesian product
+/// of parameter sets. Marks appear in pytestmark order (bottom decorator
+/// first); ids join in that order and later marks vary fastest.
+fn expand_parametrize(py: Python<'_>, marks: &[MarkData]) -> PyResult<Vec<ParamVariant>> {
+    struct Dim {
+        /// (id_part, params, extra_marks) per value set.
+        sets: Vec<(String, Vec<(String, Py<PyAny>)>, Vec<MarkData>)>,
+    }
+
+    let param_spec_cls = py.import("pytest")?.getattr("ParamSpec")?;
+    let mut dims: Vec<Dim> = Vec::new();
+
+    for mark in marks.iter().filter(|m| m.name == "parametrize") {
+        let args = mark.obj.bind(py).getattr("args")?;
+        let argnames_obj = args.get_item(0)?;
+        let argvalues = args.get_item(1)?;
+        let argnames: Vec<String> = match argnames_obj.extract::<String>() {
+            Ok(joined) => joined.split(',').map(|s| s.trim().to_string()).collect(),
+            Err(_) => argnames_obj.extract()?,
+        };
+        let explicit_ids: Option<Vec<Option<String>>> = mark
+            .obj
+            .bind(py)
+            .getattr("kwargs")?
+            .get_item("ids")
+            .ok()
+            .and_then(|ids| ids.extract().ok());
+
+        let mut sets = Vec::new();
+        for (index, value_set) in argvalues.try_iter()?.enumerate() {
+            let value_set = value_set?;
+            let (values, spec_id, extra_marks) = if value_set.is_instance(&param_spec_cls)? {
+                let values: Vec<Bound<'_, PyAny>> = value_set
+                    .getattr("values")?
+                    .try_iter()?
+                    .collect::<PyResult<_>>()?;
+                let spec_id: Option<String> = value_set.getattr("id")?.extract()?;
+                let extra_marks = value_set
+                    .getattr("marks")?
+                    .try_iter()?
+                    .map(|m| {
+                        let m = m?;
+                        Ok(MarkData {
+                            name: m.getattr("name")?.extract()?,
+                            obj: m.unbind(),
+                        })
+                    })
+                    .collect::<PyResult<Vec<_>>>()?;
+                (values, spec_id, extra_marks)
+            } else if argnames.len() > 1 {
+                let values: Vec<Bound<'_, PyAny>> =
+                    value_set.try_iter()?.collect::<PyResult<_>>()?;
+                (values, None, Vec::new())
+            } else {
+                (vec![value_set], None, Vec::new())
+            };
+
+            if values.len() != argnames.len() {
+                return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                    "parametrize: {} argnames but {} values",
+                    argnames.len(),
+                    values.len()
+                )));
+            }
+
+            let id_part = spec_id
+                .or_else(|| {
+                    explicit_ids
+                        .as_ref()
+                        .and_then(|ids| ids.get(index).cloned().flatten())
+                })
+                .unwrap_or_else(|| {
+                    let parts: Vec<String> = argnames
+                        .iter()
+                        .zip(values.iter())
+                        .map(|(argname, value)| id_for_value(value, argname, index))
+                        .collect();
+                    parts.join("-")
+                });
+            let params: Vec<(String, Py<PyAny>)> = argnames
+                .iter()
+                .cloned()
+                .zip(values.into_iter().map(Bound::unbind))
+                .collect();
+            sets.push((id_part, params, extra_marks));
+        }
+        dims.push(Dim { sets });
+    }
+
+    if dims.is_empty() {
+        return Ok(vec![ParamVariant {
+            id: None,
+            params: Vec::new(),
+            extra_marks: Vec::new(),
+        }]);
+    }
+
+    // Odometer over dims; the last dim varies fastest, ids join in dim order.
+    let mut variants = Vec::new();
+    let mut indices = vec![0usize; dims.len()];
+    'outer: loop {
+        let mut id_parts = Vec::new();
+        let mut params = Vec::new();
+        let mut extra_marks = Vec::new();
+        for (dim, &index) in dims.iter().zip(indices.iter()) {
+            let (id_part, set_params, set_marks) = &dim.sets[index];
+            id_parts.push(id_part.clone());
+            for (name, value) in set_params {
+                params.push((name.clone(), value.clone_ref(py)));
+            }
+            for mark in set_marks {
+                extra_marks.push(MarkData {
+                    name: mark.name.clone(),
+                    obj: mark.obj.clone_ref(py),
+                });
+            }
+        }
+        variants.push(ParamVariant {
+            id: Some(id_parts.join("-")),
+            params,
+            extra_marks,
+        });
+
+        for pos in (0..dims.len()).rev() {
+            indices[pos] += 1;
+            if indices[pos] < dims[pos].sets.len() {
+                continue 'outer;
+            }
+            indices[pos] = 0;
+            if pos == 0 {
+                break 'outer;
+            }
+        }
+    }
+    Ok(variants)
+}
+
+/// pytest-style id for one parameter value.
+fn id_for_value(value: &Bound<'_, PyAny>, argname: &str, index: usize) -> String {
+    if value.is_none() {
+        return "None".to_string();
+    }
+    if let Ok(b) = value.cast::<pyo3::types::PyBool>() {
+        return if b.is_true() { "True" } else { "False" }.to_string();
+    }
+    if let Ok(s) = value.extract::<String>() {
+        return s;
+    }
+    if value.cast::<pyo3::types::PyInt>().is_ok() || value.cast::<pyo3::types::PyFloat>().is_ok() {
+        if let Ok(repr) = value.repr() {
+            return repr.to_string();
+        }
+    }
+    format!("{argname}{index}")
 }
 
 fn register_fixtures_from(
@@ -165,32 +452,48 @@ fn register_fixtures_from(
     registry: &mut FixtureRegistry,
 ) -> PyResult<()> {
     for (key, value) in module.dict().iter() {
-        let Ok(_name) = key.extract::<String>() else {
+        let Ok(attr_name) = key.extract::<String>() else {
             continue;
         };
         if !value.is_callable() || !value.hasattr("_pytestfixturefunction")? {
             continue;
         }
-        let marker = value.getattr("_pytestfixturefunction")?;
-        let scope_str: String = marker.getattr("scope")?.extract()?;
-        let scope = Scope::parse(&scope_str).unwrap_or(Scope::Function);
-        let autouse: bool = marker.getattr("autouse")?.extract()?;
-        let explicit_name: Option<String> = marker.getattr("name")?.extract()?;
-        let name = explicit_name.unwrap_or(_name);
-        let flags = async_flags(py, &value)?;
-        let param_names = param_names(py, &value)?;
-        registry.register(FixtureDef {
-            name,
-            func: value.unbind(),
-            scope,
-            autouse,
-            is_coroutine: flags.is_coroutine,
-            is_generator: flags.is_generator,
-            is_async_gen: flags.is_async_gen,
-            param_names,
-            baseid: baseid.to_string(),
-        });
+        register_fixture_def(py, &attr_name, &value, baseid, false, registry)?;
     }
+    Ok(())
+}
+
+pub(crate) fn register_fixture_def(
+    py: Python<'_>,
+    attr_name: &str,
+    value: &Bound<'_, PyAny>,
+    baseid: &str,
+    needs_instance: bool,
+    registry: &mut FixtureRegistry,
+) -> PyResult<()> {
+    let marker = value.getattr("_pytestfixturefunction")?;
+    let scope_str: String = marker.getattr("scope")?.extract()?;
+    let scope = Scope::parse(&scope_str).unwrap_or(Scope::Function);
+    let autouse: bool = marker.getattr("autouse")?.extract()?;
+    let explicit_name: Option<String> = marker.getattr("name")?.extract()?;
+    let name = explicit_name.unwrap_or_else(|| attr_name.to_string());
+    let flags = async_flags(py, value)?;
+    let mut param_names = param_names(py, value)?;
+    if needs_instance && param_names.first().map(String::as_str) == Some("self") {
+        param_names.remove(0);
+    }
+    registry.register(FixtureDef {
+        name,
+        func: value.clone().unbind(),
+        scope,
+        autouse,
+        is_coroutine: flags.is_coroutine,
+        is_generator: flags.is_generator,
+        is_async_gen: flags.is_async_gen,
+        param_names,
+        baseid: baseid.to_string(),
+        needs_instance,
+    });
     Ok(())
 }
 
@@ -253,12 +556,25 @@ pub fn call_with_kwargs<'py>(
     func: &Py<PyAny>,
     kwargs: &[(String, Py<PyAny>)],
 ) -> PyResult<Bound<'py, PyAny>> {
+    call_fixture(py, func, None, kwargs)
+}
+
+/// Call a fixture/test function, prepending the test class instance as
+/// `self` when the definition lives inside a Test* class.
+pub fn call_fixture<'py>(
+    py: Python<'py>,
+    func: &Py<PyAny>,
+    instance: Option<&Py<PyAny>>,
+    kwargs: &[(String, Py<PyAny>)],
+) -> PyResult<Bound<'py, PyAny>> {
     let dict = PyDict::new(py);
     for (name, value) in kwargs {
         dict.set_item(name, value.bind(py))?;
     }
-    let empty = PyTuple::empty(py);
-    func.bind(py).call(empty, Some(&dict))
+    match instance {
+        Some(instance) => func.bind(py).call((instance.bind(py),), Some(&dict)),
+        None => func.bind(py).call(PyTuple::empty(py), Some(&dict)),
+    }
 }
 
 /// Resume a suspended sync generator fixture, expecting StopIteration.

@@ -54,11 +54,13 @@ pub trait Plugin: Send {
 
     /// firstresult: provide the value (and optional finalizer) for a fixture
     /// the core cannot set up itself (async fixtures, native fixtures).
+    /// `instance` is the test class instance for class-defined fixtures.
     fn pytest_fixture_setup(
         &self,
         _ctx: &mut HookContext,
         _def: &FixtureDef,
         _item: &TestItem,
+        _instance: Option<&Py<PyAny>>,
         _kwargs: &[(String, Py<PyAny>)],
     ) -> HookResult<FixtureValue> {
         Ok(None)
@@ -70,11 +72,13 @@ pub trait Plugin: Send {
 
     /// firstresult: actually invoke the test function. Return `Some(())`
     /// after running it (exceptions propagate as Err). The core's default
-    /// sync caller runs if no plugin claims the item.
+    /// sync caller runs if no plugin claims the item. `callable` is already
+    /// bound to the test class instance for methods.
     fn pytest_pyfunc_call(
         &self,
         _ctx: &mut HookContext,
         _item: &TestItem,
+        _callable: &Py<PyAny>,
         _kwargs: &[(String, Py<PyAny>)],
     ) -> HookResult<()> {
         Ok(None)

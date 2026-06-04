@@ -105,6 +105,7 @@ impl Plugin for AsyncioPlugin {
         ctx: &mut HookContext,
         def: &FixtureDef,
         _item: &TestItem,
+        instance: Option<&Py<PyAny>>,
         kwargs: &[(String, Py<PyAny>)],
     ) -> HookResult<FixtureValue> {
         if !def.is_coroutine && !def.is_async_gen {
@@ -115,7 +116,7 @@ impl Plugin for AsyncioPlugin {
         let loop_ = self.ensure_loop(py)?;
 
         if def.is_coroutine {
-            let coro = pytest_rs_core::python::call_with_kwargs(py, &def.func, kwargs)?;
+            let coro = pytest_rs_core::python::call_fixture(py, &def.func, instance, kwargs)?;
             let value = helper.getattr("run")?.call1((loop_.bind(py), coro))?;
             return Ok(Some(FixtureValue {
                 value: value.unbind(),
@@ -124,7 +125,7 @@ impl Plugin for AsyncioPlugin {
         }
 
         // async generator fixture
-        let agen = pytest_rs_core::python::call_with_kwargs(py, &def.func, kwargs)?;
+        let agen = pytest_rs_core::python::call_fixture(py, &def.func, instance, kwargs)?;
         let value = helper
             .getattr("async_gen_first")?
             .call1((loop_.bind(py), &agen))?;
@@ -141,6 +142,7 @@ impl Plugin for AsyncioPlugin {
         &self,
         ctx: &mut HookContext,
         item: &TestItem,
+        callable: &Py<PyAny>,
         kwargs: &[(String, Py<PyAny>)],
     ) -> HookResult<()> {
         if !item.is_coroutine || !self.applicable(item) {
@@ -149,7 +151,7 @@ impl Plugin for AsyncioPlugin {
         let py = ctx.py;
         let helper = self.helper(py)?;
         let loop_ = self.ensure_loop(py)?;
-        let coro = pytest_rs_core::python::call_with_kwargs(py, &item.func, kwargs)?;
+        let coro = pytest_rs_core::python::call_with_kwargs(py, callable, kwargs)?;
         helper.getattr("run")?.call1((loop_.bind(py), coro))?;
         Ok(Some(()))
     }

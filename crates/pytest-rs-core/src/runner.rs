@@ -122,7 +122,8 @@ fn run_one(
 
     // ---- setup -----------------------------------------------------------
     let setup_started = Instant::now();
-    let kwargs = (|| -> PyResult<Vec<(String, Py<PyAny>)>> {
+    type SetupOk = (Py<PyAny>, Vec<(String, Py<PyAny>)>);
+    let setup_result = (|| -> PyResult<SetupOk> {
         {
             let mut ctx = HookContext {
                 py,
@@ -133,21 +134,55 @@ fn run_one(
                 plugin.pytest_runtest_setup(&mut ctx, item)?;
             }
         }
+        // A fresh class instance per test (pytest behavior).
+        let instance: Option<Py<PyAny>> = match &item.cls {
+            Some(cls) => Some(cls.bind(py).call0()?.unbind()),
+            None => None,
+        };
+        let callable = match &instance {
+            Some(instance) => instance.bind(py).getattr(item.func_name.as_str())?.unbind(),
+            None => item.func.clone_ref(py),
+        };
+
         // autouse fixtures run first, then the requested ones.
         let mut stack = Vec::new();
         for def in session.registry.autouse_for(&item.nodeid) {
-            resolve_fixture(py, plugins, session, config, &def.name, item, &mut stack)?;
+            resolve_fixture(
+                py,
+                plugins,
+                session,
+                config,
+                &def.name,
+                item,
+                instance.as_ref(),
+                &mut stack,
+            )?;
         }
         let mut kwargs = Vec::new();
         for name in &item.fixture_names {
-            let value = resolve_fixture(py, plugins, session, config, name, item, &mut stack)?;
+            if item.callspec.iter().any(|(param, _)| param == name) {
+                continue;
+            }
+            let value = resolve_fixture(
+                py,
+                plugins,
+                session,
+                config,
+                name,
+                item,
+                instance.as_ref(),
+                &mut stack,
+            )?;
             kwargs.push((name.clone(), value));
         }
-        Ok(kwargs)
+        for (name, value) in &item.callspec {
+            kwargs.push((name.clone(), value.clone_ref(py)));
+        }
+        Ok((callable, kwargs))
     })();
 
-    let kwargs = match kwargs {
-        Ok(kwargs) => kwargs,
+    let (callable, kwargs) = match setup_result {
+        Ok(setup) => setup,
         Err(err) => {
             reports.push(report_from_err(py, item, Phase::Setup, setup_started, &err));
             teardown_one(py, plugins, session, config, item, &mut reports);
@@ -172,7 +207,7 @@ fn run_one(
         };
         for plugin in plugins {
             if plugin
-                .pytest_pyfunc_call(&mut ctx, item, &kwargs)?
+                .pytest_pyfunc_call(&mut ctx, item, &callable, &kwargs)?
                 .is_some()
             {
                 return Ok(true);
@@ -199,7 +234,7 @@ fn run_one(
                     longrepr: Some("async def functions are not natively supported.".to_string()),
                 }
             } else {
-                match python::call_with_kwargs(py, &item.func, &kwargs) {
+                match python::call_with_kwargs(py, &callable, &kwargs) {
                     Ok(_) => TestReport {
                         nodeid: item.nodeid.clone(),
                         phase: Phase::Call,
@@ -312,6 +347,7 @@ fn teardown_scope(
 
 /// Resolve one fixture by name for an item, using the cache, recursing into
 /// dependencies, and letting plugins claim setup (async fixtures).
+#[allow(clippy::too_many_arguments)]
 fn resolve_fixture(
     py: Python<'_>,
     plugins: &[Box<dyn Plugin>],
@@ -319,6 +355,7 @@ fn resolve_fixture(
     config: &Config,
     name: &str,
     item: &TestItem,
+    class_instance: Option<&Py<PyAny>>,
     stack: &mut Vec<String>,
 ) -> PyResult<Py<PyAny>> {
     let Some(def) = session.registry.lookup(name, &item.nodeid) else {
@@ -352,7 +389,16 @@ fn resolve_fixture(
                     "the 'request' fixture is not supported yet",
                 ));
             }
-            let value = resolve_fixture(py, plugins, session, config, dep, item, stack)?;
+            let value = resolve_fixture(
+                py,
+                plugins,
+                session,
+                config,
+                dep,
+                item,
+                class_instance,
+                stack,
+            )?;
             kwargs.push((dep.clone(), value));
         }
         Ok(kwargs)
@@ -369,8 +415,15 @@ fn resolve_fixture(
             config,
         };
         let mut claimed = None;
+        let fixture_instance = if def.needs_instance {
+            class_instance
+        } else {
+            None
+        };
         for plugin in plugins {
-            if let Some(value) = plugin.pytest_fixture_setup(&mut ctx, &def, item, &kwargs)? {
+            if let Some(value) =
+                plugin.pytest_fixture_setup(&mut ctx, &def, item, fixture_instance, &kwargs)?
+            {
                 claimed = Some(value);
                 break;
             }
@@ -378,6 +431,11 @@ fn resolve_fixture(
         claimed
     };
 
+    let fixture_instance = if def.needs_instance {
+        class_instance
+    } else {
+        None
+    };
     let (value, finalizer) = match claimed {
         Some(fixture_value) => (fixture_value.value, fixture_value.finalizer),
         None => {
@@ -387,11 +445,11 @@ fn resolve_fixture(
                 )));
             }
             if def.is_generator {
-                let generator = python::call_with_kwargs(py, &def.func, &kwargs)?;
+                let generator = python::call_fixture(py, &def.func, fixture_instance, &kwargs)?;
                 let value = python::next_value(py, &generator)?;
                 (value.unbind(), Some(Finalizer::GenNext(generator.unbind())))
             } else {
-                let value = python::call_with_kwargs(py, &def.func, &kwargs)?;
+                let value = python::call_fixture(py, &def.func, fixture_instance, &kwargs)?;
                 (value.unbind(), None)
             }
         }

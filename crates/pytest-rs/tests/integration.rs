@@ -316,3 +316,105 @@ async def test_async_auto():
     assert_eq!(output.status.code(), Some(0), "out: {out}");
     assert!(out.contains("1 passed"), "out: {out}");
 }
+
+#[test]
+fn parametrize_expands_items() {
+    let suite = TempSuite::new("parametrize");
+    suite.write(
+        "test_params.py",
+        r#"
+import pytest
+
+@pytest.mark.parametrize("a,b,expected", [(1, 2, 3), (2, 3, 5)])
+def test_add(a, b, expected):
+    assert a + b == expected
+
+@pytest.mark.parametrize("x", [0, 1])
+@pytest.mark.parametrize("y", [2, 3])
+def test_stacked(x, y):
+    assert x in (0, 1) and y in (2, 3)
+
+@pytest.mark.parametrize("v", [pytest.param(9, id="nine"), pytest.param(0, marks=pytest.mark.skip)])
+def test_param_obj(v):
+    assert v == 9
+"#,
+    );
+    let output = suite.run(&["-v"]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(
+        out.contains("test_params.py::test_add[1-2-3] PASSED"),
+        "out: {out}"
+    );
+    assert!(
+        out.contains("test_params.py::test_add[2-3-5] PASSED"),
+        "out: {out}"
+    );
+    assert!(
+        out.contains("test_params.py::test_stacked[2-0] PASSED"),
+        "out: {out}"
+    );
+    assert!(
+        out.contains("test_params.py::test_stacked[3-1] PASSED"),
+        "out: {out}"
+    );
+    assert!(
+        out.contains("test_params.py::test_param_obj[nine] PASSED"),
+        "out: {out}"
+    );
+    assert!(
+        out.contains("test_params.py::test_param_obj[0] SKIPPED"),
+        "out: {out}"
+    );
+}
+
+#[test]
+fn test_class_collection() {
+    let suite = TempSuite::new("classes");
+    suite.write(
+        "test_cls.py",
+        r#"
+import pytest
+
+class TestThing:
+    @pytest.fixture
+    def offset(self):
+        return 100
+
+    def test_method(self, offset):
+        assert offset + 1 == 101
+
+    @pytest.mark.parametrize("v", [1, 2])
+    def test_params(self, v, offset):
+        assert offset + v > 100
+
+class TestStateless:
+    def test_fresh_instance(self):
+        assert not hasattr(self, "state")
+        self.state = True
+
+class NotCollected:
+    def test_ignored(self):
+        raise AssertionError
+
+class TestWithInit:
+    def __init__(self):
+        pass
+
+    def test_skipped_class(self):
+        raise AssertionError
+"#,
+    );
+    let output = suite.run(&["-v"]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(
+        out.contains("test_cls.py::TestThing::test_method PASSED"),
+        "out: {out}"
+    );
+    assert!(
+        out.contains("test_cls.py::TestThing::test_params[1] PASSED"),
+        "out: {out}"
+    );
+    assert!(out.contains("4 passed"), "out: {out}");
+}

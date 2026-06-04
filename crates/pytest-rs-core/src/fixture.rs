@@ -41,6 +41,8 @@ pub struct FixtureDef {
     /// Visibility prefix: items whose nodeid starts with this see the
     /// fixture. "" = global (plugin / rootdir conftest).
     pub baseid: String,
+    /// Defined inside a Test* class: call with the test instance as `self`.
+    pub needs_instance: bool,
 }
 
 /// All fixture definitions visible in this session, name -> defs ordered

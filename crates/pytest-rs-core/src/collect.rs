@@ -11,17 +11,23 @@ pub struct MarkData {
 
 /// One runnable, collected test function.
 pub struct TestItem {
-    /// pytest-compatible node id, e.g. "tests/test_code.py::test_add".
+    /// pytest-compatible node id, e.g. "tests/test_code.py::test_add[1-2]".
     pub nodeid: String,
     pub path: PathBuf,
     pub module_name: String,
     pub func_name: String,
-    /// The test callable itself.
+    /// The test callable itself (unbound function for class methods).
     pub func: Py<PyAny>,
+    /// The Test* class this method belongs to, if any. A fresh instance is
+    /// created per test at setup.
+    pub cls: Option<Py<PyAny>>,
     pub is_coroutine: bool,
-    /// Fixture names requested in the test signature.
+    /// Fixture names requested in the test signature (parametrize-provided
+    /// names included; the runner skips resolving those).
     pub fixture_names: Vec<String>,
     pub marks: Vec<MarkData>,
+    /// Direct parameters from @pytest.mark.parametrize, by argname.
+    pub callspec: Vec<(String, Py<PyAny>)>,
 }
 
 impl TestItem {
