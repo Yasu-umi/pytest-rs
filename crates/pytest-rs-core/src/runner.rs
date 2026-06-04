@@ -376,7 +376,7 @@ fn teardown_scope(
     }
     session
         .fixture_cache
-        .retain(|(_, inst, _), _| inst != instance);
+        .retain(|(_, _, inst, _), _| inst != instance);
     errors
 }
 
@@ -391,7 +391,7 @@ fn resolve_fixture(
     name: &str,
     item: &TestItem,
     class_instance: Option<&Py<PyAny>>,
-    stack: &mut Vec<String>,
+    stack: &mut Vec<(String, String)>,
 ) -> PyResult<Py<PyAny>> {
     let Some(def) = session.registry.lookup(name, &item.nodeid) else {
         return Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
@@ -399,9 +399,35 @@ fn resolve_fixture(
             item.nodeid
         )));
     };
-    if stack.contains(&def.name) {
+    resolve_fixture_def(
+        py,
+        plugins,
+        session,
+        config,
+        def,
+        item,
+        class_instance,
+        stack,
+    )
+}
+
+/// Resolve a specific fixture definition (override-aware entry point).
+#[allow(clippy::too_many_arguments)]
+fn resolve_fixture_def(
+    py: Python<'_>,
+    plugins: &[Box<dyn Plugin>],
+    session: &mut Session,
+    config: &Config,
+    def: std::sync::Arc<crate::fixture::FixtureDef>,
+    item: &TestItem,
+    class_instance: Option<&Py<PyAny>>,
+    stack: &mut Vec<(String, String)>,
+) -> PyResult<Py<PyAny>> {
+    let def_id = (def.name.clone(), def.baseid.clone());
+    if stack.contains(&def_id) {
         return Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
-            "recursive fixture dependency involving '{name}'"
+            "recursive fixture dependency involving '{}'",
+            def.name
         )));
     }
 
@@ -418,6 +444,7 @@ fn resolve_fixture(
         .map(|(_, index, value)| (*index, value.clone_ref(py)));
     let cache_key = (
         def.name.clone(),
+        def.baseid.clone(),
         instance.clone(),
         fixture_param.as_ref().map(|(index, _)| *index),
     );
@@ -425,7 +452,7 @@ fn resolve_fixture(
         return Ok(cached.clone_ref(py));
     }
 
-    stack.push(def.name.clone());
+    stack.push(def_id);
     let mut request: Option<Py<crate::request::PyRequest>> = None;
     let deps_result = (|| -> PyResult<Vec<(String, Py<PyAny>)>> {
         let mut kwargs = Vec::new();
@@ -444,16 +471,37 @@ fn resolve_fixture(
                 request = Some(req);
                 continue;
             }
-            let value = resolve_fixture(
-                py,
-                plugins,
-                session,
-                config,
-                dep,
-                item,
-                class_instance,
-                stack,
-            )?;
+            let value = if dep == &def.name {
+                // Fixture override: a fixture requesting its own name gets
+                // the next less-specific definition.
+                let Some(parent) = session.registry.lookup_overridden(dep, &item.nodeid, &def)
+                else {
+                    return Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
+                        "fixture '{dep}' not found (no less-specific definition to override)"
+                    )));
+                };
+                resolve_fixture_def(
+                    py,
+                    plugins,
+                    session,
+                    config,
+                    parent,
+                    item,
+                    class_instance,
+                    stack,
+                )?
+            } else {
+                resolve_fixture(
+                    py,
+                    plugins,
+                    session,
+                    config,
+                    dep,
+                    item,
+                    class_instance,
+                    stack,
+                )?
+            };
             kwargs.push((dep.clone(), value));
         }
         Ok(kwargs)
@@ -496,7 +544,8 @@ fn resolve_fixture(
         None => {
             if def.is_coroutine || def.is_async_gen {
                 return Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
-                    "async fixture '{name}' requires an async plugin (pytest-rs-asyncio)"
+                    "async fixture '{}' requires an async plugin (pytest-rs-asyncio)",
+                    def.name
                 )));
             }
             if def.is_generator {

@@ -74,6 +74,24 @@ impl FixtureRegistry {
         })
     }
 
+    /// Fixture override: the next less-specific visible definition of
+    /// `name`, below `current` (a fixture requesting its own name).
+    pub fn lookup_overridden(
+        &self,
+        name: &str,
+        nodeid: &str,
+        current: &Arc<FixtureDef>,
+    ) -> Option<Arc<FixtureDef>> {
+        self.by_name.get(name).and_then(|defs| {
+            defs.iter()
+                .rev()
+                .skip_while(|def| !Arc::ptr_eq(def, current))
+                .skip(1)
+                .find(|def| nodeid.starts_with(&def.baseid))
+                .cloned()
+        })
+    }
+
     /// The transitive fixture closure for an item: requested names plus
     /// autouse, following dependencies, deduped, in discovery order.
     pub fn closure_for(&self, nodeid: &str, requested: &[String]) -> Vec<Arc<FixtureDef>> {

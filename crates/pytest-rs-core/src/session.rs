@@ -8,10 +8,11 @@ use crate::fixture::{FixtureRegistry, Scope};
 use crate::report::TestReport;
 
 /// Key identifying one live instance of a fixture value in the cache:
-/// (fixture name, scope instance, fixture param index). The scope instance
-/// is "" for session scope, the module nodeid for module scope, and the
-/// item nodeid for function scope.
-pub type CacheKey = (String, String, Option<usize>);
+/// (fixture name, definition baseid, scope instance, fixture param index).
+/// The baseid distinguishes override levels of the same name; the scope
+/// instance is "" for session scope, the module nodeid for module scope,
+/// and the item nodeid for function scope.
+pub type CacheKey = (String, String, String, Option<usize>);
 
 /// Teardown work registered during fixture setup, run LIFO when the owning
 /// scope finishes.
