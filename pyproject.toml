@@ -23,4 +23,4 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.mypy]
 python_version = "3.13"
-files = ["crates/**/py/**/*.py"]
+files = ["crates/**/py/**/*.py", "conformance/runner.py"]

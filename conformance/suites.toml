@@ -1,0 +1,55 @@
+# Upstream test suites used as the conformance target: each library's own
+# tests are run, file by file, under pytest-rs. The scoreboard tracks how
+# much of upstream we reproduce; expected/<name>.toml pins files that must
+# keep passing (CI gate).
+#
+# `local` points at a sibling checkout (used with --local for development;
+# CI always clones the pinned tag for determinism).
+
+[pytest]
+repo = "https://github.com/pytest-dev/pytest"
+tag = "9.0.3"
+testpaths = ["testing"]
+local = "../pytest"
+enabled = true
+
+[pytest-asyncio]
+repo = "https://github.com/pytest-dev/pytest-asyncio"
+tag = "v1.4.0"
+testpaths = ["tests"]
+local = "../pytest-asyncio"
+enabled = true
+
+[pytest-mock]
+repo = "https://github.com/pytest-dev/pytest-mock"
+tag = "v3.15.1"
+testpaths = ["tests"]
+local = "../pytest-mock"
+enabled = false # enable when pytest-rs-mock lands
+
+[pytest-cov]
+repo = "https://github.com/pytest-dev/pytest-cov"
+tag = "v7.1.0"
+testpaths = ["tests"]
+local = "../pytest-cov"
+enabled = false # enable when pytest-rs-cov lands
+
+[pytest-xdist]
+repo = "https://github.com/pytest-dev/pytest-xdist"
+tag = "v3.8.0"
+testpaths = ["testing"]
+local = "../pytest-xdist"
+enabled = false # enable when -n workers land (M4)
+
+[pytest-split]
+repo = "https://github.com/jerry-git/pytest-split"
+tag = "0.9.0"
+testpaths = ["tests"]
+local = "../pytest-split"
+enabled = false # enable when pytest-rs-split lands
+
+[pytest-benchmark]
+repo = "https://github.com/ionelmc/pytest-benchmark"
+tag = "v5.1.0"
+testpaths = ["tests"]
+enabled = false # enable when pytest-rs-benchmark lands
