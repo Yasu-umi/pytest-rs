@@ -261,6 +261,16 @@ impl Plugin for AsyncioPlugin {
     }
 
     fn pytest_runtest_setup(&self, ctx: &mut HookContext, item: &TestItem) -> PyResult<()> {
+        // mark.asyncio takes keyword arguments only.
+        if let Some(mark) = item.get_closest_marker("asyncio")
+            && let Ok(args) = mark.obj.bind(ctx.py).getattr("args")
+            && args.len().unwrap_or(0) > 0
+        {
+            return Err(pytest_rs_core::pyo3::exceptions::PyValueError::new_err(
+                "mark.asyncio accepts only keyword arguments",
+            ));
+        }
+
         // Close module/class-scoped loops from a previous module.
         let module = item.module_instance();
         let mut current = self.current_module.borrow_mut();

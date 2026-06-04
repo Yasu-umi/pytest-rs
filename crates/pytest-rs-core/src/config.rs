@@ -254,6 +254,7 @@ impl Config {
             ("report-chars", Some('r')),
             ("plugin", Some('p')),
             ("config-file", Some('c')),
+            ("assert", None),
             ("tb", None),
             ("maxfail", None),
             ("durations", None),
