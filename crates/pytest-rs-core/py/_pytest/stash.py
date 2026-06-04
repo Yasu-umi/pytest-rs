@@ -26,3 +26,6 @@ class Stash:
 
     def setdefault(self, key, default):
         return self._storage.setdefault(key, default)
+
+
+from _pytest._stub import __getattr__  # noqa: E402, F401

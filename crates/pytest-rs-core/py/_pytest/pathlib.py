@@ -38,3 +38,6 @@ def import_path(path, *, root=None, mode=None, consider_namespace_packages=False
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+from _pytest._stub import __getattr__  # noqa: E402, F401

@@ -21,3 +21,6 @@ def get_empty_parameterset_mark(config, argnames, function):
 
 def pytest_configure(config):
     pass
+
+
+from _pytest._stub import __getattr__  # noqa: E402, F401

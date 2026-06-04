@@ -37,3 +37,5 @@ class NotSetType(enum.Enum):
 
 NOTSET = NotSetType.token
 LEGACY_PATH = None  # py.path.local is not supported
+
+from _pytest._stub import __getattr__  # noqa: E402, F401

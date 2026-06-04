@@ -44,6 +44,22 @@ pub fn install_shim(py: Python<'_>) -> PyResult<PathBuf> {
             .getattr("environ")?
             .set_item("PYTEST_RS_EXE", exe.to_string_lossy())?;
     }
+
+    // Embedded interpreters inherit argv[0] as sys.executable, which would
+    // make `subprocess.run([sys.executable, ...])` re-run pytest-rs
+    // recursively. Point it at the real python binary instead.
+    py.run(
+        c"import os, sys, sysconfig
+if not os.path.basename(sys.executable).startswith('python'):
+    for _name in ('python' + sysconfig.get_config_var('VERSION'), 'python3'):
+        _candidate = os.path.join(sysconfig.get_config_var('BINDIR'), _name)
+        if os.path.exists(_candidate):
+            sys.executable = _candidate
+            break
+",
+        None,
+        None,
+    )?;
     Ok(shim_root)
 }
 

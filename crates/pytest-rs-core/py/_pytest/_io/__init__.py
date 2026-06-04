@@ -33,3 +33,6 @@ class TerminalWriter:
 
     def markup(self, text, **markup):
         return text
+
+
+from _pytest._stub import __getattr__  # noqa: E402, F401

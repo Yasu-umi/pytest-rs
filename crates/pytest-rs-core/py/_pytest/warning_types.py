@@ -42,3 +42,6 @@ class PytestExperimentalApiWarning(PytestWarning, FutureWarning):
     @classmethod
     def simple(cls, apiname):
         return cls(f"{apiname} is an experimental api that may change over time")
+
+
+from _pytest._stub import __getattr__  # noqa: E402, F401

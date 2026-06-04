@@ -1,3 +1,1 @@
-from time import perf_counter, sleep, time  # noqa: F401
-
 from _pytest._stub import __getattr__  # noqa: E402, F401

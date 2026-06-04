@@ -12,3 +12,6 @@ class Source:
 
     def __str__(self):
         return "\n".join(self.lines)
+
+
+from _pytest._stub import __getattr__  # noqa: E402, F401

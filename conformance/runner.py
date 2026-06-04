@@ -98,13 +98,15 @@ class Suite:
             capture_output=True,
         )
 
-    def test_files(self) -> list[Path]:
+    def test_files(self) -> tuple[list[Path], int]:
+        """(files to run, number excluded by configuration)."""
         files: list[Path] = []
         for testpath in self.testpaths:
             base = self.checkout / testpath
             files.extend(sorted(base.rglob("test_*.py")))
             files.extend(sorted(p for p in base.rglob("*_test.py") if p not in files))
-        return [f for f in files if not any(part in self.exclude for part in f.parts)]
+        kept = [f for f in files if not any(part in self.exclude for part in f.parts)]
+        return kept, len(files) - len(kept)
 
     def run_file(self, path: Path) -> FileResult:
         import os
@@ -181,15 +183,31 @@ def load_expected(suite: Suite) -> dict[str, str]:
 def run_suite(suite: Suite, use_local: bool) -> list[FileResult]:
     print(f"=== {suite.name} @ {suite.tag} ===")
     suite.fetch(use_local)
-    results = [suite.run_file(path) for path in suite.test_files()]
+    files, excluded = suite.test_files()
+    results = [suite.run_file(path) for path in files]
 
     by_status: dict[str, int] = {}
-    tests_passed = sum(r.passed for r in results)
-    tests_failed = sum(r.failed for r in results)
     for result in results:
         by_status[result.status] = by_status.get(result.status, 0) + 1
-    print(f"  files: {by_status}")
-    print(f"  upstream tests passed: {tests_passed}, failed: {tests_failed}")
+    passed = sum(r.passed for r in results)
+    failed = sum(r.failed for r in results)
+    skipped = sum(r.skipped for r in results)
+    errors = sum(r.errors for r in results)
+    collected = passed + failed + skipped + errors
+    # Files that died before running any test contribute no test counts.
+    unmeasured = sum(
+        1 for r in results if r.status in ("error", "timeout") and r.passed + r.failed == 0
+    )
+
+    print(
+        f"  files: {len(files) + excluded} total, {excluded} excluded, {len(files)} run -> "
+        + ", ".join(f"{count} {status}" for status, count in sorted(by_status.items()))
+    )
+    print(
+        f"  tests: {collected} ran -> {passed} passed, {failed} failed, "
+        f"{skipped} skipped, {errors} errors"
+        + (f" ({unmeasured} files unmeasured: died before running tests)" if unmeasured else "")
+    )
 
     scoreboard = ROOT / "conformance" / "scoreboard"
     scoreboard.mkdir(exist_ok=True)

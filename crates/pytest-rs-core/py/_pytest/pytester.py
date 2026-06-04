@@ -6,3 +6,6 @@ class HookRecorder:
 
     def __init__(self, *args, **kwargs):
         raise NotImplementedError("HookRecorder is not supported by pytest-rs yet")
+
+
+from _pytest._stub import __getattr__  # noqa: E402, F401

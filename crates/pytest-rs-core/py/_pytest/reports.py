@@ -8,3 +8,6 @@ class TestReport(BaseReport):
 
 class CollectReport(BaseReport):
     pass
+
+
+from _pytest._stub import __getattr__  # noqa: E402, F401

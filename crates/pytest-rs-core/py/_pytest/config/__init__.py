@@ -11,3 +11,6 @@ class PytestPluginManager:
 
 def main(args=None, plugins=None):
     raise NotImplementedError("_pytest.config.main is not supported by pytest-rs")
+
+
+from _pytest._stub import __getattr__  # noqa: E402, F401
