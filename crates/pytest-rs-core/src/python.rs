@@ -626,6 +626,15 @@ pub fn format_exception(py: Python<'_>, err: &PyErr) -> String {
     result.unwrap_or_else(|_| format!("{err}"))
 }
 
+/// Evaluate a (skipif) condition string in a test module's namespace.
+pub fn eval_in_module(py: Python<'_>, module_name: &str, expr: &str) -> PyResult<bool> {
+    let module = py.import(module_name)?;
+    let globals = module.dict();
+    let code = std::ffi::CString::new(expr)
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+    py.eval(code.as_c_str(), Some(&globals), None)?.is_truthy()
+}
+
 /// Is this error an instance of the shim's `Skipped` outcome?
 pub fn is_skipped(py: Python<'_>, err: &PyErr) -> bool {
     err_matches_shim(py, err, "Skipped")

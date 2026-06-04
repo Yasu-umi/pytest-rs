@@ -12,6 +12,10 @@ pub enum Outcome {
     Passed,
     Failed,
     Skipped,
+    /// Failed under @pytest.mark.xfail (expected).
+    XFailed,
+    /// Passed despite @pytest.mark.xfail.
+    XPassed,
 }
 
 #[derive(Debug)]
@@ -31,6 +35,8 @@ impl TestReport {
             (Phase::Call, Outcome::Passed) => Some('.'),
             (_, Outcome::Failed) => Some(if self.phase == Phase::Call { 'F' } else { 'E' }),
             (_, Outcome::Skipped) => Some('s'),
+            (_, Outcome::XFailed) => Some('x'),
+            (_, Outcome::XPassed) => Some('X'),
             _ => None,
         }
     }

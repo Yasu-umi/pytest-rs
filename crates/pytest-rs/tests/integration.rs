@@ -463,3 +463,52 @@ def test_request_node(request):
         "done"
     );
 }
+
+#[test]
+fn skipif_and_xfail_marks() {
+    let suite = TempSuite::new("skipif-xfail");
+    suite.write(
+        "test_sx.py",
+        r#"
+import sys
+import pytest
+
+@pytest.mark.skipif(sys.platform == "nowhere", reason="never true")
+def test_runs():
+    assert True
+
+@pytest.mark.skipif("sys.platform != 'nowhere'", reason="string condition")
+def test_skipped_by_string():
+    raise AssertionError
+
+@pytest.mark.xfail(reason="known bug")
+def test_xfail():
+    assert False
+
+@pytest.mark.xfail
+def test_xpass():
+    assert True
+
+def test_imperative_xfail():
+    pytest.xfail("not implemented")
+"#,
+    );
+    let output = suite.run(&["-v"]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(out.contains("test_sx.py::test_runs PASSED"), "out: {out}");
+    assert!(
+        out.contains("test_sx.py::test_skipped_by_string SKIPPED"),
+        "out: {out}"
+    );
+    assert!(out.contains("test_sx.py::test_xfail XFAIL"), "out: {out}");
+    assert!(out.contains("test_sx.py::test_xpass XPASS"), "out: {out}");
+    assert!(
+        out.contains("test_sx.py::test_imperative_xfail XFAIL"),
+        "out: {out}"
+    );
+    assert!(
+        out.contains("1 passed, 1 skipped, 2 xfailed, 1 xpassed"),
+        "out: {out}"
+    );
+}

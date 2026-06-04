@@ -61,6 +61,8 @@ impl Engine {
                         Outcome::Passed => "PASSED",
                         Outcome::Failed => "FAILED",
                         Outcome::Skipped => "SKIPPED",
+                        Outcome::XFailed => "XFAIL",
+                        Outcome::XPassed => "XPASS",
                     };
                     if report.phase == Phase::Call || report.outcome != Outcome::Passed {
                         println!("{} {}", item.nodeid, word);
@@ -101,15 +103,8 @@ fn run_one(
 ) -> Vec<TestReport> {
     let mut reports = Vec::new();
 
-    // @pytest.mark.skip
-    if let Some(mark) = item.get_closest_marker("skip") {
-        let reason: String = mark
-            .obj
-            .bind(py)
-            .getattr("kwargs")
-            .and_then(|kw| kw.get_item("reason"))
-            .and_then(|r| r.extract())
-            .unwrap_or_default();
+    // @pytest.mark.skip / @pytest.mark.skipif
+    if let Some(reason) = skip_reason(py, item) {
         reports.push(TestReport {
             nodeid: item.nodeid.clone(),
             phase: Phase::Setup,
@@ -119,6 +114,7 @@ fn run_one(
         });
         return reports;
     }
+    let xfail = item.get_closest_marker("xfail").is_some();
 
     // ---- setup -----------------------------------------------------------
     let setup_started = Instant::now();
@@ -266,6 +262,22 @@ fn run_one(
             }
         }
         Err(err) => report_from_err(py, item, Phase::Call, call_started, &err),
+    };
+    // @pytest.mark.xfail: expected failures invert at the call phase.
+    let report = if xfail {
+        match report.outcome {
+            Outcome::Failed => TestReport {
+                outcome: Outcome::XFailed,
+                ..report
+            },
+            Outcome::Passed => TestReport {
+                outcome: Outcome::XPassed,
+                ..report
+            },
+            _ => report,
+        }
+    } else {
+        report
     };
     reports.push(report);
 
@@ -527,6 +539,39 @@ fn resolve_fixture(
     Ok(value)
 }
 
+/// The skip reason for an item, from @pytest.mark.skip or a true
+/// @pytest.mark.skipif condition.
+fn skip_reason(py: Python<'_>, item: &TestItem) -> Option<String> {
+    let mark_reason = |mark: &crate::collect::MarkData| -> String {
+        mark.obj
+            .bind(py)
+            .getattr("kwargs")
+            .and_then(|kwargs| kwargs.get_item("reason"))
+            .and_then(|reason| reason.extract())
+            .unwrap_or_default()
+    };
+    if let Some(mark) = item.get_closest_marker("skip") {
+        return Some(mark_reason(mark));
+    }
+    for mark in item.marks.iter().filter(|m| m.name == "skipif") {
+        let Ok(args) = mark.obj.bind(py).getattr("args") else {
+            continue;
+        };
+        let Ok(iter) = args.try_iter() else { continue };
+        for condition in iter.flatten() {
+            let truthy = match condition.extract::<String>() {
+                // String conditions evaluate in the test module's namespace.
+                Ok(expr) => python::eval_in_module(py, &item.module_name, &expr).unwrap_or(true),
+                Err(_) => condition.is_truthy().unwrap_or(false),
+            };
+            if truthy {
+                return Some(mark_reason(mark));
+            }
+        }
+    }
+    None
+}
+
 fn report_from_err(
     py: Python<'_>,
     item: &TestItem,
@@ -534,7 +579,15 @@ fn report_from_err(
     started: Instant,
     err: &PyErr,
 ) -> TestReport {
-    if python::is_skipped(py, err) {
+    if python::is_xfailed(py, err) {
+        TestReport {
+            nodeid: item.nodeid.clone(),
+            phase,
+            outcome: Outcome::XFailed,
+            duration: started.elapsed(),
+            longrepr: python::outcome_msg(py, err),
+        }
+    } else if python::is_skipped(py, err) {
         TestReport {
             nodeid: item.nodeid.clone(),
             phase,
@@ -558,12 +611,16 @@ pub fn summary_line(reports: &[TestReport], elapsed: Duration) -> String {
     let mut failed = 0usize;
     let mut errors = 0usize;
     let mut skipped = 0usize;
+    let mut xfailed = 0usize;
+    let mut xpassed = 0usize;
     for report in reports {
         match (report.phase, report.outcome) {
             (Phase::Call, Outcome::Passed) => passed += 1,
             (Phase::Call, Outcome::Failed) => failed += 1,
             (Phase::Call, Outcome::Skipped) | (Phase::Setup, Outcome::Skipped) => skipped += 1,
             (Phase::Setup, Outcome::Failed) | (Phase::Teardown, Outcome::Failed) => errors += 1,
+            (_, Outcome::XFailed) => xfailed += 1,
+            (_, Outcome::XPassed) => xpassed += 1,
             _ => {}
         }
     }
@@ -576,6 +633,12 @@ pub fn summary_line(reports: &[TestReport], elapsed: Duration) -> String {
     }
     if skipped > 0 {
         parts.push(format!("{skipped} skipped"));
+    }
+    if xfailed > 0 {
+        parts.push(format!("{xfailed} xfailed"));
+    }
+    if xpassed > 0 {
+        parts.push(format!("{xpassed} xpassed"));
     }
     if errors > 0 {
         parts.push(format!(
