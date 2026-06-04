@@ -6,7 +6,7 @@
 use std::path::{Path, PathBuf};
 
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyModule, PyTuple};
+use pyo3::types::{PyDict, PyList, PyModule};
 
 use crate::collect::{MarkData, TestItem, file_nodeid, module_name_for};
 use crate::fixture::{FixtureDef, FixtureRegistry, Scope};
@@ -211,7 +211,8 @@ fn introspect_namespace(
             }
             continue;
         }
-        if !name.starts_with("test_")
+        // pytest default python_functions = "test*"
+        if !name.starts_with("test")
             || !value.is_callable()
             || value.hasattr("_pytestfixturefunction")?
         {
@@ -282,7 +283,7 @@ fn collect_class(
             )?;
             continue;
         }
-        if !name.starts_with("test_") {
+        if !name.starts_with("test") {
             continue;
         }
         let mut marks = read_marks(py, &value)?;
@@ -817,7 +818,9 @@ pub fn call_with_kwargs<'py>(
 }
 
 /// Call a fixture/test function, prepending the test class instance as
-/// `self` when the definition lives inside a Test* class.
+/// `self` when the definition lives inside a Test* class. Calls run in the
+/// current item's contextvars context (pytest._ctx) so vars set by
+/// fixtures propagate into the test.
 pub fn call_fixture<'py>(
     py: Python<'py>,
     func: &Py<PyAny>,
@@ -828,16 +831,31 @@ pub fn call_fixture<'py>(
     for (name, value) in kwargs {
         dict.set_item(name, value.bind(py))?;
     }
+    let call = py.import("pytest._ctx")?.getattr("call")?;
     match instance {
-        Some(instance) => func.bind(py).call((instance.bind(py),), Some(&dict)),
-        None => func.bind(py).call(PyTuple::empty(py), Some(&dict)),
+        Some(instance) => call.call((func.bind(py), instance.bind(py)), Some(&dict)),
+        None => call.call((func.bind(py),), Some(&dict)),
     }
 }
 
+/// Begin/end the per-item contextvars context.
+pub fn begin_item_context(py: Python<'_>) -> PyResult<()> {
+    py.import("pytest._ctx")?.call_method0("begin_item")?;
+    Ok(())
+}
+
+pub fn end_item_context(py: Python<'_>) {
+    let _ = py
+        .import("pytest._ctx")
+        .and_then(|m| m.call_method0("end_item"));
+}
+
 /// Resume a suspended sync generator fixture, expecting StopIteration.
+/// Runs in the item context so contextvar tokens reset cleanly.
 pub fn finalize_generator(py: Python<'_>, generator: &Py<PyAny>) -> PyResult<()> {
-    let builtins = py.import("builtins")?;
-    match builtins.getattr("next")?.call1((generator.bind(py),)) {
+    let next_fn = py.import("builtins")?.getattr("next")?;
+    let call = py.import("pytest._ctx")?.getattr("call")?;
+    match call.call1((next_fn, generator.bind(py))) {
         Ok(_) => Err(pyo3::exceptions::PyRuntimeError::new_err(
             "fixture generator yielded more than once",
         )),
@@ -847,9 +865,13 @@ pub fn finalize_generator(py: Python<'_>, generator: &Py<PyAny>) -> PyResult<()>
 }
 
 /// Advance a generator fixture to its first yield, returning the value.
+/// Runs in the item context so contextvars set before the yield propagate.
 pub fn next_value<'py>(
     py: Python<'py>,
     generator: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    py.import("builtins")?.getattr("next")?.call1((generator,))
+    let next_fn = py.import("builtins")?.getattr("next")?;
+    py.import("pytest._ctx")?
+        .getattr("call")?
+        .call1((next_fn, generator))
 }

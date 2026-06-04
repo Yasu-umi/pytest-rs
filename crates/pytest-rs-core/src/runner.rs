@@ -116,6 +116,18 @@ fn run_one(
     }
     let xfail = item.get_closest_marker("xfail").is_some();
 
+    // One contextvars context per item: fixtures + test share it.
+    if let Err(err) = python::begin_item_context(py) {
+        reports.push(report_from_err(
+            py,
+            item,
+            Phase::Setup,
+            Instant::now(),
+            &err,
+        ));
+        return reports;
+    }
+
     // ---- setup -----------------------------------------------------------
     let setup_started = Instant::now();
     type SetupOk = (
@@ -194,6 +206,7 @@ fn run_one(
         Err(err) => {
             reports.push(report_from_err(py, item, Phase::Setup, setup_started, &err));
             teardown_one(py, plugins, session, config, item, &mut reports);
+            python::end_item_context(py);
             return reports;
         }
     };
@@ -286,6 +299,7 @@ fn run_one(
     }
 
     teardown_one(py, plugins, session, config, item, &mut reports);
+    python::end_item_context(py);
     reports
 }
 

@@ -18,17 +18,29 @@ def close_loop(loop):
 
 
 def run(loop, coro):
-    return loop.run_until_complete(coro)
+    """Drive a coroutine in the item's contextvars context.
+
+    The task is created with the *same* Context object (not a copy) so
+    contextvars set inside async fixtures/tests propagate back to sync
+    fixtures and vice versa.
+    """
+    import pytest._ctx as _ctx
+
+    ctx = _ctx.current()
+    if ctx is None:
+        return loop.run_until_complete(coro)
+    task = loop.create_task(coro, context=ctx)
+    return loop.run_until_complete(task)
 
 
 def async_gen_first(loop, agen):
-    return loop.run_until_complete(agen.__anext__())
+    return run(loop, agen.__anext__())
 
 
 def async_gen_finalizer(loop, agen):
     def _finalize():
         try:
-            loop.run_until_complete(agen.__anext__())
+            run(loop, agen.__anext__())
         except StopAsyncIteration:
             pass
         else:
