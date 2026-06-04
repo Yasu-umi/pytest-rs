@@ -31,7 +31,7 @@ impl Engine {
             eprintln!("INTERNAL ERROR: failed to install pytest shim: {err}");
             return exit_code::INTERNAL_ERROR;
         }
-        if let Err(err) = python::apply_warning_filters(py, &self.config.w_options) {
+        if let Err(err) = python::install_warning_capture(py, &self.config.w_options) {
             eprintln!("ERROR: invalid -W option: {}", err.value(py));
             return exit_code::USAGE_ERROR;
         }
@@ -91,7 +91,11 @@ impl Engine {
         if n_items == 0 {
             println!(
                 "{}",
-                crate::runner::summary_line(&self.session.reports, started.elapsed())
+                crate::runner::summary_line(
+                    &self.session.reports,
+                    python::warning_count(py),
+                    started.elapsed()
+                )
             );
             return exit_code::NO_TESTS_COLLECTED;
         }
@@ -120,9 +124,16 @@ impl Engine {
         if let Err(err) = self.print_plugin_summaries(py) {
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
         }
+        let warning_count = python::warning_count(py);
+        if warning_count > 0 && !self.config.quiet {
+            println!("{}", center_banner("warnings summary"));
+            for line in python::warning_summary_lines(py) {
+                println!("{line}");
+            }
+        }
         println!(
             "{}",
-            crate::runner::summary_line(&self.session.reports, started.elapsed())
+            crate::runner::summary_line(&self.session.reports, warning_count, started.elapsed())
         );
         code
     }

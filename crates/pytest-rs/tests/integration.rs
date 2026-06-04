@@ -672,3 +672,44 @@ async def test_async():
     assert_eq!(output.status.code(), Some(0), "out: {out}");
     assert!(out.contains("1 skipped"), "out: {out}");
 }
+
+#[test]
+fn warnings_captured_and_counted() {
+    let suite = TempSuite::new("warnings");
+    suite.write(
+        "test_w.py",
+        r#"
+import warnings
+
+def test_warns_once():
+    warnings.warn("legacy api", DeprecationWarning)
+
+def test_clean():
+    assert True
+"#,
+    );
+    let output = suite.run(&[]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(out.contains("warnings summary"), "out: {out}");
+    assert!(out.contains("DeprecationWarning: legacy api"), "out: {out}");
+    assert!(out.contains("2 passed, 1 warning"), "out: {out}");
+}
+
+#[test]
+fn w_error_turns_warning_into_failure() {
+    let suite = TempSuite::new("werror");
+    suite.write(
+        "test_we.py",
+        r#"
+import warnings
+
+def test_warns():
+    warnings.warn("boom", UserWarning)
+"#,
+    );
+    let output = suite.run(&["-W", "error"]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(1), "out: {out}");
+    assert!(out.contains("1 failed"), "out: {out}");
+}

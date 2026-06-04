@@ -29,6 +29,9 @@ pub struct AsyncioPlugin {
     /// Event loops cached per (loop scope, scope instance key).
     loops: RefCell<HashMap<(Scope, String), Py<PyAny>>>,
     current_module: RefCell<Option<String>>,
+    /// asyncio_default_fixture_loop_scope / asyncio_default_test_loop_scope.
+    default_fixture_loop_scope: Option<Scope>,
+    default_test_loop_scope: Option<Scope>,
 }
 
 impl AsyncioPlugin {
@@ -38,6 +41,8 @@ impl AsyncioPlugin {
             helper: None,
             loops: RefCell::new(HashMap::new()),
             current_module: RefCell::new(None),
+            default_fixture_loop_scope: None,
+            default_test_loop_scope: None,
         }
     }
 
@@ -92,11 +97,13 @@ impl AsyncioPlugin {
         });
         from_marker
             .and_then(|name| Scope::parse(&name))
+            .or(self.default_test_loop_scope)
             .unwrap_or(Scope::Function)
     }
 
     /// The loop scope of an async fixture: explicit loop_scope recorded by
-    /// pytest_asyncio.fixture, else the fixture's own scope.
+    /// pytest_asyncio.fixture, else the configured default, else the
+    /// fixture's own scope.
     fn fixture_loop_scope(&self, py: Python<'_>, def: &FixtureDef) -> Scope {
         def.func
             .bind(py)
@@ -104,6 +111,7 @@ impl AsyncioPlugin {
             .ok()
             .and_then(|scope| scope.extract::<String>().ok())
             .and_then(|name| Scope::parse(&name))
+            .or(self.default_fixture_loop_scope)
             .unwrap_or(def.scope)
     }
 
@@ -149,6 +157,32 @@ impl Plugin for AsyncioPlugin {
                 ));
             }
         };
+        for (ini_key, slot) in [
+            (
+                "asyncio_default_fixture_loop_scope",
+                &mut self.default_fixture_loop_scope,
+            ),
+            (
+                "asyncio_default_test_loop_scope",
+                &mut self.default_test_loop_scope,
+            ),
+        ] {
+            if let Some(value) = ctx.config.get_ini(ini_key) {
+                match Scope::parse(value) {
+                    Some(scope) => *slot = Some(scope),
+                    None => {
+                        return Err(pytest_rs_core::python::usage_error(
+                            ctx.py,
+                            &format!(
+                                "'{value}' is not a valid {ini_key}. \
+                                 Valid scopes: function, class, module, package, session."
+                            ),
+                        ));
+                    }
+                }
+            }
+        }
+
         let module = PyModule::from_code(
             ctx.py,
             CString::new(HELPER)?.as_c_str(),

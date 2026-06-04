@@ -599,7 +599,7 @@ fn report_from_err(
     }
 }
 
-pub fn summary_line(reports: &[TestReport], elapsed: Duration) -> String {
+pub fn summary_line(reports: &[TestReport], warning_count: usize, elapsed: Duration) -> String {
     let mut passed = 0usize;
     let mut failed = 0usize;
     let mut errors = 0usize;
@@ -632,6 +632,12 @@ pub fn summary_line(reports: &[TestReport], elapsed: Duration) -> String {
     }
     if xpassed > 0 {
         parts.push(format!("{xpassed} xpassed"));
+    }
+    if warning_count > 0 {
+        parts.push(format!(
+            "{warning_count} warning{}",
+            if warning_count == 1 { "" } else { "s" }
+        ));
     }
     if errors > 0 {
         parts.push(format!(

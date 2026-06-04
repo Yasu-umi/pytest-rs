@@ -720,15 +720,32 @@ pub fn eval_in_module(py: Python<'_>, module_name: &str, expr: &str) -> PyResult
     py.eval(code.as_c_str(), Some(&globals), None)?.is_truthy()
 }
 
-/// Apply -W warning filter specs (same syntax as python -W).
-pub fn apply_warning_filters(py: Python<'_>, specs: &[String]) -> PyResult<()> {
-    if specs.is_empty() {
-        return Ok(());
+/// Install session-wide warning capture (pytest default filters), then
+/// apply -W warning filter specs (same syntax as python -W) on top.
+pub fn install_warning_capture(py: Python<'_>, specs: &[String]) -> PyResult<()> {
+    py.import("pytest._wcapture")?.call_method0("install")?;
+    if !specs.is_empty() {
+        let warnings = py.import("warnings")?;
+        // warnings._processoptions implements exactly python -W parsing.
+        warnings.call_method1("_processoptions", (specs.to_vec(),))?;
     }
-    let warnings = py.import("warnings")?;
-    // warnings._processoptions implements exactly python -W parsing.
-    warnings.call_method1("_processoptions", (specs.to_vec(),))?;
     Ok(())
+}
+
+/// Number of warnings captured so far in this session.
+pub fn warning_count(py: Python<'_>) -> usize {
+    py.import("pytest._wcapture")
+        .and_then(|m| m.call_method0("count"))
+        .and_then(|count| count.extract())
+        .unwrap_or(0)
+}
+
+/// Formatted lines for the warnings summary section.
+pub fn warning_summary_lines(py: Python<'_>) -> Vec<String> {
+    py.import("pytest._wcapture")
+        .and_then(|m| m.call_method0("summary_lines"))
+        .and_then(|lines| lines.extract())
+        .unwrap_or_default()
 }
 
 /// Construct a pytest.UsageError as a PyErr.
