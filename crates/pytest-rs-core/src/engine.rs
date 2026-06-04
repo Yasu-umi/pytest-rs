@@ -282,6 +282,13 @@ impl Engine {
                 errors.push((file.clone(), python::format_exception(py, &err)));
             }
         }
+
+        // Expand items over parametrized fixtures in their closure.
+        let items = std::mem::take(&mut self.session.items);
+        match python::expand_fixture_params(py, items, &self.session.registry) {
+            Ok(expanded) => self.session.items = expanded,
+            Err(err) => return Err(python::format_exception(py, &err)),
+        }
         Ok(errors)
     }
 }

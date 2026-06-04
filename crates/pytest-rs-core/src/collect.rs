@@ -28,6 +28,8 @@ pub struct TestItem {
     pub marks: Vec<MarkData>,
     /// Direct parameters from @pytest.mark.parametrize, by argname.
     pub callspec: Vec<(String, Py<PyAny>)>,
+    /// Parametrized-fixture assignments: (fixture name, param index, value).
+    pub fixture_params: Vec<(String, usize, Py<PyAny>)>,
 }
 
 impl TestItem {

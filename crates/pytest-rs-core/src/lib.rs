@@ -5,6 +5,7 @@ pub mod fixture;
 pub mod hooks;
 pub mod python;
 pub mod report;
+pub mod request;
 pub mod runner;
 pub mod session;
 

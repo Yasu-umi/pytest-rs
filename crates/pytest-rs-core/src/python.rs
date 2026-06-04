@@ -276,6 +276,7 @@ fn push_test_items(
             fixture_names: fixture_names.clone(),
             marks: item_marks,
             callspec: variant.params,
+            fixture_params: Vec::new(),
         });
     }
     Ok(())
@@ -490,6 +491,12 @@ pub(crate) fn register_fixture_def(
     if needs_instance && param_names.first().map(String::as_str) == Some("self") {
         param_names.remove(0);
     }
+    let params_obj = marker.getattr("params")?;
+    let params = if params_obj.is_none() {
+        None
+    } else {
+        Some(params_obj.unbind())
+    };
     registry.register(FixtureDef {
         name,
         func: value.clone().unbind(),
@@ -501,8 +508,95 @@ pub(crate) fn register_fixture_def(
         param_names,
         baseid: baseid.to_string(),
         needs_instance,
+        params,
     });
     Ok(())
+}
+
+/// Expand items over parametrized fixtures in their closure: an item using
+/// a fixture with `params=[...]` becomes one item per param value, with the
+/// param id appended to the nodeid.
+pub fn expand_fixture_params(
+    py: Python<'_>,
+    items: Vec<TestItem>,
+    registry: &FixtureRegistry,
+) -> PyResult<Vec<TestItem>> {
+    let mut expanded = Vec::new();
+    for item in items {
+        let parametrized: Vec<_> = registry
+            .closure_for(&item.nodeid, &item.fixture_names)
+            .into_iter()
+            .filter(|def| def.params.is_some())
+            .collect();
+        if parametrized.is_empty() {
+            expanded.push(item);
+            continue;
+        }
+
+        // Cartesian product over each parametrized fixture's values.
+        let mut variants: Vec<(String, Vec<(String, usize, Py<PyAny>)>)> =
+            vec![(String::new(), Vec::new())];
+        for def in &parametrized {
+            let values: Vec<Bound<'_, PyAny>> = def
+                .params
+                .as_ref()
+                .expect("filtered to Some above")
+                .bind(py)
+                .try_iter()?
+                .collect::<PyResult<_>>()?;
+            let mut next = Vec::new();
+            for (id, assignments) in &variants {
+                for (index, value) in values.iter().enumerate() {
+                    let part = id_for_value(value, &def.name, index);
+                    let id = if id.is_empty() {
+                        part
+                    } else {
+                        format!("{id}-{part}")
+                    };
+                    let mut assignments = assignments
+                        .iter()
+                        .map(|(n, i, v)| (n.clone(), *i, v.clone_ref(py)))
+                        .collect::<Vec<_>>();
+                    assignments.push((def.name.clone(), index, value.clone().unbind()));
+                    next.push((id, assignments));
+                }
+            }
+            variants = next;
+        }
+
+        for (id, assignments) in variants {
+            let nodeid = if item.nodeid.ends_with(']') {
+                format!("{}-{id}]", &item.nodeid[..item.nodeid.len() - 1])
+            } else {
+                format!("{}[{id}]", item.nodeid)
+            };
+            expanded.push(TestItem {
+                nodeid,
+                path: item.path.clone(),
+                module_name: item.module_name.clone(),
+                func_name: item.func_name.clone(),
+                func: item.func.clone_ref(py),
+                cls: item.cls.as_ref().map(|c| c.clone_ref(py)),
+                is_coroutine: item.is_coroutine,
+                fixture_names: item.fixture_names.clone(),
+                marks: item
+                    .marks
+                    .iter()
+                    .map(|m| MarkData {
+                        name: m.name.clone(),
+                        obj: m.obj.clone_ref(py),
+                    })
+                    .collect(),
+                callspec: item
+                    .callspec
+                    .iter()
+                    .map(|(n, v)| (n.clone(), v.clone_ref(py)))
+                    .collect(),
+                fixture_params: assignments,
+            });
+        }
+    }
+    Ok(expanded)
 }
 
 fn read_marks(py: Python<'_>, func: &Bound<'_, PyAny>) -> PyResult<Vec<MarkData>> {

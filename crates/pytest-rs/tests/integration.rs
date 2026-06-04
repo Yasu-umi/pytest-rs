@@ -418,3 +418,48 @@ class TestWithInit:
     );
     assert!(out.contains("4 passed"), "out: {out}");
 }
+
+#[test]
+fn fixture_params_and_request() {
+    let suite = TempSuite::new("fixparams");
+    suite.write(
+        "test_fp.py",
+        r#"
+import pytest
+
+@pytest.fixture(params=[1, 2, 3])
+def number(request):
+    return request.param
+
+def test_number(number):
+    assert number in (1, 2, 3)
+
+@pytest.fixture
+def with_finalizer(request):
+    request.addfinalizer(lambda: open("fin.txt", "w").write("done"))
+    return "v"
+
+def test_finalizer(with_finalizer):
+    assert with_finalizer == "v"
+
+def test_request_node(request):
+    assert "test_request_node" in request.node.nodeid
+"#,
+    );
+    let output = suite.run(&["-v"]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(
+        out.contains("test_fp.py::test_number[1] PASSED"),
+        "out: {out}"
+    );
+    assert!(
+        out.contains("test_fp.py::test_number[3] PASSED"),
+        "out: {out}"
+    );
+    assert!(out.contains("5 passed"), "out: {out}");
+    assert_eq!(
+        std::fs::read_to_string(suite.path().join("fin.txt")).unwrap(),
+        "done"
+    );
+}

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use pyo3::prelude::*;
@@ -43,6 +43,9 @@ pub struct FixtureDef {
     pub baseid: String,
     /// Defined inside a Test* class: call with the test instance as `self`.
     pub needs_instance: bool,
+    /// @pytest.fixture(params=[...]) values; items using this fixture are
+    /// expanded per param at collection time.
+    pub params: Option<Py<PyAny>>,
 }
 
 /// All fixture definitions visible in this session, name -> defs ordered
@@ -69,6 +72,29 @@ impl FixtureRegistry {
                 .find(|def| nodeid.starts_with(&def.baseid))
                 .cloned()
         })
+    }
+
+    /// The transitive fixture closure for an item: requested names plus
+    /// autouse, following dependencies, deduped, in discovery order.
+    pub fn closure_for(&self, nodeid: &str, requested: &[String]) -> Vec<Arc<FixtureDef>> {
+        let mut seen: HashSet<String> = HashSet::new();
+        let mut ordered: Vec<Arc<FixtureDef>> = Vec::new();
+        let mut queue: Vec<String> = Vec::new();
+        for def in self.autouse_for(nodeid) {
+            queue.push(def.name.clone());
+        }
+        queue.extend(requested.iter().cloned());
+        while let Some(name) = queue.pop() {
+            if name == "request" || !seen.insert(name.clone()) {
+                continue;
+            }
+            if let Some(def) = self.lookup(&name, nodeid) {
+                queue.extend(def.param_names.iter().cloned());
+                ordered.push(def);
+            }
+        }
+        ordered.sort_by(|a, b| a.name.cmp(&b.name));
+        ordered
     }
 
     /// Autouse fixtures visible from `nodeid`, most general first.

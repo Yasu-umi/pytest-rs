@@ -122,7 +122,11 @@ fn run_one(
 
     // ---- setup -----------------------------------------------------------
     let setup_started = Instant::now();
-    type SetupOk = (Py<PyAny>, Vec<(String, Py<PyAny>)>);
+    type SetupOk = (
+        Py<PyAny>,
+        Vec<(String, Py<PyAny>)>,
+        Option<Py<crate::request::PyRequest>>,
+    );
     let setup_result = (|| -> PyResult<SetupOk> {
         {
             let mut ctx = HookContext {
@@ -159,8 +163,23 @@ fn run_one(
             )?;
         }
         let mut kwargs = Vec::new();
+        let mut test_request: Option<Py<crate::request::PyRequest>> = None;
         for name in &item.fixture_names {
             if item.callspec.iter().any(|(param, _)| param == name) {
+                continue;
+            }
+            if name == "request" {
+                let req = Py::new(
+                    py,
+                    crate::request::PyRequest::new(
+                        None,
+                        item.nodeid.clone(),
+                        item.func_name.clone(),
+                        None,
+                    ),
+                )?;
+                kwargs.push((name.clone(), req.clone_ref(py).into_any()));
+                test_request = Some(req);
                 continue;
             }
             let value = resolve_fixture(
@@ -178,10 +197,10 @@ fn run_one(
         for (name, value) in &item.callspec {
             kwargs.push((name.clone(), value.clone_ref(py)));
         }
-        Ok((callable, kwargs))
+        Ok((callable, kwargs, test_request))
     })();
 
-    let (callable, kwargs) = match setup_result {
+    let (callable, kwargs, test_request) = match setup_result {
         Ok(setup) => setup,
         Err(err) => {
             reports.push(report_from_err(py, item, Phase::Setup, setup_started, &err));
@@ -249,6 +268,17 @@ fn run_one(
         Err(err) => report_from_err(py, item, Phase::Call, call_started, &err),
     };
     reports.push(report);
+
+    // Finalizers added via the test's own `request` run at function teardown.
+    if let Some(request) = &test_request {
+        for finalizer in request.borrow(py).take_finalizers() {
+            session.finalizers.push(PendingFinalizer {
+                scope: Scope::Function,
+                instance: item.nodeid.clone(),
+                finalizer: Finalizer::Callable(finalizer),
+            });
+        }
+    }
 
     teardown_one(py, plugins, session, config, item, &mut reports);
     reports
@@ -341,7 +371,7 @@ fn teardown_scope(
     }
     session
         .fixture_cache
-        .retain(|(_, inst), _| inst != instance);
+        .retain(|(_, inst, _), _| inst != instance);
     errors
 }
 
@@ -375,19 +405,39 @@ fn resolve_fixture(
         Scope::Module | Scope::Package => item.module_instance(),
         Scope::Session => String::new(),
     };
-    let cache_key = (def.name.clone(), instance.clone());
+    // Parametrized fixtures cache per param index.
+    let fixture_param: Option<(usize, Py<PyAny>)> = item
+        .fixture_params
+        .iter()
+        .find(|(fixture, _, _)| fixture == &def.name)
+        .map(|(_, index, value)| (*index, value.clone_ref(py)));
+    let cache_key = (
+        def.name.clone(),
+        instance.clone(),
+        fixture_param.as_ref().map(|(index, _)| *index),
+    );
     if let Some(cached) = session.fixture_cache.get(&cache_key) {
         return Ok(cached.clone_ref(py));
     }
 
     stack.push(def.name.clone());
+    let mut request: Option<Py<crate::request::PyRequest>> = None;
     let deps_result = (|| -> PyResult<Vec<(String, Py<PyAny>)>> {
         let mut kwargs = Vec::new();
         for dep in &def.param_names {
             if dep == "request" {
-                return Err(pyo3::exceptions::PyRuntimeError::new_err(
-                    "the 'request' fixture is not supported yet",
-                ));
+                let req = Py::new(
+                    py,
+                    crate::request::PyRequest::new(
+                        fixture_param.as_ref().map(|(_, value)| value.clone_ref(py)),
+                        item.nodeid.clone(),
+                        item.func_name.clone(),
+                        Some(def.name.clone()),
+                    ),
+                )?;
+                kwargs.push((dep.clone(), req.clone_ref(py).into_any()));
+                request = Some(req);
+                continue;
             }
             let value = resolve_fixture(
                 py,
@@ -455,6 +505,17 @@ fn resolve_fixture(
         }
     };
 
+    // Finalizers registered through request.addfinalizer run at this
+    // fixture's scope teardown, LIFO.
+    if let Some(request) = &request {
+        for finalizer in request.borrow(py).take_finalizers() {
+            session.finalizers.push(PendingFinalizer {
+                scope: def.scope,
+                instance: instance.clone(),
+                finalizer: Finalizer::Callable(finalizer),
+            });
+        }
+    }
     if let Some(finalizer) = finalizer {
         session.finalizers.push(PendingFinalizer {
             scope: def.scope,
