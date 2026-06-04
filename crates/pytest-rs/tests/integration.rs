@@ -512,3 +512,58 @@ def test_imperative_xfail():
         "out: {out}"
     );
 }
+
+#[test]
+fn builtin_fixtures_tmp_path_monkeypatch() {
+    let suite = TempSuite::new("builtins");
+    suite.write(
+        "test_builtin.py",
+        r#"
+import os
+
+def test_tmp_path(tmp_path):
+    f = tmp_path / "x.txt"
+    f.write_text("hi")
+    assert f.read_text() == "hi"
+
+def test_monkeypatch_env(monkeypatch):
+    monkeypatch.setenv("PYTEST_RS_TEST_ENV", "yes")
+    assert os.environ["PYTEST_RS_TEST_ENV"] == "yes"
+
+def test_env_undone():
+    assert "PYTEST_RS_TEST_ENV" not in os.environ
+"#,
+    );
+    let output = suite.run(&[]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(out.contains("3 passed"), "out: {out}");
+}
+
+#[test]
+fn pytester_runs_nested_session() {
+    let suite = TempSuite::new("pytester");
+    suite.write(
+        "test_pt.py",
+        r#"
+def test_nested_run(pytester):
+    pytester.makepyfile(
+        """
+        def test_inner_pass():
+            assert True
+
+        def test_inner_fail():
+            assert False
+        """
+    )
+    result = pytester.runpytest()
+    assert result.ret == 1
+    result.assert_outcomes(passed=1, failed=1)
+    result.stdout.fnmatch_lines(["*1 failed, 1 passed*"])
+"#,
+    );
+    let output = suite.run(&["-v"]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(out.contains("1 passed"), "out: {out}");
+}

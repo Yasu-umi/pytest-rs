@@ -23,7 +23,21 @@ pub fn install_shim(py: Python<'_>) -> PyResult<PathBuf> {
     std::fs::write(pkg_dir.join("__init__.py"), PYTEST_SHIM)
         .map_err(|e| pyo3::exceptions::PyOSError::new_err(e.to_string()))?;
     sys_path_prepend(py, &shim_root)?;
+
+    // The pytester fixture spawns this binary to run nested sessions.
+    if let Ok(exe) = std::env::current_exe() {
+        py.import("os")?
+            .getattr("environ")?
+            .set_item("PYTEST_RS_EXE", exe.to_string_lossy())?;
+    }
     Ok(shim_root)
+}
+
+/// Register the shim's builtin fixtures (tmp_path, monkeypatch, pytester)
+/// with global visibility.
+pub fn register_builtin_fixtures(py: Python<'_>, registry: &mut FixtureRegistry) -> PyResult<()> {
+    let pytest_module = py.import("pytest")?;
+    register_fixtures_from(py, &pytest_module, "", registry)
 }
 
 pub fn sys_path_prepend(py: Python<'_>, path: &Path) -> PyResult<()> {

@@ -264,6 +264,9 @@ impl Engine {
         }
 
         let mut errors = Vec::new();
+        if let Err(err) = python::register_builtin_fixtures(py, &mut self.session.registry) {
+            return Err(python::format_exception(py, &err));
+        }
         for conftest in &conftests {
             if let Err(err) =
                 python::collect_conftest(py, &rootdir, conftest, &mut self.session.registry)

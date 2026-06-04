@@ -4,4 +4,8 @@
 [files]
 "tests/async_fixtures/test_async_fixtures.py" = "passed"
 "tests/async_fixtures/test_nested.py" = "passed"
+"tests/async_fixtures/test_shared_module_fixture.py" = "passed"
+"tests/test_asyncio_fixture.py" = "passed"
+"tests/test_package.py" = "passed"
 "tests/test_subprocess.py" = "passed"
+"tests/test_task_cleanup.py" = "passed"

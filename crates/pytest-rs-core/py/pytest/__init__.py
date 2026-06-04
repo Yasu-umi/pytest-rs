@@ -250,3 +250,337 @@ class _Approx:
 
 def approx(expected, rel=None, abs=None, nan_ok=False):
     return _Approx(expected, rel=rel, abs=abs)
+
+
+# ---------------------------------------------------------------------------
+# monkeypatch
+# ---------------------------------------------------------------------------
+
+
+class MonkeyPatch:
+    def __init__(self):
+        self._setattr = []
+        self._setitem = []
+        self._cwd = None
+        self._savesyspath = None
+
+    @classmethod
+    def context(cls):
+        import contextlib
+
+        @contextlib.contextmanager
+        def _context():
+            m = cls()
+            try:
+                yield m
+            finally:
+                m.undo()
+
+        return _context()
+
+    _notset = object()
+
+    def setattr(self, target, name, value=_notset, raising=True):
+        if isinstance(target, str):
+            # setattr("module.path.attr", value) form
+            import importlib
+
+            if value is self._notset:
+                value = name
+                module_path, _, name = target.rpartition(".")
+            else:
+                module_path, _, name = target.rpartition(".")
+            target = importlib.import_module(module_path)
+        elif value is self._notset:
+            raise TypeError("setattr requires a value when target is an object")
+        old = getattr(target, name, self._notset)
+        if raising and old is self._notset:
+            raise AttributeError(f"{target!r} has no attribute {name!r}")
+        self._setattr.append((target, name, old))
+        setattr(target, name, value)
+
+    def delattr(self, target, name=_notset, raising=True):
+        if isinstance(target, str):
+            import importlib
+
+            module_path, _, attr_name = target.rpartition(".")
+            target = importlib.import_module(module_path)
+            name = attr_name
+        old = getattr(target, name, self._notset)
+        if old is self._notset:
+            if raising:
+                raise AttributeError(name)
+            return
+        self._setattr.append((target, name, old))
+        delattr(target, name)
+
+    def setitem(self, mapping, name, value):
+        self._setitem.append((mapping, name, mapping.get(name, self._notset)))
+        mapping[name] = value
+
+    def delitem(self, mapping, name, raising=True):
+        if name not in mapping:
+            if raising:
+                raise KeyError(name)
+            return
+        self._setitem.append((mapping, name, mapping[name]))
+        del mapping[name]
+
+    def setenv(self, name, value, prepend=None):
+        import os
+
+        value = str(value)
+        if prepend and name in os.environ:
+            value = value + prepend + os.environ[name]
+        self.setitem(os.environ, name, value)
+
+    def delenv(self, name, raising=True):
+        import os
+
+        self.delitem(os.environ, name, raising=raising)
+
+    def syspath_prepend(self, path):
+        import sys
+
+        if self._savesyspath is None:
+            self._savesyspath = sys.path[:]
+        sys.path.insert(0, str(path))
+
+    def chdir(self, path):
+        import os
+
+        if self._cwd is None:
+            self._cwd = os.getcwd()
+        os.chdir(path)
+
+    def undo(self):
+        import os
+        import sys
+
+        for target, name, old in reversed(self._setattr):
+            if old is self._notset:
+                try:
+                    delattr(target, name)
+                except AttributeError:
+                    pass
+            else:
+                setattr(target, name, old)
+        self._setattr.clear()
+        for mapping, name, old in reversed(self._setitem):
+            if old is self._notset:
+                mapping.pop(name, None)
+            else:
+                mapping[name] = old
+        self._setitem.clear()
+        if self._savesyspath is not None:
+            sys.path[:] = self._savesyspath
+            self._savesyspath = None
+        if self._cwd is not None:
+            os.chdir(self._cwd)
+            self._cwd = None
+
+
+@fixture
+def monkeypatch():
+    m = MonkeyPatch()
+    yield m
+    m.undo()
+
+
+# ---------------------------------------------------------------------------
+# tmp_path
+# ---------------------------------------------------------------------------
+
+
+@fixture
+def tmp_path():
+    import pathlib
+    import shutil
+    import tempfile
+
+    path = pathlib.Path(tempfile.mkdtemp(prefix="pytest-rs-tmp-"))
+    yield path
+    shutil.rmtree(path, ignore_errors=True)
+
+
+# ---------------------------------------------------------------------------
+# pytester: run pytest-rs as a child process so upstream test suites can
+# exercise the runner itself.
+# ---------------------------------------------------------------------------
+
+_OUTCOME_RE = None
+_ANSI_RE = None
+
+
+def _outcome_regexes():
+    global _OUTCOME_RE, _ANSI_RE
+    if _OUTCOME_RE is None:
+        _OUTCOME_RE = _re.compile(
+            r"(\d+) (passed|failed|skipped|xfailed|xpassed|errors?|warnings?|deselected)"
+        )
+        _ANSI_RE = _re.compile(r"\x1b\[[0-9;]*m")
+    return _OUTCOME_RE, _ANSI_RE
+
+
+class LineMatcher:
+    def __init__(self, lines):
+        self.lines = lines
+
+    def __str__(self):
+        return "\n".join(self.lines)
+
+    def str(self):
+        return str(self)
+
+    def fnmatch_lines(self, patterns):
+        import fnmatch
+
+        if isinstance(patterns, str):
+            patterns = [patterns]
+        remaining = list(self.lines)
+        for pattern in patterns:
+            for index, line in enumerate(remaining):
+                if fnmatch.fnmatch(line, pattern):
+                    remaining = remaining[index + 1 :]
+                    break
+            else:
+                fail(f"fnmatch_lines: no line matches {pattern!r} in:\n{self}")
+
+    def no_fnmatch_line(self, pattern):
+        import fnmatch
+
+        for line in self.lines:
+            if fnmatch.fnmatch(line, pattern):
+                fail(f"no_fnmatch_line: unexpectedly matched {pattern!r}: {line!r}")
+
+
+class RunResult:
+    def __init__(self, ret, outlines, errlines, duration):
+        self.ret = ret
+        self.outlines = outlines
+        self.errlines = errlines
+        self.duration = duration
+        self.stdout = LineMatcher(outlines)
+        self.stderr = LineMatcher(errlines)
+
+    def parseoutcomes(self):
+        outcome_re, ansi_re = _outcome_regexes()
+        for line in reversed(self.outlines):
+            clean = ansi_re.sub("", line)
+            if clean.startswith("====") and " in " in clean:
+                found = {}
+                for count, key in outcome_re.findall(clean):
+                    found[key.rstrip("s") if key in ("errors", "warnings") else key] = int(count)
+                return found
+        return {}
+
+    def assert_outcomes(
+        self,
+        passed=0,
+        skipped=0,
+        failed=0,
+        errors=0,
+        xpassed=0,
+        xfailed=0,
+        warnings=None,
+        deselected=None,
+    ):
+        actual = self.parseoutcomes()
+        expected = {
+            "passed": passed,
+            "skipped": skipped,
+            "failed": failed,
+            "error": errors,
+            "xpassed": xpassed,
+            "xfailed": xfailed,
+        }
+        got = {key: actual.get(key, 0) for key in expected}
+        assert got == expected, f"assert_outcomes: expected {expected}, got {actual}"
+        if warnings is not None:
+            assert actual.get("warning", 0) == warnings
+        if deselected is not None:
+            assert actual.get("deselected", 0) == deselected
+
+
+class Pytester:
+    def __init__(self, path, request_name):
+        import pathlib
+
+        self.path = pathlib.Path(path)
+        self._name = request_name
+
+    def _makefile(self, ext, args, kwargs):
+        items = list(kwargs.items())
+        if args:
+            source = "\n".join(str(arg) for arg in args)
+            items.insert(0, (self._name, source))
+        paths = []
+        for basename, source in items:
+            import textwrap
+
+            path = self.path / (basename + ext)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(textwrap.dedent(str(source)).lstrip("\n"))
+            paths.append(path)
+        return paths[0] if len(paths) == 1 else paths
+
+    def makepyfile(self, *args, **kwargs):
+        return self._makefile(".py", args, kwargs)
+
+    def makeconftest(self, source):
+        return self._makefile(".py", [], {"conftest": source})
+
+    def maketxtfile(self, *args, **kwargs):
+        return self._makefile(".txt", args, kwargs)
+
+    def makeini(self, source):
+        return self._makefile(".ini", [], {"tox": source})
+
+    def makefile(self, ext, *args, **kwargs):
+        return self._makefile(ext, args, kwargs)
+
+    def mkdir(self, name):
+        path = self.path / name
+        path.mkdir()
+        return path
+
+    def runpytest(self, *args):
+        import os
+        import subprocess
+        import time
+
+        exe = os.environ.get("PYTEST_RS_EXE")
+        if exe is None:
+            fail("PYTEST_RS_EXE is not set; pytester cannot run the runner")
+        start = time.perf_counter()
+        proc = subprocess.run(
+            [exe, *[str(arg) for arg in args]],
+            cwd=self.path,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        duration = time.perf_counter() - start
+        _, ansi_re = _outcome_regexes()
+        outlines = [ansi_re.sub("", line) for line in proc.stdout.splitlines()]
+        errlines = [ansi_re.sub("", line) for line in proc.stderr.splitlines()]
+        return RunResult(proc.returncode, outlines, errlines, duration)
+
+    runpytest_subprocess = runpytest
+    runpytest_inprocess = runpytest
+
+
+@fixture
+def pytester(request):
+    import os
+    import re
+    import shutil
+    import tempfile
+
+    name = re.sub(r"\W", "_", request.node.name)
+    path = tempfile.mkdtemp(prefix="pytest-rs-pytester-")
+    old_cwd = os.getcwd()
+    os.chdir(path)
+    yield Pytester(path, name)
+    os.chdir(old_cwd)
+    shutil.rmtree(path, ignore_errors=True)

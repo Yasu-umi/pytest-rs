@@ -13,6 +13,7 @@ use pytest_rs_core::pyo3::types::PyModule;
 use pytest_rs_core::session::Finalizer;
 
 const HELPER: &str = include_str!("../py/helper.py");
+const PYTEST_ASYNCIO_SHIM: &str = include_str!("../py/pytest_asyncio_shim.py");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
@@ -97,6 +98,18 @@ impl Plugin for AsyncioPlugin {
             c"_pytest_rs_asyncio",
         )?;
         self.helper = Some(module.unbind());
+
+        // `import pytest_asyncio` in upstream suites resolves to our shim.
+        let shim = PyModule::from_code(
+            ctx.py,
+            CString::new(PYTEST_ASYNCIO_SHIM)?.as_c_str(),
+            c"pytest_rs_asyncio/pytest_asyncio_shim.py",
+            c"pytest_asyncio",
+        )?;
+        ctx.py
+            .import("sys")?
+            .getattr("modules")?
+            .set_item("pytest_asyncio", shim)?;
         Ok(())
     }
 
