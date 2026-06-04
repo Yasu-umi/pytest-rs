@@ -567,3 +567,41 @@ def test_nested_run(pytester):
     assert_eq!(output.status.code(), Some(0), "out: {out}");
     assert!(out.contains("1 passed"), "out: {out}");
 }
+
+#[test]
+fn assertion_rewriting_shows_values() {
+    let suite = TempSuite::new("rewrite");
+    suite.write(
+        "test_rw.py",
+        r#"
+def helper():
+    return 41
+
+def test_compare():
+    assert helper() == 42
+
+def test_with_message():
+    assert 1 + 1 == 3, "math is broken"
+
+def test_in():
+    assert "x" in ["a", "b"]
+
+def test_lineno_preserved():
+    # failure must point at the next line
+    value = None
+    assert value is not None
+"#,
+    );
+    let output = suite.run(&[]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(1), "out: {out}");
+    assert!(out.contains("assert 41 == 42"), "out: {out}");
+    assert!(out.contains("math is broken"), "out: {out}");
+    assert!(out.contains("assert 'x' in ['a', 'b']"), "out: {out}");
+    // traceback line number fidelity: `assert value is not None` is line 17
+    // (the file content starts with a blank line from the raw string).
+    assert!(
+        out.contains("line 17, in test_lineno_preserved"),
+        "out: {out}"
+    );
+}

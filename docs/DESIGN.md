@@ -78,10 +78,12 @@ Key structural rules:
    exactly like real pytest); the Rust engine introspects after import. Names are never trusted.
 3. **Import-based collection.** AST pre-scan is only a "should we import this file" fast path,
    never the source of truth (decorators are runtime constructs).
-4. **Assertion rewriting**: meta_path finder intercepts test-module loads → Rust parses with
-   ruff, rewrites `assert` statements into pytest-style explanations (statement-granular,
-   line-count preserving) → emits source text → CPython `compile()`. No CPython `ast` object
-   construction from Rust.
+4. **Assertion rewriting**: meta_path finder (`pytest/_rewrite.py` in the shim) intercepts
+   test-module loads and rewrites `assert` statements on the CPython ast
+   (`ast.NodeTransformer` + `copy_location`, a simplified port of pytest's AssertionRewriter),
+   then `compile()`s — line numbers stay exact. Rewriting happens once per module at import;
+   a Rust (ruff) transform was considered but source-text regeneration loses location fidelity,
+   so it stays a possible later optimization only if profiling shows import-time rewrite cost.
 5. **Fixture engine** ports pytest's `SetupState` model: scope keys
    (function/class/module/package/session), autouse ordering, LIFO finalizer stack, fixture
    params expanding items at collection time. This is the hardest correctness area — golden-test

@@ -12,6 +12,7 @@ use crate::collect::{MarkData, TestItem, file_nodeid, module_name_for};
 use crate::fixture::{FixtureDef, FixtureRegistry, Scope};
 
 const PYTEST_SHIM: &str = include_str!("../py/pytest/__init__.py");
+const REWRITE_SHIM: &str = include_str!("../py/pytest/_rewrite.py");
 
 /// Set up the embedded interpreter for a run: write the pytest shim package
 /// to a temp dir and prepend it to sys.path so `import pytest` resolves to us.
@@ -22,7 +23,12 @@ pub fn install_shim(py: Python<'_>) -> PyResult<PathBuf> {
         .map_err(|e| pyo3::exceptions::PyOSError::new_err(e.to_string()))?;
     std::fs::write(pkg_dir.join("__init__.py"), PYTEST_SHIM)
         .map_err(|e| pyo3::exceptions::PyOSError::new_err(e.to_string()))?;
+    std::fs::write(pkg_dir.join("_rewrite.py"), REWRITE_SHIM)
+        .map_err(|e| pyo3::exceptions::PyOSError::new_err(e.to_string()))?;
     sys_path_prepend(py, &shim_root)?;
+
+    // Assertion rewriting: rewrite `assert` in test modules at import time.
+    py.import("pytest._rewrite")?.call_method0("install")?;
 
     // The pytester fixture spawns this binary to run nested sessions.
     if let Ok(exe) = std::env::current_exe() {
