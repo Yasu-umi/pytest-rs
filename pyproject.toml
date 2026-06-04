@@ -1,0 +1,26 @@
+[project]
+name = "pytest-rs-dev"
+version = "0.0.0"
+description = "Dev tooling for pytest-rs (the runner itself is Rust)"
+requires-python = ">=3.13"
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15",
+    "mypy>=1.15",
+]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+extend-exclude = ["sample/.venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.13"
+files = ["crates/**/py/**/*.py"]
