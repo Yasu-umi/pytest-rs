@@ -23,6 +23,7 @@ class LineMatcher:
         return str(self)
 
     def fnmatch_lines(self, patterns):
+        __tracebackhide__ = True
         import fnmatch
 
         if isinstance(patterns, str):
@@ -37,6 +38,7 @@ class LineMatcher:
                 fail(f"fnmatch_lines: no line matches {pattern!r} in:\n{self}")
 
     def no_fnmatch_line(self, pattern):
+        __tracebackhide__ = True
         import fnmatch
 
         for line in self.lines:
@@ -74,6 +76,7 @@ class RunResult:
         warnings=None,
         deselected=None,
     ):
+        __tracebackhide__ = True
         actual = self.parseoutcomes()
         expected = {
             "passed": passed,

@@ -15,9 +15,7 @@ def _visible_frames(exc):
     tb = exc.__traceback__
     while tb is not None:
         frame = tb.tb_frame
-        hidden = frame.f_locals.get("__tracebackhide__") or frame.f_globals.get(
-            "__tracebackhide__"
-        )
+        hidden = frame.f_locals.get("__tracebackhide__") or frame.f_globals.get("__tracebackhide__")
         if not hidden:
             frames.append((frame, tb.tb_lineno))
         tb = tb.tb_next

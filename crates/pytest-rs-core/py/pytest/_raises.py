@@ -37,6 +37,7 @@ class RaisesContext:
         return self.excinfo
 
     def __exit__(self, exc_type, exc_value, tb):
+        __tracebackhide__ = True
         if exc_type is None:
             expected = getattr(self.expected_exception, "__name__", str(self.expected_exception))
             fail(f"DID NOT RAISE {expected}")

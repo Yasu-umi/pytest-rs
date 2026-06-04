@@ -67,6 +67,7 @@ class WarningsChecker(WarningsRecorder):
         self.match_expr = match_expr
 
     def __exit__(self, exc_type, exc_value, tb):
+        __tracebackhide__ = True
         suppressed = super().__exit__(exc_type, exc_value, tb)
         if exc_type is not None:
             return suppressed

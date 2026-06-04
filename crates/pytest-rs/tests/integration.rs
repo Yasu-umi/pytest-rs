@@ -763,3 +763,47 @@ def test_c():
     let pos_a = out.find("test_hooks.py::test_a").unwrap();
     assert!(pos_b < pos_a, "expected b before a, out: {out}");
 }
+
+#[test]
+fn unittest_testcase_collection() {
+    let suite = TempSuite::new("unittest");
+    suite.write(
+        "test_ut.py",
+        r#"
+import unittest
+
+class ThingTest(unittest.TestCase):
+    def setUp(self):
+        self.value = 41
+
+    def test_passes(self):
+        self.assertEqual(self.value + 1, 42)
+
+    def test_fails(self):
+        self.assertEqual(self.value, 0)
+
+    @unittest.skip("not now")
+    def test_skipped(self):
+        raise AssertionError
+
+    def test_skiptest_inside(self):
+        raise unittest.SkipTest("dynamic skip")
+"#,
+    );
+    let output = suite.run(&["-v"]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(1), "out: {out}");
+    assert!(
+        out.contains("test_ut.py::ThingTest::test_passes PASSED"),
+        "out: {out}"
+    );
+    assert!(
+        out.contains("test_ut.py::ThingTest::test_fails FAILED"),
+        "out: {out}"
+    );
+    assert!(
+        out.contains("test_ut.py::ThingTest::test_skipped SKIPPED"),
+        "out: {out}"
+    );
+    assert!(out.contains("1 failed, 1 passed, 2 skipped"), "out: {out}");
+}

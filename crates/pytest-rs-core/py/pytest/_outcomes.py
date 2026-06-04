@@ -20,14 +20,17 @@ class XFailed(Failed):
 
 
 def skip(reason=""):
+    __tracebackhide__ = True
     raise Skipped(msg=reason)
 
 
 def fail(reason="", pytrace=True):
+    __tracebackhide__ = True
     raise Failed(msg=reason)
 
 
 def xfail(reason=""):
+    __tracebackhide__ = True
     raise XFailed(msg=reason)
 
 

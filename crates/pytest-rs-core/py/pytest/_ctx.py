@@ -26,6 +26,7 @@ def current():
 
 
 def call(func, /, *args, **kwargs):
+    __tracebackhide__ = True
     if _current is None:
         return func(*args, **kwargs)
     return _current.run(func, *args, **kwargs)

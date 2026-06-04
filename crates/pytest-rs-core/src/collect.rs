@@ -56,7 +56,10 @@ pub fn collect_test_files(rootdir: &Path, paths: &[String]) -> Result<Vec<PathBu
 
     let mut files = Vec::new();
     for arg in &args {
+        // Canonicalize so symlinked paths (e.g. /tmp on macOS) match the
+        // canonical rootdir when computing node ids.
         let path = rootdir.join(arg);
+        let path = std::fs::canonicalize(&path).unwrap_or(path);
         let meta = std::fs::metadata(&path).map_err(|e| format!("{}: {e}", path.display()))?;
         if meta.is_dir() {
             collect_dir(&path, &mut files)?;
@@ -128,12 +131,15 @@ pub fn module_name_for(path: &Path) -> (PathBuf, String) {
     (basedir, parts.join("."))
 }
 
-/// Node id for a test file: path relative to rootdir with '/' separators.
+/// Node id for a test file: path relative to rootdir with '/' separators,
+/// or the path as-is when it lives outside the rootdir.
 pub fn file_nodeid(rootdir: &Path, path: &Path) -> String {
-    path.strip_prefix(rootdir)
-        .unwrap_or(path)
-        .components()
-        .map(|c| c.as_os_str().to_string_lossy())
-        .collect::<Vec<_>>()
-        .join("/")
+    match path.strip_prefix(rootdir) {
+        Ok(relative) => relative
+            .components()
+            .map(|c| c.as_os_str().to_string_lossy())
+            .collect::<Vec<_>>()
+            .join("/"),
+        Err(_) => path.to_string_lossy().replace('\\', "/"),
+    }
 }

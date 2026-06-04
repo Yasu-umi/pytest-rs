@@ -210,7 +210,23 @@ fn introspect_namespace(
             continue;
         };
         if isclass.call1((&value,))?.extract::<bool>()? {
-            if name.starts_with("Test") {
+            let is_testcase: bool = py
+                .import("pytest._unittest")?
+                .getattr("is_testcase_class")?
+                .call1((&value,))?
+                .extract()?;
+            if is_testcase {
+                collect_testcase(
+                    py,
+                    &value,
+                    &name,
+                    nodeid_base,
+                    module_name,
+                    path,
+                    &module_marks,
+                    items,
+                )?;
+            } else if name.starts_with("Test") {
                 collect_class(
                     py,
                     &value,
@@ -257,6 +273,62 @@ fn clone_marks(py: Python<'_>, marks: &[MarkData]) -> Vec<MarkData> {
             obj: m.obj.clone_ref(py),
         })
         .collect()
+}
+
+/// Collect unittest.TestCase test methods as zero-arg runner callables
+/// (setUp/method/tearDown handled by the pytest._unittest shim).
+#[allow(clippy::too_many_arguments)]
+fn collect_testcase(
+    py: Python<'_>,
+    cls: &Bound<'_, PyAny>,
+    cls_name: &str,
+    nodeid_base: &str,
+    module_name: &str,
+    path: &Path,
+    module_marks: &[MarkData],
+    items: &mut Vec<TestItem>,
+) -> PyResult<()> {
+    let unittest_shim = py.import("pytest._unittest")?;
+    let make_runner = unittest_shim.getattr("make_runner")?;
+    let class_nodeid = format!("{nodeid_base}::{cls_name}");
+    let mut class_marks = read_marks(py, cls)?;
+    class_marks.extend(clone_marks(py, module_marks));
+
+    // dir() includes inherited test methods, matching unittest collection.
+    let mut names: Vec<String> = py
+        .import("builtins")?
+        .getattr("dir")?
+        .call1((cls,))?
+        .extract()?;
+    names.sort();
+    for name in names {
+        if !name.starts_with("test") {
+            continue;
+        }
+        let Ok(method) = cls.getattr(name.as_str()) else {
+            continue;
+        };
+        if !method.is_callable() {
+            continue;
+        }
+        let mut marks = read_marks(py, &method)?;
+        marks.extend(clone_marks(py, &class_marks));
+        let runner = make_runner.call1((cls, name.as_str()))?;
+        items.push(TestItem {
+            nodeid: format!("{class_nodeid}::{name}"),
+            path: path.to_path_buf(),
+            module_name: module_name.to_string(),
+            func_name: name,
+            func: runner.unbind(),
+            cls: None,
+            is_coroutine: false,
+            fixture_names: Vec::new(),
+            marks,
+            callspec: Vec::new(),
+            fixture_params: Vec::new(),
+        });
+    }
+    Ok(())
 }
 
 /// Collect test methods (and class-level fixtures) from a Test* class.
