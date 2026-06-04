@@ -600,8 +600,10 @@ def test_lineno_preserved():
     assert!(out.contains("assert 'x' in ['a', 'b']"), "out: {out}");
     // traceback line number fidelity: `assert value is not None` is line 17
     // (the file content starts with a blank line from the raw string).
+    // pytest-style location line + `>` marker on the failing source line.
+    assert!(out.contains("test_rw.py:17: AssertionError"), "out: {out}");
     assert!(
-        out.contains("line 17, in test_lineno_preserved"),
+        out.contains(">       assert value is not None"),
         "out: {out}"
     );
 }

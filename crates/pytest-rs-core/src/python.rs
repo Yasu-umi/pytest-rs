@@ -571,7 +571,15 @@ pub(crate) fn register_fixture_def(
     registry: &mut FixtureRegistry,
 ) -> PyResult<()> {
     let marker = value.getattr("_pytestfixturefunction")?;
-    let scope_str: String = marker.getattr("scope")?.extract()?;
+    // Defensive: objects faking the marker attribute (stubs, mocks) are
+    // skipped rather than failing collection.
+    let Ok(scope_str) = marker
+        .getattr("scope")
+        .and_then(|scope| scope.extract::<String>())
+    else {
+        return Ok(());
+    };
+    let scope_str: String = scope_str;
     let scope = Scope::parse(&scope_str).unwrap_or(Scope::Function);
     let autouse: bool = marker.getattr("autouse")?.extract()?;
     let explicit_name: Option<String> = marker.getattr("name")?.extract()?;
@@ -707,7 +715,10 @@ fn read_marks(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<Vec<MarkData>>
             Ok(inner) if inner.hasattr("name")? => inner,
             _ => entry,
         };
-        let name: String = mark.getattr("name")?.extract()?;
+        // Defensive: skip entries without a string name (stubs, mocks).
+        let Ok(name) = mark.getattr("name").and_then(|n| n.extract::<String>()) else {
+            continue;
+        };
         marks.push(MarkData {
             name,
             obj: mark.unbind(),
@@ -726,6 +737,17 @@ pub fn format_exception(py: Python<'_>, err: &PyErr) -> String {
         Ok(lines.join(""))
     })();
     result.unwrap_or_else(|_| format!("{err}"))
+}
+
+/// Format a test failure pytest-style (per --tb), falling back to the
+/// native traceback.
+pub fn format_test_failure(py: Python<'_>, err: &PyErr, style: &str) -> String {
+    let result: PyResult<String> = (|| {
+        py.import("pytest._tb")?
+            .call_method1("format_exception", (err.value(py), style))?
+            .extract()
+    })();
+    result.unwrap_or_else(|_| format_exception(py, err))
 }
 
 /// Build a `pytest._node.Node` for an item (used as `request.node`).

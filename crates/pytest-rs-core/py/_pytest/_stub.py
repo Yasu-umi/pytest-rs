@@ -6,6 +6,10 @@ files import successfully; only tests that exercise the internal fail.
 
 
 class _Unsupported:
+    # Attributes the pytest-rs engine probes during collection; answering
+    # them would make stubs look like fixtures/marks.
+    _OPAQUE = ("_pytestfixturefunction", "pytestmark", "mark", "name")
+
     def __init__(self, name):
         self._name = name
 
@@ -13,7 +17,7 @@ class _Unsupported:
         raise NotImplementedError(f"_pytest internal {self._name!r} is not supported by pytest-rs")
 
     def __getattr__(self, attr):
-        if attr.startswith("__"):
+        if attr.startswith("__") or attr in _Unsupported._OPAQUE:
             raise AttributeError(attr)
         return _Unsupported(f"{self._name}.{attr}")
 

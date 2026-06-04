@@ -131,6 +131,7 @@ impl Engine {
                 println!("{line}");
             }
         }
+        self.print_short_summary();
         println!(
             "{}",
             crate::runner::summary_line(&self.session.reports, warning_count, started.elapsed())
@@ -169,13 +170,49 @@ impl Engine {
                 println!("{longrepr}");
             }
         }
-        println!("{}", center_banner("short test summary info"));
-        for report in &failures {
-            let phase = match report.phase {
-                Phase::Call => "FAILED",
-                _ => "ERROR",
+    }
+
+    /// The "short test summary info" section, controlled by -r chars
+    /// (default fE: failures and errors).
+    fn print_short_summary(&self) {
+        let chars = self.config.get_value("report-chars").unwrap_or("fE");
+        let chars = if chars.contains('a') {
+            "fEsxX".to_string()
+        } else if chars.contains('A') {
+            "fEsxXp".to_string()
+        } else if chars == "N" {
+            String::new()
+        } else {
+            chars.to_string()
+        };
+
+        let mut lines = Vec::new();
+        for report in &self.session.reports {
+            let entry = match (report.phase, report.outcome) {
+                (Phase::Call, Outcome::Failed) if chars.contains('f') => Some("FAILED"),
+                (Phase::Setup | Phase::Teardown, Outcome::Failed) if chars.contains('E') => {
+                    Some("ERROR")
+                }
+                (_, Outcome::Skipped) if chars.contains('s') => Some("SKIPPED"),
+                (_, Outcome::XFailed) if chars.contains('x') => Some("XFAIL"),
+                (_, Outcome::XPassed) if chars.contains('X') => Some("XPASS"),
+                (Phase::Call, Outcome::Passed) if chars.contains('p') => Some("PASSED"),
+                _ => None,
             };
-            println!("{phase} {}", report.nodeid);
+            if let Some(word) = entry {
+                let mut line = format!("{word} {}", report.nodeid);
+                if let Some(message) = report.longrepr.as_deref().and_then(short_message) {
+                    line.push_str(&format!(" - {message}"));
+                }
+                lines.push(line);
+            }
+        }
+        if lines.is_empty() {
+            return;
+        }
+        println!("{}", center_banner("short test summary info"));
+        for line in lines {
+            println!("{line}");
         }
     }
 
@@ -405,6 +442,24 @@ impl Engine {
         }
         Ok(errors)
     }
+}
+
+/// The one-line summary appended to FAILED/ERROR entries: the first
+/// E-prefixed explanation line, else the exception line.
+fn short_message(longrepr: &str) -> Option<String> {
+    let from_e_line = longrepr.lines().find_map(|line| {
+        line.strip_prefix("E ")
+            .map(|rest| rest.trim_start().to_string())
+    });
+    from_e_line
+        .or_else(|| {
+            longrepr
+                .lines()
+                .rev()
+                .find(|line| !line.trim().is_empty())
+                .map(|line| line.trim().to_string())
+        })
+        .filter(|message| !message.is_empty())
 }
 
 pub fn center_banner(label: &str) -> String {

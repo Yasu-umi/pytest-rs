@@ -21,8 +21,11 @@ impl Engine {
         } = self;
 
         let items = std::mem::take(&mut session.items);
+        let total = items.len().max(1);
+        let mut done = 0usize;
         let mut prev_module: Option<String> = None;
         let mut current_file = String::new();
+        let mut line = String::new();
         let mut failed = 0usize;
 
         for item in &items {
@@ -45,13 +48,14 @@ impl Engine {
                 .unwrap_or_default();
             if config.verbose == 0 && !config.quiet && file != current_file {
                 if !current_file.is_empty() {
-                    println!();
+                    println!("{line} [{:>3}%]", done * 100 / total);
                 }
-                print!("{file} ");
+                line = format!("{file} ");
                 current_file = file;
             }
 
             let reports = run_one(py, plugins, session, config, item);
+            done += 1;
             for report in reports {
                 if report.outcome == Outcome::Failed {
                     failed += 1;
@@ -65,19 +69,19 @@ impl Engine {
                         Outcome::XPassed => "XPASS",
                     };
                     if report.phase == Phase::Call || report.outcome != Outcome::Passed {
-                        println!("{} {}", item.nodeid, word);
+                        println!("{} {} [{:>3}%]", item.nodeid, word, done * 100 / total);
+                        let _ = std::io::stdout().flush();
                     }
                 } else if !config.quiet
                     && let Some(c) = report.progress_char()
                 {
-                    print!("{c}");
-                    let _ = std::io::stdout().flush();
+                    line.push(c);
                 }
                 session.reports.push(report);
             }
         }
         if config.verbose == 0 && !config.quiet && !current_file.is_empty() {
-            println!();
+            println!("{line} [{:>3}%]", done * 100 / total);
         }
 
         // Final scope teardowns.
@@ -120,6 +124,7 @@ fn run_one(
     if let Err(err) = python::begin_item_context(py) {
         reports.push(report_from_err(
             py,
+            config,
             item,
             Phase::Setup,
             Instant::now(),
@@ -204,7 +209,14 @@ fn run_one(
     let (callable, kwargs, test_request) = match setup_result {
         Ok(setup) => setup,
         Err(err) => {
-            reports.push(report_from_err(py, item, Phase::Setup, setup_started, &err));
+            reports.push(report_from_err(
+                py,
+                config,
+                item,
+                Phase::Setup,
+                setup_started,
+                &err,
+            ));
             teardown_one(py, plugins, session, config, item, &mut reports);
             python::end_item_context(py);
             return reports;
@@ -263,11 +275,11 @@ fn run_one(
                         duration: call_started.elapsed(),
                         longrepr: None,
                     },
-                    Err(err) => report_from_err(py, item, Phase::Call, call_started, &err),
+                    Err(err) => report_from_err(py, config, item, Phase::Call, call_started, &err),
                 }
             }
         }
-        Err(err) => report_from_err(py, item, Phase::Call, call_started, &err),
+        Err(err) => report_from_err(py, config, item, Phase::Call, call_started, &err),
     };
     // @pytest.mark.xfail: expected failures invert at the call phase.
     let report = if xfail {
@@ -630,6 +642,7 @@ fn skip_reason(py: Python<'_>, item: &TestItem) -> Option<String> {
 
 fn report_from_err(
     py: Python<'_>,
+    config: &Config,
     item: &TestItem,
     phase: Phase,
     started: Instant,
@@ -657,7 +670,11 @@ fn report_from_err(
             phase,
             outcome: Outcome::Failed,
             duration: started.elapsed(),
-            longrepr: Some(python::format_exception(py, err)),
+            longrepr: Some(python::format_test_failure(
+                py,
+                err,
+                config.get_value("tb").unwrap_or("long"),
+            )),
         }
     }
 }
