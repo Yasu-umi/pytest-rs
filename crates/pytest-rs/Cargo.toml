@@ -1,0 +1,20 @@
+[package]
+name = "pytest-rs"
+version = "0.0.1"
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = "../../README.md"
+
+[features]
+default = ["asyncio"]
+asyncio = ["dep:pytest-rs-asyncio"]
+
+[dependencies]
+pytest-rs-core = { workspace = true }
+pytest-rs-asyncio = { workspace = true, optional = true }
+
+[lints]
+workspace = true
