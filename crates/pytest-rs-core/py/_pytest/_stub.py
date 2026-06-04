@@ -21,6 +21,9 @@ class _Unsupported:
             raise AttributeError(attr)
         return _Unsupported(f"{self._name}.{attr}")
 
+    def __iter__(self):
+        return iter(())
+
     def __mro_entries__(self, bases):
         # Allow `class X(SomeInternal):` to at least be defined.
         return (object,)

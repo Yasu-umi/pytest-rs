@@ -180,10 +180,26 @@ def load_expected(suite: Suite) -> dict[str, str]:
     return data.get("files", {})
 
 
+def load_excluded(suite: Suite) -> dict[str, str]:
+    """Files intentionally not run, with the reason (e.g. tests of pytest
+    internals that pytest-rs deliberately does not replicate)."""
+    path = ROOT / "conformance" / "expected" / f"{suite.name}.toml"
+    if not path.exists():
+        return {}
+    data = tomllib.loads(path.read_text())
+    return data.get("excluded", {})
+
+
 def run_suite(suite: Suite, use_local: bool) -> list[FileResult]:
     print(f"=== {suite.name} @ {suite.tag} ===")
     suite.fetch(use_local)
     files, excluded = suite.test_files()
+    manifest_excluded = load_excluded(suite)
+    skipped_by_manifest = [
+        f for f in files if str(f.relative_to(suite.checkout)) in manifest_excluded
+    ]
+    files = [f for f in files if str(f.relative_to(suite.checkout)) not in manifest_excluded]
+    excluded += len(skipped_by_manifest)
     results = [suite.run_file(path) for path in files]
 
     by_status: dict[str, int] = {}

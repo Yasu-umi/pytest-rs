@@ -556,6 +556,11 @@ fn expand_parametrize(py: Python<'_>, marks: &[MarkData]) -> PyResult<Vec<ParamV
             extra_marks: Vec::new(),
         }]);
     }
+    // An empty parameter set produces no items (pytest marks one skipped;
+    // zero items is the closest simple behavior).
+    if dims.iter().any(|dim| dim.sets.is_empty()) {
+        return Ok(Vec::new());
+    }
 
     // Odometer over dims; the last dim varies fastest, ids join in dim order.
     let mut variants = Vec::new();

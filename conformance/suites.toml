@@ -12,7 +12,7 @@ tag = "9.0.3"
 testpaths = ["testing"]
 exclude = ["example_scripts"]
 local = "../pytest"
-deps = ["packaging", "iniconfig", "pluggy"]
+deps = ["packaging", "iniconfig", "pluggy", "xmlschema", "setuptools"]
 enabled = true
 
 [pytest-asyncio]
@@ -20,6 +20,7 @@ repo = "https://github.com/pytest-dev/pytest-asyncio"
 tag = "v1.4.0"
 testpaths = ["tests"]
 local = "../pytest-asyncio"
+deps = ["hypothesis"]
 enabled = true
 
 [pytest-mock]

@@ -4,6 +4,10 @@ from pytest import ExitCode, UsageError  # noqa: F401
 class Config:
     """Stub config type (mostly used for annotations upstream)."""
 
+    VERBOSITY_ASSERTIONS = "assertions"
+    VERBOSITY_TEST_CASES = "test_cases"
+    VERBOSITY_SUBTESTS = "subtests"
+
 
 class PytestPluginManager:
     """Stub plugin manager (pluggy is not used by pytest-rs)."""

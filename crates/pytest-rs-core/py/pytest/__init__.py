@@ -36,6 +36,19 @@ from pytest._raises import raises as raises
 from pytest._tmp_path import TempPathFactory as TempPathFactory
 from pytest._tmp_path import tmp_path as tmp_path
 from pytest._tmp_path import tmp_path_factory as tmp_path_factory
+from pytest._warning_types import PytestAssertRewriteWarning as PytestAssertRewriteWarning
+from pytest._warning_types import PytestCacheWarning as PytestCacheWarning
+from pytest._warning_types import PytestCollectionWarning as PytestCollectionWarning
+from pytest._warning_types import PytestConfigWarning as PytestConfigWarning
+from pytest._warning_types import PytestDeprecationWarning as PytestDeprecationWarning
+from pytest._warning_types import PytestExperimentalApiWarning as PytestExperimentalApiWarning
+from pytest._warning_types import PytestRemovedIn10Warning as PytestRemovedIn10Warning
+from pytest._warning_types import PytestReturnNotNoneWarning as PytestReturnNotNoneWarning
+from pytest._warning_types import PytestUnknownMarkWarning as PytestUnknownMarkWarning
+from pytest._warning_types import (
+    PytestUnraisableExceptionWarning as PytestUnraisableExceptionWarning,
+)
+from pytest._warning_types import PytestWarning as PytestWarning
 from pytest._warns import WarningsRecorder as WarningsRecorder
 from pytest._warns import deprecated_call as deprecated_call
 from pytest._warns import recwarn as recwarn
