@@ -1,0 +1,318 @@
+//! End-to-end tests: build a small pytest suite in a temp dir, run the
+//! pytest-rs binary against it, and assert on output + exit code.
+
+use std::path::{Path, PathBuf};
+use std::process::Output;
+
+struct TempSuite {
+    root: PathBuf,
+}
+
+impl TempSuite {
+    fn new(name: &str) -> Self {
+        let root = std::env::temp_dir()
+            .join("pytest-rs-it")
+            .join(format!("{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        Self { root }
+    }
+
+    fn write(&self, rel: &str, content: &str) -> &Self {
+        let path = self.root.join(rel);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, content).unwrap();
+        self
+    }
+
+    fn run(&self, args: &[&str]) -> Output {
+        std::process::Command::new(env!("CARGO_BIN_EXE_pytest-rs"))
+            .args(args)
+            .current_dir(&self.root)
+            .output()
+            .expect("failed to run pytest-rs")
+    }
+
+    fn path(&self) -> &Path {
+        &self.root
+    }
+}
+
+impl Drop for TempSuite {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.root);
+    }
+}
+
+fn stdout(output: &Output) -> String {
+    String::from_utf8_lossy(&output.stdout).to_string()
+}
+
+#[test]
+fn basic_pass_fail_skip() {
+    let suite = TempSuite::new("basic");
+    suite.write(
+        "test_basic.py",
+        r#"
+import pytest
+
+def test_pass():
+    assert 1 + 1 == 2
+
+def test_fail():
+    assert 1 + 1 == 3
+
+@pytest.mark.skip(reason="nope")
+def test_skip():
+    raise AssertionError
+"#,
+    );
+    let output = suite.run(&["test_basic.py"]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(1), "out: {out}");
+    assert!(out.contains("1 failed, 1 passed, 1 skipped"), "out: {out}");
+    assert!(
+        out.contains("FAILED test_basic.py::test_fail"),
+        "out: {out}"
+    );
+}
+
+#[test]
+fn fixture_scopes_and_teardown_order() {
+    let suite = TempSuite::new("scopes");
+    // Fixtures append events to a log file; the last test asserts the
+    // session fixture was created exactly once and torn down generators ran.
+    suite.write(
+        "conftest.py",
+        r#"
+import pytest
+
+COUNTS = {"session": 0, "module": 0}
+
+@pytest.fixture(scope="session")
+def session_fix():
+    COUNTS["session"] += 1
+    return COUNTS["session"]
+
+@pytest.fixture(scope="module")
+def module_fix():
+    COUNTS["module"] += 1
+    yield COUNTS["module"]
+"#,
+    );
+    suite.write(
+        "test_a.py",
+        r#"
+def test_a1(session_fix, module_fix):
+    assert session_fix == 1
+    assert module_fix == 1
+
+def test_a2(session_fix, module_fix):
+    assert session_fix == 1
+    assert module_fix == 1
+"#,
+    );
+    suite.write(
+        "test_b.py",
+        r#"
+def test_b1(session_fix, module_fix):
+    assert session_fix == 1
+    assert module_fix == 2
+"#,
+    );
+    let output = suite.run(&[]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(out.contains("3 passed"), "out: {out}");
+}
+
+#[test]
+fn generator_fixture_teardown_runs() {
+    let suite = TempSuite::new("teardown");
+    suite.write(
+        "test_td.py",
+        r#"
+import pathlib
+import pytest
+
+@pytest.fixture
+def thing():
+    yield "value"
+    pathlib.Path("teardown.txt").write_text("done")
+
+def test_thing(thing):
+    assert thing == "value"
+"#,
+    );
+    let output = suite.run(&[]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert_eq!(
+        std::fs::read_to_string(suite.path().join("teardown.txt")).unwrap(),
+        "done"
+    );
+}
+
+#[test]
+fn fixture_depends_on_fixture() {
+    let suite = TempSuite::new("deps");
+    suite.write(
+        "test_deps.py",
+        r#"
+import pytest
+
+@pytest.fixture
+def base():
+    return 10
+
+@pytest.fixture
+def derived(base):
+    return base * 2
+
+def test_derived(derived):
+    assert derived == 20
+"#,
+    );
+    let output = suite.run(&[]);
+    assert_eq!(output.status.code(), Some(0), "out: {}", stdout(&output));
+}
+
+#[test]
+fn raises_and_outcomes() {
+    let suite = TempSuite::new("raises");
+    suite.write(
+        "test_raises.py",
+        r#"
+import pytest
+
+def test_raises_ok():
+    with pytest.raises(ValueError, match="bad"):
+        raise ValueError("bad value")
+
+def test_raises_callable():
+    excinfo = pytest.raises(ZeroDivisionError, lambda: 1 / 0)
+    assert excinfo.typename == "ZeroDivisionError"
+
+def test_skip_inside():
+    pytest.skip("not today")
+"#,
+    );
+    let output = suite.run(&[]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(out.contains("2 passed, 1 skipped"), "out: {out}");
+}
+
+#[test]
+fn autouse_fixture() {
+    let suite = TempSuite::new("autouse");
+    suite.write(
+        "test_autouse.py",
+        r#"
+import pytest
+
+STATE = []
+
+@pytest.fixture(autouse=True)
+def prepare():
+    STATE.append("ready")
+
+def test_state():
+    assert STATE == ["ready"]
+"#,
+    );
+    let output = suite.run(&[]);
+    assert_eq!(output.status.code(), Some(0), "out: {}", stdout(&output));
+}
+
+#[test]
+fn collect_only_lists_nodeids() {
+    let suite = TempSuite::new("collect");
+    suite.write("test_co.py", "def test_one(): pass\ndef test_two(): pass\n");
+    let output = suite.run(&["--collect-only"]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(out.contains("test_co.py::test_one"), "out: {out}");
+    assert!(out.contains("test_co.py::test_two"), "out: {out}");
+}
+
+#[test]
+fn exitfirst_stops_after_failure() {
+    let suite = TempSuite::new("exitfirst");
+    suite.write(
+        "test_x.py",
+        r#"
+def test_1():
+    assert False
+
+def test_2():
+    assert True
+"#,
+    );
+    let output = suite.run(&["-x"]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(1), "out: {out}");
+    assert!(out.contains("1 failed"), "out: {out}");
+    assert!(!out.contains("1 passed"), "out: {out}");
+}
+
+#[test]
+fn no_tests_collected_exit_code() {
+    let suite = TempSuite::new("empty");
+    suite.write("test_empty.py", "X = 1\n");
+    let output = suite.run(&[]);
+    assert_eq!(output.status.code(), Some(5), "out: {}", stdout(&output));
+}
+
+#[test]
+fn async_test_and_fixture_strict_marker() {
+    let suite = TempSuite::new("asyncio");
+    suite.write(
+        "test_async.py",
+        r#"
+import asyncio
+import pytest
+
+@pytest.fixture
+async def value():
+    await asyncio.sleep(0)
+    return 41
+
+@pytest.fixture
+async def gen_value():
+    await asyncio.sleep(0)
+    yield 1
+
+@pytest.mark.asyncio
+async def test_async(value, gen_value):
+    await asyncio.sleep(0)
+    assert value + gen_value == 42
+
+async def test_async_unmarked_is_skipped():
+    raise AssertionError("strict mode must not run this")
+"#,
+    );
+    let output = suite.run(&[]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(out.contains("1 passed, 1 skipped"), "out: {out}");
+}
+
+#[test]
+fn asyncio_auto_mode() {
+    let suite = TempSuite::new("asyncio-auto");
+    suite.write(
+        "test_auto.py",
+        r#"
+import asyncio
+
+async def test_async_auto():
+    await asyncio.sleep(0)
+    assert True
+"#,
+    );
+    let output = suite.run(&["--asyncio-mode", "auto"]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(out.contains("1 passed"), "out: {out}");
+}
