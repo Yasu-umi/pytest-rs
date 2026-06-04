@@ -10,7 +10,9 @@
 repo = "https://github.com/pytest-dev/pytest"
 tag = "9.0.3"
 testpaths = ["testing"]
+exclude = ["example_scripts"]
 local = "../pytest"
+deps = ["packaging", "iniconfig", "pluggy"]
 enabled = true
 
 [pytest-asyncio]

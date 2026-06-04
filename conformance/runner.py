@@ -51,7 +51,28 @@ class Suite:
         self.testpaths = config["testpaths"]
         self.enabled = config.get("enabled", False)
         self.local = config.get("local")
+        self.deps: list[str] = config.get("deps", [])
+        self.exclude: list[str] = config.get("exclude", [])
         self.checkout = CACHE / f"{self.name}-{self.tag}"
+
+    def deps_dir(self) -> Path | None:
+        """Install the suite's extra runtime deps into a --target dir, used
+        as PYTHONPATH so upstream tests can import them."""
+        if not self.deps:
+            return None
+        target = CACHE / "deps" / self.name
+        marker = target / ".deps.txt"
+        wanted = "\n".join(sorted(self.deps))
+        if marker.exists() and marker.read_text() == wanted:
+            return target
+        target.mkdir(parents=True, exist_ok=True)
+        subprocess.run(
+            ["uv", "pip", "install", "--target", str(target), *self.deps],
+            check=True,
+            capture_output=True,
+        )
+        marker.write_text(wanted)
+        return target
 
     def fetch(self, use_local: bool) -> None:
         if use_local and self.local is not None:
@@ -83,10 +104,18 @@ class Suite:
             base = self.checkout / testpath
             files.extend(sorted(base.rglob("test_*.py")))
             files.extend(sorted(p for p in base.rglob("*_test.py") if p not in files))
-        return files
+        return [
+            f for f in files if not any(part in self.exclude for part in f.parts)
+        ]
 
     def run_file(self, path: Path) -> FileResult:
+        import os
+
         rel = str(path.relative_to(self.checkout))
+        env = dict(os.environ)
+        deps_dir = self.deps_dir()
+        if deps_dir is not None:
+            env["PYTHONPATH"] = str(deps_dir)
         try:
             proc = subprocess.run(
                 [str(BINARY), rel],
@@ -94,6 +123,7 @@ class Suite:
                 capture_output=True,
                 text=True,
                 timeout=TIMEOUT_S,
+                env=env,
             )
         except subprocess.TimeoutExpired:
             return FileResult(file=rel, status="timeout", exit_code=None)

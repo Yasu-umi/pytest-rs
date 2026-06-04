@@ -3,7 +3,6 @@
 use std::sync::Mutex;
 
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
 
 /// A (subset of the) pytest `FixtureRequest` API. Constructed per fixture
 /// setup; finalizers registered through it are drained into the session's
@@ -11,23 +10,16 @@ use pyo3::types::PyDict;
 #[pyclass(name = "FixtureRequest")]
 pub struct PyRequest {
     param: Option<Py<PyAny>>,
-    nodeid: String,
-    node_name: String,
+    node: Py<PyAny>,
     fixturename: Option<String>,
     finalizers: Mutex<Vec<Py<PyAny>>>,
 }
 
 impl PyRequest {
-    pub fn new(
-        param: Option<Py<PyAny>>,
-        nodeid: String,
-        node_name: String,
-        fixturename: Option<String>,
-    ) -> Self {
+    pub fn new(param: Option<Py<PyAny>>, node: Py<PyAny>, fixturename: Option<String>) -> Self {
         Self {
             param,
-            nodeid,
-            node_name,
+            node,
             fixturename,
             finalizers: Mutex::new(Vec::new()),
         }
@@ -56,17 +48,10 @@ impl PyRequest {
         self.fixturename.clone()
     }
 
-    /// A minimal `request.node` (nodeid / name attributes).
+    /// The `request.node` object (a pytest._node.Node shim instance).
     #[getter]
-    fn node<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let types = py.import("types")?;
-        let kwargs = PyDict::new(py);
-        kwargs.set_item("nodeid", &self.nodeid)?;
-        kwargs.set_item("name", &self.node_name)?;
-        types
-            .getattr("SimpleNamespace")?
-            .call((), Some(&kwargs))
-            .map(Bound::into_any)
+    fn node(&self, py: Python<'_>) -> Py<PyAny> {
+        self.node.clone_ref(py)
     }
 
     fn addfinalizer(&self, finalizer: Py<PyAny>) {

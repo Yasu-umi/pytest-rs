@@ -165,15 +165,8 @@ fn run_one(
                 continue;
             }
             if name == "request" {
-                let req = Py::new(
-                    py,
-                    crate::request::PyRequest::new(
-                        None,
-                        item.nodeid.clone(),
-                        item.func_name.clone(),
-                        None,
-                    ),
-                )?;
+                let node = python::make_node(py, item)?;
+                let req = Py::new(py, crate::request::PyRequest::new(None, node, None))?;
                 kwargs.push((name.clone(), req.clone_ref(py).into_any()));
                 test_request = Some(req);
                 continue;
@@ -438,12 +431,12 @@ fn resolve_fixture(
         let mut kwargs = Vec::new();
         for dep in &def.param_names {
             if dep == "request" {
+                let node = python::make_node(py, item)?;
                 let req = Py::new(
                     py,
                     crate::request::PyRequest::new(
                         fixture_param.as_ref().map(|(_, value)| value.clone_ref(py)),
-                        item.nodeid.clone(),
-                        item.func_name.clone(),
+                        node,
                         Some(def.name.clone()),
                     ),
                 )?;
