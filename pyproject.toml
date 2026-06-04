@@ -1,7 +1,7 @@
 [project]
-name = "pytest-rs-dev"
-version = "0.0.0"
-description = "Dev tooling for pytest-rs (the runner itself is Rust)"
+name = "pytest-rs"
+version = "0.0.1"
+description = "A fast, drop-in compatible pytest runner written in Rust"
 requires-python = ">=3.13"
 
 [tool.uv]
