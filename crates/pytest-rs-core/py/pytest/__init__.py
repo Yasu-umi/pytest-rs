@@ -33,7 +33,9 @@ from pytest._pytester import pytester as pytester
 from pytest._raises import ExceptionInfo as ExceptionInfo
 from pytest._raises import RaisesContext as RaisesContext
 from pytest._raises import raises as raises
+from pytest._tmp_path import TempPathFactory as TempPathFactory
 from pytest._tmp_path import tmp_path as tmp_path
+from pytest._tmp_path import tmp_path_factory as tmp_path_factory
 from pytest._warns import WarningsRecorder as WarningsRecorder
 from pytest._warns import deprecated_call as deprecated_call
 from pytest._warns import recwarn as recwarn

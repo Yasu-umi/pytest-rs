@@ -1,5 +1,111 @@
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+/// Find and parse the pytest config file: walk up from `start` looking for
+/// pytest.ini ([pytest]), pyproject.toml ([tool.pytest.ini_options]),
+/// tox.ini ([pytest]) or setup.cfg ([tool:pytest]) — first hit wins and its
+/// directory becomes the rootdir.
+fn find_ini(start: &Path) -> (PathBuf, HashMap<String, String>) {
+    for dir in start.ancestors() {
+        let pytest_ini = dir.join("pytest.ini");
+        if pytest_ini.exists()
+            && let Ok(content) = std::fs::read_to_string(&pytest_ini)
+        {
+            // pytest.ini counts as config even with an empty/missing section.
+            let values = parse_ini_section(&content, "pytest").unwrap_or_default();
+            return (dir.to_path_buf(), values);
+        }
+        let pyproject = dir.join("pyproject.toml");
+        if pyproject.exists()
+            && let Ok(content) = std::fs::read_to_string(&pyproject)
+            && let Some(values) = parse_pyproject(&content)
+        {
+            return (dir.to_path_buf(), values);
+        }
+        let tox_ini = dir.join("tox.ini");
+        if tox_ini.exists()
+            && let Ok(content) = std::fs::read_to_string(&tox_ini)
+            && let Some(values) = parse_ini_section(&content, "pytest")
+        {
+            return (dir.to_path_buf(), values);
+        }
+        let setup_cfg = dir.join("setup.cfg");
+        if setup_cfg.exists()
+            && let Ok(content) = std::fs::read_to_string(&setup_cfg)
+            && let Some(values) = parse_ini_section(&content, "tool:pytest")
+        {
+            return (dir.to_path_buf(), values);
+        }
+    }
+    (start.to_path_buf(), HashMap::new())
+}
+
+/// Minimal INI parser: one named section, `key = value` pairs, indented
+/// continuation lines appended with newlines.
+fn parse_ini_section(content: &str, section: &str) -> Option<HashMap<String, String>> {
+    let mut values: HashMap<String, String> = HashMap::new();
+    let mut in_section = false;
+    let mut found = false;
+    let mut current_key: Option<String> = None;
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') && trimmed.ends_with(']') {
+            in_section = &trimmed[1..trimmed.len() - 1] == section;
+            found |= in_section;
+            current_key = None;
+            continue;
+        }
+        if !in_section || trimmed.starts_with('#') || trimmed.starts_with(';') {
+            continue;
+        }
+        if line.starts_with([' ', '\t']) && !trimmed.is_empty() {
+            // continuation of a multiline value
+            if let Some(key) = &current_key
+                && let Some(value) = values.get_mut(key)
+            {
+                if !value.is_empty() {
+                    value.push('\n');
+                }
+                value.push_str(trimmed);
+            }
+            continue;
+        }
+        if let Some((key, value)) = trimmed.split_once('=') {
+            let key = key.trim().to_string();
+            values.insert(key.clone(), value.trim().to_string());
+            current_key = Some(key);
+        }
+    }
+    found.then_some(values)
+}
+
+/// [tool.pytest.ini_options] from pyproject.toml, stringified pytest-style
+/// (arrays become newline-joined linelists).
+fn parse_pyproject(content: &str) -> Option<HashMap<String, String>> {
+    let document: toml::Value = content.parse().ok()?;
+    let options = document
+        .get("tool")?
+        .get("pytest")?
+        .get("ini_options")?
+        .as_table()?;
+    let mut values = HashMap::new();
+    for (key, value) in options {
+        let rendered = match value {
+            toml::Value::String(s) => s.clone(),
+            toml::Value::Array(items) => items
+                .iter()
+                .map(|item| match item {
+                    toml::Value::String(s) => s.clone(),
+                    other => other.to_string(),
+                })
+                .collect::<Vec<_>>()
+                .join("\n"),
+            other => other.to_string(),
+        };
+        values.insert(key.clone(), rendered);
+    }
+    Some(values)
+}
 
 /// A CLI option contributed by the core or a plugin.
 #[derive(Debug, Clone)]
@@ -56,12 +162,24 @@ pub struct Config {
     pub w_options: Vec<String>,
     flags: HashSet<String>,
     values: HashMap<String, String>,
-    /// -o name=value overrides (ini file parsing lands with config support).
+    /// -o name=value overrides; take precedence over file values.
     ini_overrides: HashMap<String, String>,
+    /// Values from pytest.ini / pyproject.toml / tox.ini / setup.cfg.
+    ini_file: HashMap<String, String>,
 }
 
 impl Config {
     pub fn from_args(parser: OptionParser, argv: Vec<String>) -> Result<Self, String> {
+        let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
+        let (rootdir, ini_file) = find_ini(&cwd);
+
+        // addopts from the config file are prepended to the CLI args.
+        let mut argv = argv;
+        if let Some(addopts) = ini_file.get("addopts") {
+            let extra: Vec<String> = addopts.split_whitespace().map(str::to_string).collect();
+            argv.splice(1..1, extra);
+        }
+
         let mut cmd = clap::Command::new("pytest-rs")
             .disable_help_flag(false)
             .arg(
@@ -108,6 +226,58 @@ impl Config {
                     .action(clap::ArgAction::Append),
             );
 
+        // Accepted-but-inert pytest options, so real-world addopts and
+        // pytester invocations parse. They gain behavior as features land.
+        for flag in [
+            "strict-config",
+            "strict-markers",
+            "strict",
+            "no-header",
+            "no-summary",
+            "continue-on-collection-errors",
+            "exact-mode", // placeholder; harmless
+        ] {
+            cmd = cmd.arg(
+                clap::Arg::new(flag)
+                    .long(flag)
+                    .action(clap::ArgAction::SetTrue)
+                    .hide(true),
+            );
+        }
+        cmd = cmd.arg(
+            clap::Arg::new("capture-disable")
+                .short('s')
+                .action(clap::ArgAction::SetTrue)
+                .hide(true),
+        );
+        for (name, short) in [
+            ("report-chars", Some('r')),
+            ("plugin", Some('p')),
+            ("config-file", Some('c')),
+            ("tb", None),
+            ("maxfail", None),
+            ("durations", None),
+            ("durations-min", None),
+            ("color", None),
+            ("basetemp", None),
+            ("import-mode", None),
+            ("capture", None),
+            ("rootdir-opt", None),
+        ] {
+            let mut arg = clap::Arg::new(name)
+                .value_name("VALUE")
+                .action(clap::ArgAction::Append)
+                .hide(true);
+            arg = match name {
+                "rootdir-opt" => arg.long("rootdir"),
+                _ => arg.long(name),
+            };
+            if let Some(short) = short {
+                arg = arg.short(short);
+            }
+            cmd = cmd.arg(arg);
+        }
+
         for opt in &parser.opts {
             let arg = clap::Arg::new(opt.name.clone())
                 .long(opt.name.clone())
@@ -146,7 +316,6 @@ impl Config {
             }
         }
 
-        let rootdir = std::env::current_dir().map_err(|e| e.to_string())?;
         Ok(Self {
             paths: matches
                 .get_many::<String>("paths")
@@ -164,12 +333,16 @@ impl Config {
             flags,
             values,
             ini_overrides,
+            ini_file,
         })
     }
 
-    /// An ini-style option (currently only -o overrides; ini files later).
+    /// An ini-style option: -o overrides win over config file values.
     pub fn get_ini(&self, name: &str) -> Option<&str> {
-        self.ini_overrides.get(name).map(String::as_str)
+        self.ini_overrides
+            .get(name)
+            .or_else(|| self.ini_file.get(name))
+            .map(String::as_str)
     }
 
     /// Plugin-contributed boolean option.

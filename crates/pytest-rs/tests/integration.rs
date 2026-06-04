@@ -605,3 +605,70 @@ def test_lineno_preserved():
         "out: {out}"
     );
 }
+
+#[test]
+fn tmp_path_factory_fixture() {
+    let suite = TempSuite::new("tmpfactory");
+    suite.write(
+        "test_tf.py",
+        r#"
+def test_factory(tmp_path_factory):
+    a = tmp_path_factory.mktemp("data")
+    b = tmp_path_factory.mktemp("data")
+    assert a != b
+    assert a.name.startswith("data")
+    assert a.is_dir()
+
+def test_tmp_path_under_basetemp(tmp_path, tmp_path_factory):
+    assert tmp_path.is_dir()
+    assert tmp_path_factory.getbasetemp() in tmp_path.parents
+"#,
+    );
+    let output = suite.run(&[]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(out.contains("2 passed"), "out: {out}");
+}
+
+#[test]
+fn ini_file_and_addopts() {
+    let suite = TempSuite::new("ini");
+    suite.write(
+        "pytest.ini",
+        "[pytest]\naddopts = -v\nasyncio_mode = auto\n",
+    );
+    suite.write(
+        "test_ini.py",
+        r#"
+import asyncio
+
+async def test_auto_from_ini():
+    await asyncio.sleep(0)
+"#,
+    );
+    // asyncio_mode=auto comes from pytest.ini; -v from addopts.
+    let output = suite.run(&[]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(
+        out.contains("test_ini.py::test_auto_from_ini PASSED"),
+        "out: {out}"
+    );
+}
+
+#[test]
+fn override_ini_beats_file() {
+    let suite = TempSuite::new("ini-override");
+    suite.write("pytest.ini", "[pytest]\nasyncio_mode = auto\n");
+    suite.write(
+        "test_o.py",
+        r#"
+async def test_async():
+    raise AssertionError("must not run: strict via -o")
+"#,
+    );
+    let output = suite.run(&["-o", "asyncio_mode=strict"]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(out.contains("1 skipped"), "out: {out}");
+}
