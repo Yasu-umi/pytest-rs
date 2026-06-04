@@ -1,8 +1,52 @@
-//! The Python-visible `request` fixture object.
+//! The Python-visible `request` fixture and `config` proxy objects.
 
+use std::collections::HashMap;
 use std::sync::Mutex;
 
 use pyo3::prelude::*;
+
+/// A (subset of the) pytest `Config` API passed to conftest hooks.
+#[pyclass(name = "Config")]
+pub struct PyConfig {
+    rootdir: String,
+    ini: HashMap<String, String>,
+}
+
+impl PyConfig {
+    pub fn new(rootdir: String, ini: HashMap<String, String>) -> Self {
+        Self { rootdir, ini }
+    }
+}
+
+#[pymethods]
+impl PyConfig {
+    fn getini(&self, name: &str) -> Option<String> {
+        self.ini.get(name).cloned()
+    }
+
+    #[pyo3(signature = (name, default = None))]
+    fn getoption(
+        &self,
+        py: Python<'_>,
+        name: &str,
+        default: Option<Py<PyAny>>,
+    ) -> PyResult<Py<PyAny>> {
+        let _ = name;
+        Ok(default.unwrap_or_else(|| py.None()))
+    }
+
+    #[getter]
+    fn rootpath<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        py.import("pathlib")?
+            .getattr("Path")?
+            .call1((self.rootdir.as_str(),))
+    }
+
+    #[getter]
+    fn rootdir<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        self.rootpath(py)
+    }
+}
 
 /// A (subset of the) pytest `FixtureRequest` API. Constructed per fixture
 /// setup; finalizers registered through it are drained into the session's

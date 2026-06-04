@@ -53,15 +53,70 @@ impl AsyncioPlugin {
             .ok_or_else(|| PyRuntimeError::new_err("asyncio plugin not configured"))
     }
 
-    /// The cached (or new) loop for a scope instance.
-    fn loop_for(&self, py: Python<'_>, scope: Scope, key: &str) -> PyResult<Py<PyAny>> {
+    /// The cached (or new) loop for a scope instance. A factory from the
+    /// pytest_asyncio_loop_factories conftest hook customizes creation.
+    fn loop_for(
+        &self,
+        py: Python<'_>,
+        scope: Scope,
+        key: &str,
+        factory: Option<&Py<PyAny>>,
+    ) -> PyResult<Py<PyAny>> {
         let mut loops = self.loops.borrow_mut();
         if let Some(loop_) = loops.get(&(scope, key.to_string())) {
             return Ok(loop_.clone_ref(py));
         }
-        let loop_ = self.helper(py)?.getattr("new_loop")?.call0()?.unbind();
+        let helper = self.helper(py)?;
+        let loop_ = match factory {
+            Some(factory) => helper
+                .getattr("new_loop_with_factory")?
+                .call1((factory.bind(py),))?
+                .unbind(),
+            None => helper.getattr("new_loop")?.call0()?.unbind(),
+        };
         loops.insert((scope, key.to_string()), loop_.clone_ref(py));
         Ok(loop_)
+    }
+
+    /// The loop factory for an item from conftest
+    /// pytest_asyncio_loop_factories hooks (first factory wins; named
+    /// multi-factory parametrization is not supported yet).
+    fn loop_factory(&self, ctx: &mut HookContext, item: &TestItem) -> PyResult<Option<Py<PyAny>>> {
+        let py = ctx.py;
+        let hook_funcs: Vec<Py<PyAny>> = ctx
+            .session
+            .py_hooks
+            .iter()
+            .filter(|hook| {
+                hook.name == "pytest_asyncio_loop_factories"
+                    && item.nodeid.starts_with(&hook.baseid)
+            })
+            .map(|hook| hook.func.clone_ref(py))
+            .collect();
+        if hook_funcs.is_empty() {
+            return Ok(None);
+        }
+        let config = pytest_rs_core::python::make_py_config(py, ctx.config)?;
+        let node = pytest_rs_core::python::make_node(py, item)?;
+        for func in &hook_funcs {
+            let result = pytest_rs_core::python::call_py_hook(
+                py,
+                func,
+                &[
+                    ("config", config.clone_ref(py)),
+                    ("item", node.clone_ref(py)),
+                ],
+            )?;
+            let result = result.bind(py);
+            if result.is_none() {
+                continue;
+            }
+            let values = result.call_method0("values")?;
+            if let Some(factory) = values.try_iter()?.next() {
+                return Ok(Some(factory?.unbind()));
+            }
+        }
+        Ok(None)
     }
 
     fn close_loop(&self, py: Python<'_>, loop_: &Py<PyAny>) -> PyResult<()> {
@@ -243,10 +298,11 @@ impl Plugin for AsyncioPlugin {
         if !def.is_coroutine && !def.is_async_gen {
             return Ok(None);
         }
+        let factory = self.loop_factory(ctx, item)?;
         let py = ctx.py;
         let helper = self.helper(py)?;
         let scope = self.fixture_loop_scope(py, def);
-        let loop_ = self.loop_for(py, scope, &Self::scope_key(scope, item))?;
+        let loop_ = self.loop_for(py, scope, &Self::scope_key(scope, item), factory.as_ref())?;
 
         if def.is_coroutine {
             let coro = pytest_rs_core::python::call_fixture(py, &def.func, instance, kwargs)?;
@@ -281,10 +337,11 @@ impl Plugin for AsyncioPlugin {
         if !item.is_coroutine || !self.applicable(item) {
             return Ok(None);
         }
+        let factory = self.loop_factory(ctx, item)?;
         let py = ctx.py;
         let helper = self.helper(py)?;
         let scope = self.test_loop_scope(py, item);
-        let loop_ = self.loop_for(py, scope, &Self::scope_key(scope, item))?;
+        let loop_ = self.loop_for(py, scope, &Self::scope_key(scope, item), factory.as_ref())?;
         let coro = pytest_rs_core::python::call_with_kwargs(py, callable, kwargs)?;
         helper.getattr("run")?.call1((loop_.bind(py), coro))?;
         Ok(Some(()))

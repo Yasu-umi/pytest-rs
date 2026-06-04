@@ -345,6 +345,17 @@ impl Config {
             .map(String::as_str)
     }
 
+    /// All effective ini values (file merged with -o overrides).
+    pub fn ini_snapshot(&self) -> HashMap<String, String> {
+        let mut merged = self.ini_file.clone();
+        merged.extend(
+            self.ini_overrides
+                .iter()
+                .map(|(key, value)| (key.clone(), value.clone())),
+        );
+        merged
+    }
+
     /// Plugin-contributed boolean option.
     pub fn get_flag(&self, name: &str) -> bool {
         self.flags.contains(name.trim_start_matches("--"))

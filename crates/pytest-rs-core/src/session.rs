@@ -30,6 +30,14 @@ pub struct PendingFinalizer {
     pub finalizer: Finalizer,
 }
 
+/// A pytest_* hook function defined in a conftest.py.
+pub struct PyHook {
+    pub name: String,
+    pub func: Py<PyAny>,
+    /// Visibility prefix (the conftest's directory), "" for rootdir.
+    pub baseid: String,
+}
+
 /// Mutable state shared by the engine and every hook for one test run.
 pub struct Session {
     pub items: Vec<TestItem>,
@@ -44,6 +52,9 @@ pub struct Session {
     /// Well-known shared Python objects published by plugins
     /// (e.g. "asyncio.event_loop").
     pub py_stash: HashMap<String, Py<PyAny>>,
+    /// pytest_* hook functions collected from conftest.py files,
+    /// registration order (rootdir first).
+    pub py_hooks: Vec<PyHook>,
     /// A plugin may force the session exit code (e.g. --cov-fail-under).
     pub exit_code_override: Option<i32>,
 }
@@ -58,6 +69,7 @@ impl Session {
             reports: Vec::new(),
             stash: HashMap::new(),
             py_stash: HashMap::new(),
+            py_hooks: Vec::new(),
             exit_code_override: None,
         }
     }

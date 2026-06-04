@@ -9,6 +9,12 @@ def new_loop():
     return loop
 
 
+def new_loop_with_factory(factory):
+    loop = factory()
+    asyncio.set_event_loop(loop)
+    return loop
+
+
 def close_loop(loop):
     try:
         loop.run_until_complete(loop.shutdown_asyncgens())

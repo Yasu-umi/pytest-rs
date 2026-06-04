@@ -225,20 +225,103 @@ impl Engine {
         // Temporarily move items out so hooks can mutate the list while the
         // session stays borrowable.
         let mut items = std::mem::take(&mut self.session.items);
-        let mut ctx = HookContext {
-            py,
-            session: &mut self.session,
-            config: &self.config,
-        };
-        let mut result = Ok(());
-        for plugin in &self.plugins {
-            result = plugin.pytest_collection_modifyitems(&mut ctx, &mut items);
-            if result.is_err() {
-                break;
+        {
+            let mut ctx = HookContext {
+                py,
+                session: &mut self.session,
+                config: &self.config,
+            };
+            for plugin in &self.plugins {
+                if let Err(err) = plugin.pytest_collection_modifyitems(&mut ctx, &mut items) {
+                    self.session.items = items;
+                    return Err(err);
+                }
             }
         }
+        let result = self.run_py_modifyitems(py, &mut items);
         self.session.items = items;
         result
+    }
+
+    /// conftest pytest_collection_modifyitems hooks: items are exposed as
+    /// node proxies; reordering, deselection, and added markers are read
+    /// back from the proxy list.
+    fn run_py_modifyitems(
+        &mut self,
+        py: Python<'_>,
+        items: &mut Vec<crate::collect::TestItem>,
+    ) -> PyResult<()> {
+        let hook_funcs: Vec<Py<pyo3::PyAny>> = self
+            .session
+            .py_hooks
+            .iter()
+            .filter(|hook| hook.name == "pytest_collection_modifyitems")
+            .map(|hook| hook.func.clone_ref(py))
+            .collect();
+        if hook_funcs.is_empty() {
+            return Ok(());
+        }
+
+        let config_proxy = python::make_py_config(py, &self.config)?;
+        let nodes: Vec<Py<pyo3::PyAny>> = items
+            .iter()
+            .map(|item| python::make_node(py, item))
+            .collect::<PyResult<_>>()?;
+        let node_list = pyo3::types::PyList::new(py, nodes.iter().map(|n| n.bind(py)))?;
+
+        for func in &hook_funcs {
+            python::call_py_hook(
+                py,
+                func,
+                &[
+                    ("config", config_proxy.clone_ref(py)),
+                    ("items", node_list.clone().unbind().into_any()),
+                    ("session", py.None()),
+                ],
+            )?;
+        }
+
+        // Read back order/membership (by nodeid) and any added markers.
+        let mut by_nodeid: std::collections::HashMap<String, crate::collect::TestItem> =
+            std::mem::take(items)
+                .into_iter()
+                .map(|item| (item.nodeid.clone(), item))
+                .collect();
+        for node in node_list.iter() {
+            let nodeid: String = node.getattr("nodeid")?.extract()?;
+            if let Some(mut item) = by_nodeid.remove(&nodeid) {
+                let mut marks = Vec::new();
+                for mark in node.getattr("own_markers")?.try_iter()? {
+                    let mark = mark?;
+                    marks.push(crate::collect::MarkData {
+                        name: mark.getattr("name")?.extract()?,
+                        obj: mark.unbind(),
+                    });
+                }
+                item.marks = marks;
+                items.push(item);
+            }
+        }
+        Ok(())
+    }
+
+    /// Fire conftest hooks that only take `config` (e.g. pytest_configure).
+    fn fire_py_hooks_simple(&mut self, py: Python<'_>, name: &str) -> PyResult<()> {
+        let hook_funcs: Vec<Py<pyo3::PyAny>> = self
+            .session
+            .py_hooks
+            .iter()
+            .filter(|hook| hook.name == name)
+            .map(|hook| hook.func.clone_ref(py))
+            .collect();
+        if hook_funcs.is_empty() {
+            return Ok(());
+        }
+        let config_proxy = python::make_py_config(py, &self.config)?;
+        for func in &hook_funcs {
+            python::call_py_hook(py, func, &[("config", config_proxy.clone_ref(py))])?;
+        }
+        Ok(())
     }
 
     fn fire_sessionfinish(&mut self, py: Python<'_>, code: i32) -> PyResult<()> {
@@ -287,11 +370,20 @@ impl Engine {
             return Err(python::format_exception(py, &err));
         }
         for conftest in &conftests {
-            if let Err(err) =
-                python::collect_conftest(py, &rootdir, conftest, &mut self.session.registry)
-            {
+            if let Err(err) = python::collect_conftest(
+                py,
+                &rootdir,
+                conftest,
+                &mut self.session.registry,
+                &mut self.session.py_hooks,
+            ) {
                 errors.push((conftest.clone(), python::format_exception(py, &err)));
             }
+        }
+
+        // conftest pytest_configure hooks run once conftests are loaded.
+        if let Err(err) = self.fire_py_hooks_simple(py, "pytest_configure") {
+            errors.push((rootdir.clone(), python::format_exception(py, &err)));
         }
         for file in &files {
             if let Err(err) = python::collect_module(

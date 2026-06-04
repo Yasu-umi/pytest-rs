@@ -153,13 +153,14 @@ pub fn collect_module(
     )
 }
 
-/// Import a conftest.py; its fixtures are visible to all items under its
-/// directory.
+/// Import a conftest.py; its fixtures and pytest_* hooks are visible to
+/// all items under its directory.
 pub fn collect_conftest(
     py: Python<'_>,
     rootdir: &Path,
     path: &Path,
     registry: &mut FixtureRegistry,
+    hooks: &mut Vec<crate::session::PyHook>,
 ) -> PyResult<()> {
     let (basedir, module_name) = module_name_for(path);
     sys_path_prepend(py, &basedir)?;
@@ -170,7 +171,20 @@ pub fn collect_conftest(
     } else {
         format!("{dir_nodeid}/")
     };
-    register_fixtures_from(py, &module, &baseid, registry)
+    register_fixtures_from(py, &module, &baseid, registry)?;
+    scan_py_hooks(&module, &baseid, hooks)
+}
+
+/// Build the Config proxy passed to conftest hooks.
+pub fn make_py_config(py: Python<'_>, config: &crate::config::Config) -> PyResult<Py<PyAny>> {
+    let proxy = Py::new(
+        py,
+        crate::request::PyConfig::new(
+            config.rootdir.to_string_lossy().to_string(),
+            config.ini_snapshot(),
+        ),
+    )?;
+    Ok(proxy.into_any())
 }
 
 fn introspect_namespace(
@@ -720,12 +734,80 @@ pub fn make_node(py: Python<'_>, item: &TestItem) -> PyResult<Py<PyAny>> {
     for mark in &item.marks {
         marks.append(mark.obj.bind(py))?;
     }
+    let fixturenames = pyo3::types::PyList::new(py, &item.fixture_names)?;
     let node = py.import("pytest._node")?.getattr("Node")?.call1((
         item.nodeid.as_str(),
         item.func_name.as_str(),
         marks,
+        fixturenames,
+        item.func.bind(py),
     ))?;
     Ok(node.unbind())
+}
+
+/// Scan a conftest module for pytest_* hook functions.
+pub fn scan_py_hooks(
+    module: &Bound<'_, PyModule>,
+    baseid: &str,
+    hooks: &mut Vec<crate::session::PyHook>,
+) -> PyResult<()> {
+    for (key, value) in module.dict().iter() {
+        let Ok(name) = key.extract::<String>() else {
+            continue;
+        };
+        if name.starts_with("pytest_") && value.is_callable() {
+            hooks.push(crate::session::PyHook {
+                name,
+                func: value.unbind(),
+                baseid: baseid.to_string(),
+            });
+        }
+    }
+    Ok(())
+}
+
+/// Call a conftest hook with only the keyword arguments its signature
+/// requests. Generator hooks (pytest wrapper style: `return (yield)`) are
+/// driven to completion: setup before the yield, the rest right after.
+pub fn call_py_hook(
+    py: Python<'_>,
+    func: &Py<PyAny>,
+    available: &[(&str, Py<PyAny>)],
+) -> PyResult<Py<PyAny>> {
+    let func = func.bind(py);
+    let accepted = param_names(py, func)?;
+    let kwargs = PyDict::new(py);
+    for (name, value) in available {
+        if accepted.iter().any(|param| param == name) {
+            kwargs.set_item(name, value.bind(py))?;
+        }
+    }
+    let empty = pyo3::types::PyTuple::empty(py);
+    let result = func.call(empty, Some(&kwargs))?;
+
+    let inspect = py.import("inspect")?;
+    let is_generator: bool = inspect
+        .getattr("isgenerator")?
+        .call1((&result,))?
+        .extract()?;
+    if !is_generator {
+        return Ok(result.unbind());
+    }
+    // Drive the wrapper: run to the yield, then to completion.
+    let next_fn = py.import("builtins")?.getattr("next")?;
+    if let Err(err) = next_fn.call1((&result,)) {
+        if err.is_instance_of::<pyo3::exceptions::PyStopIteration>(py) {
+            return Ok(py.None());
+        }
+        return Err(err);
+    }
+    match result.call_method1("send", (py.None(),)) {
+        Ok(_) => Err(pyo3::exceptions::PyRuntimeError::new_err(
+            "conftest hook wrapper yielded more than once",
+        )),
+        Err(err) if err.is_instance_of::<pyo3::exceptions::PyStopIteration>(py) => Ok(py.None()),
+        Err(err) => Err(err),
+    }
 }
 
 /// Evaluate a (skipif) condition string in a test module's namespace.

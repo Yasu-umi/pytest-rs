@@ -2,10 +2,13 @@
 
 
 class Node:
-    def __init__(self, nodeid, name, marks):
+    def __init__(self, nodeid, name, marks, fixturenames=None, function=None):
         self.nodeid = nodeid
         self.name = name
         self.own_markers = list(marks)
+        self.fixturenames = list(fixturenames or [])
+        self.function = function
+        self.obj = function
 
     def get_closest_marker(self, name, default=None):
         for marker in self.own_markers:

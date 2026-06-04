@@ -713,3 +713,51 @@ def test_warns():
     assert_eq!(output.status.code(), Some(1), "out: {out}");
     assert!(out.contains("1 failed"), "out: {out}");
 }
+
+#[test]
+fn conftest_hooks_modifyitems_and_configure() {
+    let suite = TempSuite::new("conftest-hooks");
+    suite.write(
+        "conftest.py",
+        r#"
+import pytest
+
+CONFIGURED = []
+
+def pytest_configure(config):
+    CONFIGURED.append(config.rootpath)
+
+@pytest.hookimpl(wrapper=True, tryfirst=True)
+def pytest_collection_modifyitems(items):
+    # reverse order and mark the first (originally last) test as skipped
+    items[:] = list(reversed(items))
+    items[0].add_marker(pytest.mark.skip)
+    return (yield)
+"#,
+    );
+    suite.write(
+        "test_hooks.py",
+        r#"
+ORDER = []
+
+def test_a():
+    ORDER.append("a")
+
+def test_b():
+    ORDER.append("b")
+
+def test_c():
+    # runs first after the reversal; test_c itself is skipped
+    raise AssertionError("must be skipped by conftest hook")
+"#,
+    );
+    let output = suite.run(&["-v"]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(out.contains("test_hooks.py::test_c SKIPPED"), "out: {out}");
+    assert!(out.contains("2 passed, 1 skipped"), "out: {out}");
+    // reversed order: c (skipped), b, a
+    let pos_b = out.find("test_hooks.py::test_b").unwrap();
+    let pos_a = out.find("test_hooks.py::test_a").unwrap();
+    assert!(pos_b < pos_a, "expected b before a, out: {out}");
+}
