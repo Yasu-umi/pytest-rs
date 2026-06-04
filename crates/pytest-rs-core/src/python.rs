@@ -293,9 +293,13 @@ struct ParamVariant {
 /// of parameter sets. Marks appear in pytestmark order (bottom decorator
 /// first); ids join in that order and later marks vary fastest.
 fn expand_parametrize(py: Python<'_>, marks: &[MarkData]) -> PyResult<Vec<ParamVariant>> {
+    struct ParamSet {
+        id_part: String,
+        params: Vec<(String, Py<PyAny>)>,
+        extra_marks: Vec<MarkData>,
+    }
     struct Dim {
-        /// (id_part, params, extra_marks) per value set.
-        sets: Vec<(String, Vec<(String, Py<PyAny>)>, Vec<MarkData>)>,
+        sets: Vec<ParamSet>,
     }
 
     let param_spec_cls = py.import("pytest")?.getattr("ParamSpec")?;
@@ -373,7 +377,11 @@ fn expand_parametrize(py: Python<'_>, marks: &[MarkData]) -> PyResult<Vec<ParamV
                 .cloned()
                 .zip(values.into_iter().map(Bound::unbind))
                 .collect();
-            sets.push((id_part, params, extra_marks));
+            sets.push(ParamSet {
+                id_part,
+                params,
+                extra_marks,
+            });
         }
         dims.push(Dim { sets });
     }
@@ -394,12 +402,12 @@ fn expand_parametrize(py: Python<'_>, marks: &[MarkData]) -> PyResult<Vec<ParamV
         let mut params = Vec::new();
         let mut extra_marks = Vec::new();
         for (dim, &index) in dims.iter().zip(indices.iter()) {
-            let (id_part, set_params, set_marks) = &dim.sets[index];
-            id_parts.push(id_part.clone());
-            for (name, value) in set_params {
+            let set = &dim.sets[index];
+            id_parts.push(set.id_part.clone());
+            for (name, value) in &set.params {
                 params.push((name.clone(), value.clone_ref(py)));
             }
-            for mark in set_marks {
+            for mark in &set.extra_marks {
                 extra_marks.push(MarkData {
                     name: mark.name.clone(),
                     obj: mark.obj.clone_ref(py),
@@ -437,10 +445,10 @@ fn id_for_value(value: &Bound<'_, PyAny>, argname: &str, index: usize) -> String
     if let Ok(s) = value.extract::<String>() {
         return s;
     }
-    if value.cast::<pyo3::types::PyInt>().is_ok() || value.cast::<pyo3::types::PyFloat>().is_ok() {
-        if let Ok(repr) = value.repr() {
-            return repr.to_string();
-        }
+    if (value.cast::<pyo3::types::PyInt>().is_ok() || value.cast::<pyo3::types::PyFloat>().is_ok())
+        && let Ok(repr) = value.repr()
+    {
+        return repr.to_string();
     }
     format!("{argname}{index}")
 }
