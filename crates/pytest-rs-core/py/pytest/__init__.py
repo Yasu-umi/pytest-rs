@@ -134,6 +134,21 @@ class MarkGenerator:
 mark = MarkGenerator()
 
 
+class ParamSpec:
+    """The object returned by pytest.param(): values + per-param marks/id."""
+
+    def __init__(self, values, marks, id):
+        self.values = tuple(values)
+        self.marks = list(marks)
+        self.id = id
+
+
+def param(*values, marks=(), id=None):
+    if not isinstance(marks, list | tuple):
+        marks = [marks]
+    return ParamSpec(values, [decorator.mark for decorator in marks], id)
+
+
 # ---------------------------------------------------------------------------
 # raises
 # ---------------------------------------------------------------------------
