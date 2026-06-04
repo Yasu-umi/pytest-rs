@@ -1,4 +1,4 @@
-# Upstream pytest (9.0.3) test files that must keep passing under pytest-rs.
+# Upstream pytest test files that must keep passing under pytest-rs.
 # This list only grows; a regression here fails CI.
 
 [files]

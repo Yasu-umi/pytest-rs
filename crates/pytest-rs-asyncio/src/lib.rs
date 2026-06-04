@@ -2,12 +2,14 @@
 //! execution of async tests and async (generator) fixtures.
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::ffi::CString;
 
 use pytest_rs_core::collect::TestItem;
 use pytest_rs_core::config::{OptDef, OptionParser};
-use pytest_rs_core::fixture::FixtureDef;
+use pytest_rs_core::fixture::{FixtureDef, Scope};
 use pytest_rs_core::hooks::{FixtureValue, HookContext, HookResult, Plugin};
+use pytest_rs_core::pyo3::exceptions::PyRuntimeError;
 use pytest_rs_core::pyo3::prelude::*;
 use pytest_rs_core::pyo3::types::PyModule;
 use pytest_rs_core::session::Finalizer;
@@ -24,8 +26,9 @@ enum Mode {
 pub struct AsyncioPlugin {
     mode: Mode,
     helper: Option<Py<PyModule>>,
-    /// The function-scoped loop for the item currently running.
-    current_loop: RefCell<Option<Py<PyAny>>>,
+    /// Event loops cached per (loop scope, scope instance key).
+    loops: RefCell<HashMap<(Scope, String), Py<PyAny>>>,
+    current_module: RefCell<Option<String>>,
 }
 
 impl AsyncioPlugin {
@@ -33,7 +36,8 @@ impl AsyncioPlugin {
         Self {
             mode: Mode::Strict,
             helper: None,
-            current_loop: RefCell::new(None),
+            loops: RefCell::new(HashMap::new()),
+            current_module: RefCell::new(None),
         }
     }
 
@@ -41,22 +45,66 @@ impl AsyncioPlugin {
         self.helper
             .as_ref()
             .map(|m| m.bind(py).clone())
-            .ok_or_else(|| {
-                pytest_rs_core::pyo3::exceptions::PyRuntimeError::new_err(
-                    "asyncio plugin not configured",
-                )
-            })
+            .ok_or_else(|| PyRuntimeError::new_err("asyncio plugin not configured"))
     }
 
-    /// The loop for the current item, created lazily.
-    fn ensure_loop(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut slot = self.current_loop.borrow_mut();
-        if let Some(loop_) = slot.as_ref() {
+    /// The cached (or new) loop for a scope instance.
+    fn loop_for(&self, py: Python<'_>, scope: Scope, key: &str) -> PyResult<Py<PyAny>> {
+        let mut loops = self.loops.borrow_mut();
+        if let Some(loop_) = loops.get(&(scope, key.to_string())) {
             return Ok(loop_.clone_ref(py));
         }
         let loop_ = self.helper(py)?.getattr("new_loop")?.call0()?.unbind();
-        *slot = Some(loop_.clone_ref(py));
+        loops.insert((scope, key.to_string()), loop_.clone_ref(py));
         Ok(loop_)
+    }
+
+    fn close_loop(&self, py: Python<'_>, loop_: &Py<PyAny>) -> PyResult<()> {
+        self.helper(py)?
+            .getattr("close_loop")?
+            .call1((loop_.bind(py),))?;
+        Ok(())
+    }
+
+    fn scope_key(scope: Scope, item: &TestItem) -> String {
+        match scope {
+            Scope::Function => item.nodeid.clone(),
+            Scope::Class => item
+                .nodeid
+                .rsplit_once("::")
+                .map(|(prefix, _)| prefix.to_string())
+                .unwrap_or_else(|| item.module_instance()),
+            Scope::Module | Scope::Package => item.module_instance(),
+            Scope::Session => String::new(),
+        }
+    }
+
+    /// The loop scope of a test item: marker kwarg, else the configured
+    /// default, else function.
+    fn test_loop_scope(&self, py: Python<'_>, item: &TestItem) -> Scope {
+        let from_marker = item.get_closest_marker("asyncio").and_then(|mark| {
+            mark.obj
+                .bind(py)
+                .getattr("kwargs")
+                .ok()
+                .and_then(|kwargs| kwargs.get_item("loop_scope").ok())
+                .and_then(|scope| scope.extract::<String>().ok())
+        });
+        from_marker
+            .and_then(|name| Scope::parse(&name))
+            .unwrap_or(Scope::Function)
+    }
+
+    /// The loop scope of an async fixture: explicit loop_scope recorded by
+    /// pytest_asyncio.fixture, else the fixture's own scope.
+    fn fixture_loop_scope(&self, py: Python<'_>, def: &FixtureDef) -> Scope {
+        def.func
+            .bind(py)
+            .getattr("_pytest_asyncio_loop_scope")
+            .ok()
+            .and_then(|scope| scope.extract::<String>().ok())
+            .and_then(|name| Scope::parse(&name))
+            .unwrap_or(def.scope)
     }
 
     fn applicable(&self, item: &TestItem) -> bool {
@@ -81,15 +129,25 @@ impl Plugin for AsyncioPlugin {
     fn pytest_addoption(&self, parser: &mut OptionParser) {
         parser.add_option(OptDef::value(
             "--asyncio-mode",
-            Some("strict"),
+            None,
             "asyncio mode: auto or strict",
         ));
     }
 
     fn pytest_configure(&mut self, ctx: &mut HookContext) -> PyResult<()> {
-        self.mode = match ctx.config.get_value("--asyncio-mode") {
+        let mode_value = ctx
+            .config
+            .get_value("--asyncio-mode")
+            .or_else(|| ctx.config.get_ini("asyncio_mode"));
+        self.mode = match mode_value {
+            None | Some("strict") => Mode::Strict,
             Some("auto") => Mode::Auto,
-            _ => Mode::Strict,
+            Some(other) => {
+                return Err(pytest_rs_core::python::usage_error(
+                    ctx.py,
+                    &format!("'{other}' is not a valid asyncio_mode. Valid modes: auto, strict."),
+                ));
+            }
         };
         let module = PyModule::from_code(
             ctx.py,
@@ -113,11 +171,38 @@ impl Plugin for AsyncioPlugin {
         Ok(())
     }
 
+    fn pytest_runtest_setup(&self, ctx: &mut HookContext, item: &TestItem) -> PyResult<()> {
+        // Close module/class-scoped loops from a previous module.
+        let module = item.module_instance();
+        let mut current = self.current_module.borrow_mut();
+        if current.as_ref() != Some(&module) {
+            if let Some(prev) = current.as_ref() {
+                let stale: Vec<_> = self
+                    .loops
+                    .borrow()
+                    .keys()
+                    .filter(|(scope, key)| {
+                        matches!(scope, Scope::Module | Scope::Package | Scope::Class)
+                            && (key == prev || key.starts_with(&format!("{prev}::")))
+                    })
+                    .cloned()
+                    .collect();
+                for entry in stale {
+                    if let Some(loop_) = self.loops.borrow_mut().remove(&entry) {
+                        self.close_loop(ctx.py, &loop_)?;
+                    }
+                }
+            }
+            *current = Some(module);
+        }
+        Ok(())
+    }
+
     fn pytest_fixture_setup(
         &self,
         ctx: &mut HookContext,
         def: &FixtureDef,
-        _item: &TestItem,
+        item: &TestItem,
         instance: Option<&Py<PyAny>>,
         kwargs: &[(String, Py<PyAny>)],
     ) -> HookResult<FixtureValue> {
@@ -126,7 +211,8 @@ impl Plugin for AsyncioPlugin {
         }
         let py = ctx.py;
         let helper = self.helper(py)?;
-        let loop_ = self.ensure_loop(py)?;
+        let scope = self.fixture_loop_scope(py, def);
+        let loop_ = self.loop_for(py, scope, &Self::scope_key(scope, item))?;
 
         if def.is_coroutine {
             let coro = pytest_rs_core::python::call_fixture(py, &def.func, instance, kwargs)?;
@@ -163,17 +249,26 @@ impl Plugin for AsyncioPlugin {
         }
         let py = ctx.py;
         let helper = self.helper(py)?;
-        let loop_ = self.ensure_loop(py)?;
+        let scope = self.test_loop_scope(py, item);
+        let loop_ = self.loop_for(py, scope, &Self::scope_key(scope, item))?;
         let coro = pytest_rs_core::python::call_with_kwargs(py, callable, kwargs)?;
         helper.getattr("run")?.call1((loop_.bind(py), coro))?;
         Ok(Some(()))
     }
 
-    fn pytest_runtest_teardown(&self, ctx: &mut HookContext, _item: &TestItem) -> PyResult<()> {
-        if let Some(loop_) = self.current_loop.borrow_mut().take() {
-            self.helper(ctx.py)?
-                .getattr("close_loop")?
-                .call1((loop_.bind(ctx.py),))?;
+    fn pytest_runtest_teardown(&self, ctx: &mut HookContext, item: &TestItem) -> PyResult<()> {
+        // Function-scoped loops die with their item.
+        let entry = (Scope::Function, item.nodeid.clone());
+        if let Some(loop_) = self.loops.borrow_mut().remove(&entry) {
+            self.close_loop(ctx.py, &loop_)?;
+        }
+        Ok(())
+    }
+
+    fn pytest_sessionfinish(&mut self, ctx: &mut HookContext, _exit_code: i32) -> PyResult<()> {
+        let remaining: Vec<_> = self.loops.borrow_mut().drain().map(|(_, l)| l).collect();
+        for loop_ in remaining {
+            self.close_loop(ctx.py, &loop_)?;
         }
         Ok(())
     }

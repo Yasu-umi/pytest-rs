@@ -31,11 +31,19 @@ impl Engine {
             eprintln!("INTERNAL ERROR: failed to install pytest shim: {err}");
             return exit_code::INTERNAL_ERROR;
         }
+        if let Err(err) = python::apply_warning_filters(py, &self.config.w_options) {
+            eprintln!("ERROR: invalid -W option: {}", err.value(py));
+            return exit_code::USAGE_ERROR;
+        }
 
         if let Err(err) = self
             .fire_configure(py)
             .and_then(|()| self.fire_sessionstart(py))
         {
+            if python::is_usage_error(py, &err) {
+                eprintln!("ERROR: {}", err.value(py));
+                return exit_code::USAGE_ERROR;
+            }
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
             return exit_code::INTERNAL_ERROR;
         }

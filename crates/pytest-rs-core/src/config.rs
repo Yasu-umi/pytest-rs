@@ -52,8 +52,12 @@ pub struct Config {
     pub exitfirst: bool,
     pub collect_only: bool,
     pub rootdir: PathBuf,
+    /// -W warning filter specs, applied at session start.
+    pub w_options: Vec<String>,
     flags: HashSet<String>,
     values: HashMap<String, String>,
+    /// -o name=value overrides (ini file parsing lands with config support).
+    ini_overrides: HashMap<String, String>,
 }
 
 impl Config {
@@ -88,6 +92,20 @@ impl Config {
                     .long("collect-only")
                     .alias("co")
                     .action(clap::ArgAction::SetTrue),
+            )
+            .arg(
+                clap::Arg::new("override-ini")
+                    .short('o')
+                    .long("override-ini")
+                    .value_name("NAME=VALUE")
+                    .action(clap::ArgAction::Append),
+            )
+            .arg(
+                clap::Arg::new("pythonwarnings")
+                    .short('W')
+                    .long("pythonwarnings")
+                    .value_name("WARNING")
+                    .action(clap::ArgAction::Append),
             );
 
         for opt in &parser.opts {
@@ -119,6 +137,15 @@ impl Config {
             }
         }
 
+        let mut ini_overrides = HashMap::new();
+        if let Some(overrides) = matches.get_many::<String>("override-ini") {
+            for entry in overrides {
+                if let Some((name, value)) = entry.split_once('=') {
+                    ini_overrides.insert(name.to_string(), value.to_string());
+                }
+            }
+        }
+
         let rootdir = std::env::current_dir().map_err(|e| e.to_string())?;
         Ok(Self {
             paths: matches
@@ -130,9 +157,19 @@ impl Config {
             exitfirst: matches.get_flag("exitfirst"),
             collect_only: matches.get_flag("collect-only"),
             rootdir,
+            w_options: matches
+                .get_many::<String>("pythonwarnings")
+                .map(|vals| vals.cloned().collect())
+                .unwrap_or_default(),
             flags,
             values,
+            ini_overrides,
         })
+    }
+
+    /// An ini-style option (currently only -o overrides; ini files later).
+    pub fn get_ini(&self, name: &str) -> Option<&str> {
+        self.ini_overrides.get(name).map(String::as_str)
     }
 
     /// Plugin-contributed boolean option.

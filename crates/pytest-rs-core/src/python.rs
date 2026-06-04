@@ -64,14 +64,28 @@ pub fn sys_path_prepend(py: Python<'_>, path: &Path) -> PyResult<()> {
     Ok(())
 }
 
-/// Names of the parameters of a Python callable, in order.
+/// Names of the fixture-requesting parameters of a Python callable, in
+/// order: positional/keyword params without defaults (defaulted params and
+/// *args/**kwargs are not fixture requests, matching pytest).
 pub fn param_names(py: Python<'_>, func: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
-    let signature = py.import("inspect")?.getattr("signature")?.call1((func,))?;
-    let params = signature.getattr("parameters")?;
-    params
-        .try_iter()?
-        .map(|key| key?.extract::<String>())
-        .collect()
+    let inspect = py.import("inspect")?;
+    let signature = inspect.getattr("signature")?.call1((func,))?;
+    let parameters = signature.getattr("parameters")?;
+    let empty = inspect.getattr("Parameter")?.getattr("empty")?;
+    let mut names = Vec::new();
+    for value in parameters.call_method0("values")?.try_iter()? {
+        let parameter = value?;
+        let kind = parameter.getattr("kind")?;
+        let kind_name: String = kind.getattr("name")?.extract()?;
+        if kind_name != "POSITIONAL_OR_KEYWORD" && kind_name != "KEYWORD_ONLY" {
+            continue;
+        }
+        if !parameter.getattr("default")?.is(&empty) {
+            continue;
+        }
+        names.push(parameter.getattr("name")?.extract()?);
+    }
+    Ok(names)
 }
 
 pub struct AsyncFlags {
@@ -154,6 +168,9 @@ fn introspect_namespace(
 ) -> PyResult<()> {
     register_fixtures_from(py, module, &format!("{nodeid_base}::"), registry)?;
 
+    // Module-level `pytestmark` applies to every item in the module.
+    let module_marks = read_marks(py, module.as_any())?;
+
     let inspect = py.import("inspect")?;
     let isclass = inspect.getattr("isclass")?;
     let dict = module.dict();
@@ -171,6 +188,7 @@ fn introspect_namespace(
                     nodeid_base,
                     module_name,
                     path,
+                    &module_marks,
                     items,
                     registry,
                 )?;
@@ -183,7 +201,8 @@ fn introspect_namespace(
         {
             continue;
         }
-        let marks = read_marks(py, &value)?;
+        let mut marks = read_marks(py, &value)?;
+        marks.extend(clone_marks(py, &module_marks));
         push_test_items(
             py,
             items,
@@ -199,6 +218,16 @@ fn introspect_namespace(
     Ok(())
 }
 
+fn clone_marks(py: Python<'_>, marks: &[MarkData]) -> Vec<MarkData> {
+    marks
+        .iter()
+        .map(|m| MarkData {
+            name: m.name.clone(),
+            obj: m.obj.clone_ref(py),
+        })
+        .collect()
+}
+
 /// Collect test methods (and class-level fixtures) from a Test* class.
 #[allow(clippy::too_many_arguments)]
 fn collect_class(
@@ -208,6 +237,7 @@ fn collect_class(
     nodeid_base: &str,
     module_name: &str,
     path: &Path,
+    module_marks: &[MarkData],
     items: &mut Vec<TestItem>,
     registry: &mut FixtureRegistry,
 ) -> PyResult<()> {
@@ -217,7 +247,8 @@ fn collect_class(
         return Ok(());
     }
     let class_nodeid = format!("{nodeid_base}::{cls_name}");
-    let class_marks = read_marks(py, cls)?;
+    let mut class_marks = read_marks(py, cls)?;
+    class_marks.extend(clone_marks(py, module_marks));
 
     for pair in cls_dict.call_method0("items")?.try_iter()? {
         let (name, value): (String, Bound<'_, PyAny>) = pair?.extract()?;
@@ -627,17 +658,29 @@ pub fn expand_fixture_params(
     Ok(expanded)
 }
 
-fn read_marks(py: Python<'_>, func: &Bound<'_, PyAny>) -> PyResult<Vec<MarkData>> {
+/// Read `pytestmark` from a function, class, or module. Accepts a single
+/// mark or a list, and normalizes bare MarkDecorators (e.g.
+/// `pytestmark = pytest.mark.asyncio`) to their Mark.
+fn read_marks(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<Vec<MarkData>> {
     let mut marks = Vec::new();
-    if let Ok(pytestmark) = func.getattr("pytestmark") {
-        for mark in pytestmark.try_iter()? {
-            let mark = mark?;
-            let name: String = mark.getattr("name")?.extract()?;
-            marks.push(MarkData {
-                name,
-                obj: mark.unbind(),
-            });
-        }
+    let Ok(pytestmark) = obj.getattr("pytestmark") else {
+        return Ok(marks);
+    };
+    let entries: Vec<Bound<'_, PyAny>> = match pytestmark.try_iter() {
+        Ok(iter) => iter.collect::<PyResult<_>>()?,
+        Err(_) => vec![pytestmark],
+    };
+    for entry in entries {
+        // A bare MarkDecorator carries the Mark in its `mark` attribute.
+        let mark = match entry.getattr("mark") {
+            Ok(inner) if inner.hasattr("name")? => inner,
+            _ => entry,
+        };
+        let name: String = mark.getattr("name")?.extract()?;
+        marks.push(MarkData {
+            name,
+            obj: mark.unbind(),
+        });
     }
     let _ = py;
     Ok(marks)
@@ -675,6 +718,34 @@ pub fn eval_in_module(py: Python<'_>, module_name: &str, expr: &str) -> PyResult
     let code = std::ffi::CString::new(expr)
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
     py.eval(code.as_c_str(), Some(&globals), None)?.is_truthy()
+}
+
+/// Apply -W warning filter specs (same syntax as python -W).
+pub fn apply_warning_filters(py: Python<'_>, specs: &[String]) -> PyResult<()> {
+    if specs.is_empty() {
+        return Ok(());
+    }
+    let warnings = py.import("warnings")?;
+    // warnings._processoptions implements exactly python -W parsing.
+    warnings.call_method1("_processoptions", (specs.to_vec(),))?;
+    Ok(())
+}
+
+/// Construct a pytest.UsageError as a PyErr.
+pub fn usage_error(py: Python<'_>, message: &str) -> PyErr {
+    let result: PyResult<PyErr> = (|| {
+        let cls = py.import("pytest")?.getattr("UsageError")?;
+        Ok(PyErr::from_value(cls.call1((message,))?))
+    })();
+    result.unwrap_or_else(|_| pyo3::exceptions::PyRuntimeError::new_err(message.to_string()))
+}
+
+/// Is this error a pytest.UsageError?
+pub fn is_usage_error(py: Python<'_>, err: &PyErr) -> bool {
+    py.import("pytest")
+        .and_then(|m| m.getattr("UsageError"))
+        .map(|cls| err.matches(py, &cls).unwrap_or(false))
+        .unwrap_or(false)
 }
 
 /// Is this error an instance of the shim's `Skipped` outcome?

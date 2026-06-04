@@ -6,14 +6,19 @@ __version__ = "1.4.0"  # pytest-asyncio API version this shim tracks
 
 
 def fixture(fixture_function=None, *, loop_scope=None, **kwargs):
-    """pytest_asyncio.fixture: records the same metadata as pytest.fixture.
+    """pytest_asyncio.fixture: records the same metadata as pytest.fixture
+    plus the loop scope for the asyncio plugin."""
+    marker = pytest.fixture(**kwargs)
 
-    loop_scope is accepted but per-fixture loop scoping is not implemented
-    yet (the function-scoped loop is used).
-    """
+    def apply(func):
+        func = marker(func)
+        if loop_scope is not None:
+            func._pytest_asyncio_loop_scope = loop_scope
+        return func
+
     if fixture_function is not None:
-        return pytest.fixture(fixture_function)
-    return pytest.fixture(**kwargs)
+        return apply(fixture_function)
+    return apply
 
 
 def is_async_test(item):  # pragma: no cover - compat surface

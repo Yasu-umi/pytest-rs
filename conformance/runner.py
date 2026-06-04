@@ -104,9 +104,7 @@ class Suite:
             base = self.checkout / testpath
             files.extend(sorted(base.rglob("test_*.py")))
             files.extend(sorted(p for p in base.rglob("*_test.py") if p not in files))
-        return [
-            f for f in files if not any(part in self.exclude for part in f.parts)
-        ]
+        return [f for f in files if not any(part in self.exclude for part in f.parts)]
 
     def run_file(self, path: Path) -> FileResult:
         import os

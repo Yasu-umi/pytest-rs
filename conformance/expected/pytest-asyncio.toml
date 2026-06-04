@@ -1,11 +1,13 @@
-# Upstream pytest-asyncio (v1.4.0) test files that must keep passing under
-# pytest-rs. This list only grows; a regression here fails CI.
+# Upstream pytest-asyncio test files that must keep passing under pytest-rs.
+# This list only grows; a regression here fails CI.
 
 [files]
 "tests/async_fixtures/test_async_fixtures.py" = "passed"
 "tests/async_fixtures/test_nested.py" = "passed"
 "tests/async_fixtures/test_shared_module_fixture.py" = "passed"
+"tests/markers/test_mixed_scope.py" = "passed"
 "tests/test_asyncio_fixture.py" = "passed"
 "tests/test_package.py" = "passed"
+"tests/test_simple.py" = "passed"
 "tests/test_subprocess.py" = "passed"
 "tests/test_task_cleanup.py" = "passed"
