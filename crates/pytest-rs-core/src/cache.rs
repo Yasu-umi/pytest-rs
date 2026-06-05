@@ -15,6 +15,10 @@ pub struct CacheState {
     lf: bool,
     ff: bool,
     nf: bool,
+    /// --stepwise: resume from the cached failure, stop at the next one.
+    sw: bool,
+    /// The nodeid the previous --stepwise run stopped at.
+    sw_resume: Option<String>,
     /// Failed nodeids from the previous run, in recorded order.
     lastfailed: Vec<String>,
     /// Nodeids seen in previous runs (--nf sorts unseen ones first).
@@ -34,6 +38,12 @@ impl CacheState {
         let lf = enabled && config.get_flag("lf");
         let ff = enabled && config.get_flag("ff");
         let nf = enabled && config.get_flag("nf");
+        let sw = enabled && (config.get_flag("sw") || config.get_flag("sw-skip"));
+        let sw_resume = if sw && !config.get_flag("sw-reset") {
+            crate::python::cache_stepwise(py, config)
+        } else {
+            None
+        };
         let lastfailed = if enabled {
             crate::python::cache_lastfailed(py, config)
         } else {
@@ -49,6 +59,8 @@ impl CacheState {
             lf,
             ff,
             nf,
+            sw,
+            sw_resume,
             lastfailed,
             cached_nodeids,
             skipped_files: 0,
@@ -190,6 +202,14 @@ impl CacheState {
                 }
             }
         }
+        // --stepwise: drop items before the cached resume point (they
+        // already passed last run); unknown resume points run everything.
+        if self.sw
+            && let Some(resume) = &self.sw_resume
+            && let Some(index) = items.iter().position(|item| &item.nodeid == resume)
+        {
+            removed.extend(items.drain(..index));
+        }
         if self.nf {
             let seen: HashSet<&str> = self.cached_nodeids.iter().map(String::as_str).collect();
             let (mut new_items, mut other_items): (Vec<TestItem>, Vec<TestItem>) = items
@@ -251,5 +271,14 @@ impl CacheState {
             }
         }
         let _ = crate::python::cache_write_session(py, config, &failed, &self.cached_nodeids);
+        if self.sw {
+            // Persist the first failing nodeid as the next resume point;
+            // a fully passing run clears it.
+            let first_failed = reports
+                .iter()
+                .find(|r| r.outcome == Outcome::Failed)
+                .map(|r| r.nodeid.as_str());
+            let _ = crate::python::cache_write_stepwise(py, config, first_failed);
+        }
     }
 }

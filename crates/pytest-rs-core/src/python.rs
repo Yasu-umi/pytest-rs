@@ -1906,6 +1906,30 @@ pub fn cache_write_session(
     Ok(())
 }
 
+/// The nodeid --stepwise stopped at last run (cache/stepwise), if any.
+pub fn cache_stepwise(py: Python<'_>, config: &crate::config::Config) -> Option<String> {
+    let read = || -> PyResult<Option<String>> {
+        let cache = cache_object(py, config)?;
+        let value = cache.call_method1("get", ("cache/stepwise", py.None()))?;
+        value.extract()
+    };
+    read().ok().flatten()
+}
+
+/// Persist (or clear, with None) the --stepwise resume point.
+pub fn cache_write_stepwise(
+    py: Python<'_>,
+    config: &crate::config::Config,
+    nodeid: Option<&str>,
+) -> PyResult<()> {
+    let cache = cache_object(py, config)?;
+    match nodeid {
+        Some(nodeid) => cache.call_method1("set", ("cache/stepwise", nodeid))?,
+        None => cache.call_method1("set", ("cache/stepwise", py.None()))?,
+    };
+    Ok(())
+}
+
 /// Nodeids seen in previous runs (cache/nodeids).
 pub fn cache_nodeids(py: Python<'_>, config: &crate::config::Config) -> Vec<String> {
     let read = || -> PyResult<Vec<String>> {

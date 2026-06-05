@@ -29,6 +29,12 @@ impl Engine {
         let mut current_file = String::new();
         let mut line = String::new();
         let maxfail = config.maxfail();
+        // --stepwise stops after the first failing item (--stepwise-skip
+        // ignores the first one); the resume point persists via the cache.
+        let stepwise =
+            (config.get_flag("sw") || config.get_flag("sw-skip")) && maxfail.is_none();
+        let sw_skip = config.get_flag("sw-skip");
+        let mut sw_failed_items = 0usize;
         // Collection errors (--continue-on-collection-errors) already count
         // toward the --maxfail budget, like pytest's session.testsfailed.
         let mut failed = session
@@ -85,9 +91,11 @@ impl Engine {
             python::set_subtest_fail_budget(py, maxfail.map(|m| m.saturating_sub(failed)));
             let reports = run_one(py, plugins, session, config, item);
             done += 1;
+            let mut item_failed = false;
             for report in reports {
                 if report.outcome == Outcome::Failed {
                     failed += 1;
+                    item_failed = true;
                 }
                 if config.no_terminal() {
                     // -p no:terminal: no progress output at all.
@@ -128,6 +136,12 @@ impl Engine {
                     line.push(c);
                 }
                 session.reports.push(report);
+            }
+            if stepwise && item_failed {
+                sw_failed_items += 1;
+                if !(sw_skip && sw_failed_items == 1) {
+                    break;
+                }
             }
         }
         if config.verbose == 0 && !config.quiet && !config.no_terminal() && !current_file.is_empty()

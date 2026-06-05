@@ -447,6 +447,9 @@ impl Config {
             ("lf", "last-failed"),
             ("ff", "failed-first"),
             ("nf", "new-first"),
+            ("sw", "stepwise"),
+            ("sw-skip", "stepwise-skip"),
+            ("sw-reset", "stepwise-reset"),
         ] {
             cmd = cmd.arg(
                 clap::Arg::new(name)
