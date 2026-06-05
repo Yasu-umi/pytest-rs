@@ -257,6 +257,35 @@ pub(crate) fn run_one(
         location: None,
     });
 
+    if setup_show_active(config) {
+        let mut names: Vec<String> = kwargs
+            .iter()
+            .map(|(name, _)| name.clone())
+            .filter(|name| name != "request")
+            .collect();
+        for def in session.registry.autouse_for(&item.nodeid) {
+            if !names.contains(&def.name) {
+                names.push(def.name.clone());
+            }
+        }
+        names.sort_unstable();
+        if names.is_empty() {
+            println!("        {}", item.nodeid);
+        } else {
+            println!(
+                "        {} (fixtures used: {})",
+                item.nodeid,
+                names.join(", ")
+            );
+        }
+        if config.get_flag("setup-only") || config.get_flag("setup-plan") {
+            // Fixtures only: tear down without calling the test.
+            teardown_one(py, plugins, session, config, item, &mut reports);
+            python::end_item_context(py);
+            return reports;
+        }
+    }
+
     // ---- call --------------------------------------------------------------
     let call_started = Instant::now();
     let call_result = (|| -> PyResult<bool> {
@@ -623,6 +652,50 @@ fn resolve_fixture_def(
         }
     };
 
+    // --setup-show narration: SETUP now, TEARDOWN via a print finalizer
+    // pushed before the real one (LIFO: it prints after the teardown ran).
+    if setup_show_active(config) {
+        let (scope_char, indent) = scope_display(def.scope);
+        // Parametrized fixtures display their current param: name['spam'].
+        let display_name = match &fixture_param {
+            Some((_, value)) => {
+                let rendered = value
+                    .bind(py)
+                    .repr()
+                    .map(|repr| repr.to_string())
+                    .unwrap_or_default();
+                format!("{}[{rendered}]", def.name)
+            }
+            None => def.name.clone(),
+        };
+        let mut dep_names: Vec<&str> = kwargs
+            .iter()
+            .map(|(name, _)| name.as_str())
+            .filter(|name| *name != "request")
+            .collect();
+        dep_names.sort_unstable();
+        if dep_names.is_empty() {
+            println!("{:indent$}SETUP    {scope_char} {display_name}", "");
+        } else {
+            println!(
+                "{:indent$}SETUP    {scope_char} {display_name} (fixtures used: {})",
+                "",
+                dep_names.join(", ")
+            );
+        }
+        if let Ok(printer) = py
+            .import("pytest._setupshow")
+            .and_then(|m| m.getattr("teardown_printer"))
+            .and_then(|f| f.call1((" ".repeat(indent), scope_char.to_string(), display_name)))
+        {
+            session.finalizers.push(PendingFinalizer {
+                scope: def.scope,
+                instance: instance.clone(),
+                finalizer: Finalizer::Callable(printer.unbind()),
+            });
+        }
+    }
+
     // Finalizers registered through request.addfinalizer run at this
     // fixture's scope teardown, LIFO.
     if let Some(request) = &request {
@@ -777,4 +850,19 @@ pub fn summary_line(reports: &[TestReport], warning_count: usize, elapsed: Durat
         "\x1b[32m" // green
     };
     format!("{color}{}\x1b[0m", crate::engine::center_banner(&body))
+}
+
+/// --setup-show display attributes: (scope letter, indent width).
+fn scope_display(scope: Scope) -> (char, usize) {
+    match scope {
+        Scope::Session => ('S', 0),
+        Scope::Package => ('P', 2),
+        Scope::Module => ('M', 4),
+        Scope::Class => ('C', 6),
+        Scope::Function => ('F', 8),
+    }
+}
+
+fn setup_show_active(config: &Config) -> bool {
+    config.get_flag("setup-only") || config.get_flag("setup-plan") || config.get_flag("setup-show")
 }

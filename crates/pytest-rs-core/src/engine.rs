@@ -80,6 +80,11 @@ impl Engine {
             return exit_code::INTERRUPTED;
         }
 
+        if let Err(message) = self.check_strict_markers() {
+            println!("{message}");
+            return exit_code::USAGE_ERROR;
+        }
+
         let collected = self.session.items.len();
         if let Err(err) = self.apply_selection(py) {
             if python::is_usage_error(py, &err) {
@@ -316,6 +321,65 @@ impl Engine {
         };
         for plugin in self.plugins.iter_mut() {
             plugin.pytest_sessionstart(&mut ctx)?;
+        }
+        Ok(())
+    }
+
+    /// --strict-markers / --strict (CLI or ini): every mark must be
+    /// registered in the `markers` ini option or be a builtin/bundled one.
+    fn check_strict_markers(&self) -> Result<(), String> {
+        let strict = self.config.get_flag("strict-markers")
+            || self.config.get_flag("strict")
+            || matches!(
+                self.config.get_ini("strict_markers").map(str::trim),
+                Some("true") | Some("True") | Some("1")
+            )
+            || matches!(
+                self.config.get_ini("strict").map(str::trim),
+                Some("true") | Some("True") | Some("1")
+            );
+        if !strict {
+            return Ok(());
+        }
+
+        // Marks owned by the core or bundled plugins.
+        const KNOWN: [&str; 12] = [
+            "skip",
+            "skipif",
+            "xfail",
+            "parametrize",
+            "usefixtures",
+            "filterwarnings",
+            "tryfirst",
+            "trylast",
+            "asyncio",
+            "benchmark",
+            "no_cover",
+            "xdist_group",
+        ];
+        let registered: std::collections::HashSet<String> = self
+            .config
+            .get_ini("markers")
+            .map(|lines| {
+                lines
+                    .lines()
+                    .filter_map(|line| {
+                        let name = line.trim().split([':', '(']).next()?.trim();
+                        (!name.is_empty()).then(|| name.to_string())
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        for item in &self.session.items {
+            for mark in &item.marks {
+                if !KNOWN.contains(&mark.name.as_str()) && !registered.contains(&mark.name) {
+                    return Err(format!(
+                        "'{}' not found in `markers` configuration option",
+                        mark.name
+                    ));
+                }
+            }
         }
         Ok(())
     }

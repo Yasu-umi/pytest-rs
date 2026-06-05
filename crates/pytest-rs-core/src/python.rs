@@ -44,6 +44,20 @@ pub fn install_shim(py: Python<'_>) -> PyResult<PathBuf> {
     // Assertion rewriting: rewrite `assert` in test modules at import time.
     py.import("pytest._rewrite")?.call_method0("install")?;
 
+    // The embedded interpreter never runs Python's exit machinery, so a
+    // block-buffered (piped) stdout would silently drop test prints.
+    py.run(
+        c"import sys
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(line_buffering=True)
+    except (AttributeError, ValueError):
+        pass
+",
+        None,
+        None,
+    )?;
+
     // The pytester fixture spawns this binary to run nested sessions.
     if let Ok(exe) = std::env::current_exe() {
         py.import("os")?

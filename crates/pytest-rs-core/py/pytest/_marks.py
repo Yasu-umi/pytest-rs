@@ -10,14 +10,52 @@ class Mark:
     def __repr__(self):
         return f"Mark({self.name!r}, {self.args!r}, {self.kwargs!r})"
 
+    def __eq__(self, other):
+        if not isinstance(other, Mark):
+            return NotImplemented
+        return (self.name, self.args, self.kwargs) == (other.name, other.args, other.kwargs)
+
+    def __hash__(self):
+        return hash((self.name, self.args))
+
+    def combined_with(self, other):
+        assert self.name == other.name
+        return Mark(self.name, self.args + other.args, {**self.kwargs, **other.kwargs})
+
 
 class MarkDecorator:
-    def __init__(self, mark):
+    def __init__(self, mark, *, _ispytest=False):
         self.mark = mark
 
     @property
     def name(self):
         return self.mark.name
+
+    @property
+    def args(self):
+        return self.mark.args
+
+    @property
+    def kwargs(self):
+        return self.mark.kwargs
+
+    def __repr__(self):
+        return f"MarkDecorator({self.mark!r})"
+
+    def __eq__(self, other):
+        if isinstance(other, MarkDecorator):
+            return self.mark == other.mark
+        return NotImplemented
+
+    def __hash__(self):
+        return hash(self.mark)
+
+    def with_args(self, *args, **kwargs):
+        """Bind arguments without applying — even a lone callable arg is an
+        argument, not a decoration target."""
+        return MarkDecorator(
+            Mark(self.mark.name, self.mark.args + args, {**self.mark.kwargs, **kwargs})
+        )
 
     def __call__(self, *args, **kwargs):
         if len(args) == 1 and not kwargs and (callable(args[0]) or isinstance(args[0], type)):
@@ -26,9 +64,7 @@ class MarkDecorator:
             existing.append(self.mark)
             func.pytestmark = existing
             return func
-        return MarkDecorator(
-            Mark(self.mark.name, self.mark.args + args, {**self.mark.kwargs, **kwargs})
-        )
+        return self.with_args(*args, **kwargs)
 
 
 class MarkGenerator:

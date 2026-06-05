@@ -290,7 +290,7 @@ impl Config {
         // Core pytest options parsed into flags/values (queried via
         // get_flag/get_value); some are still inert and gain behavior as
         // features land.
-        const CORE_FLAGS: [&str; 11] = [
+        const CORE_FLAGS: [&str; 14] = [
             "strict-config",
             "strict-markers",
             "strict",
@@ -302,6 +302,9 @@ impl Config {
             "nbmake",          // accepted-but-inert: notebook collection not implemented
             "worker",          // hidden: this process is a -n worker (IPC on stdin/stdout)
             "runxfail",        // report xfail-marked tests as if unmarked
+            "setup-only",      // run fixtures, skip the tests
+            "setup-plan",      // like --setup-only (fixtures do execute here)
+            "setup-show",      // run tests, narrating fixture setup/teardown
         ];
         const CORE_VALUES: [(&str, Option<char>); 20] = [
             ("report-chars", Some('r')),
