@@ -546,29 +546,36 @@ impl Engine {
     }
 
     /// The "short test summary info" section, controlled by -r chars
-    /// (default fE: failures and errors).
+    /// (default fE). Groups print in the order the chars were given,
+    /// matching pytest (a -> sxXEf, A -> PpsxXEf, F/S are old aliases).
     fn print_short_summary(&self) {
-        let chars = self.config.get_value("report-chars").unwrap_or("fE");
-        let chars = if chars.contains('a') {
-            "fEsxX".to_string()
-        } else if chars.contains('A') {
-            "fEsxXp".to_string()
-        } else if chars == "N" {
-            String::new()
-        } else {
-            chars.to_string()
-        };
+        let given = self.config.get_value("report-chars").unwrap_or("fE");
+        let mut chars = String::new();
+        for c in given.chars() {
+            match c {
+                'a' => chars = "sxXEf".to_string(),
+                'A' => chars = "PpsxXEf".to_string(),
+                'N' => chars.clear(),
+                'F' | 'S' => {
+                    let lower = c.to_ascii_lowercase();
+                    if !chars.contains(lower) {
+                        chars.push(lower);
+                    }
+                }
+                c if !chars.contains(c) => chars.push(c),
+                _ => {}
+            }
+        }
 
         let mut lines = Vec::new();
-        // Skips group by (location, reason): "SKIPPED [2] file.py:3: reason".
-        let mut skip_groups: Vec<((String, String), usize)> = Vec::new();
-        for report in &self.session.reports {
-            let entry = match (report.phase, report.outcome) {
-                (Phase::Call, Outcome::Failed) if chars.contains('f') => Some("FAILED"),
-                (Phase::Setup | Phase::Teardown, Outcome::Failed) if chars.contains('E') => {
-                    Some("ERROR")
-                }
-                (_, Outcome::Skipped) if chars.contains('s') => {
+        for c in chars.chars() {
+            if c == 's' {
+                // Skips fold by (location, reason): "SKIPPED [2] file.py:3: x".
+                let mut skip_groups: Vec<((String, String), usize)> = Vec::new();
+                for report in &self.session.reports {
+                    if report.outcome != Outcome::Skipped {
+                        continue;
+                    }
                     let location = report
                         .location
                         .clone()
@@ -579,14 +586,22 @@ impl Engine {
                         Some((_, count)) => *count += 1,
                         None => skip_groups.push((key, 1)),
                     }
-                    None
                 }
-                (_, Outcome::XFailed) if chars.contains('x') => Some("XFAIL"),
-                (_, Outcome::XPassed) if chars.contains('X') => Some("XPASS"),
-                (Phase::Call, Outcome::Passed) if chars.contains('p') => Some("PASSED"),
-                _ => None,
-            };
-            if let Some(word) = entry {
+                for ((location, reason), count) in skip_groups {
+                    lines.push(format!("SKIPPED [{count}] {location}: {reason}"));
+                }
+                continue;
+            }
+            for report in &self.session.reports {
+                let word = match (c, report.phase, report.outcome) {
+                    ('f', Phase::Call, Outcome::Failed) => "FAILED",
+                    ('E', Phase::Setup | Phase::Teardown, Outcome::Failed) => "ERROR",
+                    ('x', _, Outcome::XFailed) => "XFAIL",
+                    ('X', _, Outcome::XPassed) => "XPASS",
+                    // 'P' selects the PASSES section, not a summary line.
+                    ('p', Phase::Call, Outcome::Passed) => "PASSED",
+                    _ => continue,
+                };
                 let mut line = format!("{word} {}", report.nodeid);
                 // Collection errors print bare, like pytest's "ERROR file.py".
                 let is_collect_error = self
@@ -601,9 +616,6 @@ impl Engine {
                 }
                 lines.push(line);
             }
-        }
-        for ((location, reason), count) in skip_groups {
-            lines.push(format!("SKIPPED [{count}] {location}: {reason}"));
         }
         if lines.is_empty() {
             return;
