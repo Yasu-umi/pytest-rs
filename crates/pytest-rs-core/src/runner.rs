@@ -167,6 +167,10 @@ pub(crate) fn run_one(
     // configure time) are ignored; tests report their real outcomes.
     let xfail = item.get_closest_marker("xfail").is_some() && !config.get_flag("runxfail");
 
+    // request.getfixturevalue() support: expose this item's engine state to
+    // Python for the duration of the run (popped when the guard drops).
+    let _resolve_ctx = push_resolve_ctx(plugins, session, config, item);
+
     // Warnings emitted from here on are attributed to this item in the
     // warnings summary.
     let _ = py
@@ -261,6 +265,8 @@ pub(crate) fn run_one(
             Some(instance) => instance.bind(py).getattr(item.func_name.as_str())?.unbind(),
             None => item.func.clone_ref(py),
         };
+
+        set_resolve_ctx_instance(py, instance.as_ref());
 
         // xunit-style setup_module/setup_class/setup_method/setup_function.
         python::ensure_xunit_setup(py, session, item, instance.as_ref())?;
@@ -602,6 +608,109 @@ pub(crate) fn teardown_scope(
         .fixture_cache
         .retain(|(_, _, inst, _), _| inst != instance);
     errors
+}
+
+/// State for `request.getfixturevalue()`: raw pointers to the engine state
+/// of the item currently running on this thread. Only dereferenced from
+/// `getfixturevalue` while Python code called by the runner is on the stack —
+/// the suspended Rust frames in between never touch the session concurrently.
+struct ResolveCtx {
+    plugins: *const [Box<dyn Plugin>],
+    session: *mut Session,
+    config: *const Config,
+    item: *const TestItem,
+    class_instance: Option<Py<PyAny>>,
+}
+
+thread_local! {
+    static RESOLVE_CTX: std::cell::RefCell<Vec<ResolveCtx>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Pops the context pushed by `push_resolve_ctx` (kept alive for the whole
+/// item run, teardown included).
+pub(crate) struct ResolveCtxGuard(());
+
+impl Drop for ResolveCtxGuard {
+    fn drop(&mut self) {
+        RESOLVE_CTX.with(|stack| {
+            stack.borrow_mut().pop();
+        });
+    }
+}
+
+fn push_resolve_ctx(
+    plugins: &[Box<dyn Plugin>],
+    session: &mut Session,
+    config: &Config,
+    item: &TestItem,
+) -> ResolveCtxGuard {
+    RESOLVE_CTX.with(|stack| {
+        stack.borrow_mut().push(ResolveCtx {
+            plugins,
+            session,
+            config,
+            item,
+            class_instance: None,
+        });
+    });
+    ResolveCtxGuard(())
+}
+
+/// Record the test's class instance once setup created it, so dynamically
+/// requested fixtures with needs_instance bind to the right object.
+fn set_resolve_ctx_instance(py: Python<'_>, instance: Option<&Py<PyAny>>) {
+    RESOLVE_CTX.with(|stack| {
+        if let Some(ctx) = stack.borrow_mut().last_mut() {
+            ctx.class_instance = instance.map(|obj| obj.clone_ref(py));
+        }
+    });
+}
+
+/// `request.getfixturevalue(name)`: dynamic fixture resolution from Python
+/// while a test item is running (fixture setup, the test body, or teardown).
+#[allow(unsafe_code)]
+pub(crate) fn getfixturevalue(py: Python<'_>, name: &str) -> PyResult<Py<PyAny>> {
+    let ctx = RESOLVE_CTX.with(|stack| {
+        let stack = stack.borrow();
+        stack.last().map(|ctx| {
+            (
+                ctx.plugins,
+                ctx.session,
+                ctx.config,
+                ctx.item,
+                ctx.class_instance.as_ref().map(|obj| obj.clone_ref(py)),
+            )
+        })
+    });
+    let Some((plugins, session, config, item, instance)) = ctx else {
+        return Err(pyo3::exceptions::PyRuntimeError::new_err(
+            "getfixturevalue() is only available while a test is running",
+        ));
+    };
+    // Safety: the pointers were pushed by the run_one frame below us on this
+    // thread's stack and stay valid until its drop guard pops them; that
+    // frame is suspended inside a Python call and does not touch the session
+    // while Python (and hence this resolver) runs.
+    let (plugins, session, config, item) = unsafe { (&*plugins, &mut *session, &*config, &*item) };
+    // pytest raises FixtureLookupError for unknown names (callers catch it).
+    if name != "pytestconfig" && session.registry.lookup(name, &item.nodeid).is_none() {
+        let err_type = py.import("_pytest.fixtures")?.getattr("FixtureLookupError")?;
+        return Err(PyErr::from_value(
+            err_type.call1((format!("fixture '{name}' not found"),))?,
+        ));
+    }
+    let mut stack = Vec::new();
+    resolve_fixture(
+        py,
+        plugins,
+        session,
+        config,
+        name,
+        item,
+        instance.as_ref(),
+        &mut stack,
+    )
 }
 
 /// Resolve one fixture by name for an item, using the cache, recursing into

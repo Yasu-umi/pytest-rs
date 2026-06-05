@@ -160,6 +160,12 @@ impl PyRequest {
         Ok(self.node.bind(py).getattr("function")?.unbind())
     }
 
+    /// Dynamically resolve (and cache) a fixture by name, like pytest's
+    /// request.getfixturevalue. Delegates to the runner's per-item context.
+    fn getfixturevalue(&self, py: Python<'_>, argname: &str) -> PyResult<Py<PyAny>> {
+        crate::runner::getfixturevalue(py, argname)
+    }
+
     fn addfinalizer(&self, finalizer: Py<PyAny>) {
         self.finalizers
             .lock()

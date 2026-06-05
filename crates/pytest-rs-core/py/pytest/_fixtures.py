@@ -1,6 +1,10 @@
 """The @pytest.fixture decorator: records metadata, resolved by the engine."""
 
 
+class FixtureLookupError(LookupError):
+    """Raised by request.getfixturevalue() for unknown fixture names."""
+
+
 class FixtureFunctionMarker:
     def __init__(self, scope="function", params=None, autouse=False, ids=None, name=None):
         self.scope = scope

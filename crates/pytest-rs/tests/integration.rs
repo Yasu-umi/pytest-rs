@@ -869,3 +869,45 @@ class TestCls:
         "out: {out}"
     );
 }
+
+#[test]
+fn getfixturevalue_dynamic_resolution() {
+    let suite = TempSuite::new("getfixturevalue");
+    suite.write(
+        "test_gfv.py",
+        r#"
+import pytest
+
+@pytest.fixture
+def base():
+    return 10
+
+@pytest.fixture
+def derived(request):
+    return request.getfixturevalue("base") + 1
+
+def test_in_fixture(derived):
+    assert derived == 11
+
+def test_cache_identity(request, base):
+    # dynamic resolution shares the cache with static injection
+    assert request.getfixturevalue("base") is base
+
+def test_missing(request):
+    with pytest.raises(pytest.FixtureLookupError):
+        request.getfixturevalue("nope")
+
+class TestCls:
+    @pytest.fixture
+    def needs_self(self):
+        return type(self).__name__
+
+    def test_instance_bound(self, request):
+        assert request.getfixturevalue("needs_self") == "TestCls"
+"#,
+    );
+    let output = suite.run(&["test_gfv.py"]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(out.contains("4 passed"), "out: {out}");
+}

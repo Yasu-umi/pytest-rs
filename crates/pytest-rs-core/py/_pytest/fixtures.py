@@ -4,8 +4,7 @@ import pytest
 FixtureRequest = getattr(pytest, "FixtureRequest", object)
 
 
-class FixtureLookupError(LookupError):
-    pass
+from pytest._fixtures import FixtureLookupError as FixtureLookupError  # noqa: E402
 
 
 class FixtureFunctionDefinition:
