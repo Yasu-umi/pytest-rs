@@ -618,26 +618,36 @@ def _is_mocked(obj: Any) -> bool:
 
 
 def _patch_unwrap_mock_aware():
-    """Context manager that patches inspect.unwrap to skip mock objects."""
-    import contextlib, inspect
+    """Context manager that patches inspect.unwrap to skip mock objects
+    and warn (then re-raise) when a broken object explodes during unwrap."""
+    import contextlib
 
     @contextlib.contextmanager
     def _ctx():
-        original = inspect.unwrap
+        real_unwrap = inspect.unwrap
 
-        def unwrap_safe(obj, *, stop=None):
-            if _is_mocked(obj):
-                return obj
+        def _mock_aware_unwrap(func, *, stop=None):
+            from pytest._warning_types import PytestWarning
+
             try:
-                return original(obj, stop=stop)
-            except Exception:
-                return obj
+                if stop is None or stop is _is_mocked:
+                    return real_unwrap(func, stop=_is_mocked)
+                _stop = stop
+                return real_unwrap(func, stop=lambda obj: _is_mocked(obj) or _stop(func))
+            except Exception as e:
+                warnings.warn(
+                    f"Got {e!r} when unwrapping {func!r}.  This is usually caused "
+                    "by a violation of Python's object protocol; see e.g. "
+                    "https://github.com/pytest-dev/pytest/issues/5080",
+                    PytestWarning,
+                )
+                raise
 
-        inspect.unwrap = unwrap_safe
+        inspect.unwrap = _mock_aware_unwrap
         try:
             yield
         finally:
-            inspect.unwrap = original
+            inspect.unwrap = real_unwrap
 
     return _ctx()
 
