@@ -6,6 +6,10 @@ class PytestDeprecationWarning(PytestWarning, DeprecationWarning):
     pass
 
 
+class PytestRemovedIn9Warning(PytestDeprecationWarning):
+    pass
+
+
 class PytestRemovedIn10Warning(PytestDeprecationWarning):
     pass
 

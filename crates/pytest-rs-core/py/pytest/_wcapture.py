@@ -8,6 +8,12 @@ pytest's warning capture.
 import warnings
 
 captured: list[dict[str, object]] = []
+current_test: str | None = None
+
+
+def set_current_test(nodeid):
+    global current_test
+    current_test = nodeid
 
 
 def _showwarning(message, category, filename, lineno, file=None, line=None):
@@ -17,6 +23,7 @@ def _showwarning(message, category, filename, lineno, file=None, line=None):
             "category": category.__name__,
             "filename": filename,
             "lineno": lineno,
+            "test": current_test,
         }
     )
 
@@ -35,8 +42,16 @@ def count():
 
 
 def summary_lines():
+    """Warnings grouped under the test nodeid they were emitted in, the way
+    pytest's warnings summary does."""
     lines = []
+    last_test = None
     for warning in captured:
+        test = warning.get("test")
+        if test and test != last_test:
+            lines.append(test)
+        last_test = test
         location = f"{warning['filename']}:{warning['lineno']}"
-        lines.append(f"{location}: {warning['category']}: {warning['message']}")
+        indent = "  " if test else ""
+        lines.append(f"{indent}{location}: {warning['category']}: {warning['message']}")
     return lines

@@ -22,5 +22,6 @@ def fixture(fixture_function=None, *, loop_scope=None, **kwargs):
     return apply
 
 
-def is_async_test(item):  # pragma: no cover - compat surface
-    return False
+def is_async_test(item):
+    """True for items the asyncio plugin will run (marked async tests)."""
+    return item.get_closest_marker("asyncio") is not None

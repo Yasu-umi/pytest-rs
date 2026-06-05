@@ -52,6 +52,7 @@ from pytest._warning_types import PytestCollectionWarning as PytestCollectionWar
 from pytest._warning_types import PytestConfigWarning as PytestConfigWarning
 from pytest._warning_types import PytestDeprecationWarning as PytestDeprecationWarning
 from pytest._warning_types import PytestExperimentalApiWarning as PytestExperimentalApiWarning
+from pytest._warning_types import PytestRemovedIn9Warning as PytestRemovedIn9Warning
 from pytest._warning_types import PytestRemovedIn10Warning as PytestRemovedIn10Warning
 from pytest._warning_types import PytestReturnNotNoneWarning as PytestReturnNotNoneWarning
 from pytest._warning_types import PytestUnknownMarkWarning as PytestUnknownMarkWarning

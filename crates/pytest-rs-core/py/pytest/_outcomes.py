@@ -19,9 +19,11 @@ class XFailed(Failed):
     pass
 
 
-def skip(reason=""):
+def skip(reason="", allow_module_level=False):
     __tracebackhide__ = True
-    raise Skipped(msg=reason)
+    exc = Skipped(msg=reason)
+    exc.allow_module_level = allow_module_level
+    raise exc
 
 
 def fail(reason="", pytrace=True):

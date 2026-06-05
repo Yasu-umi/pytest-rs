@@ -37,7 +37,7 @@ class MonkeyPatch:
             target = importlib.import_module(module_path)
         elif value is self._notset:
             raise TypeError("setattr requires a value when target is an object")
-        old = getattr(target, name, self._notset)
+        old = self._old_value(target, name)
         if raising and old is self._notset:
             raise AttributeError(f"{target!r} has no attribute {name!r}")
         self._setattr.append((target, name, old))
@@ -50,13 +50,21 @@ class MonkeyPatch:
             module_path, _, attr_name = target.rpartition(".")
             target = importlib.import_module(module_path)
             name = attr_name
-        old = getattr(target, name, self._notset)
-        if old is self._notset:
+        if not hasattr(target, name):
             if raising:
                 raise AttributeError(name)
             return
-        self._setattr.append((target, name, old))
+        self._setattr.append((target, name, self._old_value(target, name)))
         delattr(target, name)
+
+    def _old_value(self, target, name):
+        """The restore value: for classes, read the raw __dict__ entry so
+        descriptors (staticmethod/classmethod) are not unwrapped."""
+        import inspect
+
+        if inspect.isclass(target):
+            return target.__dict__.get(name, self._notset)
+        return getattr(target, name, self._notset)
 
     def setitem(self, mapping, name, value):
         self._setitem.append((mapping, name, mapping.get(name, self._notset)))
@@ -70,17 +78,44 @@ class MonkeyPatch:
         self._setitem.append((mapping, name, mapping[name]))
         del mapping[name]
 
+    @staticmethod
+    def _warn_if_env_name_is_not_str(name):
+        import warnings
+
+        from pytest._warning_types import PytestWarning
+
+        if not isinstance(name, str):
+            warnings.warn(
+                PytestWarning(
+                    f"Environment variable name {name!r} should be a str"
+                ),
+                stacklevel=3,
+            )
+
     def setenv(self, name, value, prepend=None):
         import os
+        import warnings
 
-        value = str(value)
+        if not isinstance(value, str):
+            from pytest._warning_types import PytestWarning
+
+            warnings.warn(
+                PytestWarning(
+                    f"Value of environment variable {name} type should be str, but got "
+                    f"{value!r} (type: {type(value).__name__}); converted to str implicitly"
+                ),
+                stacklevel=2,
+            )
+            value = str(value)
         if prepend and name in os.environ:
             value = value + prepend + os.environ[name]
+        self._warn_if_env_name_is_not_str(name)
         self.setitem(os.environ, name, value)
 
     def delenv(self, name, raising=True):
         import os
 
+        self._warn_if_env_name_is_not_str(name)
         self.delitem(os.environ, name, raising=raising)
 
     def syspath_prepend(self, path):

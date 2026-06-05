@@ -1,15 +1,20 @@
-"""pytest.warns / recwarn: warning capture and assertion."""
+"""pytest.warns / recwarn: warning capture and assertion (ported from
+_pytest/recwarn.py)."""
 
 import re as _re
 import warnings as _warnings
+from pprint import pformat as _pformat
 
 from pytest._fixtures import fixture
-from pytest._outcomes import fail
+from pytest._outcomes import Exit, fail
 
 
-class WarningsRecorder:
+class WarningsRecorder(_warnings.catch_warnings):
+    """A context manager to record raised warnings (adapted from
+    `warnings.catch_warnings`)."""
+
     def __init__(self, *, _ispytest=False):
-        self._catch = _warnings.catch_warnings(record=True)
+        super().__init__(record=True)
         self._entered = False
         self._list = []
 
@@ -17,95 +22,168 @@ class WarningsRecorder:
     def list(self):
         return self._list
 
-    def __enter__(self):
-        if self._entered:
-            raise RuntimeError(f"Cannot enter {self!r} twice")
-        self._list = self._catch.__enter__()
-        self._entered = True
-        _warnings.simplefilter("always")
-        return self
-
-    def __exit__(self, exc_type, exc_value, tb):
-        if not self._entered:
-            raise RuntimeError(f"Cannot exit {self!r} without entering first")
-        result = self._catch.__exit__(exc_type, exc_value, tb)
-        self._entered = False
-        return result
-
-    def __len__(self):
-        return len(self._list)
-
-    def __getitem__(self, index):
-        return self._list[index]
+    def __getitem__(self, i):
+        return self._list[i]
 
     def __iter__(self):
         return iter(self._list)
 
+    def __len__(self):
+        return len(self._list)
+
     def pop(self, cls=Warning):
-        """Pop the first warning of exact category `cls`, or the first
-        subclass match when there is no exact match (pytest behavior)."""
-        best_index = None
-        for index, w in enumerate(self._list):
-            if w.category is cls:
-                best_index = index
-                break
-            if best_index is None and issubclass(w.category, cls):
-                best_index = index
-        if best_index is not None:
-            return self._list.pop(best_index)
+        """Pop the first recorded warning which is an instance of ``cls``,
+        but not an instance of a child class of any other match."""
+        best_idx = None
+        for i, w in enumerate(self._list):
+            if w.category == cls:
+                return self._list.pop(i)  # exact match, stop looking
+            if issubclass(w.category, cls) and (
+                best_idx is None
+                or not issubclass(w.category, self._list[best_idx].category)
+            ):
+                best_idx = i
+        if best_idx is not None:
+            return self._list.pop(best_idx)
         __tracebackhide__ = True
         raise AssertionError(f"{cls!r} not found in warning list")
 
     def clear(self):
         self._list[:] = []
 
+    def __enter__(self):
+        if self._entered:
+            __tracebackhide__ = True
+            raise RuntimeError(f"Cannot enter {self!r} twice")
+        _list = super().__enter__()
+        self._list = _list
+        _warnings.simplefilter("always")
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if not self._entered:
+            __tracebackhide__ = True
+            raise RuntimeError(f"Cannot exit {self!r} without entering first")
+        super().__exit__(exc_type, exc_val, exc_tb)
+        # Reset entered state so the context manager is reusable.
+        self._entered = False
+
 
 class WarningsChecker(WarningsRecorder):
     def __init__(self, expected_warning=Warning, match_expr=None, *, _ispytest=False):
-        super().__init__(_ispytest=_ispytest)
-        self.expected_warning = expected_warning
+        super().__init__(_ispytest=True)
+
+        msg = "exceptions must be derived from Warning, not %s"
+        if isinstance(expected_warning, tuple):
+            for exc in expected_warning:
+                if not issubclass(exc, Warning):
+                    raise TypeError(msg % type(exc))
+            expected_warning_tup = expected_warning
+        elif isinstance(expected_warning, type) and issubclass(
+            expected_warning, Warning
+        ):
+            expected_warning_tup = (expected_warning,)
+        else:
+            raise TypeError(msg % type(expected_warning))
+
+        self.expected_warning = expected_warning_tup
         self.match_expr = match_expr
 
-    def __exit__(self, exc_type, exc_value, tb):
+    def matches(self, warning):
+        return issubclass(warning.category, self.expected_warning) and bool(
+            self.match_expr is None
+            or _re.search(self.match_expr, str(warning.message))
+        )
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        super().__exit__(exc_type, exc_val, exc_tb)
+
         __tracebackhide__ = True
-        suppressed = super().__exit__(exc_type, exc_value, tb)
-        if exc_type is not None:
-            return suppressed
-        matched = [w for w in self._list if issubclass(w.category, self.expected_warning)]
-        if not matched:
-            fail(
-                f"DID NOT WARN. No warnings of type {self.expected_warning} were emitted.\n"
-                f" Emitted warnings: {[w.category.__name__ for w in self._list]}."
-            )
-        if self.match_expr is not None and not any(
-            _re.search(self.match_expr, str(w.message)) for w in matched
+
+        # BaseExceptions like pytest.{skip,fail,xfail,exit} or Ctrl-C within
+        # pytest.warns should *not* trigger "DID NOT WARN"; control-flow
+        # exceptions always propagate.
+        if exc_val is not None and (
+            not isinstance(exc_val, Exception) or isinstance(exc_val, Exit)
         ):
-            fail(
-                f"DID NOT WARN. No warnings of type {self.expected_warning} "
-                f"matching the regex {self.match_expr!r} were emitted.\n"
-                f" Emitted warnings: {[str(w.message) for w in matched]}."
-            )
-        return suppressed
+            return
+
+        def found_str():
+            return _pformat([record.message for record in self], indent=2)
+
+        try:
+            if not any(
+                issubclass(w.category, self.expected_warning) for w in self
+            ):
+                fail(
+                    f"DID NOT WARN. No warnings of type {self.expected_warning} were emitted.\n"
+                    f" Emitted warnings: {found_str()}."
+                )
+            elif not any(self.matches(w) for w in self):
+                fail(
+                    f"DID NOT WARN. No warnings of type {self.expected_warning} matching the regex were emitted.\n"
+                    f" Regex: {self.match_expr}\n"
+                    f" Emitted warnings: {found_str()}."
+                )
+        finally:
+            # Whether or not any warnings matched, re-emit all unmatched
+            # warnings (pytest 8.0 behavior).
+            for w in self:
+                if not self.matches(w):
+                    _warnings.warn_explicit(
+                        message=w.message,
+                        category=w.category,
+                        filename=w.filename,
+                        lineno=w.lineno,
+                        module=w.__module__,
+                        source=w.source,
+                    )
+
+            # Guard against non-str warning messages (CPython #103577).
+            for w in self:
+                if type(w.message) is not UserWarning:
+                    continue
+                if not w.message.args:
+                    continue
+                msg = w.message.args[0]
+                if isinstance(msg, str):
+                    continue
+                raise TypeError(
+                    f"Warning must be str or Warning, got {msg!r} (type {type(msg).__name__})"
+                )
 
 
 def warns(expected_warning=Warning, *args, match=None, **kwargs):
-    if args:
-        func, *fargs = args
-        with WarningsChecker(expected_warning, match_expr=match):
-            return func(*fargs, **kwargs)
-    return WarningsChecker(expected_warning, match_expr=match)
+    __tracebackhide__ = True
+    if not args:
+        if kwargs:
+            argnames = ", ".join(sorted(kwargs))
+            raise TypeError(
+                f"Unexpected keyword arguments passed to pytest.warns: {argnames}"
+                "\nUse context-manager form instead?"
+            )
+        return WarningsChecker(expected_warning, match_expr=match, _ispytest=True)
+    func = args[0]
+    if not callable(func):
+        raise TypeError(f"{func!r} object (type: {type(func)}) must be callable")
+    with WarningsChecker(expected_warning, _ispytest=True):
+        return func(*args[1:], **kwargs)
 
 
 def deprecated_call(func=None, *args, **kwargs):
     __tracebackhide__ = True
-    expected = (DeprecationWarning, PendingDeprecationWarning, FutureWarning)
     if func is not None:
-        with WarningsChecker(expected):
-            return func(*args, **kwargs)
-    return WarningsChecker(expected, match_expr=kwargs.get("match"))
+        args = (func, *args)
+    return warns(
+        (DeprecationWarning, PendingDeprecationWarning, FutureWarning),
+        *args,
+        **kwargs,
+    )
 
 
 @fixture
 def recwarn():
-    with WarningsRecorder(_ispytest=True) as recorder:
-        yield recorder
+    wrec = WarningsRecorder(_ispytest=True)
+    with wrec:
+        _warnings.simplefilter("default")
+        yield wrec

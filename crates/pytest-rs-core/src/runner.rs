@@ -146,8 +146,17 @@ pub(crate) fn run_one(
     // configure time) are ignored; tests report their real outcomes.
     let xfail = item.get_closest_marker("xfail").is_some() && !config.get_flag("runxfail");
 
-    // One contextvars context per item: fixtures + test share it.
-    if let Err(err) = python::begin_item_context(py) {
+    // Warnings emitted from here on are attributed to this item in the
+    // warnings summary.
+    let _ = py
+        .import("pytest._wcapture")
+        .and_then(|m| m.call_method1("set_current_test", (item.nodeid.as_str(),)));
+
+    // One contextvars context per async item: fixtures + test share it,
+    // and context changes stay isolated between async tests. Sync tests run
+    // unisolated in the root context (pytest behavior), so their
+    // contextvar mutations are visible to later tests.
+    if item.is_coroutine && let Err(err) = python::begin_item_context(py) {
         reports.push(report_from_err(
             py,
             config,
@@ -319,12 +328,20 @@ pub(crate) fn run_one(
         },
         Ok(false) => {
             if item.is_coroutine {
+                // pytest 8.4+: unhandled async tests fail (without being
+                // called) instead of skipping.
                 TestReport {
                     nodeid: item.nodeid.clone(),
                     phase: Phase::Call,
-                    outcome: Outcome::Skipped,
+                    outcome: Outcome::Failed,
                     duration: call_started.elapsed(),
-                    longrepr: Some("async def functions are not natively supported.".to_string()),
+                    longrepr: Some(
+                        "async def functions are not natively supported.\n\
+                         You need to install a suitable plugin for your async framework, \
+                         for example:\n  - anyio\n  - pytest-asyncio\n  - pytest-tornasync\n  \
+                         - pytest-trio\n  - pytest-twisted"
+                            .to_string(),
+                    ),
                     location: None,
                 }
             } else {
@@ -659,12 +676,27 @@ fn resolve_fixture_def(
         Some(fixture_value) => (fixture_value.value, fixture_value.finalizer),
         None => {
             if def.is_coroutine || def.is_async_gen {
-                return Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
-                    "async fixture '{}' requires an async plugin (pytest-rs-asyncio)",
-                    def.name
-                )));
-            }
-            if def.is_generator {
+                // pytest 8.4 parity: an unhandled async fixture resolves to
+                // its raw coroutine/async-generator and warns (this becomes
+                // an error in pytest 9.1).
+                let test_name = item.nodeid.rsplit("::").next().unwrap_or(&item.nodeid);
+                python::warn_explicit_at(
+                    py,
+                    "PytestRemovedIn9Warning",
+                    &format!(
+                        "'{test_name}' requested an async fixture '{}', with no plugin or \
+                         hook that handled it. This is usually an error, as pytest does not \
+                         natively support it. This will turn into an error in pytest 9.\n  \
+                         See: https://docs.pytest.org/en/stable/deprecations.html\
+                         #sync-test-depending-on-async-fixture",
+                        def.name
+                    ),
+                    "_pytest/fixtures.py",
+                    1188,
+                )?;
+                let value = python::call_fixture(py, &def.func, fixture_instance, &kwargs)?;
+                (value.unbind(), None)
+            } else if def.is_generator {
                 let generator = python::call_fixture(py, &def.func, fixture_instance, &kwargs)?;
                 let value = python::next_value(py, &generator)?;
                 (value.unbind(), Some(Finalizer::GenNext(generator.unbind())))

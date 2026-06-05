@@ -82,7 +82,7 @@ fn parse_ini_section(content: &str, section: &str) -> Option<HashMap<String, Str
 /// [tool.pytest.ini_options] from pyproject.toml, stringified pytest-style
 /// (arrays become newline-joined linelists).
 fn parse_pyproject(content: &str) -> Option<HashMap<String, String>> {
-    let document: toml::Value = content.parse().ok()?;
+    let document: toml::Table = content.parse().ok()?;
     let options = document
         .get("tool")?
         .get("pytest")?

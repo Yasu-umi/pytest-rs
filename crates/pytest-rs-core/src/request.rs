@@ -9,7 +9,7 @@ use pyo3::prelude::*;
 #[pyclass(name = "Config")]
 pub struct PyConfig {
     rootdir: String,
-    ini: HashMap<String, String>,
+    ini: Mutex<HashMap<String, String>>,
     /// The argparse-namespace equivalent (`config.option`), mutable from
     /// Python so conftest hooks can stash flags on it.
     #[pyo3(get)]
@@ -20,7 +20,7 @@ impl PyConfig {
     pub fn new(rootdir: String, ini: HashMap<String, String>, option: Py<PyAny>) -> Self {
         Self {
             rootdir,
-            ini,
+            ini: Mutex::new(ini),
             option,
         }
     }
@@ -29,7 +29,21 @@ impl PyConfig {
 #[pymethods]
 impl PyConfig {
     fn getini(&self, name: &str) -> Option<String> {
-        self.ini.get(name).cloned()
+        self.ini
+            .lock()
+            .expect("config lock poisoned")
+            .get(name)
+            .cloned()
+    }
+
+    /// Append one line to a line-list ini option (e.g. "markers").
+    fn addinivalue_line(&self, name: &str, line: &str) {
+        let mut ini = self.ini.lock().expect("config lock poisoned");
+        let entry = ini.entry(name.to_string()).or_default();
+        if !entry.is_empty() {
+            entry.push('\n');
+        }
+        entry.push_str(line);
     }
 
     #[pyo3(signature = (name, default = None))]

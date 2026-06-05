@@ -37,7 +37,15 @@ pub struct AsyncioPlugin {
     default_test_loop_scope: Option<Scope>,
     /// --asyncio-debug / asyncio_debug: new loops run in asyncio debug mode.
     debug: bool,
+    /// event_loop_policy fixture values per scope instance (the override
+    /// deprecation fires once per created value, like upstream).
+    policies: RefCell<HashMap<String, Py<PyAny>>>,
 }
+
+/// The deprecation emitted when a user event_loop_policy fixture is used.
+const POLICY_DEPRECATION: &str = "Overriding the \"event_loop_policy\" fixture is deprecated \
+     and will be removed in a future version of pytest-asyncio. Use the \
+     \"pytest_asyncio_loop_factories\" hook to customize event loop creation.";
 
 impl AsyncioPlugin {
     pub fn new() -> Self {
@@ -49,6 +57,7 @@ impl AsyncioPlugin {
             default_fixture_loop_scope: None,
             default_test_loop_scope: None,
             debug: false,
+            policies: RefCell::new(HashMap::new()),
         }
     }
 
@@ -94,19 +103,83 @@ impl AsyncioPlugin {
     }
 
     /// The user's event_loop_policy fixture value, if one is defined
-    /// (resolved directly: policy fixtures are plain zero-dependency
-    /// factories in practice).
+    /// (resolved directly: policy fixtures are plain factories, optionally
+    /// parametrized through `request.param`). Values are cached per scope
+    /// instance; creation fires the override deprecation, like upstream.
     fn loop_policy(&self, ctx: &mut HookContext, item: &TestItem) -> Option<Py<PyAny>> {
         let def = ctx
             .session
             .registry
             .lookup("event_loop_policy", &item.nodeid)?;
-        if !def.param_names.is_empty() {
-            return None;
+        let py = ctx.py;
+        let param = item
+            .fixture_params
+            .iter()
+            .find(|(name, _, _)| name == "event_loop_policy")
+            .map(|(_, index, value)| (*index, value.clone_ref(py)));
+        let instance = match def.scope {
+            Scope::Function => item.nodeid.clone(),
+            Scope::Class => item.class_instance(),
+            Scope::Module => item.module_instance(),
+            // Shared by every module in the directory.
+            Scope::Package => item
+                .module_instance()
+                .rsplit_once('/')
+                .map(|(dir, _)| format!("{dir}/"))
+                .unwrap_or_default(),
+            Scope::Session => String::new(),
+        };
+        let cache_key = format!(
+            "{:?}|{instance}|{:?}",
+            def.scope,
+            param.as_ref().map(|(index, _)| *index)
+        );
+        if let Some(cached) = self.policies.borrow().get(&cache_key) {
+            return Some(cached.clone_ref(py));
         }
-        pytest_rs_core::python::call_fixture(ctx.py, &def.func, None, &[])
-            .ok()
-            .map(|value| value.unbind())
+
+        let value = if let Some((_, param_value)) = &param {
+            let node = pytest_rs_core::python::make_node(py, item).ok()?;
+            let request = Py::new(
+                py,
+                pytest_rs_core::request::PyRequest::new(
+                    Some(param_value.clone_ref(py)),
+                    node,
+                    Some("event_loop_policy".to_string()),
+                ),
+            )
+            .ok()?;
+            pytest_rs_core::python::call_fixture(
+                py,
+                &def.func,
+                None,
+                &[("request".to_string(), request.into_any())],
+            )
+            .ok()?
+            .unbind()
+        } else {
+            if !def.param_names.is_empty() {
+                return None;
+            }
+            // Class-defined policy fixtures get a throwaway instance as
+            // `self`.
+            let cls_instance: Option<Py<PyAny>> = if def.needs_instance {
+                item.cls
+                    .as_ref()
+                    .and_then(|cls| cls.bind(py).call0().ok())
+                    .map(|instance| instance.unbind())
+            } else {
+                None
+            };
+            pytest_rs_core::python::call_fixture(py, &def.func, cls_instance.as_ref(), &[])
+                .ok()?
+                .unbind()
+        };
+        let _ = Self::warn_pytest_deprecation(py, item, POLICY_DEPRECATION);
+        self.policies
+            .borrow_mut()
+            .insert(cache_key, value.clone_ref(py));
+        Some(value)
     }
 
     /// The factory recorded for this item at collection time, as a
@@ -199,6 +272,8 @@ impl AsyncioPlugin {
     }
 
     /// The loop_factories kwarg of mark.asyncio: requested factory names.
+    /// Err (a ValueError) when the value is not a non-empty sequence of
+    /// non-empty factory names.
     fn marker_loop_factories(
         &self,
         py: Python<'_>,
@@ -213,9 +288,24 @@ impl AsyncioPlugin {
         let Ok(value) = kwargs.get_item("loop_factories") else {
             return Ok(None);
         };
+        let invalid = || {
+            pytest_rs_core::pyo3::exceptions::PyValueError::new_err(
+                "mark.asyncio 'loop_factories' must be a non-empty sequence of factory names",
+            )
+        };
+        if value.is_instance_of::<pytest_rs_core::pyo3::types::PyString>() {
+            return Err(invalid());
+        }
         let mut names = Vec::new();
-        for name in value.try_iter()? {
-            names.push(name?.extract::<String>()?);
+        for name in value.try_iter().map_err(|_| invalid())? {
+            let name: String = name?.extract().map_err(|_| invalid())?;
+            if name.is_empty() {
+                return Err(invalid());
+            }
+            names.push(name);
+        }
+        if names.is_empty() {
+            return Err(invalid());
         }
         Ok(Some(names))
     }
@@ -235,7 +325,15 @@ impl AsyncioPlugin {
                 .rsplit_once("::")
                 .map(|(prefix, _)| prefix.to_string())
                 .unwrap_or_else(|| item.module_instance()),
-            Scope::Module | Scope::Package => item.module_instance(),
+            Scope::Module => item.module_instance(),
+            // Package loops are shared by every module in the directory.
+            Scope::Package => {
+                let module = item.module_instance();
+                match module.rsplit_once('/') {
+                    Some((dir, _)) => format!("{dir}/"),
+                    None => String::new(),
+                }
+            }
             Scope::Session => String::new(),
         };
         // Items parametrized over loop factories never share loops.
@@ -249,6 +347,14 @@ impl AsyncioPlugin {
             key.push('#');
             key.push_str(&name);
         }
+        // Neither do items parametrized over event_loop_policy params.
+        if let Some((_, index, _)) = item
+            .fixture_params
+            .iter()
+            .find(|(name, _, _)| name == "event_loop_policy")
+        {
+            key.push_str(&format!("@policy{index}"));
+        }
         key
     }
 
@@ -260,7 +366,13 @@ impl AsyncioPlugin {
                 .bind(py)
                 .getattr("kwargs")
                 .ok()
-                .and_then(|kwargs| kwargs.get_item("loop_scope").ok())
+                .and_then(|kwargs| {
+                    // scope= is the deprecated loop_scope alias.
+                    kwargs
+                        .get_item("loop_scope")
+                        .or_else(|_| kwargs.get_item("scope"))
+                        .ok()
+                })
                 .and_then(|scope| scope.extract::<String>().ok())
         });
         from_marker
@@ -302,6 +414,29 @@ impl AsyncioPlugin {
         let category = py.import("pytest")?.getattr("PytestWarning")?;
         py.import("warnings")?
             .call_method1("warn", (message, category))?;
+        Ok(())
+    }
+
+    fn warn_deprecation(py: Python<'_>, message: &str) -> PyResult<()> {
+        let category = py.import("builtins")?.getattr("DeprecationWarning")?;
+        py.import("warnings")?
+            .call_method1("warn", (message, category))?;
+        Ok(())
+    }
+
+    /// warn_explicit with registry=None: never deduplicated, attributed to
+    /// the item's file (upstream warns once per fixture setup).
+    fn warn_pytest_deprecation(py: Python<'_>, item: &TestItem, message: &str) -> PyResult<()> {
+        let category = py.import("pytest")?.getattr("PytestDeprecationWarning")?;
+        py.import("warnings")?.call_method1(
+            "warn_explicit",
+            (
+                message,
+                category,
+                item.path.to_string_lossy().as_ref(),
+                item.lineno,
+            ),
+        )?;
         Ok(())
     }
 }
@@ -367,7 +502,7 @@ impl Plugin for AsyncioPlugin {
                             ctx.py,
                             &format!(
                                 "'{value}' is not a valid {ini_key}. \
-                                 Valid scopes: function, class, module, package, session."
+                                 Valid scopes are: function, class, module, package, session."
                             ),
                         ));
                     }
@@ -403,7 +538,85 @@ impl Plugin for AsyncioPlugin {
         items: &mut Vec<TestItem>,
     ) -> PyResult<()> {
         let py = ctx.py;
-        let taken = std::mem::take(items);
+        // Pre-pass: the implicit asyncio mark in auto mode, and expansion
+        // of async items over parametrized event_loop_policy fixtures.
+        let pre = std::mem::take(items);
+        let mut taken = Vec::new();
+        for mut item in pre {
+            if !item.is_coroutine || !self.applicable(&item) {
+                taken.push(item);
+                continue;
+            }
+            if self.mode == Mode::Auto && item.get_closest_marker("asyncio").is_none() {
+                let mark = py
+                    .import("pytest")?
+                    .getattr("mark")?
+                    .getattr("asyncio")?
+                    .getattr("mark")?;
+                item.marks.push(pytest_rs_core::collect::MarkData {
+                    name: "asyncio".to_string(),
+                    obj: mark.unbind(),
+                });
+            }
+            let policy_def = ctx.session.registry.lookup("event_loop_policy", &item.nodeid);
+            let Some(policy_def) = policy_def else {
+                taken.push(item);
+                continue;
+            };
+            let already_expanded = item
+                .fixture_params
+                .iter()
+                .any(|(name, _, _)| name == "event_loop_policy");
+            let Some(params) = policy_def.params.as_ref().filter(|_| !already_expanded) else {
+                taken.push(item);
+                continue;
+            };
+            let values: Vec<Py<PyAny>> = params
+                .bind(py)
+                .try_iter()?
+                .map(|value| value.map(|v| v.unbind()))
+                .collect::<PyResult<_>>()?;
+            for (index, value) in values.into_iter().enumerate() {
+                let id = format!("event_loop_policy{index}");
+                let nodeid = if item.nodeid.ends_with(']') {
+                    format!("{}-{id}]", &item.nodeid[..item.nodeid.len() - 1])
+                } else {
+                    format!("{}[{id}]", item.nodeid)
+                };
+                let mut fixture_params: Vec<(String, usize, Py<PyAny>)> = item
+                    .fixture_params
+                    .iter()
+                    .map(|(name, idx, val)| (name.clone(), *idx, val.clone_ref(py)))
+                    .collect();
+                fixture_params.push(("event_loop_policy".to_string(), index, value));
+                taken.push(TestItem {
+                    nodeid,
+                    path: item.path.clone(),
+                    module_name: item.module_name.clone(),
+                    func_name: item.func_name.clone(),
+                    func: item.func.clone_ref(py),
+                    cls: item.cls.as_ref().map(|cls| cls.clone_ref(py)),
+                    is_coroutine: item.is_coroutine,
+                    fixture_names: item.fixture_names.clone(),
+                    extra_fixture_names: item.extra_fixture_names.clone(),
+                    marks: item
+                        .marks
+                        .iter()
+                        .map(|mark| pytest_rs_core::collect::MarkData {
+                            name: mark.name.clone(),
+                            obj: mark.obj.clone_ref(py),
+                        })
+                        .collect(),
+                    callspec: item
+                        .callspec
+                        .iter()
+                        .map(|(name, value)| (name.clone(), value.clone_ref(py)))
+                        .collect(),
+                    fixture_params,
+                    lineno: item.lineno,
+                });
+            }
+        }
         for item in taken {
             if !item.is_coroutine {
                 let is_async_gen = Self::is_async_gen_func(py, &item.func);
@@ -430,7 +643,26 @@ impl Plugin for AsyncioPlugin {
                 items.push(item);
                 continue;
             }
-            let requested = self.marker_loop_factories(py, &item)?;
+            // mark.asyncio(scope=...) is the deprecated loop_scope alias.
+            if let Some(mark) = item.get_closest_marker("asyncio")
+                && let Ok(kwargs) = mark.obj.bind(py).getattr("kwargs")
+                && kwargs.get_item("scope").is_ok()
+                && kwargs.get_item("loop_scope").is_err()
+            {
+                Self::warn_deprecation(
+                    py,
+                    "The 'scope' keyword argument to mark.asyncio is deprecated, \
+                     use 'loop_scope' instead.",
+                )?;
+            }
+            let requested = match self.marker_loop_factories(py, &item) {
+                Ok(requested) => requested,
+                // Invalid marker values error per item at setup, not here.
+                Err(_) => {
+                    items.push(item);
+                    continue;
+                }
+            };
             let factories = match self.resolve_hook_factories(ctx, &item) {
                 Ok(factories) => factories,
                 // Invalid hook results error per item at setup, not here.
@@ -566,26 +798,58 @@ impl Plugin for AsyncioPlugin {
     }
 
     fn pytest_runtest_setup(&self, ctx: &mut HookContext, item: &TestItem) -> PyResult<()> {
-        // mark.asyncio takes keyword arguments only.
-        if let Some(mark) = item.get_closest_marker("asyncio")
-            && let Ok(args) = mark.obj.bind(ctx.py).getattr("args")
-            && args.len().unwrap_or(0) > 0
-        {
-            return Err(pytest_rs_core::pyo3::exceptions::PyValueError::new_err(
-                "mark.asyncio accepts only keyword arguments",
-            ));
+        // mark.asyncio takes (known) keyword arguments only.
+        if let Some(mark) = item.get_closest_marker("asyncio") {
+            let mark = mark.obj.bind(ctx.py);
+            let positional = mark
+                .getattr("args")
+                .ok()
+                .and_then(|args| args.len().ok())
+                .unwrap_or(0)
+                > 0;
+            let unknown_kwarg = mark
+                .getattr("kwargs")
+                .ok()
+                .and_then(|kwargs| {
+                    kwargs.try_iter().ok().map(|keys| {
+                        keys.flatten().any(|key| {
+                            !matches!(
+                                key.extract::<String>().as_deref(),
+                                Ok("loop_scope") | Ok("loop_factories") | Ok("scope")
+                            )
+                        })
+                    })
+                })
+                .unwrap_or(false);
+            if positional || unknown_kwarg {
+                return Err(pytest_rs_core::pyo3::exceptions::PyValueError::new_err(
+                    "mark.asyncio accepts only keyword arguments",
+                ));
+            }
+            // scope= is the deprecated alias of loop_scope; both together
+            // are rejected.
+            if let Ok(kwargs) = mark.getattr("kwargs")
+                && kwargs.get_item("scope").is_ok()
+                && kwargs.get_item("loop_scope").is_ok()
+            {
+                return Err(pytest_rs_core::pyo3::exceptions::PyValueError::new_err(
+                    "The 'scope' and 'loop_scope' arguments are mutually exclusive",
+                ));
+            }
         }
 
         // An async item that collection left without a factory mark either
-        // requested factories no hook provides, or sits under hook impls
-        // that returned no valid mapping: both are per-item setup errors.
+        // has an invalid loop_factories value, requested factories no hook
+        // provides, or sits under hook impls that returned no valid
+        // mapping: all are per-item setup errors.
         if item.is_coroutine
             && self.applicable(item)
             && item.get_closest_marker("_asyncio_loop_factory").is_none()
         {
+            let requested = self.marker_loop_factories(ctx.py, item)?;
             let has_hooks = !self.hook_funcs(ctx, &item.nodeid).is_empty();
             if !has_hooks {
-                if self.marker_loop_factories(ctx.py, item)?.is_some() {
+                if requested.is_some() {
                     return Err(PyRuntimeError::new_err(
                         "mark.asyncio 'loop_factories' requires at least one \
                          pytest_asyncio_loop_factories hook implementation.",
@@ -609,7 +873,8 @@ impl Plugin for AsyncioPlugin {
                         matches!(scope, Scope::Module | Scope::Package | Scope::Class)
                             && (key == prev
                                 || key.starts_with(&format!("{prev}::"))
-                                || key.starts_with(&format!("{prev}#")))
+                                || key.starts_with(&format!("{prev}#"))
+                                || key.starts_with(&format!("{prev}@")))
                     })
                     .cloned()
                     .collect();
@@ -632,12 +897,12 @@ impl Plugin for AsyncioPlugin {
         instance: Option<&Py<PyAny>>,
         kwargs: &[(String, Py<PyAny>)],
     ) -> HookResult<FixtureValue> {
+        let func = def.func.bind(ctx.py);
+        let is_asyncio_fixture = func.hasattr("_pytest_asyncio_fixture").unwrap_or(false)
+            || func.hasattr("_pytest_asyncio_loop_scope").unwrap_or(false);
         if !def.is_coroutine && !def.is_async_gen {
             // A sync pytest_asyncio.fixture expects its loop scope's loop
             // installed as current for both setup and teardown.
-            let func = def.func.bind(ctx.py);
-            let is_asyncio_fixture = func.hasattr("_pytest_asyncio_fixture").unwrap_or(false)
-                || func.hasattr("_pytest_asyncio_loop_scope").unwrap_or(false);
             if !is_asyncio_fixture {
                 return Ok(None);
             }
@@ -672,6 +937,29 @@ impl Plugin for AsyncioPlugin {
                 finalizer: Some(Finalizer::Callable(finalizer.unbind())),
             }));
         }
+        // Strict mode only handles pytest_asyncio.fixture async fixtures; a
+        // plain @pytest.fixture async def resolves to its raw coroutine
+        // (the core warns), plus a deprecation when the test opted in.
+        if self.mode == Mode::Strict && !is_asyncio_fixture {
+            if item.get_closest_marker("asyncio").is_some() {
+                let test_name = item.nodeid.rsplit("::").next().unwrap_or(&item.nodeid);
+                pytest_rs_core::python::warn_explicit_at(
+                    ctx.py,
+                    "PytestDeprecationWarning",
+                    &format!(
+                        "asyncio test '{test_name}' requested async @pytest.fixture '{}' \
+                         in strict mode. You might want to use @pytest_asyncio.fixture or \
+                         switch to auto mode. This will become an error in future versions \
+                         of pytest-asyncio.",
+                        def.name
+                    ),
+                    "/pytest_asyncio/plugin.py",
+                    862,
+                )?;
+            }
+            return Ok(None);
+        }
+
         let factory = self.item_factory(ctx.py, item)?;
         let policy = self.loop_policy(ctx, item);
         let py = ctx.py;
@@ -685,12 +973,23 @@ impl Plugin for AsyncioPlugin {
             policy.as_ref(),
         )?;
 
+        // Async fixtures adopt a copy of the current context: contextvars
+        // they set propagate to dependent fixtures and the test, and the
+        // previous context is restored at their teardown.
+        let (new_ctx, prev_ctx): (Py<PyAny>, Py<PyAny>) =
+            helper.getattr("adopt_context")?.call0()?.extract()?;
+
         if def.is_coroutine {
             let coro = pytest_rs_core::python::call_fixture(py, &def.func, instance, kwargs)?;
             let value = helper.getattr("run")?.call1((loop_.bind(py), coro))?;
+            let finalizer = helper.getattr("context_restoring_finalizer")?.call1((
+                py.None(),
+                new_ctx.bind(py),
+                prev_ctx.bind(py),
+            ))?;
             return Ok(Some(FixtureValue {
                 value: value.unbind(),
-                finalizer: None,
+                finalizer: Some(Finalizer::Callable(finalizer.unbind())),
             }));
         }
 
@@ -699,9 +998,14 @@ impl Plugin for AsyncioPlugin {
         let value = helper
             .getattr("async_gen_first")?
             .call1((loop_.bind(py), &agen))?;
-        let finalizer = helper
+        let inner = helper
             .getattr("async_gen_finalizer")?
             .call1((loop_.bind(py), &agen))?;
+        let finalizer = helper.getattr("context_restoring_finalizer")?.call1((
+            inner,
+            new_ctx.bind(py),
+            prev_ctx.bind(py),
+        ))?;
         Ok(Some(FixtureValue {
             value: value.unbind(),
             finalizer: Some(Finalizer::Callable(finalizer.unbind())),
@@ -724,6 +1028,38 @@ impl Plugin for AsyncioPlugin {
                 "xfail",
                 ("Tests based on asynchronous generators are not supported",),
             )?;
+        }
+        // Hypothesis wraps async tests in a sync shim; rewire its
+        // inner_test to drive each example on the item's loop.
+        if !item.is_coroutine && self.applicable(item) {
+            let py = ctx.py;
+            let inner = self
+                .helper(py)?
+                .getattr("hypothesis_async_inner")?
+                .call1((callable.bind(py),))?;
+            if !inner.is_none() {
+                let factory = self.item_factory(py, item)?;
+                let policy = self.loop_policy(ctx, item);
+                let py = ctx.py;
+                let helper = self.helper(py)?;
+                let scope = self.test_loop_scope(py, item);
+                let loop_ = self.loop_for(
+                    py,
+                    scope,
+                    &Self::scope_key(py, scope, item),
+                    factory.as_ref().map(|(_, factory)| factory),
+                    policy.as_ref(),
+                )?;
+                let wrapper = helper
+                    .getattr("hypothesis_wrap")?
+                    .call1((loop_.bind(py), &inner))?;
+                callable
+                    .bind(py)
+                    .getattr("hypothesis")?
+                    .setattr("inner_test", wrapper)?;
+                pytest_rs_core::python::call_with_kwargs(py, callable, kwargs)?;
+                return Ok(Some(()));
+            }
         }
         if !item.is_coroutine || !self.applicable(item) {
             return Ok(None);
@@ -754,7 +1090,9 @@ impl Plugin for AsyncioPlugin {
             .keys()
             .filter(|(scope, key)| {
                 *scope == Scope::Function
-                    && (key == &item.nodeid || key.starts_with(&format!("{}#", item.nodeid)))
+                    && (key == &item.nodeid
+                        || key.starts_with(&format!("{}#", item.nodeid))
+                        || key.starts_with(&format!("{}@", item.nodeid)))
             })
             .cloned()
             .collect();

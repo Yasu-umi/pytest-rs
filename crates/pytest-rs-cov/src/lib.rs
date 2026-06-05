@@ -327,6 +327,15 @@ impl Plugin for CovPlugin {
             "--cov-append",
             "accepted but inert: append mode is not implemented yet",
         ));
+        parser.add_option(OptDef::flag(
+            "--no-cov-on-fail",
+            "accepted but inert: reports are cheap enough to always print",
+        ));
+        parser.add_option(OptDef::value(
+            "--cov-context",
+            None,
+            "accepted but inert: dynamic contexts are not implemented",
+        ));
     }
 
     fn pytest_configure(&mut self, ctx: &mut HookContext) -> PyResult<()> {

@@ -77,6 +77,27 @@ impl Engine {
             eprintln!("{err}");
         }
         if !collect_errors.is_empty() {
+            // Collection errors still report as errors in the summary.
+            for (path, err) in collect_errors {
+                let nodeid = crate::collect::file_nodeid(&self.config.rootdir, &path);
+                self.session.reports.push(crate::report::TestReport {
+                    nodeid,
+                    phase: Phase::Setup,
+                    outcome: Outcome::Failed,
+                    duration: std::time::Duration::ZERO,
+                    longrepr: Some(err),
+                    location: None,
+                });
+            }
+            self.print_short_summary();
+            println!(
+                "{}",
+                crate::runner::summary_line(
+                    &self.session.reports,
+                    python::warning_count(py),
+                    started.elapsed()
+                )
+            );
             return exit_code::INTERRUPTED;
         }
 
@@ -613,7 +634,24 @@ impl Engine {
                 &mut self.session.registry,
                 &mut self.session.py_hooks,
             ) {
-                errors.push((file.clone(), python::format_exception(py, &err)));
+                // pytest.skip(..., allow_module_level=True) or
+                // unittest.SkipTest at module import skip the whole module;
+                // a bare pytest.skip there is an error.
+                match python::module_level_skip(py, &err) {
+                    Some(Ok(reason)) => {
+                        let nodeid = crate::collect::file_nodeid(&rootdir, file);
+                        self.session.reports.push(crate::report::TestReport {
+                            nodeid: nodeid.clone(),
+                            phase: crate::report::Phase::Setup,
+                            outcome: crate::report::Outcome::Skipped,
+                            duration: std::time::Duration::ZERO,
+                            longrepr: Some(reason),
+                            location: Some(format!("{nodeid}:1")),
+                        });
+                    }
+                    Some(Err(message)) => errors.push((file.clone(), message)),
+                    None => errors.push((file.clone(), python::format_exception(py, &err))),
+                }
             }
         }
 

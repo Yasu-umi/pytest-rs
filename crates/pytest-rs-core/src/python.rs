@@ -687,7 +687,8 @@ fn collect_class(
         let (name, value): (String, Bound<'_, PyAny>) = pair?.extract()?;
         // cls.__dict__ stores staticmethods as descriptors; unwrap so mark
         // reading and async introspection see the underlying function.
-        let value = if value.is_instance(&py.import("builtins")?.getattr("staticmethod")?)? {
+        let is_static = value.is_instance(&py.import("builtins")?.getattr("staticmethod")?)?;
+        let value = if is_static {
             value.getattr("__func__")?
         } else {
             value
@@ -701,7 +702,7 @@ fn collect_class(
                 &name,
                 &value,
                 &format!("{class_nodeid}::"),
-                true,
+                !is_static,
                 registry,
             )?;
             continue;
@@ -1325,6 +1326,21 @@ pub fn warning_summary_lines(py: Python<'_>) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// Emit a warning of a pytest category attributed to an explicit
+/// file/line (registry=None: never deduplicated).
+pub fn warn_explicit_at(
+    py: Python<'_>,
+    category: &str,
+    message: &str,
+    filename: &str,
+    lineno: u32,
+) -> PyResult<()> {
+    let category = py.import("pytest")?.getattr(category)?;
+    py.import("warnings")?
+        .call_method1("warn_explicit", (message, category, filename, lineno))?;
+    Ok(())
+}
+
 /// Construct a pytest.UsageError as a PyErr.
 pub fn usage_error(py: Python<'_>, message: &str) -> PyErr {
     let result: PyResult<PyErr> = (|| {
@@ -1345,6 +1361,44 @@ pub fn is_usage_error(py: Python<'_>, err: &PyErr) -> bool {
 /// Is this error an instance of the shim's `Skipped` outcome?
 pub fn is_skipped(py: Python<'_>, err: &PyErr) -> bool {
     err_matches_shim(py, err, "Skipped")
+}
+
+/// Classify a module-import error as a module-level skip.
+/// Some(Ok(reason)): the whole module skips (allow_module_level=True or
+/// unittest.SkipTest). Some(Err(message)): pytest.skip misused at module
+/// level. None: not a skip at all.
+pub fn module_level_skip(py: Python<'_>, err: &PyErr) -> Option<Result<String, String>> {
+    let skiptest = py
+        .import("unittest")
+        .and_then(|m| m.getattr("SkipTest"))
+        .ok();
+    if let Some(skiptest) = skiptest
+        && err.matches(py, &skiptest).unwrap_or(false)
+    {
+        return Some(Ok(format!("Skipped: {}", err.value(py))));
+    }
+    if !is_skipped(py, err) {
+        return None;
+    }
+    let value = err.value(py);
+    let allowed = value
+        .getattr("allow_module_level")
+        .and_then(|allow| allow.extract::<bool>())
+        .unwrap_or(false);
+    if allowed {
+        let reason = value
+            .getattr("msg")
+            .ok()
+            .and_then(|msg| msg.extract::<String>().ok())
+            .unwrap_or_default();
+        Some(Ok(format!("Skipped: {reason}")))
+    } else {
+        Some(Err(
+            "Using pytest.skip outside of a test will skip the entire module. \
+             If that's your intention, pass `allow_module_level=True` instead."
+                .to_string(),
+        ))
+    }
 }
 
 /// Is this error an instance of the shim's `XFailed` outcome?

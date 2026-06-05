@@ -21,6 +21,11 @@ class Node:
             if name is None or marker.name == name:
                 yield marker
 
+    def iter_markers_with_node(self, name=None):
+        for marker in self.own_markers:
+            if name is None or marker.name == name:
+                yield self, marker
+
     def add_marker(self, marker, append=True):
         from pytest._marks import Mark, MarkDecorator
 

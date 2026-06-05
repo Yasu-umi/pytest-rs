@@ -22,12 +22,28 @@ class LineMatcher:
     def str(self):
         return str(self)
 
+    @staticmethod
+    def _pattern_lines(patterns):
+        """A multi-line string becomes a dedented pattern list (pytest's
+        Source semantics); a plain one-line string is a single pattern."""
+        if not isinstance(patterns, str):
+            return patterns
+        if "\n" not in patterns:
+            return [patterns]
+        import textwrap
+
+        lines = textwrap.dedent(patterns).splitlines()
+        while lines and not lines[0].strip():
+            lines.pop(0)
+        while lines and not lines[-1].strip():
+            lines.pop()
+        return lines
+
     def fnmatch_lines(self, patterns, *, consecutive=False):
         __tracebackhide__ = True
         import fnmatch
 
-        if isinstance(patterns, str):
-            patterns = [patterns]
+        patterns = self._pattern_lines(patterns)
         if consecutive:
             # The whole pattern block must match a consecutive run of lines.
             for start in range(len(self.lines)):
@@ -58,6 +74,7 @@ class LineMatcher:
         __tracebackhide__ = True
         import fnmatch
 
+        patterns = self._pattern_lines(patterns)
         for pattern in patterns:
             if not any(fnmatch.fnmatch(line, pattern) for line in self.lines):
                 fail(f"fnmatch_lines_random: no line matches {pattern!r} in:\n{self}")
