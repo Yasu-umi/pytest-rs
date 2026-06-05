@@ -531,6 +531,7 @@ pub(crate) fn run_one(
         && let Some(code) = python::session_abort_code(py, err)
     {
         session.exit_code_override = Some(code);
+        session.abort_banner = python::session_abort_banner(py, err);
         teardown_one(py, plugins, session, config, item, xfail, &mut reports);
         close_item_filters(py);
         python::end_item_context(py);
@@ -578,6 +579,7 @@ pub(crate) fn run_one(
                     Err(err) => {
                         if let Some(code) = python::session_abort_code(py, &err) {
                             session.exit_code_override = Some(code);
+                            session.abort_banner = python::session_abort_banner(py, &err);
                             teardown_one(py, plugins, session, config, item, xfail, &mut reports);
                             close_item_filters(py);
                             python::end_item_context(py);

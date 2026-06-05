@@ -278,7 +278,19 @@ impl Engine {
             };
         }
         if n_items == 0 {
-            if let Err(err) = self.fire_py_sessionfinish(py, exit_code::NO_TESTS_COLLECTED) {
+            // Module-level skips count as a run that skipped everything
+            // (exit 0), not as "no tests collected".
+            let code = if self
+                .session
+                .reports
+                .iter()
+                .any(|r| r.outcome == Outcome::Skipped)
+            {
+                exit_code::OK
+            } else {
+                exit_code::NO_TESTS_COLLECTED
+            };
+            if let Err(err) = self.fire_py_sessionfinish(py, code) {
                 eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
             }
             if let Some(cache) = &self.cache {
@@ -286,6 +298,7 @@ impl Engine {
             }
             if !self.config.no_terminal() {
                 self.print_warnings_summary(py);
+                self.print_short_summary();
                 println!(
                     "{}",
                     crate::runner::summary_line(
@@ -296,7 +309,7 @@ impl Engine {
                     )
                 );
             }
-            return exit_code::NO_TESTS_COLLECTED;
+            return code;
         }
 
         #[cfg(feature = "xdist")]
@@ -330,6 +343,9 @@ impl Engine {
 
         if self.config.no_terminal() {
             return code;
+        }
+        if let Some(banner) = &self.session.abort_banner {
+            println!("{}", center_with(banner, '!'));
         }
         // --continue-on-collection-errors: the ERRORS section was deferred
         // until after the run, like pytest's terminal reporter.
@@ -1139,13 +1155,16 @@ impl Engine {
                 match python::module_level_skip(py, &err) {
                     Some(Ok(reason)) => {
                         let nodeid = crate::collect::file_nodeid(&rootdir, file);
+                        // The skip call site (file:line), like pytest.
+                        let location = python::raise_location(py, &err)
+                            .unwrap_or_else(|| format!("{nodeid}:1"));
                         self.session.reports.push(crate::report::TestReport {
                             nodeid: nodeid.clone(),
                             phase: crate::report::Phase::Setup,
                             outcome: crate::report::Outcome::Skipped,
                             duration: std::time::Duration::ZERO,
                             longrepr: Some(reason),
-                            location: Some(format!("{nodeid}:1")),
+                            location: Some(location),
                         });
                     }
                     Some(Err(message)) => errors.push((file.clone(), message)),

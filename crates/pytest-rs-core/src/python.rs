@@ -1844,6 +1844,24 @@ pub fn is_skipped(py: Python<'_>, err: &PyErr) -> bool {
 
 /// The session exit code this error forces, if it is a session-aborting
 /// one: pytest.exit (its returncode, default INTERRUPTED) or Ctrl-C.
+/// The "!!! ... !!!" banner text for a session abort (pytest.exit /
+/// Ctrl-C), e.g. "_pytest.outcomes.Exit: foo".
+pub fn session_abort_banner(py: Python<'_>, err: &PyErr) -> Option<String> {
+    if err.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py) {
+        return Some("KeyboardInterrupt".to_string());
+    }
+    if err_matches_shim(py, err, "Exit") {
+        let msg: String = err
+            .value(py)
+            .getattr("msg")
+            .ok()
+            .and_then(|msg| msg.extract().ok())
+            .unwrap_or_default();
+        return Some(format!("_pytest.outcomes.Exit: {msg}"));
+    }
+    None
+}
+
 pub fn session_abort_code(py: Python<'_>, err: &PyErr) -> Option<i32> {
     if err.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py) {
         return Some(crate::report::exit_code::INTERRUPTED);
@@ -1872,7 +1890,7 @@ pub fn module_level_skip(py: Python<'_>, err: &PyErr) -> Option<Result<String, S
     if let Some(skiptest) = skiptest
         && err.matches(py, &skiptest).unwrap_or(false)
     {
-        return Some(Ok(format!("Skipped: {}", err.value(py))));
+        return Some(Ok(err.value(py).to_string()));
     }
     if !is_skipped(py, err) {
         return None;
@@ -1888,7 +1906,7 @@ pub fn module_level_skip(py: Python<'_>, err: &PyErr) -> Option<Result<String, S
             .ok()
             .and_then(|msg| msg.extract::<String>().ok())
             .unwrap_or_default();
-        Some(Ok(format!("Skipped: {reason}")))
+        Some(Ok(reason))
     } else {
         Some(Err(
             "Using pytest.skip outside of a test will skip the entire module. \
