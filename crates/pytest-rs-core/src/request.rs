@@ -176,9 +176,31 @@ impl PyRequest {
     }
 
     /// The underlying test function object.
+    /// Returns None for doctest items (they have no user-visible test function).
     #[getter]
     fn function(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        Ok(self.node.bind(py).getattr("function")?.unbind())
+        let node = self.node.bind(py);
+        if node
+            .getattr("_pytest_doctest_item")
+            .ok()
+            .and_then(|v| v.extract::<bool>().ok())
+            .unwrap_or(false)
+        {
+            return Ok(py.None());
+        }
+        Ok(node.getattr("function")?.unbind())
+    }
+
+    /// The class containing the test, or None for functions/doctests.
+    #[getter]
+    fn cls(&self, py: Python<'_>) -> Py<PyAny> {
+        py.None()
+    }
+
+    /// The module containing the test, or None for doctests.
+    #[getter]
+    fn module(&self, py: Python<'_>) -> Py<PyAny> {
+        py.None()
     }
 
     /// Dynamically resolve (and cache) a fixture by name, like pytest's

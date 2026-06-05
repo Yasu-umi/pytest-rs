@@ -243,6 +243,36 @@ class Pytester:
         path = self.makepyfile(source)
         return self.inline_run(*args, path)
 
+    def inline_genitems(self, *args):
+        """Run collection-only mode and return (items, reprec).
+
+        Items are lightweight objects with .nodeid, .name, and .parent attributes.
+        """
+        result = self.runpytest("--collect-only", "-q", *[str(arg) for arg in args])
+        reprec = InlineRunResult(result)
+        items = []
+        parents: dict = {}
+        for line in result.outlines:
+            line = line.strip()
+            if not line or line.startswith("=") or line.startswith("<") or line.startswith("no tests"):
+                continue
+            if "::" in line or line.endswith((".txt", ".rst", ".md")):
+                # Deduce type from nodeid
+                nodeid = line.split()[0] if line.split() else line
+                from _pytest.doctest import DoctestItem, DoctestModule, DoctestTextfile
+                filename = nodeid.split("::")[0]
+                if filename not in parents:
+                    if filename.endswith((".txt", ".rst", ".md")):
+                        parents[filename] = DoctestTextfile(filename, None)
+                    else:
+                        parents[filename] = DoctestModule(filename, None)
+                item = DoctestItem(nodeid, None)
+                item.parent = parents[filename]
+                item.nodeid = nodeid
+                item._pytester_path = self.path
+                items.append(item)
+        return items, reprec
+
     def mkpydir(self, name):
         path = self.path / name
         path.mkdir(parents=True)
@@ -373,21 +403,31 @@ class InlineRunResult:
 
     def listoutcomes(self):
         outcomes = {"passed": [], "skipped": [], "failed": []}
+        seen = set()
         for line in self._result.outlines:
             parts = line.split()
-            if len(parts) >= 2:
+            if len(parts) < 2:
+                continue
+            # Format 1: "nodeid WORD [progress]" — verbose run-time output
+            # Format 2: "WORD nodeid - message" — short test summary info section
+            if parts[0] in self._WORDS:
+                # Short summary format: "FAILED nodeid - ..."
+                word = parts[0]
+                nodeid = parts[1]
+            else:
+                # Verbose format: "nodeid WORD [progress]"
                 nodeid = parts[0]
                 word = parts[1]
-                # Accept nodeids with '::' (normal tests) or ending in a
-                # text/doc file extension (doctest text files).
-                is_test_line = (
-                    "::" in nodeid
-                    or nodeid.endswith((".txt", ".rst", ".md"))
-                )
-                if is_test_line:
-                    bucket = self._WORDS.get(word)
-                    if bucket is not None:
-                        outcomes[bucket].append(_OutcomeReport(nodeid))
+
+            bucket = self._WORDS.get(word)
+            is_test_node = (
+                "::" in nodeid
+                or nodeid.endswith((".txt", ".rst", ".md"))
+                or (nodeid.endswith(".py") and "." in nodeid.split("/")[-1][:-3])
+            )
+            if bucket is not None and is_test_node and nodeid not in seen:
+                seen.add(nodeid)
+                outcomes[bucket].append(_OutcomeReport(nodeid))
         return outcomes["passed"], outcomes["skipped"], outcomes["failed"]
 
     def assertoutcome(self, passed=0, skipped=0, failed=0):

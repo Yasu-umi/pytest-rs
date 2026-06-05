@@ -607,6 +607,7 @@ impl Plugin for AsyncioPlugin {
                     func: item.func.clone_ref(py),
                     cls: item.cls.as_ref().map(|cls| cls.clone_ref(py)),
                     is_coroutine: item.is_coroutine,
+                    is_doctest: item.is_doctest,
                     fixture_names: item.fixture_names.clone(),
                     extra_fixture_names: item.extra_fixture_names.clone(),
                     marks: item
@@ -771,6 +772,7 @@ impl Plugin for AsyncioPlugin {
                     func: item.func.clone_ref(py),
                     cls: item.cls.as_ref().map(|cls| cls.clone_ref(py)),
                     is_coroutine: item.is_coroutine,
+                    is_doctest: item.is_doctest,
                     fixture_names: item.fixture_names.clone(),
                     extra_fixture_names,
                     marks,

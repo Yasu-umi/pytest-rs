@@ -469,6 +469,7 @@ pub fn collect_doctests_from_module(
             func,
             cls: None,
             is_coroutine: false,
+            is_doctest: true,
             fixture_names: vec!["doctest_namespace".to_string(), "request".to_string()],
             extra_fixture_names: vec![],
             marks: vec![],
@@ -515,6 +516,7 @@ pub fn collect_doctests_from_textfile(
             func,
             cls: None,
             is_coroutine: false,
+            is_doctest: true,
             fixture_names: vec!["doctest_namespace".to_string(), "request".to_string()],
             extra_fixture_names: vec![],
             marks: vec![],
@@ -963,6 +965,7 @@ fn collect_testcase(
             func: runner.unbind(),
             cls: None,
             is_coroutine: false,
+            is_doctest: false,
             fixture_names: Vec::new(),
             extra_fixture_names: Vec::new(),
             marks,
@@ -1117,6 +1120,7 @@ fn push_test_items(
             func: func.clone().unbind(),
             cls: cls.map(|c| c.clone().unbind()),
             is_coroutine: flags.is_coroutine,
+            is_doctest: false,
             fixture_names: fixture_names.clone(),
             extra_fixture_names: Vec::new(),
             marks: item_marks,
@@ -1583,6 +1587,7 @@ pub fn expand_fixture_params(
                 func: item.func.clone_ref(py),
                 cls: item.cls.as_ref().map(|c| c.clone_ref(py)),
                 is_coroutine: item.is_coroutine,
+                is_doctest: item.is_doctest,
                 lineno: item.lineno,
                 fixture_names: item.fixture_names.clone(),
                 extra_fixture_names: item.extra_fixture_names.clone(),
@@ -1679,13 +1684,11 @@ pub fn make_node(py: Python<'_>, item: &TestItem) -> PyResult<Py<PyAny>> {
         .rsplit("::")
         .next()
         .unwrap_or(item.func_name.as_str());
-    let node = py.import("pytest._node")?.getattr("Node")?.call1((
-        item.nodeid.as_str(),
-        name,
-        marks,
-        fixturenames,
-        item.func.bind(py),
-    ))?;
+    let node_cls = if item.is_doctest { "DoctestNode" } else { "Node" };
+    let node = py
+        .import("pytest._node")?
+        .getattr(node_cls)?
+        .call1((item.nodeid.as_str(), name, marks, fixturenames, item.func.bind(py)))?;
     Ok(node.unbind())
 }
 

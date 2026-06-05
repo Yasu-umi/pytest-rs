@@ -392,7 +392,7 @@ impl Config {
             "setup-plan",      // like --setup-only (fixtures do execute here)
             "setup-show",      // run tests, narrating fixture setup/teardown
         ];
-        const CORE_VALUES: [(&str, Option<char>); 24] = [
+        const CORE_VALUES: [(&str, Option<char>); 25] = [
             ("deselect", None),
             ("log-level", None),
             ("last-failed-no-failures", None),
@@ -414,6 +414,7 @@ impl Config {
             ("doctest-glob", None),
             ("doctest-report", None),
             ("ignore", None),             // accepted-but-inert (conformance runs files explicitly)
+            ("junit-xml", None),          // accepted-but-inert: JUnit XML output not implemented
             ("dist", None), // accepted-but-inert: module-affinity load is the only mode
             ("maxprocesses", None), // accepted-but-inert
             ("max-worker-restart", None), // accepted-but-inert: workers are not restarted
@@ -569,7 +570,7 @@ impl Config {
             if name == "plugin" {
                 plugin_opts = parsed.iter().map(|v| v.to_string()).collect();
             }
-            if name == "deselect" {
+            if matches!(name, "deselect" | "doctest-glob") {
                 // Every occurrence matters (newline-joined for get_values).
                 let joined = parsed
                     .iter()

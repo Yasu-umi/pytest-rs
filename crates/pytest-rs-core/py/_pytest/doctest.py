@@ -6,6 +6,7 @@ and for text files matching --doctest-glob patterns.
 from __future__ import annotations
 
 import doctest
+import inspect
 import os
 import re
 import sys
@@ -22,14 +23,72 @@ from _pytest.outcomes import skip, fail
 # Exceptions
 # ---------------------------------------------------------------------------
 
+def _format_context_lines(dtest: doctest.DocTest, ex: doctest.Example) -> List[str]:
+    """Return source-context lines for a failing doctest example.
+
+    Shows up to 10 lines from the docstring ending at the failing example,
+    with ``>>> ``/``... `` prompts added and 1-indexed absolute line numbers.
+    When lineno information is unavailable, shows a placeholder message.
+    """
+    if dtest.lineno is None:
+        lines: List[str] = ["EXAMPLE LOCATION UNKNOWN, not showing all tests of that example"]
+        src_lines = ex.source.splitlines() or [""]
+        for i, src_line in enumerate(src_lines):
+            prompt = ">>> " if i == 0 else "... "
+            lines.append(f"??? {prompt}{src_line}")
+        return lines
+
+    docstring_lines = (dtest.docstring or "").splitlines()
+
+    # Map offset→(prompt, code) for every source line of every example.
+    source_at: dict = {}
+    for e in dtest.examples:
+        for i, src_line in enumerate(e.source.splitlines()):
+            source_at[e.lineno + i] = (">>> " if i == 0 else "... ", src_line)
+
+    # Window: show at most 10 lines ending at the last source line of ex.
+    ex_src_lines = ex.source.splitlines() or [""]
+    window_end = ex.lineno + len(ex_src_lines) - 1
+    window_start = max(0, ex.lineno - 9)
+
+    result: List[str] = []
+    for offset in range(window_start, window_end + 1):
+        abs_line = dtest.lineno + offset + 1
+        if offset in source_at:
+            prompt, code = source_at[offset]
+            result.append(f"{abs_line:03d} {prompt}{code}")
+        else:
+            content = docstring_lines[offset] if offset < len(docstring_lines) else ""
+            result.append(f"{abs_line:03d} {content}")
+    return result
+
+
+def _location_line(dtest: doctest.DocTest, ex: doctest.Example, kind: str) -> str:
+    if dtest.filename:
+        if dtest.lineno is not None:
+            lineno: Any = dtest.lineno + ex.lineno + 1
+        else:
+            lineno = None
+        return f"{dtest.filename}:{lineno}: {kind}"
+    return ""
+
+
 class DoctestFailure(Exception):
     """Raised when a doctest example fails; formatted without a Python traceback."""
 
     pytrace = False
 
-    def __init__(self, dtest: doctest.DocTest, failure: doctest.DocTestFailure) -> None:
+    def __init__(
+        self,
+        dtest: doctest.DocTest,
+        failure: doctest.DocTestFailure,
+        optionflags: int = 0,
+        checker: Any = None,
+    ) -> None:
         self.dtest = dtest
         self.failure = failure
+        self.optionflags = optionflags
+        self._checker = checker or doctest.OutputChecker()
         super().__init__(str(failure))
 
     @property
@@ -37,13 +96,77 @@ class DoctestFailure(Exception):
         return self._format()
 
     def _format(self) -> str:
-        lines = ["FAILED: " + self.dtest.name]
         ex = self.failure.example
-        lines.append(f"Failed example:\n    {ex.source.rstrip()}")
-        if self.failure.got is not None:
-            lines.append(f"Expected:\n    {(ex.want or '(nothing)').rstrip()}")
-            lines.append(f"Got:\n    {self.failure.got.rstrip()}")
+        got = self.failure.got
+        lines = _format_context_lines(self.dtest, ex)
+        diff = self._checker.output_difference(ex, got or "", self.optionflags)
+        lines.append(diff.rstrip())
+        loc = _location_line(self.dtest, ex, "DocTestFailure")
+        if loc:
+            lines.append("")
+            lines.append(loc)
         return "\n".join(lines)
+
+
+class DoctestUnexpected(Exception):
+    """Raised when a doctest example triggers an unexpected exception."""
+
+    pytrace = False
+
+    def __init__(
+        self,
+        test: doctest.DocTest,
+        example: doctest.Example,
+        exc_info: tuple,
+        optionflags: int = 0,
+    ) -> None:
+        self._test = test
+        self._example = example
+        self._exc_info = exc_info
+        self.optionflags = optionflags
+        super().__init__(str(exc_info[1]))
+
+    @property
+    def msg(self) -> str:
+        return self._format()
+
+    def _format(self) -> str:
+        import traceback as tb_mod
+        exc_type, exc_val, exc_tb = self._exc_info
+        lines = _format_context_lines(self._test, self._example)
+        lines.append(f"UNEXPECTED EXCEPTION: {exc_type.__name__}({exc_val})")
+        tb_text = "".join(tb_mod.format_exception(exc_type, exc_val, exc_tb)).rstrip()
+        lines.extend(tb_text.splitlines())
+        loc = _location_line(self._test, self._example, "UnexpectedException")
+        if loc:
+            lines.append(loc)
+        return "\n".join(lines)
+
+
+def _format_unexpected(failure: doctest.UnexpectedException) -> str:
+    """Format a doctest.UnexpectedException (used in continue-on-failure mode)."""
+    import traceback as tb_mod
+    test = failure.test
+    ex = failure.example
+    exc_type, exc_val, exc_tb = failure.exc_info
+    lines = _format_context_lines(test, ex)
+    lines.append(f"UNEXPECTED EXCEPTION: {exc_type.__name__}({exc_val})")
+    tb_text = "".join(tb_mod.format_exception(exc_type, exc_val, exc_tb)).rstrip()
+    lines.extend(tb_text.splitlines())
+    loc = _location_line(test, ex, "UnexpectedException")
+    if loc:
+        lines.append(loc)
+    return "\n".join(lines)
+
+
+def _format_one(f: Any) -> str:
+    if isinstance(f, DoctestFailure):
+        return f._format()
+    if isinstance(f, DoctestUnexpected):
+        return f._format()
+    if isinstance(f, doctest.UnexpectedException):
+        return _format_unexpected(f)
+    return str(f)
 
 
 class MultipleDoctestFailures(Exception):
@@ -57,12 +180,24 @@ class MultipleDoctestFailures(Exception):
 
     @property
     def msg(self) -> str:
-        return "\n\n".join(f._format() for f in self.failures)
+        return "\n\n".join(_format_one(f) for f in self.failures)
 
 
 # ---------------------------------------------------------------------------
 # Option flags
 # ---------------------------------------------------------------------------
+
+# Register pytest's extended flags (ALLOW_UNICODE / ALLOW_BYTES / NUMBER) into
+# the doctest module so inline +ALLOW_BYTES etc. comments are recognized.
+_ALLOW_UNICODE = 0
+_ALLOW_BYTES = 0
+_NUMBER = 0
+
+for _name, _bits in [("ALLOW_UNICODE", 1 << 16), ("ALLOW_BYTES", 1 << 17), ("NUMBER", 1 << 18)]:
+    if not hasattr(doctest, _name):
+        setattr(doctest, _name, _bits)
+        doctest.OPTIONFLAGS_BY_NAME[_name] = _bits
+    exec(f"_{_name} = doctest.{_name}")
 
 _OPTION_FLAGS_NAMES = {
     "DONT_ACCEPT_TRUE_FOR_1": doctest.DONT_ACCEPT_TRUE_FOR_1,
@@ -75,6 +210,9 @@ _OPTION_FLAGS_NAMES = {
     "REPORT_CDIFF": doctest.REPORT_CDIFF,
     "REPORT_NDIFF": doctest.REPORT_NDIFF,
     "REPORT_ONLY_FIRST_FAILURE": doctest.REPORT_ONLY_FIRST_FAILURE,
+    "ALLOW_UNICODE": _ALLOW_UNICODE,
+    "ALLOW_BYTES": _ALLOW_BYTES,
+    "NUMBER": _NUMBER,
 }
 
 _REPORT_FLAG_MAP = {
@@ -88,7 +226,12 @@ _REPORT_FLAG_MAP = {
 
 def get_optionflags(config: Any) -> int:
     flags = 0
-    ini_flags = config.getini("doctest_optionflags") if hasattr(config, "getini") else []
+    raw = config.getini("doctest_optionflags") if hasattr(config, "getini") else []
+    # getini returns a string (space/newline-separated) or a list depending on the caller.
+    if isinstance(raw, str):
+        ini_flags = raw.split() if raw else []
+    else:
+        ini_flags = list(raw) if raw else []
     if not ini_flags:
         ini_flags = ["ELLIPSIS"]
     for name in ini_flags:
@@ -122,20 +265,27 @@ def _get_continue_on_failure(config: Any) -> bool:
 # Output checker with ALLOW_UNICODE / ALLOW_BYTES / NUMBER
 # ---------------------------------------------------------------------------
 
-# Attempt to use pytest's built-in flags if available (they live in doctest at
-# high bit positions). Define them locally so we can always reference them.
-_ALLOW_UNICODE = 0
-_ALLOW_BYTES = 0
-_NUMBER = 0
-
-for _name, _bits in [("ALLOW_UNICODE", 1 << 16), ("ALLOW_BYTES", 1 << 17), ("NUMBER", 1 << 18)]:
-    if not hasattr(doctest, _name):
-        setattr(doctest, _name, _bits)
-        doctest.OPTIONFLAGS_BY_NAME[_name] = _bits
-    exec(f"_{_name} = doctest.{_name}")
-
 _NUMBER_RE = re.compile(
-    r"(?:[-+]?(?:(?:\d[\d_]*)?\.(?:\d[\d_]*)|\d[\d_]*\.)(?:[eE][-+]?\d+)?|[-+]?\d[\d_]*[eE][-+]?\d+)"
+    r"""
+    (?P<number>
+      (?P<mantissa>
+        (?P<integer1> [+-]?\d*)\.(?P<fraction>\d+)
+        |
+        (?P<integer2> [+-]?\d+)\.
+      )
+      (?:
+        [Ee]
+        (?P<exponent1> [+-]?\d+)
+      )?
+      |
+      (?P<integer3> [+-]?\d+)
+      (?:
+        [Ee]
+        (?P<exponent2> [+-]?\d+)
+      )
+    )
+    """,
+    re.VERBOSE,
 )
 
 
@@ -146,20 +296,22 @@ def _init_checker_class() -> type:
         def check_output(self, want: str, got: str, optionflags: int) -> bool:
             if doctest.OutputChecker.check_output(self, want, got, optionflags):
                 return True
-            if optionflags & _ALLOW_UNICODE:
-                want2 = re.sub(r"\bu'", "'", want)
-                got2 = re.sub(r"\bu'", "'", got)
-                if doctest.OutputChecker.check_output(self, want2, got2, optionflags):
-                    return True
-            if optionflags & _ALLOW_BYTES:
-                want2 = re.sub(r"\bb'", "'", want)
-                got2 = re.sub(r"\bb'", "'", got)
-                if doctest.OutputChecker.check_output(self, want2, got2, optionflags):
-                    return True
-            if optionflags & _NUMBER:
-                if _check_number(want, got, optionflags):
-                    return True
-            return False
+            allow_unicode = optionflags & _ALLOW_UNICODE
+            allow_bytes = optionflags & _ALLOW_BYTES
+            allow_number = optionflags & _NUMBER
+            if not (allow_unicode or allow_bytes or allow_number):
+                return False
+            if allow_unicode:
+                want = re.sub(r"\bu'", "'", want)
+                got = re.sub(r"\bu'", "'", got)
+            if allow_bytes:
+                want = re.sub(r"\bb'", "'", want)
+                got = re.sub(r"\bb'", "'", got)
+            if doctest.OutputChecker.check_output(self, want, got, optionflags):
+                return True
+            if allow_number:
+                got = _remove_unwanted_precision(want, got)
+            return doctest.OutputChecker.check_output(self, want, got, optionflags)
 
         def output_difference(self, example, got, optionflags):
             return doctest.OutputChecker.output_difference(self, example, got, optionflags)
@@ -167,23 +319,36 @@ def _init_checker_class() -> type:
     return LiteralsOutputChecker
 
 
-def _check_number(want: str, got: str, optionflags: int) -> bool:
-    want_nums = _NUMBER_RE.findall(want)
-    got_nums = _NUMBER_RE.findall(got)
-    if len(want_nums) != len(got_nums):
-        return False
-    want_rest = _NUMBER_RE.sub("", want).strip()
-    got_rest = _NUMBER_RE.sub("", got).strip()
-    if want_rest != got_rest:
-        return False
-    for wn, gn in zip(want_nums, got_nums):
+def _remove_unwanted_precision(want: str, got: str) -> str:
+    """Replace numbers in got with want's numbers when they're close enough.
+
+    Tolerance is 10^(-precision) where precision = len(fraction) - exponent.
+    Matches upstream pytest's LiteralsOutputChecker behavior.
+    """
+    wants = list(_NUMBER_RE.finditer(want))
+    gots = list(_NUMBER_RE.finditer(got))
+    if len(wants) != len(gots):
+        return got
+    offset = 0
+    for w, g in zip(wants, gots):
+        fraction = w.group("fraction")
+        exponent = w.group("exponent1")
+        if exponent is None:
+            exponent = w.group("exponent2")
+        precision = 0 if fraction is None else len(fraction)
+        if exponent is not None:
+            precision -= int(exponent)
         try:
-            if abs(float(wn) - float(gn)) > 1e-6 * max(1, abs(float(wn))):
-                return False
+            w_val = float(w.group())
+            g_val = float(g.group())
         except ValueError:
-            if wn != gn:
-                return False
-    return True
+            continue
+        if abs(g_val - w_val) <= 10 ** (-precision):
+            got = (
+                got[: g.start() + offset] + w.group() + got[g.end() + offset :]
+            )
+            offset += len(w.group()) - (g.end() - g.start())
+    return got
 
 
 # ---------------------------------------------------------------------------
@@ -199,14 +364,15 @@ def _init_runner_class(continue_on_failure: bool, checker: Any, optionflags: int
 
         def report_failure(self, out, test, example, got):  # type: ignore[override]
             failure = doctest.DocTestFailure(test, example, got)
-            df = DoctestFailure(test, failure)
+            df = DoctestFailure(test, failure, optionflags=optionflags, checker=checker)
             if self._continue:
                 self._failures.append(df)
             else:
                 raise df from None
 
         def report_unexpected_exception(self, out, test, example, exc_info):  # type: ignore[override]
-            if issubclass(exc_info[0], (skip.Exception,)):
+            from _pytest.outcomes import OutcomeException
+            if issubclass(exc_info[0], OutcomeException):
                 raise exc_info[1]
             unexpected = doctest.UnexpectedException(test, example, exc_info)
             if self._continue:
@@ -235,9 +401,13 @@ def _make_finder(module: types.ModuleType) -> doctest.DocTestFinder:
             # Skip mock objects that lack __doc__
             if hasattr(obj, "_mock_name"):
                 return
-            # Unwrap properties / cached_property to get docstrings
+            # Unwrap properties / cached_property to get docstrings.
+            # Only replace with fget when it is a regular Python function;
+            # if fget is a method-wrapper (overridden property), leave the
+            # property as-is so the parent returns lineno=None correctly.
             if isinstance(obj, property):
-                obj = obj.fget
+                if inspect.isfunction(obj.fget):
+                    obj = obj.fget
             elif isinstance(obj, cached_property):
                 obj = obj.func
             try:
@@ -253,14 +423,9 @@ def _make_finder(module: types.ModuleType) -> doctest.DocTestFinder:
 # ---------------------------------------------------------------------------
 
 def _check_all_skipped(test: doctest.DocTest) -> None:
-    if not test.examples:
-        skip(f"no examples in doctest: {test.name}")
-    all_skip = all(
-        doctest.SKIP & ex.options.get(doctest.SKIP, 0) or "+SKIP" in ex.source
-        for ex in test.examples
-    )
-    if all_skip:
-        skip(f"all examples skipped in doctest: {test.name}")
+    all_skipped = all(x.options.get(doctest.SKIP, False) for x in test.examples)
+    if test.examples and all_skipped:
+        skip("all tests skipped by +SKIP option")
 
 
 # ---------------------------------------------------------------------------
@@ -270,12 +435,14 @@ def _check_all_skipped(test: doctest.DocTest) -> None:
 def _make_doctest_func(
     dtest: doctest.DocTest,
     runner_cls: type,
+    optionflags: int = 0,
     module: Optional[types.ModuleType] = None,
     extra_globs: Optional[dict] = None,
 ):
     """Return a callable that runs `dtest`. Accepts doctest_namespace kwarg."""
 
     def run_doctest(doctest_namespace: Optional[dict] = None, request: Any = None) -> None:
+        _check_all_skipped(dtest)
         if extra_globs:
             dtest.globs.update(extra_globs)
         if doctest_namespace:
@@ -288,7 +455,7 @@ def _make_doctest_func(
         try:
             runner.run(dtest, clear_globs=False)
         except doctest.UnexpectedException as e:
-            raise e.exc_info[1].with_traceback(e.exc_info[2]) from None
+            raise DoctestUnexpected(e.test, e.example, e.exc_info, optionflags) from None
 
     run_doctest.__name__ = dtest.name
     return run_doctest
@@ -344,7 +511,7 @@ def collect_module_doctests(
         # nodeid: e.g. "test_foo.py::test_foo.MyClass.method"
         nodeid = f"{nodeid_base}::{dtest.name}"
         lineno = dtest.lineno or 0
-        func = _make_doctest_func(dtest, runner_cls, module=module, extra_globs=extra_globs)
+        func = _make_doctest_func(dtest, runner_cls, optionflags=optionflags, module=module, extra_globs=extra_globs)
         results.append((nodeid, func, lineno))
 
     return results
@@ -381,7 +548,7 @@ def collect_textfile_doctests(
         return []
 
     nodeid = nodeid_base
-    func = _make_doctest_func(dtest, runner_cls, extra_globs=extra_globs)
+    func = _make_doctest_func(dtest, runner_cls, optionflags=optionflags, extra_globs=extra_globs)
     return [(nodeid, func, 0)]
 
 
@@ -475,12 +642,53 @@ def _patch_unwrap_mock_aware():
     return _ctx()
 
 
-class DoctestItem:
-    """Minimal pytest DoctestItem stub for introspection by conformance tests."""
+class _DoctestItemMeta(type):
+    """Metaclass that makes isinstance(item, DoctestItem) work for pytest-rs node proxies."""
+
+    def __instancecheck__(cls, instance: Any) -> bool:
+        return getattr(instance, "_pytest_doctest_item", False)
+
+
+class DoctestItem(metaclass=_DoctestItemMeta):
+    """Stub for pytest DoctestItem; isinstance works for DoctestNode proxies."""
 
     def __init__(self, name: str, dtest: doctest.DocTest) -> None:
         self.name = name
         self.dtest = dtest
+
+    def reportinfo(self) -> tuple:
+        if self.dtest is not None:
+            lineno = self.dtest.lineno
+        else:
+            lineno = self._compute_lineno()
+        filename = self.name.split("::")[0] if "::" in self.name else self.name
+        name_part = self.name.split("::", 1)[1] if "::" in self.name else self.name
+        return filename, lineno, f"[doctest] {name_part}"
+
+    def _compute_lineno(self) -> Optional[int]:
+        if not hasattr(self, "_pytester_path") or "::" not in self.name:
+            return None
+        relpath, dotname = self.name.split("::", 1)
+        abs_path = str(self._pytester_path / relpath)
+        # Qualified name within module (strip the module-name prefix from dotname).
+        parts = dotname.split(".", 1)
+        qualified = parts[1] if len(parts) > 1 else parts[0]
+        try:
+            import importlib.util as _ilu
+            import types as _types
+            spec = _ilu.spec_from_file_location("_ri_tmp_", abs_path)
+            if spec is None or spec.loader is None:
+                return None
+            mod = _types.ModuleType("_ri_tmp_")
+            spec.loader.exec_module(mod)  # type: ignore[union-attr]
+            import doctest as _dt
+            for t in _dt.DocTestFinder().find(mod):
+                t_qualified = t.name.split(".", 1)[1] if "." in t.name else t.name
+                if t_qualified == qualified:
+                    return t.lineno
+        except Exception:
+            pass
+        return None
 
     def repr_failure(self, excinfo: Any) -> str:
         exc = excinfo.value if hasattr(excinfo, "value") else excinfo

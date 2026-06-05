@@ -22,6 +22,7 @@ pub struct TestItem {
     /// created per test at setup.
     pub cls: Option<Py<PyAny>>,
     pub is_coroutine: bool,
+    pub is_doctest: bool,
     /// Fixture names requested in the test signature (parametrize-provided
     /// names included; the runner skips resolving those).
     pub fixture_names: Vec<String>,
@@ -201,6 +202,68 @@ pub fn module_name_for(path: &Path) -> (PathBuf, String) {
     }
     parts.reverse();
     (basedir, parts.join("."))
+}
+
+/// Collect all Python files (including non-test files like __init__.py) for
+/// --doctest-modules. Does not include files already covered by collect_test_files.
+pub fn collect_all_python_files(
+    invocation_dir: &Path,
+    paths: &[String],
+    collect_in_virtualenv: bool,
+    already_collected: &[PathBuf],
+) -> Vec<PathBuf> {
+    let args: Vec<String> = if paths.is_empty() {
+        vec![".".to_string()]
+    } else {
+        paths.to_vec()
+    };
+    let mut files = Vec::new();
+    for arg in &args {
+        let arg = arg.split("::").next().unwrap_or(arg);
+        let path = invocation_dir.join(arg);
+        let path = std::fs::canonicalize(&path).unwrap_or(path);
+        if path.is_dir() {
+            collect_all_py_dir(&path, &mut files, collect_in_virtualenv);
+        } else if path.extension().and_then(|e| e.to_str()) == Some("py")
+            && !files.contains(&path)
+            && !already_collected.contains(&path)
+        {
+            files.push(path);
+        }
+    }
+    // Exclude files that were already collected as test files.
+    files.retain(|f| !already_collected.contains(f));
+    files
+}
+
+fn collect_all_py_dir(dir: &Path, files: &mut Vec<PathBuf>, collect_in_virtualenv: bool) {
+    const NORECURSE: &[&str] = &[
+        ".git", ".venv", "venv", "node_modules", "__pycache__", ".tox", ".eggs", "build", "dist",
+    ];
+    let Ok(read_dir) = std::fs::read_dir(dir) else {
+        return;
+    };
+    let mut entries: Vec<_> = read_dir
+        .filter_map(Result::ok)
+        .map(|e| e.path())
+        .collect();
+    entries.sort();
+    for path in entries {
+        if path.is_dir() {
+            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if !NORECURSE.contains(&name)
+                && !name.starts_with('.')
+                && (collect_in_virtualenv || !in_venv(&path))
+            {
+                collect_all_py_dir(&path, files, collect_in_virtualenv);
+            }
+        } else if path.extension().and_then(|e| e.to_str()) == Some("py")
+            && path.is_file()
+            && !files.contains(&path)
+        {
+            files.push(path);
+        }
+    }
 }
 
 /// Gather non-Python files from the search paths for --doctest-glob matching.

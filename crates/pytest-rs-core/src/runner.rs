@@ -70,7 +70,7 @@ impl Engine {
                 .nodeid
                 .split_once("::")
                 .map(|(f, _)| f.to_string())
-                .unwrap_or_default();
+                .unwrap_or_else(|| item.nodeid.clone());
             if config.verbose == 0 && !config.quiet && !config.no_terminal() && file != current_file
             {
                 if !current_file.is_empty() {

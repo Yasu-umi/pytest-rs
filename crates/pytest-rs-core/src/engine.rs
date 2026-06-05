@@ -54,6 +54,16 @@ impl Engine {
             eprintln!("INTERNAL ERROR: failed to install pytest shim: {err}");
             return exit_code::INTERNAL_ERROR;
         }
+        if let Some(report) = self.config.get_value("doctest-report") {
+            const CHOICES: &[&str] = &["none", "cdiff", "udiff", "ndiff", "only_first_failure"];
+            if !CHOICES.iter().any(|c| c.eq_ignore_ascii_case(report)) {
+                eprintln!(
+                    "error: argument --doctest-report: invalid choice: '{report}' (choose from {})",
+                    CHOICES.join(", ")
+                );
+                return exit_code::USAGE_ERROR;
+            }
+        }
         let ini_filters: Vec<String> = self
             .config
             .get_ini("filterwarnings")
@@ -364,7 +374,7 @@ impl Engine {
         }
         let warning_count = python::warning_count(py) + self.session.worker_warning_count;
         println!(
-            "{}",
+            "\n{}",
             crate::runner::summary_line(
                 &self.session.reports,
                 self.session.deselected,
@@ -541,6 +551,23 @@ impl Engine {
         }
     }
 
+    /// Return the display title for a failure section heading.
+    /// Doctest items get a `[doctest] ` prefix matching pytest's reportinfo().
+    fn failure_title(nodeid: &str) -> String {
+        if !nodeid.contains("::") {
+            // Text-file doctest (e.g. "test_fail.txt")
+            return format!("[doctest] {nodeid}");
+        }
+        let after = nodeid.splitn(2, "::").nth(1).unwrap_or(nodeid);
+        if after.contains('.') {
+            // Module doctest (e.g. "file.py::module.Class.method")
+            format!("[doctest] {after}")
+        } else {
+            // Regular test: use the last "::" component
+            nodeid.rsplit("::").next().unwrap_or(nodeid).to_string()
+        }
+    }
+
     fn print_failures(&self) {
         let failures: Vec<_> = self
             .session
@@ -553,8 +580,8 @@ impl Engine {
         }
         println!("\n{}", center_banner("FAILURES"));
         for report in &failures {
-            let name = report.nodeid.rsplit("::").next().unwrap_or(&report.nodeid);
-            println!("{}", center_named(name));
+            let name = Self::failure_title(&report.nodeid);
+            println!("{}", center_named(&name));
             if let Some(longrepr) = &report.longrepr {
                 println!("{longrepr}");
             }
@@ -1218,17 +1245,46 @@ impl Engine {
             }
         }
 
-        // --doctest-glob: scan start dirs for matching text files.
-        // Scan text files when --doctest-modules or --doctest-glob is active.
-        // The default glob (test*.txt) activates with --doctest-modules;
-        // explicit --doctest-glob patterns override.
-        let scan_text_files = self.config.get_flag("doctest-modules")
-            || self.config.get_values("doctest-glob").is_some();
+        // --doctest-modules: also scan ALL .py files (not just test files) for doctests.
+        if self.config.get_flag("doctest-modules") {
+            let extra_py = crate::collect::collect_all_python_files(
+                &self.config.invocation_dir,
+                &paths,
+                self.config.get_flag("collect-in-virtualenv"),
+                &files,
+            );
+            if let Ok(py_config) = python::make_py_config(py, &self.config) {
+                for extra_file in &extra_py {
+                    // Import the module and collect doctests.
+                    if let Err(err) = python::collect_doctests_from_module(
+                        py,
+                        &rootdir,
+                        extra_file,
+                        &py_config,
+                        &mut self.session.items,
+                    ) {
+                        // Import errors are non-fatal with --doctest-ignore-import-errors.
+                        if !self.config.get_flag("doctest-ignore-import-errors") {
+                            errors.push((extra_file.clone(), python::format_exception(py, &err)));
+                        }
+                    }
+                }
+            }
+        }
+
+        // Text files matching the glob (default: test*.txt) are always collected
+        // even without explicit --doctest-modules or --doctest-glob flags, mirroring
+        // upstream pytest's _is_doctest() behavior.
+        let scan_text_files = true;
         if scan_text_files {
             if let Ok(py_config) = python::make_py_config(py, &self.config) {
                 let text_files =
                     crate::collect::collect_doctest_textfiles(&self.config.invocation_dir, &paths);
                 for tf in text_files {
+                    // Skip files already collected in the explicit-file loop above.
+                    if files.contains(&tf) {
+                        continue;
+                    }
                     match python::is_doctest_textfile(py, &tf, &py_config) {
                         Ok(true) => {
                             if let Err(err) = python::collect_doctests_from_textfile(
@@ -1337,8 +1393,8 @@ pub fn center_with(label: &str, fill: char) -> String {
     const WIDTH: usize = 80;
     let label = format!(" {label} ");
     let pad = WIDTH.saturating_sub(label.len());
-    let left = pad / 2;
-    let right = pad - left;
+    let left = (pad / 2).max(1);
+    let right = (pad - pad / 2).max(1);
     format!(
         "{}{}{}",
         fill.to_string().repeat(left),
