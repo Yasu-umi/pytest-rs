@@ -239,6 +239,12 @@ pub(crate) fn run_one(
     };
 
     // ---- setup -----------------------------------------------------------
+    // Per-phase log capture (caplog records + "Captured log" sections).
+    let log_level_cfg: Option<String> = config
+        .get_value("log-level")
+        .map(str::to_string)
+        .or_else(|| config.get_ini("log_level").map(str::to_string));
+    python::log_start_phase(py, "setup", log_level_cfg.as_deref());
     let setup_started = Instant::now();
     type SetupOk = (
         Py<PyAny>,
@@ -416,6 +422,7 @@ pub(crate) fn run_one(
     }
 
     // ---- call --------------------------------------------------------------
+    python::log_start_phase(py, "call", log_level_cfg.as_deref());
     let call_started = Instant::now();
     let call_result = (|| -> PyResult<bool> {
         let mut ctx = HookContext {
@@ -568,6 +575,11 @@ fn teardown_one(
     item: &TestItem,
     reports: &mut Vec<TestReport>,
 ) {
+    let log_level_cfg: Option<String> = config
+        .get_value("log-level")
+        .map(str::to_string)
+        .or_else(|| config.get_ini("log_level").map(str::to_string));
+    python::log_start_phase(py, "teardown", log_level_cfg.as_deref());
     let teardown_started = Instant::now();
     let mut errors = teardown_scope(
         py,
@@ -613,6 +625,7 @@ fn teardown_one(
             location: None,
         });
     }
+    python::log_finish_item(py);
 }
 
 /// Run (LIFO) and remove every pending finalizer of the given scope instance.
@@ -1103,16 +1116,18 @@ fn report_from_err(
             location: python::raise_location(py, err),
         }
     } else {
+        let mut longrepr =
+            python::format_test_failure(py, err, config.get_value("tb").unwrap_or("long"));
+        // pytest parity: failing reports carry "Captured log {when}" sections.
+        for (title, text) in python::log_failure_sections(py) {
+            longrepr.push_str(&format!("\n{:-^80}\n{text}", format!(" {title} ")));
+        }
         TestReport {
             nodeid: item.nodeid.clone(),
             phase,
             outcome: Outcome::Failed,
             duration: started.elapsed(),
-            longrepr: Some(python::format_test_failure(
-                py,
-                err,
-                config.get_value("tb").unwrap_or("long"),
-            )),
+            longrepr: Some(longrepr),
             location: None,
         }
     }

@@ -390,8 +390,9 @@ impl Config {
             "setup-plan",      // like --setup-only (fixtures do execute here)
             "setup-show",      // run tests, narrating fixture setup/teardown
         ];
-        const CORE_VALUES: [(&str, Option<char>); 22] = [
+        const CORE_VALUES: [(&str, Option<char>); 23] = [
             ("deselect", None),
+            ("log-level", None),
             ("last-failed-no-failures", None),
             ("report-chars", Some('r')),
             ("markexpr", Some('m')),

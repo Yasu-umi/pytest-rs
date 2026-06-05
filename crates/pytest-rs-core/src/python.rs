@@ -1767,6 +1767,29 @@ pub fn end_item_filters(py: Python<'_>, ctx: &Py<PyAny>) {
 }
 
 /// Number of warnings captured so far in this session.
+/// Begin a logging capture phase for the current item (pytest's
+/// catching_logs around setup/call/teardown). Best-effort.
+pub fn log_start_phase(py: Python<'_>, when: &str, level: Option<&str>) {
+    let _ = py
+        .import("pytest._logging")
+        .and_then(|m| m.call_method1("start_phase", (when, level)));
+}
+
+/// Close the current item's logging capture (end of teardown).
+pub fn log_finish_item(py: Python<'_>) {
+    let _ = py
+        .import("pytest._logging")
+        .and_then(|m| m.call_method0("finish_item"));
+}
+
+/// "Captured log {when}" report sections accumulated for the running item.
+pub fn log_failure_sections(py: Python<'_>) -> Vec<(String, String)> {
+    py.import("pytest._logging")
+        .and_then(|m| m.call_method0("failure_sections"))
+        .and_then(|sections| sections.extract())
+        .unwrap_or_default()
+}
+
 pub fn warning_count(py: Python<'_>) -> usize {
     py.import("pytest._wcapture")
         .and_then(|m| m.call_method0("count"))

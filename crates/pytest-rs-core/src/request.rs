@@ -83,6 +83,12 @@ impl PyConfig {
         self.rootpath(py)
     }
 
+    /// Minimal pluginmanager (getplugin("logging-plugin") etc.).
+    #[getter]
+    fn pluginmanager<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        py.import("pytest._pluginmanager")?.getattr("pluginmanager")
+    }
+
     /// The pytest `config.cache` API (a pytest._cache.Cache).
     #[getter]
     fn cache<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
