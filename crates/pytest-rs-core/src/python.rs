@@ -429,6 +429,11 @@ pub fn collect_conftest(
     } else {
         format!("{dir_nodeid}/")
     };
+    // `pytest_plugins = [...]` in a conftest: the named modules' fixtures
+    // and hooks register globally. Dotted names ("tests.fixtures.db")
+    // resolve against the rootdir.
+    sys_path_prepend(py, rootdir)?;
+    register_pytest_plugins(py, &module, registry, hooks)?;
     register_fixtures_from(py, &module, &baseid, registry)?;
     scan_py_hooks(&module, &baseid, hooks)
 }
