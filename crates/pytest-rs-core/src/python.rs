@@ -439,7 +439,8 @@ pub fn collect_doctests_from_module(
     py_config: &Py<PyAny>,
     items: &mut Vec<TestItem>,
 ) -> PyResult<()> {
-    let (_, module_name) = module_name_for(path);
+    let (basedir, module_name) = module_name_for(path);
+    sys_path_prepend(py, &basedir)?;
     let nodeid_base = file_nodeid(rootdir, path);
     let doctest_mod = py.import("_pytest.doctest")?;
     let results = doctest_mod

@@ -187,7 +187,9 @@ fn wildcard_match(pattern: &str, name: &str) -> bool {
 /// the relative path from there.
 pub fn module_name_for(path: &Path) -> (PathBuf, String) {
     let mut basedir = path.parent().unwrap_or(Path::new(".")).to_path_buf();
-    let mut parts = vec![path.file_stem().unwrap().to_string_lossy().to_string()];
+    let stem = path.file_stem().unwrap().to_string_lossy().to_string();
+    // pkg/__init__.py imports as package "pkg", not "pkg.__init__".
+    let mut parts = if stem == "__init__" { vec![] } else { vec![stem] };
     while basedir.join("__init__.py").exists() {
         parts.push(
             basedir
