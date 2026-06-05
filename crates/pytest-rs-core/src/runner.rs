@@ -151,7 +151,7 @@ pub(crate) fn run_one(
 
     // @pytest.mark.skip / @pytest.mark.skipif (mark-usage and condition
     // errors report as setup errors, like pytest.fail in runtest_setup).
-    match evaluate_skip_marks(py, item) {
+    match evaluate_skip_marks(py, session, item) {
         Ok(Some((reason, module_level))) => {
             let file = item.nodeid.split("::").next().unwrap_or("");
             // Marker skips report the item's definition site; module-level
@@ -187,7 +187,7 @@ pub(crate) fn run_one(
     // @pytest.mark.xfail evaluation (conditions, run/strict/raises kwargs).
     // --runxfail ignores marks; tests report their real outcomes.
     let runxfail = config.get_flag("runxfail");
-    let xfailed = match evaluate_xfail_marks(py, config, item) {
+    let xfailed = match evaluate_xfail_marks(py, session, config, item) {
         Ok(xfailed) => xfailed,
         Err(err) => {
             reports.push(report_from_err(
@@ -1121,9 +1121,43 @@ fn marks_for_eval(py: Python<'_>, item: &TestItem) -> Vec<(String, Py<PyAny>)> {
         .collect()
 }
 
+/// conftest pytest_markeval_namespace hook results (usually none).
+fn markeval_namespaces(py: Python<'_>, session: &Session) -> Vec<Py<PyAny>> {
+    let hooks: Vec<&crate::session::PyHook> = session
+        .py_hooks
+        .iter()
+        .filter(|hook| hook.name == "pytest_markeval_namespace")
+        .collect();
+    if hooks.is_empty() {
+        return Vec::new();
+    }
+    let config_obj = python::existing_py_config(py);
+    hooks
+        .iter()
+        .filter_map(|hook| {
+            let kwargs: Vec<(&str, Py<PyAny>)> = match &config_obj {
+                Some(config) => vec![("config", config.clone_ref(py))],
+                None => Vec::new(),
+            };
+            python::call_py_hook(py, &hook.func, &kwargs).ok()
+        })
+        .collect()
+}
+
 /// pytest evaluate_skip_marks: Some((reason, from_pytestmark)) when the item
 /// should skip. Errors (bad mark usage, conditions) report as setup errors.
-fn evaluate_skip_marks(py: Python<'_>, item: &TestItem) -> PyResult<Option<(String, bool)>> {
+fn evaluate_skip_marks(
+    py: Python<'_>,
+    session: &Session,
+    item: &TestItem,
+) -> PyResult<Option<(String, bool)>> {
+    if !item
+        .marks
+        .iter()
+        .any(|mark| mark.name == "skip" || mark.name == "skipif")
+    {
+        return Ok(None);
+    }
     let config_obj = python::existing_py_config(py).unwrap_or_else(|| py.None());
     py.import("pytest._skipping")?
         .call_method1(
@@ -1132,6 +1166,7 @@ fn evaluate_skip_marks(py: Python<'_>, item: &TestItem) -> PyResult<Option<(Stri
                 marks_for_eval(py, item),
                 item.module_name.as_str(),
                 config_obj,
+                markeval_namespaces(py, session),
             ),
         )?
         .extract()
@@ -1148,9 +1183,14 @@ struct XfailEval {
 /// pytest evaluate_xfail_marks: the first triggered xfail mark, if any.
 fn evaluate_xfail_marks(
     py: Python<'_>,
+    session: &Session,
     config: &Config,
     item: &TestItem,
 ) -> PyResult<Option<XfailEval>> {
+    // Unmarked items (the common case) never enter Python.
+    if !item.marks.iter().any(|mark| mark.name == "xfail") {
+        return Ok(None);
+    }
     // Strict default: strict_xfail, then strict, then the pre-9 xfail_strict.
     let strict_default = matches!(
         config
@@ -1168,6 +1208,7 @@ fn evaluate_xfail_marks(
             item.module_name.as_str(),
             config_obj,
             strict_default,
+            markeval_namespaces(py, session),
         ),
     )?;
     if result.is_none() {

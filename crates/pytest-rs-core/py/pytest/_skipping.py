@@ -9,6 +9,7 @@ import os
 import platform
 import sys
 import traceback
+from collections.abc import Mapping
 
 from pytest._outcomes import fail
 
@@ -20,19 +21,26 @@ class Skip:
         self.reason = reason
 
 
-def _condition_globals(module_name, config):
+def _condition_globals(module_name, config, namespaces):
     globals_ = {"os": os, "sys": sys, "platform": platform, "config": config}
+    # conftest pytest_markeval_namespace contributions (later hooks first).
+    for dictionary in reversed(namespaces or []):
+        if not isinstance(dictionary, Mapping):
+            raise ValueError(
+                f"pytest_markeval_namespace() needs to return a dict, got {dictionary!r}"
+            )
+        globals_.update(dictionary)
     module = sys.modules.get(module_name)
     if module is not None:
         globals_.update(vars(module))
     return globals_
 
 
-def evaluate_condition(mark_name, kwargs, condition, module_name, config):
+def evaluate_condition(mark_name, kwargs, condition, module_name, config, namespaces=None):
     """One skipif/xfail condition -> (triggered, reason). pytest.fail
     (no traceback) on evaluation errors and reason-less boolean conditions."""
     if isinstance(condition, str):
-        globals_ = _condition_globals(module_name, config)
+        globals_ = _condition_globals(module_name, config, namespaces)
         try:
             condition_code = compile(condition, f"<{mark_name} condition>", "eval")
             result = eval(condition_code, globals_)
@@ -94,7 +102,7 @@ def _is_module_mark(mark, module_name):
     )
 
 
-def evaluate_skip_marks(marks, module_name, config):
+def evaluate_skip_marks(marks, module_name, config, namespaces=None):
     """(reason, from_pytestmark) when the item should skip, else None.
     marks: [(name, mark), ...] in closest-first order."""
     for name, mark in marks:
@@ -107,7 +115,7 @@ def evaluate_skip_marks(marks, module_name, config):
         # If any of the conditions are true.
         for condition in conditions:
             result, reason = evaluate_condition(
-                name, mark.kwargs, condition, module_name, config
+                name, mark.kwargs, condition, module_name, config, namespaces
             )
             if result:
                 return (reason, _is_module_mark(mark, module_name))
@@ -124,7 +132,7 @@ def evaluate_skip_marks(marks, module_name, config):
     return None
 
 
-def evaluate_xfail_marks(marks, module_name, config, strict_default):
+def evaluate_xfail_marks(marks, module_name, config, strict_default, namespaces=None):
     """(reason, run, strict, raises) for the first triggered xfail mark,
     or None."""
     for name, mark in marks:
@@ -142,7 +150,7 @@ def evaluate_xfail_marks(marks, module_name, config, strict_default):
         # If any of the conditions are true.
         for condition in conditions:
             result, reason = evaluate_condition(
-                name, mark.kwargs, condition, module_name, config
+                name, mark.kwargs, condition, module_name, config, namespaces
             )
             if result:
                 return (str(reason), bool(run), bool(strict), raises)
