@@ -224,6 +224,65 @@ fn common_ancestor(dirs: &[PathBuf]) -> PathBuf {
     ancestor
 }
 
+/// Python shlex.split (posix): whitespace-separated tokens with '...'
+/// (literal) and "..." (backslash escapes \\ and \") quoting.
+fn shlex_split(input: &str) -> Vec<String> {
+    let mut parts = Vec::new();
+    let mut current = String::new();
+    let mut in_word = false;
+    let mut chars = input.chars();
+    while let Some(c) = chars.next() {
+        match c {
+            c if c.is_whitespace() => {
+                if in_word {
+                    parts.push(std::mem::take(&mut current));
+                    in_word = false;
+                }
+            }
+            '\'' => {
+                in_word = true;
+                for inner in chars.by_ref() {
+                    if inner == '\'' {
+                        break;
+                    }
+                    current.push(inner);
+                }
+            }
+            '"' => {
+                in_word = true;
+                while let Some(inner) = chars.next() {
+                    match inner {
+                        '"' => break,
+                        '\\' => match chars.next() {
+                            Some(esc @ ('"' | '\\')) => current.push(esc),
+                            Some(other) => {
+                                current.push('\\');
+                                current.push(other);
+                            }
+                            None => current.push('\\'),
+                        },
+                        other => current.push(other),
+                    }
+                }
+            }
+            '\\' => {
+                in_word = true;
+                if let Some(esc) = chars.next() {
+                    current.push(esc);
+                }
+            }
+            other => {
+                in_word = true;
+                current.push(other);
+            }
+        }
+    }
+    if in_word {
+        parts.push(current);
+    }
+    parts
+}
+
 impl Config {
     pub fn from_args(parser: OptionParser, argv: Vec<String>) -> Result<Self, String> {
         let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
@@ -235,10 +294,32 @@ impl Config {
         let (rootdir, ini_file) = find_ini(&ancestor);
 
         // addopts from the config file are prepended to the CLI args.
+        // `-o addopts=...` wins over the file: it must apply here, before
+        // clap parsing, or the override could never disable addopts.
         let mut argv = argv;
-        if let Some(addopts) = ini_file.get("addopts") {
-            let extra: Vec<String> = addopts.split_whitespace().map(str::to_string).collect();
-            argv.splice(1..1, extra);
+        let mut override_addopts: Option<String> = None;
+        let mut idx = 1;
+        while idx < argv.len() {
+            let arg = &argv[idx];
+            let entry: Option<&str> = if arg == "-o" || arg == "--override-ini" {
+                idx += 1;
+                argv.get(idx).map(String::as_str)
+            } else if let Some(rest) = arg.strip_prefix("--override-ini=") {
+                Some(rest)
+            } else if let Some(rest) = arg.strip_prefix("-o") {
+                (!rest.is_empty()).then_some(rest)
+            } else {
+                None
+            };
+            if let Some(value) = entry.and_then(|entry| entry.strip_prefix("addopts=")) {
+                override_addopts = Some(value.to_string());
+            }
+            idx += 1;
+        }
+        let addopts = override_addopts.or_else(|| ini_file.get("addopts").cloned());
+        if let Some(addopts) = addopts {
+            // shlex-style splitting: `-m "not performance"` is one argument.
+            argv.splice(1..1, shlex_split(&addopts));
         }
 
         let mut cmd = clap::Command::new("pytest-rs")
