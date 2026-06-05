@@ -528,6 +528,7 @@ impl WorkerOwner {
                         self.index
                     )),
                     location: None,
+                    subtest_desc: None,
                 },
                 worker: self.index,
             });

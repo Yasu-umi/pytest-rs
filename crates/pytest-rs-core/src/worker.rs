@@ -33,6 +33,7 @@ fn send_collect_error(nodeid: &str, message: String) {
             duration: std::time::Duration::ZERO,
             longrepr: Some(message),
             location: None,
+            subtest_desc: None,
         },
     });
     send(&WorkerMsg::Report {
@@ -43,6 +44,7 @@ fn send_collect_error(nodeid: &str, message: String) {
             duration: std::time::Duration::ZERO,
             longrepr: None,
             location: None,
+            subtest_desc: None,
         },
     });
 }

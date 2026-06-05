@@ -38,6 +38,8 @@ from pytest._outcomes import exit as exit
 from pytest._outcomes import fail as fail
 from pytest._outcomes import importorskip as importorskip
 from pytest._outcomes import skip as skip
+from pytest._subtests import Subtests as Subtests
+from pytest._subtests import subtests as subtests
 from pytest._outcomes import xfail as xfail
 from pytest._pytester import LineMatcher as LineMatcher
 from pytest._pytester import Pytester as Pytester

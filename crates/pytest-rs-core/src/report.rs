@@ -32,11 +32,24 @@ pub struct TestReport {
     /// "file.py:line" of the skip/xfail origin, for -r summary grouping.
     #[serde(default)]
     pub location: Option<String>,
+    /// Subtest description like "[msg] (i=3)"; Some marks a subtest report.
+    #[serde(default)]
+    pub subtest_desc: Option<String>,
 }
 
 impl TestReport {
     /// The single-char progress marker for this report, if it should print one.
     pub fn progress_char(&self) -> Option<char> {
+        if self.subtest_desc.is_some() {
+            // Upstream subtests short letters: u (failed/passed), - (skipped),
+            // y (xfail). Quiet subtest verbosity drops non-failed subtest
+            // reports before they reach here, so default runs print only 'u'.
+            return match self.outcome {
+                Outcome::Skipped => Some('-'),
+                Outcome::XFailed => Some('y'),
+                _ => Some('u'),
+            };
+        }
         match (self.phase, self.outcome) {
             (Phase::Call, Outcome::Passed) => Some('.'),
             (_, Outcome::Failed) => Some(if self.phase == Phase::Call { 'F' } else { 'E' }),

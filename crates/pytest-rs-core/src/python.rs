@@ -1665,6 +1665,58 @@ pub fn format_test_failure(py: Python<'_>, err: &PyErr, style: &str) -> String {
     result.unwrap_or_else(|_| format_exception(py, err))
 }
 
+/// Drain the subtests fixture accumulator into reports for this item.
+/// Quiet subtest verbosity (the default) keeps only failed subtests,
+/// matching upstream's pytest_report_teststatus filtering.
+pub fn pop_subtest_reports(
+    py: Python<'_>,
+    config: &crate::config::Config,
+    item: &TestItem,
+    quiet: bool,
+) -> Vec<crate::report::TestReport> {
+    let result: PyResult<Vec<crate::report::TestReport>> = (|| {
+        let module = py.import("pytest._subtests")?;
+        let results = module.getattr("pop_results")?.call0()?;
+        let style = config.get_value("tb").unwrap_or("long").to_string();
+        let mut reports = Vec::new();
+        for record in results.try_iter()? {
+            let record = record?;
+            let outcome_str: String = record.get_item("outcome")?.extract()?;
+            let desc: String = record.get_item("desc")?.extract()?;
+            let duration: f64 = record.get_item("duration")?.extract()?;
+            let reason: String = record.get_item("reason")?.extract()?;
+            let location: Option<String> = record.get_item("location")?.extract()?;
+            let (outcome, longrepr) = match outcome_str.as_str() {
+                "failed" => {
+                    let exc = record.get_item("exc")?;
+                    let err = PyErr::from_value(exc);
+                    (
+                        crate::report::Outcome::Failed,
+                        Some(format_test_failure(py, &err, &style)),
+                    )
+                }
+                "skipped" => (crate::report::Outcome::Skipped, Some(reason)),
+                "xfailed" => (crate::report::Outcome::XFailed, Some(reason)),
+                _ => (crate::report::Outcome::Passed, None),
+            };
+            if quiet && outcome != crate::report::Outcome::Failed {
+                continue;
+            }
+            reports.push(crate::report::TestReport {
+                nodeid: item.nodeid.clone(),
+                phase: crate::report::Phase::Call,
+                outcome,
+                duration: std::time::Duration::from_secs_f64(duration),
+                longrepr,
+                location,
+                subtest_desc: Some(desc),
+            });
+        }
+        Ok(reports)
+    })();
+    result.unwrap_or_default()
+}
+
 /// Build a `pytest._node.Node` for an item (used as `request.node`).
 pub fn make_node(py: Python<'_>, item: &TestItem) -> PyResult<Py<PyAny>> {
     let marks = pyo3::types::PyList::empty(py);

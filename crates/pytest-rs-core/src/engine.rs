@@ -155,6 +155,7 @@ impl Engine {
                     duration: std::time::Duration::ZERO,
                     longrepr: Some(err),
                     location: None,
+                    subtest_desc: None,
                 });
             }
             // --maxfail aborting collection exits TESTS_FAILED with a
@@ -580,7 +581,11 @@ impl Engine {
         }
         println!("\n{}", center_banner("FAILURES"));
         for report in &failures {
-            let name = Self::failure_title(&report.nodeid);
+            let mut name = Self::failure_title(&report.nodeid);
+            // Subtest headings append the description: "test_foo [msg]".
+            if let Some(desc) = &report.subtest_desc {
+                name = format!("{name} {desc}");
+            }
             println!("{}", center_named(&name));
             if let Some(longrepr) = &report.longrepr {
                 println!("{longrepr}");
@@ -614,10 +619,20 @@ impl Engine {
         for c in chars.chars() {
             if c == 's' {
                 // Skips fold by (location, reason): "SKIPPED [2] file.py:3: x".
+                // The section label comes from the first skipped report, so a
+                // leading subtest skip relabels the whole group SUBSKIPPED[..]
+                // (upstream show_skipped_folded uses skipped[0] for the word).
+                let mut label: Option<String> = None;
                 let mut skip_groups: Vec<((String, String), usize)> = Vec::new();
                 for report in &self.session.reports {
                     if report.outcome != Outcome::Skipped {
                         continue;
+                    }
+                    if label.is_none() {
+                        label = Some(match &report.subtest_desc {
+                            Some(desc) => format!("SUBSKIPPED{desc}"),
+                            None => "SKIPPED".to_string(),
+                        });
                     }
                     let location = report
                         .location
@@ -630,8 +645,9 @@ impl Engine {
                         None => skip_groups.push((key, 1)),
                     }
                 }
+                let label = label.unwrap_or_else(|| "SKIPPED".to_string());
                 for ((location, reason), count) in skip_groups {
-                    lines.push(format!("SKIPPED [{count}] {location}: {reason}"));
+                    lines.push(format!("{label} [{count}] {location}: {reason}"));
                 }
                 continue;
             }
@@ -644,6 +660,12 @@ impl Engine {
                     // 'P' selects the PASSES section, not a summary line.
                     ('p', Phase::Call, Outcome::Passed) => "PASSED",
                     _ => continue,
+                };
+                let word = match (&report.subtest_desc, report.outcome) {
+                    (Some(desc), Outcome::Failed) => format!("SUBFAILED{desc}"),
+                    (Some(desc), Outcome::Passed) => format!("SUBPASSED{desc}"),
+                    (Some(desc), Outcome::XFailed) => format!("SUBXFAIL{desc}"),
+                    _ => word.to_string(),
                 };
                 let mut line = format!("{word} {}", report.nodeid);
                 // Collection errors print bare, like pytest's "ERROR file.py".
@@ -1216,6 +1238,7 @@ impl Engine {
                                 duration: std::time::Duration::ZERO,
                                 longrepr: Some(reason),
                                 location: Some(location),
+                                subtest_desc: None,
                             });
                         }
                         Some(Err(message)) => errors.push((file.clone(), message)),
@@ -1243,6 +1266,7 @@ impl Engine {
                                         file.display()
                                     )),
                                     location: Some(format!("{nodeid}:1")),
+                                    subtest_desc: None,
                                 });
                             }
                         }
@@ -1298,6 +1322,7 @@ impl Engine {
                                     extra_file.display()
                                 )),
                                 location: Some(format!("{nodeid}:1")),
+                                subtest_desc: None,
                             });
                         } else {
                             errors.push((extra_file.clone(), python::format_exception(py, &err)));

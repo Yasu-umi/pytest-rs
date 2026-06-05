@@ -89,12 +89,24 @@ impl Engine {
                 if config.no_terminal() {
                     // -p no:terminal: no progress output at all.
                 } else if config.verbose > 0 {
-                    let word = match report.outcome {
-                        Outcome::Passed => "PASSED",
-                        Outcome::Failed => "FAILED",
-                        Outcome::Skipped => "SKIPPED",
-                        Outcome::XFailed => "XFAIL",
-                        Outcome::XPassed => "XPASS",
+                    let word = if let Some(desc) = &report.subtest_desc {
+                        match report.outcome {
+                            Outcome::Failed => format!("SUBFAILED{desc}"),
+                            Outcome::Skipped => format!(
+                                "SUBSKIPPED{desc} ({})",
+                                report.longrepr.as_deref().unwrap_or("")
+                            ),
+                            Outcome::XFailed => format!("SUBXFAIL{desc}"),
+                            _ => format!("SUBPASSED{desc}"),
+                        }
+                    } else {
+                        match report.outcome {
+                            Outcome::Passed => "PASSED".to_string(),
+                            Outcome::Failed => "FAILED".to_string(),
+                            Outcome::Skipped => "SKIPPED".to_string(),
+                            Outcome::XFailed => "XFAIL".to_string(),
+                            Outcome::XPassed => "XPASS".to_string(),
+                        }
                     };
                     if report.phase == Phase::Call || report.outcome != Outcome::Passed {
                         println!("{} {} [{:>3}%]", item.nodeid, word, done * 100 / total);
@@ -168,6 +180,7 @@ pub(crate) fn run_one(
                 duration: Duration::ZERO,
                 longrepr: Some(reason),
                 location: Some(location),
+                subtest_desc: None,
             });
             return reports;
         }
@@ -217,6 +230,7 @@ pub(crate) fn run_one(
             duration: Duration::ZERO,
             longrepr: Some(format!("[NOTRUN] {}", xf.reason)),
             location: None,
+            subtest_desc: None,
         });
         return reports;
     }
@@ -448,6 +462,7 @@ pub(crate) fn run_one(
         duration: setup_started.elapsed(),
         longrepr: None,
         location: None,
+        subtest_desc: None,
     });
 
     if setup_show_active(config) {
@@ -498,6 +513,7 @@ pub(crate) fn run_one(
                     duration: Duration::ZERO,
                     longrepr: Some(format!("[NOTRUN] {}", xf.reason)),
                     location: None,
+                    subtest_desc: None,
                 });
                 teardown_one(py, plugins, session, config, item, true, &mut reports);
                 close_item_filters(py);
@@ -547,6 +563,7 @@ pub(crate) fn run_one(
             duration: call_started.elapsed(),
             longrepr: None,
             location: None,
+            subtest_desc: None,
         },
         Ok(false) => {
             if item.is_coroutine {
@@ -565,6 +582,7 @@ pub(crate) fn run_one(
                             .to_string(),
                     ),
                     location: None,
+                    subtest_desc: None,
                 }
             } else {
                 match python::call_with_kwargs(py, &callable, &kwargs) {
@@ -575,6 +593,7 @@ pub(crate) fn run_one(
                         duration: call_started.elapsed(),
                         longrepr: None,
                         location: None,
+                        subtest_desc: None,
                     },
                     Err(err) => {
                         if let Some(code) = python::session_abort_code(py, &err) {
@@ -629,6 +648,30 @@ pub(crate) fn run_one(
                 }
             }
             _ => report,
+        }
+    } else {
+        report
+    };
+    // Subtests recorded during the call report individually before the
+    // test's own report; a passed test containing failed subtests fails.
+    let quiet_subtests = config
+        .get_ini("verbosity_subtests")
+        .map(|v| v.trim() == "0")
+        .unwrap_or(config.verbose == 0);
+    let sub_reports = python::pop_subtest_reports(py, config, item, quiet_subtests);
+    let failed_subs = sub_reports
+        .iter()
+        .filter(|r| r.outcome == Outcome::Failed)
+        .count();
+    reports.extend(sub_reports);
+    let report = if failed_subs > 0 && report.outcome == Outcome::Passed {
+        TestReport {
+            outcome: Outcome::Failed,
+            longrepr: Some(format!(
+                "contains {failed_subs} failed subtest{}",
+                if failed_subs > 1 { "s" } else { "" }
+            )),
+            ..report
         }
     } else {
         report
@@ -703,6 +746,7 @@ fn teardown_one(
             duration: teardown_started.elapsed(),
             longrepr: None,
             location: None,
+            subtest_desc: None,
         });
     } else {
         reports.push(TestReport {
@@ -718,6 +762,7 @@ fn teardown_one(
             duration: teardown_started.elapsed(),
             longrepr: Some(errors.join("\n")),
             location: None,
+            subtest_desc: None,
         });
     }
     python::log_finish_item(py);
@@ -1326,6 +1371,7 @@ fn report_from_err(
             duration: started.elapsed(),
             longrepr: python::outcome_msg(py, err),
             location: None,
+            subtest_desc: None,
         }
     } else if python::is_skipped(py, err) {
         // Imperative skips report where pytest.skip was raised; skips out
@@ -1344,6 +1390,7 @@ fn report_from_err(
             duration: started.elapsed(),
             longrepr: python::outcome_msg(py, err),
             location,
+            subtest_desc: None,
         }
     } else {
         let mut longrepr =
@@ -1359,6 +1406,7 @@ fn report_from_err(
             duration: started.elapsed(),
             longrepr: Some(longrepr),
             location: None,
+            subtest_desc: None,
         }
     }
 }
@@ -1375,7 +1423,14 @@ pub fn summary_line(
     let mut skipped = 0usize;
     let mut xfailed = 0usize;
     let mut xpassed = 0usize;
+    let mut subtests_passed = 0usize;
     for report in reports {
+        // Passed subtests count their own category; other subtest outcomes
+        // fold into the regular buckets (upstream report_teststatus).
+        if report.subtest_desc.is_some() && report.outcome == Outcome::Passed {
+            subtests_passed += 1;
+            continue;
+        }
         match (report.phase, report.outcome) {
             (Phase::Call, Outcome::Passed) => passed += 1,
             (Phase::Call, Outcome::Failed) => failed += 1,
@@ -1395,6 +1450,9 @@ pub fn summary_line(
     }
     if skipped > 0 {
         parts.push(format!("{skipped} skipped"));
+    }
+    if subtests_passed > 0 {
+        parts.push(format!("{subtests_passed} subtests passed"));
     }
     if deselected > 0 {
         parts.push(format!("{deselected} deselected"));
