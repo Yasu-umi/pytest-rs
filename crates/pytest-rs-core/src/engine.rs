@@ -29,6 +29,8 @@ pub struct Engine {
     pub plugins: Vec<Box<dyn Plugin>>,
     pub session: Session,
     pub config: Config,
+    /// cacheprovider state (--lf/--ff/--nf, lastfailed persistence).
+    cache: Option<crate::cache::CacheState>,
 }
 
 impl Engine {
@@ -37,6 +39,7 @@ impl Engine {
             plugins,
             session: Session::new(),
             config,
+            cache: None,
         }
     }
 
@@ -99,6 +102,19 @@ impl Engine {
         }
 
         self.print_header();
+        self.cache = Some(crate::cache::CacheState::new(py, &self.config));
+
+        // --cache-show: display cache contents instead of running tests.
+        if let Some(glob) = self.config.get_value("cache-show").map(str::to_string) {
+            let glob = if glob.is_empty() { "*" } else { &glob };
+            return match python::cache_show(py, &self.config, glob) {
+                Ok(()) => exit_code::OK,
+                Err(err) => {
+                    eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+                    exit_code::INTERNAL_ERROR
+                }
+            };
+        }
 
         let collect_errors = match self.collect(py) {
             Ok(errors) => errors,
@@ -124,11 +140,16 @@ impl Engine {
                     location: None,
                 });
             }
+            // A file that fails collection is a "last failed" entry.
+            if let Some(cache) = &self.cache {
+                cache.sessionfinish(py, &self.config, &self.session.reports);
+            }
             self.print_short_summary();
             println!(
                 "{}",
                 crate::runner::summary_line(
                     &self.session.reports,
+                    self.session.deselected,
                     python::warning_count(py),
                     started.elapsed()
                 )
@@ -154,27 +175,46 @@ impl Engine {
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
             return exit_code::INTERNAL_ERROR;
         }
+        if let Some(cache) = &mut self.cache {
+            cache.modify_items(&self.config, &mut self.session.items);
+        }
 
         let n_items = self.session.items.len();
+        // Plugins may also expand items (e.g. loop-factory
+        // parametrization), so saturate against growth.
+        self.session.deselected = collected.saturating_sub(n_items);
         if !self.config.quiet && !self.config.no_terminal() {
-            // Plugins may also expand items (e.g. loop-factory
-            // parametrization), so saturate against growth.
-            let deselected = collected.saturating_sub(n_items);
+            let deselected = self.session.deselected;
             if deselected > 0 {
                 println!(
-                    "collected {collected} items / {deselected} deselected / {n_items} selected\n"
+                    "collected {collected} items / {deselected} deselected / {n_items} selected"
                 );
             } else {
                 println!(
-                    "collected {n_items} item{}\n",
+                    "collected {n_items} item{}",
                     if n_items == 1 { "" } else { "s" }
                 );
             }
+            if let Some(line) = self
+                .cache
+                .as_ref()
+                .and_then(|cache| cache.status_line(&self.config))
+            {
+                println!("{line}");
+            }
+            println!();
         }
 
         if self.config.collect_only {
-            for item in &self.session.items {
-                println!("{}", item.nodeid);
+            if !self.config.no_terminal() {
+                if self.config.quiet {
+                    for item in &self.session.items {
+                        println!("{}", item.nodeid);
+                    }
+                } else {
+                    self.print_collect_tree();
+                }
+                self.print_collect_only_summary(started.elapsed());
             }
             return if n_items == 0 {
                 exit_code::NO_TESTS_COLLECTED
@@ -183,12 +223,16 @@ impl Engine {
             };
         }
         if n_items == 0 {
+            if let Some(cache) = &self.cache {
+                cache.sessionfinish(py, &self.config, &self.session.reports);
+            }
             if !self.config.no_terminal() {
                 self.print_warnings_summary(py);
                 println!(
                     "{}",
                     crate::runner::summary_line(
                         &self.session.reports,
+                        self.session.deselected,
                         python::warning_count(py),
                         started.elapsed()
                     )
@@ -216,6 +260,9 @@ impl Engine {
         if let Err(err) = self.fire_sessionfinish(py, code) {
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
         }
+        if let Some(cache) = &self.cache {
+            cache.sessionfinish(py, &self.config, &self.session.reports);
+        }
         if let Some(forced) = self.session.exit_code_override {
             code = forced;
         }
@@ -235,9 +282,97 @@ impl Engine {
         let warning_count = python::warning_count(py) + self.session.worker_warning_count;
         println!(
             "{}",
-            crate::runner::summary_line(&self.session.reports, warning_count, started.elapsed())
+            crate::runner::summary_line(
+                &self.session.reports,
+                self.session.deselected,
+                warning_count,
+                started.elapsed(),
+            )
         );
         code
+    }
+
+    /// The --collect-only hierarchy: <Dir>/<Package>/<Module>/<Class>/
+    /// <Function> nodes, two-space indent per level.
+    fn print_collect_tree(&self) {
+        if self.session.items.is_empty() {
+            return;
+        }
+        let root_name = self
+            .config
+            .rootdir
+            .file_name()
+            .map(|name| name.to_string_lossy().to_string())
+            .unwrap_or_default();
+        println!("<Dir {root_name}>");
+        // The open chain of (label) nodes above the current item.
+        let mut open: Vec<String> = Vec::new();
+        for item in &self.session.items {
+            let (file_part, rest) = match item.nodeid.split_once("::") {
+                Some(parts) => parts,
+                None => continue,
+            };
+            let mut labels: Vec<String> = Vec::new();
+            let mut dir_so_far = self.config.rootdir.clone();
+            let segments: Vec<&str> = file_part.split('/').collect();
+            for dir in &segments[..segments.len().saturating_sub(1)] {
+                dir_so_far = dir_so_far.join(dir);
+                let kind = if dir_so_far.join("__init__.py").is_file() {
+                    "Package"
+                } else {
+                    "Dir"
+                };
+                labels.push(format!("<{kind} {dir}>"));
+            }
+            if let Some(module) = segments.last() {
+                labels.push(format!("<Module {module}>"));
+            }
+            let parts: Vec<&str> = rest.split("::").collect();
+            for class in &parts[..parts.len().saturating_sub(1)] {
+                labels.push(format!("<Class {class}>"));
+            }
+            if let Some(function) = parts.last() {
+                labels.push(format!("<Function {function}>"));
+            }
+            // Print only the suffix that differs from the previous item.
+            let shared = open
+                .iter()
+                .zip(labels.iter())
+                .take_while(|(open_label, label)| open_label == label)
+                .count();
+            for (depth, label) in labels.iter().enumerate().skip(shared) {
+                println!("{}{label}", "  ".repeat(depth + 1));
+            }
+            open = labels;
+        }
+    }
+
+    /// The --collect-only closing banner ("N/M tests collected ...").
+    fn print_collect_only_summary(&self, elapsed: std::time::Duration) {
+        let selected = self.session.items.len();
+        let deselected = self.session.deselected;
+        let body = if selected == 0 && deselected == 0 {
+            format!("no tests collected in {:.2}s", elapsed.as_secs_f64())
+        } else if deselected > 0 {
+            format!(
+                "{selected}/{} tests collected ({deselected} deselected) in {:.2}s",
+                selected + deselected,
+                elapsed.as_secs_f64()
+            )
+        } else {
+            format!(
+                "{selected} test{} collected in {:.2}s",
+                if selected == 1 { "" } else { "s" },
+                elapsed.as_secs_f64()
+            )
+        };
+        let color = if selected == 0 && deselected == 0 {
+            "\x1b[33m" // yellow
+        } else {
+            "\x1b[32m" // green
+        };
+        println!();
+        println!("{color}{}\x1b[0m", center_banner(&body));
     }
 
     fn print_warnings_summary(&self, py: Python<'_>) {
@@ -265,6 +400,21 @@ impl Engine {
             std::env::consts::OS,
             env!("CARGO_PKG_VERSION"),
         );
+        // pytest shows the cachedir only when it is non-default or -v.
+        let default_dir = std::env::var("TOX_ENV_DIR")
+            .map(|tox| format!("{tox}/.pytest_cache"))
+            .unwrap_or_else(|_| ".pytest_cache".to_string());
+        let cache_dir = self
+            .config
+            .get_ini("cache_dir")
+            .map(str::trim)
+            .map(str::to_string)
+            .unwrap_or(default_dir);
+        if !self.config.plugin_disabled("cacheprovider")
+            && (self.config.verbose > 0 || cache_dir != ".pytest_cache")
+        {
+            println!("cachedir: {cache_dir}");
+        }
         println!("rootdir: {}", self.config.rootdir.display());
     }
 
@@ -741,6 +891,56 @@ impl Engine {
         match python::expand_fixture_params(py, items, &self.session.registry) {
             Ok(expanded) => self.session.items = expanded,
             Err(err) => return Err(python::format_exception(py, &err)),
+        }
+
+        // Node-id args ("file.py::TestCls::test_a") restrict collection to
+        // matching items; unlike -k/-m this is not a deselection.
+        enum ArgSel {
+            Path(PathBuf),
+            NodeId(String),
+        }
+        if paths.iter().any(|arg| arg.contains("::")) {
+            let arg_sels: Vec<ArgSel> = paths
+                .iter()
+                .map(|arg| match arg.split_once("::") {
+                    Some((file_part, rest)) => {
+                        let path = self.config.invocation_dir.join(file_part);
+                        let path = std::fs::canonicalize(&path).unwrap_or(path);
+                        ArgSel::NodeId(format!(
+                            "{}::{}",
+                            crate::collect::file_nodeid(&rootdir, &path),
+                            rest
+                        ))
+                    }
+                    None => {
+                        let path = self.config.invocation_dir.join(arg);
+                        ArgSel::Path(std::fs::canonicalize(&path).unwrap_or(path))
+                    }
+                })
+                .collect();
+            self.session.items.retain(|item| {
+                arg_sels.iter().any(|sel| match sel {
+                    ArgSel::Path(path) => item.path.starts_with(path),
+                    ArgSel::NodeId(sel) => {
+                        item.nodeid == *sel
+                            || item
+                                .nodeid
+                                .strip_prefix(sel.as_str())
+                                .is_some_and(|rest| rest.starts_with('[') || rest.starts_with("::"))
+                    }
+                })
+            });
+        }
+
+        // --lf drops failure-free files (and non-failed top-level functions
+        // of failed files) at collection time.
+        if let Some(cache) = &mut self.cache {
+            cache.filter_collected_items(
+                &rootdir,
+                &self.config.invocation_dir,
+                &paths,
+                &mut self.session.items,
+            );
         }
         Ok(errors)
     }

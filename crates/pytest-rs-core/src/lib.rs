@@ -1,3 +1,4 @@
+pub mod cache;
 pub mod collect;
 pub mod config;
 pub mod dist;

@@ -202,6 +202,13 @@ class _AssertRewriter(ast.NodeTransformer):
 
 
 class _RewriteLoader(importlib.machinery.SourceFileLoader):
+    def get_code(self, fullname):
+        # Always compile from source, bypassing the bytecode cache:
+        # CPython's pyc validation (mtime seconds + size) misses the
+        # same-second same-size rewrites pytester does constantly.
+        path = self.get_filename(fullname)
+        return self.source_to_code(self.get_data(path), path)
+
     def source_to_code(self, data, path, *, _optimize=-1):
         tree = ast.parse(data, filename=path)
         _AssertRewriter(path).visit(tree)

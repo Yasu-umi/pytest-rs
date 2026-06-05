@@ -290,10 +290,11 @@ impl Config {
         // Core pytest options parsed into flags/values (queried via
         // get_flag/get_value); some are still inert and gain behavior as
         // features land.
-        const CORE_FLAGS: [&str; 14] = [
+        const CORE_FLAGS: [&str; 15] = [
             "strict-config",
             "strict-markers",
             "strict",
+            "cache-clear",
             "no-header",
             "no-summary",
             "continue-on-collection-errors",
@@ -306,7 +307,8 @@ impl Config {
             "setup-plan",      // like --setup-only (fixtures do execute here)
             "setup-show",      // run tests, narrating fixture setup/teardown
         ];
-        const CORE_VALUES: [(&str, Option<char>); 20] = [
+        const CORE_VALUES: [(&str, Option<char>); 21] = [
+            ("last-failed-no-failures", None),
             ("report-chars", Some('r')),
             ("markexpr", Some('m')),
             ("keyword", Some('k')),
@@ -342,6 +344,29 @@ impl Config {
                 .action(clap::ArgAction::SetTrue)
                 .hide(true),
         );
+        // cacheprovider selection flags (each with its long-form alias).
+        for (name, alias) in [
+            ("lf", "last-failed"),
+            ("ff", "failed-first"),
+            ("nf", "new-first"),
+        ] {
+            cmd = cmd.arg(
+                clap::Arg::new(name)
+                    .long(name)
+                    .alias(alias)
+                    .action(clap::ArgAction::SetTrue)
+                    .hide(true),
+            );
+        }
+        cmd = cmd.arg(
+            clap::Arg::new("cache-show")
+                .long("cache-show")
+                .value_name("GLOB")
+                .num_args(0..=1)
+                .default_missing_value("*")
+                .action(clap::ArgAction::Append)
+                .hide(true),
+        );
         for (name, short) in CORE_VALUES.into_iter().chain([("rootdir-opt", None)]) {
             let mut arg = clap::Arg::new(name)
                 .value_name("VALUE")
@@ -349,6 +374,7 @@ impl Config {
                 .hide(true);
             arg = match name {
                 "rootdir-opt" => arg.long("rootdir"),
+                "last-failed-no-failures" => arg.long(name).alias("lfnf"),
                 _ => arg.long(name),
             };
             if let Some(short) = short {
@@ -400,10 +426,18 @@ impl Config {
                 flags.insert(opt.name.clone());
             }
         }
-        for flag in CORE_FLAGS.into_iter().chain(["capture-disable"]) {
+        for flag in CORE_FLAGS
+            .into_iter()
+            .chain(["capture-disable", "lf", "ff", "nf"])
+        {
             if matches.get_flag(flag) {
                 flags.insert(flag.to_string());
             }
+        }
+        if let Some(parsed) = matches.get_many::<String>("cache-show")
+            && let Some(last) = parsed.last()
+        {
+            values.insert("cache-show".to_string(), last.clone());
         }
         let mut plugin_opts = Vec::new();
         for (name, _) in CORE_VALUES {
@@ -498,6 +532,13 @@ impl Config {
                 .plugin_opts
                 .iter()
                 .any(|spec| spec == "no:terminal" || spec == "no:terminalreporter")
+    }
+
+    /// `-p no:NAME` for a bundled plugin.
+    pub fn plugin_disabled(&self, name: &str) -> bool {
+        self.plugin_opts
+            .iter()
+            .any(|spec| spec.strip_prefix("no:") == Some(name))
     }
 
     /// This process is a `-n` worker, driven over stdin/stdout.

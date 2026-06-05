@@ -1320,6 +1320,75 @@ pub fn install_warning_capture(
     Ok(())
 }
 
+/// The `config.cache` object (a pytest._cache.Cache) for this run.
+fn cache_object<'py>(
+    py: Python<'py>,
+    config: &crate::config::Config,
+) -> PyResult<Bound<'py, PyAny>> {
+    let proxy = make_py_config(py, config)?;
+    proxy.bind(py).getattr("cache")
+}
+
+/// Nodeids recorded as failed in cache/lastfailed (insertion order).
+pub fn cache_lastfailed(py: Python<'_>, config: &crate::config::Config) -> Vec<String> {
+    let read = || -> PyResult<Vec<String>> {
+        let cache = cache_object(py, config)?;
+        let value = cache.call_method1("get", ("cache/lastfailed", pyo3::types::PyDict::new(py)))?;
+        // dict_keys is not extractable directly; materialize a list first.
+        py.import("builtins")?
+            .getattr("list")?
+            .call1((value.call_method0("keys")?,))?
+            .extract()
+    };
+    read().unwrap_or_default()
+}
+
+/// Persist cache/lastfailed and cache/nodeids at session end (done from the
+/// pytest.cacheprovider shim so cache warnings carry pytest's locations).
+pub fn cache_write_session(
+    py: Python<'_>,
+    config: &crate::config::Config,
+    failed: &[String],
+    nodeids: &[String],
+) -> PyResult<()> {
+    let dict = pyo3::types::PyDict::new(py);
+    for nodeid in failed {
+        dict.set_item(nodeid, true)?;
+    }
+    let proxy = make_py_config(py, config)?;
+    py.import("pytest.cacheprovider")?.call_method1(
+        "write_session_cache",
+        (proxy, dict, nodeids.to_vec()),
+    )?;
+    Ok(())
+}
+
+/// Nodeids seen in previous runs (cache/nodeids).
+pub fn cache_nodeids(py: Python<'_>, config: &crate::config::Config) -> Vec<String> {
+    let read = || -> PyResult<Vec<String>> {
+        let cache = cache_object(py, config)?;
+        let value = cache.call_method1("get", ("cache/nodeids", pyo3::types::PyList::empty(py)))?;
+        value.extract()
+    };
+    read().unwrap_or_default()
+}
+
+
+/// --cache-show: print cache values/directories matching the glob.
+pub fn cache_show(py: Python<'_>, config: &crate::config::Config, glob: &str) -> PyResult<()> {
+    let cache = cache_object(py, config)?;
+    let cachedir = cache.getattr("_cachedir")?;
+    py.import("pytest._cache")?
+        .call_method1("cacheshow", (cachedir, glob))?;
+    Ok(())
+}
+
+/// --cache-clear: drop the cache's value/directory stores at startup.
+pub fn cache_clear(py: Python<'_>, config: &crate::config::Config) -> PyResult<()> {
+    cache_object(py, config)?.call_method0("clear_cache")?;
+    Ok(())
+}
+
 /// Expand `testpaths` ini globs against the rootdir (sorted per entry,
 /// recursive ** supported), pytest's Config._decide_args.
 pub fn glob_testpaths(

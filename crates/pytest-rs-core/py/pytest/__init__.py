@@ -8,6 +8,8 @@ resolves fixtures or runs tests.
 import enum as _enum
 
 from pytest._approx import approx as approx
+from pytest._cache import Cache as Cache
+from pytest._cache import cache as cache
 from pytest._capture import CaptureFixture as CaptureFixture
 from pytest._capture import capsys as capsys
 from pytest._fixtures import FixtureFunctionMarker as FixtureFunctionMarker

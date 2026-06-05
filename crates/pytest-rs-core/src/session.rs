@@ -66,6 +66,8 @@ pub struct Session {
     /// Fatal distribution condition (crashed-worker budget exhausted),
     /// shown as a banner before the short summary.
     pub dist_banner: Option<String>,
+    /// Items dropped by selection (-k/-m/--lf), for the summary line.
+    pub deselected: usize,
 }
 
 impl Session {
@@ -83,6 +85,7 @@ impl Session {
             worker_warnings: Vec::new(),
             worker_warning_count: 0,
             dist_banner: None,
+            deselected: 0,
         }
     }
 

@@ -44,19 +44,25 @@ class LineMatcher:
         import fnmatch
 
         patterns = self._pattern_lines(patterns)
+
+        # Upstream checks equality before globbing, so a literal "[1, 2, 3]"
+        # pattern matches itself despite being a valid character class.
+        def matches(line, pattern):
+            return line == pattern or fnmatch.fnmatch(line, pattern)
+
         if consecutive:
             # The whole pattern block must match a consecutive run of lines.
             for start in range(len(self.lines)):
                 window = self.lines[start : start + len(patterns)]
                 if len(window) == len(patterns) and all(
-                    fnmatch.fnmatch(line, pattern) for line, pattern in zip(window, patterns)
+                    matches(line, pattern) for line, pattern in zip(window, patterns)
                 ):
                     return
             fail(f"fnmatch_lines: no consecutive match for {patterns!r} in:\n{self}")
         remaining = list(self.lines)
         for pattern in patterns:
             for index, line in enumerate(remaining):
-                if fnmatch.fnmatch(line, pattern):
+                if matches(line, pattern):
                     remaining = remaining[index + 1 :]
                     break
             else:
@@ -67,7 +73,7 @@ class LineMatcher:
         import fnmatch
 
         for line in self.lines:
-            if fnmatch.fnmatch(line, pattern):
+            if line == pattern or fnmatch.fnmatch(line, pattern):
                 fail(f"no_fnmatch_line: unexpectedly matched {pattern!r}: {line!r}")
 
     def fnmatch_lines_random(self, patterns):
@@ -76,7 +82,9 @@ class LineMatcher:
 
         patterns = self._pattern_lines(patterns)
         for pattern in patterns:
-            if not any(fnmatch.fnmatch(line, pattern) for line in self.lines):
+            if not any(
+                line == pattern or fnmatch.fnmatch(line, pattern) for line in self.lines
+            ):
                 fail(f"fnmatch_lines_random: no line matches {pattern!r} in:\n{self}")
 
 
@@ -146,7 +154,9 @@ class Pytester:
         for basename, source in items:
             import textwrap
 
-            path = self.path / (basename + ext)
+            # with_suffix both appends and replaces ("pkg/test_1.py" stays
+            # itself), matching upstream pytester.
+            path = (self.path / basename).with_suffix(ext)
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(textwrap.dedent(str(source)).lstrip("\n"))
             paths.append(path)

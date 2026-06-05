@@ -82,6 +82,20 @@ impl PyConfig {
     fn rootdir<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         self.rootpath(py)
     }
+
+    /// The pytest `config.cache` API (a pytest._cache.Cache).
+    #[getter]
+    fn cache<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let cls = py.import("pytest._cache")?.getattr("Cache")?;
+        let dir = cls.call_method1(
+            "cache_dir_from",
+            (
+                self.rootdir.as_str(),
+                self.getini("cache_dir").unwrap_or_default(),
+            ),
+        )?;
+        cls.call1((dir,))
+    }
 }
 
 /// A (subset of the) pytest `FixtureRequest` API. Constructed per fixture
@@ -151,5 +165,12 @@ impl PyRequest {
             .lock()
             .expect("request lock poisoned")
             .push(finalizer);
+    }
+
+    /// The session config proxy (pytest's `request.config`).
+    #[getter]
+    fn config(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        crate::python::existing_py_config(py)
+            .ok_or_else(|| pyo3::exceptions::PyAttributeError::new_err("config"))
     }
 }

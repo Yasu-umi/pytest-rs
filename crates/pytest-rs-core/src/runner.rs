@@ -18,6 +18,7 @@ impl Engine {
             plugins,
             session,
             config,
+            ..
         } = self;
 
         let items = std::mem::take(&mut session.items);
@@ -431,17 +432,45 @@ pub(crate) fn run_one(
         }
         Err(err) => report_from_err(py, config, item, Phase::Call, call_started, &err),
     };
-    // @pytest.mark.xfail: expected failures invert at the call phase.
+    // @pytest.mark.xfail: expected failures invert at the call phase; with
+    // strict=True (mark kwarg, or the xfail_strict ini default) an
+    // unexpected pass fails instead.
     let report = if xfail {
         match report.outcome {
             Outcome::Failed => TestReport {
                 outcome: Outcome::XFailed,
                 ..report
             },
-            Outcome::Passed => TestReport {
-                outcome: Outcome::XPassed,
-                ..report
-            },
+            Outcome::Passed => {
+                let mark = item.get_closest_marker("xfail");
+                let kwargs = mark.and_then(|mark| mark.obj.bind(py).getattr("kwargs").ok());
+                let strict = kwargs
+                    .as_ref()
+                    .and_then(|kwargs| kwargs.get_item("strict").ok())
+                    .and_then(|value| value.extract::<bool>().ok())
+                    .unwrap_or_else(|| {
+                        matches!(
+                            config.get_ini("xfail_strict").map(str::trim),
+                            Some("true") | Some("True") | Some("1")
+                        )
+                    });
+                if strict {
+                    let reason = kwargs
+                        .and_then(|kwargs| kwargs.get_item("reason").ok())
+                        .and_then(|value| value.extract::<String>().ok())
+                        .unwrap_or_default();
+                    TestReport {
+                        outcome: Outcome::Failed,
+                        longrepr: Some(format!("[XPASS(strict)] {reason}")),
+                        ..report
+                    }
+                } else {
+                    TestReport {
+                        outcome: Outcome::XPassed,
+                        ..report
+                    }
+                }
+            }
             _ => report,
         }
     } else {
@@ -921,7 +950,12 @@ fn report_from_err(
     }
 }
 
-pub fn summary_line(reports: &[TestReport], warning_count: usize, elapsed: Duration) -> String {
+pub fn summary_line(
+    reports: &[TestReport],
+    deselected: usize,
+    warning_count: usize,
+    elapsed: Duration,
+) -> String {
     let mut passed = 0usize;
     let mut failed = 0usize;
     let mut errors = 0usize;
@@ -948,6 +982,9 @@ pub fn summary_line(reports: &[TestReport], warning_count: usize, elapsed: Durat
     }
     if skipped > 0 {
         parts.push(format!("{skipped} skipped"));
+    }
+    if deselected > 0 {
+        parts.push(format!("{deselected} deselected"));
     }
     if xfailed > 0 {
         parts.push(format!("{xfailed} xfailed"));

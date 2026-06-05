@@ -70,6 +70,9 @@ pub fn collect_test_files(invocation_dir: &Path, paths: &[String]) -> Result<Vec
 
     let mut files = Vec::new();
     for arg in &args {
+        // Node-id args select within a file; only the path part is
+        // collected here (the engine filters items afterwards).
+        let arg = arg.split("::").next().unwrap_or(arg);
         // Canonicalize so symlinked paths (e.g. /tmp on macOS) match the
         // canonical rootdir when computing node ids.
         let path = invocation_dir.join(arg);
@@ -77,7 +80,7 @@ pub fn collect_test_files(invocation_dir: &Path, paths: &[String]) -> Result<Vec
         let meta = std::fs::metadata(&path).map_err(|e| format!("{}: {e}", path.display()))?;
         if meta.is_dir() {
             collect_dir(&path, &mut files)?;
-        } else {
+        } else if !files.contains(&path) {
             files.push(path);
         }
     }

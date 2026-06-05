@@ -229,11 +229,19 @@ def test_state():
 fn collect_only_lists_nodeids() {
     let suite = TempSuite::new("collect");
     suite.write("test_co.py", "def test_one(): pass\ndef test_two(): pass\n");
-    let output = suite.run(&["--collect-only"]);
+    let output = suite.run(&["--collect-only", "-q"]);
     let out = stdout(&output);
     assert_eq!(output.status.code(), Some(0), "out: {out}");
     assert!(out.contains("test_co.py::test_one"), "out: {out}");
     assert!(out.contains("test_co.py::test_two"), "out: {out}");
+
+    // Without -q, --collect-only renders the node tree.
+    let output = suite.run(&["--collect-only"]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(out.contains("<Module test_co.py>"), "out: {out}");
+    assert!(out.contains("<Function test_one>"), "out: {out}");
+    assert!(out.contains("2 tests collected"), "out: {out}");
 }
 
 #[test]

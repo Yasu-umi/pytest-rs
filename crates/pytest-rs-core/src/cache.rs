@@ -1,0 +1,246 @@
+//! cacheprovider parity: --lf/--ff/--nf selection plus the
+//! cache/lastfailed and cache/nodeids stores.
+
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
+
+use pyo3::prelude::*;
+
+use crate::collect::TestItem;
+use crate::config::Config;
+use crate::report::{Outcome, Phase, TestReport};
+
+pub struct CacheState {
+    enabled: bool,
+    lf: bool,
+    ff: bool,
+    nf: bool,
+    /// Failed nodeids from the previous run, in recorded order.
+    lastfailed: Vec<String>,
+    /// Nodeids seen in previous runs (--nf sorts unseen ones first).
+    cached_nodeids: Vec<String>,
+    /// Files not collected because --lf restricted collection.
+    skipped_files: usize,
+    /// The "run-last-failure: ..." collection status line.
+    report_status: Option<String>,
+}
+
+impl CacheState {
+    pub fn new(py: Python<'_>, config: &Config) -> Self {
+        let enabled = !config.plugin_disabled("cacheprovider");
+        if enabled && config.get_flag("cache-clear") {
+            let _ = crate::python::cache_clear(py, config);
+        }
+        let lf = enabled && config.get_flag("lf");
+        let ff = enabled && config.get_flag("ff");
+        let nf = enabled && config.get_flag("nf");
+        let lastfailed = if enabled {
+            crate::python::cache_lastfailed(py, config)
+        } else {
+            Vec::new()
+        };
+        let cached_nodeids = if enabled {
+            crate::python::cache_nodeids(py, config)
+        } else {
+            Vec::new()
+        };
+        Self {
+            enabled,
+            lf,
+            ff,
+            nf,
+            lastfailed,
+            cached_nodeids,
+            skipped_files: 0,
+            report_status: None,
+        }
+    }
+
+    /// LFPluginCollWrapper/CollSkipfiles: with --lf (and at least one
+    /// previous failure still collected), files without failures skip
+    /// entirely (counted), and top-level non-failed functions of failed
+    /// files drop out — neither counts as "deselected". Files passed
+    /// explicitly on the command line and class members are exempt: those
+    /// deselect later in modify_items, like pytest's isinitpath/Collector
+    /// exemptions.
+    pub fn filter_collected_items(
+        &mut self,
+        rootdir: &Path,
+        invocation_dir: &Path,
+        paths: &[String],
+        items: &mut Vec<TestItem>,
+    ) {
+        if !self.lf || self.lastfailed.is_empty() {
+            return;
+        }
+        let failed_set: HashSet<&str> = self.lastfailed.iter().map(String::as_str).collect();
+        if !items
+            .iter()
+            .any(|item| failed_set.contains(item.nodeid.as_str()))
+        {
+            return;
+        }
+        let failed_paths: HashSet<PathBuf> = self
+            .lastfailed
+            .iter()
+            .filter_map(|nodeid| {
+                let file = nodeid.split("::").next()?;
+                let path = rootdir.join(file);
+                let path = std::fs::canonicalize(&path).unwrap_or(path);
+                path.is_file().then_some(path)
+            })
+            .collect();
+        let arg_files: HashSet<PathBuf> = paths
+            .iter()
+            .map(|arg| {
+                let arg = arg.split("::").next().unwrap_or(arg);
+                let path = invocation_dir.join(arg);
+                std::fs::canonicalize(&path).unwrap_or(path)
+            })
+            .filter(|path| path.is_file())
+            .collect();
+        let mut skipped: HashSet<PathBuf> = HashSet::new();
+        items.retain(|item| {
+            if arg_files.contains(&item.path) {
+                return true;
+            }
+            if !failed_paths.contains(&item.path) {
+                skipped.insert(item.path.clone());
+                return false;
+            }
+            // Class members survive collection (the whole class node does);
+            // they deselect in modify_items instead.
+            let in_class = item
+                .nodeid
+                .split_once("::")
+                .is_some_and(|(_, rest)| rest.contains("::"));
+            failed_set.contains(item.nodeid.as_str()) || in_class
+        });
+        self.skipped_files = skipped.len();
+    }
+
+    /// LFPlugin/NFPlugin pytest_collection_modifyitems: --lf filters to the
+    /// previous failures, --ff moves them first, --nf runs never-seen tests
+    /// first (newest files first).
+    pub fn modify_items(&mut self, config: &Config, items: &mut Vec<TestItem>) {
+        if !self.enabled {
+            return;
+        }
+        if self.lf || self.ff {
+            if self.lastfailed.is_empty() {
+                let mut status = "no previously failed tests, ".to_string();
+                if self.lf
+                    && config.get_value("last-failed-no-failures").map(str::trim) == Some("none")
+                {
+                    status.push_str("deselecting all items.");
+                    items.clear();
+                } else {
+                    status.push_str("not deselecting items.");
+                }
+                self.report_status = Some(status);
+            } else {
+                let failed_set: HashSet<&str> =
+                    self.lastfailed.iter().map(String::as_str).collect();
+                let previously_failed = items
+                    .iter()
+                    .filter(|item| failed_set.contains(item.nodeid.as_str()))
+                    .count();
+                if previously_failed == 0 {
+                    self.report_status = Some(format!(
+                        "{} known failures not in selected tests",
+                        self.lastfailed.len()
+                    ));
+                } else {
+                    if self.lf {
+                        items.retain(|item| failed_set.contains(item.nodeid.as_str()));
+                    } else {
+                        // --ff: previous failures first, order otherwise kept.
+                        let (failed, passed): (Vec<TestItem>, Vec<TestItem>) = items
+                            .drain(..)
+                            .partition(|item| failed_set.contains(item.nodeid.as_str()));
+                        items.extend(failed);
+                        items.extend(passed);
+                    }
+                    let noun = if previously_failed == 1 {
+                        "failure"
+                    } else {
+                        "failures"
+                    };
+                    let suffix = if self.ff { " first" } else { "" };
+                    self.report_status =
+                        Some(format!("rerun previous {previously_failed} {noun}{suffix}"));
+                }
+                if self.skipped_files > 0 {
+                    let files_noun = if self.skipped_files == 1 {
+                        "file"
+                    } else {
+                        "files"
+                    };
+                    let status = self.report_status.get_or_insert_with(String::new);
+                    status.push_str(&format!(" (skipped {} {})", self.skipped_files, files_noun));
+                }
+            }
+        }
+        if self.nf {
+            let seen: HashSet<&str> = self.cached_nodeids.iter().map(String::as_str).collect();
+            let (mut new_items, mut other_items): (Vec<TestItem>, Vec<TestItem>) = items
+                .drain(..)
+                .partition(|item| !seen.contains(item.nodeid.as_str()));
+            // Newest files first within each group (mtime descending).
+            let mtime_desc = |item: &TestItem| {
+                std::cmp::Reverse(
+                    item.path
+                        .metadata()
+                        .and_then(|meta| meta.modified())
+                        .ok()
+                        .map(|t| t.duration_since(std::time::UNIX_EPOCH).unwrap_or_default()),
+                )
+            };
+            new_items.sort_by_key(mtime_desc);
+            other_items.sort_by_key(mtime_desc);
+            items.extend(new_items);
+            items.extend(other_items);
+        }
+        // Remember every collected nodeid for the next --nf run.
+        let seen: HashSet<&str> = self.cached_nodeids.iter().map(String::as_str).collect();
+        let unseen: Vec<String> = items
+            .iter()
+            .filter(|item| !seen.contains(item.nodeid.as_str()))
+            .map(|item| item.nodeid.clone())
+            .collect();
+        self.cached_nodeids.extend(unseen);
+    }
+
+    /// The "run-last-failure: ..." line shown after the collected count.
+    pub fn status_line(&self, config: &Config) -> Option<String> {
+        if !(self.lf || self.ff) || config.quiet {
+            return None;
+        }
+        self.report_status
+            .as_ref()
+            .map(|status| format!("run-last-failure: {status}"))
+    }
+
+    /// LFPlugin/NFPlugin pytest_sessionfinish: replay the run's reports into
+    /// cache/lastfailed and persist cache/nodeids.
+    pub fn sessionfinish(&self, py: Python<'_>, config: &Config, reports: &[TestReport]) {
+        if !self.enabled || config.is_worker() || config.get_value("cache-show").is_some() {
+            return;
+        }
+        let mut failed: Vec<String> = self.lastfailed.clone();
+        let mut in_failed: HashSet<String> = failed.iter().cloned().collect();
+        for report in reports {
+            let pop = (report.phase == Phase::Call && report.outcome == Outcome::Passed)
+                || matches!(report.outcome, Outcome::Skipped | Outcome::XFailed);
+            let push = report.outcome == Outcome::Failed;
+            if pop {
+                if in_failed.remove(&report.nodeid) {
+                    failed.retain(|nodeid| nodeid != &report.nodeid);
+                }
+            } else if push && in_failed.insert(report.nodeid.clone()) {
+                failed.push(report.nodeid.clone());
+            }
+        }
+        let _ = crate::python::cache_write_session(py, config, &failed, &self.cached_nodeids);
+    }
+}
