@@ -15,6 +15,15 @@ def new_loop_with_factory(factory):
     return loop
 
 
+def new_loop_with_policy(policy):
+    """The (overridable) event_loop_policy fixture drives loop creation;
+    pytest-asyncio also installs it as the current policy."""
+    asyncio.set_event_loop_policy(policy)
+    loop = policy.new_event_loop()
+    asyncio.set_event_loop(loop)
+    return loop
+
+
 def close_loop(loop):
     try:
         loop.run_until_complete(loop.shutdown_asyncgens())

@@ -54,28 +54,50 @@ impl AsyncioPlugin {
     }
 
     /// The cached (or new) loop for a scope instance. A factory from the
-    /// pytest_asyncio_loop_factories conftest hook customizes creation.
+    /// pytest_asyncio_loop_factories conftest hook customizes creation,
+    /// else a user-defined event_loop_policy fixture does.
     fn loop_for(
         &self,
         py: Python<'_>,
         scope: Scope,
         key: &str,
         factory: Option<&Py<PyAny>>,
+        policy: Option<&Py<PyAny>>,
     ) -> PyResult<Py<PyAny>> {
         let mut loops = self.loops.borrow_mut();
         if let Some(loop_) = loops.get(&(scope, key.to_string())) {
             return Ok(loop_.clone_ref(py));
         }
         let helper = self.helper(py)?;
-        let loop_ = match factory {
-            Some(factory) => helper
+        let loop_ = match (factory, policy) {
+            (Some(factory), _) => helper
                 .getattr("new_loop_with_factory")?
                 .call1((factory.bind(py),))?
                 .unbind(),
-            None => helper.getattr("new_loop")?.call0()?.unbind(),
+            (None, Some(policy)) => helper
+                .getattr("new_loop_with_policy")?
+                .call1((policy.bind(py),))?
+                .unbind(),
+            (None, None) => helper.getattr("new_loop")?.call0()?.unbind(),
         };
         loops.insert((scope, key.to_string()), loop_.clone_ref(py));
         Ok(loop_)
+    }
+
+    /// The user's event_loop_policy fixture value, if one is defined
+    /// (resolved directly: policy fixtures are plain zero-dependency
+    /// factories in practice).
+    fn loop_policy(&self, ctx: &mut HookContext, item: &TestItem) -> Option<Py<PyAny>> {
+        let def = ctx
+            .session
+            .registry
+            .lookup("event_loop_policy", &item.nodeid)?;
+        if !def.param_names.is_empty() {
+            return None;
+        }
+        pytest_rs_core::python::call_fixture(ctx.py, &def.func, None, &[])
+            .ok()
+            .map(|value| value.unbind())
     }
 
     /// The loop factory for an item from conftest
@@ -309,10 +331,17 @@ impl Plugin for AsyncioPlugin {
             return Ok(None);
         }
         let factory = self.loop_factory(ctx, item)?;
+        let policy = self.loop_policy(ctx, item);
         let py = ctx.py;
         let helper = self.helper(py)?;
         let scope = self.fixture_loop_scope(py, def);
-        let loop_ = self.loop_for(py, scope, &Self::scope_key(scope, item), factory.as_ref())?;
+        let loop_ = self.loop_for(
+            py,
+            scope,
+            &Self::scope_key(scope, item),
+            factory.as_ref(),
+            policy.as_ref(),
+        )?;
 
         if def.is_coroutine {
             let coro = pytest_rs_core::python::call_fixture(py, &def.func, instance, kwargs)?;
@@ -348,10 +377,17 @@ impl Plugin for AsyncioPlugin {
             return Ok(None);
         }
         let factory = self.loop_factory(ctx, item)?;
+        let policy = self.loop_policy(ctx, item);
         let py = ctx.py;
         let helper = self.helper(py)?;
         let scope = self.test_loop_scope(py, item);
-        let loop_ = self.loop_for(py, scope, &Self::scope_key(scope, item), factory.as_ref())?;
+        let loop_ = self.loop_for(
+            py,
+            scope,
+            &Self::scope_key(scope, item),
+            factory.as_ref(),
+            policy.as_ref(),
+        )?;
         let coro = pytest_rs_core::python::call_with_kwargs(py, callable, kwargs)?;
         helper.getattr("run")?.call1((loop_.bind(py), coro))?;
         Ok(Some(()))
