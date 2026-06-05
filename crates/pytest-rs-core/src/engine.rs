@@ -611,6 +611,7 @@ impl Engine {
                 file,
                 &mut self.session.items,
                 &mut self.session.registry,
+                &mut self.session.py_hooks,
             ) {
                 errors.push((file.clone(), python::format_exception(py, &err)));
             }

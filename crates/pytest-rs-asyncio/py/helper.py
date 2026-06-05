@@ -52,6 +52,23 @@ def run(loop, coro):
     return loop.run_until_complete(task)
 
 
+def sync_gen_finalizer(loop, gen):
+    """Finalizer for sync generator fixtures owned by pytest-asyncio: the
+    fixture's loop is re-installed as current before resuming, so teardown
+    code sees the same loop as setup."""
+
+    def _finalize():
+        asyncio.set_event_loop(loop)
+        try:
+            next(gen)
+        except StopIteration:
+            pass
+        else:
+            raise RuntimeError("fixture function has more than one 'yield'")
+
+    return _finalize
+
+
 def async_gen_first(loop, agen):
     return run(loop, agen.__anext__())
 

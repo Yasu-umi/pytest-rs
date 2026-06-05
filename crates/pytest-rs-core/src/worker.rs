@@ -279,6 +279,7 @@ impl Engine {
             &path,
             &mut new_items,
             &mut self.session.registry,
+            &mut self.session.py_hooks,
         )
         .map_err(|err| python::format_exception(py, &err))?;
         let new_items = python::expand_fixture_params(py, new_items, &self.session.registry)

@@ -66,6 +66,18 @@ pub trait Plugin: Send {
         Ok(None)
     }
 
+    /// firstresult: an extra discriminator appended to a fixture's cache key
+    /// (e.g. the asyncio loop-factory variant, so loop-bound fixtures are
+    /// recreated per variant instead of shared across them).
+    fn pytest_fixture_cache_key(
+        &self,
+        _ctx: &mut HookContext,
+        _def: &FixtureDef,
+        _item: &TestItem,
+    ) -> HookResult<String> {
+        Ok(None)
+    }
+
     fn pytest_runtest_setup(&self, _ctx: &mut HookContext, _item: &TestItem) -> PyResult<()> {
         Ok(())
     }

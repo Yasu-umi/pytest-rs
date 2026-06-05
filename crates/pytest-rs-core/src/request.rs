@@ -120,6 +120,12 @@ impl PyRequest {
         self.node.clone_ref(py)
     }
 
+    /// Names of all fixtures visible to this request's item.
+    #[getter]
+    fn fixturenames(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        Ok(self.node.bind(py).getattr("fixturenames")?.unbind())
+    }
+
     fn addfinalizer(&self, finalizer: Py<PyAny>) {
         self.finalizers
             .lock()

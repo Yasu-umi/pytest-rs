@@ -35,6 +35,8 @@ pub struct AsyncioPlugin {
     /// asyncio_default_fixture_loop_scope / asyncio_default_test_loop_scope.
     default_fixture_loop_scope: Option<Scope>,
     default_test_loop_scope: Option<Scope>,
+    /// --asyncio-debug / asyncio_debug: new loops run in asyncio debug mode.
+    debug: bool,
 }
 
 impl AsyncioPlugin {
@@ -46,6 +48,7 @@ impl AsyncioPlugin {
             current_module: RefCell::new(None),
             default_fixture_loop_scope: None,
             default_test_loop_scope: None,
+            debug: false,
         }
     }
 
@@ -83,6 +86,9 @@ impl AsyncioPlugin {
                 .unbind(),
             (None, None) => helper.getattr("new_loop")?.call0()?.unbind(),
         };
+        if self.debug {
+            loop_.bind(py).call_method1("set_debug", (true,))?;
+        }
         loops.insert((scope, key.to_string()), loop_.clone_ref(py));
         Ok(loop_)
     }
@@ -103,74 +109,60 @@ impl AsyncioPlugin {
             .map(|value| value.unbind())
     }
 
-    /// The loop factory for an item: the one recorded by multi-factory
-    /// expansion at collection time, else the first factory from conftest
-    /// pytest_asyncio_loop_factories hooks.
-    fn loop_factory(&self, ctx: &mut HookContext, item: &TestItem) -> PyResult<Option<Py<PyAny>>> {
+    /// The factory recorded for this item at collection time, as a
+    /// (name, factory) pair from the _asyncio_loop_factory pseudo-mark.
+    fn item_factory(&self, py: Python<'_>, item: &TestItem) -> PyResult<Option<(String, Py<PyAny>)>> {
+        let Some(mark) = item.get_closest_marker("_asyncio_loop_factory") else {
+            return Ok(None);
+        };
+        let pair = mark.obj.bind(py);
+        Ok(Some((
+            pair.get_item(0)?.extract::<String>()?,
+            pair.get_item(1)?.unbind(),
+        )))
+    }
+
+    /// pytest_asyncio_loop_factories hook impls visible to an item, deepest
+    /// conftest first (pluggy registers nested conftests last → LIFO call).
+    fn hook_funcs(&self, ctx: &HookContext, item_nodeid: &str) -> Vec<(usize, Py<PyAny>)> {
         let py = ctx.py;
-        if let Some(mark) = item.get_closest_marker("_asyncio_loop_factory") {
-            // obj is a (name, factory) tuple stashed by modifyitems.
-            return Ok(Some(mark.obj.bind(py).get_item(1)?.unbind()));
-        }
-        let hook_funcs: Vec<Py<PyAny>> = ctx
+        let mut funcs: Vec<(usize, Py<PyAny>)> = ctx
             .session
             .py_hooks
             .iter()
             .filter(|hook| {
                 hook.name == "pytest_asyncio_loop_factories"
-                    && item.nodeid.starts_with(&hook.baseid)
+                    && item_nodeid.starts_with(&hook.baseid)
             })
-            .map(|hook| hook.func.clone_ref(py))
+            .map(|hook| (hook.baseid.len(), hook.func.clone_ref(py)))
             .collect();
-        if hook_funcs.is_empty() {
-            return Ok(None);
-        }
-        let config = pytest_rs_core::python::make_py_config(py, ctx.config)?;
-        let node = pytest_rs_core::python::make_node(py, item)?;
-        for func in &hook_funcs {
-            let result = pytest_rs_core::python::call_py_hook(
-                py,
-                func,
-                &[
-                    ("config", config.clone_ref(py)),
-                    ("item", node.clone_ref(py)),
-                ],
-            )?;
-            let result = result.bind(py);
-            if result.is_none() {
-                continue;
-            }
-            let values = result.call_method0("values")?;
-            if let Some(factory) = values.try_iter()?.next() {
-                return Ok(Some(factory?.unbind()));
-            }
-        }
-        Ok(None)
+        funcs.sort_by(|a, b| b.0.cmp(&a.0));
+        funcs
     }
 
-    /// All named factories from conftest hooks, in declaration order.
-    fn loop_factories_map(
+    fn invalid_factories_error() -> pytest_rs_core::pyo3::PyErr {
+        PyRuntimeError::new_err(
+            "pytest_asyncio_loop_factories must return a non-empty mapping of \
+             factory names to factory callables",
+        )
+    }
+
+    /// First non-None hook result, validated: it must be a non-empty mapping
+    /// of non-empty names to callables. Ok(None) when no hook impl applies;
+    /// Err when impls exist but none produced a valid mapping.
+    fn resolve_hook_factories(
         &self,
         ctx: &mut HookContext,
         item: &TestItem,
     ) -> PyResult<Option<NamedFactories>> {
         let py = ctx.py;
-        let hook_funcs: Vec<Py<PyAny>> = ctx
-            .session
-            .py_hooks
-            .iter()
-            .filter(|hook| {
-                hook.name == "pytest_asyncio_loop_factories"
-                    && item.nodeid.starts_with(&hook.baseid)
-            })
-            .map(|hook| hook.func.clone_ref(py))
-            .collect();
-        if hook_funcs.is_empty() {
+        let funcs = self.hook_funcs(ctx, &item.nodeid);
+        if funcs.is_empty() {
             return Ok(None);
         }
         let config = pytest_rs_core::python::make_py_config(py, ctx.config)?;
         let node = pytest_rs_core::python::make_node(py, item)?;
-        for func in &hook_funcs {
+        for (_, func) in &funcs {
             let result = pytest_rs_core::python::call_py_hook(
                 py,
                 func,
@@ -184,14 +176,48 @@ impl AsyncioPlugin {
                 continue;
             }
             let mut factories = Vec::new();
-            for key in result.call_method0("keys")?.try_iter()? {
+            let Ok(keys) = result.call_method0("keys") else {
+                return Err(Self::invalid_factories_error());
+            };
+            for key in keys.try_iter()? {
                 let key = key?;
                 let factory = result.get_item(&key)?;
-                factories.push((key.extract::<String>()?, factory.unbind()));
+                let name: String = key
+                    .extract()
+                    .map_err(|_| Self::invalid_factories_error())?;
+                if name.is_empty() || !factory.is_callable() {
+                    return Err(Self::invalid_factories_error());
+                }
+                factories.push((name, factory.unbind()));
+            }
+            if factories.is_empty() {
+                return Err(Self::invalid_factories_error());
             }
             return Ok(Some(factories));
         }
-        Ok(None)
+        Err(Self::invalid_factories_error())
+    }
+
+    /// The loop_factories kwarg of mark.asyncio: requested factory names.
+    fn marker_loop_factories(
+        &self,
+        py: Python<'_>,
+        item: &TestItem,
+    ) -> PyResult<Option<Vec<String>>> {
+        let Some(mark) = item.get_closest_marker("asyncio") else {
+            return Ok(None);
+        };
+        let Ok(kwargs) = mark.obj.bind(py).getattr("kwargs") else {
+            return Ok(None);
+        };
+        let Ok(value) = kwargs.get_item("loop_factories") else {
+            return Ok(None);
+        };
+        let mut names = Vec::new();
+        for name in value.try_iter()? {
+            names.push(name?.extract::<String>()?);
+        }
+        Ok(Some(names))
     }
 
     fn close_loop(&self, py: Python<'_>, loop_: &Py<PyAny>) -> PyResult<()> {
@@ -263,6 +289,21 @@ impl AsyncioPlugin {
             Mode::Strict => item.get_closest_marker("asyncio").is_some(),
         }
     }
+
+    fn is_async_gen_func(py: Python<'_>, func: &Py<PyAny>) -> bool {
+        py.import("inspect")
+            .and_then(|inspect| inspect.getattr("isasyncgenfunction"))
+            .and_then(|check| check.call1((func.bind(py),)))
+            .and_then(|result| result.extract())
+            .unwrap_or(false)
+    }
+
+    fn warn(py: Python<'_>, message: &str) -> PyResult<()> {
+        let category = py.import("pytest")?.getattr("PytestWarning")?;
+        py.import("warnings")?
+            .call_method1("warn", (message, category))?;
+        Ok(())
+    }
 }
 
 impl Default for AsyncioPlugin {
@@ -282,9 +323,18 @@ impl Plugin for AsyncioPlugin {
             None,
             "asyncio mode: auto or strict",
         ));
+        parser.add_option(OptDef::flag(
+            "--asyncio-debug",
+            "enable asyncio debug mode for event loops",
+        ));
     }
 
     fn pytest_configure(&mut self, ctx: &mut HookContext) -> PyResult<()> {
+        self.debug = ctx.config.get_flag("asyncio-debug")
+            || matches!(
+                ctx.config.get_ini("asyncio_debug").map(str::trim),
+                Some("true") | Some("True") | Some("1")
+            );
         let mode_value = ctx
             .config
             .get_value("--asyncio-mode")
@@ -355,19 +405,70 @@ impl Plugin for AsyncioPlugin {
         let py = ctx.py;
         let taken = std::mem::take(items);
         for item in taken {
+            if !item.is_coroutine {
+                let is_async_gen = Self::is_async_gen_func(py, &item.func);
+                if is_async_gen && self.applicable(&item) {
+                    Self::warn(
+                        py,
+                        "Tests based on asynchronous generators are not supported. \
+                         Please use native coroutines, instead.",
+                    )?;
+                } else if !is_async_gen && item.get_closest_marker("asyncio").is_some() {
+                    Self::warn(
+                        py,
+                        &format!(
+                            "The test {} is marked with '@pytest.mark.asyncio' but it is \
+                             not an async function. Please remove the asyncio mark. If \
+                             the test is not marked explicitly, check for global marks \
+                             applied via 'pytestmark'.",
+                            item.func_name
+                        ),
+                    )?;
+                }
+            }
             if !item.is_coroutine || !self.applicable(&item) {
                 items.push(item);
                 continue;
             }
-            let factories = self.loop_factories_map(ctx, &item)?;
-            // A single factory keeps the plain test name (HIDDEN_PARAM
-            // upstream); several parametrize the item.
-            let Some(factories) = factories.filter(|factories| factories.len() > 1) else {
+            let requested = self.marker_loop_factories(py, &item)?;
+            let factories = match self.resolve_hook_factories(ctx, &item) {
+                Ok(factories) => factories,
+                // Invalid hook results error per item at setup, not here.
+                Err(_) => {
+                    items.push(item);
+                    continue;
+                }
+            };
+            let Some(factories) = factories else {
+                // No hook impls; a marker-requested subset errors at setup.
                 items.push(item);
                 continue;
             };
-            for (name, factory) in factories {
-                let nodeid = if item.nodeid.ends_with(']') {
+            // mark.asyncio(loop_factories=[...]) selects a subset by name;
+            // requested names the hook doesn't provide skip at run time.
+            let selected: Vec<(String, Option<Py<PyAny>>)> = match &requested {
+                Some(names) => names
+                    .iter()
+                    .map(|name| {
+                        let factory = factories
+                            .iter()
+                            .find(|(provided, _)| provided == name)
+                            .map(|(_, factory)| factory.clone_ref(py));
+                        (name.clone(), factory)
+                    })
+                    .collect(),
+                None => factories
+                    .into_iter()
+                    .map(|(name, factory)| (name, Some(factory)))
+                    .collect(),
+            };
+            // A single factory keeps the plain test name (HIDDEN_PARAM
+            // upstream); several parametrize the item.
+            let single = selected.len() == 1;
+            for (name, factory) in selected {
+                let nodeid = if single {
+                    item.nodeid.clone()
+                } else if item.nodeid.ends_with(']') {
                     format!("{}-{name}]", &item.nodeid[..item.nodeid.len() - 1])
                 } else {
                     format!("{}[{name}]", item.nodeid)
@@ -380,14 +481,43 @@ impl Plugin for AsyncioPlugin {
                         obj: mark.obj.clone_ref(py),
                     })
                     .collect();
-                let pair = pytest_rs_core::pyo3::types::PyTuple::new(
-                    py,
-                    [name.into_pyobject(py)?.into_any(), factory.bind(py).clone()],
-                )?;
-                marks.push(pytest_rs_core::collect::MarkData {
-                    name: "_asyncio_loop_factory".to_string(),
-                    obj: pair.into_any().unbind(),
-                });
+                let mut extra_fixture_names = item.extra_fixture_names.clone();
+                match factory {
+                    Some(factory) => {
+                        let pair = pytest_rs_core::pyo3::types::PyTuple::new(
+                            py,
+                            [
+                                name.clone().into_pyobject(py)?.into_any(),
+                                factory.bind(py).clone(),
+                            ],
+                        )?;
+                        marks.push(pytest_rs_core::collect::MarkData {
+                            name: "_asyncio_loop_factory".to_string(),
+                            obj: pair.into_any().unbind(),
+                        });
+                        extra_fixture_names.push("_asyncio_loop_factory".to_string());
+                    }
+                    None => {
+                        // Requested but not provided by the hook.
+                        let reason =
+                            format!("Loop factory '{name}' is not available on this platform");
+                        let kwargs = pytest_rs_core::pyo3::types::PyDict::new(py);
+                        kwargs.set_item("reason", reason)?;
+                        let obj = py
+                            .import("types")?
+                            .getattr("SimpleNamespace")?
+                            .call((), Some(&{
+                                let ns = pytest_rs_core::pyo3::types::PyDict::new(py);
+                                ns.set_item("args", pytest_rs_core::pyo3::types::PyTuple::empty(py))?;
+                                ns.set_item("kwargs", kwargs)?;
+                                ns
+                            }))?;
+                        marks.push(pytest_rs_core::collect::MarkData {
+                            name: "skip".to_string(),
+                            obj: obj.unbind(),
+                        });
+                    }
+                }
                 items.push(TestItem {
                     nodeid,
                     path: item.path.clone(),
@@ -397,6 +527,7 @@ impl Plugin for AsyncioPlugin {
                     cls: item.cls.as_ref().map(|cls| cls.clone_ref(py)),
                     is_coroutine: item.is_coroutine,
                     fixture_names: item.fixture_names.clone(),
+                    extra_fixture_names,
                     marks,
                     callspec: item
                         .callspec
@@ -415,6 +546,25 @@ impl Plugin for AsyncioPlugin {
         Ok(())
     }
 
+    fn pytest_fixture_cache_key(
+        &self,
+        ctx: &mut HookContext,
+        def: &FixtureDef,
+        item: &TestItem,
+    ) -> HookResult<String> {
+        let py = ctx.py;
+        let func = def.func.bind(py);
+        // Loop-bound fixtures are recreated per loop-factory variant.
+        let loop_bound = def.is_coroutine
+            || def.is_async_gen
+            || func.hasattr("_pytest_asyncio_fixture").unwrap_or(false)
+            || func.hasattr("_pytest_asyncio_loop_scope").unwrap_or(false);
+        if !loop_bound {
+            return Ok(None);
+        }
+        Ok(self.item_factory(py, item)?.map(|(name, _)| name))
+    }
+
     fn pytest_runtest_setup(&self, ctx: &mut HookContext, item: &TestItem) -> PyResult<()> {
         // mark.asyncio takes keyword arguments only.
         if let Some(mark) = item.get_closest_marker("asyncio")
@@ -424,6 +574,26 @@ impl Plugin for AsyncioPlugin {
             return Err(pytest_rs_core::pyo3::exceptions::PyValueError::new_err(
                 "mark.asyncio accepts only keyword arguments",
             ));
+        }
+
+        // An async item that collection left without a factory mark either
+        // requested factories no hook provides, or sits under hook impls
+        // that returned no valid mapping: both are per-item setup errors.
+        if item.is_coroutine
+            && self.applicable(item)
+            && item.get_closest_marker("_asyncio_loop_factory").is_none()
+        {
+            let has_hooks = !self.hook_funcs(ctx, &item.nodeid).is_empty();
+            if !has_hooks {
+                if self.marker_loop_factories(ctx.py, item)?.is_some() {
+                    return Err(PyRuntimeError::new_err(
+                        "mark.asyncio 'loop_factories' requires at least one \
+                         pytest_asyncio_loop_factories hook implementation.",
+                    ));
+                }
+            } else {
+                self.resolve_hook_factories(ctx, item)?;
+            }
         }
 
         // Close module/class-scoped loops from a previous module.
@@ -437,7 +607,9 @@ impl Plugin for AsyncioPlugin {
                     .keys()
                     .filter(|(scope, key)| {
                         matches!(scope, Scope::Module | Scope::Package | Scope::Class)
-                            && (key == prev || key.starts_with(&format!("{prev}::")))
+                            && (key == prev
+                                || key.starts_with(&format!("{prev}::"))
+                                || key.starts_with(&format!("{prev}#")))
                     })
                     .cloned()
                     .collect();
@@ -461,33 +633,46 @@ impl Plugin for AsyncioPlugin {
         kwargs: &[(String, Py<PyAny>)],
     ) -> HookResult<FixtureValue> {
         if !def.is_coroutine && !def.is_async_gen {
-            // A sync fixture with an explicit loop_scope still expects the
-            // scope's loop installed as current; set it and let the core
-            // call the fixture normally.
-            let has_loop_scope = def
-                .func
-                .bind(ctx.py)
-                .hasattr("_pytest_asyncio_loop_scope")
-                .unwrap_or(false);
-            if has_loop_scope {
-                let factory = self.loop_factory(ctx, item)?;
-                let policy = self.loop_policy(ctx, item);
-                let py = ctx.py;
-                let scope = self.fixture_loop_scope(py, def);
-                let loop_ = self.loop_for(
-                    py,
-                    scope,
-                    &Self::scope_key(py, scope, item),
-                    factory.as_ref(),
-                    policy.as_ref(),
-                )?;
-                self.helper(py)?
-                    .getattr("set_current_loop")?
-                    .call1((loop_.bind(py),))?;
+            // A sync pytest_asyncio.fixture expects its loop scope's loop
+            // installed as current for both setup and teardown.
+            let func = def.func.bind(ctx.py);
+            let is_asyncio_fixture = func.hasattr("_pytest_asyncio_fixture").unwrap_or(false)
+                || func.hasattr("_pytest_asyncio_loop_scope").unwrap_or(false);
+            if !is_asyncio_fixture {
+                return Ok(None);
             }
-            return Ok(None);
+            let factory = self.item_factory(ctx.py, item)?;
+            let policy = self.loop_policy(ctx, item);
+            let py = ctx.py;
+            let scope = self.fixture_loop_scope(py, def);
+            let loop_ = self.loop_for(
+                py,
+                scope,
+                &Self::scope_key(py, scope, item),
+                factory.as_ref().map(|(_, factory)| factory),
+                policy.as_ref(),
+            )?;
+            let helper = self.helper(py)?;
+            helper
+                .getattr("set_current_loop")?
+                .call1((loop_.bind(py),))?;
+            if !def.is_generator {
+                // Plain sync fixture: the core calls it normally.
+                return Ok(None);
+            }
+            // Sync generator fixture: claim it so teardown resumes with the
+            // same loop installed as current.
+            let generator = pytest_rs_core::python::call_fixture(py, &def.func, instance, kwargs)?;
+            let value = pytest_rs_core::python::next_value(py, &generator)?;
+            let finalizer = helper
+                .getattr("sync_gen_finalizer")?
+                .call1((loop_.bind(py), &generator))?;
+            return Ok(Some(FixtureValue {
+                value: value.unbind(),
+                finalizer: Some(Finalizer::Callable(finalizer.unbind())),
+            }));
         }
-        let factory = self.loop_factory(ctx, item)?;
+        let factory = self.item_factory(ctx.py, item)?;
         let policy = self.loop_policy(ctx, item);
         let py = ctx.py;
         let helper = self.helper(py)?;
@@ -496,7 +681,7 @@ impl Plugin for AsyncioPlugin {
             py,
             scope,
             &Self::scope_key(py, scope, item),
-            factory.as_ref(),
+            factory.as_ref().map(|(_, factory)| factory),
             policy.as_ref(),
         )?;
 
@@ -530,10 +715,20 @@ impl Plugin for AsyncioPlugin {
         callable: &Py<PyAny>,
         kwargs: &[(String, Py<PyAny>)],
     ) -> HookResult<()> {
+        if !item.is_coroutine
+            && self.applicable(item)
+            && Self::is_async_gen_func(ctx.py, &item.func)
+        {
+            // Raises the imperative XFailed outcome.
+            ctx.py.import("pytest")?.call_method1(
+                "xfail",
+                ("Tests based on asynchronous generators are not supported",),
+            )?;
+        }
         if !item.is_coroutine || !self.applicable(item) {
             return Ok(None);
         }
-        let factory = self.loop_factory(ctx, item)?;
+        let factory = self.item_factory(ctx.py, item)?;
         let policy = self.loop_policy(ctx, item);
         let py = ctx.py;
         let helper = self.helper(py)?;
@@ -542,7 +737,7 @@ impl Plugin for AsyncioPlugin {
             py,
             scope,
             &Self::scope_key(py, scope, item),
-            factory.as_ref(),
+            factory.as_ref().map(|(_, factory)| factory),
             policy.as_ref(),
         )?;
         let coro = pytest_rs_core::python::call_with_kwargs(py, callable, kwargs)?;
@@ -551,10 +746,22 @@ impl Plugin for AsyncioPlugin {
     }
 
     fn pytest_runtest_teardown(&self, ctx: &mut HookContext, item: &TestItem) -> PyResult<()> {
-        // Function-scoped loops die with their item.
-        let entry = (Scope::Function, item.nodeid.clone());
-        if let Some(loop_) = self.loops.borrow_mut().remove(&entry) {
-            self.close_loop(ctx.py, &loop_)?;
+        // Function-scoped loops die with their item (keys may carry a
+        // "#factory" variant suffix).
+        let stale: Vec<_> = self
+            .loops
+            .borrow()
+            .keys()
+            .filter(|(scope, key)| {
+                *scope == Scope::Function
+                    && (key == &item.nodeid || key.starts_with(&format!("{}#", item.nodeid)))
+            })
+            .cloned()
+            .collect();
+        for entry in stale {
+            if let Some(loop_) = self.loops.borrow_mut().remove(&entry) {
+                self.close_loop(ctx.py, &loop_)?;
+            }
         }
         Ok(())
     }

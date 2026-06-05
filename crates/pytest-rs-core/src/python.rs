@@ -332,12 +332,14 @@ pub fn collect_module(
     path: &Path,
     items: &mut Vec<TestItem>,
     registry: &mut FixtureRegistry,
+    hooks: &mut Vec<crate::session::PyHook>,
 ) -> PyResult<()> {
     let (basedir, module_name) = module_name_for(path);
     sys_path_prepend(py, &basedir)?;
     let module = py.import(module_name.as_str())?;
     let nodeid_base = file_nodeid(rootdir, path);
 
+    register_pytest_plugins(py, &module, registry, hooks)?;
     introspect_namespace(
         py,
         &module,
@@ -347,6 +349,49 @@ pub fn collect_module(
         items,
         registry,
     )
+}
+
+/// `pytest_plugins = "name"` / `pytest_plugins = (...)` in a test module:
+/// import each named module and register its hooks and fixtures globally.
+/// Bundled plugins (pytest_asyncio, ...) resolve to their shims and carry
+/// no pytest_* hooks, so importing them here is a no-op.
+fn register_pytest_plugins(
+    py: Python<'_>,
+    module: &Bound<'_, PyModule>,
+    registry: &mut FixtureRegistry,
+    hooks: &mut Vec<crate::session::PyHook>,
+) -> PyResult<()> {
+    let Ok(declared) = module.getattr("pytest_plugins") else {
+        return Ok(());
+    };
+    let names: Vec<String> = match declared.extract::<String>() {
+        Ok(single) => vec![single],
+        Err(_) => declared
+            .try_iter()?
+            .map(|name| name?.extract::<String>())
+            .collect::<PyResult<_>>()?,
+    };
+    for name in names {
+        // Built-in plugin names ("pytester", ...) aren't importable modules;
+        // they're provided natively, so only importable plugins register.
+        let Ok(plugin) = py.import(name.as_str()) else {
+            continue;
+        };
+        // Re-registering an already-seen plugin would duplicate its hooks.
+        let already = hooks
+            .iter()
+            .any(|hook| hook.plugin_module.as_deref() == Some(name.as_str()));
+        if already {
+            continue;
+        }
+        register_fixtures_from(py, &plugin, "", registry)?;
+        let before = hooks.len();
+        scan_py_hooks(&plugin, "", hooks)?;
+        for hook in &mut hooks[before..] {
+            hook.plugin_module = Some(name.clone());
+        }
+    }
+    Ok(())
 }
 
 /// Import a conftest.py; its fixtures and pytest_* hooks are visible to
@@ -360,7 +405,13 @@ pub fn collect_conftest(
 ) -> PyResult<()> {
     let (basedir, module_name) = module_name_for(path);
     sys_path_prepend(py, &basedir)?;
-    let module = py.import(module_name.as_str())?;
+    // Conftests in nested directories (without __init__.py) all resolve to
+    // the module name "conftest"; a plain import would alias them to the
+    // first one imported. Import shadowed ones under a unique name instead.
+    let module = match conftest_alias_name(py, &module_name, path)? {
+        Some(unique) => import_module_from_path(py, &unique, path)?,
+        None => py.import(module_name.as_str())?,
+    };
     let dir_nodeid = file_nodeid(rootdir, path.parent().unwrap_or(rootdir));
     let baseid = if dir_nodeid.is_empty() || dir_nodeid == "." {
         String::new()
@@ -369,6 +420,59 @@ pub fn collect_conftest(
     };
     register_fixtures_from(py, &module, &baseid, registry)?;
     scan_py_hooks(&module, &baseid, hooks)
+}
+
+/// A unique import name for a conftest whose module name is already taken
+/// by a *different* file in sys.modules; None when a plain import is safe.
+fn conftest_alias_name(
+    py: Python<'_>,
+    module_name: &str,
+    path: &Path,
+) -> PyResult<Option<String>> {
+    let sys_modules = py.import("sys")?.getattr("modules")?;
+    let Ok(existing) = sys_modules.get_item(module_name) else {
+        return Ok(None);
+    };
+    let same_file = existing
+        .getattr("__file__")
+        .ok()
+        .and_then(|file| file.extract::<String>().ok())
+        .map(|file| {
+            let existing_path = std::fs::canonicalize(&file).unwrap_or_else(|_| file.into());
+            let this_path = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+            existing_path == this_path
+        })
+        .unwrap_or(false);
+    if same_file {
+        return Ok(None);
+    }
+    let suffix: String = path
+        .parent()
+        .map(|dir| dir.to_string_lossy().replace(['/', '\\', '.', ':'], "_"))
+        .unwrap_or_default();
+    Ok(Some(format!("{module_name}@{suffix}")))
+}
+
+/// Import a module from an explicit file path under the given name
+/// (importlib spec machinery; registers it in sys.modules).
+fn import_module_from_path<'py>(
+    py: Python<'py>,
+    name: &str,
+    path: &Path,
+) -> PyResult<Bound<'py, PyModule>> {
+    let sys_modules = py.import("sys")?.getattr("modules")?;
+    if let Ok(existing) = sys_modules.get_item(name) {
+        return existing.downcast_into::<PyModule>().map_err(Into::into);
+    }
+    let util = py.import("importlib.util")?;
+    let spec = util
+        .getattr("spec_from_file_location")?
+        .call1((name, path.to_string_lossy().as_ref()))?;
+    let module = util.getattr("module_from_spec")?.call1((&spec,))?;
+    sys_modules.set_item(name, &module)?;
+    spec.getattr("loader")?
+        .call_method1("exec_module", (&module,))?;
+    module.downcast_into::<PyModule>().map_err(Into::into)
 }
 
 /// Build the Config proxy passed to conftest hooks. One proxy per process
@@ -545,6 +649,7 @@ fn collect_testcase(
             cls: None,
             is_coroutine: false,
             fixture_names: Vec::new(),
+            extra_fixture_names: Vec::new(),
             marks,
             callspec: Vec::new(),
             fixture_params: Vec::new(),
@@ -580,6 +685,13 @@ fn collect_class(
 
     for pair in cls_dict.call_method0("items")?.try_iter()? {
         let (name, value): (String, Bound<'_, PyAny>) = pair?.extract()?;
+        // cls.__dict__ stores staticmethods as descriptors; unwrap so mark
+        // reading and async introspection see the underlying function.
+        let value = if value.is_instance(&py.import("builtins")?.getattr("staticmethod")?)? {
+            value.getattr("__func__")?
+        } else {
+            value
+        };
         if !value.is_callable() {
             continue;
         }
@@ -685,6 +797,7 @@ fn push_test_items(
             cls: cls.map(|c| c.clone().unbind()),
             is_coroutine: flags.is_coroutine,
             fixture_names: fixture_names.clone(),
+            extra_fixture_names: Vec::new(),
             marks: item_marks,
             callspec: variant.params,
             fixture_params: Vec::new(),
@@ -1005,6 +1118,7 @@ pub fn expand_fixture_params(
                 is_coroutine: item.is_coroutine,
                 lineno: item.lineno,
                 fixture_names: item.fixture_names.clone(),
+                extra_fixture_names: item.extra_fixture_names.clone(),
                 marks: item
                     .marks
                     .iter()
@@ -1084,7 +1198,13 @@ pub fn make_node(py: Python<'_>, item: &TestItem) -> PyResult<Py<PyAny>> {
     for mark in &item.marks {
         marks.append(mark.obj.bind(py))?;
     }
-    let fixturenames = pyo3::types::PyList::new(py, &item.fixture_names)?;
+    let fixturenames = pyo3::types::PyList::new(
+        py,
+        item.fixture_names
+            .iter()
+            .chain(&item.extra_fixture_names)
+            .collect::<Vec<_>>(),
+    )?;
     // node.name is the last nodeid segment, parametrization id included
     // ("test_foo[a-1]"), matching pytest.
     let name = item
@@ -1117,6 +1237,7 @@ pub fn scan_py_hooks(
                 name,
                 func: value.unbind(),
                 baseid: baseid.to_string(),
+                plugin_module: None,
             });
         }
     }

@@ -25,6 +25,9 @@ pub struct TestItem {
     /// Fixture names requested in the test signature (parametrize-provided
     /// names included; the runner skips resolving those).
     pub fixture_names: Vec<String>,
+    /// Pseudo-fixture names visible in request.fixturenames but never
+    /// resolved or passed to the test (e.g. _asyncio_loop_factory).
+    pub extra_fixture_names: Vec<String>,
     pub marks: Vec<MarkData>,
     /// Direct parameters from @pytest.mark.parametrize, by argname.
     pub callspec: Vec<(String, Py<PyAny>)>,

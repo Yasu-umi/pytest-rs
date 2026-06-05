@@ -47,6 +47,8 @@ impl Engine {
                 && prev != &module_instance
             {
                 teardown_scope(py, plugins, session, config, Scope::Module, prev, item);
+                // Package-scoped fixtures are keyed per module instance.
+                teardown_scope(py, plugins, session, config, Scope::Package, prev, item);
             }
             prev_module = Some(module_instance);
 
@@ -107,6 +109,7 @@ impl Engine {
             && let Some(last) = items.last()
         {
             teardown_scope(py, plugins, session, config, Scope::Module, prev, last);
+            teardown_scope(py, plugins, session, config, Scope::Package, prev, last);
         }
         if let Some(last) = items.last() {
             teardown_scope(py, plugins, session, config, Scope::Session, "", last);
@@ -535,8 +538,28 @@ fn resolve_fixture_def(
         .iter()
         .find(|(fixture, _, _)| fixture == &def.name)
         .map(|(_, index, value)| (*index, value.clone_ref(py)));
+    // firstresult: plugins may discriminate the key further (asyncio
+    // loop-factory variants recreate loop-bound fixtures per variant).
+    let keyed_name = {
+        let mut ctx = HookContext {
+            py,
+            session,
+            config,
+        };
+        let mut suffix = None;
+        for plugin in plugins {
+            if let Some(value) = plugin.pytest_fixture_cache_key(&mut ctx, &def, item)? {
+                suffix = Some(value);
+                break;
+            }
+        }
+        match suffix {
+            Some(suffix) => format!("{}#{suffix}", def.name),
+            None => def.name.clone(),
+        }
+    };
     let cache_key = (
-        def.name.clone(),
+        keyed_name,
         def.baseid.clone(),
         instance.clone(),
         fixture_param.as_ref().map(|(index, _)| *index),
