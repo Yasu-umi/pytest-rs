@@ -290,10 +290,11 @@ impl Config {
         // Core pytest options parsed into flags/values (queried via
         // get_flag/get_value); some are still inert and gain behavior as
         // features land.
-        const CORE_FLAGS: [&str; 15] = [
+        const CORE_FLAGS: [&str; 16] = [
             "strict-config",
             "strict-markers",
             "strict",
+            "collect-in-virtualenv",
             "cache-clear",
             "no-header",
             "no-summary",

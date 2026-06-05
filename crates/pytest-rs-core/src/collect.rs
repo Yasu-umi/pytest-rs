@@ -61,7 +61,12 @@ impl TestItem {
 }
 
 /// Expand CLI path arguments into the ordered list of test files.
-pub fn collect_test_files(invocation_dir: &Path, paths: &[String]) -> Result<Vec<PathBuf>, String> {
+pub fn collect_test_files(
+    invocation_dir: &Path,
+    paths: &[String],
+    collect_in_virtualenv: bool,
+    python_files: &[String],
+) -> Result<Vec<PathBuf>, String> {
     let args: Vec<String> = if paths.is_empty() {
         vec![".".to_string()]
     } else {
@@ -79,7 +84,9 @@ pub fn collect_test_files(invocation_dir: &Path, paths: &[String]) -> Result<Vec
         let path = std::fs::canonicalize(&path).unwrap_or(path);
         let meta = std::fs::metadata(&path).map_err(|e| format!("{}: {e}", path.display()))?;
         if meta.is_dir() {
-            collect_dir(&path, &mut files)?;
+            // An explicitly given directory is collected even if it is a
+            // virtualenv root; only recursion skips them.
+            collect_dir(&path, files.as_mut(), collect_in_virtualenv, python_files)?;
         } else if !files.contains(&path) {
             files.push(path);
         }
@@ -87,7 +94,18 @@ pub fn collect_test_files(invocation_dir: &Path, paths: &[String]) -> Result<Vec
     Ok(files)
 }
 
-fn collect_dir(dir: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {
+/// A virtual environment root: PEP-405 pyvenv.cfg, or a conda env
+/// (conda-meta/history, which conda creates without pyvenv.cfg).
+fn in_venv(path: &Path) -> bool {
+    path.join("pyvenv.cfg").is_file() || path.join("conda-meta").join("history").is_file()
+}
+
+fn collect_dir(
+    dir: &Path,
+    files: &mut Vec<PathBuf>,
+    collect_in_virtualenv: bool,
+    python_files: &[String],
+) -> Result<(), String> {
     const NORECURSE: &[&str] = &[
         ".git",
         ".venv",
@@ -108,22 +126,59 @@ fn collect_dir(dir: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {
     for path in entries {
         if path.is_dir() {
             let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            if !NORECURSE.contains(&name) && !name.starts_with('.') {
-                collect_dir(&path, files)?;
+            if !NORECURSE.contains(&name)
+                && !name.starts_with('.')
+                && (collect_in_virtualenv || !in_venv(&path))
+            {
+                collect_dir(&path, files, collect_in_virtualenv, python_files)?;
             }
-        } else if is_test_file(&path) {
+        } else if is_test_file(&path, python_files) && path.is_file() && !files.contains(&path) {
+            // Overlapping arguments ("pytest a a/b") collect each file
+            // once; is_file also drops broken symlinks.
             files.push(path);
         }
     }
     Ok(())
 }
 
-/// Default python_files patterns: test_*.py / *_test.py.
-pub fn is_test_file(path: &Path) -> bool {
+/// A file collected during directory recursion: its name matches one of the
+/// python_files patterns (default test_*.py / *_test.py). conftest.py never
+/// collects as a test module, whatever the patterns say.
+pub fn is_test_file(path: &Path, python_files: &[String]) -> bool {
     let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
         return false;
     };
-    name.ends_with(".py") && (name.starts_with("test_") || name.ends_with("_test.py"))
+    name != "conftest.py"
+        && python_files
+            .iter()
+            .any(|pattern| wildcard_match(pattern, name))
+}
+
+/// fnmatch-style match supporting * and ? (iterative, no allocation).
+fn wildcard_match(pattern: &str, name: &str) -> bool {
+    let pattern: Vec<char> = pattern.chars().collect();
+    let name: Vec<char> = name.chars().collect();
+    let (mut p, mut n) = (0usize, 0usize);
+    let mut star: Option<(usize, usize)> = None;
+    while n < name.len() {
+        if p < pattern.len() && (pattern[p] == '?' || pattern[p] == name[n]) {
+            p += 1;
+            n += 1;
+        } else if p < pattern.len() && pattern[p] == '*' {
+            star = Some((p, n));
+            p += 1;
+        } else if let Some((sp, sn)) = star {
+            p = sp + 1;
+            n = sn + 1;
+            star = Some((sp, sn + 1));
+        } else {
+            return false;
+        }
+    }
+    while p < pattern.len() && pattern[p] == '*' {
+        p += 1;
+    }
+    p == pattern.len()
 }
 
 /// pytest "prepend" import mode: walk up while __init__.py exists; the first

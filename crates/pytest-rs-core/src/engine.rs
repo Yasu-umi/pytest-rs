@@ -877,7 +877,18 @@ impl Engine {
         }
         // Relative CLI paths (and bare collection) resolve against the
         // invocation dir; rootdir only anchors node ids.
-        let files = crate::collect::collect_test_files(&self.config.invocation_dir, &paths)?;
+        let python_files: Vec<String> = self
+            .config
+            .get_ini("python_files")
+            .map(|value| value.split_whitespace().map(str::to_string).collect())
+            .filter(|patterns: &Vec<String>| !patterns.is_empty())
+            .unwrap_or_else(|| vec!["test_*.py".to_string(), "*_test.py".to_string()]);
+        let files = crate::collect::collect_test_files(
+            &self.config.invocation_dir,
+            &paths,
+            self.config.get_flag("collect-in-virtualenv"),
+            &python_files,
+        )?;
 
         // Conftests load for every collection start dir (even ones with no
         // test files — pytest imports initial conftests during dir scan),
