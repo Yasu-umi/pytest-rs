@@ -317,6 +317,7 @@ pub(crate) fn run_one(
                 plugin.pytest_runtest_setup(&mut ctx, item)?;
             }
         }
+        fire_runtest_py_hooks(py, session, item, "pytest_runtest_setup")?;
         // A fresh class instance per test (pytest behavior).
         let instance: Option<Py<PyAny>> = match &item.cls {
             Some(cls) => Some(cls.bind(py).call0()?.unbind()),
@@ -508,6 +509,7 @@ pub(crate) fn run_one(
     python::log_start_phase(py, "call", log_level_cfg.as_deref());
     let call_started = Instant::now();
     let call_result = (|| -> PyResult<bool> {
+        fire_runtest_py_hooks(py, session, item, "pytest_runtest_call")?;
         let mut ctx = HookContext {
             py,
             session,
@@ -673,6 +675,9 @@ fn teardown_one(
         item,
     );
 
+    if let Err(err) = fire_runtest_py_hooks(py, session, item, "pytest_runtest_teardown") {
+        errors.push(python::format_exception(py, &err));
+    }
     let hook_result = (|| -> PyResult<()> {
         let mut ctx = HookContext {
             py,
@@ -1208,6 +1213,30 @@ struct XfailEval {
     run: bool,
     strict: bool,
     raises: Option<Py<PyAny>>,
+}
+
+/// Fire conftest pytest_runtest_{setup,call,teardown} hooks for an item
+/// (visibility-scoped by the conftest's directory, item kwarg).
+fn fire_runtest_py_hooks(
+    py: Python<'_>,
+    session: &Session,
+    item: &TestItem,
+    name: &str,
+) -> PyResult<()> {
+    let funcs: Vec<Py<PyAny>> = session
+        .py_hooks
+        .iter()
+        .filter(|hook| hook.name == name && item.nodeid.starts_with(hook.baseid.as_str()))
+        .map(|hook| hook.func.clone_ref(py))
+        .collect();
+    if funcs.is_empty() {
+        return Ok(());
+    }
+    let node = python::make_node(py, item)?;
+    for func in funcs {
+        python::call_py_hook(py, &func, &[("item", node.clone_ref(py))])?;
+    }
+    Ok(())
 }
 
 /// Marks added at runtime via node.add_marker / request.applymarker.
