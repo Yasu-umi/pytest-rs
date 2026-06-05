@@ -1220,10 +1220,32 @@ impl Engine {
                         }
                         Some(Err(message)) => errors.push((file.clone(), message)),
                         // CollectError carries a user-facing message, no traceback.
-                        None => match python::collect_error_message(py, &err) {
-                            Some(message) => errors.push((file.clone(), message)),
-                            None => errors.push((file.clone(), python::format_exception(py, &err))),
-                        },
+                        None => {
+                            match python::collect_error_message(py, &err) {
+                                Some(message) => errors.push((file.clone(), message)),
+                                None => {
+                                    errors.push((file.clone(), python::format_exception(py, &err)))
+                                }
+                            }
+                            // Upstream DoctestModule: with --doctest-ignore-import-errors
+                            // the doctest collector skips while the Module still errors.
+                            if self.config.get_flag("doctest-modules")
+                                && self.config.get_flag("doctest-ignore-import-errors")
+                            {
+                                let nodeid = crate::collect::file_nodeid(&rootdir, file);
+                                self.session.reports.push(crate::report::TestReport {
+                                    nodeid: nodeid.clone(),
+                                    phase: crate::report::Phase::Setup,
+                                    outcome: crate::report::Outcome::Skipped,
+                                    duration: std::time::Duration::ZERO,
+                                    longrepr: Some(format!(
+                                        "unable to import module PosixPath('{}')",
+                                        file.display()
+                                    )),
+                                    location: Some(format!("{nodeid}:1")),
+                                });
+                            }
+                        }
                     }
                     false
                 }
@@ -1263,8 +1285,21 @@ impl Engine {
                         &py_config,
                         &mut self.session.items,
                     ) {
-                        // Import errors are non-fatal with --doctest-ignore-import-errors.
-                        if !self.config.get_flag("doctest-ignore-import-errors") {
+                        // Import errors skip the module with --doctest-ignore-import-errors.
+                        if self.config.get_flag("doctest-ignore-import-errors") {
+                            let nodeid = crate::collect::file_nodeid(&rootdir, extra_file);
+                            self.session.reports.push(crate::report::TestReport {
+                                nodeid: nodeid.clone(),
+                                phase: crate::report::Phase::Setup,
+                                outcome: crate::report::Outcome::Skipped,
+                                duration: std::time::Duration::ZERO,
+                                longrepr: Some(format!(
+                                    "unable to import module PosixPath('{}')",
+                                    extra_file.display()
+                                )),
+                                location: Some(format!("{nodeid}:1")),
+                            });
+                        } else {
                             errors.push((extra_file.clone(), python::format_exception(py, &err)));
                         }
                     }

@@ -428,6 +428,20 @@ class InlineRunResult:
             if bucket is not None and is_test_node and nodeid not in seen:
                 seen.add(nodeid)
                 outcomes[bucket].append(_OutcomeReport(nodeid))
+        # Collect-level reports (e.g. a skipped DoctestModule, a module that
+        # failed to import) have no per-item lines; the final summary counts
+        # are authoritative, so pad each bucket up to them. Upstream's
+        # HookRecorder counts collect reports too: xpassed→passed,
+        # xfailed→skipped, errors→failed.
+        totals = self._result.parseoutcomes()
+        expected = {
+            "passed": totals.get("passed", 0) + totals.get("xpassed", 0),
+            "skipped": totals.get("skipped", 0) + totals.get("xfailed", 0),
+            "failed": totals.get("failed", 0) + totals.get("error", 0),
+        }
+        for bucket, want in expected.items():
+            while len(outcomes[bucket]) < want:
+                outcomes[bucket].append(_OutcomeReport("<collect report>"))
         return outcomes["passed"], outcomes["skipped"], outcomes["failed"]
 
     def assertoutcome(self, passed=0, skipped=0, failed=0):

@@ -489,8 +489,9 @@ def collect_module_doctests(
                 warnings.simplefilter("ignore")
                 spec.loader.exec_module(module)  # type: ignore[union-attr]
     except Exception:
-        if _get_ignore_import_errors(config):
-            return []
+        # Import errors propagate; the Rust side turns them into a skip
+        # when --doctest-ignore-import-errors is set (upstream DoctestModule).
+        sys.modules.pop(module_name, None)
         raise
 
     optionflags = get_optionflags(config)
