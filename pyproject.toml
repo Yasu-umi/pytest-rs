@@ -4,8 +4,24 @@ version = "0.0.1"
 description = "A fast, drop-in compatible pytest runner written in Rust"
 requires-python = ">=3.13"
 
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+bindings = "bin"
+manifest-path = "crates/pytest-rs/Cargo.toml"
+
 [tool.uv]
-package = false
+# Rebuild the wheel when Rust sources or the embedded Python shims change,
+# not only when pyproject.toml does (uv's default cache key).
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "Cargo.toml" },
+    { file = "crates/**/Cargo.toml" },
+    { file = "crates/**/*.rs" },
+    { file = "crates/**/py/**/*.py" },
+]
 
 [dependency-groups]
 dev = [

@@ -122,7 +122,12 @@ impl CacheState {
     /// LFPlugin/NFPlugin pytest_collection_modifyitems: --lf filters to the
     /// previous failures, --ff moves them first, --nf runs never-seen tests
     /// first (newest files first).
-    pub fn modify_items(&mut self, config: &Config, items: &mut Vec<TestItem>) {
+    pub fn modify_items(
+        &mut self,
+        config: &Config,
+        items: &mut Vec<TestItem>,
+        removed: &mut Vec<TestItem>,
+    ) {
         if !self.enabled {
             return;
         }
@@ -133,7 +138,7 @@ impl CacheState {
                     && config.get_value("last-failed-no-failures").map(str::trim) == Some("none")
                 {
                     status.push_str("deselecting all items.");
-                    items.clear();
+                    removed.append(items);
                 } else {
                     status.push_str("not deselecting items.");
                 }
@@ -152,7 +157,11 @@ impl CacheState {
                     ));
                 } else {
                     if self.lf {
-                        items.retain(|item| failed_set.contains(item.nodeid.as_str()));
+                        let (kept, dropped): (Vec<TestItem>, Vec<TestItem>) = items
+                            .drain(..)
+                            .partition(|item| failed_set.contains(item.nodeid.as_str()));
+                        *items = kept;
+                        removed.extend(dropped);
                     } else {
                         // --ff: previous failures first, order otherwise kept.
                         let (failed, passed): (Vec<TestItem>, Vec<TestItem>) = items

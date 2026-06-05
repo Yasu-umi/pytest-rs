@@ -371,6 +371,17 @@ fn register_pytest_plugins(
             .map(|name| name?.extract::<String>())
             .collect::<PyResult<_>>()?,
     };
+    load_named_plugins(py, &names, registry, hooks)
+}
+
+/// Import plugin modules by name (`-p NAME` / `pytest_plugins`) and register
+/// their fixtures and pytest_* hooks globally.
+pub fn load_named_plugins(
+    py: Python<'_>,
+    names: &[String],
+    registry: &mut FixtureRegistry,
+    hooks: &mut Vec<crate::session::PyHook>,
+) -> PyResult<()> {
     for name in names {
         // Built-in plugin names ("pytester", ...) aren't importable modules;
         // they're provided natively, so only importable plugins register.

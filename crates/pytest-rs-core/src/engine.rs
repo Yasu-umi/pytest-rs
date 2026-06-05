@@ -212,7 +212,15 @@ impl Engine {
             return exit_code::INTERNAL_ERROR;
         }
         if let Some(cache) = &mut self.cache {
-            cache.modify_items(&self.config, &mut self.session.items);
+            cache.modify_items(
+                &self.config,
+                &mut self.session.items,
+                &mut self.session.deselected_items,
+            );
+        }
+        if let Err(err) = self.fire_py_deselected(py) {
+            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+            return exit_code::INTERNAL_ERROR;
         }
 
         let n_items = self.session.items.len();
@@ -265,6 +273,9 @@ impl Engine {
             };
         }
         if n_items == 0 {
+            if let Err(err) = self.fire_py_sessionfinish(py, exit_code::NO_TESTS_COLLECTED) {
+                eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+            }
             if let Some(cache) = &self.cache {
                 cache.sessionfinish(py, &self.config, &self.session.reports);
             }
@@ -684,17 +695,20 @@ impl Engine {
         if let Some(expr) = self.config.get_value("markexpr").map(str::to_string) {
             let expr = expr.trim().to_string();
             let mut error = None;
-            self.session.items.retain(|item| {
-                match crate::markexpr::evaluate(&expr, |name| {
-                    item.marks.iter().any(|mark| mark.name == name)
-                }) {
-                    Ok(keep) => keep,
-                    Err(message) => {
-                        error.get_or_insert(message);
-                        true
+            let (kept, removed): (Vec<_>, Vec<_>) =
+                self.session.items.drain(..).partition(|item| {
+                    match crate::markexpr::evaluate(&expr, |name| {
+                        item.marks.iter().any(|mark| mark.name == name)
+                    }) {
+                        Ok(keep) => keep,
+                        Err(message) => {
+                            error.get_or_insert(message);
+                            true
+                        }
                     }
-                }
-            });
+                });
+            self.session.items = kept;
+            self.session.deselected_items.extend(removed);
             if let Some(message) = error {
                 return Err(python::usage_error(
                     py,
@@ -705,20 +719,23 @@ impl Engine {
         if let Some(expr) = self.config.get_value("keyword").map(str::to_string) {
             let expr = expr.trim().to_string();
             let mut error = None;
-            self.session.items.retain(|item| {
-                // -k matches case-insensitively against the test name part.
-                let name = item.nodeid.split_once("::").map_or("", |(_, n)| n);
-                let haystack = name.to_lowercase();
-                match crate::markexpr::evaluate(&expr, |token| {
-                    haystack.contains(&token.to_lowercase())
-                }) {
-                    Ok(keep) => keep,
-                    Err(message) => {
-                        error.get_or_insert(message);
-                        true
+            let (kept, removed): (Vec<_>, Vec<_>) =
+                self.session.items.drain(..).partition(|item| {
+                    // -k matches case-insensitively against the test name part.
+                    let name = item.nodeid.split_once("::").map_or("", |(_, n)| n);
+                    let haystack = name.to_lowercase();
+                    match crate::markexpr::evaluate(&expr, |token| {
+                        haystack.contains(&token.to_lowercase())
+                    }) {
+                        Ok(keep) => keep,
+                        Err(message) => {
+                            error.get_or_insert(message);
+                            true
+                        }
                     }
-                }
-            });
+                });
+            self.session.items = kept;
+            self.session.deselected_items.extend(removed);
             if let Some(message) = error {
                 return Err(python::usage_error(
                     py,
@@ -813,6 +830,39 @@ impl Engine {
         Ok(())
     }
 
+    /// pytest_deselected conftest/plugin hooks: called once with every item
+    /// dropped by -k/-m/--lf selection (a copy, like pytest's list).
+    fn fire_py_deselected(&mut self, py: Python<'_>) -> PyResult<()> {
+        if self.session.deselected_items.is_empty() {
+            return Ok(());
+        }
+        let hook_funcs: Vec<Py<pyo3::PyAny>> = self
+            .session
+            .py_hooks
+            .iter()
+            .filter(|hook| hook.name == "pytest_deselected")
+            .map(|hook| hook.func.clone_ref(py))
+            .collect();
+        if hook_funcs.is_empty() {
+            return Ok(());
+        }
+        let nodes: Vec<Py<pyo3::PyAny>> = self
+            .session
+            .deselected_items
+            .iter()
+            .map(|item| python::make_node(py, item))
+            .collect::<PyResult<_>>()?;
+        let node_list = pyo3::types::PyList::new(py, nodes.iter().map(|n| n.bind(py)))?;
+        for func in &hook_funcs {
+            python::call_py_hook(
+                py,
+                func,
+                &[("items", node_list.clone().unbind().into_any())],
+            )?;
+        }
+        Ok(())
+    }
+
     /// Fire conftest hooks that only take `config` (e.g. pytest_configure).
     fn fire_py_hooks_simple(&mut self, py: Python<'_>, name: &str) -> PyResult<()> {
         let hook_funcs: Vec<Py<pyo3::PyAny>> = self
@@ -840,6 +890,35 @@ impl Engine {
         };
         for plugin in self.plugins.iter_mut() {
             plugin.pytest_sessionfinish(&mut ctx, code)?;
+        }
+        self.fire_py_sessionfinish(py, code)
+    }
+
+    /// pytest_sessionfinish conftest/plugin hooks (session is not modeled;
+    /// hooks asking for it receive None).
+    fn fire_py_sessionfinish(&mut self, py: Python<'_>, code: i32) -> PyResult<()> {
+        let hook_funcs: Vec<Py<pyo3::PyAny>> = self
+            .session
+            .py_hooks
+            .iter()
+            .filter(|hook| hook.name == "pytest_sessionfinish")
+            .map(|hook| hook.func.clone_ref(py))
+            .collect();
+        if hook_funcs.is_empty() {
+            return Ok(());
+        }
+        let config_proxy = python::make_py_config(py, &self.config)?;
+        let exitstatus = code.into_pyobject(py)?.unbind().into_any();
+        for func in &hook_funcs {
+            python::call_py_hook(
+                py,
+                func,
+                &[
+                    ("config", config_proxy.clone_ref(py)),
+                    ("session", py.None()),
+                    ("exitstatus", exitstatus.clone_ref(py)),
+                ],
+            )?;
         }
         Ok(())
     }
@@ -889,6 +968,26 @@ impl Engine {
             self.config.get_flag("collect-in-virtualenv"),
             &python_files,
         )?;
+
+        // -p NAME (non-"no:") plugins import before conftests, like
+        // pytest's cmdline plugin loading.
+        let named_plugins: Vec<String> = self
+            .config
+            .plugin_opts
+            .iter()
+            .filter(|spec| !spec.starts_with("no:"))
+            .cloned()
+            .collect();
+        if !named_plugins.is_empty()
+            && let Err(err) = python::load_named_plugins(
+                py,
+                &named_plugins,
+                &mut self.session.registry,
+                &mut self.session.py_hooks,
+            )
+        {
+            return Err(python::format_exception(py, &err));
+        }
 
         // Conftests load for every collection start dir (even ones with no
         // test files — pytest imports initial conftests during dir scan),
