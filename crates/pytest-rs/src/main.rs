@@ -19,7 +19,7 @@ fn build_plugins() -> Vec<Box<dyn Plugin>> {
 }
 
 fn main() {
-    let plugins = build_plugins();
+    let mut plugins = build_plugins();
 
     let mut parser = OptionParser::default();
     for plugin in &plugins {
@@ -34,6 +34,20 @@ fn main() {
             std::process::exit(pytest_rs_core::report::exit_code::USAGE_ERROR);
         }
     };
+
+    // `-p no:NAME` disables a bundled plugin at runtime (pytest semantics);
+    // both the short name (no:cov) and the distribution-style name
+    // (no:pytest_cov / no:pytest-cov) are accepted.
+    plugins.retain(|plugin| {
+        !config.plugin_opts.iter().any(|spec| {
+            spec.strip_prefix("no:").is_some_and(|disabled| {
+                disabled
+                    .trim_start_matches("pytest_")
+                    .trim_start_matches("pytest-")
+                    == plugin.name()
+            })
+        })
+    });
 
     let mut engine = Engine::new(plugins, config);
     let code = Python::attach(|py| engine.run(py));

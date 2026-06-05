@@ -96,15 +96,21 @@ Key structural rules:
 - **firstresult** hooks return `PyResult<Option<T>>`; the manager stops at the first `Some`.
   The core owns the actual test call (`pytest_pyfunc_call` firstresult; asyncio claims async
   items). Same for `pytest_fixture_setup`.
-- **hookwrapper** semantics via RAII guards: `around_runtest_call` returns
-  `Option<Box<dyn RuntestGuard + 'py>>`; the manager runs guards LIFO after the call
-  (benchmark timing, cov contexts).
-- **Plugin-provided fixtures** two ways: `FixtureProvider::PySource` (embedded `@pytest.fixture`
-  Python source — mocker) or `FixtureProvider::Native` (resolved via `pytest_fixture_setup` —
-  benchmark's `#[pyclass]`).
+- **hookwrapper** semantics (`around_runtest_call` RAII guards) turned out unnecessary for v1:
+  benchmark times inside its fixture and split reads `TestReport.duration` — deferred until a
+  plugin actually needs it.
+- **Plugin-provided fixtures** two ways (both landed in M6):
+  - *PySource*: the plugin ships an embedded Python package written into the per-run shim dir
+    and registered via `python::register_plugin_fixtures` — mock's `pytest_mock` package.
+    Writing real files (not `PyModule::from_code`) keeps normal import machinery working
+    (`pytest_mock._util` submodule imports) and lets the assertion rewriter process the shim
+    (`pytest.register_assert_rewrite("pytest_mock")`, like pytest rewrites entry-point plugins).
+  - *Native*: the plugin registers a raising stub `@pytest.fixture` for name resolution and
+    claims the actual setup in `pytest_fixture_setup` — benchmark's `#[pyclass]` fixture.
 - **Registration**: explicit feature-gated assembly in the binary (`#[cfg(feature = "...")]`),
-  not `inventory`. `PluginManager::resolve_order()` topo-sorts `depends_on()` then stable-sorts
-  per-hook `Order` (TryFirst/Normal/TryLast) into precomputed dispatch lists.
+  not `inventory`; plugins run in registration order (`depends_on()`/`Order` topo-sort is
+  deferred until ordering actually matters). At runtime `-p no:NAME` (also `no:pytest_NAME`)
+  drops a bundled plugin before the engine starts, matching pytest semantics.
 - **Inter-plugin coupling** only via `depends_on()` ordering + `Session::stash`
   (`HashMap<TypeId, Box<dyn Any>>` + well-known string keys, e.g. `"asyncio.event_loop"`).
   Never crate-to-crate Rust deps between plugins. This is how pytest-aiohttp plugs in later.
@@ -128,10 +134,10 @@ Key structural rules:
 | Plugin | Mechanism | Hooks (main) |
 |---|---|---|
 | **asyncio** | `asyncio_mode auto/strict`, loop cache per `loop_scope`, `LoopRunner` trait (asyncio now; trio/uvloop later). Owns running coroutines: async tests via `pytest_pyfunc_call`, async (gen) fixtures via `pytest_fixture_setup` + finalizer driving `__anext__` | pyfunc_call, fixture_setup, collection_modifyitems, sessionfinish |
-| **mock** | Embedded Python shim (`MockFixture` wrapping unittest.mock, patch bookkeeping + `stopall` on teardown). Fixtures: `mocker` + class/module/package/session variants. Thin Rust loader | configure (register fixtures) |
-| **cov** | `sys.monitoring` tool id 1, LINE events, Rust `#[pyfunction]` callback returning `DISABLE` (each line costs one callback ever). Hits in `HashMap<file, RoaringBitmap>`. Denominator from ruff AST executable-line analysis + `exclude_lines` regexes. Reports: term/term-missing, Cobertura XML, lcov (HTML later; branch coverage deferred) | sessionstart/finish, terminal_summary (+ fail_under → exit code) |
-| **split** | `.test_durations` JSON (nodeid → seconds), `--splits N --group K`, algorithms `duration_based_chunks` (order-preserving) / `least_duration` (LPT greedy), unknown tests get mean duration | addoption, collection_modifyitems (+ deselected), around_runtest_call (timing), sessionfinish |
-| **benchmark** | `benchmark` fixture: `#[pyclass]` backed by Rust; inner loop is a generated tiny Python `for` driven once per round (one FFI crossing per round, parity with pytest-benchmark numbers); `perf_counter` clock; calibration vs clock resolution, warmup, stats (min/max/mean/stddev/median/iqr/outliers/ops). `--benchmark-json`, `--benchmark-only/skip`. pedantic mode | configure, collection_modifyitems, terminal_summary, sessionfinish |
+| **mock** | Adapted upstream pytest-mock shim shipped as a real `pytest_mock` package in the shim dir (assert-rewritten, so `assert_called_*` introspection diffs match pytest). Fixtures: `mocker` + class/module/package/session variants; `stopall` via generator-fixture teardown; assert-method traceback wrapping (`mock_traceback_monkeypatch`) | configure (write package, wrap asserts, register fixtures), sessionfinish (unwrap) |
+| **cov** | `sys.monitoring` tool id 1 (COVERAGE_ID), LINE events, Rust `#[pyclass]` callback returning `DISABLE` (each line costs one callback ever). Hits in `HashMap<file, BTreeSet<u32>>` (roaring deferred to M4 merge work). Denominator from ruff AST executable-line analysis + `exclude_lines` regexes (.coveragerc / --cov-config / pyproject; default `# pragma: no cover`); observed-but-unanalyzed lines union into the denominator. Reports: term/term-missing (+skip-covered), Cobertura XML, lcov (HTML/JSON later; branch coverage deferred). `--cov-fail-under` forces exit code 1 | configure (start monitoring), sessionfinish (stop, build report, fail_under), terminal_summary |
+| **split** | `.test_durations` JSON (nodeid → seconds, legacy list format accepted), `--splits N --group K`, algorithms `duration_based_chunks` (order-preserving) / `least_duration` (LPT greedy), unknown tests get mean duration of the relevant cached set; `--store-durations` aggregates `TestReport.duration` per nodeid | addoption, configure (validation), collection_modifyitems, sessionfinish (store) |
+| **benchmark** | `benchmark` fixture: `#[pyclass]` backed by Rust; inner loop is a generated tiny Python `for` driven once per round (one FFI crossing per round, parity with pytest-benchmark numbers); `perf_counter` clock; calibration vs clock resolution, warmup, stats (min/max/mean/stddev/median/iqr/outliers/ops, `benchmark.stats.stats.min` API). `--benchmark-json`, `--benchmark-only/skip/disable`. pedantic mode with upstream call-count/validation parity (storage/compare/histogram/cprofile not reproduced) | addoption, configure, collection_modifyitems, fixture_setup (native claim), terminal_summary, sessionfinish (json) |
 
 ## Milestones
 
@@ -148,9 +154,17 @@ Key structural rules:
 - **M4 — Multi-process workers**: `-n N`, worker mode, IPC protocol, report/cov merge.
 - **M5 — Config & selection parity**: ini/toml/addopts, `-k`/`-m`, `--lf/--ff` cache,
   `--collect-only`, `--tb` modes, junitxml, builtin fixtures (tmp_path, monkeypatch, capsys, caplog).
-- **M6 — Plugins**: mock → cov → split → benchmark (asyncio already landed in M1).
-  Order rationale: mock validates `register_fixture` with minimal surface; cov is the most
-  isolated; benchmark composes everything so it goes last.
+- **M6 — Plugins** *(done)*: mock → cov → split → benchmark (asyncio already landed in M1).
+  Order rationale: mock validates plugin-provided fixtures with minimal surface; cov is the most
+  isolated; benchmark composes everything so it goes last. Landing M6 also pulled core parity
+  work the upstream suites depended on: `pytest_generate_tests` (metafunc), pytest's rootdir
+  algorithm (common ancestor of cwd + path-like args), `-k`/`-m` selection expressions,
+  builtin `pytestconfig`/`tmpdir`/`testdir`/`capsys` fixtures, pytester `inline_run`,
+  `==`-failure diff explanations (`_compare_eq_*`), and `-p no:NAME` plugin disabling.
+  Upstream-suite scores at landing: pytest-mock 89/90 (1 env skip), pytest-split 59/59
+  (3 internal-API files excluded), pytest-benchmark test_normal/test_sample green
+  (storage/cli internals excluded), pytest-cov 28/209 (the rest is branch coverage, xdist,
+  and html/json reports — deferred by design).
 
 ## Conformance testing
 
