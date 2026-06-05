@@ -13,6 +13,39 @@ pytest-rs is a re-implementation of the popular Python testing framework [pytest
 - pytest-compatible terminal output and exit codes
 - Plugin system: Rust traits mirroring pytest hooks, plugins as crates behind feature flags
 
+## Installation
+
+pytest-rs builds as a single binary via [maturin](https://github.com/PyO3/maturin); install it like any Python package:
+
+```toml
+[dependency-groups]
+dev = ["pytest-rs"]
+
+[tool.uv.sources]
+pytest-rs = { path = "../pytest-rs" }  # or a published index
+```
+
+### Selecting plugins at install time
+
+Bundled plugins (`asyncio`, `mock`, `cov`, `split`, `benchmark`) are Cargo
+features, all enabled by default. To build a binary with only some of them,
+pass build args to maturin from the consuming project:
+
+```toml
+[tool.uv]
+config-settings-package = { pytest-rs = { build-args = "--no-default-features --features asyncio,mock" } }
+```
+
+### Disabling plugins at runtime
+
+Like pytest, any bundled plugin can be turned off per run or per project
+without rebuilding:
+
+```toml
+[tool.pytest.ini_options]
+addopts = "-p no:benchmark -p no:split"
+```
+
 ## Conformance testing
 
 Compatibility is verified by running the **upstream test suites** of the libraries pytest-rs reproduces, unchanged, under pytest-rs (`conformance/`). The harness clones each project at a pinned tag at test time; their code is not redistributed in this repository.
