@@ -53,8 +53,23 @@ impl PyConfig {
         name: &str,
         default: Option<Py<PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        let _ = name;
-        Ok(default.unwrap_or_else(|| py.None()))
+        // Normalize: "--foo-bar" → "foo_bar", "foo-bar" → "foo_bar"
+        let attr = name.trim_start_matches('-').replace('-', "_");
+        let ns = self.option.bind(py);
+        match ns.getattr(attr.as_str()) {
+            Ok(v) => Ok(v.into()),
+            Err(_) => Ok(default.unwrap_or_else(|| py.None())),
+        }
+    }
+
+    #[pyo3(signature = (name, default = None))]
+    fn getvalue(
+        &self,
+        py: Python<'_>,
+        name: &str,
+        default: Option<Py<PyAny>>,
+    ) -> PyResult<Py<PyAny>> {
+        self.getoption(py, name, default)
     }
 
     /// xdist parity: present (with the worker id) only in -n workers, so

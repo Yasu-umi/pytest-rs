@@ -203,6 +203,56 @@ pub fn module_name_for(path: &Path) -> (PathBuf, String) {
     (basedir, parts.join("."))
 }
 
+/// Gather non-Python files from the search paths for --doctest-glob matching.
+/// Walks the same directories as collect_test_files but collects all non-Python files.
+pub fn collect_doctest_textfiles(invocation_dir: &Path, paths: &[String]) -> Vec<PathBuf> {
+    let args: Vec<String> = if paths.is_empty() {
+        vec![".".to_string()]
+    } else {
+        paths.to_vec()
+    };
+    let mut files = Vec::new();
+    for arg in &args {
+        let arg = arg.split("::").next().unwrap_or(arg);
+        let path = invocation_dir.join(arg);
+        let path = std::fs::canonicalize(&path).unwrap_or(path);
+        if path.is_dir() {
+            collect_textfiles_dir(&path, &mut files);
+        } else if path.is_file() && !is_python_file(&path) && !files.contains(&path) {
+            files.push(path);
+        }
+    }
+    files
+}
+
+fn collect_textfiles_dir(dir: &Path, files: &mut Vec<PathBuf>) {
+    const NORECURSE: &[&str] = &[
+        ".git", ".venv", "venv", "node_modules", "__pycache__", ".tox", ".eggs", "build", "dist",
+    ];
+    let Ok(read_dir) = std::fs::read_dir(dir) else {
+        return;
+    };
+    let mut entries: Vec<_> = read_dir
+        .filter_map(Result::ok)
+        .map(|e| e.path())
+        .collect();
+    entries.sort();
+    for path in entries {
+        if path.is_dir() {
+            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if !NORECURSE.contains(&name) && !name.starts_with('.') {
+                collect_textfiles_dir(&path, files);
+            }
+        } else if path.is_file() && !is_python_file(&path) && !files.contains(&path) {
+            files.push(path);
+        }
+    }
+}
+
+fn is_python_file(path: &Path) -> bool {
+    path.extension().and_then(|e| e.to_str()) == Some("py")
+}
+
 /// Node id for a test file: path relative to rootdir with '/' separators,
 /// or the path as-is when it lives outside the rootdir.
 pub fn file_nodeid(rootdir: &Path, path: &Path) -> String {

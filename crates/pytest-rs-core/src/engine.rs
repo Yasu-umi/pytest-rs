@@ -1141,7 +1141,29 @@ impl Engine {
             {
                 break;
             }
-            if let Err(err) = python::collect_module(
+            let is_py = file.extension().and_then(|e| e.to_str()) == Some("py");
+            if !is_py {
+                // Non-Python files: only text files with doctest content.
+                // For explicitly-specified files, collect regardless of --doctest-glob.
+                // For scanned files, the glob loop below handles them.
+                let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+                let is_text_doctest = matches!(ext, "txt" | "rst" | "md");
+                if is_text_doctest {
+                    if let Ok(py_config) = python::make_py_config(py, &self.config) {
+                        if let Err(err) = python::collect_doctests_from_textfile(
+                            py,
+                            &rootdir,
+                            file,
+                            &py_config,
+                            &mut self.session.items,
+                        ) {
+                            errors.push((file.clone(), python::format_exception(py, &err)));
+                        }
+                    }
+                }
+                continue;
+            }
+            let module_ok = match python::collect_module(
                 py,
                 &rootdir,
                 file,
@@ -1149,30 +1171,78 @@ impl Engine {
                 &mut self.session.registry,
                 &mut self.session.py_hooks,
             ) {
-                // pytest.skip(..., allow_module_level=True) or
-                // unittest.SkipTest at module import skip the whole module;
-                // a bare pytest.skip there is an error.
-                match python::module_level_skip(py, &err) {
-                    Some(Ok(reason)) => {
-                        let nodeid = crate::collect::file_nodeid(&rootdir, file);
-                        // The skip call site (file:line), like pytest.
-                        let location = python::raise_location(py, &err)
-                            .unwrap_or_else(|| format!("{nodeid}:1"));
-                        self.session.reports.push(crate::report::TestReport {
-                            nodeid: nodeid.clone(),
-                            phase: crate::report::Phase::Setup,
-                            outcome: crate::report::Outcome::Skipped,
-                            duration: std::time::Duration::ZERO,
-                            longrepr: Some(reason),
-                            location: Some(location),
-                        });
+                Ok(()) => true,
+                Err(err) => {
+                    // pytest.skip(..., allow_module_level=True) or
+                    // unittest.SkipTest at module import skip the whole module;
+                    // a bare pytest.skip there is an error.
+                    match python::module_level_skip(py, &err) {
+                        Some(Ok(reason)) => {
+                            let nodeid = crate::collect::file_nodeid(&rootdir, file);
+                            // The skip call site (file:line), like pytest.
+                            let location = python::raise_location(py, &err)
+                                .unwrap_or_else(|| format!("{nodeid}:1"));
+                            self.session.reports.push(crate::report::TestReport {
+                                nodeid: nodeid.clone(),
+                                phase: crate::report::Phase::Setup,
+                                outcome: crate::report::Outcome::Skipped,
+                                duration: std::time::Duration::ZERO,
+                                longrepr: Some(reason),
+                                location: Some(location),
+                            });
+                        }
+                        Some(Err(message)) => errors.push((file.clone(), message)),
+                        // CollectError carries a user-facing message, no traceback.
+                        None => match python::collect_error_message(py, &err) {
+                            Some(message) => errors.push((file.clone(), message)),
+                            None => errors.push((file.clone(), python::format_exception(py, &err))),
+                        },
                     }
-                    Some(Err(message)) => errors.push((file.clone(), message)),
-                    // CollectError carries a user-facing message, no traceback.
-                    None => match python::collect_error_message(py, &err) {
-                        Some(message) => errors.push((file.clone(), message)),
-                        None => errors.push((file.clone(), python::format_exception(py, &err))),
-                    },
+                    false
+                }
+            };
+            // --doctest-modules: collect doctests from each successfully-imported module.
+            if module_ok && self.config.get_flag("doctest-modules") {
+                if let Ok(py_config) = python::make_py_config(py, &self.config) {
+                    if let Err(err) = python::collect_doctests_from_module(
+                        py,
+                        &rootdir,
+                        file,
+                        &py_config,
+                        &mut self.session.items,
+                    ) {
+                        // Non-fatal: log as collect error and continue.
+                        errors.push((file.clone(), python::format_exception(py, &err)));
+                    }
+                }
+            }
+        }
+
+        // --doctest-glob: scan start dirs for matching text files.
+        // Scan text files when --doctest-modules or --doctest-glob is active.
+        // The default glob (test*.txt) activates with --doctest-modules;
+        // explicit --doctest-glob patterns override.
+        let scan_text_files = self.config.get_flag("doctest-modules")
+            || self.config.get_values("doctest-glob").is_some();
+        if scan_text_files {
+            if let Ok(py_config) = python::make_py_config(py, &self.config) {
+                let text_files =
+                    crate::collect::collect_doctest_textfiles(&self.config.invocation_dir, &paths);
+                for tf in text_files {
+                    match python::is_doctest_textfile(py, &tf, &py_config) {
+                        Ok(true) => {
+                            if let Err(err) = python::collect_doctests_from_textfile(
+                                py,
+                                &rootdir,
+                                &tf,
+                                &py_config,
+                                &mut self.session.items,
+                            ) {
+                                errors.push((tf.clone(), python::format_exception(py, &err)));
+                            }
+                        }
+                        _ => {}
+                    }
                 }
             }
         }

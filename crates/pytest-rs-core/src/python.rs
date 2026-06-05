@@ -112,11 +112,14 @@ if not os.path.basename(sys.executable).startswith('python'):
     Ok(shim_root)
 }
 
-/// Register the shim's builtin fixtures (tmp_path, monkeypatch, pytester)
-/// with global visibility.
+/// Register the shim's builtin fixtures (tmp_path, monkeypatch, pytester,
+/// doctest_namespace) with global visibility.
 pub fn register_builtin_fixtures(py: Python<'_>, registry: &mut FixtureRegistry) -> PyResult<()> {
     let pytest_module = py.import("pytest")?;
-    register_fixtures_from(py, &pytest_module, "", registry)
+    register_fixtures_from(py, &pytest_module, "", registry)?;
+    let doctest_module = py.import("_pytest.doctest")?;
+    register_fixtures_from(py, &doctest_module, "", registry)?;
+    Ok(())
 }
 
 /// The 1-based first line of a callable's definition (0 if unknown).
@@ -187,6 +190,10 @@ pub fn ensure_xunit_setup(
     item: &TestItem,
     instance: Option<&Py<PyAny>>,
 ) -> PyResult<()> {
+    // Doctest text file items have no module to import; skip xunit hooks.
+    if item.module_name == "__doctest_textfile__" {
+        return Ok(());
+    }
     let xunit = py.import("pytest._xunit")?;
     let call_optional = xunit.getattr("call_optional")?;
     let bind = xunit.getattr("bind")?;
@@ -421,6 +428,115 @@ pub fn collect_module(
         items,
         registry,
     )
+}
+
+/// Collect doctest items from an already-imported Python module.
+/// Returns items appended to `items`; `py_config` is the PyConfig proxy.
+pub fn collect_doctests_from_module(
+    py: Python<'_>,
+    rootdir: &Path,
+    path: &Path,
+    py_config: &Py<PyAny>,
+    items: &mut Vec<TestItem>,
+) -> PyResult<()> {
+    let (_, module_name) = module_name_for(path);
+    let nodeid_base = file_nodeid(rootdir, path);
+    let doctest_mod = py.import("_pytest.doctest")?;
+    let results = doctest_mod
+        .getattr("collect_module_doctests")?
+        .call1((
+            module_name.as_str(),
+            path.to_string_lossy().as_ref(),
+            nodeid_base.as_str(),
+            py_config.bind(py),
+        ))?;
+    for item in results.try_iter()? {
+        let tuple = item?;
+        let nodeid: String = tuple.get_item(0)?.extract()?;
+        let func: Py<PyAny> = tuple.get_item(1)?.extract()?;
+        let lineno: u32 = tuple.get_item(2)?.extract()?;
+        // Derive func_name from the last "::" component of the nodeid.
+        let func_name = nodeid
+            .rsplit("::")
+            .next()
+            .unwrap_or(&nodeid)
+            .to_string();
+        items.push(TestItem {
+            nodeid,
+            path: path.to_path_buf(),
+            module_name: module_name.clone(),
+            func_name,
+            func,
+            cls: None,
+            is_coroutine: false,
+            fixture_names: vec!["doctest_namespace".to_string(), "request".to_string()],
+            extra_fixture_names: vec![],
+            marks: vec![],
+            callspec: vec![],
+            fixture_params: vec![],
+            lineno,
+        });
+    }
+    Ok(())
+}
+
+/// Collect doctest items from a text file (e.g. `*.rst`).
+pub fn collect_doctests_from_textfile(
+    py: Python<'_>,
+    rootdir: &Path,
+    path: &Path,
+    py_config: &Py<PyAny>,
+    items: &mut Vec<TestItem>,
+) -> PyResult<()> {
+    let nodeid_base = file_nodeid(rootdir, path);
+    let doctest_mod = py.import("_pytest.doctest")?;
+    let results = doctest_mod
+        .getattr("collect_textfile_doctests")?
+        .call1((
+            path.to_string_lossy().as_ref(),
+            nodeid_base.as_str(),
+            py_config.bind(py),
+        ))?;
+    for item in results.try_iter()? {
+        let tuple = item?;
+        let nodeid: String = tuple.get_item(0)?.extract()?;
+        let func: Py<PyAny> = tuple.get_item(1)?.extract()?;
+        let lineno: u32 = tuple.get_item(2)?.extract()?;
+        let func_name = nodeid
+            .rsplit("::")
+            .next()
+            .unwrap_or(&nodeid)
+            .to_string();
+        items.push(TestItem {
+            nodeid,
+            path: path.to_path_buf(),
+            module_name: "__doctest_textfile__".to_string(),
+            func_name,
+            func,
+            cls: None,
+            is_coroutine: false,
+            fixture_names: vec!["doctest_namespace".to_string(), "request".to_string()],
+            extra_fixture_names: vec![],
+            marks: vec![],
+            callspec: vec![],
+            fixture_params: vec![],
+            lineno,
+        });
+    }
+    Ok(())
+}
+
+/// Check whether a file path matches --doctest-glob patterns.
+pub fn is_doctest_textfile(
+    py: Python<'_>,
+    path: &Path,
+    py_config: &Py<PyAny>,
+) -> PyResult<bool> {
+    let doctest_mod = py.import("_pytest.doctest")?;
+    let result = doctest_mod
+        .getattr("is_doctest_textfile")?
+        .call1((path.to_string_lossy().as_ref(), py_config.bind(py)))?;
+    result.extract()
 }
 
 /// `pytest_plugins = "name"` / `pytest_plugins = (...)` in a test module:
@@ -659,11 +775,36 @@ pub fn make_py_config(py: Python<'_>, config: &crate::config::Config) -> PyResul
     }
     // `config.option` is the argparse namespace in pytest; expose a mutable
     // namespace so conftests can stash flags on it.
-    let option = py
-        .import("types")?
-        .getattr("SimpleNamespace")?
-        .call0()?
-        .unbind();
+    let option_ns = py.import("types")?.getattr("SimpleNamespace")?.call0()?;
+    // Populate doctest-related option attributes so getoption() works.
+    option_ns.setattr(
+        "doctest_modules",
+        config.get_flag("doctest-modules"),
+    )?;
+    option_ns.setattr(
+        "doctest_continue_on_failure",
+        config.get_flag("doctest-continue-on-failure"),
+    )?;
+    option_ns.setattr(
+        "doctest_ignore_import_errors",
+        config.get_flag("doctest-ignore-import-errors"),
+    )?;
+    option_ns.setattr(
+        "doctest_report",
+        config
+            .get_value("doctest-report")
+            .unwrap_or("none")
+            .to_owned(),
+    )?;
+    // doctest_glob: list of glob patterns (multi-value)
+    let glob_list = pyo3::types::PyList::empty(py);
+    if let Some(globs) = config.get_values("doctest-glob") {
+        for g in globs {
+            glob_list.append(g)?;
+        }
+    }
+    option_ns.setattr("doctest_glob", glob_list)?;
+    let option = option_ns.unbind();
     let proxy = Py::new(
         py,
         crate::request::PyConfig::new(

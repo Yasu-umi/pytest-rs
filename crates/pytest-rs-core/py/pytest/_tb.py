@@ -90,7 +90,7 @@ def format_exception(exc, style="long"):
     if not getattr(exc, "pytrace", True):
         parts = []
         context = exc.__context__
-        if context is not None:
+        if context is not None and not exc.__suppress_context__:
             parts.append(str(context))
             parts.append("")
             parts.append("During handling of the above exception, another exception occurred:")

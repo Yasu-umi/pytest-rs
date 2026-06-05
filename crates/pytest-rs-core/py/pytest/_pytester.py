@@ -375,10 +375,19 @@ class InlineRunResult:
         outcomes = {"passed": [], "skipped": [], "failed": []}
         for line in self._result.outlines:
             parts = line.split()
-            if len(parts) >= 2 and "::" in parts[0]:
-                bucket = self._WORDS.get(parts[1])
-                if bucket is not None:
-                    outcomes[bucket].append(_OutcomeReport(parts[0]))
+            if len(parts) >= 2:
+                nodeid = parts[0]
+                word = parts[1]
+                # Accept nodeids with '::' (normal tests) or ending in a
+                # text/doc file extension (doctest text files).
+                is_test_line = (
+                    "::" in nodeid
+                    or nodeid.endswith((".txt", ".rst", ".md"))
+                )
+                if is_test_line:
+                    bucket = self._WORDS.get(word)
+                    if bucket is not None:
+                        outcomes[bucket].append(_OutcomeReport(nodeid))
         return outcomes["passed"], outcomes["skipped"], outcomes["failed"]
 
     def assertoutcome(self, passed=0, skipped=0, failed=0):

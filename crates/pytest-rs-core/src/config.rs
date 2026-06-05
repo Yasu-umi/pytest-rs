@@ -372,7 +372,7 @@ impl Config {
         // Core pytest options parsed into flags/values (queried via
         // get_flag/get_value); some are still inert and gain behavior as
         // features land.
-        const CORE_FLAGS: [&str; 16] = [
+        const CORE_FLAGS: [&str; 18] = [
             "strict-config",
             "strict-markers",
             "strict",
@@ -382,7 +382,9 @@ impl Config {
             "no-summary",
             "continue-on-collection-errors",
             "exact-mode",      // placeholder; harmless
-            "doctest-modules", // accepted-but-inert: doctest collection not implemented
+            "doctest-modules",
+            "doctest-continue-on-failure",
+            "doctest-ignore-import-errors",
             "nbmake",          // accepted-but-inert: notebook collection not implemented
             "worker",          // hidden: this process is a -n worker (IPC on stdin/stdout)
             "runxfail",        // report xfail-marked tests as if unmarked
@@ -390,7 +392,7 @@ impl Config {
             "setup-plan",      // like --setup-only (fixtures do execute here)
             "setup-show",      // run tests, narrating fixture setup/teardown
         ];
-        const CORE_VALUES: [(&str, Option<char>); 23] = [
+        const CORE_VALUES: [(&str, Option<char>); 24] = [
             ("deselect", None),
             ("log-level", None),
             ("last-failed-no-failures", None),
@@ -409,7 +411,8 @@ impl Config {
             ("basetemp", None),
             ("import-mode", None),
             ("capture", None),
-            ("doctest-glob", None),       // accepted-but-inert
+            ("doctest-glob", None),
+            ("doctest-report", None),
             ("ignore", None),             // accepted-but-inert (conformance runs files explicitly)
             ("dist", None), // accepted-but-inert: module-affinity load is the only mode
             ("maxprocesses", None), // accepted-but-inert
