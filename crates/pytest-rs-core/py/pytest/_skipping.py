@@ -81,30 +81,45 @@ def _mark_conditions(mark):
     return (mark.kwargs["condition"],)
 
 
+def _is_module_mark(mark, module_name):
+    """Did this mark come from the module-level pytestmark variable?
+    (Such skips fold without a line number in the -rs summary.)"""
+    module = sys.modules.get(module_name)
+    pytestmark = getattr(module, "pytestmark", None)
+    if pytestmark is None:
+        return False
+    entries = pytestmark if isinstance(pytestmark, (list, tuple)) else [pytestmark]
+    return any(
+        entry is mark or getattr(entry, "mark", None) is mark for entry in entries
+    )
+
+
 def evaluate_skip_marks(marks, module_name, config):
-    """The skip reason for the item, or None. marks: [(name, mark), ...]."""
+    """(reason, from_pytestmark) when the item should skip, else None.
+    marks: [(name, mark), ...] in closest-first order."""
     for name, mark in marks:
         if name != "skipif":
             continue
         conditions = _mark_conditions(mark)
         if not conditions:
             # Unconditional.
-            return mark.kwargs.get("reason", "")
+            return (mark.kwargs.get("reason", ""), _is_module_mark(mark, module_name))
         # If any of the conditions are true.
         for condition in conditions:
             result, reason = evaluate_condition(
                 name, mark.kwargs, condition, module_name, config
             )
             if result:
-                return reason
+                return (reason, _is_module_mark(mark, module_name))
 
     for name, mark in marks:
         if name != "skip":
             continue
         try:
-            return Skip(*mark.args, **mark.kwargs).reason
+            reason = Skip(*mark.args, **mark.kwargs).reason
         except TypeError as e:
             raise TypeError(str(e) + " - maybe you meant pytest.mark.skipif?") from None
+        return (reason, _is_module_mark(mark, module_name))
 
     return None
 
@@ -123,13 +138,13 @@ def evaluate_xfail_marks(marks, module_name, config, strict_default):
         conditions = _mark_conditions(mark)
         if not conditions:
             # Unconditional.
-            return (mark.kwargs.get("reason", ""), run, strict, raises)
+            return (str(mark.kwargs.get("reason", "")), bool(run), bool(strict), raises)
         # If any of the conditions are true.
         for condition in conditions:
             result, reason = evaluate_condition(
                 name, mark.kwargs, condition, module_name, config
             )
             if result:
-                return (reason, run, strict, raises)
+                return (str(reason), bool(run), bool(strict), raises)
 
     return None

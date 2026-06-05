@@ -149,23 +149,81 @@ pub(crate) fn run_one(
 ) -> Vec<TestReport> {
     let mut reports = Vec::new();
 
-    // @pytest.mark.skip / @pytest.mark.skipif
-    if let Some(reason) = skip_reason(py, item) {
-        let file = item.nodeid.split("::").next().unwrap_or("");
+    // @pytest.mark.skip / @pytest.mark.skipif (mark-usage and condition
+    // errors report as setup errors, like pytest.fail in runtest_setup).
+    match evaluate_skip_marks(py, item) {
+        Ok(Some((reason, module_level))) => {
+            let file = item.nodeid.split("::").next().unwrap_or("");
+            // Marker skips report the item's definition site; module-level
+            // pytestmark skips fold per file, without a line number.
+            let location = if module_level {
+                file.to_string()
+            } else {
+                format!("{file}:{}", item.lineno)
+            };
+            reports.push(TestReport {
+                nodeid: item.nodeid.clone(),
+                phase: Phase::Setup,
+                outcome: Outcome::Skipped,
+                duration: Duration::ZERO,
+                longrepr: Some(reason),
+                location: Some(location),
+            });
+            return reports;
+        }
+        Ok(None) => {}
+        Err(err) => {
+            reports.push(report_from_err(
+                py,
+                config,
+                item,
+                Phase::Setup,
+                Instant::now(),
+                &err,
+            ));
+            return reports;
+        }
+    }
+    // @pytest.mark.xfail evaluation (conditions, run/strict/raises kwargs).
+    // --runxfail ignores marks; tests report their real outcomes.
+    let runxfail = config.get_flag("runxfail");
+    let xfailed = match evaluate_xfail_marks(py, config, item) {
+        Ok(xfailed) => xfailed,
+        Err(err) => {
+            reports.push(report_from_err(
+                py,
+                config,
+                item,
+                Phase::Setup,
+                Instant::now(),
+                &err,
+            ));
+            return reports;
+        }
+    };
+    // run=False: report XFAIL without setting up or calling the test.
+    if let Some(xf) = &xfailed
+        && !runxfail
+        && !xf.run
+    {
         reports.push(TestReport {
             nodeid: item.nodeid.clone(),
             phase: Phase::Setup,
-            outcome: Outcome::Skipped,
+            outcome: Outcome::XFailed,
             duration: Duration::ZERO,
-            longrepr: Some(reason),
-            // Marker skips report the item's definition site.
-            location: Some(format!("{file}:{}", item.lineno)),
+            longrepr: Some(format!("[NOTRUN] {}", xf.reason)),
+            location: None,
         });
         return reports;
     }
-    // --runxfail: xfail marks (and imperative pytest.xfail, no-opped at
-    // configure time) are ignored; tests report their real outcomes.
-    let xfail = item.get_closest_marker("xfail").is_some() && !config.get_flag("runxfail");
+    let xfail = xfailed.is_some() && !runxfail;
+    // raises= kwarg: only a matching exception counts as an expected failure.
+    let raises_match = |err: &PyErr| -> bool {
+        match xfailed.as_ref().and_then(|xf| xf.raises.as_ref()) {
+            Some(raises) => err.matches(py, raises.bind(py)).unwrap_or(false),
+            None => true,
+        }
+    };
 
     // request.getfixturevalue() support: expose this item's engine state to
     // Python for the duration of the run (popped when the guard drops).
@@ -368,15 +426,18 @@ pub(crate) fn run_one(
     let (callable, kwargs, test_request) = match setup_result {
         Ok(setup) => setup,
         Err(err) => {
-            reports.push(report_from_err(
-                py,
-                config,
-                item,
-                Phase::Setup,
-                setup_started,
-                &err,
-            ));
-            teardown_one(py, plugins, session, config, item, &mut reports);
+            let mut report = report_from_err(py, config, item, Phase::Setup, setup_started, &err);
+            // @pytest.mark.xfail covers setup failures too.
+            if let Some(xf) = &xfailed
+                && xfail
+                && report.outcome == Outcome::Failed
+                && raises_match(&err)
+            {
+                report.outcome = Outcome::XFailed;
+                report.longrepr = Some(xf.reason.clone());
+            }
+            reports.push(report);
+            teardown_one(py, plugins, session, config, item, xfail, &mut reports);
             close_item_filters(py);
             python::end_item_context(py);
             return reports;
@@ -414,7 +475,7 @@ pub(crate) fn run_one(
         }
         if config.get_flag("setup-only") || config.get_flag("setup-plan") {
             // Fixtures only: tear down without calling the test.
-            teardown_one(py, plugins, session, config, item, &mut reports);
+            teardown_one(py, plugins, session, config, item, xfail, &mut reports);
             close_item_filters(py);
             python::end_item_context(py);
             return reports;
@@ -446,12 +507,13 @@ pub(crate) fn run_one(
         && let Some(code) = python::session_abort_code(py, err)
     {
         session.exit_code_override = Some(code);
-        teardown_one(py, plugins, session, config, item, &mut reports);
+        teardown_one(py, plugins, session, config, item, xfail, &mut reports);
         close_item_filters(py);
         python::end_item_context(py);
         return reports;
     }
 
+    let mut xfail_raises_ok = true;
     let report = match call_result {
         Ok(true) => TestReport {
             nodeid: item.nodeid.clone(),
@@ -492,53 +554,42 @@ pub(crate) fn run_one(
                     Err(err) => {
                         if let Some(code) = python::session_abort_code(py, &err) {
                             session.exit_code_override = Some(code);
-                            teardown_one(py, plugins, session, config, item, &mut reports);
+                            teardown_one(py, plugins, session, config, item, xfail, &mut reports);
                             close_item_filters(py);
                             python::end_item_context(py);
                             return reports;
                         }
+                        xfail_raises_ok = raises_match(&err);
                         report_from_err(py, config, item, Phase::Call, call_started, &err)
                     }
                 }
             }
         }
-        Err(err) => report_from_err(py, config, item, Phase::Call, call_started, &err),
+        Err(err) => {
+            xfail_raises_ok = raises_match(&err);
+            report_from_err(py, config, item, Phase::Call, call_started, &err)
+        }
     };
-    // @pytest.mark.xfail: expected failures invert at the call phase; with
-    // strict=True (mark kwarg, or the xfail_strict ini default) an
-    // unexpected pass fails instead.
-    let report = if xfail {
+    // @pytest.mark.xfail: expected failures invert at the call phase (when
+    // the raises= filter matches); with strict=True an unexpected pass fails.
+    let report = if let (Some(xf), true) = (&xfailed, xfail) {
         match report.outcome {
-            Outcome::Failed => TestReport {
+            Outcome::Failed if xfail_raises_ok => TestReport {
                 outcome: Outcome::XFailed,
+                longrepr: Some(xf.reason.clone()),
                 ..report
             },
             Outcome::Passed => {
-                let mark = item.get_closest_marker("xfail");
-                let kwargs = mark.and_then(|mark| mark.obj.bind(py).getattr("kwargs").ok());
-                let strict = kwargs
-                    .as_ref()
-                    .and_then(|kwargs| kwargs.get_item("strict").ok())
-                    .and_then(|value| value.extract::<bool>().ok())
-                    .unwrap_or_else(|| {
-                        matches!(
-                            config.get_ini("xfail_strict").map(str::trim),
-                            Some("true") | Some("True") | Some("1")
-                        )
-                    });
-                if strict {
-                    let reason = kwargs
-                        .and_then(|kwargs| kwargs.get_item("reason").ok())
-                        .and_then(|value| value.extract::<String>().ok())
-                        .unwrap_or_default();
+                if xf.strict {
                     TestReport {
                         outcome: Outcome::Failed,
-                        longrepr: Some(format!("[XPASS(strict)] {reason}")),
+                        longrepr: Some(format!("[XPASS(strict)] {}", xf.reason)),
                         ..report
                     }
                 } else {
                     TestReport {
                         outcome: Outcome::XPassed,
+                        longrepr: Some(xf.reason.clone()),
                         ..report
                     }
                 }
@@ -561,7 +612,7 @@ pub(crate) fn run_one(
         }
     }
 
-    teardown_one(py, plugins, session, config, item, &mut reports);
+    teardown_one(py, plugins, session, config, item, xfail, &mut reports);
     close_item_filters(py);
     python::end_item_context(py);
     reports
@@ -573,6 +624,7 @@ fn teardown_one(
     session: &mut Session,
     config: &Config,
     item: &TestItem,
+    xfail: bool,
     reports: &mut Vec<TestReport>,
 ) {
     let log_level_cfg: Option<String> = config
@@ -619,7 +671,13 @@ fn teardown_one(
         reports.push(TestReport {
             nodeid: item.nodeid.clone(),
             phase: Phase::Teardown,
-            outcome: Outcome::Failed,
+            // @pytest.mark.xfail covers teardown failures too (pytest's
+            // makereport hook turns any failing phase into an xfail).
+            outcome: if xfail {
+                Outcome::XFailed
+            } else {
+                Outcome::Failed
+            },
             duration: teardown_started.elapsed(),
             longrepr: Some(errors.join("\n")),
             location: None,
@@ -1055,37 +1113,74 @@ fn resolve_fixture_def(
     Ok(value)
 }
 
-/// The skip reason for an item, from @pytest.mark.skip or a true
-/// @pytest.mark.skipif condition.
-fn skip_reason(py: Python<'_>, item: &TestItem) -> Option<String> {
-    let mark_reason = |mark: &crate::collect::MarkData| -> String {
-        mark.obj
-            .bind(py)
-            .getattr("kwargs")
-            .and_then(|kwargs| kwargs.get_item("reason"))
-            .and_then(|reason| reason.extract())
-            .unwrap_or_default()
-    };
-    if let Some(mark) = item.get_closest_marker("skip") {
-        return Some(mark_reason(mark));
+/// The item's marks as (name, mark) pairs for the pytest._skipping shim.
+fn marks_for_eval(py: Python<'_>, item: &TestItem) -> Vec<(String, Py<PyAny>)> {
+    item.marks
+        .iter()
+        .map(|mark| (mark.name.clone(), mark.obj.clone_ref(py)))
+        .collect()
+}
+
+/// pytest evaluate_skip_marks: Some((reason, from_pytestmark)) when the item
+/// should skip. Errors (bad mark usage, conditions) report as setup errors.
+fn evaluate_skip_marks(py: Python<'_>, item: &TestItem) -> PyResult<Option<(String, bool)>> {
+    let config_obj = python::existing_py_config(py).unwrap_or_else(|| py.None());
+    py.import("pytest._skipping")?
+        .call_method1(
+            "evaluate_skip_marks",
+            (
+                marks_for_eval(py, item),
+                item.module_name.as_str(),
+                config_obj,
+            ),
+        )?
+        .extract()
+}
+
+/// Evaluated @pytest.mark.xfail data (pytest's Xfail).
+struct XfailEval {
+    reason: String,
+    run: bool,
+    strict: bool,
+    raises: Option<Py<PyAny>>,
+}
+
+/// pytest evaluate_xfail_marks: the first triggered xfail mark, if any.
+fn evaluate_xfail_marks(
+    py: Python<'_>,
+    config: &Config,
+    item: &TestItem,
+) -> PyResult<Option<XfailEval>> {
+    // Strict default: strict_xfail, then strict, then the pre-9 xfail_strict.
+    let strict_default = matches!(
+        config
+            .get_ini("strict_xfail")
+            .or_else(|| config.get_ini("strict"))
+            .or_else(|| config.get_ini("xfail_strict"))
+            .map(str::trim),
+        Some("true") | Some("True") | Some("1")
+    );
+    let config_obj = python::existing_py_config(py).unwrap_or_else(|| py.None());
+    let result = py.import("pytest._skipping")?.call_method1(
+        "evaluate_xfail_marks",
+        (
+            marks_for_eval(py, item),
+            item.module_name.as_str(),
+            config_obj,
+            strict_default,
+        ),
+    )?;
+    if result.is_none() {
+        return Ok(None);
     }
-    for mark in item.marks.iter().filter(|m| m.name == "skipif") {
-        let Ok(args) = mark.obj.bind(py).getattr("args") else {
-            continue;
-        };
-        let Ok(iter) = args.try_iter() else { continue };
-        for condition in iter.flatten() {
-            let truthy = match condition.extract::<String>() {
-                // String conditions evaluate in the test module's namespace.
-                Ok(expr) => python::eval_in_module(py, &item.module_name, &expr).unwrap_or(true),
-                Err(_) => condition.is_truthy().unwrap_or(false),
-            };
-            if truthy {
-                return Some(mark_reason(mark));
-            }
-        }
-    }
-    None
+    let (reason, run, strict, raises): (String, bool, bool, Option<Py<PyAny>>) =
+        result.extract()?;
+    Ok(Some(XfailEval {
+        reason,
+        run,
+        strict,
+        raises,
+    }))
 }
 
 fn report_from_err(
@@ -1106,14 +1201,22 @@ fn report_from_err(
             location: None,
         }
     } else if python::is_skipped(py, err) {
+        // Imperative skips report where pytest.skip was raised; skips out
+        // of fixtures/xunit setup report the item's definition site instead
+        // (pytest's _use_item_location), so the user knows which test.
+        let location = if phase == Phase::Setup {
+            let file = item.nodeid.split("::").next().unwrap_or("");
+            Some(format!("{file}:{}", item.lineno))
+        } else {
+            python::raise_location(py, err)
+        };
         TestReport {
             nodeid: item.nodeid.clone(),
             phase,
             outcome: Outcome::Skipped,
             duration: started.elapsed(),
             longrepr: python::outcome_msg(py, err),
-            // Imperative skips report where pytest.skip was raised.
-            location: python::raise_location(py, err),
+            location,
         }
     } else {
         let mut longrepr =
