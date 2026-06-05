@@ -74,7 +74,7 @@ impl Engine {
             if config.verbose == 0 && !config.quiet && !config.no_terminal() && file != current_file
             {
                 if !current_file.is_empty() {
-                    println!("{line} [{:>3}%]", done * 100 / total);
+                    println!("{}", with_progress(&line, done, total));
                 }
                 line = format!("{file} ");
                 current_file = file;
@@ -109,7 +109,10 @@ impl Engine {
                         }
                     };
                     if report.phase == Phase::Call || report.outcome != Outcome::Passed {
-                        println!("{} {} [{:>3}%]", item.nodeid, word, done * 100 / total);
+                        println!(
+                            "{}",
+                            with_progress(&format!("{} {}", item.nodeid, word), done, total)
+                        );
                         let _ = std::io::stdout().flush();
                     }
                 } else if !config.quiet
@@ -122,7 +125,7 @@ impl Engine {
         }
         if config.verbose == 0 && !config.quiet && !config.no_terminal() && !current_file.is_empty()
         {
-            println!("{line} [{:>3}%]", done * 100 / total);
+            println!("{}", with_progress(&line, done, total));
         }
 
         // Final scope teardowns.
@@ -149,6 +152,26 @@ impl Engine {
         }
 
         session.items = items;
+    }
+}
+
+/// Terminal width for right-aligning the progress percentage, like
+/// pytest's TerminalWriter (COLUMNS env, else 80).
+fn term_width() -> usize {
+    std::env::var("COLUMNS")
+        .ok()
+        .and_then(|c| c.trim().parse().ok())
+        .unwrap_or(80)
+}
+
+/// "body        [ 33%]" — the percentage right-aligned at the terminal edge.
+fn with_progress(body: &str, done: usize, total: usize) -> String {
+    let pct = format!("[{:>3}%]", done * 100 / total);
+    let pad = term_width().saturating_sub(body.chars().count() + pct.len());
+    if pad > 0 {
+        format!("{body}{}{pct}", " ".repeat(pad))
+    } else {
+        format!("{body} {pct}")
     }
 }
 
