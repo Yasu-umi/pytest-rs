@@ -14,7 +14,7 @@ use std::collections::VecDeque;
 use std::io::{BufRead, BufReader, Lines, Write};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::atomic::{AtomicIsize, Ordering};
-use std::sync::{Arc, Condvar, Mutex, mpsc};
+use std::sync::{Arc, Mutex, mpsc};
 
 use pyo3::prelude::*;
 
@@ -44,17 +44,18 @@ enum Event {
     Banner(String),
 }
 
-/// The shared work queue: idle workers wait while batches are in flight
-/// (a crash may requeue work), and an exhausted restart budget aborts
-/// whatever was not yet dispatched.
+/// The shared work queue. An empty queue means shutdown for whoever asks —
+/// like xdist, workers are released once everything is dispatched (waiting
+/// for completion would deadlock suites whose class setups hold
+/// cross-process locks). A crashed worker requeues its remainder for its
+/// own replacement; an exhausted restart budget aborts whatever was not
+/// yet dispatched.
 struct WorkQueue {
     state: Mutex<QueueState>,
-    cond: Condvar,
 }
 
 struct QueueState {
     queue: VecDeque<Vec<String>>,
-    in_flight: usize,
     aborted: bool,
 }
 
@@ -63,52 +64,32 @@ impl WorkQueue {
         Self {
             state: Mutex::new(QueueState {
                 queue: batches,
-                in_flight: 0,
                 aborted: false,
             }),
-            cond: Condvar::new(),
         }
     }
 
-    /// The next batch, or None once all work is finished or aborted.
+    /// The next batch, or None once all work is dispatched or aborted.
     fn next(&self) -> Option<Vec<String>> {
         let mut state = self.state.lock().expect("work queue lock poisoned");
-        loop {
-            if state.aborted {
-                return None;
-            }
-            if let Some(batch) = state.queue.pop_front() {
-                state.in_flight += 1;
-                return Some(batch);
-            }
-            if state.in_flight == 0 {
-                return None;
-            }
-            state = self.cond.wait(state).expect("work queue lock poisoned");
+        if state.aborted {
+            return None;
         }
-    }
-
-    fn complete(&self) {
-        let mut state = self.state.lock().expect("work queue lock poisoned");
-        state.in_flight -= 1;
-        self.cond.notify_all();
+        state.queue.pop_front()
     }
 
     /// Crash bookkeeping: the unfinished remainder goes back to the front.
     fn requeue(&self, batch: Vec<String>) {
         let mut state = self.state.lock().expect("work queue lock poisoned");
-        state.in_flight -= 1;
         if !state.aborted && !batch.is_empty() {
             state.queue.push_front(batch);
         }
-        self.cond.notify_all();
     }
 
     fn abort(&self) {
         let mut state = self.state.lock().expect("work queue lock poisoned");
         state.aborted = true;
         state.queue.clear();
-        self.cond.notify_all();
     }
 }
 
@@ -359,7 +340,6 @@ impl WorkerOwner {
             };
             let _ = self.sender.send(Event::Output(message.clone()));
             let _ = self.sender.send(Event::Banner(format!("xdist: {message}")));
-            self.queue.requeue(Vec::new());
             self.queue.abort();
             None
         }
@@ -422,10 +402,7 @@ impl WorkerOwner {
                             worker: self.index,
                         });
                     }
-                    Some(WorkerMsg::Done) => {
-                        self.queue.complete();
-                        continue 'work;
-                    }
+                    Some(WorkerMsg::Done) => continue 'work,
                     Some(WorkerMsg::Extra { plugin, payload }) => {
                         let _ = self.sender.send(Event::Extra { plugin, payload });
                     }
