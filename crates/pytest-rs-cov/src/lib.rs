@@ -247,6 +247,49 @@ impl CovPlugin {
         }
     }
 
+    /// coverage `[run] relative_files`: from --cov-config / .coveragerc /
+    /// setup.cfg / tox.ini (ini forms) or pyproject [tool.coverage.run].
+    fn relative_files_enabled(rootdir: &Path, cov_config: Option<&str>) -> bool {
+        let truthy = |value: &str| {
+            matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "true" | "1" | "yes" | "on"
+            )
+        };
+        for candidate in [cov_config.unwrap_or(".coveragerc"), "setup.cfg", "tox.ini"] {
+            let Ok(content) = std::fs::read_to_string(rootdir.join(candidate)) else {
+                continue;
+            };
+            let mut in_run = false;
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if trimmed.starts_with('[') {
+                    in_run = trimmed == "[run]" || trimmed == "[coverage:run]";
+                    continue;
+                }
+                if in_run
+                    && let Some((key, value)) = trimmed.split_once('=')
+                    && key.trim() == "relative_files"
+                {
+                    return truthy(value);
+                }
+            }
+        }
+        if let Ok(content) = std::fs::read_to_string(rootdir.join("pyproject.toml"))
+            && let Ok(document) = content.parse::<toml::Value>()
+            && let Some(value) = document
+                .get("tool")
+                .and_then(|tool| tool.get("coverage"))
+                .and_then(|coverage| coverage.get("run"))
+                .and_then(|run| run.get("relative_files"))
+        {
+            return value
+                .as_bool()
+                .unwrap_or_else(|| value.as_str().is_some_and(truthy));
+        }
+        false
+    }
+
     /// pytest-cov parity: persist the merged hits as a `.coverage` data file
     /// (coverage.py's sqlite format) via the installed `coverage` package,
     /// so downstream tooling (coverage html/report/combine, diff-cover)
@@ -281,10 +324,27 @@ impl CovPlugin {
         if append {
             data.call_method0("read")?;
         }
+        // [run] relative_files: store rootdir-relative paths so coverage
+        // report/combine resolve them like coverage.py would.
+        let relative =
+            Self::relative_files_enabled(&ctx.config.rootdir, ctx.config.get_value("cov-config"));
+        let rootdir_canon = ctx
+            .config
+            .rootdir
+            .canonicalize()
+            .unwrap_or_else(|_| ctx.config.rootdir.clone());
         let lines = core_pyo3::types::PyDict::new(py);
         for (file, hit_lines) in hits {
+            let key = if relative {
+                Path::new(file)
+                    .strip_prefix(&rootdir_canon)
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_else(|_| file.clone())
+            } else {
+                file.clone()
+            };
             let list: Vec<u32> = hit_lines.iter().copied().collect();
-            lines.set_item(file, list)?;
+            lines.set_item(key, list)?;
         }
         data.call_method1("add_lines", (lines,))?;
         data.call_method0("write")?;
