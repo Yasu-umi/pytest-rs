@@ -68,8 +68,12 @@ impl Engine {
             return exit_code::USAGE_ERROR;
         }
         // Arm unknown-mark validation (PytestUnknownMarkWarning on access).
-        if let Err(err) = python::configure_mark_generator(py, &self.config, self.strict_markers())
-        {
+        if let Err(err) = python::configure_mark_generator(
+            py,
+            &self.config,
+            self.strict_markers(),
+            self.strict_parametrization_ids(),
+        ) {
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
             return exit_code::INTERNAL_ERROR;
         }
@@ -123,14 +127,12 @@ impl Engine {
                 return exit_code::USAGE_ERROR;
             }
         };
-        for (path, err) in &collect_errors {
-            eprintln!("ERROR collecting {}", path.display());
-            eprintln!("{err}");
-        }
-        if !collect_errors.is_empty() {
+        let n_collect_errors = collect_errors.len();
+        if n_collect_errors > 0 {
             // Collection errors still report as errors in the summary.
             for (path, err) in collect_errors {
                 let nodeid = crate::collect::file_nodeid(&self.config.rootdir, &path);
+                self.session.collect_errors.push((nodeid.clone(), err.clone()));
                 self.session.reports.push(crate::report::TestReport {
                     nodeid,
                     phase: Phase::Setup,
@@ -140,21 +142,55 @@ impl Engine {
                     location: None,
                 });
             }
-            // A file that fails collection is a "last failed" entry.
-            if let Some(cache) = &self.cache {
-                cache.sessionfinish(py, &self.config, &self.session.reports);
+            // --maxfail aborting collection exits TESTS_FAILED with a
+            // "stopping after N failures" banner; otherwise INTERRUPTED.
+            let maxfail_hit = self
+                .config
+                .maxfail()
+                .is_some_and(|m| n_collect_errors >= m);
+            if !self.config.get_flag("continue-on-collection-errors") || maxfail_hit {
+                if !self.config.no_terminal() {
+                    if !self.config.quiet {
+                        let n_items = self.session.items.len();
+                        println!(
+                            "collected {n_items} item{} / {n_collect_errors} error{}",
+                            if n_items == 1 { "" } else { "s" },
+                            if n_collect_errors == 1 { "" } else { "s" }
+                        );
+                    }
+                    self.print_collect_errors();
+                }
+                // A file that fails collection is a "last failed" entry.
+                if let Some(cache) = &self.cache {
+                    cache.sessionfinish(py, &self.config, &self.session.reports);
+                }
+                if !self.config.no_terminal() {
+                    self.print_short_summary();
+                    let banner = if maxfail_hit {
+                        format!("stopping after {n_collect_errors} failures")
+                    } else {
+                        format!(
+                            "Interrupted: {n_collect_errors} error{} during collection",
+                            if n_collect_errors == 1 { "" } else { "s" }
+                        )
+                    };
+                    println!("{}", center_with(&banner, '!'));
+                    println!(
+                        "{}",
+                        crate::runner::summary_line(
+                            &self.session.reports,
+                            self.session.deselected,
+                            python::warning_count(py),
+                            started.elapsed()
+                        )
+                    );
+                }
+                return if maxfail_hit {
+                    exit_code::TESTS_FAILED
+                } else {
+                    exit_code::INTERRUPTED
+                };
             }
-            self.print_short_summary();
-            println!(
-                "{}",
-                crate::runner::summary_line(
-                    &self.session.reports,
-                    self.session.deselected,
-                    python::warning_count(py),
-                    started.elapsed()
-                )
-            );
-            return exit_code::INTERRUPTED;
         }
 
         if let Err(message) = self.check_strict_markers() {
@@ -188,6 +224,12 @@ impl Engine {
             if deselected > 0 {
                 println!(
                     "collected {collected} items / {deselected} deselected / {n_items} selected"
+                );
+            } else if n_collect_errors > 0 {
+                println!(
+                    "collected {n_items} item{} / {n_collect_errors} error{}",
+                    if n_items == 1 { "" } else { "s" },
+                    if n_collect_errors == 1 { "" } else { "s" }
                 );
             } else {
                 println!(
@@ -270,6 +312,9 @@ impl Engine {
         if self.config.no_terminal() {
             return code;
         }
+        // --continue-on-collection-errors: the ERRORS section was deferred
+        // until after the run, like pytest's terminal reporter.
+        self.print_collect_errors();
         self.print_failures();
         if let Err(err) = self.print_plugin_summaries(py) {
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
@@ -279,6 +324,9 @@ impl Engine {
             println!("{}", center_banner(banner));
         }
         self.print_short_summary();
+        if let Some(n) = self.session.stopped_after {
+            println!("{}", center_with(&format!("stopping after {n} failures"), '!'));
+        }
         let warning_count = python::warning_count(py) + self.session.worker_warning_count;
         println!(
             "{}",
@@ -418,12 +466,34 @@ impl Engine {
         println!("rootdir: {}", self.config.rootdir.display());
     }
 
+    /// The ERRORS section: one "ERROR collecting <file>" banner per
+    /// collection error, with the error text (no traceback for CollectError).
+    fn print_collect_errors(&self) {
+        if self.session.collect_errors.is_empty() {
+            return;
+        }
+        println!();
+        println!("{}", center_banner("ERRORS"));
+        for (nodeid, err) in &self.session.collect_errors {
+            println!("{}", center_with(&format!("ERROR collecting {nodeid}"), '_'));
+            println!("{err}");
+        }
+    }
+
     fn print_failures(&self) {
         let failures: Vec<_> = self
             .session
             .reports
             .iter()
             .filter(|r| r.outcome == Outcome::Failed)
+            .filter(|r| {
+                // Collection errors print in the ERRORS section instead.
+                !self
+                    .session
+                    .collect_errors
+                    .iter()
+                    .any(|(nodeid, _)| nodeid == &r.nodeid)
+            })
             .collect();
         if failures.is_empty() {
             return;
@@ -481,7 +551,15 @@ impl Engine {
             };
             if let Some(word) = entry {
                 let mut line = format!("{word} {}", report.nodeid);
-                if let Some(message) = report.longrepr.as_deref().and_then(short_message) {
+                // Collection errors print bare, like pytest's "ERROR file.py".
+                let is_collect_error = self
+                    .session
+                    .collect_errors
+                    .iter()
+                    .any(|(nodeid, _)| nodeid == &report.nodeid);
+                if !is_collect_error
+                    && let Some(message) = report.longrepr.as_deref().and_then(short_message)
+                {
                     line.push_str(&format!(" - {message}"));
                 }
                 lines.push(line);
@@ -553,6 +631,16 @@ impl Engine {
                 self.config.get_ini("strict").map(str::trim),
                 Some("true") | Some("True") | Some("1")
             )
+    }
+
+    /// strict_parametrization_ids ini (falling back to strict): duplicate
+    /// parametrization IDs become a collection error instead of suffixing.
+    fn strict_parametrization_ids(&self) -> bool {
+        let enabled = |value: &str| matches!(value.trim(), "true" | "True" | "1");
+        match self.config.get_ini("strict_parametrization_ids") {
+            Some(value) => enabled(value),
+            None => self.config.get_ini("strict").is_some_and(enabled),
+        }
     }
 
     /// --strict-markers / --strict (CLI or ini): every mark must be
@@ -857,6 +945,13 @@ impl Engine {
             errors.push((rootdir.clone(), python::format_exception(py, &err)));
         }
         for file in &files {
+            // --maxfail aborts collection once the budget is spent on
+            // collection errors, ignoring further files.
+            if let Some(m) = self.config.maxfail()
+                && errors.len() >= m
+            {
+                break;
+            }
             if let Err(err) = python::collect_module(
                 py,
                 &rootdir,
@@ -881,7 +976,11 @@ impl Engine {
                         });
                     }
                     Some(Err(message)) => errors.push((file.clone(), message)),
-                    None => errors.push((file.clone(), python::format_exception(py, &err))),
+                    // CollectError carries a user-facing message, no traceback.
+                    None => match python::collect_error_message(py, &err) {
+                        Some(message) => errors.push((file.clone(), message)),
+                        None => errors.push((file.clone(), python::format_exception(py, &err))),
+                    },
                 }
             }
         }

@@ -68,6 +68,12 @@ pub struct Session {
     pub dist_banner: Option<String>,
     /// Items dropped by selection (-k/-m/--lf), for the summary line.
     pub deselected: usize,
+    /// Collection errors as (nodeid, longrepr), shown in the ERRORS section
+    /// (and excluded from FAILURES / " - msg" summary suffixes).
+    pub collect_errors: Vec<(String, String)>,
+    /// Set when --maxfail/-x stopped the run, with the failure count, for
+    /// the "stopping after N failures" banner.
+    pub stopped_after: Option<usize>,
 }
 
 impl Session {
@@ -86,6 +92,8 @@ impl Session {
             worker_warning_count: 0,
             dist_banner: None,
             deselected: 0,
+            collect_errors: Vec::new(),
+            stopped_after: None,
         }
     }
 

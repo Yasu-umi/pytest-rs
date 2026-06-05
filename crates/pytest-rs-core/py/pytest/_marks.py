@@ -1,5 +1,15 @@
 """Marks (@pytest.mark.*) and pytest.param: metadata records only."""
 
+import enum
+
+
+class _HiddenParam(enum.Enum):
+    token = 0
+
+
+#: pytest.param(..., id=HIDDEN_PARAM) hides the parameter set from the test ID.
+HIDDEN_PARAM = _HiddenParam.token
+
 
 class Mark:
     def __init__(self, name, args=(), kwargs=None):
@@ -109,11 +119,12 @@ class MarkGenerator:
 mark = MarkGenerator()
 
 
-def configure_mark_generator(config, builtin_names, strict):
+def configure_mark_generator(config, builtin_names, strict, strict_parametrization_ids=False):
     """Arm unknown-mark validation once the session config is known."""
     mark._config = config
     mark._strict = strict
     mark._markers = set(builtin_names)
+    mark._strict_parametrization_ids = strict_parametrization_ids
 
 
 class ParamSpec:

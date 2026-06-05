@@ -28,10 +28,19 @@ impl Engine {
         let mut prev_class: Option<String> = None;
         let mut current_file = String::new();
         let mut line = String::new();
-        let mut failed = 0usize;
+        let maxfail = config.maxfail();
+        // Collection errors (--continue-on-collection-errors) already count
+        // toward the --maxfail budget, like pytest's session.testsfailed.
+        let mut failed = session
+            .reports
+            .iter()
+            .filter(|r| r.outcome == Outcome::Failed)
+            .count();
 
         for item in &items {
-            if config.exitfirst && failed > 0 {
+            if let Some(m) = maxfail
+                && failed >= m
+            {
                 break;
             }
             // pytest.exit / Ctrl-C inside a test aborts the session.
@@ -118,6 +127,13 @@ impl Engine {
         }
         if let Some(last) = items.last() {
             teardown_scope(py, plugins, session, config, Scope::Session, "", last);
+        }
+        // pytest prints the banner even when the budget was spent on the
+        // very last test, so check the final count rather than the break.
+        if let Some(m) = maxfail
+            && failed >= m
+        {
+            session.stopped_after = Some(failed);
         }
 
         session.items = items;

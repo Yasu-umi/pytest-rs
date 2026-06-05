@@ -546,6 +546,17 @@ impl Config {
         self.get_flag("worker")
     }
 
+    /// The effective failure budget: -x/--exitfirst means 1, otherwise the
+    /// --maxfail=N value (0 disables, as in pytest).
+    pub fn maxfail(&self) -> Option<usize> {
+        if self.exitfirst {
+            return Some(1);
+        }
+        self.get_value("maxfail")
+            .and_then(|v| v.parse().ok())
+            .filter(|&n| n > 0)
+    }
+
     /// -n N (xdist-style): Some(N) requests distributed execution. "auto"
     /// and "logical" map to the CPU count; 0 means in-process.
     pub fn numprocesses(&self) -> Option<usize> {

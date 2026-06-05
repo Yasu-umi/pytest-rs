@@ -14,6 +14,7 @@ from pytest._capture import CaptureFixture as CaptureFixture
 from pytest._capture import capsys as capsys
 from pytest._fixtures import FixtureFunctionMarker as FixtureFunctionMarker
 from pytest._fixtures import fixture as fixture
+from pytest._marks import HIDDEN_PARAM as HIDDEN_PARAM
 from pytest._marks import Mark as Mark
 from pytest._marks import MarkDecorator as MarkDecorator
 from pytest._marks import MarkGenerator as MarkGenerator
@@ -22,6 +23,9 @@ from pytest._marks import mark as mark
 from pytest._marks import param as param
 from pytest._monkeypatch import MonkeyPatch as MonkeyPatch
 from pytest._monkeypatch import monkeypatch as monkeypatch
+from pytest._node import Collector as Collector
+from pytest._node import File as File
+from pytest._node import Item as Item
 from pytest._outcomes import Exit as Exit
 from pytest._outcomes import Failed as Failed
 from pytest._outcomes import OutcomeException as OutcomeException

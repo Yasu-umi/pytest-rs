@@ -1,6 +1,21 @@
 """The `request.node` object: a minimal pytest Item surface."""
 
 
+class Collector:
+    """Stub collector base (annotations/isinstance upstream)."""
+
+    class CollectError(Exception):
+        """An error during collection, shown without a traceback."""
+
+
+class Item:
+    """Stub item base (annotations/isinstance upstream)."""
+
+
+class File:
+    """Stub file collector base."""
+
+
 class Node:
     def __init__(self, nodeid, name, marks, fixturenames=None, function=None):
         self.nodeid = nodeid
