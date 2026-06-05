@@ -28,7 +28,9 @@ def skip(reason="", allow_module_level=False):
 
 def fail(reason="", pytrace=True):
     __tracebackhide__ = True
-    raise Failed(msg=reason)
+    exc = Failed(msg=reason)
+    exc.pytrace = pytrace
+    raise exc
 
 
 def xfail(reason=""):

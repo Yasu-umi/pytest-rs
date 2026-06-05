@@ -85,6 +85,17 @@ def raise_location(exc):
 def format_exception(exc, style="long"):
     if style == "no":
         return ""
+    # pytest.fail(..., pytrace=False): no traceback, message only (with the
+    # original exception's text when raised from an except block).
+    if not getattr(exc, "pytrace", True):
+        parts = []
+        context = exc.__context__
+        if context is not None:
+            parts.append(str(context))
+            parts.append("")
+            parts.append("During handling of the above exception, another exception occurred:")
+        parts.append(str(getattr(exc, "msg", None) or ""))
+        return "\n".join(parts)
     if style == "native":
         return "".join(traceback.format_exception(exc))
 

@@ -485,10 +485,25 @@ impl Engine {
         println!("rootdir: {}", self.config.rootdir.display());
     }
 
-    /// The ERRORS section: one "ERROR collecting <file>" banner per
-    /// collection error, with the error text (no traceback for CollectError).
+    /// The ERRORS section: "ERROR collecting <file>" banners per collection
+    /// error, plus "ERROR at setup/teardown of <test>" banners for
+    /// fixture/teardown failures (pytest groups all of these together).
     fn print_collect_errors(&self) {
-        if self.session.collect_errors.is_empty() {
+        let phase_errors: Vec<_> = self
+            .session
+            .reports
+            .iter()
+            .filter(|r| {
+                r.outcome == Outcome::Failed
+                    && matches!(r.phase, Phase::Setup | Phase::Teardown)
+                    && !self
+                        .session
+                        .collect_errors
+                        .iter()
+                        .any(|(nodeid, _)| nodeid == &r.nodeid)
+            })
+            .collect();
+        if self.session.collect_errors.is_empty() && phase_errors.is_empty() {
             return;
         }
         println!();
@@ -497,6 +512,17 @@ impl Engine {
             println!("{}", center_with(&format!("ERROR collecting {nodeid}"), '_'));
             println!("{err}");
         }
+        for report in phase_errors {
+            let name = report.nodeid.rsplit("::").next().unwrap_or(&report.nodeid);
+            let when = match report.phase {
+                Phase::Teardown => "teardown",
+                _ => "setup",
+            };
+            println!("{}", center_with(&format!("ERROR at {when} of {name}"), '_'));
+            if let Some(longrepr) = &report.longrepr {
+                println!("{longrepr}");
+            }
+        }
     }
 
     fn print_failures(&self) {
@@ -504,15 +530,7 @@ impl Engine {
             .session
             .reports
             .iter()
-            .filter(|r| r.outcome == Outcome::Failed)
-            .filter(|r| {
-                // Collection errors print in the ERRORS section instead.
-                !self
-                    .session
-                    .collect_errors
-                    .iter()
-                    .any(|(nodeid, _)| nodeid == &r.nodeid)
-            })
+            .filter(|r| r.outcome == Outcome::Failed && r.phase == Phase::Call)
             .collect();
         if failures.is_empty() {
             return;
