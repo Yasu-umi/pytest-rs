@@ -43,7 +43,8 @@ repo = "https://github.com/pytest-dev/pytest-xdist"
 tag = "v3.8.0"
 testpaths = ["testing"]
 local = "../pytest-xdist"
-enabled = false # enable when -n workers land (M4)
+deps = ["execnet", "filelock", "py"]
+enabled = true
 
 [pytest-split]
 repo = "https://github.com/jerry-git/pytest-split"

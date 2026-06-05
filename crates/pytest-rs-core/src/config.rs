@@ -290,7 +290,7 @@ impl Config {
         // Core pytest options parsed into flags/values (queried via
         // get_flag/get_value); some are still inert and gain behavior as
         // features land.
-        const CORE_FLAGS: [&str; 9] = [
+        const CORE_FLAGS: [&str; 10] = [
             "strict-config",
             "strict-markers",
             "strict",
@@ -300,13 +300,15 @@ impl Config {
             "exact-mode",      // placeholder; harmless
             "doctest-modules", // accepted-but-inert: doctest collection not implemented
             "nbmake",          // accepted-but-inert: notebook collection not implemented
+            "worker",          // hidden: this process is a -n worker (IPC on stdin/stdout)
         ];
-        const CORE_VALUES: [(&str, Option<char>); 16] = [
+        const CORE_VALUES: [(&str, Option<char>); 20] = [
             ("report-chars", Some('r')),
             ("markexpr", Some('m')),
             ("keyword", Some('k')),
             ("plugin", Some('p')),
             ("config-file", Some('c')),
+            ("numprocesses", Some('n')),
             ("assert", None),
             ("tb", None),
             ("maxfail", None),
@@ -316,8 +318,11 @@ impl Config {
             ("basetemp", None),
             ("import-mode", None),
             ("capture", None),
-            ("doctest-glob", None), // accepted-but-inert
-            ("ignore", None),       // accepted-but-inert (conformance runs files explicitly)
+            ("doctest-glob", None),       // accepted-but-inert
+            ("ignore", None),             // accepted-but-inert (conformance runs files explicitly)
+            ("dist", None), // accepted-but-inert: module-affinity load is the only mode
+            ("maxprocesses", None), // accepted-but-inert
+            ("max-worker-restart", None), // accepted-but-inert: workers are not restarted
         ];
         for flag in CORE_FLAGS {
             cmd = cmd.arg(
@@ -481,10 +486,31 @@ impl Config {
             .map(|joined| joined.split('\n').collect())
     }
 
-    /// `-p no:terminal` disables the terminal reporter entirely.
+    /// `-p no:terminal` disables the terminal reporter entirely. Workers
+    /// are always silent: their stdout is the IPC channel.
     pub fn no_terminal(&self) -> bool {
-        self.plugin_opts
-            .iter()
-            .any(|spec| spec == "no:terminal" || spec == "no:terminalreporter")
+        self.is_worker()
+            || self
+                .plugin_opts
+                .iter()
+                .any(|spec| spec == "no:terminal" || spec == "no:terminalreporter")
+    }
+
+    /// This process is a `-n` worker, driven over stdin/stdout.
+    pub fn is_worker(&self) -> bool {
+        self.get_flag("worker")
+    }
+
+    /// -n N (xdist-style): Some(N) requests distributed execution. "auto"
+    /// and "logical" map to the CPU count; 0 means in-process.
+    pub fn numprocesses(&self) -> Option<usize> {
+        let value = self.get_value("numprocesses")?;
+        let n = match value {
+            "auto" | "logical" => std::thread::available_parallelism()
+                .map(std::num::NonZero::get)
+                .unwrap_or(1),
+            other => other.parse().ok()?,
+        };
+        (n > 0).then_some(n)
     }
 }

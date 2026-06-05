@@ -548,6 +548,7 @@ version = "0.0.1"
 dependencies = [
  "pyo3",
  "pytest-rs-core",
+ "serde",
  "serde_json",
 ]
 
@@ -577,6 +578,7 @@ dependencies = [
  "ruff_python_parser",
  "ruff_source_file",
  "ruff_text_size",
+ "serde_json",
  "toml",
 ]
 

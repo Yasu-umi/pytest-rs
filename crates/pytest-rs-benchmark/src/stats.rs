@@ -1,5 +1,8 @@
 //! Round statistics, matching pytest-benchmark's Stats fields.
 
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
 pub struct Stats {
     pub min: f64,
     pub max: f64,

@@ -43,6 +43,8 @@ from pytest._tmp_path import tmp_path as tmp_path
 from pytest._tmp_path import tmp_path_factory as tmp_path_factory
 from pytest._tmp_path import tmpdir as tmpdir
 from pytest._warning_types import PytestAssertRewriteWarning as PytestAssertRewriteWarning
+from pytest._xdist_fixtures import testrun_uid as testrun_uid
+from pytest._xdist_fixtures import worker_id as worker_id
 from pytest._warning_types import PytestCacheWarning as PytestCacheWarning
 from pytest._warning_types import PytestCollectionWarning as PytestCollectionWarning
 from pytest._warning_types import PytestConfigWarning as PytestConfigWarning

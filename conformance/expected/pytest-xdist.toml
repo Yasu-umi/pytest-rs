@@ -1,0 +1,17 @@
+# Upstream pytest-xdist test files that must keep passing under pytest-rs.
+# This list only grows; a regression here fails CI.
+#
+# acceptance_test.py is the behavioral target (currently ~60/102 passing);
+# it is tracked by the scoreboard and gets pinned once fully green.
+
+[files]
+
+[excluded]
+# These drive xdist's execnet/DSession implementation directly; pytest-rs
+# replaces that machinery with native Rust process workers.
+"testing/test_dsession.py" = "imports xdist.dsession internals (execnet scheduler not reproduced)"
+"testing/test_plugin.py" = "imports xdist.workermanage internals (execnet NodeManager not reproduced)"
+"testing/test_remote.py" = "tests the execnet remote protocol (not reproduced)"
+"testing/test_workermanage.py" = "imports xdist.workermanage internals (rsync/NodeManager not reproduced)"
+"testing/test_looponfail.py" = "tests --looponfail (not implemented)"
+"testing/test_newhooks.py" = "tests pytest_xdist_* pluggy hooks (no pluggy hook surface in pytest-rs)"

@@ -115,19 +115,33 @@ Key structural rules:
   (`HashMap<TypeId, Box<dyn Any>>` + well-known string keys, e.g. `"asyncio.event_loop"`).
   Never crate-to-crate Rust deps between plugins. This is how pytest-aiohttp plugs in later.
 
-### Multi-process execution (`-n N`, default 1)
+### Multi-process execution (`-n N`, default 1) *(landed in M4)*
 
-- `-n 0`/absent: everything in-process (no worker overhead at all).
-- `-n N`: main process collects (fast: pre-scan + import once), then spawns N workers — the same
-  binary in a hidden `--worker` mode. Work distribution over a simple length-prefixed
-  JSON IPC on stdin/stdout (work-stealing queue of node IDs; module-affinity batching so a
-  worker imports each test module once). Each worker embeds CPython, runs its items with the
-  full plugin stack, streams `TestReport`s back; the parent merges reports, cov bitmaps
-  (roaring merge is cheap), and durations.
-- Session-scoped fixtures are per-worker (same semantics as xdist).
+- `-n 0`/absent: everything in-process (no worker overhead at all). `-n auto` = CPU count.
+- `-n N`: main process collects (import once, applies -k/-m/modifyitems), then spawns N
+  workers — the same binary in a hidden `--worker` mode. Work distribution over
+  newline-delimited JSON IPC: parent→worker on a clean stdin; worker→parent on stdout with a
+  sentinel frame prefix (tests print via Python, so worker `sys.stdout` is aliased to stderr
+  and stray fd-1 output passes through unmangled). Workers collect lazily — only the modules
+  their batches reference get imported — and stream `TestReport`s back per phase.
+- Dispatch granularity follows `--dist` (xdist parity): per-test for `load`/`worksteal`
+  (default), per-module for `loadscope`/`loadfile`/`loadgroup` (each module imported by one
+  worker), duplicated per worker for `each`. The queue is work-stealing: idle workers wait on
+  a condvar while batches are in flight (a crash may requeue work).
+- Crash handling: a dead worker fails its running test (`worker gwN crashed while running …`),
+  requeues the rest, and is replaced while `--max-worker-restart`'s budget lasts; an exhausted
+  budget aborts undispatched work and banners `xdist: maximum crashed workers reached: N`.
+- Merging: reports stream into the parent in arrival order; plugins serialize per-process
+  state through `pytest_worker_dump`/`pytest_worker_load` (cov hits as JSON line sets —
+  roaring stayed unnecessary at this scale — benchmark results as stats JSON); worker warnings
+  forward into the parent's summary; split durations come from the merged reports for free.
+- Session-scoped fixtures are per-worker (same semantics as xdist). The `worker_id` /
+  `testrun_uid` fixtures and `PYTEST_XDIST_WORKER*` env vars are provided for compatibility,
+  plus an `xdist` import shim (`is_xdist_worker` etc.) and `config.workerinput`.
+- Known divergence: the parent imports test modules during collection (xdist collects in
+  workers), so module-level side effects run once in the parent too.
 - Architecture consequence for everything else: collection, execution, and reporting communicate
-  through serializable types (`TestItem`, `TestReport` are plain data) — never via shared Python
-  state.
+  through serializable types (node IDs in, `TestReport`s out) — never via shared Python state.
 
 ### Bundled plugins (v1 scope)
 
@@ -151,7 +165,10 @@ Key structural rules:
 - **M2 — Assertion rewriting**: meta_path hook, Rust rewriter, line-fidelity, rich failure output.
 - **M3 — Fixture engine completeness**: all scopes + teardown ordering, autouse, conftest.py
   hierarchy + visibility, parametrize (test + fixture), `pytest.raises/approx/skip/xfail`.
-- **M4 — Multi-process workers**: `-n N`, worker mode, IPC protocol, report/cov merge.
+- **M4 — Multi-process workers** *(done)*: `-n N`, worker mode, IPC protocol, report/cov
+  merge, crashed-worker replacement, `--dist` modes. Upstream pytest-xdist acceptance tests:
+  60/102 at landing (execnet/DSession/looponfail internals excluded); enabling -n also lifted
+  pytest-cov's suite (xdist-variant tests) from 28 to 46 passing.
 - **M5 — Config & selection parity**: ini/toml/addopts, `-k`/`-m`, `--lf/--ff` cache,
   `--collect-only`, `--tb` modes, junitxml, builtin fixtures (tmp_path, monkeypatch, capsys, caplog).
 - **M6 — Plugins** *(done)*: mock → cov → split → benchmark (asyncio already landed in M1).

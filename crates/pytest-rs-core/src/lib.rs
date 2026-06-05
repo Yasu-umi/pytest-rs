@@ -1,14 +1,17 @@
 pub mod collect;
 pub mod config;
+pub mod dist;
 pub mod engine;
 pub mod fixture;
 pub mod hooks;
+pub mod ipc;
 pub mod markexpr;
 pub mod python;
 pub mod report;
 pub mod request;
 pub mod runner;
 pub mod session;
+pub mod worker;
 
 // Plugin crates must use pyo3 through this re-export so exactly one pyo3
 // version exists in the dependency graph.

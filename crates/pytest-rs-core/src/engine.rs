@@ -48,6 +48,12 @@ impl Engine {
             return exit_code::INTERNAL_ERROR;
         }
 
+        // -n worker mode: this process is driven over stdin/stdout; it
+        // never collects or reports on its own.
+        if self.config.is_worker() {
+            return self.run_worker(py);
+        }
+
         self.print_header();
 
         let collect_errors = match self.collect(py) {
@@ -118,7 +124,10 @@ impl Engine {
             return exit_code::NO_TESTS_COLLECTED;
         }
 
-        self.run_items(py);
+        match self.config.numprocesses() {
+            Some(workers) => self.run_dist(py, workers),
+            None => self.run_items(py),
+        }
 
         let failed = self
             .session
@@ -145,12 +154,18 @@ impl Engine {
         if let Err(err) = self.print_plugin_summaries(py) {
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
         }
-        let warning_count = python::warning_count(py);
+        let warning_count = python::warning_count(py) + self.session.worker_warning_count;
         if warning_count > 0 && !self.config.quiet {
             println!("{}", center_banner("warnings summary"));
             for line in python::warning_summary_lines(py) {
                 println!("{line}");
             }
+            for line in &self.session.worker_warnings {
+                println!("{line}");
+            }
+        }
+        if let Some(banner) = &self.session.dist_banner {
+            println!("{}", center_banner(banner));
         }
         self.print_short_summary();
         println!(

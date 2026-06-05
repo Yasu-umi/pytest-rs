@@ -57,6 +57,12 @@ pub struct Session {
     pub py_hooks: Vec<PyHook>,
     /// A plugin may force the session exit code (e.g. --cov-fail-under).
     pub exit_code_override: Option<i32>,
+    /// Warnings forwarded from -n workers, merged into the summary.
+    pub worker_warnings: Vec<String>,
+    pub worker_warning_count: usize,
+    /// Fatal distribution condition (crashed-worker budget exhausted),
+    /// shown as a banner before the short summary.
+    pub dist_banner: Option<String>,
 }
 
 impl Session {
@@ -71,6 +77,9 @@ impl Session {
             py_stash: HashMap::new(),
             py_hooks: Vec::new(),
             exit_code_override: None,
+            worker_warnings: Vec::new(),
+            worker_warning_count: 0,
+            dist_banner: None,
         }
     }
 

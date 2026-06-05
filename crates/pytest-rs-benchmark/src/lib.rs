@@ -263,6 +263,10 @@ impl Plugin for BenchmarkPlugin {
     }
 
     fn pytest_sessionfinish(&mut self, ctx: &mut HookContext, _exit_code: i32) -> PyResult<()> {
+        if ctx.config.is_worker() {
+            // Results travel to the parent (pytest_worker_dump) instead.
+            return Ok(());
+        }
         let Some(json_path) = &self.json_path else {
             return Ok(());
         };
@@ -274,6 +278,29 @@ impl Plugin for BenchmarkPlugin {
         let path = ctx.config.invocation_dir.join(json_path);
         std::fs::write(&path, content)
             .map_err(|e| core_pyo3::exceptions::PyOSError::new_err(e.to_string()))?;
+        Ok(())
+    }
+
+    fn pytest_worker_dump(&mut self, _ctx: &mut HookContext) -> PyResult<Option<String>> {
+        let results = self
+            .results
+            .lock()
+            .expect("benchmark results lock poisoned");
+        if results.is_empty() {
+            return Ok(None);
+        }
+        let payload = serde_json::to_string(&*results)
+            .map_err(|e| core_pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        Ok(Some(payload))
+    }
+
+    fn pytest_worker_load(&mut self, _ctx: &mut HookContext, payload: &str) -> PyResult<()> {
+        let loaded: Vec<fixture::BenchResult> = serde_json::from_str(payload)
+            .map_err(|e| core_pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        self.results
+            .lock()
+            .expect("benchmark results lock poisoned")
+            .extend(loaded);
         Ok(())
     }
 }

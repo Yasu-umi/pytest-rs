@@ -245,6 +245,11 @@ impl Plugin for SplitPlugin {
         if !self.store_durations {
             return Ok(());
         }
+        // Under -n the parent holds the merged reports; workers writing the
+        // durations file would race and store partial data.
+        if ctx.config.is_worker() {
+            return Ok(());
+        }
         let mut test_durations: HashMap<String, f64> = HashMap::new();
         for report in &ctx.session.reports {
             let duration = report.duration.as_secs_f64();

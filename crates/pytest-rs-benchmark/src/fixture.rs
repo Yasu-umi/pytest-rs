@@ -9,6 +9,7 @@ use pyo3::types::{PyDict, PyModule, PyTuple};
 
 use crate::stats::Stats;
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct BenchResult {
     pub fullname: String,
     pub name: String,

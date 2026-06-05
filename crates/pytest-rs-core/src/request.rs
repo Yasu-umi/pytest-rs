@@ -43,6 +43,20 @@ impl PyConfig {
         Ok(default.unwrap_or_else(|| py.None()))
     }
 
+    /// xdist parity: present (with the worker id) only in -n workers, so
+    /// `hasattr(config, "workerinput")` detects worker processes.
+    #[getter]
+    fn workerinput<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        match std::env::var("PYTEST_XDIST_WORKER") {
+            Ok(worker_id) => {
+                let dict = pyo3::types::PyDict::new(py);
+                dict.set_item("workerid", worker_id)?;
+                Ok(dict.into_any())
+            }
+            Err(_) => Err(pyo3::exceptions::PyAttributeError::new_err("workerinput")),
+        }
+    }
+
     #[getter]
     fn rootpath<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         py.import("pathlib")?

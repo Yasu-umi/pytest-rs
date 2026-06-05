@@ -1,13 +1,15 @@
 use std::time::Duration;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Phase {
     Setup,
     Call,
     Teardown,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Outcome {
     Passed,
     Failed,
@@ -18,7 +20,8 @@ pub enum Outcome {
     XPassed,
 }
 
-#[derive(Debug)]
+/// Plain data: reports stream across the worker IPC boundary as JSON.
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TestReport {
     pub nodeid: String,
     pub phase: Phase,

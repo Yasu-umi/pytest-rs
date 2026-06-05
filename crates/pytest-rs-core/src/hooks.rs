@@ -95,4 +95,16 @@ pub trait Plugin: Send {
     fn pytest_sessionfinish(&mut self, _ctx: &mut HookContext, _exit_code: i32) -> PyResult<()> {
         Ok(())
     }
+
+    /// Worker mode (-n): serialize per-process state for the parent to
+    /// merge (cov hits, benchmark results). Called after sessionfinish.
+    fn pytest_worker_dump(&mut self, _ctx: &mut HookContext) -> PyResult<Option<String>> {
+        Ok(None)
+    }
+
+    /// Parent side of `pytest_worker_dump`: merge one worker's payload
+    /// (matched by plugin name). Called before sessionfinish.
+    fn pytest_worker_load(&mut self, _ctx: &mut HookContext, _payload: &str) -> PyResult<()> {
+        Ok(())
+    }
 }

@@ -52,6 +52,10 @@ pub struct CovPlugin {
     collector: Option<Py<LineCollector>>,
     data: Option<CoverageData>,
     fail_under_message: Option<String>,
+    /// Worker mode: this process's hits, held for pytest_worker_dump.
+    dump_payload: Option<String>,
+    /// Parent mode: hits merged in from workers via pytest_worker_load.
+    worker_hits: HashMap<String, BTreeSet<u32>>,
 }
 
 impl CovPlugin {
@@ -65,6 +69,8 @@ impl CovPlugin {
             collector: None,
             data: None,
             fail_under_message: None,
+            dump_payload: None,
+            worker_hits: HashMap::new(),
         }
     }
 
@@ -401,7 +407,20 @@ impl Plugin for CovPlugin {
         monitoring.call_method1("set_events", (TOOL_ID, 0))?;
         monitoring.call_method1("free_tool_id", (TOOL_ID,))?;
 
-        let hits = collector.borrow(py).take_hits();
+        let mut hits = collector.borrow(py).take_hits();
+        if ctx.config.is_worker() {
+            // Workers don't report: hits travel to the parent for merging.
+            self.dump_payload = Some(
+                serde_json::to_string(&hits)
+                    .map_err(|e| core_pyo3::exceptions::PyValueError::new_err(e.to_string()))?,
+            );
+            return Ok(());
+        }
+        // The parent's own hits (import-time coverage from collection)
+        // merge with everything the workers measured.
+        for (file, lines) in self.worker_hits.drain() {
+            hits.entry(file).or_default().extend(lines);
+        }
         let rootdir = ctx
             .config
             .rootdir
@@ -444,6 +463,19 @@ impl Plugin for CovPlugin {
             }
         }
         self.data = Some(data);
+        Ok(())
+    }
+
+    fn pytest_worker_dump(&mut self, _ctx: &mut HookContext) -> PyResult<Option<String>> {
+        Ok(self.dump_payload.take())
+    }
+
+    fn pytest_worker_load(&mut self, _ctx: &mut HookContext, payload: &str) -> PyResult<()> {
+        let hits: HashMap<String, BTreeSet<u32>> = serde_json::from_str(payload)
+            .map_err(|e| core_pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        for (file, lines) in hits {
+            self.worker_hits.entry(file).or_default().extend(lines);
+        }
         Ok(())
     }
 

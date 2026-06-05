@@ -1,0 +1,288 @@
+//! Worker mode (-n): this process is driven over stdin/stdout. It collects
+//! lazily — only the modules its batches actually reference get imported
+//! (module-affinity batching means usually one import per module per run).
+
+use std::collections::{HashMap, HashSet};
+use std::io::{BufRead, Write};
+use std::path::PathBuf;
+
+use pyo3::prelude::*;
+
+use crate::collect::TestItem;
+use crate::engine::Engine;
+use crate::fixture::Scope;
+use crate::hooks::HookContext;
+use crate::ipc::{ParentMsg, WorkerMsg, encode_frame};
+use crate::python;
+use crate::report::{Outcome, Phase, TestReport, exit_code};
+
+fn send(msg: &WorkerMsg) {
+    let mut stdout = std::io::stdout().lock();
+    let _ = stdout.write_all(encode_frame(msg).as_bytes());
+    let _ = stdout.flush();
+}
+
+/// A setup-failed + teardown pair, so the parent sees the test as completed
+/// (its crash bookkeeping keys on teardown reports).
+fn send_collect_error(nodeid: &str, message: String) {
+    send(&WorkerMsg::Report {
+        report: TestReport {
+            nodeid: nodeid.to_string(),
+            phase: Phase::Setup,
+            outcome: Outcome::Failed,
+            duration: std::time::Duration::ZERO,
+            longrepr: Some(message),
+        },
+    });
+    send(&WorkerMsg::Report {
+        report: TestReport {
+            nodeid: nodeid.to_string(),
+            phase: Phase::Teardown,
+            outcome: Outcome::Passed,
+            duration: std::time::Duration::ZERO,
+            longrepr: None,
+        },
+    });
+}
+
+/// Per-worker lazy collection state.
+#[derive(Default)]
+struct WorkerCollection {
+    /// All items collected so far, in collection order.
+    items: Vec<TestItem>,
+    by_nodeid: HashMap<String, usize>,
+    collected_files: HashSet<PathBuf>,
+    loaded_conftests: HashSet<PathBuf>,
+    /// How many session py_hooks have had pytest_configure fired.
+    configured_hooks: usize,
+}
+
+impl Engine {
+    /// The worker main loop; the exit code is informational (the parent
+    /// judges success from the streamed reports).
+    pub(crate) fn run_worker(&mut self, py: Python<'_>) -> i32 {
+        // Tests print via Python: alias sys.stdout to stderr so fd 1 stays
+        // a clean protocol channel (the parent forwards stderr as-is).
+        if py
+            .run(c"import sys\nsys.stdout = sys.stderr\n", None, None)
+            .is_err()
+        {
+            return exit_code::INTERNAL_ERROR;
+        }
+        if let Err(err) = python::register_builtin_fixtures(py, &mut self.session.registry) {
+            eprintln!(
+                "INTERNAL ERROR: worker fixture registration failed: {}",
+                python::format_exception(py, &err)
+            );
+            return exit_code::INTERNAL_ERROR;
+        }
+
+        let mut collection = WorkerCollection::default();
+        let mut prev_module: Option<String> = None;
+        let stdin = std::io::stdin();
+        for line in stdin.lock().lines() {
+            let Ok(line) = line else { break };
+            if line.trim().is_empty() {
+                continue;
+            }
+            let Ok(msg) = serde_json::from_str::<ParentMsg>(&line) else {
+                continue;
+            };
+            match msg {
+                ParentMsg::Run { nodeids } => {
+                    self.run_batch(py, &mut collection, &mut prev_module, &nodeids);
+                    send(&WorkerMsg::Done);
+                }
+                ParentMsg::Shutdown => break,
+            }
+        }
+
+        // Final scope teardowns mirror run_items.
+        if let Some(last) = collection.items.last() {
+            if let Some(prev) = &prev_module {
+                crate::runner::teardown_scope(
+                    py,
+                    &self.plugins,
+                    &mut self.session,
+                    &self.config,
+                    Scope::Module,
+                    prev,
+                    last,
+                );
+            }
+            crate::runner::teardown_scope(
+                py,
+                &self.plugins,
+                &mut self.session,
+                &self.config,
+                Scope::Session,
+                "",
+                last,
+            );
+        }
+
+        let mut ctx = HookContext {
+            py,
+            session: &mut self.session,
+            config: &self.config,
+        };
+        for plugin in self.plugins.iter_mut() {
+            if let Err(err) = plugin.pytest_sessionfinish(&mut ctx, exit_code::OK) {
+                eprintln!(
+                    "INTERNAL ERROR: worker sessionfinish: {}",
+                    python::format_exception(py, &err)
+                );
+            }
+        }
+        for plugin in self.plugins.iter_mut() {
+            match plugin.pytest_worker_dump(&mut ctx) {
+                Ok(Some(payload)) => send(&WorkerMsg::Extra {
+                    plugin: plugin.name().to_string(),
+                    payload,
+                }),
+                Ok(None) => {}
+                Err(err) => eprintln!(
+                    "INTERNAL ERROR: worker dump: {}",
+                    python::format_exception(py, &err)
+                ),
+            }
+        }
+        let warning_count = python::warning_count(py);
+        if warning_count > 0 {
+            send(&WorkerMsg::Warnings {
+                lines: python::warning_summary_lines(py),
+                count: warning_count,
+            });
+        }
+        send(&WorkerMsg::Bye);
+        exit_code::OK
+    }
+
+    fn run_batch(
+        &mut self,
+        py: Python<'_>,
+        collection: &mut WorkerCollection,
+        prev_module: &mut Option<String>,
+        nodeids: &[String],
+    ) {
+        for nodeid in nodeids {
+            if let Err(message) = self.ensure_collected(py, collection, nodeid) {
+                send_collect_error(nodeid, message);
+                continue;
+            }
+            let Some(&index) = collection.by_nodeid.get(nodeid) else {
+                send_collect_error(nodeid, format!("worker could not collect {nodeid}"));
+                continue;
+            };
+
+            let item = &collection.items[index];
+            let module_instance = item.module_instance();
+            if let Some(prev) = prev_module
+                && prev != &module_instance
+            {
+                crate::runner::teardown_scope(
+                    py,
+                    &self.plugins,
+                    &mut self.session,
+                    &self.config,
+                    Scope::Module,
+                    prev,
+                    item,
+                );
+            }
+            *prev_module = Some(module_instance);
+
+            let reports =
+                crate::runner::run_one(py, &self.plugins, &mut self.session, &self.config, item);
+            for report in reports {
+                send(&WorkerMsg::Report { report });
+            }
+        }
+    }
+
+    /// Import (once) everything needed to resolve a node ID: the conftest
+    /// chain, then the test module, then fixture-param expansion.
+    fn ensure_collected(
+        &mut self,
+        py: Python<'_>,
+        collection: &mut WorkerCollection,
+        nodeid: &str,
+    ) -> Result<(), String> {
+        let file_part = nodeid.split("::").next().unwrap_or(nodeid);
+        let path = self.config.rootdir.join(file_part);
+        if collection.collected_files.contains(&path) {
+            return Ok(());
+        }
+
+        // Conftest chain (rootdir-most first), each loaded once per worker.
+        let mut chain = Vec::new();
+        let mut dir = path.parent();
+        while let Some(d) = dir {
+            let conftest = d.join("conftest.py");
+            if conftest.exists() && !collection.loaded_conftests.contains(&conftest) {
+                chain.push(conftest);
+            }
+            if d == self.config.rootdir {
+                break;
+            }
+            dir = d.parent();
+        }
+        chain.reverse();
+        for conftest in chain {
+            python::collect_conftest(
+                py,
+                &self.config.rootdir,
+                &conftest,
+                &mut self.session.registry,
+                &mut self.session.py_hooks,
+            )
+            .map_err(|err| python::format_exception(py, &err))?;
+            collection.loaded_conftests.insert(conftest);
+        }
+        self.fire_new_conftest_configure(py, &mut collection.configured_hooks)
+            .map_err(|err| python::format_exception(py, &err))?;
+
+        let mut new_items = Vec::new();
+        python::collect_module(
+            py,
+            &self.config.rootdir,
+            &path,
+            &mut new_items,
+            &mut self.session.registry,
+        )
+        .map_err(|err| python::format_exception(py, &err))?;
+        let new_items = python::expand_fixture_params(py, new_items, &self.session.registry)
+            .map_err(|err| python::format_exception(py, &err))?;
+
+        for item in new_items {
+            collection
+                .by_nodeid
+                .insert(item.nodeid.clone(), collection.items.len());
+            collection.items.push(item);
+        }
+        collection.collected_files.insert(path);
+        Ok(())
+    }
+
+    /// Fire pytest_configure for conftest hooks loaded since the last call.
+    fn fire_new_conftest_configure(
+        &mut self,
+        py: Python<'_>,
+        configured: &mut usize,
+    ) -> PyResult<()> {
+        let new_hooks: Vec<Py<PyAny>> = self.session.py_hooks[*configured..]
+            .iter()
+            .filter(|hook| hook.name == "pytest_configure")
+            .map(|hook| hook.func.clone_ref(py))
+            .collect();
+        *configured = self.session.py_hooks.len();
+        if new_hooks.is_empty() {
+            return Ok(());
+        }
+        let config_proxy = python::make_py_config(py, &self.config)?;
+        for func in &new_hooks {
+            python::call_py_hook(py, func, &[("config", config_proxy.clone_ref(py))])?;
+        }
+        Ok(())
+    }
+}

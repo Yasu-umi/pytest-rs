@@ -102,7 +102,7 @@ impl Engine {
     }
 }
 
-fn run_one(
+pub(crate) fn run_one(
     py: Python<'_>,
     plugins: &[Box<dyn Plugin>],
     session: &mut Session,
@@ -375,7 +375,7 @@ fn teardown_one(
 /// Run (LIFO) and remove every pending finalizer of the given scope instance.
 /// Returns formatted errors. Also evicts cached fixture values of that
 /// instance.
-fn teardown_scope(
+pub(crate) fn teardown_scope(
     py: Python<'_>,
     _plugins: &[Box<dyn Plugin>],
     session: &mut Session,
