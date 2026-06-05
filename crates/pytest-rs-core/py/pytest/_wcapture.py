@@ -37,6 +37,25 @@ def install():
     warnings.showwarning = _showwarning
 
 
+def begin_item_filters(specs):
+    """Enter a catch_warnings block applying @pytest.mark.filterwarnings
+    specs on top of the session filters (farthest mark first, so the
+    closest mark wins)."""
+    ctx = warnings.catch_warnings()
+    ctx.__enter__()
+    try:
+        for spec in specs:
+            warnings._setoption(spec)
+    except BaseException:
+        ctx.__exit__(None, None, None)
+        raise
+    return ctx
+
+
+def end_item_filters(ctx):
+    ctx.__exit__(None, None, None)
+
+
 def count():
     return len(captured)
 

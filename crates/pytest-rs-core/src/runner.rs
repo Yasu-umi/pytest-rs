@@ -33,6 +33,10 @@ impl Engine {
             if config.exitfirst && failed > 0 {
                 break;
             }
+            // pytest.exit / Ctrl-C inside a test aborts the session.
+            if session.exit_code_override.is_some() {
+                break;
+            }
 
             let class_instance = item.class_instance();
             if let Some(prev) = &prev_class
@@ -168,6 +172,47 @@ pub(crate) fn run_one(
         return reports;
     }
 
+    // @pytest.mark.filterwarnings: per-item filters inside a
+    // catch_warnings block (farthest mark applied first, closest wins).
+    let mark_filter_specs: Vec<String> = item
+        .marks
+        .iter()
+        .rev()
+        .filter(|mark| mark.name == "filterwarnings")
+        .flat_map(|mark| {
+            mark.obj
+                .bind(py)
+                .getattr("args")
+                .ok()
+                .and_then(|args| args.extract::<Vec<String>>().ok())
+                .unwrap_or_default()
+        })
+        .collect();
+    let item_filters = if mark_filter_specs.is_empty() {
+        None
+    } else {
+        match python::begin_item_filters(py, &mark_filter_specs) {
+            Ok(ctx) => Some(ctx),
+            Err(err) => {
+                reports.push(report_from_err(
+                    py,
+                    config,
+                    item,
+                    Phase::Setup,
+                    Instant::now(),
+                    &err,
+                ));
+                python::end_item_context(py);
+                return reports;
+            }
+        }
+    };
+    let close_item_filters = |py: Python<'_>| {
+        if let Some(ctx) = &item_filters {
+            python::end_item_filters(py, ctx);
+        }
+    };
+
     // ---- setup -----------------------------------------------------------
     let setup_started = Instant::now();
     type SetupOk = (
@@ -256,6 +301,7 @@ pub(crate) fn run_one(
                 &err,
             ));
             teardown_one(py, plugins, session, config, item, &mut reports);
+            close_item_filters(py);
             python::end_item_context(py);
             return reports;
         }
@@ -293,6 +339,7 @@ pub(crate) fn run_one(
         if config.get_flag("setup-only") || config.get_flag("setup-plan") {
             // Fixtures only: tear down without calling the test.
             teardown_one(py, plugins, session, config, item, &mut reports);
+            close_item_filters(py);
             python::end_item_context(py);
             return reports;
         }
@@ -316,6 +363,17 @@ pub(crate) fn run_one(
         }
         Ok(false)
     })();
+
+    // pytest.exit / Ctrl-C abort the session without a test outcome.
+    if let Err(err) = &call_result
+        && let Some(code) = python::session_abort_code(py, err)
+    {
+        session.exit_code_override = Some(code);
+        teardown_one(py, plugins, session, config, item, &mut reports);
+        close_item_filters(py);
+        python::end_item_context(py);
+        return reports;
+    }
 
     let report = match call_result {
         Ok(true) => TestReport {
@@ -354,7 +412,16 @@ pub(crate) fn run_one(
                         longrepr: None,
                         location: None,
                     },
-                    Err(err) => report_from_err(py, config, item, Phase::Call, call_started, &err),
+                    Err(err) => {
+                        if let Some(code) = python::session_abort_code(py, &err) {
+                            session.exit_code_override = Some(code);
+                            teardown_one(py, plugins, session, config, item, &mut reports);
+                            close_item_filters(py);
+                            python::end_item_context(py);
+                            return reports;
+                        }
+                        report_from_err(py, config, item, Phase::Call, call_started, &err)
+                    }
                 }
             }
         }
@@ -390,6 +457,7 @@ pub(crate) fn run_one(
     }
 
     teardown_one(py, plugins, session, config, item, &mut reports);
+    close_item_filters(py);
     python::end_item_context(py);
     reports
 }

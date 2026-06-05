@@ -14,7 +14,11 @@ class TempPathFactory:
 
     def getbasetemp(self):
         if self._basetemp is None:
-            self._basetemp = pathlib.Path(tempfile.mkdtemp(prefix="pytest-rs-basetemp-"))
+            # resolve() so chdir(tmp_path) round-trips through os.getcwd()
+            # (macOS /tmp is a symlink to /private/tmp).
+            self._basetemp = pathlib.Path(
+                tempfile.mkdtemp(prefix="pytest-rs-basetemp-")
+            ).resolve()
         return self._basetemp
 
     def mktemp(self, basename, numbered=True):

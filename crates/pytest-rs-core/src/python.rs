@@ -1299,15 +1299,35 @@ pub fn eval_in_module(py: Python<'_>, module_name: &str, expr: &str) -> PyResult
 }
 
 /// Install session-wide warning capture (pytest default filters), then
-/// apply -W warning filter specs (same syntax as python -W) on top.
-pub fn install_warning_capture(py: Python<'_>, specs: &[String]) -> PyResult<()> {
+/// apply the `filterwarnings` ini lines and -W specs on top (-W last, so
+/// the command line takes precedence over the config file).
+pub fn install_warning_capture(
+    py: Python<'_>,
+    ini_specs: &[String],
+    w_specs: &[String],
+) -> PyResult<()> {
     py.import("pytest._wcapture")?.call_method0("install")?;
-    if !specs.is_empty() {
-        let warnings = py.import("warnings")?;
-        // warnings._processoptions implements exactly python -W parsing.
-        warnings.call_method1("_processoptions", (specs.to_vec(),))?;
+    let warnings = py.import("warnings")?;
+    for spec in ini_specs.iter().chain(w_specs) {
+        // warnings._setoption implements exactly python -W parsing.
+        warnings.call_method1("_setoption", (spec.trim(),))?;
     }
     Ok(())
+}
+
+/// Apply per-item @pytest.mark.filterwarnings specs inside a
+/// catch_warnings block; returns the context to close at item end.
+pub fn begin_item_filters(py: Python<'_>, specs: &[String]) -> PyResult<Py<PyAny>> {
+    let ctx = py
+        .import("pytest._wcapture")?
+        .call_method1("begin_item_filters", (specs.to_vec(),))?;
+    Ok(ctx.unbind())
+}
+
+pub fn end_item_filters(py: Python<'_>, ctx: &Py<PyAny>) {
+    let _ = py
+        .import("pytest._wcapture")
+        .and_then(|m| m.call_method1("end_item_filters", (ctx.bind(py),)));
 }
 
 /// Number of warnings captured so far in this session.
@@ -1361,6 +1381,24 @@ pub fn is_usage_error(py: Python<'_>, err: &PyErr) -> bool {
 /// Is this error an instance of the shim's `Skipped` outcome?
 pub fn is_skipped(py: Python<'_>, err: &PyErr) -> bool {
     err_matches_shim(py, err, "Skipped")
+}
+
+/// The session exit code this error forces, if it is a session-aborting
+/// one: pytest.exit (its returncode, default INTERRUPTED) or Ctrl-C.
+pub fn session_abort_code(py: Python<'_>, err: &PyErr) -> Option<i32> {
+    if err.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py) {
+        return Some(crate::report::exit_code::INTERRUPTED);
+    }
+    if err_matches_shim(py, err, "Exit") {
+        let code = err
+            .value(py)
+            .getattr("returncode")
+            .ok()
+            .and_then(|code| code.extract::<i32>().ok())
+            .unwrap_or(crate::report::exit_code::INTERRUPTED);
+        return Some(code);
+    }
+    None
 }
 
 /// Classify a module-import error as a module-level skip.

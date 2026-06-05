@@ -31,8 +31,21 @@ impl Engine {
             eprintln!("INTERNAL ERROR: failed to install pytest shim: {err}");
             return exit_code::INTERNAL_ERROR;
         }
-        if let Err(err) = python::install_warning_capture(py, &self.config.w_options) {
-            eprintln!("ERROR: invalid -W option: {}", err.value(py));
+        let ini_filters: Vec<String> = self
+            .config
+            .get_ini("filterwarnings")
+            .map(|lines| {
+                lines
+                    .lines()
+                    .map(str::trim)
+                    .filter(|line| !line.is_empty())
+                    .map(str::to_string)
+                    .collect()
+            })
+            .unwrap_or_default();
+        if let Err(err) = python::install_warning_capture(py, &ini_filters, &self.config.w_options)
+        {
+            eprintln!("ERROR: while parsing warning filter: {}", err.value(py));
             return exit_code::USAGE_ERROR;
         }
         if self.config.get_flag("runxfail") {

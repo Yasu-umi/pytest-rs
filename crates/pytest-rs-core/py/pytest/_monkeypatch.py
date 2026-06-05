@@ -37,10 +37,9 @@ class MonkeyPatch:
             target = importlib.import_module(module_path)
         elif value is self._notset:
             raise TypeError("setattr requires a value when target is an object")
-        old = self._old_value(target, name)
-        if raising and old is self._notset:
+        if raising and not hasattr(target, name):
             raise AttributeError(f"{target!r} has no attribute {name!r}")
-        self._setattr.append((target, name, old))
+        self._setattr.append((target, name, self._old_value(target, name)))
         setattr(target, name, value)
 
     def delattr(self, target, name=_notset, raising=True):

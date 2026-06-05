@@ -140,6 +140,12 @@ impl PyRequest {
         Ok(self.node.bind(py).getattr("fixturenames")?.unbind())
     }
 
+    /// The underlying test function object.
+    #[getter]
+    fn function(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        Ok(self.node.bind(py).getattr("function")?.unbind())
+    }
+
     fn addfinalizer(&self, finalizer: Py<PyAny>) {
         self.finalizers
             .lock()

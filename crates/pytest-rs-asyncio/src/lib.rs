@@ -410,6 +410,16 @@ impl AsyncioPlugin {
             .unwrap_or(false)
     }
 
+    /// A hypothesis-decorated sync wrapper around an async inner test still
+    /// counts as an async test (no "not an async function" warning).
+    fn is_hypothesis_async(&self, py: Python<'_>, func: &Py<PyAny>) -> bool {
+        self.helper(py)
+            .and_then(|helper| helper.getattr("hypothesis_async_inner"))
+            .and_then(|inner| inner.call1((func.bind(py),)))
+            .map(|inner| !inner.is_none())
+            .unwrap_or(false)
+    }
+
     fn warn(py: Python<'_>, message: &str) -> PyResult<()> {
         let category = py.import("pytest")?.getattr("PytestWarning")?;
         py.import("warnings")?
@@ -626,7 +636,10 @@ impl Plugin for AsyncioPlugin {
                         "Tests based on asynchronous generators are not supported. \
                          Please use native coroutines, instead.",
                     )?;
-                } else if !is_async_gen && item.get_closest_marker("asyncio").is_some() {
+                } else if !is_async_gen
+                    && item.get_closest_marker("asyncio").is_some()
+                    && !self.is_hypothesis_async(py, &item.func)
+                {
                     Self::warn(
                         py,
                         &format!(
