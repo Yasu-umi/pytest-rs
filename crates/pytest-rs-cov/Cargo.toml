@@ -1,0 +1,22 @@
+[package]
+name = "pytest-rs-cov"
+version = "0.0.1"
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = "../../README.md"
+
+[dependencies]
+pytest-rs-core = { workspace = true }
+pyo3 = { workspace = true }
+regex = { workspace = true }
+toml = { workspace = true }
+ruff_python_parser = { workspace = true }
+ruff_python_ast = { workspace = true }
+ruff_source_file = { workspace = true }
+ruff_text_size = { workspace = true }
+
+[lints]
+workspace = true

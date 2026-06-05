@@ -9,6 +9,8 @@ fn build_plugins() -> Vec<Box<dyn Plugin>> {
     plugins.push(Box::new(pytest_rs_asyncio::AsyncioPlugin::new()));
     #[cfg(feature = "mock")]
     plugins.push(Box::new(pytest_rs_mock::MockPlugin::new()));
+    #[cfg(feature = "cov")]
+    plugins.push(Box::new(pytest_rs_cov::CovPlugin::new()));
     plugins
 }
 

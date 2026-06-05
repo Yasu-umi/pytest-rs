@@ -114,6 +114,9 @@ pub struct OptDef {
     pub takes_value: bool,
     pub default: Option<String>,
     pub help: String,
+    /// The value may be omitted (`--cov` vs `--cov=src`); a bare occurrence
+    /// records an empty string.
+    pub optional_value: bool,
 }
 
 impl OptDef {
@@ -123,6 +126,7 @@ impl OptDef {
             takes_value: false,
             default: None,
             help: help.to_string(),
+            optional_value: false,
         }
     }
 
@@ -132,6 +136,17 @@ impl OptDef {
             takes_value: true,
             default: default.map(str::to_string),
             help: help.to_string(),
+            optional_value: false,
+        }
+    }
+
+    pub fn optional_value(name: &str, help: &str) -> Self {
+        Self {
+            name: name.trim_start_matches("--").to_string(),
+            takes_value: true,
+            default: None,
+            help: help.to_string(),
+            optional_value: true,
         }
     }
 }
@@ -231,16 +246,17 @@ impl Config {
         // Core pytest options parsed into flags/values (queried via
         // get_flag/get_value); some are still inert and gain behavior as
         // features land.
-        const CORE_FLAGS: [&str; 7] = [
+        const CORE_FLAGS: [&str; 8] = [
             "strict-config",
             "strict-markers",
             "strict",
             "no-header",
             "no-summary",
             "continue-on-collection-errors",
-            "exact-mode", // placeholder; harmless
+            "exact-mode",      // placeholder; harmless
+            "doctest-modules", // accepted-but-inert: doctest collection not implemented
         ];
-        const CORE_VALUES: [(&str, Option<char>); 12] = [
+        const CORE_VALUES: [(&str, Option<char>); 13] = [
             ("report-chars", Some('r')),
             ("plugin", Some('p')),
             ("config-file", Some('c')),
@@ -253,6 +269,7 @@ impl Config {
             ("basetemp", None),
             ("import-mode", None),
             ("capture", None),
+            ("doctest-glob", None), // accepted-but-inert
         ];
         for flag in CORE_FLAGS {
             cmd = cmd.arg(
@@ -288,6 +305,12 @@ impl Config {
                 .long(opt.name.clone())
                 .help(opt.help.clone());
             let arg = if opt.takes_value {
+                let arg = arg.action(clap::ArgAction::Append);
+                let arg = if opt.optional_value {
+                    arg.num_args(0..=1).default_missing_value("")
+                } else {
+                    arg
+                };
                 match &opt.default {
                     Some(d) => arg.default_value(d.clone()),
                     None => arg,
@@ -304,8 +327,17 @@ impl Config {
         let mut values = HashMap::new();
         for opt in &parser.opts {
             if opt.takes_value {
-                if let Some(v) = matches.get_one::<String>(&opt.name) {
-                    values.insert(opt.name.clone(), v.clone());
+                if let Some(parsed) = matches.get_many::<String>(&opt.name) {
+                    let parsed: Vec<&str> = parsed.map(String::as_str).collect();
+                    let stored = if opt.optional_value {
+                        // Append semantics: occurrences newline-joined
+                        // (split back via get_values).
+                        parsed.join("\n")
+                    } else {
+                        // argparse semantics: the last occurrence wins.
+                        (*parsed.last().expect("get_many is non-empty")).to_string()
+                    };
+                    values.insert(opt.name.clone(), stored);
                 }
             } else if matches.get_flag(&opt.name) {
                 flags.insert(opt.name.clone());
@@ -390,6 +422,14 @@ impl Config {
         self.values
             .get(name.trim_start_matches("--"))
             .map(String::as_str)
+    }
+
+    /// All occurrences of an append-style option (`OptDef::optional_value`),
+    /// in CLI order; a bare occurrence is an empty string. None if absent.
+    pub fn get_values(&self, name: &str) -> Option<Vec<&str>> {
+        self.values
+            .get(name.trim_start_matches("--"))
+            .map(|joined| joined.split('\n').collect())
     }
 
     /// `-p no:terminal` disables the terminal reporter entirely.

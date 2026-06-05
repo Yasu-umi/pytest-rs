@@ -91,6 +91,9 @@ class LocalPath:
     def join(self, *parts):
         return LocalPath(self._path.joinpath(*[str(part) for part in parts]))
 
+    def dirpath(self, *parts):
+        return LocalPath(self._path.parent.joinpath(*[str(part) for part in parts]))
+
     def ensure(self, *parts, dir=False):
         target = self._path.joinpath(*[str(part) for part in parts])
         if dir:

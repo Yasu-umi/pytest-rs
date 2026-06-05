@@ -191,16 +191,31 @@ pub fn collect_conftest(
     scan_py_hooks(&module, &baseid, hooks)
 }
 
-/// Build the Config proxy passed to conftest hooks.
+/// Build the Config proxy passed to conftest hooks. One proxy per process
+/// (the Config itself is process-global), so attribute mutations made by
+/// conftest hooks (e.g. `config.option.foo = ...`) stay visible everywhere.
 pub fn make_py_config(py: Python<'_>, config: &crate::config::Config) -> PyResult<Py<PyAny>> {
+    static CONFIG_PROXY: std::sync::OnceLock<Py<PyAny>> = std::sync::OnceLock::new();
+    if let Some(proxy) = CONFIG_PROXY.get() {
+        return Ok(proxy.clone_ref(py));
+    }
+    // `config.option` is the argparse namespace in pytest; expose a mutable
+    // namespace so conftests can stash flags on it.
+    let option = py
+        .import("types")?
+        .getattr("SimpleNamespace")?
+        .call0()?
+        .unbind();
     let proxy = Py::new(
         py,
         crate::request::PyConfig::new(
             config.rootdir.to_string_lossy().to_string(),
             config.ini_snapshot(),
+            option,
         ),
-    )?;
-    Ok(proxy.into_any())
+    )?
+    .into_any();
+    Ok(CONFIG_PROXY.get_or_init(|| proxy).clone_ref(py))
 }
 
 fn introspect_namespace(
@@ -216,6 +231,13 @@ fn introspect_namespace(
 
     // Module-level `pytestmark` applies to every item in the module.
     let module_marks = read_marks(py, module.as_any())?;
+
+    // A module-level pytest_generate_tests hook parametrizes via metafunc.
+    // (conftest-level hooks are not threaded through here yet.)
+    let generate_hook: Option<Bound<'_, PyAny>> = module
+        .dict()
+        .get_item("pytest_generate_tests")?
+        .filter(|hook| hook.is_callable());
 
     let inspect = py.import("inspect")?;
     let isclass = inspect.getattr("isclass")?;
@@ -253,6 +275,8 @@ fn introspect_namespace(
                     &module_marks,
                     items,
                     registry,
+                    module,
+                    generate_hook.as_ref(),
                 )?;
             }
             continue;
@@ -276,6 +300,8 @@ fn introspect_namespace(
             &value,
             None,
             marks,
+            module,
+            generate_hook.as_ref(),
         )?;
     }
     Ok(())
@@ -359,6 +385,8 @@ fn collect_class(
     module_marks: &[MarkData],
     items: &mut Vec<TestItem>,
     registry: &mut FixtureRegistry,
+    module: &Bound<'_, PyModule>,
+    generate_hook: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<()> {
     // Classes with a custom __init__ are not collected (pytest behavior).
     let cls_dict = cls.getattr("__dict__")?;
@@ -405,6 +433,8 @@ fn collect_class(
             &value,
             Some(cls),
             marks,
+            module,
+            generate_hook,
         )?;
     }
     Ok(())
@@ -422,11 +452,33 @@ fn push_test_items(
     func: &Bound<'_, PyAny>,
     cls: Option<&Bound<'_, PyAny>>,
     marks: Vec<MarkData>,
+    module: &Bound<'_, PyModule>,
+    generate_hook: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<()> {
     let flags = async_flags(py, func)?;
     let mut fixture_names = param_names(py, func)?;
     if cls.is_some() && fixture_names.first().map(String::as_str) == Some("self") {
         fixture_names.remove(0);
+    }
+
+    // pytest_generate_tests: metafunc.parametrize calls become parametrize
+    // marks, merged after the decorator-applied ones.
+    let mut marks = marks;
+    if let Some(hook) = generate_hook {
+        let metafunc = py.import("pytest._metafunc")?.getattr("Metafunc")?.call1((
+            func,
+            fixture_names.clone(),
+            module,
+            cls.map(|c| c.clone().unbind()),
+        ))?;
+        hook.call1((&metafunc,))?;
+        for mark in metafunc.getattr("_parametrize_marks")?.try_iter()? {
+            let mark = mark?;
+            marks.push(MarkData {
+                name: "parametrize".to_string(),
+                obj: mark.unbind(),
+            });
+        }
     }
 
     let variants = expand_parametrize(py, &marks)?;

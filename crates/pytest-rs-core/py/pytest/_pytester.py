@@ -45,6 +45,14 @@ class LineMatcher:
             if fnmatch.fnmatch(line, pattern):
                 fail(f"no_fnmatch_line: unexpectedly matched {pattern!r}: {line!r}")
 
+    def fnmatch_lines_random(self, patterns):
+        __tracebackhide__ = True
+        import fnmatch
+
+        for pattern in patterns:
+            if not any(fnmatch.fnmatch(line, pattern) for line in self.lines):
+                fail(f"fnmatch_lines_random: no line matches {pattern!r} in:\n{self}")
+
 
 class RunResult:
     def __init__(self, ret, outlines, errlines, duration):
@@ -115,7 +123,8 @@ class Pytester:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(textwrap.dedent(str(source)).lstrip("\n"))
             paths.append(path)
-        return paths[0] if len(paths) == 1 else paths
+        # pytest returns the first file's path even for multiple files.
+        return paths[0]
 
     def makepyfile(self, *args, **kwargs):
         return self._makefile(".py", args, kwargs)
@@ -128,6 +137,9 @@ class Pytester:
 
     def makeini(self, source):
         return self._makefile(".ini", [], {"tox": source})
+
+    def makepyprojecttoml(self, source):
+        return self._makefile(".toml", [], {"pyproject": source})
 
     def makefile(self, ext, *args, **kwargs):
         return self._makefile(ext, args, kwargs)
@@ -194,6 +206,11 @@ class Testdir(Pytester):
         if isinstance(result, list):
             return [LocalPath(path) for path in result]
         return LocalPath(result)
+
+    def mkdir(self, name):
+        from pytest._tmp_path import LocalPath
+
+        return LocalPath(super().mkdir(name))
 
 
 def _make_runner_dir(request, cls):

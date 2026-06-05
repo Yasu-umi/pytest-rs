@@ -10,11 +10,19 @@ use pyo3::prelude::*;
 pub struct PyConfig {
     rootdir: String,
     ini: HashMap<String, String>,
+    /// The argparse-namespace equivalent (`config.option`), mutable from
+    /// Python so conftest hooks can stash flags on it.
+    #[pyo3(get)]
+    option: Py<PyAny>,
 }
 
 impl PyConfig {
-    pub fn new(rootdir: String, ini: HashMap<String, String>) -> Self {
-        Self { rootdir, ini }
+    pub fn new(rootdir: String, ini: HashMap<String, String>, option: Py<PyAny>) -> Self {
+        Self {
+            rootdir,
+            ini,
+            option,
+        }
     }
 }
 

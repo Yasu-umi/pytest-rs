@@ -35,7 +35,8 @@ repo = "https://github.com/pytest-dev/pytest-cov"
 tag = "v7.1.0"
 testpaths = ["tests"]
 local = "../pytest-cov"
-enabled = false # enable when pytest-rs-cov lands
+deps = ["coverage", "process-tests"]
+enabled = true
 
 [pytest-xdist]
 repo = "https://github.com/pytest-dev/pytest-xdist"
