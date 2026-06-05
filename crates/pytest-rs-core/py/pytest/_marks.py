@@ -32,6 +32,9 @@ class MarkDecorator:
 
 
 class MarkGenerator:
+    def __init__(self, *, _ispytest=False):
+        pass
+
     def __getattr__(self, name):
         if name.startswith("_"):
             raise AttributeError(name)

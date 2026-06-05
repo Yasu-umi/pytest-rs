@@ -29,6 +29,9 @@ pub struct TestReport {
     pub duration: Duration,
     /// Formatted failure representation (traceback) or skip reason.
     pub longrepr: Option<String>,
+    /// "file.py:line" of the skip/xfail origin, for -r summary grouping.
+    #[serde(default)]
+    pub location: Option<String>,
 }
 
 impl TestReport {

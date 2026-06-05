@@ -24,6 +24,7 @@ impl Engine {
         let total = items.len().max(1);
         let mut done = 0usize;
         let mut prev_module: Option<String> = None;
+        let mut prev_class: Option<String> = None;
         let mut current_file = String::new();
         let mut line = String::new();
         let mut failed = 0usize;
@@ -32,6 +33,14 @@ impl Engine {
             if config.exitfirst && failed > 0 {
                 break;
             }
+
+            let class_instance = item.class_instance();
+            if let Some(prev) = &prev_class
+                && prev != &class_instance
+            {
+                teardown_scope(py, plugins, session, config, Scope::Class, prev, item);
+            }
+            prev_class = Some(class_instance);
 
             let module_instance = item.module_instance();
             if let Some(prev) = &prev_module
@@ -89,6 +98,11 @@ impl Engine {
         }
 
         // Final scope teardowns.
+        if let Some(prev) = &prev_class
+            && let Some(last) = items.last()
+        {
+            teardown_scope(py, plugins, session, config, Scope::Class, prev, last);
+        }
         if let Some(prev) = &prev_module
             && let Some(last) = items.last()
         {
@@ -113,16 +127,21 @@ pub(crate) fn run_one(
 
     // @pytest.mark.skip / @pytest.mark.skipif
     if let Some(reason) = skip_reason(py, item) {
+        let file = item.nodeid.split("::").next().unwrap_or("");
         reports.push(TestReport {
             nodeid: item.nodeid.clone(),
             phase: Phase::Setup,
             outcome: Outcome::Skipped,
             duration: Duration::ZERO,
             longrepr: Some(reason),
+            // Marker skips report the item's definition site.
+            location: Some(format!("{file}:{}", item.lineno)),
         });
         return reports;
     }
-    let xfail = item.get_closest_marker("xfail").is_some();
+    // --runxfail: xfail marks (and imperative pytest.xfail, no-opped at
+    // configure time) are ignored; tests report their real outcomes.
+    let xfail = item.get_closest_marker("xfail").is_some() && !config.get_flag("runxfail");
 
     // One contextvars context per item: fixtures + test share it.
     if let Err(err) = python::begin_item_context(py) {
@@ -164,6 +183,9 @@ pub(crate) fn run_one(
             Some(instance) => instance.bind(py).getattr(item.func_name.as_str())?.unbind(),
             None => item.func.clone_ref(py),
         };
+
+        // xunit-style setup_module/setup_class/setup_method/setup_function.
+        python::ensure_xunit_setup(py, session, item, instance.as_ref())?;
 
         // autouse fixtures run first, then the requested ones.
         let mut stack = Vec::new();
@@ -232,6 +254,7 @@ pub(crate) fn run_one(
         outcome: Outcome::Passed,
         duration: setup_started.elapsed(),
         longrepr: None,
+        location: None,
     });
 
     // ---- call --------------------------------------------------------------
@@ -260,6 +283,7 @@ pub(crate) fn run_one(
             outcome: Outcome::Passed,
             duration: call_started.elapsed(),
             longrepr: None,
+            location: None,
         },
         Ok(false) => {
             if item.is_coroutine {
@@ -269,6 +293,7 @@ pub(crate) fn run_one(
                     outcome: Outcome::Skipped,
                     duration: call_started.elapsed(),
                     longrepr: Some("async def functions are not natively supported.".to_string()),
+                    location: None,
                 }
             } else {
                 match python::call_with_kwargs(py, &callable, &kwargs) {
@@ -278,6 +303,7 @@ pub(crate) fn run_one(
                         outcome: Outcome::Passed,
                         duration: call_started.elapsed(),
                         longrepr: None,
+                        location: None,
                     },
                     Err(err) => report_from_err(py, config, item, Phase::Call, call_started, &err),
                 }
@@ -360,6 +386,7 @@ fn teardown_one(
             outcome: Outcome::Passed,
             duration: teardown_started.elapsed(),
             longrepr: None,
+            location: None,
         });
     } else {
         reports.push(TestReport {
@@ -368,6 +395,7 @@ fn teardown_one(
             outcome: Outcome::Failed,
             duration: teardown_started.elapsed(),
             longrepr: Some(errors.join("\n")),
+            location: None,
         });
     }
 }
@@ -467,7 +495,8 @@ fn resolve_fixture_def(
     }
 
     let instance = match def.scope {
-        Scope::Function | Scope::Class => item.nodeid.clone(),
+        Scope::Function => item.nodeid.clone(),
+        Scope::Class => item.class_instance(),
         Scope::Module | Scope::Package => item.module_instance(),
         Scope::Session => String::new(),
     };
@@ -664,6 +693,7 @@ fn report_from_err(
             outcome: Outcome::XFailed,
             duration: started.elapsed(),
             longrepr: python::outcome_msg(py, err),
+            location: None,
         }
     } else if python::is_skipped(py, err) {
         TestReport {
@@ -672,6 +702,8 @@ fn report_from_err(
             outcome: Outcome::Skipped,
             duration: started.elapsed(),
             longrepr: python::outcome_msg(py, err),
+            // Imperative skips report where pytest.skip was raised.
+            location: python::raise_location(py, err),
         }
     } else {
         TestReport {
@@ -684,6 +716,7 @@ fn report_from_err(
                 err,
                 config.get_value("tb").unwrap_or("long"),
             )),
+            location: None,
         }
     }
 }

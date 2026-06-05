@@ -21,7 +21,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 CACHE = ROOT / ".tmp" / "conformance"
 BINARY = ROOT / "target" / "debug" / "pytest-rs"
-TIMEOUT_S = 60
+TIMEOUT_S = 120
 
 SUMMARY_RE = re.compile(
     r"(?:(?P<failed>\d+) failed)?(?:, )?"

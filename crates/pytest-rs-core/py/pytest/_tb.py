@@ -73,6 +73,15 @@ def _format_short_frame(frame, lineno):
     return lines
 
 
+def raise_location(exc):
+    """"relpath:lineno" of the last visible frame (where skip was raised)."""
+    frames = _visible_frames(exc)
+    if not frames:
+        return None
+    frame, lineno = frames[-1]
+    return f"{_relpath(frame.f_code.co_filename)}:{lineno}"
+
+
 def format_exception(exc, style="long"):
     if style == "no":
         return ""

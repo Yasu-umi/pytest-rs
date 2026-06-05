@@ -35,6 +35,15 @@ impl Engine {
             eprintln!("ERROR: invalid -W option: {}", err.value(py));
             return exit_code::USAGE_ERROR;
         }
+        if self.config.get_flag("runxfail") {
+            // --runxfail also neutralizes imperative pytest.xfail (pytest's
+            // skipping plugin monkeypatches it the same way).
+            let _ = py.run(
+                c"import pytest\npytest.xfail = lambda reason='': None\n",
+                None,
+                None,
+            );
+        }
 
         if let Err(err) = self
             .fire_configure(py)
@@ -223,13 +232,27 @@ impl Engine {
         };
 
         let mut lines = Vec::new();
+        // Skips group by (location, reason): "SKIPPED [2] file.py:3: reason".
+        let mut skip_groups: Vec<((String, String), usize)> = Vec::new();
         for report in &self.session.reports {
             let entry = match (report.phase, report.outcome) {
                 (Phase::Call, Outcome::Failed) if chars.contains('f') => Some("FAILED"),
                 (Phase::Setup | Phase::Teardown, Outcome::Failed) if chars.contains('E') => {
                     Some("ERROR")
                 }
-                (_, Outcome::Skipped) if chars.contains('s') => Some("SKIPPED"),
+                (_, Outcome::Skipped) if chars.contains('s') => {
+                    let location = report
+                        .location
+                        .clone()
+                        .unwrap_or_else(|| report.nodeid.clone());
+                    let reason = report.longrepr.clone().unwrap_or_default();
+                    let key = (location, reason);
+                    match skip_groups.iter_mut().find(|(group, _)| group == &key) {
+                        Some((_, count)) => *count += 1,
+                        None => skip_groups.push((key, 1)),
+                    }
+                    None
+                }
                 (_, Outcome::XFailed) if chars.contains('x') => Some("XFAIL"),
                 (_, Outcome::XPassed) if chars.contains('X') => Some("XPASS"),
                 (Phase::Call, Outcome::Passed) if chars.contains('p') => Some("PASSED"),
@@ -242,6 +265,9 @@ impl Engine {
                 }
                 lines.push(line);
             }
+        }
+        for ((location, reason), count) in skip_groups {
+            lines.push(format!("SKIPPED [{count}] {location}: {reason}"));
         }
         if lines.is_empty() {
             return;

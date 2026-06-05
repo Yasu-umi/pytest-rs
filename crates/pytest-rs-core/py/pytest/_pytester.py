@@ -22,12 +22,21 @@ class LineMatcher:
     def str(self):
         return str(self)
 
-    def fnmatch_lines(self, patterns):
+    def fnmatch_lines(self, patterns, *, consecutive=False):
         __tracebackhide__ = True
         import fnmatch
 
         if isinstance(patterns, str):
             patterns = [patterns]
+        if consecutive:
+            # The whole pattern block must match a consecutive run of lines.
+            for start in range(len(self.lines)):
+                window = self.lines[start : start + len(patterns)]
+                if len(window) == len(patterns) and all(
+                    fnmatch.fnmatch(line, pattern) for line, pattern in zip(window, patterns)
+                ):
+                    return
+            fail(f"fnmatch_lines: no consecutive match for {patterns!r} in:\n{self}")
         remaining = list(self.lines)
         for pattern in patterns:
             for index, line in enumerate(remaining):
@@ -202,6 +211,62 @@ class Pytester:
             sys.stderr.write("\n".join(result.errlines) + "\n")
         return InlineRunResult(result)
 
+    def inline_runsource(self, source, *args):
+        path = self.makepyfile(source)
+        return self.inline_run(*args, path)
+
+    def mkpydir(self, name):
+        path = self.path / name
+        path.mkdir(parents=True)
+        (path / "__init__.py").touch()
+        return path
+
+    def runpython(self, script):
+        import os
+        import subprocess
+        import sys
+        import time
+
+        start = time.perf_counter()
+        proc = subprocess.run(
+            [sys.executable, str(script)],
+            cwd=self.path,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            env=os.environ.copy(),
+        )
+        duration = time.perf_counter() - start
+        return RunResult(
+            proc.returncode,
+            proc.stdout.splitlines(),
+            proc.stderr.splitlines(),
+            duration,
+        )
+
+    def runpython_c(self, command):
+        import os
+        import subprocess
+        import sys
+        import time
+
+        start = time.perf_counter()
+        proc = subprocess.run(
+            [sys.executable, "-c", command],
+            cwd=self.path,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            env=os.environ.copy(),
+        )
+        duration = time.perf_counter() - start
+        return RunResult(
+            proc.returncode,
+            proc.stdout.splitlines(),
+            proc.stderr.splitlines(),
+            duration,
+        )
+
 
 class _OutcomeReport:
     def __init__(self, nodeid):
@@ -245,6 +310,9 @@ class InlineRunResult:
             f"assertoutcome: expected (passed={passed}, skipped={skipped}, "
             f"failed={failed}), got {got}:\n{self._result.stdout}"
         )
+
+    def countoutcomes(self):
+        return [len(outcome) for outcome in self.listoutcomes()]
 
 
 class Testdir(Pytester):

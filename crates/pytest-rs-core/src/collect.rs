@@ -30,6 +30,8 @@ pub struct TestItem {
     pub callspec: Vec<(String, Py<PyAny>)>,
     /// Parametrized-fixture assignments: (fixture name, param index, value).
     pub fixture_params: Vec<(String, usize, Py<PyAny>)>,
+    /// 1-based line of the test definition (0 if unknown).
+    pub lineno: u32,
 }
 
 impl TestItem {
@@ -42,6 +44,15 @@ impl TestItem {
         self.nodeid
             .split_once("::")
             .map(|(m, _)| m.to_string())
+            .unwrap_or_else(|| self.nodeid.clone())
+    }
+
+    /// The class-scope cache/teardown key: everything before the final
+    /// "::" ("file.py::TestClass" for methods, the file for plain tests).
+    pub fn class_instance(&self) -> String {
+        self.nodeid
+            .rsplit_once("::")
+            .map(|(prefix, _)| prefix.to_string())
             .unwrap_or_else(|| self.nodeid.clone())
     }
 }

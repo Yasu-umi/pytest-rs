@@ -20,10 +20,12 @@ from pytest._marks import mark as mark
 from pytest._marks import param as param
 from pytest._monkeypatch import MonkeyPatch as MonkeyPatch
 from pytest._monkeypatch import monkeypatch as monkeypatch
+from pytest._outcomes import Exit as Exit
 from pytest._outcomes import Failed as Failed
 from pytest._outcomes import OutcomeException as OutcomeException
 from pytest._outcomes import Skipped as Skipped
 from pytest._outcomes import XFailed as XFailed
+from pytest._outcomes import exit as exit
 from pytest._outcomes import fail as fail
 from pytest._outcomes import importorskip as importorskip
 from pytest._outcomes import skip as skip

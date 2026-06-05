@@ -334,6 +334,7 @@ impl WorkerOwner {
                         "worker gw{} crashed while running {running}",
                         self.index
                     )),
+                    location: None,
                 },
                 worker: self.index,
             });

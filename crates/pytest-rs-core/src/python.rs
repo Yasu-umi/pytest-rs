@@ -76,6 +76,172 @@ pub fn register_builtin_fixtures(py: Python<'_>, registry: &mut FixtureRegistry)
     register_fixtures_from(py, &pytest_module, "", registry)
 }
 
+/// The 1-based first line of a callable's definition (0 if unknown).
+fn first_lineno(py: Python<'_>, func: &Bound<'_, PyAny>) -> u32 {
+    let _ = py;
+    func.getattr("__code__")
+        .and_then(|code| code.getattr("co_firstlineno"))
+        .and_then(|line| line.extract::<u32>())
+        .unwrap_or(0)
+}
+
+/// xunit setup state per module/class: None = setup succeeded; Some(exc) =
+/// it raised, and every later test of that scope re-raises the same error
+/// (pytest's cached-failure semantics).
+#[derive(Default)]
+struct XunitState {
+    modules: std::collections::HashMap<String, Option<Py<PyAny>>>,
+    classes: std::collections::HashMap<String, Option<Py<PyAny>>>,
+}
+
+/// The cached setup status for a key: None = never ran, Some(None) = ok,
+/// Some(Some(exc)) = failed with exc.
+fn xunit_status(
+    py: Python<'_>,
+    session: &crate::session::Session,
+    class_scope: bool,
+    key: &str,
+) -> Option<Option<Py<PyAny>>> {
+    let state = session.stash_get::<XunitState>()?;
+    let map = if class_scope {
+        &state.classes
+    } else {
+        &state.modules
+    };
+    map.get(key)
+        .map(|status| status.as_ref().map(|exc| exc.clone_ref(py)))
+}
+
+fn xunit_record(
+    py: Python<'_>,
+    session: &mut crate::session::Session,
+    class_scope: bool,
+    key: String,
+    error: Option<&PyErr>,
+) {
+    let state = session
+        .stash_get_mut::<XunitState>()
+        .expect("xunit state inserted");
+    let map = if class_scope {
+        &mut state.classes
+    } else {
+        &mut state.modules
+    };
+    map.insert(
+        key,
+        error.map(|err| err.value(py).clone().unbind().into_any()),
+    );
+}
+
+/// xunit-style setup hooks (setup_module / setup_function for plain
+/// functions, setup_class / setup_method for Test classes). Teardowns are
+/// pushed onto the session finalizer stack at the matching scope, so they
+/// drain LIFO with the fixture finalizers (class scope drains when the
+/// runner moves to the next class).
+pub fn ensure_xunit_setup(
+    py: Python<'_>,
+    session: &mut crate::session::Session,
+    item: &TestItem,
+    instance: Option<&Py<PyAny>>,
+) -> PyResult<()> {
+    let xunit = py.import("pytest._xunit")?;
+    let call_optional = xunit.getattr("call_optional")?;
+    let bind = xunit.getattr("bind")?;
+    let module = py.import(item.module_name.as_str())?;
+    let module_instance = item.module_instance();
+
+    if session.stash_get::<XunitState>().is_none() {
+        session.stash_insert(XunitState::default());
+    }
+
+    match xunit_status(py, session, false, &module_instance) {
+        Some(Some(exc)) => {
+            // setup_module already failed: every test re-raises that error.
+            return Err(PyErr::from_value(exc.bind(py).clone()));
+        }
+        Some(None) => {}
+        None => {
+            let setup_result: PyResult<()> = match module.getattr("setup_module") {
+                Ok(setup) => call_optional.call1((setup, &module)).map(|_| ()),
+                Err(_) => Ok(()),
+            };
+            if let Err(err) = setup_result {
+                xunit_record(py, session, false, module_instance, Some(&err));
+                return Err(err);
+            }
+            xunit_record(py, session, false, module_instance.clone(), None);
+            if let Ok(teardown) = module.getattr("teardown_module") {
+                let finalizer = bind.call1((teardown, &module))?;
+                session.finalizers.push(crate::session::PendingFinalizer {
+                    scope: Scope::Module,
+                    instance: module_instance.clone(),
+                    finalizer: crate::session::Finalizer::Callable(finalizer.unbind()),
+                });
+            }
+        }
+    }
+
+    match (&item.cls, instance) {
+        (Some(cls), Some(instance)) => {
+            let cls = cls.bind(py);
+            let class_key = item.class_instance();
+            match xunit_status(py, session, true, &class_key) {
+                Some(Some(exc)) => {
+                    return Err(PyErr::from_value(exc.bind(py).clone()));
+                }
+                Some(None) => {}
+                None => {
+                    let setup_result: PyResult<()> = match cls.getattr("setup_class") {
+                        Ok(setup) => call_optional.call1((setup, cls)).map(|_| ()),
+                        Err(_) => Ok(()),
+                    };
+                    if let Err(err) = setup_result {
+                        xunit_record(py, session, true, class_key, Some(&err));
+                        return Err(err);
+                    }
+                    xunit_record(py, session, true, class_key, None);
+                    if let Ok(teardown) = cls.getattr("teardown_class") {
+                        let finalizer = bind.call1((teardown, cls))?;
+                        session.finalizers.push(crate::session::PendingFinalizer {
+                            scope: Scope::Class,
+                            instance: item.class_instance(),
+                            finalizer: crate::session::Finalizer::Callable(finalizer.unbind()),
+                        });
+                    }
+                }
+            }
+            let instance = instance.bind(py);
+            // pytest passes the *bound* method object to setup/teardown_method.
+            let bound_method = instance.getattr(item.func_name.as_str())?;
+            if let Ok(setup) = instance.getattr("setup_method") {
+                call_optional.call1((setup, &bound_method))?;
+            }
+            if let Ok(teardown) = instance.getattr("teardown_method") {
+                let finalizer = bind.call1((teardown, &bound_method))?;
+                session.finalizers.push(crate::session::PendingFinalizer {
+                    scope: Scope::Function,
+                    instance: item.nodeid.clone(),
+                    finalizer: crate::session::Finalizer::Callable(finalizer.unbind()),
+                });
+            }
+        }
+        _ => {
+            if let Ok(setup) = module.getattr("setup_function") {
+                call_optional.call1((setup, item.func.bind(py)))?;
+            }
+            if let Ok(teardown) = module.getattr("teardown_function") {
+                let finalizer = bind.call1((teardown, item.func.bind(py)))?;
+                session.finalizers.push(crate::session::PendingFinalizer {
+                    scope: Scope::Function,
+                    instance: item.nodeid.clone(),
+                    finalizer: crate::session::Finalizer::Callable(finalizer.unbind()),
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Register fixtures defined by a plugin-provided Python module (e.g. the
 /// pytest_mock shim) with global visibility.
 pub fn register_plugin_fixtures(
@@ -368,6 +534,7 @@ fn collect_testcase(
             marks,
             callspec: Vec::new(),
             fixture_params: Vec::new(),
+            lineno: first_lineno(py, &method),
         });
     }
     Ok(())
@@ -507,6 +674,7 @@ fn push_test_items(
             marks: item_marks,
             callspec: variant.params,
             fixture_params: Vec::new(),
+            lineno: first_lineno(py, func),
         });
     }
     Ok(())
@@ -821,6 +989,7 @@ pub fn expand_fixture_params(
                 func: item.func.clone_ref(py),
                 cls: item.cls.as_ref().map(|c| c.clone_ref(py)),
                 is_coroutine: item.is_coroutine,
+                lineno: item.lineno,
                 fixture_names: item.fixture_names.clone(),
                 marks: item
                     .marks
@@ -1061,6 +1230,19 @@ pub fn outcome_msg(py: Python<'_>, err: &PyErr) -> Option<String> {
         .getattr("msg")
         .ok()
         .and_then(|m| m.extract::<Option<String>>().ok())
+        .flatten()
+}
+
+/// "relpath:lineno" of the frame that raised, for -r summary grouping.
+pub fn raise_location(py: Python<'_>, err: &PyErr) -> Option<String> {
+    let tb_module = py.import("pytest._tb").ok()?;
+    tb_module
+        .getattr("raise_location")
+        .ok()?
+        .call1((err.value(py),))
+        .ok()?
+        .extract::<Option<String>>()
+        .ok()
         .flatten()
 }
 

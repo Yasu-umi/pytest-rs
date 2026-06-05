@@ -32,6 +32,7 @@ fn send_collect_error(nodeid: &str, message: String) {
             outcome: Outcome::Failed,
             duration: std::time::Duration::ZERO,
             longrepr: Some(message),
+            location: None,
         },
     });
     send(&WorkerMsg::Report {
@@ -41,6 +42,7 @@ fn send_collect_error(nodeid: &str, message: String) {
             outcome: Outcome::Passed,
             duration: std::time::Duration::ZERO,
             longrepr: None,
+            location: None,
         },
     });
 }
@@ -55,6 +57,7 @@ struct WorkerCollection {
     loaded_conftests: HashSet<PathBuf>,
     /// How many session py_hooks have had pytest_configure fired.
     configured_hooks: usize,
+    prev_class: Option<String>,
 }
 
 impl Engine {
@@ -99,6 +102,17 @@ impl Engine {
 
         // Final scope teardowns mirror run_items.
         if let Some(last) = collection.items.last() {
+            if let Some(prev) = &collection.prev_class {
+                crate::runner::teardown_scope(
+                    py,
+                    &self.plugins,
+                    &mut self.session,
+                    &self.config,
+                    Scope::Class,
+                    prev,
+                    last,
+                );
+            }
             if let Some(prev) = &prev_module {
                 crate::runner::teardown_scope(
                     py,
@@ -176,6 +190,22 @@ impl Engine {
             };
 
             let item = &collection.items[index];
+            let class_instance = item.class_instance();
+            if let Some(prev) = &collection.prev_class
+                && prev != &class_instance
+            {
+                crate::runner::teardown_scope(
+                    py,
+                    &self.plugins,
+                    &mut self.session,
+                    &self.config,
+                    Scope::Class,
+                    prev,
+                    item,
+                );
+            }
+            collection.prev_class = Some(class_instance);
+
             let module_instance = item.module_instance();
             if let Some(prev) = prev_module
                 && prev != &module_instance
