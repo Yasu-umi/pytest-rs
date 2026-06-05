@@ -101,7 +101,9 @@ impl Engine {
 
         let n_items = self.session.items.len();
         if !self.config.quiet && !self.config.no_terminal() {
-            let deselected = collected - n_items;
+            // Plugins may also expand items (e.g. loop-factory
+            // parametrization), so saturate against growth.
+            let deselected = collected.saturating_sub(n_items);
             if deselected > 0 {
                 println!(
                     "collected {collected} items / {deselected} deselected / {n_items} selected\n"

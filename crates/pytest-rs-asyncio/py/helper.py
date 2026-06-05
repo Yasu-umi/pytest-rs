@@ -24,6 +24,10 @@ def new_loop_with_policy(policy):
     return loop
 
 
+def set_current_loop(loop):
+    asyncio.set_event_loop(loop)
+
+
 def close_loop(loop):
     try:
         loop.run_until_complete(loop.shutdown_asyncgens())

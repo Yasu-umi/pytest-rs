@@ -8,6 +8,7 @@
 "tests/markers/test_mixed_scope.py" = "passed"
 "tests/test_asyncio_fixture.py" = "passed"
 "tests/test_package.py" = "passed"
+"tests/test_set_event_loop.py" = "passed"
 "tests/test_simple.py" = "passed"
 "tests/test_subprocess.py" = "passed"
 "tests/test_task_cleanup.py" = "passed"
