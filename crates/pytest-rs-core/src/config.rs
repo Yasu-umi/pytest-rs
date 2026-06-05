@@ -324,6 +324,7 @@ impl Config {
 
         let mut cmd = clap::Command::new("pytest-rs")
             .disable_help_flag(false)
+            .version(concat!(env!("CARGO_PKG_VERSION"), " (pytest-compatible)"))
             .arg(
                 clap::Arg::new("paths")
                     .num_args(0..)
@@ -486,7 +487,22 @@ impl Config {
             cmd = cmd.arg(arg);
         }
 
-        let matches = cmd.try_get_matches_from(argv).map_err(|e| e.to_string())?;
+        let matches = match cmd.try_get_matches_from(argv) {
+            Ok(matches) => matches,
+            // --help/--version display and exit 0, like pytest (even when
+            // combined with other options, e.g. --cache-show --help).
+            Err(err)
+                if matches!(
+                    err.kind(),
+                    clap::error::ErrorKind::DisplayHelp
+                        | clap::error::ErrorKind::DisplayVersion
+                ) =>
+            {
+                let _ = err.print();
+                std::process::exit(0);
+            }
+            Err(err) => return Err(err.to_string()),
+        };
 
         let mut flags = HashSet::new();
         let mut values = HashMap::new();
