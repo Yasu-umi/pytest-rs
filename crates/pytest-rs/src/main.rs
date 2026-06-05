@@ -18,7 +18,30 @@ fn build_plugins() -> Vec<Box<dyn Plugin>> {
     plugins
 }
 
+/// Pre-initialize Python with the CLI's locale handling. pyo3's
+/// auto-initialize uses Py_InitializeEx (the legacy compat config), which
+/// skips PEP 538 C-locale coercion and PEP 540 UTF-8 mode — open() then
+/// defaults to ascii in LANG-less containers. PyPreConfig_InitPythonConfig
+/// restores the `python` binary's behavior (PYTHONUTF8 honored, UTF-8 mode
+/// auto-enabled under the C/POSIX locale).
+#[allow(unsafe_code)]
+fn preinitialize_python() {
+    use pytest_rs_core::pyo3::ffi;
+    // SAFETY: runs once at startup, before any Python use or thread spawns.
+    unsafe {
+        let mut preconfig: ffi::PyPreConfig = std::mem::zeroed();
+        ffi::PyPreConfig_InitPythonConfig(&mut preconfig);
+        let status = ffi::Py_PreInitialize(&preconfig);
+        if ffi::PyStatus_Exception(status) != 0 {
+            // Pre-init failing is non-fatal: Py_InitializeEx falls back to
+            // its own (compat) pre-initialization.
+            eprintln!("warning: Python pre-initialization failed; locale coercion disabled");
+        }
+    }
+}
+
 fn main() {
+    preinitialize_python();
     let mut plugins = build_plugins();
 
     let mut parser = OptionParser::default();
