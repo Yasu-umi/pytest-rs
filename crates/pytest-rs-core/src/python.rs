@@ -1665,6 +1665,12 @@ pub fn format_test_failure(py: Python<'_>, err: &PyErr, style: &str) -> String {
     result.unwrap_or_else(|_| format_exception(py, err))
 }
 
+/// An explicit "file.py:line" the raiser attached to a Skipped exception
+/// (`_location`), overriding traceback-derived skip locations.
+pub fn skip_location_override(py: Python<'_>, err: &PyErr) -> Option<String> {
+    err.value(py).getattr("_location").ok()?.extract().ok()
+}
+
 /// Tell the subtests fixture how many failures remain in the --maxfail
 /// budget (None = unlimited); exhausting it stops swallowing failures.
 pub fn set_subtest_fail_budget(py: Python<'_>, budget: Option<usize>) {

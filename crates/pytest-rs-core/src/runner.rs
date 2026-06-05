@@ -1413,13 +1413,16 @@ fn report_from_err(
     } else if python::is_skipped(py, err) {
         // Imperative skips report where pytest.skip was raised; skips out
         // of fixtures/xunit setup report the item's definition site instead
-        // (pytest's _use_item_location), so the user knows which test.
-        let location = if phase == Phase::Setup {
-            let file = item.nodeid.split("::").next().unwrap_or("");
-            Some(format!("{file}:{}", item.lineno))
-        } else {
-            python::raise_location(py, err)
-        };
+        // (pytest's _use_item_location), so the user knows which test. An
+        // explicit `_location` on the exception (unittest decorators) wins.
+        let location = python::skip_location_override(py, err).or_else(|| {
+            if phase == Phase::Setup {
+                let file = item.nodeid.split("::").next().unwrap_or("");
+                Some(format!("{file}:{}", item.lineno))
+            } else {
+                python::raise_location(py, err)
+            }
+        });
         TestReport {
             nodeid: item.nodeid.clone(),
             phase,

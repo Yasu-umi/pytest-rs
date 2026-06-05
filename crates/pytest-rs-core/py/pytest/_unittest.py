@@ -78,17 +78,32 @@ def make_runner(cls, method_name):
     """A zero-arg callable running setUp/method/tearDown with SkipTest
     mapped onto pytest's Skipped. A unittest _Outcome backs self.subTest()."""
 
+    def _skipped_at(msg, func):
+        """Skipped exception located at the test's definition line, so the
+        -rs fold shows "file.py:N: reason" (not this shim)."""
+        exc = Skipped(msg=msg)
+        code = getattr(func, "__code__", None)
+        if code is not None:
+            import os
+
+            try:
+                filename = os.path.relpath(code.co_filename)
+            except ValueError:
+                filename = code.co_filename
+            exc._location = f"{filename}:{code.co_firstlineno}"
+        return exc
+
     def run():
         __tracebackhide__ = True
         case = cls(method_name)
+        method = getattr(case, method_name)
         # Class-level skip decorators.
         if getattr(cls, "__unittest_skip__", False):
-            raise Skipped(msg=getattr(cls, "__unittest_skip_why__", ""))
-        method = getattr(case, method_name)
+            raise _skipped_at(getattr(cls, "__unittest_skip_why__", ""), method)
         if getattr(method, "__unittest_skip__", False):
-            raise Skipped(msg=getattr(method, "__unittest_skip_why__", ""))
+            raise _skipped_at(getattr(method, "__unittest_skip_why__", ""), method)
 
-        from unittest.case import _Outcome
+        from unittest.case import _Outcome, _ShouldStop
 
         outcome = _Outcome(_SubtestRecorder(case))
         expecting_failure = getattr(
@@ -105,6 +120,10 @@ def make_runner(cls, method_name):
                 method()
             except unittest.SkipTest as e:
                 raise Skipped(msg=str(e)) from None
+            except _ShouldStop:
+                # subTest aborts the body once an expected failure is seen
+                # (TestCase.run catches this in its outer part executor).
+                pass
         finally:
             case.tearDown()
             case._outcome = None
