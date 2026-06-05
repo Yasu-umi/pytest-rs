@@ -47,7 +47,7 @@ impl TestItem {
 }
 
 /// Expand CLI path arguments into the ordered list of test files.
-pub fn collect_test_files(rootdir: &Path, paths: &[String]) -> Result<Vec<PathBuf>, String> {
+pub fn collect_test_files(invocation_dir: &Path, paths: &[String]) -> Result<Vec<PathBuf>, String> {
     let args: Vec<String> = if paths.is_empty() {
         vec![".".to_string()]
     } else {
@@ -58,7 +58,7 @@ pub fn collect_test_files(rootdir: &Path, paths: &[String]) -> Result<Vec<PathBu
     for arg in &args {
         // Canonicalize so symlinked paths (e.g. /tmp on macOS) match the
         // canonical rootdir when computing node ids.
-        let path = rootdir.join(arg);
+        let path = invocation_dir.join(arg);
         let path = std::fs::canonicalize(&path).unwrap_or(path);
         let meta = std::fs::metadata(&path).map_err(|e| format!("{}: {e}", path.display()))?;
         if meta.is_dir() {

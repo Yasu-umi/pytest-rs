@@ -3,6 +3,7 @@ pub mod config;
 pub mod engine;
 pub mod fixture;
 pub mod hooks;
+pub mod markexpr;
 pub mod python;
 pub mod report;
 pub mod request;

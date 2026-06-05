@@ -11,6 +11,8 @@ fn build_plugins() -> Vec<Box<dyn Plugin>> {
     plugins.push(Box::new(pytest_rs_mock::MockPlugin::new()));
     #[cfg(feature = "cov")]
     plugins.push(Box::new(pytest_rs_cov::CovPlugin::new()));
+    #[cfg(feature = "split")]
+    plugins.push(Box::new(pytest_rs_split::SplitPlugin::new()));
     plugins
 }
 

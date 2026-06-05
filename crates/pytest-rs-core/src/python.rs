@@ -902,9 +902,16 @@ pub fn make_node(py: Python<'_>, item: &TestItem) -> PyResult<Py<PyAny>> {
         marks.append(mark.obj.bind(py))?;
     }
     let fixturenames = pyo3::types::PyList::new(py, &item.fixture_names)?;
+    // node.name is the last nodeid segment, parametrization id included
+    // ("test_foo[a-1]"), matching pytest.
+    let name = item
+        .nodeid
+        .rsplit("::")
+        .next()
+        .unwrap_or(item.func_name.as_str());
     let node = py.import("pytest._node")?.getattr("Node")?.call1((
         item.nodeid.as_str(),
-        item.func_name.as_str(),
+        name,
         marks,
         fixturenames,
         item.func.bind(py),

@@ -188,6 +188,64 @@ class Pytester:
     runpytest_subprocess = runpytest
     runpytest_inprocess = runpytest
 
+    def inline_run(self, *args):
+        # No in-process runner: a subprocess -v run parsed into a
+        # HookRecorder-shaped result (ret / assertoutcome / listoutcomes).
+        # The child's output is echoed so capsys sees what an in-process
+        # run would have printed.
+        import sys
+
+        result = self.runpytest("-v", *[str(arg) for arg in args])
+        if result.outlines:
+            sys.stdout.write("\n".join(result.outlines) + "\n")
+        if result.errlines:
+            sys.stderr.write("\n".join(result.errlines) + "\n")
+        return InlineRunResult(result)
+
+
+class _OutcomeReport:
+    def __init__(self, nodeid):
+        self.nodeid = nodeid
+
+    def __repr__(self):
+        return f"<OutcomeReport {self.nodeid!r}>"
+
+
+class InlineRunResult:
+    """The subset of pytester's HookRecorder API used by upstream suites."""
+
+    _WORDS = {
+        "PASSED": "passed",
+        "XPASS": "passed",
+        "SKIPPED": "skipped",
+        "XFAIL": "skipped",
+        "FAILED": "failed",
+        "ERROR": "failed",
+    }
+
+    def __init__(self, run_result):
+        self._result = run_result
+        self.ret = run_result.ret
+
+    def listoutcomes(self):
+        outcomes = {"passed": [], "skipped": [], "failed": []}
+        for line in self._result.outlines:
+            parts = line.split()
+            if len(parts) >= 2 and "::" in parts[0]:
+                bucket = self._WORDS.get(parts[1])
+                if bucket is not None:
+                    outcomes[bucket].append(_OutcomeReport(parts[0]))
+        return outcomes["passed"], outcomes["skipped"], outcomes["failed"]
+
+    def assertoutcome(self, passed=0, skipped=0, failed=0):
+        __tracebackhide__ = True
+        got_passed, got_skipped, got_failed = self.listoutcomes()
+        got = (len(got_passed), len(got_skipped), len(got_failed))
+        assert got == (passed, skipped, failed), (
+            f"assertoutcome: expected (passed={passed}, skipped={skipped}, "
+            f"failed={failed}), got {got}:\n{self._result.stdout}"
+        )
+
 
 class Testdir(Pytester):
     """Legacy pytester alias (the pre-7.0 testdir fixture API): paths are
@@ -213,15 +271,17 @@ class Testdir(Pytester):
         return LocalPath(super().mkdir(name))
 
 
-def _make_runner_dir(request, cls):
+def _make_runner_dir(request, tmp_path_factory, cls):
+    # Numbered dirs named after the test, under the session basetemp shared
+    # with tmp_path/tmpdir — upstream pytester layout (relative nodeids of
+    # nested runs can include this dir name when rootdir lands on basetemp).
     import os
-    import re
-    import shutil
     import sys
-    import tempfile
 
-    name = re.sub(r"\W", "_", request.node.name)
-    path = tempfile.mkdtemp(prefix="pytest-rs-pytester-")
+    # Upstream pytester names dirs after the bare function name (params and
+    # truncation are tmp_path behaviors, not pytester's).
+    name = request.node.name.split("[")[0]
+    path = tmp_path_factory.mktemp(name, numbered=True)
     old_cwd = os.getcwd()
     os.chdir(path)
     runner = cls(path, name)
@@ -230,14 +290,13 @@ def _make_runner_dir(request, cls):
         if entry in sys.path:
             sys.path.remove(entry)
     os.chdir(old_cwd)
-    shutil.rmtree(path, ignore_errors=True)
 
 
 @fixture
-def pytester(request):
-    yield from _make_runner_dir(request, Pytester)
+def pytester(request, tmp_path_factory):
+    yield from _make_runner_dir(request, tmp_path_factory, Pytester)
 
 
 @fixture
-def testdir(request):
-    yield from _make_runner_dir(request, Testdir)
+def testdir(request, tmp_path_factory):
+    yield from _make_runner_dir(request, tmp_path_factory, Testdir)

@@ -173,6 +173,9 @@ pub struct Config {
     pub exitfirst: bool,
     pub collect_only: bool,
     pub rootdir: PathBuf,
+    /// The directory the runner was invoked from: relative CLI paths (and
+    /// bare collection) resolve against this, not rootdir.
+    pub invocation_dir: PathBuf,
     /// -W warning filter specs, applied at session start.
     pub w_options: Vec<String>,
     /// -p specs (e.g. `no:terminal` disables all terminal output).
@@ -185,10 +188,51 @@ pub struct Config {
     ini_file: HashMap<String, String>,
 }
 
+/// pytest's rootdir-discovery inputs: cwd plus every arg token that exists
+/// on the filesystem (option values included; `::` node-id parts stripped).
+fn dirs_from_args(cwd: &Path, argv: &[String]) -> Vec<PathBuf> {
+    let mut dirs = vec![cwd.to_path_buf()];
+    for arg in argv.iter().skip(1) {
+        if arg.starts_with('-') {
+            continue;
+        }
+        let candidate = arg.split("::").next().unwrap_or(arg);
+        let path = Path::new(candidate);
+        if !path.exists() {
+            continue;
+        }
+        let path = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+        dirs.push(if path.is_file() {
+            path.parent().map(Path::to_path_buf).unwrap_or(path)
+        } else {
+            path
+        });
+    }
+    dirs
+}
+
+fn common_ancestor(dirs: &[PathBuf]) -> PathBuf {
+    let mut ancestor = dirs[0].clone();
+    for dir in &dirs[1..] {
+        while !dir.starts_with(&ancestor) {
+            let Some(parent) = ancestor.parent() else {
+                break;
+            };
+            ancestor = parent.to_path_buf();
+        }
+    }
+    ancestor
+}
+
 impl Config {
     pub fn from_args(parser: OptionParser, argv: Vec<String>) -> Result<Self, String> {
         let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
-        let (rootdir, ini_file) = find_ini(&cwd);
+        let cwd = std::fs::canonicalize(&cwd).unwrap_or(cwd);
+        // Config-file search starts at the common ancestor of cwd and the
+        // path-like args (pytest's rootdir algorithm); with no config file
+        // anywhere, the ancestor itself is the rootdir.
+        let ancestor = common_ancestor(&dirs_from_args(&cwd, &argv));
+        let (rootdir, ini_file) = find_ini(&ancestor);
 
         // addopts from the config file are prepended to the CLI args.
         let mut argv = argv;
@@ -256,8 +300,10 @@ impl Config {
             "exact-mode",      // placeholder; harmless
             "doctest-modules", // accepted-but-inert: doctest collection not implemented
         ];
-        const CORE_VALUES: [(&str, Option<char>); 13] = [
+        const CORE_VALUES: [(&str, Option<char>); 15] = [
             ("report-chars", Some('r')),
+            ("markexpr", Some('m')),
+            ("keyword", Some('k')),
             ("plugin", Some('p')),
             ("config-file", Some('c')),
             ("assert", None),
@@ -381,6 +427,7 @@ impl Config {
             exitfirst: matches.get_flag("exitfirst"),
             collect_only: matches.get_flag("collect-only"),
             rootdir,
+            invocation_dir: cwd,
             w_options: matches
                 .get_many::<String>("pythonwarnings")
                 .map(|vals| vals.cloned().collect())

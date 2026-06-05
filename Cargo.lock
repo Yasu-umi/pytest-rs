@@ -531,6 +531,7 @@ dependencies = [
  "pytest-rs-core",
  "pytest-rs-cov",
  "pytest-rs-mock",
+ "pytest-rs-split",
 ]
 
 [[package]]
@@ -574,6 +575,14 @@ name = "pytest-rs-mock"
 version = "0.0.1"
 dependencies = [
  "pytest-rs-core",
+]
+
+[[package]]
+name = "pytest-rs-split"
+version = "0.0.1"
+dependencies = [
+ "pytest-rs-core",
+ "serde_json",
 ]
 
 [[package]]

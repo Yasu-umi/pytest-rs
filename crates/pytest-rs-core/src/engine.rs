@@ -65,6 +65,15 @@ impl Engine {
             return exit_code::INTERRUPTED;
         }
 
+        let collected = self.session.items.len();
+        if let Err(err) = self.apply_selection(py) {
+            if python::is_usage_error(py, &err) {
+                eprintln!("ERROR: {}", err.value(py));
+                return exit_code::USAGE_ERROR;
+            }
+            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+            return exit_code::INTERNAL_ERROR;
+        }
         if let Err(err) = self.fire_collection_modifyitems(py) {
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
             return exit_code::INTERNAL_ERROR;
@@ -72,10 +81,17 @@ impl Engine {
 
         let n_items = self.session.items.len();
         if !self.config.quiet && !self.config.no_terminal() {
-            println!(
-                "collected {n_items} item{}\n",
-                if n_items == 1 { "" } else { "s" }
-            );
+            let deselected = collected - n_items;
+            if deselected > 0 {
+                println!(
+                    "collected {collected} items / {deselected} deselected / {n_items} selected\n"
+                );
+            } else {
+                println!(
+                    "collected {n_items} item{}\n",
+                    if n_items == 1 { "" } else { "s" }
+                );
+            }
         }
 
         if self.config.collect_only {
@@ -263,6 +279,57 @@ impl Engine {
         Ok(())
     }
 
+    /// -m / -k deselection (pytest applies these before plugin
+    /// collection_modifyitems hooks).
+    fn apply_selection(&mut self, py: Python<'_>) -> PyResult<()> {
+        if let Some(expr) = self.config.get_value("markexpr").map(str::to_string) {
+            let expr = expr.trim().to_string();
+            let mut error = None;
+            self.session.items.retain(|item| {
+                match crate::markexpr::evaluate(&expr, |name| {
+                    item.marks.iter().any(|mark| mark.name == name)
+                }) {
+                    Ok(keep) => keep,
+                    Err(message) => {
+                        error.get_or_insert(message);
+                        true
+                    }
+                }
+            });
+            if let Some(message) = error {
+                return Err(python::usage_error(
+                    py,
+                    &format!("Wrong expression passed to '-m': {expr}: {message}"),
+                ));
+            }
+        }
+        if let Some(expr) = self.config.get_value("keyword").map(str::to_string) {
+            let expr = expr.trim().to_string();
+            let mut error = None;
+            self.session.items.retain(|item| {
+                // -k matches case-insensitively against the test name part.
+                let name = item.nodeid.split_once("::").map_or("", |(_, n)| n);
+                let haystack = name.to_lowercase();
+                match crate::markexpr::evaluate(&expr, |token| {
+                    haystack.contains(&token.to_lowercase())
+                }) {
+                    Ok(keep) => keep,
+                    Err(message) => {
+                        error.get_or_insert(message);
+                        true
+                    }
+                }
+            });
+            if let Some(message) = error {
+                return Err(python::usage_error(
+                    py,
+                    &format!("Wrong expression passed to '-k': {expr}: {message}"),
+                ));
+            }
+        }
+        Ok(())
+    }
+
     fn fire_collection_modifyitems(&mut self, py: Python<'_>) -> PyResult<()> {
         // Temporarily move items out so hooks can mutate the list while the
         // session stays borrowable.
@@ -383,7 +450,10 @@ impl Engine {
     /// Returns per-file collection errors (formatted).
     fn collect(&mut self, py: Python<'_>) -> Result<Vec<(PathBuf, String)>, String> {
         let rootdir = self.config.rootdir.clone();
-        let files = crate::collect::collect_test_files(&rootdir, &self.config.paths)?;
+        // Relative CLI paths (and bare collection) resolve against the
+        // invocation dir; rootdir only anchors node ids.
+        let files =
+            crate::collect::collect_test_files(&self.config.invocation_dir, &self.config.paths)?;
 
         let mut conftests: Vec<PathBuf> = Vec::new();
         for file in &files {

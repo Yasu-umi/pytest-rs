@@ -50,7 +50,7 @@ repo = "https://github.com/jerry-git/pytest-split"
 tag = "0.9.0"
 testpaths = ["tests"]
 local = "../pytest-split"
-enabled = false # enable when pytest-rs-split lands
+enabled = true
 
 [pytest-benchmark]
 repo = "https://github.com/ionelmc/pytest-benchmark"

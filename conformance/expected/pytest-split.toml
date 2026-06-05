@@ -1,0 +1,13 @@
+# Upstream pytest-split test files that must keep passing under pytest-rs.
+# This list only grows; a regression here fails CI.
+
+[files]
+"tests/test_plugin.py" = "passed"
+
+[excluded]
+# These import pytest_split internals (algorithms / cli / ipynb_compatibility
+# modules); pytest-rs implements splitting natively in Rust and does not ship
+# those Python modules.
+"tests/test_algorithms.py" = "imports pytest_split.algorithms (internal API)"
+"tests/test_cli.py" = "imports pytest_split.cli (internal API; the slowest-tests CLI is not reproduced)"
+"tests/test_ipynb.py" = "imports pytest_split.ipynb_compatibility (internal API; ipynb cell grouping not implemented)"

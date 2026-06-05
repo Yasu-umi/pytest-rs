@@ -9,16 +9,18 @@ license = { workspace = true }
 readme = "../../README.md"
 
 [features]
-default = ["asyncio", "mock", "cov"]
+default = ["asyncio", "mock", "cov", "split"]
 asyncio = ["dep:pytest-rs-asyncio"]
 mock = ["dep:pytest-rs-mock"]
 cov = ["dep:pytest-rs-cov"]
+split = ["dep:pytest-rs-split"]
 
 [dependencies]
 pytest-rs-core = { workspace = true }
 pytest-rs-asyncio = { workspace = true, optional = true }
 pytest-rs-mock = { workspace = true, optional = true }
 pytest-rs-cov = { workspace = true, optional = true }
+pytest-rs-split = { workspace = true, optional = true }
 
 [lints]
 workspace = true
