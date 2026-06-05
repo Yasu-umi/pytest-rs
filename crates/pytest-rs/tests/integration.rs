@@ -911,3 +911,76 @@ class TestCls:
     assert_eq!(output.status.code(), Some(0), "out: {out}");
     assert!(out.contains("4 passed"), "out: {out}");
 }
+
+#[test]
+fn mock_patch_args_not_fixtures() {
+    let suite = TempSuite::new("mockpatch");
+    suite.write(
+        "test_patch.py",
+        r#"
+from unittest.mock import MagicMock, patch
+import pytest
+
+@pytest.fixture
+def real_fixture():
+    return "real"
+
+@patch("os.getcwd")
+@patch("os.getpid")
+def test_stacked(mock_getpid, mock_getcwd, real_fixture):
+    assert isinstance(mock_getpid, MagicMock)
+    assert isinstance(mock_getcwd, MagicMock)
+    assert real_fixture == "real"
+
+@patch("os.getcwd", "replaced")
+def test_patch_explicit_new(real_fixture):
+    import os
+    assert os.getcwd == "replaced"
+
+class TestCls:
+    @patch("os.getcwd")
+    def test_method_patch(self, mock_getcwd, real_fixture):
+        assert isinstance(mock_getcwd, MagicMock)
+        assert real_fixture == "real"
+"#,
+    );
+    let output = suite.run(&["test_patch.py"]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(out.contains("3 passed"), "out: {out}");
+}
+
+#[test]
+fn usefixtures_mark() {
+    let suite = TempSuite::new("usefixtures");
+    suite.write(
+        "test_uf.py",
+        r#"
+import pytest
+
+STATE = {}
+
+@pytest.fixture
+def setup_state():
+    STATE["on"] = True
+    yield
+    STATE.pop("on", None)
+
+@pytest.mark.usefixtures("setup_state")
+def test_function_mark():
+    assert STATE.get("on") is True
+
+def test_no_mark():
+    assert STATE.get("on") is None
+
+@pytest.mark.usefixtures("setup_state")
+class TestClassMark:
+    def test_in_class(self):
+        assert STATE.get("on") is True
+"#,
+    );
+    let output = suite.run(&["test_uf.py"]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(out.contains("3 passed"), "out: {out}");
+}

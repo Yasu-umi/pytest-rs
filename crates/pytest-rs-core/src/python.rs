@@ -329,6 +329,49 @@ pub fn param_names(py: Python<'_>, func: &Bound<'_, PyAny>) -> PyResult<Vec<Stri
     Ok(names)
 }
 
+/// pytest compat.num_mock_patch_args: how many leading parameters are
+/// injected by stacked @unittest.mock.patch decorators (their `patchings`
+/// entries with no attribute_name and new=DEFAULT). Those are mock-filled
+/// positionally at call time, not fixture requests.
+pub fn num_mock_patch_args(py: Python<'_>, func: &Bound<'_, PyAny>) -> usize {
+    let Ok(patchings) = func.getattr("patchings") else {
+        return 0;
+    };
+    let Ok(iter) = patchings.try_iter() else {
+        return 0;
+    };
+    // Both the stdlib and the rolling-backport `mock` define the sentinel;
+    // like pytest, only consult already-imported modules (sys.modules).
+    let modules = py
+        .import("sys")
+        .and_then(|sys| sys.getattr("modules"))
+        .ok();
+    let sentinels: Vec<Bound<'_, PyAny>> = ["unittest.mock", "mock"]
+        .iter()
+        .filter_map(|name| {
+            modules
+                .as_ref()?
+                .get_item(name)
+                .ok()?
+                .getattr("DEFAULT")
+                .ok()
+        })
+        .collect();
+    iter.flatten()
+        .filter(|p| {
+            let no_attribute_name = p
+                .getattr("attribute_name")
+                .map(|v| !v.is_truthy().unwrap_or(true))
+                .unwrap_or(false);
+            let new_is_default = p
+                .getattr("new")
+                .map(|new| sentinels.iter().any(|s| new.is(s)))
+                .unwrap_or(false);
+            no_attribute_name && new_is_default
+        })
+        .count()
+}
+
 pub struct AsyncFlags {
     pub is_coroutine: bool,
     pub is_generator: bool,
@@ -884,6 +927,11 @@ fn push_test_items(
     let mut fixture_names = param_names(py, func)?;
     if cls.is_some() && fixture_names.first().map(String::as_str) == Some("self") {
         fixture_names.remove(0);
+    }
+    // @unittest.mock.patch-injected leading params are not fixture requests.
+    let mock_args = num_mock_patch_args(py, func).min(fixture_names.len());
+    if mock_args > 0 {
+        fixture_names.drain(..mock_args);
     }
 
     // pytest_generate_tests: metafunc.parametrize calls become parametrize

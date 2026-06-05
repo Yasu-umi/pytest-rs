@@ -285,6 +285,49 @@ pub(crate) fn run_one(
                 &mut stack,
             )?;
         }
+        // @pytest.mark.usefixtures (and the usefixtures ini option): named
+        // fixtures are set up before the test's own, values not passed in.
+        // Farthest mark first (module -> class -> function), like pytest.
+        let usefixtures: Vec<String> = config
+            .get_ini("usefixtures")
+            .map(|value| {
+                value
+                    .split_whitespace()
+                    .map(str::to_string)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default()
+            .into_iter()
+            .chain(
+                item.marks
+                    .iter()
+                    .rev()
+                    .filter(|mark| mark.name == "usefixtures")
+                    .flat_map(|mark| {
+                        mark.obj
+                            .bind(py)
+                            .getattr("args")
+                            .ok()
+                            .and_then(|args| args.extract::<Vec<String>>().ok())
+                            .unwrap_or_default()
+                    }),
+            )
+            .collect();
+        for name in &usefixtures {
+            if item.callspec.iter().any(|(param, _)| param == name) {
+                continue;
+            }
+            resolve_fixture(
+                py,
+                plugins,
+                session,
+                config,
+                name,
+                item,
+                instance.as_ref(),
+                &mut stack,
+            )?;
+        }
         let mut kwargs = Vec::new();
         let mut test_request: Option<Py<crate::request::PyRequest>> = None;
         for name in &item.fixture_names {
