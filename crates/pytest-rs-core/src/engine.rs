@@ -964,12 +964,7 @@ impl Engine {
         }
         // Relative CLI paths (and bare collection) resolve against the
         // invocation dir; rootdir only anchors node ids.
-        let python_files: Vec<String> = self
-            .config
-            .get_ini("python_files")
-            .map(|value| value.split_whitespace().map(str::to_string).collect())
-            .filter(|patterns: &Vec<String>| !patterns.is_empty())
-            .unwrap_or_else(|| vec!["test_*.py".to_string(), "*_test.py".to_string()]);
+        let python_files = self.config.python_files_patterns();
         let files = crate::collect::collect_test_files(
             &self.config.invocation_dir,
             &paths,

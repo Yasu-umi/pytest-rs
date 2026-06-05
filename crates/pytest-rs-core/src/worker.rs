@@ -1,6 +1,6 @@
-//! Worker mode (-n): this process is driven over stdin/stdout. It collects
-//! lazily — only the modules its batches actually reference get imported
-//! (module-affinity batching means usually one import per module per run).
+//! Worker mode (-n): this process is driven over stdin/stdout. Like
+//! upstream xdist it imports every test module up front (collection
+//! phase), so test side effects never leak into module import time.
 
 use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, Write};
@@ -81,6 +81,11 @@ impl Engine {
         }
 
         let mut collection = WorkerCollection::default();
+        // Like upstream xdist, import every test module during collection,
+        // before any test runs: lazy per-batch imports would let earlier
+        // tests' side effects (warning filters, random seeds, monkey
+        // patches) leak into later modules' import time.
+        self.precollect_all(py, &mut collection);
         let mut prev_module: Option<String> = None;
         let stdin = std::io::stdin();
         for line in stdin.lock().lines() {
@@ -227,6 +232,38 @@ impl Engine {
             for report in reports {
                 send(&WorkerMsg::Report { report });
             }
+        }
+    }
+
+    /// Import every test module the session can reach, mirroring the
+    /// controller's discovery. Files that fail to import are skipped here;
+    /// the error reports properly when a batch references them.
+    fn precollect_all(&mut self, py: Python<'_>, collection: &mut WorkerCollection) {
+        // Mirror the controller's start paths (CLI args, else testpaths ini).
+        let mut paths = self.config.paths.clone();
+        if paths.is_empty()
+            && let Some(testpaths) = self.config.get_ini("testpaths")
+        {
+            let entries: Vec<String> = testpaths.split_whitespace().map(str::to_string).collect();
+            if !entries.is_empty()
+                && let Ok(globbed) = python::glob_testpaths(py, &self.config.rootdir, &entries)
+                && !globbed.is_empty()
+            {
+                paths = globbed;
+            }
+        }
+        let python_files = self.config.python_files_patterns();
+        let Ok(files) = crate::collect::collect_test_files(
+            &self.config.invocation_dir,
+            &paths,
+            self.config.get_flag("collect-in-virtualenv"),
+            &python_files,
+        ) else {
+            return;
+        };
+        for file in files {
+            let rel = crate::collect::file_nodeid(&self.config.rootdir, &file);
+            let _ = self.ensure_collected(py, collection, &rel);
         }
     }
 

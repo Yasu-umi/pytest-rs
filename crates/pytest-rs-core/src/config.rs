@@ -662,6 +662,14 @@ impl Config {
         self.get_flag("worker")
     }
 
+    /// python_files ini patterns (default test_*.py / *_test.py).
+    pub fn python_files_patterns(&self) -> Vec<String> {
+        self.get_ini("python_files")
+            .map(|value| value.split_whitespace().map(str::to_string).collect())
+            .filter(|patterns: &Vec<String>| !patterns.is_empty())
+            .unwrap_or_else(|| vec!["test_*.py".to_string(), "*_test.py".to_string()])
+    }
+
     /// The effective failure budget: -x/--exitfirst means 1, otherwise the
     /// --maxfail=N value (0 disables, as in pytest).
     pub fn maxfail(&self) -> Option<usize> {
