@@ -558,6 +558,7 @@ version = "0.0.1"
 dependencies = [
  "clap",
  "glob",
+ "libc",
  "pyo3",
  "ruff_python_ast",
  "ruff_python_parser",

@@ -61,8 +61,8 @@ struct WorkerCollection {
 }
 
 impl Engine {
-    /// The worker main loop; the exit code is informational (the parent
-    /// judges success from the streamed reports).
+    /// The spawned-worker entry (--worker): a fresh process, so register
+    /// fixtures and import every test module before running anything.
     pub(crate) fn run_worker(&mut self, py: Python<'_>) -> i32 {
         // Tests print via Python: alias sys.stdout to stderr so fd 1 stays
         // a clean protocol channel (the parent forwards stderr as-is).
@@ -86,6 +86,54 @@ impl Engine {
         // tests' side effects (warning filters, random seeds, monkey
         // patches) leak into later modules' import time.
         self.precollect_all(py, &mut collection);
+        self.worker_loop(py, collection)
+    }
+
+    /// The forked-worker entry (-n on unix): the parent's interpreter
+    /// state — imported test modules, conftests, fixture registry, fired
+    /// configure hooks — arrived via fork, so collection reduces to
+    /// re-indexing the parent's collected items.
+    #[cfg(unix)]
+    pub(crate) fn run_worker_forked(&mut self, py: Python<'_>) -> i32 {
+        if py
+            .run(c"import sys\nsys.stdout = sys.stderr\n", None, None)
+            .is_err()
+        {
+            return exit_code::INTERNAL_ERROR;
+        }
+        // Fork duplicates the parent's PRNG state into every worker;
+        // reseed so workers diverge like freshly spawned processes do.
+        let _ = py.run(
+            c"import sys, random\nrandom.seed()\n_np = sys.modules.get('numpy')\nif _np is not None:\n    _np.random.seed()\n",
+            None,
+            None,
+        );
+        // Collection-time warnings are the parent's to report; drop the
+        // inherited copies so they are not double-counted.
+        let _ = py.run(
+            c"import pytest._wcapture as _w\n_w.captured.clear()\n",
+            None,
+            None,
+        );
+
+        let mut collection = WorkerCollection::default();
+        collection.configured_hooks = self.session.py_hooks.len();
+        for item in std::mem::take(&mut self.session.items) {
+            let file = item.nodeid.split("::").next().unwrap_or("");
+            collection
+                .collected_files
+                .insert(self.config.rootdir.join(file));
+            collection
+                .by_nodeid
+                .insert(item.nodeid.clone(), collection.items.len());
+            collection.items.push(item);
+        }
+        self.worker_loop(py, collection)
+    }
+
+    /// The worker main loop; the exit code is informational (the parent
+    /// judges success from the streamed reports).
+    fn worker_loop(&mut self, py: Python<'_>, mut collection: WorkerCollection) -> i32 {
         let mut prev_module: Option<String> = None;
         let stdin = std::io::stdin();
         for line in stdin.lock().lines() {

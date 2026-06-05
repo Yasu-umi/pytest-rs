@@ -1,7 +1,12 @@
-//! Distributed execution (-n N): spawn N workers (the same binary in
-//! --worker mode), feed them batches of node IDs from a shared queue
-//! (work stealing: fast workers pull more), and merge the streamed reports
-//! plus per-plugin state dumps.
+//! Distributed execution (-n N): start N workers, feed them batches of
+//! node IDs from a shared queue (work stealing: fast workers pull more),
+//! and merge the streamed reports plus per-plugin state dumps.
+//!
+//! On unix, workers fork off the parent after collection — the imported
+//! test modules, conftests, and fixture registry arrive copy-on-write, so
+//! workers skip the per-process import cost that upstream xdist pays.
+//! PYTEST_RS_DIST_SPAWN=1 opts back into spawn-per-worker (each worker
+//! re-imports everything, xdist's model); non-unix always spawns.
 //!
 //! Dispatch granularity follows --dist: per-test for load/worksteal (the
 //! default, xdist parity), per-module for loadscope/loadfile/loadgroup
@@ -11,9 +16,8 @@
 //! aborts undispatched work (xdist's shutdown semantics).
 
 use std::collections::VecDeque;
-use std::io::{BufRead, BufReader, Lines, Write};
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
-use std::sync::atomic::{AtomicIsize, Ordering};
+use std::io::{BufRead, BufReader, Lines, Read, Write};
+use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex, mpsc};
 
 use pyo3::prelude::*;
@@ -47,9 +51,12 @@ enum Event {
 /// The shared work queue. An empty queue means shutdown for whoever asks —
 /// like xdist, workers are released once everything is dispatched (waiting
 /// for completion would deadlock suites whose class setups hold
-/// cross-process locks). A crashed worker requeues its remainder for its
-/// own replacement; an exhausted restart budget aborts whatever was not
-/// yet dispatched.
+/// cross-process locks). Crash bookkeeping lives under the same lock so
+/// concurrent crashes resolve deterministically: a crashed worker requeues
+/// its remainder for its own replacement; the crash that exhausts the
+/// restart budget aborts whatever was not yet dispatched; crashes that
+/// land after the abort are silent (their tests count as undispatched,
+/// not failed — xdist's shutdown semantics).
 struct WorkQueue {
     state: Mutex<QueueState>,
 }
@@ -57,14 +64,27 @@ struct WorkQueue {
 struct QueueState {
     queue: VecDeque<Vec<String>>,
     aborted: bool,
+    /// Remaining worker-restart budget (no flag = effectively unlimited).
+    restarts: isize,
+}
+
+/// What a worker-owner thread must do about its crashed worker.
+enum CrashAction {
+    /// Budget left: the remainder was requeued, start a replacement.
+    Replace,
+    /// This crash exhausted the budget: report it and stop dispatching.
+    Abort,
+    /// The run was already aborted: stop without reporting.
+    Silent,
 }
 
 impl WorkQueue {
-    fn new(batches: VecDeque<Vec<String>>) -> Self {
+    fn new(batches: VecDeque<Vec<String>>, restarts: isize) -> Self {
         Self {
             state: Mutex::new(QueueState {
                 queue: batches,
                 aborted: false,
+                restarts,
             }),
         }
     }
@@ -78,18 +98,24 @@ impl WorkQueue {
         state.queue.pop_front()
     }
 
-    /// Crash bookkeeping: the unfinished remainder goes back to the front.
-    fn requeue(&self, batch: Vec<String>) {
+    /// Crash bookkeeping, atomically: spend a restart and requeue the
+    /// unfinished remainder, or exhaust the budget and abort.
+    fn crash(&self, remaining: Vec<String>) -> CrashAction {
         let mut state = self.state.lock().expect("work queue lock poisoned");
-        if !state.aborted && !batch.is_empty() {
-            state.queue.push_front(batch);
+        if state.aborted {
+            return CrashAction::Silent;
         }
-    }
-
-    fn abort(&self) {
-        let mut state = self.state.lock().expect("work queue lock poisoned");
-        state.aborted = true;
-        state.queue.clear();
+        if state.restarts > 0 {
+            state.restarts -= 1;
+            if !remaining.is_empty() {
+                state.queue.push_front(remaining);
+            }
+            CrashAction::Replace
+        } else {
+            state.aborted = true;
+            state.queue.clear();
+            CrashAction::Abort
+        }
     }
 }
 
@@ -135,9 +161,8 @@ impl Engine {
             .config
             .get_value("max-worker-restart")
             .and_then(|value| value.parse().ok());
-        let restarts = Arc::new(AtomicIsize::new(max_restart.unwrap_or(isize::MAX)));
 
-        let queue = Arc::new(WorkQueue::new(batches));
+        let queue = Arc::new(WorkQueue::new(batches, max_restart.unwrap_or(isize::MAX)));
         let (sender, receiver) = mpsc::channel::<Event>();
         let argv: Vec<String> = std::env::args().skip(1).collect();
         // One uid for the whole distributed run (the testrun_uid fixture).
@@ -150,6 +175,18 @@ impl Engine {
                     .unwrap_or(0)
         );
 
+        // Fork workers before any thread exists (fork + threads don't
+        // mix); a worker that fails to fork falls back to spawning.
+        #[cfg(unix)]
+        let mut initial: Vec<Option<WorkerProc>> =
+            if std::env::var_os("PYTEST_RS_DIST_SPAWN").is_none() {
+                self.fork_workers(py, workers, &testrun_uid)
+            } else {
+                (0..workers).map(|_| None).collect()
+            };
+        #[cfg(not(unix))]
+        let mut initial: Vec<Option<WorkerProc>> = (0..workers).map(|_| None).collect();
+
         let mut handles = Vec::new();
         for index in 0..workers {
             let owner = WorkerOwner {
@@ -158,9 +195,9 @@ impl Engine {
                 argv: argv.clone(),
                 index,
                 worker_count: workers,
-                restarts: Arc::clone(&restarts),
                 max_restart,
                 testrun_uid: testrun_uid.clone(),
+                initial: initial[index].take(),
             };
             handles.push(std::thread::spawn(move || owner.run()));
         }
@@ -251,12 +288,178 @@ impl Engine {
             }
         }
     }
+
+    /// Fork one child per worker slot off the already-imported parent
+    /// interpreter. The parent sets the xdist worker env vars through
+    /// os.environ right before each fork (and restores them after), so
+    /// the child holds its identity from its first instruction — visible
+    /// to os.register_at_fork callbacks, not just later reads. Children
+    /// dup their pipe pair onto stdin/stdout and enter the worker loop;
+    /// they never return. A failed fork yields None and that slot spawns
+    /// instead.
+    #[cfg(unix)]
+    #[allow(unsafe_code)]
+    fn fork_workers(
+        &mut self,
+        py: Python<'_>,
+        count: usize,
+        testrun_uid: &str,
+    ) -> Vec<Option<WorkerProc>> {
+        use std::os::fd::FromRawFd;
+
+        const ENV_KEYS: [&str; 3] = [
+            "PYTEST_XDIST_WORKER",
+            "PYTEST_XDIST_WORKER_COUNT",
+            "PYTEST_XDIST_TESTRUNUID",
+        ];
+        // os.environ (not Rust setenv: the Python dict snapshots the C
+        // environ at import, and __setitem__ writes through via putenv).
+        let environ = py
+            .import("os")
+            .and_then(|os| os.getattr("environ"))
+            .ok();
+        // Restore values for the parent (we may ourselves be a worker of
+        // an outer -n run, where these are already set).
+        let saved: Vec<Option<String>> = ENV_KEYS
+            .iter()
+            .map(|key| {
+                environ.as_ref().and_then(|environ| {
+                    environ
+                        .call_method1("get", (*key,))
+                        .ok()
+                        .and_then(|value| value.extract().ok())
+                })
+            })
+            .collect();
+
+        let mut procs: Vec<Option<WorkerProc>> = Vec::with_capacity(count);
+        // Parent-side pipe ends accumulated so far: each child closes its
+        // siblings' ends, otherwise a crashed sibling never reads as EOF.
+        let mut parent_fds: Vec<libc::c_int> = Vec::new();
+        for index in 0..count {
+            if let Some(environ) = &environ {
+                let _ = environ.set_item(ENV_KEYS[0], format!("gw{index}"));
+                let _ = environ.set_item(ENV_KEYS[1], count.to_string());
+                let _ = environ.set_item(ENV_KEYS[2], testrun_uid);
+            }
+            // Flush both runtimes' stdio: buffered bytes would be
+            // duplicated into the child, whose fd 1 becomes the protocol
+            // pipe.
+            let _ = py.run(c"import sys\nsys.stdout.flush()\nsys.stderr.flush()\n", None, None);
+            let _ = std::io::stdout().flush();
+            let _ = std::io::stderr().flush();
+
+            let mut to_child: [libc::c_int; 2] = [0; 2];
+            let mut from_child: [libc::c_int; 2] = [0; 2];
+            // SAFETY: plain pipe(2) calls; results are checked.
+            if unsafe { libc::pipe(to_child.as_mut_ptr()) } != 0 {
+                procs.push(None);
+                continue;
+            }
+            if unsafe { libc::pipe(from_child.as_mut_ptr()) } != 0 {
+                unsafe {
+                    libc::close(to_child[0]);
+                    libc::close(to_child[1]);
+                }
+                procs.push(None);
+                continue;
+            }
+
+            // SAFETY: the GIL is held (`py`), and no Rust threads exist
+            // yet; PyOS_BeforeFork/AfterFork_* run CPython's os.fork
+            // bookkeeping (at-fork callbacks, lock reinit).
+            unsafe { pyo3::ffi::PyOS_BeforeFork() };
+            let pid = unsafe { libc::fork() };
+            if pid < 0 {
+                unsafe {
+                    pyo3::ffi::PyOS_AfterFork_Parent();
+                    libc::close(to_child[0]);
+                    libc::close(to_child[1]);
+                    libc::close(from_child[0]);
+                    libc::close(from_child[1]);
+                }
+                procs.push(None);
+                continue;
+            }
+            if pid == 0 {
+                // Child: become worker `index` (its env vars were set
+                // before the fork), never return.
+                unsafe {
+                    pyo3::ffi::PyOS_AfterFork_Child();
+                    libc::dup2(to_child[0], 0);
+                    libc::dup2(from_child[1], 1);
+                    libc::close(to_child[0]);
+                    libc::close(to_child[1]);
+                    libc::close(from_child[0]);
+                    libc::close(from_child[1]);
+                    for fd in &parent_fds {
+                        libc::close(*fd);
+                    }
+                }
+                let code = self.run_worker_forked(py);
+                std::process::exit(code);
+            }
+            // Parent: keep our ends, close the child's.
+            unsafe {
+                pyo3::ffi::PyOS_AfterFork_Parent();
+                libc::close(to_child[0]);
+                libc::close(from_child[1]);
+            }
+            parent_fds.push(to_child[1]);
+            parent_fds.push(from_child[0]);
+            // SAFETY: the parent owns these freshly created pipe ends.
+            let stdin: Box<dyn Write + Send> =
+                Box::new(unsafe { std::fs::File::from_raw_fd(to_child[1]) });
+            let stdout: Box<dyn Read + Send> =
+                Box::new(unsafe { std::fs::File::from_raw_fd(from_child[0]) });
+            procs.push(Some(WorkerProc {
+                handle: WorkerHandle::Forked(pid),
+                stdin,
+                lines: BufReader::new(stdout).lines(),
+            }));
+        }
+        // Restore the parent's own env (it stays the controller).
+        if let Some(environ) = &environ {
+            for (key, value) in ENV_KEYS.iter().zip(&saved) {
+                let _ = match value {
+                    Some(value) => environ.set_item(*key, value),
+                    None => environ.del_item(*key),
+                };
+            }
+        }
+        procs
+    }
+}
+
+/// A live worker: spawned (its own exec, re-imports everything) or forked
+/// (inherits the parent's imported interpreter, unix only).
+enum WorkerHandle {
+    Spawned(Child),
+    #[cfg(unix)]
+    Forked(libc::pid_t),
+}
+
+impl WorkerHandle {
+    #[allow(unsafe_code)]
+    fn wait(&mut self) {
+        match self {
+            WorkerHandle::Spawned(child) => {
+                let _ = child.wait();
+            }
+            #[cfg(unix)]
+            WorkerHandle::Forked(pid) => {
+                let mut status: libc::c_int = 0;
+                // SAFETY: reaping our own forked child.
+                unsafe { libc::waitpid(*pid, &mut status, 0) };
+            }
+        }
+    }
 }
 
 struct WorkerProc {
-    child: Child,
-    stdin: ChildStdin,
-    lines: Lines<BufReader<ChildStdout>>,
+    handle: WorkerHandle,
+    stdin: Box<dyn Write + Send>,
+    lines: Lines<BufReader<Box<dyn Read + Send>>>,
 }
 
 /// One thread per worker slot: feed batches from the shared queue, forward
@@ -267,9 +470,11 @@ struct WorkerOwner {
     argv: Vec<String>,
     index: usize,
     worker_count: usize,
-    restarts: Arc<AtomicIsize>,
     max_restart: Option<isize>,
     testrun_uid: String,
+    /// A pre-forked worker for this slot; replacements (after a crash)
+    /// always spawn — re-forking is unsafe once threads exist.
+    initial: Option<WorkerProc>,
 }
 
 impl WorkerOwner {
@@ -285,12 +490,14 @@ impl WorkerOwner {
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit())
             .spawn()?;
-        let stdin = child.stdin.take().expect("worker stdin is piped");
-        let stdout = BufReader::new(child.stdout.take().expect("worker stdout is piped"));
+        let stdin: Box<dyn Write + Send> =
+            Box::new(child.stdin.take().expect("worker stdin is piped"));
+        let stdout: Box<dyn Read + Send> =
+            Box::new(child.stdout.take().expect("worker stdout is piped"));
         Ok(WorkerProc {
-            child,
+            handle: WorkerHandle::Spawned(child),
             stdin,
-            lines: stdout.lines(),
+            lines: BufReader::new(stdout).lines(),
         })
     }
 
@@ -302,9 +509,14 @@ impl WorkerOwner {
         proc: &mut WorkerProc,
         mut remaining: Vec<String>,
     ) -> Option<WorkerProc> {
-        let _ = proc.child.wait();
-        if !remaining.is_empty() {
-            let running = remaining.remove(0);
+        proc.handle.wait();
+        let running = if remaining.is_empty() {
+            None
+        } else {
+            Some(remaining.remove(0))
+        };
+        let action = self.queue.crash(remaining);
+        if let (Some(running), CrashAction::Replace | CrashAction::Abort) = (&running, &action) {
             let _ = self.sender.send(Event::Report {
                 report: TestReport {
                     nodeid: running.clone(),
@@ -321,37 +533,44 @@ impl WorkerOwner {
             });
         }
 
-        if self.restarts.fetch_sub(1, Ordering::SeqCst) > 0 {
-            self.queue.requeue(remaining);
-            let _ = self.sender.send(Event::Output(format!(
-                "replacing crashed worker gw{}",
-                self.index
-            )));
-            self.spawn().ok()
-        } else {
-            // Budget exhausted: stop dispatching new work (xdist shutdown).
-            let message = match self.max_restart {
-                Some(0) => format!(
-                    "worker gw{} crashed and worker restarting disabled",
+        match action {
+            CrashAction::Replace => {
+                let _ = self.sender.send(Event::Output(format!(
+                    "replacing crashed worker gw{}",
                     self.index
-                ),
-                Some(max) => format!("maximum crashed workers reached: {max}"),
-                None => format!("worker gw{} crashed", self.index),
-            };
-            let _ = self.sender.send(Event::Output(message.clone()));
-            let _ = self.sender.send(Event::Banner(format!("xdist: {message}")));
-            self.queue.abort();
-            None
+                )));
+                self.spawn().ok()
+            }
+            CrashAction::Abort => {
+                // Budget exhausted: stop dispatching new work (xdist shutdown).
+                let message = match self.max_restart {
+                    Some(0) => format!(
+                        "worker gw{} crashed and worker restarting disabled",
+                        self.index
+                    ),
+                    Some(max) => format!("maximum crashed workers reached: {max}"),
+                    None => format!("worker gw{} crashed", self.index),
+                };
+                let _ = self.sender.send(Event::Output(message.clone()));
+                let _ = self.sender.send(Event::Banner(format!("xdist: {message}")));
+                None
+            }
+            // The run was already aborted by another slot's crash: this
+            // worker's tests count as undispatched, not failed.
+            CrashAction::Silent => None,
         }
     }
 
-    fn run(self) {
-        let mut proc = match self.spawn() {
-            Ok(proc) => proc,
-            Err(err) => {
-                eprintln!("ERROR: failed to spawn worker: {err}");
-                return;
-            }
+    fn run(mut self) {
+        let mut proc = match self.initial.take() {
+            Some(proc) => proc,
+            None => match self.spawn() {
+                Ok(proc) => proc,
+                Err(err) => {
+                    eprintln!("ERROR: failed to spawn worker: {err}");
+                    return;
+                }
+            },
         };
 
         'work: loop {
@@ -431,6 +650,6 @@ impl WorkerOwner {
                 Some(_) => {}
             }
         }
-        let _ = proc.child.wait();
+        proc.handle.wait();
     }
 }

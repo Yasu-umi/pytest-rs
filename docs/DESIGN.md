@@ -118,12 +118,22 @@ Key structural rules:
 ### Multi-process execution (`-n N`, default 1) *(landed in M4)*
 
 - `-n 0`/absent: everything in-process (no worker overhead at all). `-n auto` = CPU count.
-- `-n N`: main process collects (import once, applies -k/-m/modifyitems), then spawns N
-  workers — the same binary in a hidden `--worker` mode. Work distribution over
-  newline-delimited JSON IPC: parent→worker on a clean stdin; worker→parent on stdout with a
-  sentinel frame prefix (tests print via Python, so worker `sys.stdout` is aliased to stderr
-  and stray fd-1 output passes through unmangled). Workers collect lazily — only the modules
-  their batches reference get imported — and stream `TestReport`s back per phase.
+- `-n N`: main process collects (import once, applies -k/-m/modifyitems), then starts N
+  workers. On unix the workers **fork off the already-imported parent** (after collection,
+  before any thread exists): imported test modules, conftests, and the fixture registry
+  arrive copy-on-write, so workers skip the per-process import cost upstream xdist pays.
+  Forked children reseed `random`/`numpy.random` (fork duplicates PRNG state) and clear
+  inherited collection-time warnings (the parent reports those). The parent sets
+  `PYTEST_XDIST_WORKER*` through `os.environ` right before each fork and restores after,
+  so the child holds its identity from its first instruction — visible to
+  `os.register_at_fork` callbacks. `PYTEST_RS_DIST_SPAWN=1` opts back into
+  spawn-per-worker; non-unix always
+  spawns — the same binary in a hidden `--worker` mode, which imports every test module up
+  front (xdist's collection phase, so test side effects cannot leak into module import
+  time). Work distribution over newline-delimited JSON IPC: parent→worker on a clean
+  stdin; worker→parent on stdout with a sentinel frame prefix (tests print via Python, so
+  worker `sys.stdout` is aliased to stderr and stray fd-1 output passes through
+  unmangled). Workers stream `TestReport`s back per phase.
 - Dispatch granularity follows `--dist` (xdist parity): per-test for `load`/`worksteal`
   (default), per-module for `loadscope`/`loadfile`/`loadgroup` (each module imported by one
   worker), duplicated per worker for `each`. The queue is work-stealing: idle workers wait on
@@ -131,6 +141,11 @@ Key structural rules:
 - Crash handling: a dead worker fails its running test (`worker gwN crashed while running …`),
   requeues the rest, and is replaced while `--max-worker-restart`'s budget lasts; an exhausted
   budget aborts undispatched work and banners `xdist: maximum crashed workers reached: N`.
+  Crash bookkeeping is atomic under the queue lock, so concurrent crashes resolve
+  deterministically: one of them exhausts the budget; crashes landing after the abort are
+  silent (their tests count as undispatched, not failed). Replacements always spawn
+  (re-forking is unsafe once the owner threads exist), so a replaced worker pays the full
+  import cost — fine for the rare crash path.
 - Merging: reports stream into the parent in arrival order; plugins serialize per-process
   state through `pytest_worker_dump`/`pytest_worker_load` (cov hits as JSON line sets —
   roaring stayed unnecessary at this scale — benchmark results as stats JSON); worker warnings
@@ -139,7 +154,11 @@ Key structural rules:
   `testrun_uid` fixtures and `PYTEST_XDIST_WORKER*` env vars are provided for compatibility,
   plus an `xdist` import shim (`is_xdist_worker` etc.) and `config.workerinput`.
 - Known divergence: the parent imports test modules during collection (xdist collects in
-  workers), so module-level side effects run once in the parent too.
+  workers), so module-level side effects run once in the parent too. Under fork mode this
+  cuts deeper: module-level code that reads `PYTEST_XDIST_WORKER` at import time captured
+  the parent's (unset) value — every worker would see the same snapshot. Such suites must
+  read worker identity lazily (the `worker_id` fixture, or env reads inside fixtures) or
+  run with `PYTEST_RS_DIST_SPAWN=1`.
 - Architecture consequence for everything else: collection, execution, and reporting communicate
   through serializable types (node IDs in, `TestReport`s out) — never via shared Python state.
 
