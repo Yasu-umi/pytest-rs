@@ -1678,18 +1678,21 @@ pub fn set_subtest_fail_budget(py: Python<'_>, budget: Option<usize>) {
 
 /// Drain the subtests fixture accumulator into reports for this item.
 /// Quiet subtest verbosity (the default) keeps only failed subtests,
-/// matching upstream's pytest_report_teststatus filtering.
+/// matching upstream's pytest_report_teststatus filtering. The second
+/// value counts failed fixture subtests (unittest subTest failures do
+/// not fail the enclosing test upstream, so they are excluded).
 pub fn pop_subtest_reports(
     py: Python<'_>,
     config: &crate::config::Config,
     item: &TestItem,
     quiet: bool,
-) -> Vec<crate::report::TestReport> {
-    let result: PyResult<Vec<crate::report::TestReport>> = (|| {
+) -> (Vec<crate::report::TestReport>, usize) {
+    let result: PyResult<(Vec<crate::report::TestReport>, usize)> = (|| {
         let module = py.import("pytest._subtests")?;
         let results = module.getattr("pop_results")?.call0()?;
         let style = config.get_value("tb").unwrap_or("long").to_string();
         let mut reports = Vec::new();
+        let mut failed_fixture_subs = 0usize;
         for record in results.try_iter()? {
             let record = record?;
             let outcome_str: String = record.get_item("outcome")?.extract()?;
@@ -1697,10 +1700,17 @@ pub fn pop_subtest_reports(
             let duration: f64 = record.get_item("duration")?.extract()?;
             let reason: String = record.get_item("reason")?.extract()?;
             let location: Option<String> = record.get_item("location")?.extract()?;
+            let from_unittest: bool = record
+                .call_method1("get", ("unittest", false))?
+                .extract()
+                .unwrap_or(false);
             let (outcome, longrepr) = match outcome_str.as_str() {
                 "failed" => {
                     let exc = record.get_item("exc")?;
                     let err = PyErr::from_value(exc);
+                    if !from_unittest {
+                        failed_fixture_subs += 1;
+                    }
                     (
                         crate::report::Outcome::Failed,
                         Some(format_test_failure(py, &err, &style)),
@@ -1723,7 +1733,7 @@ pub fn pop_subtest_reports(
                 subtest_desc: Some(desc),
             });
         }
-        Ok(reports)
+        Ok((reports, failed_fixture_subs))
     })();
     result.unwrap_or_default()
 }

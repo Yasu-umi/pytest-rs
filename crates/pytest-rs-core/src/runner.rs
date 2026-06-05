@@ -586,7 +586,8 @@ pub(crate) fn run_one(
         session.abort_banner = python::session_abort_banner(py, err);
         // Subtests recorded before the abort still report (e.g. pytest.exit
         // inside a subtest block records a failed subtest, then aborts).
-        reports.extend(python::pop_subtest_reports(py, config, item, quiet_subtests));
+        let (sub_reports, _) = python::pop_subtest_reports(py, config, item, quiet_subtests);
+        reports.extend(sub_reports);
         teardown_one(py, plugins, session, config, item, xfail, &mut reports);
         close_item_filters(py);
         python::end_item_context(py);
@@ -638,12 +639,10 @@ pub(crate) fn run_one(
                         if let Some(code) = python::session_abort_code(py, &err) {
                             session.exit_code_override = Some(code);
                             session.abort_banner = python::session_abort_banner(py, &err);
-                            reports.extend(python::pop_subtest_reports(
-                                py,
-                                config,
-                                item,
-                                quiet_subtests,
-                            ));
+                            let (sub_reports, _) = python::pop_subtest_reports(
+                                py, config, item, quiet_subtests,
+                            );
+                            reports.extend(sub_reports);
                             teardown_one(py, plugins, session, config, item, xfail, &mut reports);
                             close_item_filters(py);
                             python::end_item_context(py);
@@ -698,12 +697,9 @@ pub(crate) fn run_one(
         report
     };
     // Subtests recorded during the call report individually before the
-    // test's own report; a passed test containing failed subtests fails.
-    let sub_reports = python::pop_subtest_reports(py, config, item, quiet_subtests);
-    let failed_subs = sub_reports
-        .iter()
-        .filter(|r| r.outcome == Outcome::Failed)
-        .count();
+    // test's own report; a passed test containing failed subtests fails
+    // (fixture subtests only; unittest subTest failures don't propagate).
+    let (sub_reports, failed_subs) = python::pop_subtest_reports(py, config, item, quiet_subtests);
     reports.extend(sub_reports);
     let report = if failed_subs > 0 && report.outcome == Outcome::Passed {
         TestReport {

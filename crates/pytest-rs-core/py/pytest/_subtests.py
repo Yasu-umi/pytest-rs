@@ -21,8 +21,10 @@ _fail_budget: Optional[int] = None
 
 
 def set_fail_budget(budget: Optional[int]) -> None:
+    """Called by the runner before each item; also drops stale records."""
     global _fail_budget
     _fail_budget = budget
+    _results.clear()
 
 
 def _saferepr(obj: Any) -> str:
