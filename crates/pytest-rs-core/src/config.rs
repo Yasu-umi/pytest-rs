@@ -290,7 +290,7 @@ impl Config {
         // Core pytest options parsed into flags/values (queried via
         // get_flag/get_value); some are still inert and gain behavior as
         // features land.
-        const CORE_FLAGS: [&str; 8] = [
+        const CORE_FLAGS: [&str; 9] = [
             "strict-config",
             "strict-markers",
             "strict",
@@ -299,8 +299,9 @@ impl Config {
             "continue-on-collection-errors",
             "exact-mode",      // placeholder; harmless
             "doctest-modules", // accepted-but-inert: doctest collection not implemented
+            "nbmake",          // accepted-but-inert: notebook collection not implemented
         ];
-        const CORE_VALUES: [(&str, Option<char>); 15] = [
+        const CORE_VALUES: [(&str, Option<char>); 16] = [
             ("report-chars", Some('r')),
             ("markexpr", Some('m')),
             ("keyword", Some('k')),
@@ -316,6 +317,7 @@ impl Config {
             ("import-mode", None),
             ("capture", None),
             ("doctest-glob", None), // accepted-but-inert
+            ("ignore", None),       // accepted-but-inert (conformance runs files explicitly)
         ];
         for flag in CORE_FLAGS {
             cmd = cmd.arg(

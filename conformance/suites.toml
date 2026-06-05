@@ -56,4 +56,4 @@ enabled = true
 repo = "https://github.com/ionelmc/pytest-benchmark"
 tag = "v5.1.0"
 testpaths = ["tests"]
-enabled = false # enable when pytest-rs-benchmark lands
+enabled = true

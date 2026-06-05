@@ -13,6 +13,8 @@ fn build_plugins() -> Vec<Box<dyn Plugin>> {
     plugins.push(Box::new(pytest_rs_cov::CovPlugin::new()));
     #[cfg(feature = "split")]
     plugins.push(Box::new(pytest_rs_split::SplitPlugin::new()));
+    #[cfg(feature = "benchmark")]
+    plugins.push(Box::new(pytest_rs_benchmark::BenchmarkPlugin::new()));
     plugins
 }
 

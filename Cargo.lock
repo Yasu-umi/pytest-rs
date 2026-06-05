@@ -528,6 +528,7 @@ name = "pytest-rs"
 version = "0.0.1"
 dependencies = [
  "pytest-rs-asyncio",
+ "pytest-rs-benchmark",
  "pytest-rs-core",
  "pytest-rs-cov",
  "pytest-rs-mock",
@@ -539,6 +540,15 @@ name = "pytest-rs-asyncio"
 version = "0.0.1"
 dependencies = [
  "pytest-rs-core",
+]
+
+[[package]]
+name = "pytest-rs-benchmark"
+version = "0.0.1"
+dependencies = [
+ "pyo3",
+ "pytest-rs-core",
+ "serde_json",
 ]
 
 [[package]]

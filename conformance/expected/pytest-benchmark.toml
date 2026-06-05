@@ -1,0 +1,16 @@
+# Upstream pytest-benchmark test files that must keep passing under
+# pytest-rs. This list only grows; a regression here fails CI.
+
+[files]
+"tests/test_normal.py" = "passed"
+"tests/test_sample.py" = "passed"
+
+[excluded]
+# These import pytest_benchmark internals (stats/utils/storage/cli modules);
+# pytest-rs implements benchmarking natively in Rust and does not ship them.
+"tests/test_stats.py" = "imports pytest_benchmark.stats (internal API)"
+"tests/test_utils.py" = "imports pytest_benchmark.utils (internal API)"
+"tests/test_storage.py" = "imports pytest_benchmark storage internals (save/compare not reproduced)"
+"tests/test_elasticsearch_storage.py" = "imports pytest_benchmark elasticsearch storage (not reproduced)"
+"tests/test_cli.py" = "tests the py.test-benchmark CLI tool (not reproduced)"
+"tests/test_with_weaver.py" = "requires the 'weaver' aspect library (benchmark weave feature not reproduced)"
