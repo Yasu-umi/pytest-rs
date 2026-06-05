@@ -413,7 +413,16 @@ impl Config {
             ("maxprocesses", None), // accepted-but-inert
             ("max-worker-restart", None), // accepted-but-inert: workers are not restarted
         ];
+        // Without the xdist feature these options stay unregistered, so
+        // `-n` is an unknown-option usage error, like pytest without the
+        // pytest-xdist plugin installed.
+        let xdist_only =
+            |name: &str| matches!(name, "numprocesses" | "dist" | "maxprocesses" | "worker");
+        let has_xdist = cfg!(feature = "xdist");
         for flag in CORE_FLAGS {
+            if !has_xdist && xdist_only(flag) {
+                continue;
+            }
             cmd = cmd.arg(
                 clap::Arg::new(flag)
                     .long(flag)
@@ -451,6 +460,9 @@ impl Config {
                 .hide(true),
         );
         for (name, short) in CORE_VALUES.into_iter().chain([("rootdir-opt", None)]) {
+            if !has_xdist && xdist_only(name) {
+                continue;
+            }
             let mut arg = clap::Arg::new(name)
                 .value_name("VALUE")
                 .action(clap::ArgAction::Append)
@@ -528,6 +540,9 @@ impl Config {
             .into_iter()
             .chain(["capture-disable", "lf", "ff", "nf"])
         {
+            if !has_xdist && xdist_only(flag) {
+                continue;
+            }
             if matches.get_flag(flag) {
                 flags.insert(flag.to_string());
             }
@@ -539,6 +554,9 @@ impl Config {
         }
         let mut plugin_opts = Vec::new();
         for (name, _) in CORE_VALUES {
+            if !has_xdist && xdist_only(name) {
+                continue;
+            }
             let Some(parsed) = matches.get_many::<String>(name) else {
                 continue;
             };

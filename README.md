@@ -27,9 +27,9 @@ pytest-rs = { path = "../pytest-rs" }  # or a published index
 
 ### Selecting plugins at install time
 
-Bundled plugins (`asyncio`, `mock`, `cov`, `split`, `benchmark`) are Cargo
-features, all enabled by default. To build a binary with only some of them,
-pass build args to maturin from the consuming project:
+Bundled plugins (`asyncio`, `mock`, `cov`, `split`, `benchmark`, `xdist`)
+are Cargo features, all enabled by default. To build a binary with only some
+of them, pass build args to maturin from the consuming project:
 
 ```toml
 [tool.uv]

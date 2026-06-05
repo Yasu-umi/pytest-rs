@@ -105,6 +105,7 @@ impl Engine {
 
         // -n worker mode: this process is driven over stdin/stdout; it
         // never collects or reports on its own.
+        #[cfg(feature = "xdist")]
         if self.config.is_worker() {
             return self.run_worker(py);
         }
@@ -298,10 +299,13 @@ impl Engine {
             return exit_code::NO_TESTS_COLLECTED;
         }
 
+        #[cfg(feature = "xdist")]
         match self.config.numprocesses() {
             Some(workers) => self.run_dist(py, workers),
             None => self.run_items(py),
         }
+        #[cfg(not(feature = "xdist"))]
+        self.run_items(py);
 
         let failed = self
             .session

@@ -8,6 +8,10 @@ repository = { workspace = true }
 license = { workspace = true }
 readme = "../../README.md"
 
+[features]
+# -n N multi-process distribution (pytest-xdist equivalent).
+xdist = []
+
 [dependencies]
 pyo3 = { workspace = true, features = ["auto-initialize"] }
 clap = { workspace = true }

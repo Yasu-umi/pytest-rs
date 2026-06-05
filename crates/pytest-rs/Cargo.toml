@@ -9,8 +9,9 @@ license = { workspace = true }
 readme = "../../README.md"
 
 [features]
-default = ["asyncio", "mock", "cov", "split", "benchmark"]
+default = ["asyncio", "mock", "cov", "split", "benchmark", "xdist"]
 asyncio = ["dep:pytest-rs-asyncio"]
+xdist = ["pytest-rs-core/xdist"]
 mock = ["dep:pytest-rs-mock"]
 cov = ["dep:pytest-rs-cov"]
 split = ["dep:pytest-rs-split"]

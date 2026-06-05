@@ -1,10 +1,12 @@
 pub mod cache;
 pub mod collect;
 pub mod config;
+#[cfg(feature = "xdist")]
 pub mod dist;
 pub mod engine;
 pub mod fixture;
 pub mod hooks;
+#[cfg(feature = "xdist")]
 pub mod ipc;
 pub mod markexpr;
 pub mod python;
@@ -12,6 +14,7 @@ pub mod report;
 pub mod request;
 pub mod runner;
 pub mod session;
+#[cfg(feature = "xdist")]
 pub mod worker;
 
 // Plugin crates must use pyo3 through this re-export so exactly one pyo3
