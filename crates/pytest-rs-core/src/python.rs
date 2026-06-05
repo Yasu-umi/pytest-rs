@@ -434,6 +434,86 @@ pub fn load_named_plugins(
     Ok(())
 }
 
+/// Distributions whose pytest11 plugin must not autoload under the shim:
+/// the bundled set (pytest-rs replaces them natively) plus plugins known
+/// to require real pytest internals at hook time. hypothesis works fully
+/// as a library without its plugin (which only adds reporting/CLI
+/// integration but calls pytest.Function & co. from its hooks).
+const SKIPPED_DISTS: [&str; 7] = [
+    "pytest-asyncio",
+    "pytest-mock",
+    "pytest-cov",
+    "pytest-split",
+    "pytest-benchmark",
+    "pytest-xdist",
+    "hypothesis",
+];
+
+/// Auto-load installed third-party plugins (`pytest11` entry points),
+/// pytest's setuptools-plugin loading. `blocked` carries `-p no:NAME`
+/// names (matched against the entry-point name and its module);
+/// PYTEST_DISABLE_PLUGIN_AUTOLOAD disables the pass entirely. Unlike
+/// pytest, a plugin that fails to import warns (PytestConfigWarning) and
+/// is skipped instead of aborting the run: plugins built against real
+/// pytest internals would otherwise make every run unusable.
+pub fn load_entrypoint_plugins(
+    py: Python<'_>,
+    blocked: &[String],
+    registry: &mut FixtureRegistry,
+    hooks: &mut Vec<crate::session::PyHook>,
+) -> PyResult<()> {
+    if std::env::var_os("PYTEST_DISABLE_PLUGIN_AUTOLOAD").is_some() {
+        return Ok(());
+    }
+    let globals = pyo3::types::PyDict::new(py);
+    globals.set_item("bundled", SKIPPED_DISTS.to_vec())?;
+    py.run(
+        c"from importlib.metadata import distributions\n\
+bundled = {name.lower() for name in bundled}\n\
+result = sorted({(ep.name, ep.value.split(':')[0].strip()) for dist in distributions() if (dist.metadata['Name'] or '').lower() not in bundled for ep in dist.entry_points if ep.group == 'pytest11'})\n",
+        Some(&globals),
+        None,
+    )?;
+    let entrypoints: Vec<(String, String)> = globals
+        .get_item("result")?
+        .map(|result| result.extract())
+        .transpose()?
+        .unwrap_or_default();
+
+    for (ep_name, module_name) in entrypoints {
+        if blocked.contains(&ep_name) || blocked.contains(&module_name) {
+            continue;
+        }
+        // Already loaded via -p NAME or a conftest's pytest_plugins.
+        let already = hooks
+            .iter()
+            .any(|hook| hook.plugin_module.as_deref() == Some(module_name.as_str()));
+        if already {
+            continue;
+        }
+        let plugin = match py.import(module_name.as_str()) {
+            Ok(plugin) => plugin,
+            Err(err) => {
+                let _ = warn_explicit_at(
+                    py,
+                    "PytestConfigWarning",
+                    &format!("could not load plugin '{ep_name}': {}", err.value(py)),
+                    module_name.as_str(),
+                    0,
+                );
+                continue;
+            }
+        };
+        register_fixtures_from(py, &plugin, "", registry)?;
+        let before = hooks.len();
+        scan_py_hooks(&plugin, "", hooks)?;
+        for hook in &mut hooks[before..] {
+            hook.plugin_module = Some(module_name.clone());
+        }
+    }
+    Ok(())
+}
+
 /// Import a conftest.py; its fixtures and pytest_* hooks are visible to
 /// all items under its directory.
 pub fn collect_conftest(

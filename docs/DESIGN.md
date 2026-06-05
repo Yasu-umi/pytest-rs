@@ -114,6 +114,18 @@ Key structural rules:
 - **Inter-plugin coupling** only via `depends_on()` ordering + `Session::stash`
   (`HashMap<TypeId, Box<dyn Any>>` + well-known string keys, e.g. `"asyncio.event_loop"`).
   Never crate-to-crate Rust deps between plugins. This is how pytest-aiohttp plugs in later.
+- **Entry-point autoload** (pytest's setuptools plugin loading): installed `pytest11` entry
+  points import under the shim and register their module-level fixtures and `pytest_*`
+  hooks — pure fixture-provider plugins (Faker, requests-mock, respx, time-machine, anyio,
+  pytest-aiohttp) work as-is. Distributions pytest-rs bundles natively (pytest-asyncio,
+  -mock, -cov, -split, -benchmark, -xdist) are skipped: their upstream modules target real
+  pytest internals. `PYTEST_DISABLE_PLUGIN_AUTOLOAD` and `-p no:NAME` (entry-point or
+  module name) opt out. Divergence: a plugin that fails to import warns
+  (PytestConfigWarning) and is skipped instead of aborting the run — plugins built against
+  pluggy/`_pytest` internals would otherwise make every run on that venv unusable. Loaded
+  in the controller before conftests and mirrored in spawned workers (forked workers
+  inherit). Known gap: `request.getfixturevalue` is not implemented, so plugins resolving
+  fixtures dynamically (Faker's `faker` fixture) error at setup.
 
 ### Multi-process execution (`-n N`, default 1) *(landed in M4)*
 

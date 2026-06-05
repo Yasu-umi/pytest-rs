@@ -79,6 +79,46 @@ impl Engine {
             );
             return exit_code::INTERNAL_ERROR;
         }
+        // Mirror the controller's plugin loading (-p NAME, then pytest11
+        // entry points); forked workers inherit these instead.
+        let named: Vec<String> = self
+            .config
+            .plugin_opts
+            .iter()
+            .filter(|spec| !spec.starts_with("no:"))
+            .cloned()
+            .collect();
+        if let Err(err) = python::load_named_plugins(
+            py,
+            &named,
+            &mut self.session.registry,
+            &mut self.session.py_hooks,
+        ) {
+            eprintln!(
+                "INTERNAL ERROR: worker plugin loading failed: {}",
+                python::format_exception(py, &err)
+            );
+            return exit_code::INTERNAL_ERROR;
+        }
+        let blocked: Vec<String> = self
+            .config
+            .plugin_opts
+            .iter()
+            .filter_map(|spec| spec.strip_prefix("no:"))
+            .map(str::to_string)
+            .collect();
+        if let Err(err) = python::load_entrypoint_plugins(
+            py,
+            &blocked,
+            &mut self.session.registry,
+            &mut self.session.py_hooks,
+        ) {
+            eprintln!(
+                "INTERNAL ERROR: worker entry-point plugin loading failed: {}",
+                python::format_exception(py, &err)
+            );
+            return exit_code::INTERNAL_ERROR;
+        }
 
         let mut collection = WorkerCollection::default();
         // Like upstream xdist, import every test module during collection,

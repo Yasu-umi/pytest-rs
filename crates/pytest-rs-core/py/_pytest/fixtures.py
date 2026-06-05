@@ -8,4 +8,11 @@ class FixtureLookupError(LookupError):
     pass
 
 
+class FixtureFunctionDefinition:
+    """pytest 8.4+ wraps @pytest.fixture functions in this. pytest-rs marks
+    fixtures with recorded metadata instead, so nothing is ever an instance —
+    but it must be a real class: hypothesis isinstance()s against it at
+    @given application time (an _Unsupported stub raises TypeError there)."""
+
+
 from _pytest._stub import __getattr__  # noqa: E402, F401

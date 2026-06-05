@@ -992,6 +992,24 @@ impl Engine {
             return Err(python::format_exception(py, &err));
         }
 
+        // Installed third-party plugins (pytest11 entry points) autoload
+        // next, before conftests — pytest's setuptools plugin loading.
+        let blocked: Vec<String> = self
+            .config
+            .plugin_opts
+            .iter()
+            .filter_map(|spec| spec.strip_prefix("no:"))
+            .map(str::to_string)
+            .collect();
+        if let Err(err) = python::load_entrypoint_plugins(
+            py,
+            &blocked,
+            &mut self.session.registry,
+            &mut self.session.py_hooks,
+        ) {
+            return Err(python::format_exception(py, &err));
+        }
+
         // Conftests load for every collection start dir (even ones with no
         // test files — pytest imports initial conftests during dir scan),
         // plus each collected file's directory chain.
