@@ -92,28 +92,26 @@ impl Engine {
                 if config.no_terminal() {
                     // -p no:terminal: no progress output at all.
                 } else if config.verbose > 0 {
+                    // pytest appends the reason to skip/xfail words: "XFAIL (why)".
+                    let reasoned = |word: &str| match report.longrepr.as_deref() {
+                        Some(reason) if !reason.is_empty() && !reason.contains('\n') => {
+                            format!("{word} ({reason})")
+                        }
+                        _ => word.to_string(),
+                    };
                     let word = if let Some(desc) = &report.subtest_desc {
                         match report.outcome {
                             Outcome::Failed => format!("SUBFAILED{desc}"),
-                            Outcome::Skipped => format!(
-                                "SUBSKIPPED{desc} ({})",
-                                report.longrepr.as_deref().unwrap_or("")
-                            ),
-                            Outcome::XFailed => format!("SUBXFAIL{desc}"),
+                            Outcome::Skipped => reasoned(&format!("SUBSKIPPED{desc}")),
+                            Outcome::XFailed => reasoned(&format!("SUBXFAIL{desc}")),
                             _ => format!("SUBPASSED{desc}"),
                         }
                     } else {
                         match report.outcome {
                             Outcome::Passed => "PASSED".to_string(),
                             Outcome::Failed => "FAILED".to_string(),
-                            // pytest appends the skip reason: "SKIPPED (why)".
-                            Outcome::Skipped => match report.longrepr.as_deref() {
-                                Some(reason) if !reason.is_empty() && !reason.contains('\n') => {
-                                    format!("SKIPPED ({reason})")
-                                }
-                                _ => "SKIPPED".to_string(),
-                            },
-                            Outcome::XFailed => "XFAIL".to_string(),
+                            Outcome::Skipped => reasoned("SKIPPED"),
+                            Outcome::XFailed => reasoned("XFAIL"),
                             Outcome::XPassed => "XPASS".to_string(),
                         }
                     };

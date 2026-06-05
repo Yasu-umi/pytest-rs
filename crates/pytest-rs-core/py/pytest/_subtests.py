@@ -70,8 +70,30 @@ def _description(msg: Optional[str], kwargs: dict) -> str:
 class SubtestReport:
     """Serializable subtest report (xdist wire format compatibility)."""
 
-    def __init__(self) -> None:
-        self.context = SubtestContext()
+    def __init__(
+        self,
+        nodeid: Optional[str] = None,
+        location: Optional[tuple] = None,
+        keywords: Optional[dict] = None,
+        outcome: Optional[str] = None,
+        when: Optional[str] = None,
+        longrepr: Any = None,
+        sections: tuple = (),
+        duration: float = 0.0,
+        context: Optional[SubtestContext] = None,
+        **kw: Any,
+    ) -> None:
+        self.nodeid = nodeid
+        self.location = location
+        self.keywords = keywords or {}
+        self.outcome = outcome
+        self.when = when
+        self.longrepr = longrepr
+        self.sections = list(sections)
+        self.duration = duration
+        self.context = context or SubtestContext()
+        for key, value in kw.items():
+            setattr(self, key, value)
 
     @property
     def head_line(self) -> str:
@@ -172,6 +194,18 @@ def subtests():
     """Provides subtests functionality."""
     _results.clear()
     return Subtests()
+
+
+def pytest_report_to_serializable(report: Any) -> Optional[Dict[str, Any]]:
+    if isinstance(report, SubtestReport):
+        return report._to_json()
+    return None
+
+
+def pytest_report_from_serializable(data: Dict[str, Any]) -> Optional[SubtestReport]:
+    if data.get("_report_type") == "SubTestReport":
+        return SubtestReport._from_json(data)
+    return None
 
 
 def pop_results() -> List[Dict[str, Any]]:

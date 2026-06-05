@@ -2,6 +2,8 @@ from pytest._subtests import (  # noqa: F401
     SubtestContext,
     SubtestReport,
     Subtests,
+    pytest_report_from_serializable,
+    pytest_report_to_serializable,
     subtests,
 )
 
