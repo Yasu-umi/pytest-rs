@@ -41,6 +41,8 @@ class FileResult:
     failed: int = 0
     skipped: int = 0
     errors: int = 0
+    stdout: str = ""
+    stderr: str = ""
 
 
 class Suite:
@@ -54,6 +56,7 @@ class Suite:
         self.deps: list[str] = config.get("deps", [])
         self.exclude: list[str] = config.get("exclude", [])
         self.checkout = CACHE / f"{self.name}-{self.tag}"
+        self.src_dir: Path | None = None
 
     def deps_dir(self) -> Path | None:
         """Install the suite's extra runtime deps into a --target dir, used
@@ -79,6 +82,9 @@ class Suite:
             local = (ROOT / self.local).resolve()
             if local.exists():
                 self.checkout = local
+                src = local / "src"
+                if src.is_dir():
+                    self.src_dir = src
                 return
         if self.checkout.exists():
             return
@@ -114,8 +120,9 @@ class Suite:
         rel = str(path.relative_to(self.checkout))
         env = dict(os.environ)
         deps_dir = self.deps_dir()
-        if deps_dir is not None:
-            env["PYTHONPATH"] = str(deps_dir)
+        extra_paths = [str(p) for p in [self.src_dir, deps_dir] if p is not None]
+        if extra_paths:
+            env["PYTHONPATH"] = ":".join(extra_paths)
         try:
             proc = subprocess.run(
                 [str(BINARY), rel],
@@ -140,6 +147,7 @@ class Suite:
             status = "no-tests"
         else:
             status = "error"
+        is_unexpected = proc.returncode not in (0, 1, 5)
         return FileResult(
             file=rel,
             status=status,
@@ -148,6 +156,8 @@ class Suite:
             failed=counts.get("failed", 0),
             skipped=counts.get("skipped", 0),
             errors=counts.get("errors", 0),
+            stdout=out if is_unexpected else "",
+            stderr=proc.stderr if is_unexpected else "",
         )
 
     @staticmethod
@@ -225,10 +235,24 @@ def run_suite(suite: Suite, use_local: bool) -> list[FileResult]:
         + (f" ({unmeasured} files unmeasured: died before running tests)" if unmeasured else "")
     )
 
+    for result in results:
+        if result.status == "error" and (result.stdout or result.stderr):
+            print(f"\n  --- error dump: {result.file} (exit {result.exit_code}) ---")
+            if result.stdout:
+                print(result.stdout.rstrip())
+            if result.stderr:
+                print("  [stderr]")
+                print(result.stderr.rstrip())
+            print(f"  --- end: {result.file} ---")
+
     scoreboard = ROOT / "conformance" / "scoreboard"
     scoreboard.mkdir(exist_ok=True)
     (scoreboard / f"{suite.name}.json").write_text(
-        json.dumps([result.__dict__ for result in results], indent=2) + "\n"
+        json.dumps(
+            [{k: v for k, v in result.__dict__.items() if k not in ("stdout", "stderr")} for result in results],
+            indent=2,
+        )
+        + "\n"
     )
     return results
 

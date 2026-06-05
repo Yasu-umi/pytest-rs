@@ -3,7 +3,7 @@
 # much of upstream we reproduce; expected/<name>.toml pins files that must
 # keep passing (CI gate).
 #
-# `local` points at a sibling checkout (used with --local for development;
+# `local` points at the submodule under conformance/suites/ (used with --local;
 # CI always clones the pinned tag for determinism).
 
 [pytest]
@@ -11,7 +11,7 @@ repo = "https://github.com/pytest-dev/pytest"
 tag = "9.0.3"
 testpaths = ["testing"]
 exclude = ["example_scripts"]
-local = "../pytest"
+local = "conformance/suites/pytest"
 deps = ["packaging", "iniconfig", "pluggy", "xmlschema", "setuptools"]
 enabled = true
 
@@ -19,7 +19,7 @@ enabled = true
 repo = "https://github.com/pytest-dev/pytest-asyncio"
 tag = "v1.4.0"
 testpaths = ["tests"]
-local = "../pytest-asyncio"
+local = "conformance/suites/pytest-asyncio"
 deps = ["hypothesis"]
 enabled = true
 
@@ -27,14 +27,14 @@ enabled = true
 repo = "https://github.com/pytest-dev/pytest-mock"
 tag = "v3.15.1"
 testpaths = ["tests"]
-local = "../pytest-mock"
+local = "conformance/suites/pytest-mock"
 enabled = true
 
 [pytest-cov]
 repo = "https://github.com/pytest-dev/pytest-cov"
 tag = "v7.1.0"
 testpaths = ["tests"]
-local = "../pytest-cov"
+local = "conformance/suites/pytest-cov"
 deps = ["coverage", "process-tests"]
 enabled = true
 
@@ -42,7 +42,7 @@ enabled = true
 repo = "https://github.com/pytest-dev/pytest-xdist"
 tag = "v3.8.0"
 testpaths = ["testing"]
-local = "../pytest-xdist"
+local = "conformance/suites/pytest-xdist"
 deps = ["execnet", "filelock", "py"]
 enabled = true
 
@@ -50,7 +50,7 @@ enabled = true
 repo = "https://github.com/jerry-git/pytest-split"
 tag = "0.9.0"
 testpaths = ["tests"]
-local = "../pytest-split"
+local = "conformance/suites/pytest-split"
 enabled = true
 
 [pytest-benchmark]

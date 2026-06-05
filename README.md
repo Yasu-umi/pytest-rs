@@ -48,17 +48,31 @@ addopts = "-p no:benchmark -p no:split"
 
 ## Conformance testing
 
-Compatibility is verified by running the **upstream test suites** of the libraries pytest-rs reproduces, unchanged, under pytest-rs (`conformance/`). The harness clones each project at a pinned tag at test time; their code is not redistributed in this repository.
+Compatibility is verified by running the **upstream test suites** of the libraries pytest-rs reproduces, unchanged, under pytest-rs (`conformance/`).
 
-| Project | License | Used as |
+The suites are included as **shallow git submodules** under `conformance/suites/` at the pinned release tags. Initialize them once after cloning:
+
+```sh
+git submodule update --init --depth 1
+```
+
+Then run the full conformance harness:
+
+```sh
+cargo build
+uv run --no-project python conformance/runner.py --local   # uses submodules
+uv run --no-project python conformance/runner.py           # re-clones from upstream (CI mode)
+```
+
+| Project | License | Tag |
 |---|---|---|
-| [pytest](https://github.com/pytest-dev/pytest) | MIT | API reference & conformance suite |
-| [pytest-asyncio](https://github.com/pytest-dev/pytest-asyncio) | Apache-2.0 | API reference & conformance suite |
-| [pytest-mock](https://github.com/pytest-dev/pytest-mock) | MIT | API reference & conformance suite |
-| [pytest-cov](https://github.com/pytest-dev/pytest-cov) | MIT | API reference & conformance suite |
-| [pytest-xdist](https://github.com/pytest-dev/pytest-xdist) | MIT | API reference & conformance suite |
-| [pytest-split](https://github.com/jerry-git/pytest-split) | MIT | API reference & conformance suite |
-| [pytest-benchmark](https://github.com/ionelmc/pytest-benchmark) | BSD-2-Clause | API reference & conformance suite |
+| [pytest](https://github.com/pytest-dev/pytest) | MIT | 9.0.3 |
+| [pytest-asyncio](https://github.com/pytest-dev/pytest-asyncio) | Apache-2.0 | v1.4.0 |
+| [pytest-mock](https://github.com/pytest-dev/pytest-mock) | MIT | v3.15.1 |
+| [pytest-cov](https://github.com/pytest-dev/pytest-cov) | MIT | v7.1.0 |
+| [pytest-xdist](https://github.com/pytest-dev/pytest-xdist) | MIT | v3.8.0 |
+| [pytest-split](https://github.com/jerry-git/pytest-split) | MIT | 0.9.0 |
+| [pytest-benchmark](https://github.com/ionelmc/pytest-benchmark) | BSD-2-Clause | v5.1.0 |
 
 pytest-rs reimplements the public APIs of these projects; it does not copy their source code. Credit for the API design and the test suites belongs to their respective authors.
 

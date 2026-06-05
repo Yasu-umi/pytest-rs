@@ -1,0 +1,24 @@
+[submodule "conformance/suites/pytest"]
+	path = conformance/suites/pytest
+	url = https://github.com/pytest-dev/pytest
+	shallow = true
+[submodule "conformance/suites/pytest-asyncio"]
+	path = conformance/suites/pytest-asyncio
+	url = https://github.com/pytest-dev/pytest-asyncio
+	shallow = true
+[submodule "conformance/suites/pytest-mock"]
+	path = conformance/suites/pytest-mock
+	url = https://github.com/pytest-dev/pytest-mock
+	shallow = true
+[submodule "conformance/suites/pytest-cov"]
+	path = conformance/suites/pytest-cov
+	url = https://github.com/pytest-dev/pytest-cov
+	shallow = true
+[submodule "conformance/suites/pytest-xdist"]
+	path = conformance/suites/pytest-xdist
+	url = https://github.com/pytest-dev/pytest-xdist
+	shallow = true
+[submodule "conformance/suites/pytest-split"]
+	path = conformance/suites/pytest-split
+	url = https://github.com/jerry-git/pytest-split
+	shallow = true
