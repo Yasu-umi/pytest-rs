@@ -14,6 +14,16 @@ from pytest._fixtures import fixture
 # fixture clears it on creation so an aborted item can't leak records.
 _results: List[Dict[str, Any]] = []
 
+# --maxfail budget remaining for the session (None = unlimited). When a
+# failed subtest exhausts it, the exception propagates so the test body
+# stops, matching upstream's session.shouldfail check in __exit__.
+_fail_budget: Optional[int] = None
+
+
+def set_fail_budget(budget: Optional[int]) -> None:
+    global _fail_budget
+    _fail_budget = budget
+
 
 def _saferepr(obj: Any) -> str:
     try:
@@ -132,6 +142,12 @@ class _SubTestContextManager:
             exc_val, (KeyboardInterrupt, SystemExit, Exit)
         ):
             return False
+        if record["outcome"] == "failed":
+            global _fail_budget
+            if _fail_budget is not None:
+                _fail_budget -= 1
+                if _fail_budget <= 0:
+                    return False
         return True
 
     @staticmethod

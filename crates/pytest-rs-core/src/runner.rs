@@ -80,6 +80,9 @@ impl Engine {
                 current_file = file;
             }
 
+            // Failed subtests share the --maxfail budget: tell the fixture
+            // how many failures remain before it must stop swallowing.
+            python::set_subtest_fail_budget(py, maxfail.map(|m| m.saturating_sub(failed)));
             let reports = run_one(py, plugins, session, config, item);
             done += 1;
             for report in reports {
@@ -103,7 +106,13 @@ impl Engine {
                         match report.outcome {
                             Outcome::Passed => "PASSED".to_string(),
                             Outcome::Failed => "FAILED".to_string(),
-                            Outcome::Skipped => "SKIPPED".to_string(),
+                            // pytest appends the skip reason: "SKIPPED (why)".
+                            Outcome::Skipped => match report.longrepr.as_deref() {
+                                Some(reason) if !reason.is_empty() && !reason.contains('\n') => {
+                                    format!("SKIPPED ({reason})")
+                                }
+                                _ => "SKIPPED".to_string(),
+                            },
                             Outcome::XFailed => "XFAIL".to_string(),
                             Outcome::XPassed => "XPASS".to_string(),
                         }
@@ -565,12 +574,21 @@ pub(crate) fn run_one(
         Ok(false)
     })();
 
+    // Quiet subtest verbosity (default) hides non-failed subtest reports.
+    let quiet_subtests = config
+        .get_ini("verbosity_subtests")
+        .map(|v| v.trim() == "0")
+        .unwrap_or(config.verbose == 0);
+
     // pytest.exit / Ctrl-C abort the session without a test outcome.
     if let Err(err) = &call_result
         && let Some(code) = python::session_abort_code(py, err)
     {
         session.exit_code_override = Some(code);
         session.abort_banner = python::session_abort_banner(py, err);
+        // Subtests recorded before the abort still report (e.g. pytest.exit
+        // inside a subtest block records a failed subtest, then aborts).
+        reports.extend(python::pop_subtest_reports(py, config, item, quiet_subtests));
         teardown_one(py, plugins, session, config, item, xfail, &mut reports);
         close_item_filters(py);
         python::end_item_context(py);
@@ -622,6 +640,12 @@ pub(crate) fn run_one(
                         if let Some(code) = python::session_abort_code(py, &err) {
                             session.exit_code_override = Some(code);
                             session.abort_banner = python::session_abort_banner(py, &err);
+                            reports.extend(python::pop_subtest_reports(
+                                py,
+                                config,
+                                item,
+                                quiet_subtests,
+                            ));
                             teardown_one(py, plugins, session, config, item, xfail, &mut reports);
                             close_item_filters(py);
                             python::end_item_context(py);
@@ -677,10 +701,6 @@ pub(crate) fn run_one(
     };
     // Subtests recorded during the call report individually before the
     // test's own report; a passed test containing failed subtests fails.
-    let quiet_subtests = config
-        .get_ini("verbosity_subtests")
-        .map(|v| v.trim() == "0")
-        .unwrap_or(config.verbose == 0);
     let sub_reports = python::pop_subtest_reports(py, config, item, quiet_subtests);
     let failed_subs = sub_reports
         .iter()

@@ -1665,6 +1665,17 @@ pub fn format_test_failure(py: Python<'_>, err: &PyErr, style: &str) -> String {
     result.unwrap_or_else(|_| format_exception(py, err))
 }
 
+/// Tell the subtests fixture how many failures remain in the --maxfail
+/// budget (None = unlimited); exhausting it stops swallowing failures.
+pub fn set_subtest_fail_budget(py: Python<'_>, budget: Option<usize>) {
+    let _ = (|| -> PyResult<()> {
+        py.import("pytest._subtests")?
+            .getattr("set_fail_budget")?
+            .call1((budget,))?;
+        Ok(())
+    })();
+}
+
 /// Drain the subtests fixture accumulator into reports for this item.
 /// Quiet subtest verbosity (the default) keeps only failed subtests,
 /// matching upstream's pytest_report_teststatus filtering.
@@ -2054,7 +2065,11 @@ pub fn session_abort_banner(py: Python<'_>, err: &PyErr) -> Option<String> {
             .ok()
             .and_then(|msg| msg.extract().ok())
             .unwrap_or_default();
-        return Some(format!("_pytest.outcomes.Exit: {msg}"));
+        return Some(if msg.is_empty() {
+            "_pytest.outcomes.Exit".to_string()
+        } else {
+            format!("_pytest.outcomes.Exit: {msg}")
+        });
     }
     None
 }
