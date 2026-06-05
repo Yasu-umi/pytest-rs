@@ -25,11 +25,45 @@ _OPS = {
 }
 
 
+# Module names (and their submodules) explicitly opted into rewriting via
+# pytest.register_assert_rewrite, e.g. bundled plugin shims like pytest_mock.
+_REGISTERED_MODULES = set()
+
+
+def register_assert_rewrite(*names):
+    _REGISTERED_MODULES.update(names)
+
+
+def _is_registered_module(name):
+    return any(
+        name == registered or name.startswith(registered + ".")
+        for registered in _REGISTERED_MODULES
+    )
+
+
 def _is_rewrite_target(origin):
     basename = os.path.basename(origin)
     return basename == "conftest.py" or (
         basename.endswith(".py") and (basename.startswith("test_") or basename.endswith("_test.py"))
     )
+
+
+def _explain_eq(left, right):
+    """Extra explanation lines for a failed `==`, matching what pytest's
+    assertion plugin appends (iterable diff via _compare_eq_iterable)."""
+    try:
+        if isinstance(left, (str, bytes)) or isinstance(right, (str, bytes)):
+            return ""
+        if not (hasattr(left, "__iter__") and hasattr(right, "__iter__")):
+            return ""
+        from _pytest.assertion.util import _compare_eq_any
+
+        lines = _compare_eq_any(left, right, lambda text, *args, **kwargs: text, 0)
+        if not lines:
+            return ""
+        return "\n  " + "\n  ".join(lines)
+    except Exception:
+        return ""
 
 
 class _AssertRewriter(ast.NodeTransformer):
@@ -76,15 +110,37 @@ class _AssertRewriter(ast.NodeTransformer):
                 value=ast.Name(id=name, ctx=ast.Load()), conversion=ord("r"), format_spec=None
             )
 
-        message = ast.JoinedStr(
-            values=[
-                *self._user_msg_prefix(node),
-                ast.Constant("assert "),
-                repr_of(left_name),
-                ast.Constant(f" {op} "),
-                repr_of(right_name),
-            ]
-        )
+        values = [
+            *self._user_msg_prefix(node),
+            ast.Constant("assert "),
+            repr_of(left_name),
+            ast.Constant(f" {op} "),
+            repr_of(right_name),
+        ]
+        if isinstance(test.ops[0], ast.Eq):
+            # pytest parity: a failed == on iterables appends diff lines.
+            explain = ast.Call(
+                func=ast.Attribute(
+                    value=ast.Attribute(
+                        value=ast.Call(
+                            func=ast.Name(id="__import__", ctx=ast.Load()),
+                            args=[ast.Constant("pytest._rewrite")],
+                            keywords=[],
+                        ),
+                        attr="_rewrite",
+                        ctx=ast.Load(),
+                    ),
+                    attr="_explain_eq",
+                    ctx=ast.Load(),
+                ),
+                args=[
+                    ast.Name(id=left_name, ctx=ast.Load()),
+                    ast.Name(id=right_name, ctx=ast.Load()),
+                ],
+                keywords=[],
+            )
+            values.append(ast.FormattedValue(value=explain, conversion=-1, format_spec=None))
+        message = ast.JoinedStr(values=values)
         raise_stmt = ast.Raise(
             exc=ast.Call(
                 func=ast.Name(id="AssertionError", ctx=ast.Load()),
@@ -146,7 +202,7 @@ class _RewriteFinder:
             spec is not None
             and spec.origin is not None
             and spec.origin.endswith(".py")
-            and _is_rewrite_target(spec.origin)
+            and (_is_rewrite_target(spec.origin) or _is_registered_module(name))
         ):
             spec.loader = _RewriteLoader(spec.name, spec.origin)
             return spec

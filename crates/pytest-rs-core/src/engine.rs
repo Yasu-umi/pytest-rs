@@ -71,7 +71,7 @@ impl Engine {
         }
 
         let n_items = self.session.items.len();
-        if !self.config.quiet {
+        if !self.config.quiet && !self.config.no_terminal() {
             println!(
                 "collected {n_items} item{}\n",
                 if n_items == 1 { "" } else { "s" }
@@ -89,14 +89,16 @@ impl Engine {
             };
         }
         if n_items == 0 {
-            println!(
-                "{}",
-                crate::runner::summary_line(
-                    &self.session.reports,
-                    python::warning_count(py),
-                    started.elapsed()
-                )
-            );
+            if !self.config.no_terminal() {
+                println!(
+                    "{}",
+                    crate::runner::summary_line(
+                        &self.session.reports,
+                        python::warning_count(py),
+                        started.elapsed()
+                    )
+                );
+            }
             return exit_code::NO_TESTS_COLLECTED;
         }
 
@@ -120,6 +122,9 @@ impl Engine {
             code = forced;
         }
 
+        if self.config.no_terminal() {
+            return code;
+        }
         self.print_failures();
         if let Err(err) = self.print_plugin_summaries(py) {
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
@@ -140,7 +145,7 @@ impl Engine {
     }
 
     fn print_header(&self) {
-        if self.config.quiet {
+        if self.config.quiet || self.config.no_terminal() {
             return;
         }
         println!("{}", center_banner("test session starts"));

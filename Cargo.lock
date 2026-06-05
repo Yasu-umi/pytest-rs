@@ -529,6 +529,7 @@ version = "0.0.1"
 dependencies = [
  "pytest-rs-asyncio",
  "pytest-rs-core",
+ "pytest-rs-mock",
 ]
 
 [[package]]
@@ -551,6 +552,13 @@ dependencies = [
  "serde_json",
  "thiserror",
  "toml",
+]
+
+[[package]]
+name = "pytest-rs-mock"
+version = "0.0.1"
+dependencies = [
+ "pytest-rs-core",
 ]
 
 [[package]]

@@ -16,10 +16,16 @@ use crate::fixture::{FixtureDef, FixtureRegistry, Scope};
 // paths that upstream test suites import.
 include!(concat!(env!("OUT_DIR"), "/shim_manifest.rs"));
 
+/// The per-run directory holding the embedded Python shim packages. Plugin
+/// crates write their own importable packages (e.g. pytest_mock) here.
+pub fn shim_root() -> PathBuf {
+    std::env::temp_dir().join(format!("pytest-rs-{}", std::process::id()))
+}
+
 /// Set up the embedded interpreter for a run: write the pytest shim package
 /// to a temp dir and prepend it to sys.path so `import pytest` resolves to us.
 pub fn install_shim(py: Python<'_>) -> PyResult<PathBuf> {
-    let shim_root = std::env::temp_dir().join(format!("pytest-rs-{}", std::process::id()));
+    let shim_root = shim_root();
     for (rel, content) in SHIM_FILES {
         let path = shim_root.join(rel);
         if let Some(parent) = path.parent() {
@@ -68,6 +74,16 @@ if not os.path.basename(sys.executable).startswith('python'):
 pub fn register_builtin_fixtures(py: Python<'_>, registry: &mut FixtureRegistry) -> PyResult<()> {
     let pytest_module = py.import("pytest")?;
     register_fixtures_from(py, &pytest_module, "", registry)
+}
+
+/// Register fixtures defined by a plugin-provided Python module (e.g. the
+/// pytest_mock shim) with global visibility.
+pub fn register_plugin_fixtures(
+    py: Python<'_>,
+    module: &Bound<'_, PyModule>,
+    registry: &mut FixtureRegistry,
+) -> PyResult<()> {
+    register_fixtures_from(py, module, "", registry)
 }
 
 pub fn sys_path_prepend(py: Python<'_>, path: &Path) -> PyResult<()> {

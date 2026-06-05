@@ -29,13 +29,17 @@ from pytest._outcomes import xfail as xfail
 from pytest._pytester import LineMatcher as LineMatcher
 from pytest._pytester import Pytester as Pytester
 from pytest._pytester import RunResult as RunResult
+from pytest._pytester import Testdir as Testdir
 from pytest._pytester import pytester as pytester
+from pytest._pytester import testdir as testdir
 from pytest._raises import ExceptionInfo as ExceptionInfo
+from pytest._rewrite import register_assert_rewrite as register_assert_rewrite
 from pytest._raises import RaisesContext as RaisesContext
 from pytest._raises import raises as raises
 from pytest._tmp_path import TempPathFactory as TempPathFactory
 from pytest._tmp_path import tmp_path as tmp_path
 from pytest._tmp_path import tmp_path_factory as tmp_path_factory
+from pytest._tmp_path import tmpdir as tmpdir
 from pytest._warning_types import PytestAssertRewriteWarning as PytestAssertRewriteWarning
 from pytest._warning_types import PytestCacheWarning as PytestCacheWarning
 from pytest._warning_types import PytestCollectionWarning as PytestCollectionWarning

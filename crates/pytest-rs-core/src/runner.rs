@@ -46,7 +46,8 @@ impl Engine {
                 .split_once("::")
                 .map(|(f, _)| f.to_string())
                 .unwrap_or_default();
-            if config.verbose == 0 && !config.quiet && file != current_file {
+            if config.verbose == 0 && !config.quiet && !config.no_terminal() && file != current_file
+            {
                 if !current_file.is_empty() {
                     println!("{line} [{:>3}%]", done * 100 / total);
                 }
@@ -60,7 +61,9 @@ impl Engine {
                 if report.outcome == Outcome::Failed {
                     failed += 1;
                 }
-                if config.verbose > 0 {
+                if config.no_terminal() {
+                    // -p no:terminal: no progress output at all.
+                } else if config.verbose > 0 {
                     let word = match report.outcome {
                         Outcome::Passed => "PASSED",
                         Outcome::Failed => "FAILED",
@@ -80,7 +83,8 @@ impl Engine {
                 session.reports.push(report);
             }
         }
-        if config.verbose == 0 && !config.quiet && !current_file.is_empty() {
+        if config.verbose == 0 && !config.quiet && !config.no_terminal() && !current_file.is_empty()
+        {
             println!("{line} [{:>3}%]", done * 100 / total);
         }
 
@@ -420,6 +424,11 @@ fn resolve_fixture(
     stack: &mut Vec<(String, String)>,
 ) -> PyResult<Py<PyAny>> {
     let Some(def) = session.registry.lookup(name, &item.nodeid) else {
+        // `pytestconfig` is a builtin backed by the Rust config, not a
+        // shim-defined fixture (overridable like any other fixture).
+        if name == "pytestconfig" {
+            return python::make_py_config(py, config);
+        }
         return Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
             "fixture '{name}' not found for test {}",
             item.nodeid

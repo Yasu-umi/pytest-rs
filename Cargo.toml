@@ -20,6 +20,7 @@ todo = "warn"
 [workspace.dependencies]
 pytest-rs-core = { path = "crates/pytest-rs-core" }
 pytest-rs-asyncio = { path = "crates/pytest-rs-asyncio" }
+pytest-rs-mock = { path = "crates/pytest-rs-mock" }
 
 pyo3 = { version = "0.28.3" }
 clap = { version = "4.6", features = ["derive", "string"] }

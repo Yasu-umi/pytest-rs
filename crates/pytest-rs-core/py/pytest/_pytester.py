@@ -100,6 +100,7 @@ class Pytester:
 
         self.path = pathlib.Path(path)
         self._name = request_name
+        self._syspaths = []
 
     def _makefile(self, ext, args, kwargs):
         items = list(kwargs.items())
@@ -136,6 +137,15 @@ class Pytester:
         path.mkdir()
         return path
 
+    def syspathinsert(self, path=None):
+        import sys
+
+        entry = str(path if path is not None else self.path)
+        # The current process (tests import what they just wrote) and the
+        # child runner via PYTHONPATH (runs are subprocesses).
+        sys.path.insert(0, entry)
+        self._syspaths.insert(0, entry)
+
     def runpytest(self, *args):
         import os
         import subprocess
@@ -144,6 +154,11 @@ class Pytester:
         exe = os.environ.get("PYTEST_RS_EXE")
         if exe is None:
             fail("PYTEST_RS_EXE is not set; pytester cannot run the runner")
+        env = os.environ.copy()
+        if self._syspaths:
+            existing = env.get("PYTHONPATH")
+            entries = [*self._syspaths, *([existing] if existing else [])]
+            env["PYTHONPATH"] = os.pathsep.join(entries)
         start = time.perf_counter()
         proc = subprocess.run(
             [exe, *[str(arg) for arg in args]],
@@ -151,6 +166,7 @@ class Pytester:
             capture_output=True,
             text=True,
             timeout=120,
+            env=env,
         )
         duration = time.perf_counter() - start
         outlines = [_ANSI_RE.sub("", line) for line in proc.stdout.splitlines()]
@@ -161,17 +177,50 @@ class Pytester:
     runpytest_inprocess = runpytest
 
 
-@fixture
-def pytester(request):
+class Testdir(Pytester):
+    """Legacy pytester alias (the pre-7.0 testdir fixture API): paths are
+    py.path-like LocalPath objects instead of pathlib.Path."""
+
+    @property
+    def tmpdir(self):
+        from pytest._tmp_path import LocalPath
+
+        return LocalPath(self.path)
+
+    def _makefile(self, ext, args, kwargs):
+        from pytest._tmp_path import LocalPath
+
+        result = super()._makefile(ext, args, kwargs)
+        if isinstance(result, list):
+            return [LocalPath(path) for path in result]
+        return LocalPath(result)
+
+
+def _make_runner_dir(request, cls):
     import os
     import re
     import shutil
+    import sys
     import tempfile
 
     name = re.sub(r"\W", "_", request.node.name)
     path = tempfile.mkdtemp(prefix="pytest-rs-pytester-")
     old_cwd = os.getcwd()
     os.chdir(path)
-    yield Pytester(path, name)
+    runner = cls(path, name)
+    yield runner
+    for entry in runner._syspaths:
+        if entry in sys.path:
+            sys.path.remove(entry)
     os.chdir(old_cwd)
     shutil.rmtree(path, ignore_errors=True)
+
+
+@fixture
+def pytester(request):
+    yield from _make_runner_dir(request, Pytester)
+
+
+@fixture
+def testdir(request):
+    yield from _make_runner_dir(request, Testdir)

@@ -28,7 +28,7 @@ repo = "https://github.com/pytest-dev/pytest-mock"
 tag = "v3.15.1"
 testpaths = ["tests"]
 local = "../pytest-mock"
-enabled = false # enable when pytest-rs-mock lands
+enabled = true
 
 [pytest-cov]
 repo = "https://github.com/pytest-dev/pytest-cov"

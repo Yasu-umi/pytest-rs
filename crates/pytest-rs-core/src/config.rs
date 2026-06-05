@@ -160,6 +160,8 @@ pub struct Config {
     pub rootdir: PathBuf,
     /// -W warning filter specs, applied at session start.
     pub w_options: Vec<String>,
+    /// -p specs (e.g. `no:terminal` disables all terminal output).
+    pub plugin_opts: Vec<String>,
     flags: HashSet<String>,
     values: HashMap<String, String>,
     /// -o name=value overrides; take precedence over file values.
@@ -226,9 +228,10 @@ impl Config {
                     .action(clap::ArgAction::Append),
             );
 
-        // Accepted-but-inert pytest options, so real-world addopts and
-        // pytester invocations parse. They gain behavior as features land.
-        for flag in [
+        // Core pytest options parsed into flags/values (queried via
+        // get_flag/get_value); some are still inert and gain behavior as
+        // features land.
+        const CORE_FLAGS: [&str; 7] = [
             "strict-config",
             "strict-markers",
             "strict",
@@ -236,7 +239,22 @@ impl Config {
             "no-summary",
             "continue-on-collection-errors",
             "exact-mode", // placeholder; harmless
-        ] {
+        ];
+        const CORE_VALUES: [(&str, Option<char>); 12] = [
+            ("report-chars", Some('r')),
+            ("plugin", Some('p')),
+            ("config-file", Some('c')),
+            ("assert", None),
+            ("tb", None),
+            ("maxfail", None),
+            ("durations", None),
+            ("durations-min", None),
+            ("color", None),
+            ("basetemp", None),
+            ("import-mode", None),
+            ("capture", None),
+        ];
+        for flag in CORE_FLAGS {
             cmd = cmd.arg(
                 clap::Arg::new(flag)
                     .long(flag)
@@ -250,21 +268,7 @@ impl Config {
                 .action(clap::ArgAction::SetTrue)
                 .hide(true),
         );
-        for (name, short) in [
-            ("report-chars", Some('r')),
-            ("plugin", Some('p')),
-            ("config-file", Some('c')),
-            ("assert", None),
-            ("tb", None),
-            ("maxfail", None),
-            ("durations", None),
-            ("durations-min", None),
-            ("color", None),
-            ("basetemp", None),
-            ("import-mode", None),
-            ("capture", None),
-            ("rootdir-opt", None),
-        ] {
+        for (name, short) in CORE_VALUES.into_iter().chain([("rootdir-opt", None)]) {
             let mut arg = clap::Arg::new(name)
                 .value_name("VALUE")
                 .action(clap::ArgAction::Append)
@@ -307,6 +311,24 @@ impl Config {
                 flags.insert(opt.name.clone());
             }
         }
+        for flag in CORE_FLAGS.into_iter().chain(["capture-disable"]) {
+            if matches.get_flag(flag) {
+                flags.insert(flag.to_string());
+            }
+        }
+        let mut plugin_opts = Vec::new();
+        for (name, _) in CORE_VALUES {
+            let Some(parsed) = matches.get_many::<String>(name) else {
+                continue;
+            };
+            let parsed: Vec<&String> = parsed.collect();
+            if name == "plugin" {
+                plugin_opts = parsed.iter().map(|v| v.to_string()).collect();
+            }
+            if let Some(last) = parsed.last() {
+                values.insert(name.to_string(), (*last).clone());
+            }
+        }
 
         let mut ini_overrides = HashMap::new();
         if let Some(overrides) = matches.get_many::<String>("override-ini") {
@@ -331,6 +353,7 @@ impl Config {
                 .get_many::<String>("pythonwarnings")
                 .map(|vals| vals.cloned().collect())
                 .unwrap_or_default(),
+            plugin_opts,
             flags,
             values,
             ini_overrides,
@@ -367,5 +390,12 @@ impl Config {
         self.values
             .get(name.trim_start_matches("--"))
             .map(String::as_str)
+    }
+
+    /// `-p no:terminal` disables the terminal reporter entirely.
+    pub fn no_terminal(&self) -> bool {
+        self.plugin_opts
+            .iter()
+            .any(|spec| spec == "no:terminal" || spec == "no:terminalreporter")
     }
 }

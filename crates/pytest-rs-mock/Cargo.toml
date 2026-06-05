@@ -1,5 +1,5 @@
 [package]
-name = "pytest-rs"
+name = "pytest-rs-mock"
 version = "0.0.1"
 authors = { workspace = true }
 edition = { workspace = true }
@@ -8,15 +8,8 @@ repository = { workspace = true }
 license = { workspace = true }
 readme = "../../README.md"
 
-[features]
-default = ["asyncio", "mock"]
-asyncio = ["dep:pytest-rs-asyncio"]
-mock = ["dep:pytest-rs-mock"]
-
 [dependencies]
 pytest-rs-core = { workspace = true }
-pytest-rs-asyncio = { workspace = true, optional = true }
-pytest-rs-mock = { workspace = true, optional = true }
 
 [lints]
 workspace = true
