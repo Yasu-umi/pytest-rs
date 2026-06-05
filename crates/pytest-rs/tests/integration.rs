@@ -828,3 +828,44 @@ class ThingTest(unittest.TestCase):
     );
     assert!(out.contains("1 failed, 1 passed, 2 skipped"), "out: {out}");
 }
+
+#[test]
+fn deselect_option() {
+    let suite = TempSuite::new("deselect");
+    suite.write(
+        "test_des.py",
+        r#"
+import pytest
+
+def test_one():
+    pass
+
+def test_two():
+    pass
+
+@pytest.mark.parametrize("x", [1, 2, 3])
+def test_param(x):
+    pass
+
+class TestCls:
+    def test_m1(self):
+        pass
+"#,
+    );
+    // Exact nodeid, one parametrized id, and a class prefix.
+    let output = suite.run(&[
+        "test_des.py",
+        "--deselect",
+        "test_des.py::test_two",
+        "--deselect",
+        "test_des.py::test_param[2]",
+        "--deselect=test_des.py::TestCls",
+    ]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(out.contains("3 passed, 3 deselected"), "out: {out}");
+    assert!(
+        out.contains("collected 6 items / 3 deselected / 3 selected"),
+        "out: {out}"
+    );
+}

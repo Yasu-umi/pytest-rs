@@ -390,7 +390,8 @@ impl Config {
             "setup-plan",      // like --setup-only (fixtures do execute here)
             "setup-show",      // run tests, narrating fixture setup/teardown
         ];
-        const CORE_VALUES: [(&str, Option<char>); 21] = [
+        const CORE_VALUES: [(&str, Option<char>); 22] = [
+            ("deselect", None),
             ("last-failed-no-failures", None),
             ("report-chars", Some('r')),
             ("markexpr", Some('m')),
@@ -564,7 +565,15 @@ impl Config {
             if name == "plugin" {
                 plugin_opts = parsed.iter().map(|v| v.to_string()).collect();
             }
-            if let Some(last) = parsed.last() {
+            if name == "deselect" {
+                // Every occurrence matters (newline-joined for get_values).
+                let joined = parsed
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                values.insert(name.to_string(), joined);
+            } else if let Some(last) = parsed.last() {
                 values.insert(name.to_string(), (*last).clone());
             }
         }

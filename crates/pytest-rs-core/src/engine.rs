@@ -697,9 +697,21 @@ impl Engine {
         Ok(())
     }
 
-    /// -m / -k deselection (pytest applies these before plugin
-    /// collection_modifyitems hooks).
+    /// --deselect / -m / -k deselection (pytest applies these before plugin
+    /// collection_modifyitems hooks; --deselect runs first as its hookimpl
+    /// is not trylast like the -m/-k one).
     fn apply_selection(&mut self, py: Python<'_>) -> PyResult<()> {
+        if let Some(prefixes) = self.config.get_values("deselect") {
+            let prefixes: Vec<String> = prefixes.iter().map(|s| s.to_string()).collect();
+            // pytest matches by plain nodeid prefix (main.py).
+            let (kept, removed): (Vec<_>, Vec<_>) = self
+                .session
+                .items
+                .drain(..)
+                .partition(|item| !prefixes.iter().any(|p| item.nodeid.starts_with(p.as_str())));
+            self.session.items = kept;
+            self.session.deselected_items.extend(removed);
+        }
         if let Some(expr) = self.config.get_value("markexpr").map(str::to_string) {
             let expr = expr.trim().to_string();
             let mut error = None;
