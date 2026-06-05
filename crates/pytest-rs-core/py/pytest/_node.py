@@ -1,5 +1,25 @@
 """The `request.node` object: a minimal pytest Item surface."""
 
+# Marks added at runtime (node.add_marker / request.applymarker) for the
+# currently running item; the engine re-evaluates xfail against these and
+# clears the list per item.
+_added_marks = []
+
+
+def record_added_mark(marker):
+    mark = getattr(marker, "mark", marker)
+    name = getattr(mark, "name", None)
+    if isinstance(name, str):
+        _added_marks.append((name, mark))
+
+
+def added_marks():
+    return list(_added_marks)
+
+
+def clear_added_marks():
+    _added_marks.clear()
+
 
 class Collector:
     """Stub collector base (annotations/isinstance upstream)."""
@@ -52,3 +72,4 @@ class Node:
             self.own_markers.append(marker)
         else:
             self.own_markers.insert(0, marker)
+        record_added_mark(marker)

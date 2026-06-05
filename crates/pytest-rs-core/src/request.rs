@@ -172,6 +172,13 @@ impl PyRequest {
         crate::runner::getfixturevalue(py, argname)
     }
 
+    /// Apply a marker to the running item (pytest's request.applymarker);
+    /// the engine re-evaluates xfail against dynamically added marks.
+    fn applymarker(&self, py: Python<'_>, marker: Py<PyAny>) -> PyResult<()> {
+        self.node.bind(py).call_method1("add_marker", (marker,))?;
+        Ok(())
+    }
+
     fn addfinalizer(&self, finalizer: Py<PyAny>) {
         self.finalizers
             .lock()

@@ -185,9 +185,13 @@ pub(crate) fn run_one(
         }
     }
     // @pytest.mark.xfail evaluation (conditions, run/strict/raises kwargs).
-    // --runxfail ignores marks; tests report their real outcomes.
+    // --runxfail ignores marks; tests report their real outcomes. Dynamic
+    // marks (request.applymarker / node.add_marker) start fresh per item.
+    let _ = py
+        .import("pytest._node")
+        .and_then(|m| m.call_method0("clear_added_marks"));
     let runxfail = config.get_flag("runxfail");
-    let xfailed = match evaluate_xfail_marks(py, session, config, item) {
+    let mut xfailed = match evaluate_xfail_marks(py, session, config, item, &[]) {
         Ok(xfailed) => xfailed,
         Err(err) => {
             reports.push(report_from_err(
@@ -217,13 +221,6 @@ pub(crate) fn run_one(
         return reports;
     }
     let xfail = xfailed.is_some() && !runxfail;
-    // raises= kwarg: only a matching exception counts as an expected failure.
-    let raises_match = |err: &PyErr| -> bool {
-        match xfailed.as_ref().and_then(|xf| xf.raises.as_ref()) {
-            Some(raises) => err.matches(py, raises.bind(py)).unwrap_or(false),
-            None => true,
-        }
-    };
 
     // request.getfixturevalue() support: expose this item's engine state to
     // Python for the duration of the run (popped when the guard drops).
@@ -431,7 +428,7 @@ pub(crate) fn run_one(
             if let Some(xf) = &xfailed
                 && xfail
                 && report.outcome == Outcome::Failed
-                && raises_match(&err)
+                && xfail_raises_ok(py, &xfailed, &err)
             {
                 report.outcome = Outcome::XFailed;
                 report.longrepr = Some(xf.reason.clone());
@@ -483,6 +480,31 @@ pub(crate) fn run_one(
     }
 
     // ---- call --------------------------------------------------------------
+    // Fixtures may have applied an xfail marker dynamically during setup;
+    // pytest re-evaluates at call start (including run=False NOTRUN).
+    if xfailed.is_none() {
+        let extra = added_marks(py);
+        if !extra.is_empty() {
+            xfailed = evaluate_xfail_marks(py, session, config, item, &extra).unwrap_or(None);
+            if let Some(xf) = &xfailed
+                && !runxfail
+                && !xf.run
+            {
+                reports.push(TestReport {
+                    nodeid: item.nodeid.clone(),
+                    phase: Phase::Call,
+                    outcome: Outcome::XFailed,
+                    duration: Duration::ZERO,
+                    longrepr: Some(format!("[NOTRUN] {}", xf.reason)),
+                    location: None,
+                });
+                teardown_one(py, plugins, session, config, item, true, &mut reports);
+                close_item_filters(py);
+                python::end_item_context(py);
+                return reports;
+            }
+        }
+    }
     python::log_start_phase(py, "call", log_level_cfg.as_deref());
     let call_started = Instant::now();
     let call_result = (|| -> PyResult<bool> {
@@ -513,7 +535,7 @@ pub(crate) fn run_one(
         return reports;
     }
 
-    let mut xfail_raises_ok = true;
+    let mut raises_ok = true;
     let report = match call_result {
         Ok(true) => TestReport {
             nodeid: item.nodeid.clone(),
@@ -559,22 +581,30 @@ pub(crate) fn run_one(
                             python::end_item_context(py);
                             return reports;
                         }
-                        xfail_raises_ok = raises_match(&err);
+                        raises_ok = xfail_raises_ok(py, &xfailed, &err);
                         report_from_err(py, config, item, Phase::Call, call_started, &err)
                     }
                 }
             }
         }
         Err(err) => {
-            xfail_raises_ok = raises_match(&err);
+            raises_ok = xfail_raises_ok(py, &xfailed, &err);
             report_from_err(py, config, item, Phase::Call, call_started, &err)
         }
     };
+    // The test body may have added an xfail marker (node.add_marker).
+    if xfailed.is_none() {
+        let extra = added_marks(py);
+        if !extra.is_empty() {
+            xfailed = evaluate_xfail_marks(py, session, config, item, &extra).unwrap_or(None);
+        }
+    }
+    let xfail = xfailed.is_some() && !runxfail;
     // @pytest.mark.xfail: expected failures invert at the call phase (when
     // the raises= filter matches); with strict=True an unexpected pass fails.
     let report = if let (Some(xf), true) = (&xfailed, xfail) {
         match report.outcome {
-            Outcome::Failed if xfail_raises_ok => TestReport {
+            Outcome::Failed if raises_ok => TestReport {
                 outcome: Outcome::XFailed,
                 longrepr: Some(xf.reason.clone()),
                 ..report
@@ -1180,15 +1210,35 @@ struct XfailEval {
     raises: Option<Py<PyAny>>,
 }
 
+/// Marks added at runtime via node.add_marker / request.applymarker.
+fn added_marks(py: Python<'_>) -> Vec<(String, Py<PyAny>)> {
+    py.import("pytest._node")
+        .and_then(|m| m.call_method0("added_marks"))
+        .and_then(|marks| marks.extract())
+        .unwrap_or_default()
+}
+
+/// `raises=` kwarg: only a matching exception counts as an expected failure.
+fn xfail_raises_ok(py: Python<'_>, xfailed: &Option<XfailEval>, err: &PyErr) -> bool {
+    match xfailed.as_ref().and_then(|xf| xf.raises.as_ref()) {
+        Some(raises) => err.matches(py, raises.bind(py)).unwrap_or(false),
+        None => true,
+    }
+}
+
 /// pytest evaluate_xfail_marks: the first triggered xfail mark, if any.
+/// `extra` carries dynamically added marks (closest, so they win).
 fn evaluate_xfail_marks(
     py: Python<'_>,
     session: &Session,
     config: &Config,
     item: &TestItem,
+    extra: &[(String, Py<PyAny>)],
 ) -> PyResult<Option<XfailEval>> {
     // Unmarked items (the common case) never enter Python.
-    if !item.marks.iter().any(|mark| mark.name == "xfail") {
+    if !item.marks.iter().any(|mark| mark.name == "xfail")
+        && !extra.iter().any(|(name, _)| name == "xfail")
+    {
         return Ok(None);
     }
     // Strict default: strict_xfail, then strict, then the pre-9 xfail_strict.
@@ -1201,10 +1251,15 @@ fn evaluate_xfail_marks(
         Some("true") | Some("True") | Some("1")
     );
     let config_obj = python::existing_py_config(py).unwrap_or_else(|| py.None());
+    let mut marks: Vec<(String, Py<PyAny>)> = extra
+        .iter()
+        .map(|(name, obj)| (name.clone(), obj.clone_ref(py)))
+        .collect();
+    marks.extend(marks_for_eval(py, item));
     let result = py.import("pytest._skipping")?.call_method1(
         "evaluate_xfail_marks",
         (
-            marks_for_eval(py, item),
+            marks,
             item.module_name.as_str(),
             config_obj,
             strict_default,
