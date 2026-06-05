@@ -900,9 +900,18 @@ fn expand_parametrize(
         let args = mark.obj.bind(py).getattr("args")?;
         let argnames_obj = args.get_item(0)?;
         let argvalues = args.get_item(1)?;
-        let argnames: Vec<String> = match argnames_obj.extract::<String>() {
-            Ok(joined) => joined.split(',').map(|s| s.trim().to_string()).collect(),
-            Err(_) => argnames_obj.extract()?,
+        // pytest's force_tuple: only a single argname given as a *string*
+        // takes each argvalue as the bare value; a one-element list
+        // (["x"]) still expects one-element value collections.
+        let (argnames, force_scalar): (Vec<String>, bool) = match argnames_obj.extract::<String>()
+        {
+            Ok(joined) => {
+                let names: Vec<String> =
+                    joined.split(',').map(|s| s.trim().to_string()).collect();
+                let single = names.len() == 1;
+                (names, single)
+            }
+            Err(_) => (argnames_obj.extract()?, false),
         };
         let explicit_ids: Option<Vec<Option<String>>> = mark
             .obj
@@ -940,12 +949,12 @@ fn expand_parametrize(
                     })
                     .collect::<PyResult<Vec<_>>>()?;
                 (values, spec_id, hidden, extra_marks)
-            } else if argnames.len() > 1 {
+            } else if force_scalar {
+                (vec![value_set], None, false, Vec::new())
+            } else {
                 let values: Vec<Bound<'_, PyAny>> =
                     value_set.try_iter()?.collect::<PyResult<_>>()?;
                 (values, None, false, Vec::new())
-            } else {
-                (vec![value_set], None, false, Vec::new())
             };
 
             if values.len() != argnames.len() {
