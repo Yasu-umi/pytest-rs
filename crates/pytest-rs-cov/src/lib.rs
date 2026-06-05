@@ -247,6 +247,50 @@ impl CovPlugin {
         }
     }
 
+    /// pytest-cov parity: persist the merged hits as a `.coverage` data file
+    /// (coverage.py's sqlite format) via the installed `coverage` package,
+    /// so downstream tooling (coverage html/report/combine, diff-cover)
+    /// keeps working. Skipped with a warning when coverage isn't installed.
+    fn write_data_file(
+        &self,
+        ctx: &mut HookContext,
+        hits: &HashMap<String, BTreeSet<u32>>,
+    ) -> PyResult<()> {
+        let py = ctx.py;
+        let Ok(coverage_mod) = py.import("coverage") else {
+            let _ = pytest_rs_core::python::warn_explicit_at(
+                py,
+                "PytestConfigWarning",
+                "coverage package not installed; .coverage data file not written",
+                "pytest_cov/plugin.py",
+                0,
+            );
+            return Ok(());
+        };
+        let data_path = match std::env::var("COVERAGE_FILE") {
+            Ok(value) => ctx.config.rootdir.join(value),
+            Err(_) => ctx.config.rootdir.join(".coverage"),
+        };
+        let append = ctx.config.get_flag("cov-append") && data_path.exists();
+        if !append {
+            let _ = std::fs::remove_file(&data_path);
+        }
+        let data = coverage_mod
+            .getattr("CoverageData")?
+            .call1((data_path.to_string_lossy().as_ref(),))?;
+        if append {
+            data.call_method0("read")?;
+        }
+        let lines = core_pyo3::types::PyDict::new(py);
+        for (file, hit_lines) in hits {
+            let list: Vec<u32> = hit_lines.iter().copied().collect();
+            lines.set_item(file, list)?;
+        }
+        data.call_method1("add_lines", (lines,))?;
+        data.call_method0("write")?;
+        Ok(())
+    }
+
     fn build_data(&self, rootdir: &Path, hits: HashMap<String, BTreeSet<u32>>) -> CoverageData {
         // Report set: every hit file, plus (with explicit --cov=src) every
         // .py file under the sources, so never-imported files show as 0%.
@@ -430,6 +474,7 @@ impl Plugin for CovPlugin {
         for (file, lines) in self.worker_hits.drain() {
             hits.entry(file).or_default().extend(lines);
         }
+        self.write_data_file(ctx, &hits)?;
         let rootdir = ctx
             .config
             .rootdir

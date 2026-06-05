@@ -34,6 +34,8 @@ class LogCaptureFixture:
         # (logger, old level) pairs restored at teardown.
         self._initial_logger_levels = {}
         self._initial_handler_level = None
+        # logging.disable() level to restore at teardown (set_level only).
+        self._initial_disabled_logging_level = None
 
     def _start(self):
         root = logging.getLogger()
@@ -48,6 +50,9 @@ class LogCaptureFixture:
         if self._initial_handler_level is not None:
             self.handler.setLevel(self._initial_handler_level)
             self._initial_handler_level = None
+        if self._initial_disabled_logging_level is not None:
+            logging.disable(self._initial_disabled_logging_level)
+            self._initial_disabled_logging_level = None
 
     @property
     def records(self):
@@ -72,6 +77,26 @@ class LogCaptureFixture:
         # Phase-separated records are not tracked; "call" covers the test body.
         return self.records if when == "call" else []
 
+    def _force_enable_logging(self, level, logger_obj):
+        """Un-disable (logging.disable) levels >= the requested capture level.
+
+        Returns the original disabled level so callers can restore it.
+        """
+        original_disable_level = logger_obj.manager.disable
+
+        if isinstance(level, str):
+            # Try to translate the level string to an int for logging.disable().
+            level = logging.getLevelName(level)
+
+        if not isinstance(level, int):
+            # The level provided was not valid, so just un-disable all logging.
+            logging.disable(logging.NOTSET)
+        elif not logger_obj.isEnabledFor(level):
+            # Each level is 10 away from other levels.
+            logging.disable(max(level - 10, logging.NOTSET))
+
+        return original_disable_level
+
     def set_level(self, level, logger=None):
         logger_obj = logging.getLogger(logger)
         self._initial_logger_levels.setdefault(logger or "", logger_obj.level)
@@ -79,6 +104,9 @@ class LogCaptureFixture:
         if self._initial_handler_level is None:
             self._initial_handler_level = self.handler.level
         self.handler.setLevel(level)
+        initial_disabled_logging_level = self._force_enable_logging(level, logger_obj)
+        if self._initial_disabled_logging_level is None:
+            self._initial_disabled_logging_level = initial_disabled_logging_level
 
     @contextlib.contextmanager
     def at_level(self, level, logger=None):
@@ -87,11 +115,13 @@ class LogCaptureFixture:
         old_handler = self.handler.level
         logger_obj.setLevel(level)
         self.handler.setLevel(level)
+        original_disable_level = self._force_enable_logging(level, logger_obj)
         try:
             yield
         finally:
             logger_obj.setLevel(old_logger)
             self.handler.setLevel(old_handler)
+            logging.disable(original_disable_level)
 
     @contextlib.contextmanager
     def filtering(self, filter_):

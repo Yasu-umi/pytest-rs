@@ -135,6 +135,10 @@ impl Engine {
     /// re-indexing the parent's collected items.
     #[cfg(unix)]
     pub(crate) fn run_worker_forked(&mut self, py: Python<'_>) -> i32 {
+        // The inherited config was parsed by the controller (no --worker
+        // flag); plugins must still see this process as a worker (e.g. cov
+        // ships its hits via pytest_worker_dump instead of reporting).
+        self.config.mark_worker();
         if py
             .run(c"import sys\nsys.stdout = sys.stderr\n", None, None)
             .is_err()

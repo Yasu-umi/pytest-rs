@@ -671,6 +671,13 @@ impl Config {
         self.get_flag("worker")
     }
 
+    /// Mark this process as a worker after the fact: forked workers inherit
+    /// the controller's parsed config, which lacks the spawn-only --worker
+    /// flag, so plugins would otherwise take their controller code paths.
+    pub fn mark_worker(&mut self) {
+        self.flags.insert("worker".to_string());
+    }
+
     /// python_files ini patterns (default test_*.py / *_test.py).
     pub fn python_files_patterns(&self) -> Vec<String> {
         self.get_ini("python_files")
