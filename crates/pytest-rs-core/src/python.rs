@@ -22,6 +22,35 @@ pub fn shim_root() -> PathBuf {
     std::env::temp_dir().join(format!("pytest-rs-{}", std::process::id()))
 }
 
+/// An embedded interpreter does not activate a virtualenv on its own: when
+/// VIRTUAL_ENV is set, add its site-packages via site.addsitedir — which
+/// also processes .pth files (editable installs), unlike PYTHONPATH — and
+/// move the added entries to the front so the venv shadows the base env.
+pub fn activate_virtualenv(py: Python<'_>) -> PyResult<()> {
+    py.run(
+        c"
+import glob as _glob
+import os as _os
+import site as _site
+import sys as _sys
+
+_venv = _os.environ.get('VIRTUAL_ENV')
+if _venv:
+    _candidates = _glob.glob(_os.path.join(_venv, 'lib', 'python*', 'site-packages'))
+    _candidates.append(_os.path.join(_venv, 'Lib', 'site-packages'))
+    for _dir in _candidates:
+        if _os.path.isdir(_dir) and _dir not in _sys.path:
+            _before = len(_sys.path)
+            _site.addsitedir(_dir)
+            _added = _sys.path[_before:]
+            del _sys.path[_before:]
+            _sys.path[:0] = _added
+",
+        None,
+        None,
+    )
+}
+
 /// Set up the embedded interpreter for a run: write the pytest shim package
 /// to a temp dir and prepend it to sys.path so `import pytest` resolves to us.
 pub fn install_shim(py: Python<'_>) -> PyResult<PathBuf> {

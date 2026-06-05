@@ -46,6 +46,10 @@ impl Engine {
     /// Run the whole test session; returns the process exit code.
     pub fn run(&mut self, py: Python<'_>) -> i32 {
         let started = Instant::now();
+        if let Err(err) = python::activate_virtualenv(py) {
+            eprintln!("INTERNAL ERROR: failed to activate virtualenv: {err}");
+            return exit_code::INTERNAL_ERROR;
+        }
         if let Err(err) = python::install_shim(py) {
             eprintln!("INTERNAL ERROR: failed to install pytest shim: {err}");
             return exit_code::INTERNAL_ERROR;
