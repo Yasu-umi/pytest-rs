@@ -69,15 +69,51 @@ class MarkDecorator:
 
 class MarkGenerator:
     def __init__(self, *, _ispytest=False):
-        pass
+        self._config = None
+        self._strict = False
+        self._markers = set()
 
     def __getattr__(self, name):
         if name.startswith("_"):
             raise AttributeError(name)
+        if self._config is not None:
+            # Known-marks set is a cache; refresh from the (mutable) ini
+            # before deciding the mark really is unknown.
+            if name not in self._markers:
+                for line in (self._config.getini("markers") or "").splitlines():
+                    marker = line.split(":")[0].split("(")[0].strip()
+                    if marker:
+                        self._markers.add(marker)
+            if name not in self._markers:
+                # Raise a specific error for common misspellings of "parametrize".
+                if name in ("parameterize", "parametrise", "parameterise"):
+                    from pytest._outcomes import fail
+
+                    fail(f"Unknown '{name}' mark, did you mean 'parametrize'?")
+                # Under --strict-markers the engine fails collection itself.
+                if not self._strict:
+                    import warnings
+
+                    from pytest._warning_types import PytestUnknownMarkWarning
+
+                    warnings.warn(
+                        f"Unknown pytest.mark.{name} - is this a typo?  You can register "
+                        "custom marks to avoid this warning - for details, see "
+                        "https://docs.pytest.org/en/stable/how-to/mark.html",
+                        PytestUnknownMarkWarning,
+                        2,
+                    )
         return MarkDecorator(Mark(name))
 
 
 mark = MarkGenerator()
+
+
+def configure_mark_generator(config, builtin_names, strict):
+    """Arm unknown-mark validation once the session config is known."""
+    mark._config = config
+    mark._strict = strict
+    mark._markers = set(builtin_names)
 
 
 class ParamSpec:

@@ -952,7 +952,8 @@ impl Plugin for AsyncioPlugin {
         }
         // Strict mode only handles pytest_asyncio.fixture async fixtures; a
         // plain @pytest.fixture async def resolves to its raw coroutine
-        // (the core warns), plus a deprecation when the test opted in.
+        // (the core warns RemovedIn9 — an error unless filtered, pytest 9
+        // parity), plus a deprecation when the test opted in.
         if self.mode == Mode::Strict && !is_asyncio_fixture {
             if item.get_closest_marker("asyncio").is_some() {
                 let test_name = item.nodeid.rsplit("::").next().unwrap_or(&item.nodeid);

@@ -129,11 +129,12 @@ class RunResult:
 
 
 class Pytester:
-    def __init__(self, path, request_name):
+    def __init__(self, path, request_name, request=None):
         import pathlib
 
         self.path = pathlib.Path(path)
         self._name = request_name
+        self._request = request
         self._syspaths = []
 
     def _makefile(self, ext, args, kwargs):
@@ -237,6 +238,57 @@ class Pytester:
         path.mkdir(parents=True)
         (path / "__init__.py").touch()
         return path
+
+    def copy_example(self, name=None):
+        """Copy a file or directory from the suite's example_scripts tree
+        into the pytester dir. The example dir is found by walking up from
+        the requesting test's file (we don't see the suite's
+        `pytester_example_dir` ini; pytest's layout keeps examples next to
+        the tests)."""
+        import pathlib
+        import shutil
+
+        function = getattr(self._request.node, "function", None) if self._request else None
+        if function is None:
+            fail("copy_example: originating test function is unknown")
+        here = pathlib.Path(function.__code__.co_filename).resolve().parent
+        example_dir = next(
+            (
+                base / "example_scripts"
+                for base in (here, *here.parents)
+                if (base / "example_scripts").is_dir()
+            ),
+            None,
+        )
+        if example_dir is None:
+            fail(f"copy_example: no example_scripts directory above {here}")
+        for mark in self._request.node.iter_markers("pytester_example_path"):
+            example_dir = example_dir.joinpath(*mark.args)
+
+        if name is None:
+            maybe_dir = example_dir / self._name
+            maybe_file = example_dir / (self._name + ".py")
+            if maybe_dir.is_dir():
+                example_path = maybe_dir
+            elif maybe_file.is_file():
+                example_path = maybe_file
+            else:
+                raise LookupError(
+                    f"{self._name} can't be found as module or package in {example_dir}"
+                )
+        else:
+            example_path = example_dir.joinpath(name)
+
+        if example_path.is_dir() and not (example_path / "__init__.py").is_file():
+            shutil.copytree(example_path, self.path, dirs_exist_ok=True)
+            return self.path
+        if example_path.is_file():
+            result = self.path / example_path.name
+            shutil.copy(example_path, result)
+            return result
+        raise LookupError(
+            f'example "{example_path}" is not found as a file or directory'
+        )
 
     def runpython(self, script):
         import os
@@ -369,7 +421,7 @@ def _make_runner_dir(request, tmp_path_factory, cls):
     path = tmp_path_factory.mktemp(name, numbered=True)
     old_cwd = os.getcwd()
     os.chdir(path)
-    runner = cls(path, name)
+    runner = cls(path, name, request)
     yield runner
     for entry in runner._syspaths:
         if entry in sys.path:

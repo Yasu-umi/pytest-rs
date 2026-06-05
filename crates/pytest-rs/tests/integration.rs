@@ -288,14 +288,21 @@ async def test_async(value, gen_value):
     await asyncio.sleep(0)
     assert value + gen_value == 42
 
-async def test_async_unmarked_is_skipped():
+async def test_async_unmarked_is_not_run():
     raise AssertionError("strict mode must not run this")
 "#,
     );
     let output = suite.run(&[]);
     let out = stdout(&output);
-    assert_eq!(output.status.code(), Some(0), "out: {out}");
-    assert!(out.contains("1 passed, 1 skipped"), "out: {out}");
+    // pytest 9 parity: the plain async @pytest.fixture is unhandled in
+    // strict mode (RemovedIn9 → error), and the unmarked async test fails
+    // as unhandled (it used to be skipped).
+    assert_eq!(output.status.code(), Some(1), "out: {out}");
+    assert!(out.contains("requested an async fixture"), "out: {out}");
+    assert!(
+        out.contains("async def functions are not natively supported"),
+        "out: {out}"
+    );
 }
 
 #[test]
@@ -671,8 +678,14 @@ async def test_async():
     );
     let output = suite.run(&["-o", "asyncio_mode=strict"]);
     let out = stdout(&output);
-    assert_eq!(output.status.code(), Some(0), "out: {out}");
-    assert!(out.contains("1 skipped"), "out: {out}");
+    // Strict (via -o, beating the ini's auto) fails the unmarked async test
+    // as unhandled (pytest 9 parity); auto mode would have run its body.
+    assert_eq!(output.status.code(), Some(1), "out: {out}");
+    assert!(
+        out.contains("async def functions are not natively supported"),
+        "out: {out}"
+    );
+    assert!(!out.contains("must not run"), "out: {out}");
 }
 
 #[test]

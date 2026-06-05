@@ -478,8 +478,14 @@ fn import_module_from_path<'py>(
 /// Build the Config proxy passed to conftest hooks. One proxy per process
 /// (the Config itself is process-global), so attribute mutations made by
 /// conftest hooks (e.g. `config.option.foo = ...`) stay visible everywhere.
+static CONFIG_PROXY: std::sync::OnceLock<Py<PyAny>> = std::sync::OnceLock::new();
+
+/// The process-global Config proxy, if one was built already.
+pub fn existing_py_config(py: Python<'_>) -> Option<Py<PyAny>> {
+    CONFIG_PROXY.get().map(|proxy| proxy.clone_ref(py))
+}
+
 pub fn make_py_config(py: Python<'_>, config: &crate::config::Config) -> PyResult<Py<PyAny>> {
-    static CONFIG_PROXY: std::sync::OnceLock<Py<PyAny>> = std::sync::OnceLock::new();
     if let Some(proxy) = CONFIG_PROXY.get() {
         return Ok(proxy.clone_ref(py));
     }
@@ -1306,12 +1312,48 @@ pub fn install_warning_capture(
     ini_specs: &[String],
     w_specs: &[String],
 ) -> PyResult<()> {
-    py.import("pytest._wcapture")?.call_method0("install")?;
-    let warnings = py.import("warnings")?;
-    for spec in ini_specs.iter().chain(w_specs) {
-        // warnings._setoption implements exactly python -W parsing.
-        warnings.call_method1("_setoption", (spec.trim(),))?;
+    let wcapture = py.import("pytest._wcapture")?;
+    wcapture.call_method0("install")?;
+    let ini: Vec<String> = ini_specs.iter().map(|s| s.trim().to_string()).collect();
+    let w: Vec<String> = w_specs.iter().map(|s| s.trim().to_string()).collect();
+    wcapture.call_method1("apply_session_filters", (ini, w))?;
+    Ok(())
+}
+
+/// Expand `testpaths` ini globs against the rootdir (sorted per entry,
+/// recursive ** supported), pytest's Config._decide_args.
+pub fn glob_testpaths(
+    py: Python<'_>,
+    rootdir: &Path,
+    entries: &[String],
+) -> PyResult<Vec<String>> {
+    let glob = py.import("glob")?;
+    let kwargs = pyo3::types::PyDict::new(py);
+    kwargs.set_item("recursive", true)?;
+    let mut out = Vec::new();
+    for entry in entries {
+        let pattern = rootdir.join(entry);
+        let mut matches: Vec<String> = glob
+            .call_method("glob", (pattern.to_string_lossy().as_ref(),), Some(&kwargs))?
+            .extract()?;
+        matches.sort();
+        out.extend(matches);
     }
+    Ok(out)
+}
+
+/// Arm the shim's MarkGenerator: unknown marks (not builtin, not in the
+/// `markers` ini) warn PytestUnknownMarkWarning at the use site.
+pub fn configure_mark_generator(
+    py: Python<'_>,
+    config: &crate::config::Config,
+    strict: bool,
+) -> PyResult<()> {
+    let proxy = make_py_config(py, config)?;
+    py.import("pytest._marks")?.call_method1(
+        "configure_mark_generator",
+        (proxy, crate::engine::BUILTIN_MARKS.to_vec(), strict),
+    )?;
     Ok(())
 }
 

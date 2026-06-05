@@ -67,8 +67,9 @@ def _explain_eq(left, right):
 
 
 class _AssertRewriter(ast.NodeTransformer):
-    def __init__(self):
+    def __init__(self, path="<unknown>"):
         self._counter = 0
+        self._path = path
 
     def _temp(self):
         self._counter += 1
@@ -76,6 +77,19 @@ class _AssertRewriter(ast.NodeTransformer):
 
     def visit_Assert(self, node):
         test = node.test
+        if isinstance(test, ast.Tuple) and test.elts:
+            import warnings
+
+            from pytest._warning_types import PytestAssertRewriteWarning
+
+            warnings.warn_explicit(
+                PytestAssertRewriteWarning(
+                    "assertion is always true, perhaps remove parentheses?"
+                ),
+                category=None,
+                filename=self._path,
+                lineno=node.lineno,
+            )
         if isinstance(test, ast.Compare) and len(test.ops) == 1:
             return self._rewrite_compare(node)
         return self._rewrite_generic(node)
@@ -190,7 +204,7 @@ class _AssertRewriter(ast.NodeTransformer):
 class _RewriteLoader(importlib.machinery.SourceFileLoader):
     def source_to_code(self, data, path, *, _optimize=-1):
         tree = ast.parse(data, filename=path)
-        _AssertRewriter().visit(tree)
+        _AssertRewriter(path).visit(tree)
         ast.fix_missing_locations(tree)
         return compile(tree, path, "exec", dont_inherit=True, optimize=_optimize)
 

@@ -9,6 +9,22 @@ use crate::python;
 use crate::report::{Outcome, Phase, exit_code};
 use crate::session::Session;
 
+/// Marks owned by the core or bundled plugins.
+pub(crate) const BUILTIN_MARKS: [&str; 12] = [
+    "skip",
+    "skipif",
+    "xfail",
+    "parametrize",
+    "usefixtures",
+    "filterwarnings",
+    "tryfirst",
+    "trylast",
+    "asyncio",
+    "benchmark",
+    "no_cover",
+    "xdist_group",
+];
+
 pub struct Engine {
     pub plugins: Vec<Box<dyn Plugin>>,
     pub session: Session,
@@ -45,8 +61,14 @@ impl Engine {
             .unwrap_or_default();
         if let Err(err) = python::install_warning_capture(py, &ini_filters, &self.config.w_options)
         {
-            eprintln!("ERROR: while parsing warning filter: {}", err.value(py));
+            eprintln!("ERROR: {}", err.value(py));
             return exit_code::USAGE_ERROR;
+        }
+        // Arm unknown-mark validation (PytestUnknownMarkWarning on access).
+        if let Err(err) = python::configure_mark_generator(py, &self.config, self.strict_markers())
+        {
+            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+            return exit_code::INTERNAL_ERROR;
         }
         if self.config.get_flag("runxfail") {
             // --runxfail also neutralizes imperative pytest.xfail (pytest's
@@ -162,6 +184,7 @@ impl Engine {
         }
         if n_items == 0 {
             if !self.config.no_terminal() {
+                self.print_warnings_summary(py);
                 println!(
                     "{}",
                     crate::runner::summary_line(
@@ -204,25 +227,32 @@ impl Engine {
         if let Err(err) = self.print_plugin_summaries(py) {
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
         }
-        let warning_count = python::warning_count(py) + self.session.worker_warning_count;
-        if warning_count > 0 && !self.config.quiet {
-            println!("{}", center_banner("warnings summary"));
-            for line in python::warning_summary_lines(py) {
-                println!("{line}");
-            }
-            for line in &self.session.worker_warnings {
-                println!("{line}");
-            }
-        }
+        self.print_warnings_summary(py);
         if let Some(banner) = &self.session.dist_banner {
             println!("{}", center_banner(banner));
         }
         self.print_short_summary();
+        let warning_count = python::warning_count(py) + self.session.worker_warning_count;
         println!(
             "{}",
             crate::runner::summary_line(&self.session.reports, warning_count, started.elapsed())
         );
         code
+    }
+
+    fn print_warnings_summary(&self, py: Python<'_>) {
+        let warning_count = python::warning_count(py) + self.session.worker_warning_count;
+        if warning_count == 0 || self.config.quiet {
+            return;
+        }
+        println!("{}", center_banner("warnings summary"));
+        for line in python::warning_summary_lines(py) {
+            println!("{line}");
+        }
+        for line in &self.session.worker_warnings {
+            println!("{line}");
+        }
+        println!("-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html");
     }
 
     fn print_header(&self) {
@@ -361,10 +391,9 @@ impl Engine {
         Ok(())
     }
 
-    /// --strict-markers / --strict (CLI or ini): every mark must be
-    /// registered in the `markers` ini option or be a builtin/bundled one.
-    fn check_strict_markers(&self) -> Result<(), String> {
-        let strict = self.config.get_flag("strict-markers")
+    /// --strict-markers / --strict via CLI or ini.
+    fn strict_markers(&self) -> bool {
+        self.config.get_flag("strict-markers")
             || self.config.get_flag("strict")
             || matches!(
                 self.config.get_ini("strict_markers").map(str::trim),
@@ -373,26 +402,16 @@ impl Engine {
             || matches!(
                 self.config.get_ini("strict").map(str::trim),
                 Some("true") | Some("True") | Some("1")
-            );
-        if !strict {
+            )
+    }
+
+    /// --strict-markers / --strict (CLI or ini): every mark must be
+    /// registered in the `markers` ini option or be a builtin/bundled one.
+    fn check_strict_markers(&self) -> Result<(), String> {
+        if !self.strict_markers() {
             return Ok(());
         }
 
-        // Marks owned by the core or bundled plugins.
-        const KNOWN: [&str; 12] = [
-            "skip",
-            "skipif",
-            "xfail",
-            "parametrize",
-            "usefixtures",
-            "filterwarnings",
-            "tryfirst",
-            "trylast",
-            "asyncio",
-            "benchmark",
-            "no_cover",
-            "xdist_group",
-        ];
         let registered: std::collections::HashSet<String> = self
             .config
             .get_ini("markers")
@@ -409,7 +428,8 @@ impl Engine {
 
         for item in &self.session.items {
             for mark in &item.marks {
-                if !KNOWN.contains(&mark.name.as_str()) && !registered.contains(&mark.name) {
+                if !BUILTIN_MARKS.contains(&mark.name.as_str()) && !registered.contains(&mark.name)
+                {
                     return Err(format!(
                         "'{}' not found in `markers` configuration option",
                         mark.name
@@ -591,14 +611,62 @@ impl Engine {
     /// Returns per-file collection errors (formatted).
     fn collect(&mut self, py: Python<'_>) -> Result<Vec<(PathBuf, String)>, String> {
         let rootdir = self.config.rootdir.clone();
+        // No CLI paths: the `testpaths` ini (globbed against rootdir) decides
+        // where collection starts; an empty glob warns and falls back to a
+        // recursive search from the invocation dir, like pytest.
+        let mut paths = self.config.paths.clone();
+        if paths.is_empty()
+            && let Some(testpaths) = self.config.get_ini("testpaths")
+        {
+            let entries: Vec<String> = testpaths.split_whitespace().map(str::to_string).collect();
+            if !entries.is_empty() {
+                let globbed = python::glob_testpaths(py, &rootdir, &entries)
+                    .map_err(|err| python::format_exception(py, &err))?;
+                if globbed.is_empty() {
+                    let _ = python::warn_explicit_at(
+                        py,
+                        "PytestConfigWarning",
+                        "No files were found in testpaths; consider removing or adjusting \
+                         your testpaths configuration. Searching recursively from the \
+                         current directory instead.",
+                        &rootdir.to_string_lossy(),
+                        0,
+                    );
+                } else {
+                    paths = globbed;
+                }
+            }
+        }
         // Relative CLI paths (and bare collection) resolve against the
         // invocation dir; rootdir only anchors node ids.
-        let files =
-            crate::collect::collect_test_files(&self.config.invocation_dir, &self.config.paths)?;
+        let files = crate::collect::collect_test_files(&self.config.invocation_dir, &paths)?;
+
+        // Conftests load for every collection start dir (even ones with no
+        // test files — pytest imports initial conftests during dir scan),
+        // plus each collected file's directory chain.
+        let mut start_dirs: Vec<PathBuf> = Vec::new();
+        if paths.is_empty() {
+            start_dirs.push(self.config.invocation_dir.clone());
+        } else {
+            for path in &paths {
+                let fs_part = path.split("::").next().unwrap_or_default();
+                let resolved = self.config.invocation_dir.join(fs_part);
+                if resolved.is_dir() {
+                    start_dirs.push(resolved);
+                } else if let Some(parent) = resolved.parent() {
+                    start_dirs.push(parent.to_path_buf());
+                }
+            }
+        }
+        start_dirs.extend(
+            files
+                .iter()
+                .filter_map(|f| f.parent().map(std::path::Path::to_path_buf)),
+        );
 
         let mut conftests: Vec<PathBuf> = Vec::new();
-        for file in &files {
-            let mut dir = file.parent();
+        for start in &start_dirs {
+            let mut dir = Some(start.as_path());
             let mut chain = Vec::new();
             while let Some(d) = dir {
                 let conftest = d.join("conftest.py");

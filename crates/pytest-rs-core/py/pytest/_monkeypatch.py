@@ -26,15 +26,39 @@ class MonkeyPatch:
 
         return _context()
 
+    @staticmethod
+    def _resolve(name):
+        """Import-or-getattr each dotted segment, pytest's monkeypatch
+        resolve(): attribute lookup wins, failed imports of submodules get
+        an "import error in {path}" message."""
+        parts = name.split(".")
+        used = parts.pop(0)
+        found = __import__(used)
+        for part in parts:
+            used += "." + part
+            try:
+                found = getattr(found, part)
+            except AttributeError:
+                pass
+            else:
+                continue
+            try:
+                __import__(used)
+            except ImportError as ex:
+                expected = str(ex).split()[-1]
+                if expected == used:
+                    raise
+                raise ImportError(f"import error in {used}: {ex}") from ex
+            found = getattr(found, part)
+        return found
+
     def setattr(self, target, name, value=_notset, raising=True):
         if isinstance(target, str):
             # setattr("module.path.attr", value) form
-            import importlib
-
             if value is self._notset:
                 value = name
             module_path, _, name = target.rpartition(".")
-            target = importlib.import_module(module_path)
+            target = self._resolve(module_path)
         elif value is self._notset:
             raise TypeError("setattr requires a value when target is an object")
         if raising and not hasattr(target, name):
@@ -44,10 +68,8 @@ class MonkeyPatch:
 
     def delattr(self, target, name=_notset, raising=True):
         if isinstance(target, str):
-            import importlib
-
             module_path, _, attr_name = target.rpartition(".")
-            target = importlib.import_module(module_path)
+            target = self._resolve(module_path)
             name = attr_name
         if not hasattr(target, name):
             if raising:

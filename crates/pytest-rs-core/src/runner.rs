@@ -188,29 +188,33 @@ pub(crate) fn run_one(
                 .unwrap_or_default()
         })
         .collect();
-    let item_filters = if mark_filter_specs.is_empty() {
-        None
-    } else {
-        match python::begin_item_filters(py, &mark_filter_specs) {
-            Ok(ctx) => Some(ctx),
-            Err(err) => {
-                reports.push(report_from_err(
-                    py,
-                    config,
-                    item,
-                    Phase::Setup,
-                    Instant::now(),
-                    &err,
-                ));
-                python::end_item_context(py);
-                return reports;
-            }
+    // Entered for every item (even without marks) so the "default" warning
+    // action's once-per-location registry resets per test, like pytest's
+    // per-item catch_warnings block.
+    let item_filters = match python::begin_item_filters(py, &mark_filter_specs) {
+        Ok(ctx) => Some(ctx),
+        Err(err) => {
+            reports.push(report_from_err(
+                py,
+                config,
+                item,
+                Phase::Setup,
+                Instant::now(),
+                &err,
+            ));
+            python::end_item_context(py);
+            return reports;
         }
     };
     let close_item_filters = |py: Python<'_>| {
         if let Some(ctx) = &item_filters {
             python::end_item_filters(py, ctx);
         }
+        // Warnings emitted between items (config/collect phases) carry no
+        // nodeid in the summary, like pytest.
+        let _ = py
+            .import("pytest._wcapture")
+            .and_then(|m| m.call_method1("set_current_test", (py.None(),)));
     };
 
     // ---- setup -----------------------------------------------------------
