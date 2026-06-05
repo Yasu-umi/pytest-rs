@@ -3,6 +3,7 @@
 
 [files]
 "testing/freeze/tests/test_trivial.py" = "passed"
+"testing/test_doctest.py" = "passed"
 "testing/test_monkeypatch.py" = "passed"
 "testing/test_recwarn.py" = "passed"
 
