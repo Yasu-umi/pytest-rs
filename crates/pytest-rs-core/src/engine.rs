@@ -81,6 +81,17 @@ impl Engine {
             eprintln!("ERROR: {}", err.value(py));
             return exit_code::USAGE_ERROR;
         }
+        if let Some(mode) = self
+            .config
+            .get_value("log-file-mode")
+            .or_else(|| self.config.get_ini("log_file_mode"))
+            && !matches!(mode, "w" | "a")
+        {
+            eprintln!(
+                "error: argument --log-file-mode: invalid choice: '{mode}' (choose from 'w', 'a')"
+            );
+            return exit_code::USAGE_ERROR;
+        }
         // Session-wide logging handlers: log_file writes, log_cli interleaves
         // live records with the progress output.
         self.session.live_logging = python::configure_logging(py, &self.config);
@@ -280,7 +291,20 @@ impl Engine {
 
         if self.config.collect_only {
             if !self.config.no_terminal() {
-                if self.config.quiet {
+                if self.config.quiet_level >= 2 {
+                    // -qq: per-file counts ("test_x.py: 3").
+                    let mut counts: Vec<(String, usize)> = Vec::new();
+                    for item in &self.session.items {
+                        let file = item.nodeid.split("::").next().unwrap_or("").to_string();
+                        match counts.iter_mut().find(|(name, _)| name == &file) {
+                            Some((_, count)) => *count += 1,
+                            None => counts.push((file, 1)),
+                        }
+                    }
+                    for (file, count) in counts {
+                        println!("{file}: {count}");
+                    }
+                } else if self.config.quiet {
                     for item in &self.session.items {
                         println!("{}", item.nodeid);
                     }
@@ -473,7 +497,12 @@ impl Engine {
             "\x1b[32m" // green
         };
         println!();
-        println!("{color}{}\x1b[0m", center_banner(&body));
+        if self.config.quiet {
+            // -q: the bare summary line, no banner.
+            println!("{color}{body}\x1b[0m");
+        } else {
+            println!("{color}{}\x1b[0m", center_banner(&body));
+        }
     }
 
     fn print_warnings_summary(&self, py: Python<'_>) {

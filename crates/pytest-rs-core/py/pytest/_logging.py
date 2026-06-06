@@ -73,6 +73,18 @@ class _LiveLogHandler(logging.StreamHandler):
         self.flush()
 
 
+class DatetimeFormatter(logging.Formatter):
+    """%f (microseconds) support in datefmt, like upstream pytest."""
+
+    def formatTime(self, record, datefmt=None):
+        if datefmt and "%f" in datefmt:
+            import datetime
+
+            ct = datetime.datetime.fromtimestamp(record.created).astimezone()
+            return ct.strftime(datefmt)
+        return super().formatTime(record, datefmt)
+
+
 def _parse_level(value):
     """An int log level from an int-ish or name string, else None."""
     if value is None:
@@ -120,7 +132,7 @@ class LoggingState:
         log_format = get("log_format") or DEFAULT_LOG_FORMAT
         log_date_format = get("log_date_format")
         # Captured-section formatter follows log_format/log_date_format ini.
-        self._report_formatter = logging.Formatter(log_format, datefmt=log_date_format)
+        self._report_formatter = DatetimeFormatter(log_format, datefmt=log_date_format)
         self.caplog_handler.setFormatter(self._report_formatter)
         self.report_handler.setFormatter(self._report_formatter)
 
@@ -138,7 +150,7 @@ class LoggingState:
             handler.setLevel(effective if effective is not None else logging.NOTSET)
             fmt = get("log_file_format") or log_format
             datefmt = get("log_file_date_format") or log_date_format
-            handler.setFormatter(logging.Formatter(fmt, datefmt=datefmt))
+            handler.setFormatter(DatetimeFormatter(fmt, datefmt=datefmt))
             self.log_file_handler = handler
             root.addHandler(handler)
             if effective is not None:
@@ -156,7 +168,7 @@ class LoggingState:
             handler.setLevel(effective if effective is not None else logging.NOTSET)
             fmt = get("log_cli_format") or log_format
             datefmt = get("log_cli_date_format") or log_date_format
-            handler.setFormatter(logging.Formatter(fmt, datefmt=datefmt))
+            handler.setFormatter(DatetimeFormatter(fmt, datefmt=datefmt))
             self.log_cli_handler = handler
             root.addHandler(handler)
             if effective is not None:

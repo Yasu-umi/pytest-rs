@@ -170,6 +170,8 @@ pub struct Config {
     pub paths: Vec<String>,
     pub verbose: u8,
     pub quiet: bool,
+    /// -q occurrences (-qq folds collect-only output per file).
+    pub quiet_level: u8,
     pub exitfirst: bool,
     pub collect_only: bool,
     pub rootdir: PathBuf,
@@ -340,7 +342,7 @@ impl Config {
                 clap::Arg::new("quiet")
                     .short('q')
                     .long("quiet")
-                    .action(clap::ArgAction::SetTrue),
+                    .action(clap::ArgAction::Count),
             )
             .arg(
                 clap::Arg::new("exitfirst")
@@ -612,7 +614,8 @@ impl Config {
                 .map(|vals| vals.cloned().collect())
                 .unwrap_or_default(),
             verbose: matches.get_count("verbose"),
-            quiet: matches.get_flag("quiet"),
+            quiet: matches.get_count("quiet") > 0,
+            quiet_level: matches.get_count("quiet"),
             exitfirst: matches.get_flag("exitfirst"),
             collect_only: matches.get_flag("collect-only"),
             rootdir,
