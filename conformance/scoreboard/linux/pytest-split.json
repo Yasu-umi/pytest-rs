@@ -1,6 +1,7 @@
 {
   "suite": "pytest-split",
   "tag": "0.9.0",
+  "category": "ecosystem",
   "excluded_files": 3,
   "files": [
     {

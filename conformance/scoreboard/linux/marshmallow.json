@@ -1,0 +1,116 @@
+{
+  "suite": "marshmallow",
+  "tag": "4.1.1",
+  "category": "real-world",
+  "excluded_files": 3,
+  "files": [
+    {
+      "file": "tests/test_context.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_decorators.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 44,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_deserialization.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 379,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_error_store.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 29,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_exceptions.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_fields.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 92,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_options.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_registry.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_schema.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 201,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_serialization.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 128,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_utils.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 16,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_validate.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 191,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    }
+  ]
+}

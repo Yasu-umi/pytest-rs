@@ -1,6 +1,7 @@
 {
   "suite": "pytest-benchmark",
   "tag": "v5.1.0",
+  "category": "ecosystem",
   "excluded_files": 6,
   "files": [
     {

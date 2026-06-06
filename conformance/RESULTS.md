@@ -23,6 +23,10 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pytest-xdist | v3.8.0 | 62 | 35 | 0 | 0 | 97 | 63.9% | 0 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 40 | 82 | 0 | 1 | 123 | 32.5% | 2 | 7 | 6 |
+| click | 8.3.1 | 1314 | 0 | 0 | 21 | 1335 | 98.4% | 20 | 20 | 0 |
+| jinja | 3.1.6 | 909 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
+| marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
+| rich | v14.2.0 | 855 | 0 | 0 | 25 | 880 | 97.2% | 60 | 62 | 0 |
 
 ### pytest @ 9.0.3
 
@@ -170,6 +174,158 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_sample.py | passed | 4 | 0 | 0 | 0 |
 | tests/test_skip.py | no-tests | 0 | 0 | 0 | 1 |
 | tests/test_with_testcase.py | failed | 0 | 2 | 0 | 0 |
+
+</details>
+
+### click @ 8.3.1
+
+<details><summary>per-file detail (20 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_arguments.py | passed | 91 | 0 | 0 | 0 |
+| tests/test_basic.py | passed | 88 | 0 | 0 | 0 |
+| tests/test_chain.py | passed | 15 | 0 | 0 | 0 |
+| tests/test_command_decorators.py | passed | 9 | 0 | 0 | 0 |
+| tests/test_commands.py | passed | 79 | 0 | 0 | 0 |
+| tests/test_compat.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_context.py | passed | 30 | 0 | 0 | 0 |
+| tests/test_custom_classes.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_defaults.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_formatting.py | passed | 17 | 0 | 0 | 0 |
+| tests/test_imports.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_info_dict.py | passed | 22 | 0 | 0 | 0 |
+| tests/test_normalization.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_options.py | passed | 531 | 0 | 0 | 0 |
+| tests/test_parser.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_shell_completion.py | passed | 52 | 0 | 0 | 0 |
+| tests/test_termui.py | passed | 147 | 0 | 0 | 21 |
+| tests/test_testing.py | passed | 26 | 0 | 0 | 0 |
+| tests/test_types.py | passed | 40 | 0 | 0 | 0 |
+| tests/test_utils.py | passed | 143 | 0 | 0 | 0 |
+
+</details>
+
+### jinja @ 3.1.6
+
+<details><summary>per-file detail (22 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_api.py | passed | 34 | 0 | 0 | 0 |
+| tests/test_async.py | passed | 76 | 0 | 0 | 0 |
+| tests/test_async_filters.py | passed | 49 | 0 | 0 | 0 |
+| tests/test_bytecode_cache.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_compile.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_core_tags.py | passed | 63 | 0 | 0 | 0 |
+| tests/test_debug.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_ext.py | passed | 51 | 0 | 0 | 0 |
+| tests/test_filters.py | passed | 132 | 0 | 0 | 0 |
+| tests/test_idtracking.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_imports.py | passed | 15 | 0 | 0 | 0 |
+| tests/test_inheritance.py | passed | 22 | 0 | 0 | 0 |
+| tests/test_lexnparse.py | passed | 150 | 0 | 0 | 0 |
+| tests/test_loader.py | passed | 43 | 0 | 0 | 0 |
+| tests/test_nativetypes.py | passed | 27 | 0 | 0 | 0 |
+| tests/test_nodes.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_pickle.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_regression.py | passed | 54 | 0 | 0 | 0 |
+| tests/test_runtime.py | passed | 19 | 0 | 0 | 0 |
+| tests/test_security.py | passed | 17 | 0 | 0 | 0 |
+| tests/test_tests.py | passed | 106 | 0 | 0 | 0 |
+| tests/test_utils.py | passed | 28 | 0 | 0 | 0 |
+
+</details>
+
+### marshmallow @ 4.1.1
+
+<details><summary>per-file detail (12 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_context.py | passed | 12 | 0 | 0 | 0 |
+| tests/test_decorators.py | passed | 44 | 0 | 0 | 0 |
+| tests/test_deserialization.py | passed | 379 | 0 | 0 | 0 |
+| tests/test_error_store.py | passed | 29 | 0 | 0 | 0 |
+| tests/test_exceptions.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_fields.py | passed | 92 | 0 | 0 | 0 |
+| tests/test_options.py | passed | 10 | 0 | 0 | 0 |
+| tests/test_registry.py | passed | 10 | 0 | 0 | 0 |
+| tests/test_schema.py | passed | 201 | 0 | 0 | 0 |
+| tests/test_serialization.py | passed | 128 | 0 | 0 | 0 |
+| tests/test_utils.py | passed | 16 | 0 | 0 | 0 |
+| tests/test_validate.py | passed | 191 | 0 | 0 | 0 |
+
+</details>
+
+### rich @ v14.2.0
+
+<details><summary>per-file detail (62 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_align.py | passed | 16 | 0 | 0 | 0 |
+| tests/test_ansi.py | passed | 23 | 0 | 0 | 0 |
+| tests/test_bar.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_block_bar.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_box.py | passed | 8 | 0 | 0 | 0 |
+| tests/test_card.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_cells.py | passed | 8 | 0 | 0 | 0 |
+| tests/test_color.py | passed | 17 | 0 | 0 | 0 |
+| tests/test_color_triplet.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_columns.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_columns_align.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_console.py | passed | 99 | 0 | 0 | 0 |
+| tests/test_constrain.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_containers.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_control.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_emoji.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_file_proxy.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_filesize.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_getfileno.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_highlighter.py | passed | 83 | 0 | 0 | 0 |
+| tests/test_inspect.py | passed | 41 | 0 | 0 | 4 |
+| tests/test_json.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_jupyter.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_layout.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_live.py | passed | 10 | 0 | 0 | 0 |
+| tests/test_live_render.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_log.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_logging.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_markdown.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_markdown_no_hyperlinks.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_markup.py | passed | 21 | 0 | 0 | 0 |
+| tests/test_measure.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_null_file.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_padding.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_palette.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_panel.py | passed | 13 | 0 | 0 | 0 |
+| tests/test_pick.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_pretty.py | passed | 51 | 0 | 0 | 1 |
+| tests/test_progress.py | passed | 38 | 0 | 0 | 0 |
+| tests/test_prompt.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_protocol.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_ratio.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_repr.py | passed | 8 | 0 | 0 | 0 |
+| tests/test_rich_print.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_rule.py | passed | 16 | 0 | 0 | 0 |
+| tests/test_rule_in_table.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_screen.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_segment.py | passed | 59 | 0 | 0 | 0 |
+| tests/test_spinner.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_stack.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_status.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_style.py | passed | 27 | 0 | 0 | 0 |
+| tests/test_styled.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_syntax.py | passed | 25 | 0 | 0 | 0 |
+| tests/test_table.py | passed | 20 | 0 | 0 | 0 |
+| tests/test_text.py | passed | 109 | 0 | 0 | 0 |
+| tests/test_theme.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_tools.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_traceback.py | passed | 22 | 0 | 0 | 1 |
+| tests/test_tree.py | passed | 7 | 0 | 0 | 2 |
+| tests/test_win32_console.py | no-tests | 0 | 0 | 0 | 0 |
+| tests/test_windows_renderer.py | no-tests | 0 | 0 | 0 | 17 |
 
 </details>
 

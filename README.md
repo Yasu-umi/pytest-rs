@@ -88,6 +88,15 @@ _linux (CI-verified)_
 | pytest-xdist | v3.8.0 | 62 | 35 | 0 | 0 | 97 | 63.9% | 0 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 40 | 82 | 0 | 1 | 123 | 32.5% | 2 | 7 | 6 |
+
+**Real-world projects** (their suites run unchanged, as drop-in evidence):
+
+| suite | tag | passed | failed | errors | skipped | total | pass % | files all-pass | files run | files excluded |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| click | 8.3.1 | 1314 | 0 | 0 | 21 | 1335 | 98.4% | 20 | 20 | 0 |
+| jinja | 3.1.6 | 909 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
+| marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
+| rich | v14.2.0 | 855 | 0 | 0 | 25 | 880 | 97.2% | 60 | 62 | 0 |
 <!-- conformance-results:end -->
 
 The suites are included as **shallow git submodules** under `conformance/suites/` at the pinned release tags. Initialize them once after cloning:
