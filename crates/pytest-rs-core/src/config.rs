@@ -83,17 +83,25 @@ fn parse_ini_section(content: &str, section: &str) -> Option<HashMap<String, Str
     found.then_some(values)
 }
 
-/// [tool.pytest.ini_options] from pyproject.toml, stringified pytest-style
-/// (arrays become newline-joined linelists).
+/// pytest config from pyproject.toml: [tool.pytest] (pytest 9 toml mode,
+/// keys other than ini_options) or [tool.pytest.ini_options] (ini mode);
+/// stringified pytest-style (arrays become newline-joined linelists).
+/// Divergence: upstream errors when both styles are present; here toml
+/// mode wins.
 fn parse_pyproject(content: &str) -> Option<HashMap<String, String>> {
     let document: toml::Table = content.parse().ok()?;
-    let options = document
-        .get("tool")?
-        .get("pytest")?
-        .get("ini_options")?
-        .as_table()?;
+    let tool_pytest = document.get("tool")?.get("pytest")?.as_table()?;
+    let toml_mode: Vec<(&String, &toml::Value)> = tool_pytest
+        .iter()
+        .filter(|(key, _)| key.as_str() != "ini_options")
+        .collect();
+    let entries: Vec<(&String, &toml::Value)> = if !toml_mode.is_empty() {
+        toml_mode
+    } else {
+        tool_pytest.get("ini_options")?.as_table()?.iter().collect()
+    };
     let mut values = HashMap::new();
-    for (key, value) in options {
+    for (key, value) in entries {
         let rendered = match value {
             toml::Value::String(s) => s.clone(),
             toml::Value::Array(items) => items

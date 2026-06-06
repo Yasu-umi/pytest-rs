@@ -219,7 +219,7 @@ class Pytester:
         sys.path.insert(0, entry)
         self._syspaths.insert(0, entry)
 
-    def runpytest(self, *args):
+    def runpytest(self, *args, timeout=None):
         import os
         import subprocess
         import time
@@ -243,7 +243,7 @@ class Pytester:
             cwd=self.path,
             capture_output=True,
             text=True,
-            timeout=120,
+            timeout=timeout if timeout is not None else 120,
             env=env,
         )
         duration = time.perf_counter() - start

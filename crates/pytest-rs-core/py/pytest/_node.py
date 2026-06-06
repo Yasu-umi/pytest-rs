@@ -53,6 +53,15 @@ class DoctestNode:
         self.path = path
         self.lineno = lineno
 
+    @property
+    def keywords(self):
+        """Mark names (plus the node name) as a mapping — pytest's
+        node.keywords, for the common `"xfail" in item.keywords` probes."""
+        keywords = {self.name: True}
+        for marker in self.own_markers:
+            keywords[marker.name] = marker
+        return keywords
+
     def warn(self, warning):
         """Issue a warning attributed to this item's definition site
         (pytest's Node.warn: warn_explicit with the item location)."""
@@ -95,7 +104,7 @@ class DoctestNode:
         record_added_mark(marker)
 
 
-class Node:
+class Node(Item):
     def __init__(
         self, nodeid, name, marks, fixturenames=None, function=None, path=None, lineno=None
     ):
@@ -108,6 +117,15 @@ class Node:
         self.path = path
         self.lineno = lineno
 
+    @property
+    def keywords(self):
+        """Mark names (plus the node name) as a mapping — pytest's
+        node.keywords, for the common `"xfail" in item.keywords` probes."""
+        keywords = {self.name: True}
+        for marker in self.own_markers:
+            keywords[marker.name] = marker
+        return keywords
+
     def warn(self, warning):
         """Issue a warning attributed to this item's definition site
         (pytest's Node.warn: warn_explicit with the item location)."""
@@ -148,3 +166,8 @@ class Node:
         else:
             self.own_markers.insert(0, marker)
         record_added_mark(marker)
+
+
+class Function(Node):
+    """Test-function node; the engine builds these for collected test items
+    (conftest hooks isinstance-check pytest.Function)."""

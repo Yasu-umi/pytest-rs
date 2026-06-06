@@ -652,7 +652,12 @@ pub(crate) fn run_one(
             kwargs.push((name.clone(), value));
         }
         for (name, value) in &item.callspec {
-            kwargs.push((name.clone(), value.clone_ref(py)));
+            // A callspec name outside the signature parametrizes a closure
+            // fixture (its value overrides the fixture, resolved on demand)
+            // and is not passed to the test (pytest semantics).
+            if item.fixture_names.iter().any(|fixture| fixture == name) {
+                kwargs.push((name.clone(), value.clone_ref(py)));
+            }
         }
         Ok((callable, kwargs, test_request))
     })();
@@ -1252,6 +1257,12 @@ fn resolve_fixture(
     class_instance: Option<&Py<PyAny>>,
     stack: &mut Vec<(String, String)>,
 ) -> PyResult<Py<PyAny>> {
+    // Direct (non-indirect) parametrize of a fixture name: the callspec
+    // value replaces the fixture outright, its function never runs
+    // (pytest's PseudoFixtureDef bypass).
+    if let Some((_, value)) = item.callspec.iter().find(|(param, _)| param == name) {
+        return Ok(value.clone_ref(py));
+    }
     let Some(def) = session.registry.lookup(name, &item.nodeid) else {
         // `pytestconfig` is a builtin backed by the Rust config, not a
         // shim-defined fixture (overridable like any other fixture).

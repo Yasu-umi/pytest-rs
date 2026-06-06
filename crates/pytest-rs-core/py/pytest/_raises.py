@@ -5,7 +5,7 @@ import re as _re
 from pytest._outcomes import fail
 
 
-class ExceptionInfo:
+class ExceptionInfo[E: BaseException]:
     def __init__(self):
         self.type = None
         self.value = None
@@ -15,6 +15,15 @@ class ExceptionInfo:
         self.type = type_
         self.value = value
         self.tb = tb
+
+    @classmethod
+    def for_later(cls):
+        """An unfilled ExceptionInfo (upstream API, used by RaisesGroup)."""
+        return cls()
+
+    def fill_unfilled(self, exc_info):
+        """Fill from a (type, value, traceback) triple."""
+        self._set(*exc_info)
 
     @property
     def typename(self):

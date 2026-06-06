@@ -1055,6 +1055,14 @@ impl Engine {
         // Temporarily move items out so hooks can mutate the list while the
         // session stays borrowable.
         let mut items = std::mem::take(&mut self.session.items);
+        // conftest hooks run before bundled-plugin hooks (pluggy LIFO:
+        // later-registered conftest hookimpls fire first), so marks added
+        // programmatically are visible to the plugins (e.g. anyio's
+        // marker-driven backend parametrization, issue #422 upstream).
+        if let Err(err) = self.run_py_modifyitems(py, &mut items) {
+            self.session.items = items;
+            return Err(err);
+        }
         {
             let mut ctx = HookContext {
                 py,
@@ -1068,9 +1076,8 @@ impl Engine {
                 }
             }
         }
-        let result = self.run_py_modifyitems(py, &mut items);
         self.session.items = items;
-        result
+        Ok(())
     }
 
     /// conftest pytest_collection_modifyitems hooks: items are exposed as

@@ -66,6 +66,29 @@ def get_runner(backend_name, backend_options):
             _runner_stack = _current_runner = None
 
 
+_coroutine_running = False
+
+
+@contextmanager
+def _exclusive_run():
+    """Reject re-entrant scheduling (request.getfixturevalue() on an async
+    fixture from inside a running async test): asyncio would raise "event
+    loop is already running", trio would deadlock — upstream raises this
+    consistent error instead (anyio#1148)."""
+    global _coroutine_running
+    if _coroutine_running:
+        raise RuntimeError(
+            "Cannot schedule a coroutine in the test runner while another is "
+            "already running; likely caused by request.getfixturevalue() on an "
+            "async fixture."
+        )
+    _coroutine_running = True
+    try:
+        yield
+    finally:
+        _coroutine_running = False
+
+
 def _iterate_exceptions(exc):
     if isinstance(exc, BaseExceptionGroup):
         for sub in exc.exceptions:
@@ -78,7 +101,7 @@ def run_test(func, backend, kwargs):
     from pytest._outcomes import Exit
 
     backend_name, backend_options = extract_backend_and_options(backend)
-    with get_runner(backend_name, backend_options) as runner:
+    with get_runner(backend_name, backend_options) as runner, _exclusive_run():
         try:
             runner.run_test(func, kwargs)
         except BaseExceptionGroup as excgrp:
@@ -91,6 +114,33 @@ def run_test(func, backend, kwargs):
             raise
 
 
+def hypothesis_async_inner(func):
+    """The hypothesis inner_test if it is (or wraps) a coroutine function,
+    else None. A previously installed backend wrapper is unwrapped so each
+    backend-parametrized item rewraps the original."""
+    from inspect import iscoroutinefunction
+
+    hypothesis = getattr(func, "hypothesis", None)
+    inner = getattr(hypothesis, "inner_test", None) if hypothesis is not None else None
+    if inner is None:
+        return None
+    inner = getattr(inner, "__anyio_original_inner__", inner)
+    return inner if iscoroutinefunction(inner) else None
+
+
+def hypothesis_wrap(inner, backend):
+    """A sync inner_test driving each hypothesis example through the
+    backend's runner (upstream's run_with_hypothesis)."""
+    from functools import wraps
+
+    @wraps(inner)
+    def run_with_hypothesis(**kwargs):
+        run_test(inner, backend, kwargs)
+
+    run_with_hypothesis.__anyio_original_inner__ = inner
+    return run_with_hypothesis
+
+
 def bound(func, instance):
     """Bind a Test*-class fixture function to the test instance."""
     if instance is not None:
@@ -100,7 +150,7 @@ def bound(func, instance):
 
 def run_fixture(func, instance, backend, kwargs):
     backend_name, backend_options = extract_backend_and_options(backend)
-    with get_runner(backend_name, backend_options) as runner:
+    with get_runner(backend_name, backend_options) as runner, _exclusive_run():
         return runner.run_fixture(bound(func, instance), kwargs)
 
 
@@ -117,7 +167,8 @@ class AsyncGenFixture:
 
     def setup(self):
         try:
-            return next(self._gen)
+            with _exclusive_run():
+                return next(self._gen)
         except BaseException:
             self._stack.close()
             raise
@@ -125,6 +176,7 @@ class AsyncGenFixture:
     def finalize(self):
         try:
             # The runner resumes the generator and raises if it yields again.
-            next(self._gen, None)
+            with _exclusive_run():
+                next(self._gen, None)
         finally:
             self._stack.close()

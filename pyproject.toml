@@ -70,6 +70,8 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # Vendored pytest-mock plugin: keep upstream's idioms.
 "crates/pytest-rs-mock/py/pytest_mock/*" = ["UP", "E402"]
+# Ported upstream pytest code: keep its pre-PEP695 generics.
+"crates/pytest-rs-core/py/pytest/_raises_group.py" = ["UP"]
 
 [tool.mypy]
 python_version = "3.13"

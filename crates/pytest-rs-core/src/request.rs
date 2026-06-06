@@ -175,6 +175,12 @@ impl PyRequest {
         Ok(self.node.bind(py).getattr("fixturenames")?.unbind())
     }
 
+    /// The item's keywords mapping (pytest's request.keywords == node.keywords).
+    #[getter]
+    fn keywords(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        Ok(self.node.bind(py).getattr("keywords")?.unbind())
+    }
+
     /// The underlying test function object.
     /// Returns None for doctest items (they have no user-visible test function).
     #[getter]

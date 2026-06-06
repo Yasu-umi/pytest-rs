@@ -35,6 +35,7 @@ from pytest._monkeypatch import MonkeyPatch as MonkeyPatch
 from pytest._monkeypatch import monkeypatch as monkeypatch
 from pytest._node import Collector as Collector
 from pytest._node import File as File
+from pytest._node import Function as Function
 from pytest._node import Item as Item
 from pytest._outcomes import Exit as Exit
 from pytest._outcomes import Failed as Failed
@@ -55,6 +56,8 @@ from pytest._pytester import testdir as testdir
 from pytest._raises import ExceptionInfo as ExceptionInfo
 from pytest._raises import RaisesContext as RaisesContext
 from pytest._raises import raises as raises
+from pytest._raises_group import RaisesExc as RaisesExc
+from pytest._raises_group import RaisesGroup as RaisesGroup
 from pytest._rewrite import register_assert_rewrite as register_assert_rewrite
 from pytest._subtests import Subtests as Subtests
 from pytest._subtests import subtests as subtests
@@ -68,6 +71,7 @@ from pytest._warning_types import PytestCollectionWarning as PytestCollectionWar
 from pytest._warning_types import PytestConfigWarning as PytestConfigWarning
 from pytest._warning_types import PytestDeprecationWarning as PytestDeprecationWarning
 from pytest._warning_types import PytestExperimentalApiWarning as PytestExperimentalApiWarning
+from pytest._warning_types import PytestFDWarning as PytestFDWarning
 from pytest._warning_types import PytestRemovedIn9Warning as PytestRemovedIn9Warning
 from pytest._warning_types import PytestRemovedIn10Warning as PytestRemovedIn10Warning
 from pytest._warning_types import PytestReturnNotNoneWarning as PytestReturnNotNoneWarning

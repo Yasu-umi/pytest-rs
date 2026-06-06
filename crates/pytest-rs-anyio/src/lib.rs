@@ -82,6 +82,10 @@ impl AnyioPlugin {
                 .fixture_params
                 .iter()
                 .any(|(name, _, _)| name == "anyio_backend")
+            || item
+                .callspec
+                .iter()
+                .any(|(name, _)| name == "anyio_backend")
             || Self::usefixtures_names(py, item).any(|name| name == "anyio_backend")
     }
 
@@ -95,6 +99,14 @@ impl AnyioPlugin {
     ) -> Option<Py<PyAny>> {
         let py = ctx.py;
         if let Some((_, value)) = kwargs.iter().find(|(name, _)| name == "anyio_backend") {
+            return Some(value.clone_ref(py));
+        }
+        // Direct parametrize of the fixture name: the value IS the backend.
+        if let Some((_, value)) = item
+            .callspec
+            .iter()
+            .find(|(name, _)| name == "anyio_backend")
+        {
             return Some(value.clone_ref(py));
         }
         let def = ctx.session.registry.lookup("anyio_backend", &item.nodeid)?;
@@ -162,6 +174,31 @@ impl Plugin for AnyioPlugin {
                 ));
             }
         };
+        // Upstream warns when both async plugins run in auto mode.
+        let asyncio_auto = ctx
+            .config
+            .get_value("--asyncio-mode")
+            .or_else(|| ctx.config.get_ini("asyncio_mode"))
+            .map(str::trim)
+            == Some("auto");
+        let asyncio_disabled = ctx.config.plugin_opts.iter().any(|spec| {
+            spec.strip_prefix("no:").is_some_and(|disabled| {
+                disabled
+                    .trim_start_matches("pytest_")
+                    .trim_start_matches("pytest-")
+                    == "asyncio"
+            })
+        });
+        if self.mode == Mode::Auto && asyncio_auto && !asyncio_disabled {
+            pytest_rs_core::python::warn_explicit_at(
+                ctx.py,
+                "PytestConfigWarning",
+                "AnyIO auto mode has been enabled together with pytest-asyncio auto \
+                 mode. This may cause unexpected behavior.",
+                "/anyio/pytest_plugin.py",
+                0,
+            )?;
+        }
         let module = PyModule::from_code(
             ctx.py,
             CString::new(HELPER)?.as_c_str(),
@@ -186,7 +223,19 @@ impl Plugin for AnyioPlugin {
         let mut taken = Vec::new();
         for mut item in pre {
             let marked = item.get_closest_marker("anyio").is_some();
-            if !item.is_coroutine || (self.mode == Mode::Strict && !marked) {
+            if self.mode == Mode::Strict && !marked {
+                taken.push(item);
+                continue;
+            }
+            // Hypothesis wraps async tests in a sync shim; its coroutine
+            // inner_test makes the item anyio-run like a plain async test.
+            let async_like = item.is_coroutine
+                || !self
+                    .helper(py)?
+                    .getattr("hypothesis_async_inner")?
+                    .call1((item.func.bind(py),))?
+                    .is_none();
+            if !async_like {
                 taken.push(item);
                 continue;
             }
@@ -202,13 +251,13 @@ impl Plugin for AnyioPlugin {
                 });
             }
             // Already requested through the signature, an existing
-            // usefixtures mark, or a parametrized assignment: the engine's
-            // collection-time expansion covered it.
+            // usefixtures mark, or a direct parametrize of the fixture name
+            // (the callspec value overrides the fixture).
             let already_requested = item.fixture_names.iter().any(|n| n == "anyio_backend")
                 || item
-                    .fixture_params
+                    .callspec
                     .iter()
-                    .any(|(name, _, _)| name == "anyio_backend")
+                    .any(|(name, _)| name == "anyio_backend")
                 || Self::usefixtures_names(py, &item).any(|name| name == "anyio_backend");
             if already_requested {
                 taken.push(item);
@@ -233,7 +282,13 @@ impl Plugin for AnyioPlugin {
                 name: "usefixtures".to_string(),
                 obj: usefixtures_mark.unbind(),
             });
-            let Some(params) = def.params.as_ref() else {
+            // indirect parametrize already assigned the backend param;
+            // resolution happens through the mark above, no cloning.
+            let already_assigned = item
+                .fixture_params
+                .iter()
+                .any(|(name, _, _)| name == "anyio_backend");
+            let Some(params) = def.params.as_ref().filter(|_| !already_assigned) else {
                 taken.push(item);
                 continue;
             };
@@ -387,8 +442,32 @@ impl Plugin for AnyioPlugin {
         callable: &Py<PyAny>,
         kwargs: &[(String, Py<PyAny>)],
     ) -> HookResult<()> {
-        if !item.is_coroutine || !Self::item_involves_backend(ctx.py, item) {
+        if !Self::item_involves_backend(ctx.py, item) {
             return Ok(None);
+        }
+        if !item.is_coroutine {
+            // Hypothesis-wrapped async test: rewire inner_test to drive each
+            // example through this item's backend runner.
+            let py = ctx.py;
+            let helper = self.helper(py)?;
+            let inner = helper
+                .getattr("hypothesis_async_inner")?
+                .call1((callable.bind(py),))?;
+            if inner.is_none() {
+                return Ok(None);
+            }
+            let Some(backend) = Self::backend_for(ctx, item, kwargs) else {
+                return Ok(None);
+            };
+            let wrapper = helper
+                .getattr("hypothesis_wrap")?
+                .call1((&inner, backend.bind(py)))?;
+            callable
+                .bind(py)
+                .getattr("hypothesis")?
+                .setattr("inner_test", wrapper)?;
+            pytest_rs_core::python::call_with_kwargs(py, callable, kwargs)?;
+            return Ok(Some(()));
         }
         let Some(backend) = Self::backend_for(ctx, item, kwargs) else {
             return Ok(None);

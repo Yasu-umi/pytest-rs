@@ -46,3 +46,7 @@ class PytestExperimentalApiWarning(PytestWarning, FutureWarning):
     @classmethod
     def simple(cls, apiname):
         return cls(f"{apiname} is an experimental api that may change over time")
+
+
+class PytestFDWarning(PytestWarning):
+    """When the lsof plugin finds leaked fds."""

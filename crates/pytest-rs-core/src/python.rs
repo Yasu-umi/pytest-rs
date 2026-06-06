@@ -1115,7 +1115,7 @@ fn push_test_items(
             extra_fixture_names: Vec::new(),
             marks: item_marks,
             callspec: variant.params,
-            fixture_params: Vec::new(),
+            fixture_params: variant.indirect_params,
             lineno: first_lineno(py, func),
         });
     }
@@ -1126,6 +1126,8 @@ struct ParamVariant {
     /// The "[...]" id suffix; None for unparametrized tests.
     id: Option<String>,
     params: Vec<(String, Py<PyAny>)>,
+    /// indirect parametrize assignments: (fixture name, param index, value).
+    indirect_params: Vec<(String, usize, Py<PyAny>)>,
     /// Marks attached via pytest.param(..., marks=...).
     extra_marks: Vec<MarkData>,
 }
@@ -1142,6 +1144,9 @@ fn expand_parametrize(
         /// None hides the set from the test ID (pytest.HIDDEN_PARAM).
         id_part: Option<String>,
         params: Vec<(String, Py<PyAny>)>,
+        /// indirect=True/[names]: the value parametrizes the same-named
+        /// fixture (request.param) instead of being passed to the test.
+        indirect_params: Vec<(String, usize, Py<PyAny>)>,
         extra_marks: Vec<MarkData>,
     }
     struct Dim {
@@ -1191,6 +1196,23 @@ fn expand_parametrize(
             .get_item("ids")
             .ok()
             .and_then(|ids| ids.extract().ok());
+        // indirect=True routes every argname's value to the same-named
+        // fixture's request.param; indirect=["x"] only the listed ones.
+        let indirect_obj = mark
+            .obj
+            .bind(py)
+            .getattr("kwargs")?
+            .get_item("indirect")
+            .ok();
+        let indirect_all = indirect_obj
+            .as_ref()
+            .and_then(|value| value.extract::<bool>().ok())
+            .unwrap_or(false);
+        let indirect_names: Vec<String> = indirect_obj
+            .as_ref()
+            .and_then(|value| value.extract::<Vec<String>>().ok())
+            .unwrap_or_default();
+        let is_indirect = |name: &str| indirect_all || indirect_names.iter().any(|n| n == name);
 
         let mut sets = Vec::new();
         for (index, value_set) in argvalues.try_iter()?.enumerate() {
@@ -1255,14 +1277,19 @@ fn expand_parametrize(
                         }),
                 )
             };
-            let params: Vec<(String, Py<PyAny>)> = argnames
-                .iter()
-                .cloned()
-                .zip(values.into_iter().map(Bound::unbind))
-                .collect();
+            let mut params: Vec<(String, Py<PyAny>)> = Vec::new();
+            let mut indirect_params: Vec<(String, usize, Py<PyAny>)> = Vec::new();
+            for (argname, value) in argnames.iter().cloned().zip(values) {
+                if is_indirect(&argname) {
+                    indirect_params.push((argname, index, value.unbind()));
+                } else {
+                    params.push((argname, value.unbind()));
+                }
+            }
             sets.push(ParamSet {
                 id_part,
                 params,
+                indirect_params,
                 extra_marks,
             });
         }
@@ -1352,6 +1379,7 @@ fn expand_parametrize(
         return Ok(vec![ParamVariant {
             id: None,
             params: Vec::new(),
+            indirect_params: Vec::new(),
             extra_marks: Vec::new(),
         }]);
     }
@@ -1367,6 +1395,7 @@ fn expand_parametrize(
     'outer: loop {
         let mut id_parts = Vec::new();
         let mut params = Vec::new();
+        let mut indirect_params = Vec::new();
         let mut extra_marks = Vec::new();
         for (dim, &index) in dims.iter().zip(indices.iter()) {
             let set = &dim.sets[index];
@@ -1376,6 +1405,9 @@ fn expand_parametrize(
             }
             for (name, value) in &set.params {
                 params.push((name.clone(), value.clone_ref(py)));
+            }
+            for (name, param_index, value) in &set.indirect_params {
+                indirect_params.push((name.clone(), *param_index, value.clone_ref(py)));
             }
             for mark in &set.extra_marks {
                 extra_marks.push(MarkData {
@@ -1388,6 +1420,7 @@ fn expand_parametrize(
             // All-hidden variants keep the bare test name (no brackets).
             id: (!id_parts.is_empty()).then(|| id_parts.join("-")),
             params,
+            indirect_params,
             extra_marks,
         });
 
@@ -1527,7 +1560,9 @@ pub(crate) fn register_fixture_def(
     let name = explicit_name.unwrap_or_else(|| attr_name.to_string());
     let flags = async_flags(py, value)?;
     let mut param_names = param_names(py, value)?;
-    if needs_instance && param_names.first().map(String::as_str) == Some("self") {
+    // Binding to the test instance consumes the first parameter whatever
+    // its name (upstream fixtures occasionally spell it `cls`).
+    if needs_instance && !param_names.is_empty() {
         param_names.remove(0);
     }
     let params_obj = marker.getattr("params")?;
@@ -1626,6 +1661,14 @@ pub fn expand_fixture_params(
             .closure_for(&item.nodeid, &requested)
             .into_iter()
             .filter(|def| def.params.is_some())
+            // indirect parametrize already assigned this fixture's param,
+            // overriding the fixture's own params (pytest semantics).
+            .filter(|def| {
+                !item
+                    .fixture_params
+                    .iter()
+                    .any(|(name, _, _)| name == &def.name)
+            })
             .collect();
         if parametrized.is_empty() {
             expanded.push(item);
@@ -1931,7 +1974,7 @@ pub fn make_node(py: Python<'_>, item: &TestItem) -> PyResult<Py<PyAny>> {
     let node_cls = if item.is_doctest {
         "DoctestNode"
     } else {
-        "Node"
+        "Function"
     };
     let node = py.import("pytest._node")?.getattr(node_cls)?.call1((
         item.nodeid.as_str(),

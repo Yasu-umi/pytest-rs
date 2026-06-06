@@ -23,7 +23,7 @@ pytest-rs -n 4                  # parallel workers (pytest-xdist compatible)
 pytest-rs --cov=mypkg           # native coverage (pytest-cov compatible)
 ```
 
-`pytest-rs` reads the same configuration pytest does (`pytest.ini`, `pyproject.toml` `[tool.pytest.ini_options]`, `tox.ini`, `setup.cfg`) and understands the familiar flags (`-v`, `-x`, `-k`, `-m`, `--lf`, `--tb=...`, `-p no:NAME`, ...). It installs alongside pytest without conflict — the `pytest` command is untouched.
+`pytest-rs` reads the same configuration pytest does (`pytest.ini`, `pyproject.toml` `[tool.pytest]` / `[tool.pytest.ini_options]`, `tox.ini`, `setup.cfg`) and understands the familiar flags (`-v`, `-x`, `-k`, `-m`, `--lf`, `--tb=...`, `-p no:NAME`, ...). It installs alongside pytest without conflict — the `pytest` command is untouched.
 
 ### Requirements
 
