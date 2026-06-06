@@ -44,11 +44,33 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      # The macos runner's system rustc lags behind the workspace's
+      # rust-version (container builds bring their own toolchain).
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          args: --release -o dist -i /usr/local/bin/python-embed
+          manylinux: ${{ matrix.platform.manylinux }}
+          # The manylinux images' pythons ship no libpython (shared or
+          # static), which an embedding binary links against. Install a
+          # python-build-standalone CPython (shared libpython) in the
+          # container and build against that; at runtime the launcher
+          # resolves the user environment's libpython via LD_LIBRARY_PATH.
+          before-script-linux: |
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            export PATH="$HOME/.local/bin:$PATH"
+            uv python install ${{ matrix.python-version }}
+            ln -sf "$(uv python find --managed-python ${{ matrix.python-version }})" /usr/local/bin/python-embed
+        if: startsWith(matrix.platform.name, 'linux')
+
       - uses: PyO3/maturin-action@v1
         with:
           command: build
           args: --release -o dist -i python${{ matrix.python-version }}
           manylinux: ${{ matrix.platform.manylinux }}
+        if: startsWith(matrix.platform.name, 'macos')
 
       - uses: astral-sh/setup-uv@v7
 
