@@ -3,6 +3,48 @@
 Notable changes per release. The release workflow uses the matching section
 as the GitHub release notes (auto-generated notes are the fallback).
 
+## v0.0.2 (2026-06-06)
+
+### Fixed
+
+- **macOS wheels work outside the build machine.** The engine now links a
+  python-build-standalone CPython, so the recorded libpython reference
+  keeps the plain `libpython3.X` leaf name the launcher resolves via the
+  loader path. The v0.0.1 macOS wheels only worked on machines with a
+  framework Python at `/Library/Frameworks` — use v0.0.2 instead.
+- `@pytest.mark.parametrize` accepts the `argnames=` / `argvalues=` keyword
+  spelling (collection raised IndexError before).
+- `pytest.importorskip` failures skip at module level instead of erroring
+  collection.
+- Fixtures requested via `@pytest.mark.usefixtures` now parametrize the
+  test like signature fixtures do (`request.param` was missing).
+- The `norecursedirs` ini option is honored during collection (pytest's
+  defaults, including `fnmatch` path patterns).
+
+### Coverage
+
+- **Branch coverage**: `--cov-branch` and `[run] branch = true` measure
+  branch arcs natively (sys.monitoring BRANCH events; per-direction on
+  CPython 3.14, dis-classified on 3.13), with Branch/BrPart report columns
+  and `13->15` / `11->exit` missing annotations matching coverage.py.
+- **Subprocess coverage**: python child processes measure themselves
+  through an env-gated site hook (a pure-python port of the native
+  collector, no coverage.py dependency) and their results merge into the
+  session report — `subprocess.run(...)`-spawned scripts now show up, like
+  pytest-cov's process startup hook.
+- Multi-line statements fold onto their first line, matching coverage.py's
+  statement counting.
+- `[paths]` aliasing rewrites measured paths to their canonical form in
+  reports.
+- pytest-cov's upstream suite: 47 -> 105 of 209 graded tests since v0.0.1.
+
+### Release pipeline
+
+- Publishing now requires the tagged commit's CI to be green and the
+  committed conformance results to match a fresh run, and asserts the
+  built wheels reference libpython by its plain leaf name.
+- Release binaries are stripped and thin-LTO'd (wheel 2.9 MB -> 2.7 MB).
+
 ## v0.0.1 (2026-06-06)
 
 First public release: a drop-in compatible pytest runner written in Rust,
