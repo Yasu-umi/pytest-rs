@@ -88,7 +88,7 @@ class Suite:
                 return
         if self.checkout.exists():
             return
-        CACHE.mkdir(exist_ok=True)
+        CACHE.mkdir(parents=True, exist_ok=True)
         subprocess.run(
             [
                 "git",

@@ -17,11 +17,14 @@ jobs:
       matrix:
         python-version: ["3.13", "3.14"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
+
+      # The conformance runner installs suite deps via `uv pip install`.
+      - uses: astral-sh/setup-uv@v6
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -52,24 +55,26 @@ jobs:
     name: python lint (ruff + mypy)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v6
 
       - name: uv sync
-        run: uv sync
+        # Lint only needs the dev group; the project itself is a maturin
+        # package whose build needs a Rust toolchain this job doesn't have.
+        run: uv sync --no-install-project
 
       - name: ruff check
-        run: uv run ruff check crates conformance
+        run: uv run --no-sync ruff check crates conformance
 
       - name: ruff format check
-        run: uv run ruff format --check crates conformance
+        run: uv run --no-sync ruff format --check crates conformance
 
       - name: mypy
         # The plugin py/ trees reuse top-level module names (helper.py), so
         # each gets its own invocation (config covers core + conformance).
         run: |
-          uv run mypy
+          uv run --no-sync mypy
           for tree in crates/pytest-rs-asyncio crates/pytest-rs-benchmark crates/pytest-rs-cov crates/pytest-rs-mock; do
-            uv run mypy "$tree/py"
+            uv run --no-sync mypy "$tree/py"
           done
