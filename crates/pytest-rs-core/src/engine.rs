@@ -588,6 +588,9 @@ impl Engine {
             println!("cachedir: {cache_dir}");
         }
         println!("rootdir: {}", self.config.rootdir.display());
+        if let Some(name) = &self.config.config_file_name {
+            println!("configfile: {name}");
+        }
     }
 
     /// The ERRORS section: "ERROR collecting <file>" banners per collection

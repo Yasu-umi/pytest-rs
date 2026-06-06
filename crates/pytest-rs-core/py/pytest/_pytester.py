@@ -200,6 +200,10 @@ class Pytester:
     def makepyprojecttoml(self, source):
         return self._makefile(".toml", [], {"pyproject": source})
 
+    def maketoml(self, source):
+        """Write a pytest.toml file."""
+        return self._makefile(".toml", [], {"pytest": source})
+
     def makefile(self, ext, *args, **kwargs):
         return self._makefile(ext, args, kwargs)
 

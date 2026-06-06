@@ -12,7 +12,7 @@ tag = "9.0.3"
 testpaths = ["testing"]
 exclude = ["example_scripts"]
 local = "conformance/suites/pytest"
-deps = ["packaging", "iniconfig", "pluggy", "xmlschema", "setuptools"]
+deps = ["packaging", "iniconfig", "pluggy", "xmlschema", "setuptools", "pygments"]
 enabled = true
 
 [pytest-asyncio]

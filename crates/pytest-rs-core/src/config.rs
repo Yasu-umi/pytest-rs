@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 /// pytest.ini ([pytest]), pyproject.toml ([tool.pytest.ini_options]),
 /// tox.ini ([pytest]) or setup.cfg ([tool:pytest]) — first hit wins and its
 /// directory becomes the rootdir.
-fn find_ini(start: &Path) -> (PathBuf, HashMap<String, String>) {
+fn find_ini(start: &Path) -> (PathBuf, Option<String>, HashMap<String, String>) {
     for dir in start.ancestors() {
         let pytest_ini = dir.join("pytest.ini");
         if pytest_ini.exists()
@@ -13,31 +13,31 @@ fn find_ini(start: &Path) -> (PathBuf, HashMap<String, String>) {
         {
             // pytest.ini counts as config even with an empty/missing section.
             let values = parse_ini_section(&content, "pytest").unwrap_or_default();
-            return (dir.to_path_buf(), values);
+            return (dir.to_path_buf(), Some("pytest.ini".to_string()), values);
         }
         let pyproject = dir.join("pyproject.toml");
         if pyproject.exists()
             && let Ok(content) = std::fs::read_to_string(&pyproject)
             && let Some(values) = parse_pyproject(&content)
         {
-            return (dir.to_path_buf(), values);
+            return (dir.to_path_buf(), Some("pyproject.toml".to_string()), values);
         }
         let tox_ini = dir.join("tox.ini");
         if tox_ini.exists()
             && let Ok(content) = std::fs::read_to_string(&tox_ini)
             && let Some(values) = parse_ini_section(&content, "pytest")
         {
-            return (dir.to_path_buf(), values);
+            return (dir.to_path_buf(), Some("tox.ini".to_string()), values);
         }
         let setup_cfg = dir.join("setup.cfg");
         if setup_cfg.exists()
             && let Ok(content) = std::fs::read_to_string(&setup_cfg)
             && let Some(values) = parse_ini_section(&content, "tool:pytest")
         {
-            return (dir.to_path_buf(), values);
+            return (dir.to_path_buf(), Some("setup.cfg".to_string()), values);
         }
     }
-    (start.to_path_buf(), HashMap::new())
+    (start.to_path_buf(), None, HashMap::new())
 }
 
 /// Minimal INI parser: one named section, `key = value` pairs, indented
@@ -188,6 +188,8 @@ pub struct Config {
     ini_overrides: HashMap<String, String>,
     /// Values from pytest.ini / pyproject.toml / tox.ini / setup.cfg.
     ini_file: HashMap<String, String>,
+    /// The config file's basename, for the "configfile:" header line.
+    pub config_file_name: Option<String>,
 }
 
 /// pytest's rootdir-discovery inputs: cwd plus every arg token that exists
@@ -293,7 +295,7 @@ impl Config {
         // path-like args (pytest's rootdir algorithm); with no config file
         // anywhere, the ancestor itself is the rootdir.
         let ancestor = common_ancestor(&dirs_from_args(&cwd, &argv));
-        let (rootdir, ini_file) = find_ini(&ancestor);
+        let (rootdir, config_file_name, ini_file) = find_ini(&ancestor);
 
         // addopts from the config file are prepended to the CLI args.
         // `-o addopts=...` wins over the file: it must apply here, before
@@ -634,6 +636,7 @@ impl Config {
             values,
             ini_overrides,
             ini_file,
+            config_file_name,
         })
     }
 
