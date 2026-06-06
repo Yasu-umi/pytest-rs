@@ -13,7 +13,7 @@ readme = "../../README.md"
 xdist = []
 
 [dependencies]
-pyo3 = { workspace = true, features = ["auto-initialize"] }
+pyo3 = { workspace = true }
 clap = { workspace = true }
 glob = { workspace = true }
 serde = { workspace = true }

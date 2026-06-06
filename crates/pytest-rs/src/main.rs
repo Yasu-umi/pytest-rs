@@ -42,6 +42,9 @@ fn preinitialize_python() {
 
 fn main() {
     preinitialize_python();
+    // Explicit interpreter startup (no pyo3 auto-initialize): required so the
+    // binary can embed libpython statically for distribution.
+    Python::initialize();
     let mut plugins = build_plugins();
 
     let mut parser = OptionParser::default();

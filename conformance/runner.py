@@ -22,7 +22,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 CACHE = ROOT / ".tmp" / "conformance"
-BINARY = ROOT / "target" / "debug" / "pytest-rs"
+BINARY = ROOT / "target" / "debug" / "pytest-rs-bin"
 # Results are platform-scoped: counts differ between linux and darwin
 # (platform-specific skips, system deps), so each platform owns its
 # scoreboard; linux is canonical (regenerated and committed from CI).

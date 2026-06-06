@@ -2,7 +2,27 @@
 name = "pytest-rs"
 version = "0.0.1"
 description = "A fast, drop-in compatible pytest runner written in Rust"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE", "THIRD-PARTY-NOTICES.md"]
+authors = [{ name = "Yasu-umi" }]
+keywords = ["pytest", "testing", "rust", "test-runner"]
 requires-python = ">=3.13"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Rust",
+    "Topic :: Software Development :: Testing",
+]
+
+[project.urls]
+Homepage = "https://github.com/Yasu-umi/pytest-rs"
+Source = "https://github.com/Yasu-umi/pytest-rs"
+Tracker = "https://github.com/Yasu-umi/pytest-rs/issues"
 
 [build-system]
 requires = ["maturin>=1.7,<2.0"]

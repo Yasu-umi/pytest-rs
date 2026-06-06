@@ -26,7 +26,7 @@ impl TempSuite {
     }
 
     fn run(&self, args: &[&str]) -> Output {
-        std::process::Command::new(env!("CARGO_BIN_EXE_pytest-rs"))
+        std::process::Command::new(env!("CARGO_BIN_EXE_pytest-rs-bin"))
             .args(args)
             .current_dir(&self.root)
             .output()

@@ -8,6 +8,16 @@ repository = { workspace = true }
 license = { workspace = true }
 readme = "../../README.md"
 
+# The engine links libpython; the `pytest-rs` command users invoke is a tiny
+# launcher that resolves the environment's libpython dir and execs the engine.
+[[bin]]
+name = "pytest-rs-bin"
+path = "src/main.rs"
+
+[[bin]]
+name = "pytest-rs"
+path = "src/launcher.rs"
+
 [features]
 default = ["asyncio", "mock", "cov", "split", "benchmark", "xdist"]
 asyncio = ["dep:pytest-rs-asyncio"]
