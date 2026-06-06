@@ -1,0 +1,16 @@
+{
+  "suite": "pytest-cov",
+  "tag": "v7.1.0",
+  "excluded_files": 0,
+  "files": [
+    {
+      "file": "tests/test_pytest_cov.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 47,
+      "failed": 159,
+      "skipped": 3,
+      "errors": 0
+    }
+  ]
+}

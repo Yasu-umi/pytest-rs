@@ -53,15 +53,15 @@ Compatibility is verified by running the **upstream test suites** of the librari
 Current results (`total = passed + failed + errors + skipped`; updated automatically by `conformance/runner.py`, refreshed by CI on every push to main — see [conformance/RESULTS.md](conformance/RESULTS.md) for per-file detail):
 
 <!-- conformance-results:start -->
-_darwin (dev snapshot)_
+_linux (CI-verified)_
 
 | suite | tag | passed | failed | errors | skipped | total | pass % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 1182 | 836 | 0 | 21 | 2039 | 58.0% | 5 | 45 | 63 |
+| pytest | 9.0.3 | 1182 | 835 | 0 | 22 | 2039 | 58.0% | 5 | 45 | 63 |
 | pytest-asyncio | v1.4.0 | 262 | 0 | 1 | 0 | 263 | 99.6% | 29 | 30 | 0 |
 | pytest-mock | v3.15.1 | 85 | 0 | 0 | 5 | 90 | 94.4% | 1 | 1 | 0 |
-| pytest-cov | v7.1.0 | 47 | 158 | 0 | 4 | 209 | 22.5% | 0 | 1 | 0 |
-| pytest-xdist | v3.8.0 | 63 | 35 | 0 | 0 | 98 | 64.3% | 0 | 1 | 6 |
+| pytest-cov | v7.1.0 | 47 | 159 | 0 | 3 | 209 | 22.5% | 0 | 1 | 0 |
+| pytest-xdist | v3.8.0 | 62 | 36 | 0 | 0 | 98 | 63.3% | 0 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 40 | 82 | 0 | 1 | 123 | 32.5% | 2 | 7 | 6 |
 <!-- conformance-results:end -->

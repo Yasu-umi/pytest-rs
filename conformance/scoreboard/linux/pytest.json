@@ -1,0 +1,412 @@
+{
+  "suite": "pytest",
+  "tag": "9.0.3",
+  "excluded_files": 63,
+  "files": [
+    {
+      "file": "testing/examples/test_issue519.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 0,
+      "failed": 1,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/freeze/tests/test_trivial.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/logging/test_fixture.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 26,
+      "failed": 1,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/logging/test_formatter.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 0,
+      "failed": 4,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/logging/test_reporting.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 44,
+      "failed": 8,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_assertion.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 117,
+      "failed": 43,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_cacheprovider.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 36,
+      "failed": 21,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_capture.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 106,
+      "failed": 1,
+      "skipped": 1,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_collect_imported_tests.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 2,
+      "failed": 1,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_collection.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 55,
+      "failed": 57,
+      "skipped": 4,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_compat.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 6,
+      "failed": 4,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_config.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 65,
+      "failed": 143,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_conftest.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 3,
+      "failed": 39,
+      "skipped": 1,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_doctest.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 139,
+      "failed": 0,
+      "skipped": 1,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_error_diffs.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_faulthandler.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 2,
+      "failed": 10,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_helpconfig.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 2,
+      "failed": 10,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_junitxml.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 127,
+      "failed": 9,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_link_resolve.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 0,
+      "failed": 1,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_main.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 1,
+      "failed": 12,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_mark.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 41,
+      "failed": 64,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_monkeypatch.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 33,
+      "failed": 0,
+      "skipped": 2,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_nodes.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 1,
+      "failed": 7,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_pastebin.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 0,
+      "failed": 5,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_pytester.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 14,
+      "failed": 39,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_python_path.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 0,
+      "failed": 6,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_recwarn.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 63,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_runner.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 15,
+      "failed": 37,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_runner_xunit.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 7,
+      "failed": 6,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_scope.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 0,
+      "failed": 4,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_session.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 3,
+      "failed": 14,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_setuponly.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 21,
+      "failed": 5,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_setupplan.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 1,
+      "failed": 2,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_skipping.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 70,
+      "failed": 22,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_stepwise.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 2,
+      "failed": 16,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_subtests.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 29,
+      "failed": 5,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_terminal.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 64,
+      "failed": 127,
+      "skipped": 2,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_threadexception.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 0,
+      "failed": 2,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_tmpdir.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 11,
+      "failed": 28,
+      "skipped": 1,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_unittest.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 27,
+      "failed": 43,
+      "skipped": 9,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_unraisableexception.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 0,
+      "failed": 11,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_warnings.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 35,
+      "failed": 8,
+      "skipped": 1,
+      "errors": 0
+    },
+    {
+      "file": "testing/acceptance_test.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/deprecated_test.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 0,
+      "failed": 11,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/python/show_fixtures_per_test.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 0,
+      "failed": 8,
+      "skipped": 0,
+      "errors": 0
+    }
+  ]
+}

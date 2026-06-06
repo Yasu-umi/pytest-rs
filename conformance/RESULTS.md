@@ -12,6 +12,167 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 `conformance/suites.toml`) are not run at all and only show up in the
 "files excluded" column.
 
+## linux (CI-verified)
+
+| suite | tag | passed | failed | errors | skipped | total | pass % | files all-pass | files run | files excluded |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| pytest | 9.0.3 | 1182 | 835 | 0 | 22 | 2039 | 58.0% | 5 | 45 | 63 |
+| pytest-asyncio | v1.4.0 | 262 | 0 | 1 | 0 | 263 | 99.6% | 29 | 30 | 0 |
+| pytest-mock | v3.15.1 | 85 | 0 | 0 | 5 | 90 | 94.4% | 1 | 1 | 0 |
+| pytest-cov | v7.1.0 | 47 | 159 | 0 | 3 | 209 | 22.5% | 0 | 1 | 0 |
+| pytest-xdist | v3.8.0 | 62 | 36 | 0 | 0 | 98 | 63.3% | 0 | 1 | 6 |
+| pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
+| pytest-benchmark | v5.1.0 | 40 | 82 | 0 | 1 | 123 | 32.5% | 2 | 7 | 6 |
+
+### pytest @ 9.0.3
+
+<details><summary>per-file detail (45 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| testing/examples/test_issue519.py | failed | 0 | 1 | 0 | 0 |
+| testing/freeze/tests/test_trivial.py | passed | 2 | 0 | 0 | 0 |
+| testing/logging/test_fixture.py | failed | 26 | 1 | 0 | 0 |
+| testing/logging/test_formatter.py | failed | 0 | 4 | 0 | 0 |
+| testing/logging/test_reporting.py | failed | 44 | 8 | 0 | 0 |
+| testing/test_assertion.py | failed | 117 | 43 | 0 | 0 |
+| testing/test_cacheprovider.py | failed | 36 | 21 | 0 | 0 |
+| testing/test_capture.py | failed | 106 | 1 | 0 | 1 |
+| testing/test_collect_imported_tests.py | failed | 2 | 1 | 0 | 0 |
+| testing/test_collection.py | failed | 55 | 57 | 0 | 4 |
+| testing/test_compat.py | failed | 6 | 4 | 0 | 0 |
+| testing/test_config.py | failed | 65 | 143 | 0 | 0 |
+| testing/test_conftest.py | failed | 3 | 39 | 0 | 1 |
+| testing/test_doctest.py | passed | 139 | 0 | 0 | 1 |
+| testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 |
+| testing/test_faulthandler.py | failed | 2 | 10 | 0 | 0 |
+| testing/test_helpconfig.py | failed | 2 | 10 | 0 | 0 |
+| testing/test_junitxml.py | failed | 127 | 9 | 0 | 0 |
+| testing/test_link_resolve.py | failed | 0 | 1 | 0 | 0 |
+| testing/test_main.py | failed | 1 | 12 | 0 | 0 |
+| testing/test_mark.py | failed | 41 | 64 | 0 | 0 |
+| testing/test_monkeypatch.py | passed | 33 | 0 | 0 | 2 |
+| testing/test_nodes.py | failed | 1 | 7 | 0 | 0 |
+| testing/test_pastebin.py | failed | 0 | 5 | 0 | 0 |
+| testing/test_pytester.py | failed | 14 | 39 | 0 | 0 |
+| testing/test_python_path.py | failed | 0 | 6 | 0 | 0 |
+| testing/test_recwarn.py | passed | 63 | 0 | 0 | 0 |
+| testing/test_runner.py | failed | 15 | 37 | 0 | 0 |
+| testing/test_runner_xunit.py | failed | 7 | 6 | 0 | 0 |
+| testing/test_scope.py | failed | 0 | 4 | 0 | 0 |
+| testing/test_session.py | failed | 3 | 14 | 0 | 0 |
+| testing/test_setuponly.py | failed | 21 | 5 | 0 | 0 |
+| testing/test_setupplan.py | failed | 1 | 2 | 0 | 0 |
+| testing/test_skipping.py | failed | 70 | 22 | 0 | 0 |
+| testing/test_stepwise.py | failed | 2 | 16 | 0 | 0 |
+| testing/test_subtests.py | failed | 29 | 5 | 0 | 0 |
+| testing/test_terminal.py | failed | 64 | 127 | 0 | 2 |
+| testing/test_threadexception.py | failed | 0 | 2 | 0 | 0 |
+| testing/test_tmpdir.py | failed | 11 | 28 | 0 | 1 |
+| testing/test_unittest.py | failed | 27 | 43 | 0 | 9 |
+| testing/test_unraisableexception.py | failed | 0 | 11 | 0 | 0 |
+| testing/test_warnings.py | failed | 35 | 8 | 0 | 1 |
+| testing/acceptance_test.py | failed | 0 | 0 | 0 | 0 |
+| testing/deprecated_test.py | failed | 0 | 11 | 0 | 0 |
+| testing/python/show_fixtures_per_test.py | failed | 0 | 8 | 0 | 0 |
+
+</details>
+
+### pytest-asyncio @ v1.4.0
+
+<details><summary>per-file detail (30 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/async_fixtures/test_async_fixtures.py | passed | 2 | 0 | 0 | 0 |
+| tests/async_fixtures/test_async_fixtures_contextvars.py | passed | 10 | 0 | 0 | 0 |
+| tests/async_fixtures/test_nested.py | passed | 1 | 0 | 0 | 0 |
+| tests/async_fixtures/test_shared_module_fixture.py | passed | 1 | 0 | 0 | 0 |
+| tests/hypothesis/test_base.py | passed | 6 | 0 | 0 | 0 |
+| tests/markers/test_class_scope.py | passed | 10 | 0 | 0 | 0 |
+| tests/markers/test_function_scope.py | passed | 12 | 0 | 0 | 0 |
+| tests/markers/test_invalid_arguments.py | passed | 8 | 0 | 0 | 0 |
+| tests/markers/test_mixed_scope.py | passed | 1 | 0 | 0 | 0 |
+| tests/markers/test_module_scope.py | passed | 9 | 0 | 0 | 0 |
+| tests/markers/test_package_scope.py | passed | 8 | 0 | 0 | 0 |
+| tests/markers/test_session_scope.py | passed | 11 | 0 | 0 | 0 |
+| tests/modes/test_auto_mode.py | passed | 6 | 0 | 0 | 0 |
+| tests/modes/test_strict_mode.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_asyncio_debug.py | passed | 12 | 0 | 0 | 0 |
+| tests/test_asyncio_fixture.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_asyncio_mark.py | passed | 9 | 0 | 0 | 0 |
+| tests/test_doctest.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_event_loop_fixture.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_fixture_loop_scopes.py | passed | 11 | 0 | 0 | 0 |
+| tests/test_import.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_is_async_test.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_loop_factory_parametrization.py | passed | 40 | 0 | 0 | 0 |
+| tests/test_package.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_port_factories.py | error | 0 | 0 | 1 | 0 |
+| tests/test_set_event_loop.py | passed | 61 | 0 | 0 | 0 |
+| tests/test_simple.py | passed | 9 | 0 | 0 | 0 |
+| tests/test_skips.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_subprocess.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_task_cleanup.py | passed | 1 | 0 | 0 | 0 |
+
+</details>
+
+### pytest-mock @ v3.15.1
+
+<details><summary>per-file detail (1 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_pytest_mock.py | passed | 85 | 0 | 0 | 5 |
+
+</details>
+
+### pytest-cov @ v7.1.0
+
+<details><summary>per-file detail (1 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_pytest_cov.py | failed | 47 | 159 | 0 | 3 |
+
+</details>
+
+### pytest-xdist @ v3.8.0
+
+<details><summary>per-file detail (1 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| testing/acceptance_test.py | failed | 62 | 36 | 0 | 0 |
+
+</details>
+
+### pytest-split @ 0.9.0
+
+<details><summary>per-file detail (1 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_plugin.py | passed | 59 | 0 | 0 | 0 |
+
+</details>
+
+### pytest-benchmark @ v5.1.0
+
+<details><summary>per-file detail (7 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_benchmark.py | failed | 4 | 49 | 0 | 0 |
+| tests/test_calibration.py | failed | 4 | 30 | 0 | 0 |
+| tests/test_normal.py | passed | 10 | 0 | 0 | 0 |
+| tests/test_pedantic.py | failed | 18 | 1 | 0 | 0 |
+| tests/test_sample.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_skip.py | no-tests | 0 | 0 | 0 | 1 |
+| tests/test_with_testcase.py | failed | 0 | 2 | 0 | 0 |
+
+</details>
+
 ## darwin (dev snapshot)
 
 | suite | tag | passed | failed | errors | skipped | total | pass % | files all-pass | files run | files excluded |
