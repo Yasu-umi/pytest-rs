@@ -139,6 +139,9 @@ impl Engine {
             };
         }
 
+        if self.session.live_logging {
+            python::log_set_live_when(py, "collection");
+        }
         let collect_errors = match self.collect(py) {
             Ok(errors) => errors,
             Err(message) => {

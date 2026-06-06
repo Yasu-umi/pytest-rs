@@ -1715,6 +1715,16 @@ pub fn configure_logging(py: Python<'_>, config: &crate::config::Config) -> bool
     result.unwrap_or(false)
 }
 
+/// Relabel the live (log_cli) section header (start/finish/collection).
+pub fn log_set_live_when(py: Python<'_>, when: &str) {
+    let _ = (|| -> PyResult<()> {
+        py.import("pytest._logging")?
+            .getattr("set_live_when")?
+            .call1((when,))?;
+        Ok(())
+    })();
+}
+
 /// Tell the subtests fixture how many failures remain in the --maxfail
 /// budget (None = unlimited); exhausting it stops swallowing failures.
 pub fn set_subtest_fail_budget(py: Python<'_>, budget: Option<usize>) {

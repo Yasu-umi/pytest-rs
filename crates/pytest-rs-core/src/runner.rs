@@ -84,23 +84,33 @@ impl Engine {
                 && file != current_file
             {
                 if !current_file.is_empty() {
-                    println!("{}", with_progress(&line, done, total));
+                    println!("{}", progress_suffix(&line, done, total));
                 }
                 line = format!("{file} ");
+                print!("{line}");
+                let _ = std::io::stdout().flush();
                 current_file = file;
             }
 
             // log_cli: the item header prints on its own line up front so
-            // live log records appear under it.
-            if session.live_logging && !config.no_terminal() && !config.quiet {
-                println!("{} ", item.nodeid);
-                let _ = std::io::stdout().flush();
+            // live log records appear under it; pytest_runtest_logstart
+            // hooks log under a "live log start" section.
+            if session.live_logging {
+                if !config.no_terminal() && !config.quiet && config.verbose == 0 {
+                    println!("{} ", item.nodeid);
+                    let _ = std::io::stdout().flush();
+                }
+                session.live_progress = Some((done + 1, total));
+                python::log_set_live_when(py, "start");
             }
+            let _ = fire_runtest_py_hooks(py, session, item, "pytest_runtest_logstart");
 
             // Failed subtests share the --maxfail budget: tell the fixture
             // how many failures remain before it must stop swallowing.
             python::set_subtest_fail_budget(py, maxfail.map(|m| m.saturating_sub(failed)));
+            session.live_printed = 0;
             let reports = run_one(py, plugins, session, config, item);
+            live_flush(session, config, &reports);
             done += 1;
             let mut item_failed = false;
             for report in reports {
@@ -123,18 +133,21 @@ impl Engine {
                         let _ = std::io::stdout().flush();
                     }
                 } else if session.live_logging && !config.quiet {
-                    // log_cli: the outcome word alone, under the live records.
-                    if report.phase == Phase::Call || report.outcome != Outcome::Passed {
-                        println!("{}", with_progress(&outcome_word(&report), done, total));
-                        let _ = std::io::stdout().flush();
-                    }
+                    // log_cli: outcome words print via live_flush (between
+                    // the call phase and teardown logs).
                 } else if !config.quiet
                     && let Some(c) = report.progress_char()
                 {
+                    print!("{c}");
+                    let _ = std::io::stdout().flush();
                     line.push(c);
                 }
                 session.reports.push(report);
             }
+            if session.live_logging {
+                python::log_set_live_when(py, "finish");
+            }
+            let _ = fire_runtest_py_hooks(py, session, item, "pytest_runtest_logfinish");
             if stepwise && item_failed {
                 sw_failed_items += 1;
                 if !(sw_skip && sw_failed_items == 1) {
@@ -148,7 +161,7 @@ impl Engine {
             && !session.live_logging
             && !current_file.is_empty()
         {
-            println!("{}", with_progress(&line, done, total));
+            println!("{}", progress_suffix(&line, done, total));
         }
 
         // Final scope teardowns.
@@ -175,6 +188,27 @@ impl Engine {
         }
 
         session.items = items;
+    }
+}
+
+/// log_cli live mode: print outcome words for reports not yet printed
+/// (the call outcome appears between the call and teardown log sections).
+fn live_flush(session: &mut Session, config: &Config, reports: &[TestReport]) {
+    if !session.live_logging || config.verbose != 0 || config.quiet || config.no_terminal() {
+        session.live_printed = reports.len();
+        return;
+    }
+    let Some((done, total)) = session.live_progress else {
+        session.live_printed = reports.len();
+        return;
+    };
+    while session.live_printed < reports.len() {
+        let report = &reports[session.live_printed];
+        session.live_printed += 1;
+        if report.phase == Phase::Call || report.outcome != Outcome::Passed {
+            println!("{}", with_progress(&outcome_word(report), done, total));
+            let _ = std::io::stdout().flush();
+        }
     }
 }
 
@@ -212,6 +246,18 @@ fn term_width() -> usize {
         .ok()
         .and_then(|c| c.trim().parse().ok())
         .unwrap_or(80)
+}
+
+/// The padding + percentage that completes an already-printed progress
+/// line of `body`'s width (the body itself streamed char by char).
+fn progress_suffix(body: &str, done: usize, total: usize) -> String {
+    let pct = format!("[{:>3}%]", done * 100 / total);
+    let pad = term_width().saturating_sub(body.chars().count() + pct.len());
+    if pad > 0 {
+        format!("{}{pct}", " ".repeat(pad))
+    } else {
+        format!(" {pct}")
+    }
 }
 
 /// "body        [ 33%]" — the percentage right-aligned at the terminal edge.
@@ -784,6 +830,8 @@ fn teardown_one(
     xfail: bool,
     reports: &mut Vec<TestReport>,
 ) {
+    // log_cli: the call outcome prints before teardown records appear.
+    live_flush(session, config, reports);
     let log_level_cfg: Option<String> = config
         .get_value("log-level")
         .map(str::to_string)

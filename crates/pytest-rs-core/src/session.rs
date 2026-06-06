@@ -71,6 +71,10 @@ pub struct Session {
     /// log_cli live logging: the runner prints per-item headers and
     /// word-style outcomes so log records interleave with progress.
     pub live_logging: bool,
+    /// (done, total) for the current item's live outcome line.
+    pub live_progress: Option<(usize, usize)>,
+    /// How many of the current item's reports already printed live.
+    pub live_printed: usize,
     /// Items dropped by selection (-k/-m/--lf), for the summary line.
     pub deselected: usize,
     /// The dropped items themselves, passed to pytest_deselected hooks.
@@ -100,6 +104,8 @@ impl Session {
             worker_warning_count: 0,
             dist_banner: None,
             live_logging: false,
+            live_progress: None,
+            live_printed: 0,
             deselected: 0,
             deselected_items: Vec::new(),
             collect_errors: Vec::new(),

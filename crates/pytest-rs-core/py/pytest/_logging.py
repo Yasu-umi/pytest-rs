@@ -244,6 +244,13 @@ def configure(settings):
     state.configure(settings)
 
 
+def set_live_when(when):
+    """Relabel the live (log_cli) section header outside the normal phases
+    (start/finish/collection)."""
+    if state.log_cli_handler is not None:
+        state.log_cli_handler.set_when(when)
+
+
 def log_cli_enabled():
     return state.log_cli_enabled
 

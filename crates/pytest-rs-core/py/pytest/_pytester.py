@@ -76,6 +76,20 @@ class LineMatcher:
             if line == pattern or fnmatch.fnmatch(line, pattern):
                 fail(f"no_fnmatch_line: unexpectedly matched {pattern!r}: {line!r}")
 
+    def re_match_lines(self, patterns):
+        __tracebackhide__ = True
+        import re
+
+        patterns = self._pattern_lines(patterns)
+        remaining = list(self.lines)
+        for pattern in patterns:
+            for index, line in enumerate(remaining):
+                if re.match(pattern, line):
+                    remaining = remaining[index + 1 :]
+                    break
+            else:
+                fail(f"re_match_lines: no line matches {pattern!r} in:\n{self}")
+
     def fnmatch_lines_random(self, patterns):
         __tracebackhide__ = True
         import fnmatch
