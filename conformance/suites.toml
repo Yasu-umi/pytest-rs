@@ -61,3 +61,39 @@ repo = "https://github.com/ionelmc/pytest-benchmark"
 tag = "v5.1.0"
 testpaths = ["tests"]
 enabled = true
+
+# --- Real-world projects: famous suites that must pass wholesale, as
+# --- drop-in evidence (no pytest-rs-specific relationship).
+
+[click]
+repo = "https://github.com/pallets/click"
+tag = "8.3.1"
+testpaths = ["tests"]
+category = "real-world"
+enabled = true
+
+[jinja]
+repo = "https://github.com/pallets/jinja"
+tag = "3.1.6"
+testpaths = ["tests"]
+deps = ["markupsafe", "trio"]
+category = "real-world"
+enabled = true
+
+[marshmallow]
+repo = "https://github.com/marshmallow-code/marshmallow"
+tag = "4.1.1"
+testpaths = ["tests"]
+deps = ["simplejson"]
+category = "real-world"
+enabled = true
+
+[rich]
+repo = "https://github.com/Textualize/rich"
+tag = "v14.2.0"
+testpaths = ["tests"]
+deps = ["markdown-it-py", "pygments"]
+# Flat package layout: the checkout root is the import path.
+pythonpath = ["."]
+category = "real-world"
+enabled = true

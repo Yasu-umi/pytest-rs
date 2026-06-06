@@ -66,6 +66,12 @@ class Suite:
         # Node ids never run (flaky under load; they would destabilize the
         # committed results the release gate compares against).
         self.deselect: list[str] = config.get("deselect", [])
+        # "ecosystem" (pytest + its plugins, the reimplementation targets)
+        # or "real-world" (famous suites run as drop-in evidence).
+        self.category: str = config.get("category", "ecosystem")
+        # Extra PYTHONPATH entries relative to the checkout (e.g. "." for
+        # flat package layouts).
+        self.pythonpath: list[str] = config.get("pythonpath", [])
         self.checkout = CACHE / f"{self.name}-{self.tag}"
         self.src_dir: Path | None = None
 
@@ -93,27 +99,31 @@ class Suite:
             local = (ROOT / self.local).resolve()
             if local.exists():
                 self.checkout = local
-                src = local / "src"
-                if src.is_dir():
-                    self.src_dir = src
+                self._detect_src()
                 return
-        if self.checkout.exists():
-            return
-        CACHE.mkdir(parents=True, exist_ok=True)
-        subprocess.run(
-            [
-                "git",
-                "clone",
-                "--depth",
-                "1",
-                "--branch",
-                self.tag,
-                self.repo,
-                str(self.checkout),
-            ],
-            check=True,
-            capture_output=True,
-        )
+        if not self.checkout.exists():
+            CACHE.mkdir(parents=True, exist_ok=True)
+            subprocess.run(
+                [
+                    "git",
+                    "clone",
+                    "--depth",
+                    "1",
+                    "--branch",
+                    self.tag,
+                    self.repo,
+                    str(self.checkout),
+                ],
+                check=True,
+                capture_output=True,
+            )
+        self._detect_src()
+
+    def _detect_src(self) -> None:
+        """src-layout checkouts import the package from src/."""
+        src = self.checkout / "src"
+        if src.is_dir():
+            self.src_dir = src
 
     def test_files(self) -> tuple[list[Path], int]:
         """(files to run, number excluded by configuration)."""
@@ -136,6 +146,7 @@ class Suite:
         env = dict(os.environ)
         deps_dir = self.deps_dir()
         extra_paths = [str(p) for p in [self.src_dir, deps_dir] if p is not None]
+        extra_paths.extend(str((self.checkout / entry).resolve()) for entry in self.pythonpath)
         if extra_paths:
             env["PYTHONPATH"] = ":".join(extra_paths)
         try:
@@ -282,6 +293,7 @@ def run_suite(suite: Suite, use_local: bool, jobs: int) -> tuple[list[FileResult
             {
                 "suite": suite.name,
                 "tag": suite.tag,
+                "category": suite.category,
                 "excluded_files": excluded,
                 "files": [
                     {k: v for k, v in result.__dict__.items() if k not in ("stdout", "stderr")}
@@ -312,8 +324,24 @@ def scoreboard_platforms() -> list[str]:
     return sorted(found, key=lambda name: (name != "linux", name))
 
 
+def cross_suite_tables(boards: list[dict]) -> list[str]:
+    """Category-split cross-suite tables (shared by RESULTS.md / README.md):
+    the pytest ecosystem (reimplementation targets), then real-world suites
+    run wholesale as drop-in evidence."""
+    ecosystem = [b for b in boards if b.get("category", "ecosystem") == "ecosystem"]
+    real_world = [b for b in boards if b.get("category") == "real-world"]
+    lines = ["**pytest & plugin ecosystem** (the APIs pytest-rs reimplements):", ""]
+    lines.extend(cross_suite_table(ecosystem))
+    if real_world:
+        lines.append("")
+        lines.append("**Real-world projects** (their suites run unchanged, as drop-in evidence):")
+        lines.append("")
+        lines.extend(cross_suite_table(real_world))
+    return lines
+
+
 def cross_suite_table(boards: list[dict]) -> list[str]:
-    """The cross-suite markdown table (shared by RESULTS.md and README.md)."""
+    """One cross-suite markdown table."""
     lines = [
         "| suite | tag | passed | failed | errors | skipped | total | pass % "
         "| files all-pass | files run | files excluded |",
@@ -403,7 +431,7 @@ def update_readme_table(suites: list[Suite]) -> None:
     head, rest = text.split(start, 1)
     _, tail = rest.split(end, 1)
     label = "CI-verified" if platform == "linux" else "dev snapshot"
-    table = "\n".join([f"_{platform} ({label})_", "", *cross_suite_table(boards)])
+    table = "\n".join([f"_{platform} ({label})_", "", *cross_suite_tables(boards)])
     README_DOC.write_text(f"{head}{start}\n{table}\n{end}{tail}")
 
 

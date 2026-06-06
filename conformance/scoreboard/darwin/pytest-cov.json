@@ -1,6 +1,7 @@
 {
   "suite": "pytest-cov",
   "tag": "v7.1.0",
+  "category": "ecosystem",
   "excluded_files": 0,
   "files": [
     {

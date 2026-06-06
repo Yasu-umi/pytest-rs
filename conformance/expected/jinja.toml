@@ -1,0 +1,26 @@
+# jinja's upstream test suite runs wholesale under pytest-rs.
+# This list only grows; a regression here fails CI.
+
+[files]
+"tests/test_api.py" = "passed"
+"tests/test_async.py" = "passed"
+"tests/test_async_filters.py" = "passed"
+"tests/test_bytecode_cache.py" = "passed"
+"tests/test_compile.py" = "passed"
+"tests/test_core_tags.py" = "passed"
+"tests/test_debug.py" = "passed"
+"tests/test_ext.py" = "passed"
+"tests/test_filters.py" = "passed"
+"tests/test_idtracking.py" = "passed"
+"tests/test_imports.py" = "passed"
+"tests/test_inheritance.py" = "passed"
+"tests/test_lexnparse.py" = "passed"
+"tests/test_loader.py" = "passed"
+"tests/test_nativetypes.py" = "passed"
+"tests/test_nodes.py" = "passed"
+"tests/test_pickle.py" = "passed"
+"tests/test_regression.py" = "passed"
+"tests/test_runtime.py" = "passed"
+"tests/test_security.py" = "passed"
+"tests/test_tests.py" = "passed"
+"tests/test_utils.py" = "passed"

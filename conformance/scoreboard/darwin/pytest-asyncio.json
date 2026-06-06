@@ -1,6 +1,7 @@
 {
   "suite": "pytest-asyncio",
   "tag": "v1.4.0",
+  "category": "ecosystem",
   "excluded_files": 0,
   "files": [
     {

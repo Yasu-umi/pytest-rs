@@ -1,6 +1,7 @@
 {
   "suite": "pytest",
   "tag": "9.0.3",
+  "category": "ecosystem",
   "excluded_files": 63,
   "files": [
     {

@@ -1,0 +1,24 @@
+# click's upstream test suite runs wholesale under pytest-rs.
+# This list only grows; a regression here fails CI.
+
+[files]
+"tests/test_arguments.py" = "passed"
+"tests/test_basic.py" = "passed"
+"tests/test_chain.py" = "passed"
+"tests/test_command_decorators.py" = "passed"
+"tests/test_commands.py" = "passed"
+"tests/test_compat.py" = "passed"
+"tests/test_context.py" = "passed"
+"tests/test_custom_classes.py" = "passed"
+"tests/test_defaults.py" = "passed"
+"tests/test_formatting.py" = "passed"
+"tests/test_imports.py" = "passed"
+"tests/test_info_dict.py" = "passed"
+"tests/test_normalization.py" = "passed"
+"tests/test_options.py" = "passed"
+"tests/test_parser.py" = "passed"
+"tests/test_shell_completion.py" = "passed"
+"tests/test_termui.py" = "passed"
+"tests/test_testing.py" = "passed"
+"tests/test_types.py" = "passed"
+"tests/test_utils.py" = "passed"

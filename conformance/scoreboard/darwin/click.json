@@ -1,0 +1,188 @@
+{
+  "suite": "click",
+  "tag": "8.3.1",
+  "category": "real-world",
+  "excluded_files": 0,
+  "files": [
+    {
+      "file": "tests/test_arguments.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 91,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_basic.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 88,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_chain.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_command_decorators.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_commands.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 79,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_compat.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_context.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 30,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_custom_classes.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_defaults.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_formatting.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 17,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_imports.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_info_dict.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 22,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_normalization.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_options.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 531,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_parser.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_shell_completion.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 52,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_termui.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 147,
+      "failed": 0,
+      "skipped": 21,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_testing.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 26,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_types.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 39,
+      "failed": 0,
+      "skipped": 1,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_utils.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 143,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    }
+  ]
+}

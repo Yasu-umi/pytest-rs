@@ -77,6 +77,8 @@ Current results (`total = passed + failed + errors + skipped`; updated automatic
 <!-- conformance-results:start -->
 _linux (CI-verified)_
 
+**pytest & plugin ecosystem** (the APIs pytest-rs reimplements):
+
 | suite | tag | passed | failed | errors | skipped | total | pass % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | pytest | 9.0.3 | 1186 | 831 | 0 | 22 | 2039 | 58.2% | 5 | 45 | 63 |
