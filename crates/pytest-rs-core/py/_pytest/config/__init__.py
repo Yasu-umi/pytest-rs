@@ -1,14 +1,34 @@
+import argparse
 import os
 
 from pytest import ExitCode, UsageError  # noqa: F401
 
+_notset = object()
+
 
 class Config:
-    """Stub config type (mostly used for annotations upstream)."""
+    """Stub config type (mostly used for annotations upstream); instances
+    built by _prepareconfig carry an option namespace for getoption()."""
 
     VERBOSITY_ASSERTIONS = "assertions"
     VERBOSITY_TEST_CASES = "test_cases"
     VERBOSITY_SUBTESTS = "subtests"
+
+    def __init__(self, option=None):
+        self.option = option if option is not None else argparse.Namespace()
+
+    def getoption(self, name, default=_notset, skip=False):
+        name = name.lstrip("-").replace("-", "_")
+        try:
+            return getattr(self.option, name)
+        except AttributeError:
+            if default is not _notset:
+                return default
+            if skip:
+                import pytest
+
+                pytest.skip(f"no {name!r} option found")
+            raise ValueError(f"no option named {name!r}") from None
 
 
 class PytestPluginManager:
@@ -17,6 +37,25 @@ class PytestPluginManager:
 
 def main(args=None, plugins=None):
     raise NotImplementedError("_pytest.config.main is not supported by pytest-rs")
+
+
+def _prepareconfig(args=None, plugins=None):
+    """Build a default-options Config. Upstream parses the full command
+    line; here only the defaults consumed by ported helpers (e.g. the
+    TerminalReporter summary-stats logic) are materialized."""
+    if args:
+        raise NotImplementedError(
+            "_pytest.config._prepareconfig with args is not supported by pytest-rs"
+        )
+    option = argparse.Namespace(
+        collectonly=False,
+        verbose=0,
+        quiet=0,
+        capture="fd",
+        setupshow=False,
+        fold_skipped=True,
+    )
+    return Config(option)
 
 
 def parse_warning_filter(arg, *, escape):
