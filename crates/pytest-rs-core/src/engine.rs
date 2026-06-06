@@ -201,7 +201,9 @@ impl Engine {
             // Collection errors still report as errors in the summary.
             for (path, err) in collect_errors {
                 let nodeid = crate::collect::file_nodeid(&self.config.rootdir, &path);
-                self.session.collect_errors.push((nodeid.clone(), err.clone()));
+                self.session
+                    .collect_errors
+                    .push((nodeid.clone(), err.clone()));
                 self.session.reports.push(crate::report::TestReport {
                     nodeid,
                     phase: Phase::Setup,
@@ -215,10 +217,7 @@ impl Engine {
             }
             // --maxfail aborting collection exits TESTS_FAILED with a
             // "stopping after N failures" banner; otherwise INTERRUPTED.
-            let maxfail_hit = self
-                .config
-                .maxfail()
-                .is_some_and(|m| n_collect_errors >= m);
+            let maxfail_hit = self.config.maxfail().is_some_and(|m| n_collect_errors >= m);
             if !self.config.get_flag("continue-on-collection-errors") || maxfail_hit {
                 if !self.config.no_terminal() {
                     if !self.config.quiet {
@@ -450,7 +449,10 @@ impl Engine {
         }
         self.print_short_summary();
         if let Some(n) = self.session.stopped_after {
-            println!("{}", center_with(&format!("stopping after {n} failures"), '!'));
+            println!(
+                "{}",
+                center_with(&format!("stopping after {n} failures"), '!')
+            );
         }
         let warning_count = python::warning_count(py) + self.session.worker_warning_count;
         println!(
@@ -623,7 +625,10 @@ impl Engine {
         println!();
         println!("{}", center_banner("ERRORS"));
         for (nodeid, err) in &self.session.collect_errors {
-            println!("{}", center_with(&format!("ERROR collecting {nodeid}"), '_'));
+            println!(
+                "{}",
+                center_with(&format!("ERROR collecting {nodeid}"), '_')
+            );
             println!("{err}");
         }
         for report in phase_errors {
@@ -632,7 +637,10 @@ impl Engine {
                 Phase::Teardown => "teardown",
                 _ => "setup",
             };
-            println!("{}", center_with(&format!("ERROR at {when} of {name}"), '_'));
+            println!(
+                "{}",
+                center_with(&format!("ERROR at {when} of {name}"), '_')
+            );
             if report.longrepr.is_some() {
                 println!("{}", Self::render_longrepr(report));
             }
@@ -648,7 +656,10 @@ impl Engine {
         match python::junit_write(py, &self.session) {
             Ok(path) => {
                 if !self.config.no_terminal() && !self.config.quiet {
-                    println!("{}", center_with(&format!("generated xml file: {path}"), '-'));
+                    println!(
+                        "{}",
+                        center_with(&format!("generated xml file: {path}"), '-')
+                    );
                 }
             }
             Err(err) => {
@@ -746,9 +757,7 @@ impl Engine {
             .reports
             .iter()
             .filter(|r| {
-                r.outcome == Outcome::Passed
-                    && r.phase == Phase::Call
-                    && r.subtest_desc.is_none()
+                r.outcome == Outcome::Passed && r.phase == Phase::Call && r.subtest_desc.is_none()
             })
             .collect();
         if passed.is_empty() {
@@ -953,11 +962,10 @@ impl Engine {
         if let Some(prefixes) = self.config.get_values("deselect") {
             let prefixes: Vec<String> = prefixes.iter().map(|s| s.to_string()).collect();
             // pytest matches by plain nodeid prefix (main.py).
-            let (kept, removed): (Vec<_>, Vec<_>) = self
-                .session
-                .items
-                .drain(..)
-                .partition(|item| !prefixes.iter().any(|p| item.nodeid.starts_with(p.as_str())));
+            let (kept, removed): (Vec<_>, Vec<_>) =
+                self.session.items.drain(..).partition(|item| {
+                    !prefixes.iter().any(|p| item.nodeid.starts_with(p.as_str()))
+                });
             self.session.items = kept;
             self.session.deselected_items.extend(removed);
         }
@@ -1364,15 +1372,16 @@ impl Engine {
                 let is_text_doctest = matches!(ext, "txt" | "rst" | "md");
                 if is_text_doctest
                     && let Ok(py_config) = python::make_py_config(py, &self.config)
-                        && let Err(err) = python::collect_doctests_from_textfile(
-                            py,
-                            &rootdir,
-                            file,
-                            &py_config,
-                            &mut self.session.items,
-                        ) {
-                            errors.push((file.clone(), python::format_exception(py, &err)));
-                        }
+                    && let Err(err) = python::collect_doctests_from_textfile(
+                        py,
+                        &rootdir,
+                        file,
+                        &py_config,
+                        &mut self.session.items,
+                    )
+                {
+                    errors.push((file.clone(), python::format_exception(py, &err)));
+                }
                 continue;
             }
             // Import-time output attaches to a failing collect report as
@@ -1459,18 +1468,20 @@ impl Engine {
                 }
             };
             // --doctest-modules: collect doctests from each successfully-imported module.
-            if module_ok && self.config.get_flag("doctest-modules")
+            if module_ok
+                && self.config.get_flag("doctest-modules")
                 && let Ok(py_config) = python::make_py_config(py, &self.config)
-                    && let Err(err) = python::collect_doctests_from_module(
-                        py,
-                        &rootdir,
-                        file,
-                        &py_config,
-                        &mut self.session.items,
-                    ) {
-                        // Non-fatal: log as collect error and continue.
-                        errors.push((file.clone(), python::format_exception(py, &err)));
-                    }
+                && let Err(err) = python::collect_doctests_from_module(
+                    py,
+                    &rootdir,
+                    file,
+                    &py_config,
+                    &mut self.session.items,
+                )
+            {
+                // Non-fatal: log as collect error and continue.
+                errors.push((file.clone(), python::format_exception(py, &err)));
+            }
         }
 
         // --doctest-modules: also scan ALL .py files (not just test files) for doctests.
@@ -1519,28 +1530,27 @@ impl Engine {
         // even without explicit --doctest-modules or --doctest-glob flags, mirroring
         // upstream pytest's _is_doctest() behavior.
         let scan_text_files = true;
-        if scan_text_files
-            && let Ok(py_config) = python::make_py_config(py, &self.config) {
-                let text_files =
-                    crate::collect::collect_doctest_textfiles(&self.config.invocation_dir, &paths);
-                for tf in text_files {
-                    // Skip files already collected in the explicit-file loop above.
-                    if files.contains(&tf) {
-                        continue;
-                    }
-                    if let Ok(true) = python::is_doctest_textfile(py, &tf, &py_config)
-                        && let Err(err) = python::collect_doctests_from_textfile(
-                            py,
-                            &rootdir,
-                            &tf,
-                            &py_config,
-                            &mut self.session.items,
-                        )
-                    {
-                        errors.push((tf.clone(), python::format_exception(py, &err)));
-                    }
+        if scan_text_files && let Ok(py_config) = python::make_py_config(py, &self.config) {
+            let text_files =
+                crate::collect::collect_doctest_textfiles(&self.config.invocation_dir, &paths);
+            for tf in text_files {
+                // Skip files already collected in the explicit-file loop above.
+                if files.contains(&tf) {
+                    continue;
+                }
+                if let Ok(true) = python::is_doctest_textfile(py, &tf, &py_config)
+                    && let Err(err) = python::collect_doctests_from_textfile(
+                        py,
+                        &rootdir,
+                        &tf,
+                        &py_config,
+                        &mut self.session.items,
+                    )
+                {
+                    errors.push((tf.clone(), python::format_exception(py, &err)));
                 }
             }
+        }
 
         // Collection over: close its catching_logs phase.
         python::log_end_phase(py);

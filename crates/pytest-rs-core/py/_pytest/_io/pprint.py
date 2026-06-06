@@ -16,14 +16,12 @@
 from __future__ import annotations
 
 import collections as _collections
-from collections.abc import Callable
-from collections.abc import Iterator
 import dataclasses as _dataclasses
-from io import StringIO as _StringIO
 import re
 import types as _types
-from typing import Any
-from typing import IO
+from collections.abc import Callable, Iterator
+from io import StringIO as _StringIO
+from typing import IO, Any
 
 
 class _safe_key:
@@ -120,9 +118,7 @@ class PrettyPrinter:
             and "__create_fn__" in object.__repr__.__wrapped__.__qualname__
         ):
             context.add(objid)
-            self._pprint_dataclass(
-                object, stream, indent, allowance, context, level + 1
-            )
+            self._pprint_dataclass(object, stream, indent, allowance, context, level + 1)
             context.remove(objid)
         else:
             stream.write(self._repr(object, context, level))
@@ -137,11 +133,7 @@ class PrettyPrinter:
         level: int,
     ) -> None:
         cls_name = object.__class__.__name__
-        items = [
-            (f.name, getattr(object, f.name))
-            for f in _dataclasses.fields(object)
-            if f.repr
-        ]
+        items = [(f.name, getattr(object, f.name)) for f in _dataclasses.fields(object) if f.repr]
         stream.write(cls_name + "(")
         self._format_namespace_items(items, stream, indent, allowance, context, level)
         stream.write(")")
@@ -342,9 +334,7 @@ class PrettyPrinter:
     ) -> None:
         write = stream.write
         write("bytearray(")
-        self._pprint_bytes(
-            bytes(object), stream, indent + 10, allowance + 1, context, level + 1
-        )
+        self._pprint_bytes(bytes(object), stream, indent + 10, allowance + 1, context, level + 1)
         write(")")
 
     _dispatch[bytearray.__repr__] = _pprint_bytearray
@@ -587,9 +577,7 @@ class PrettyPrinter:
 
     _dispatch[_collections.UserString.__repr__] = _pprint_user_string
 
-    def _safe_repr(
-        self, object: Any, context: set[int], maxlevels: int | None, level: int
-    ) -> str:
+    def _safe_repr(self, object: Any, context: set[int], maxlevels: int | None, level: int) -> str:
         typ = type(object)
         if typ in _builtin_scalars:
             return repr(object)
@@ -646,9 +634,7 @@ class PrettyPrinter:
         return repr(object)
 
 
-_builtin_scalars = frozenset(
-    {str, bytes, bytearray, float, complex, bool, type(None), int}
-)
+_builtin_scalars = frozenset({str, bytes, bytearray, float, complex, bool, type(None), int})
 
 
 def _recursion(object: Any) -> str:

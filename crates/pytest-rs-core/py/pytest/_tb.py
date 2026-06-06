@@ -82,7 +82,7 @@ def _format_short_frame(frame, lineno):
 
 
 def raise_location(exc):
-    """"relpath:lineno" of the last visible frame (where skip was raised)."""
+    """ "relpath:lineno" of the last visible frame (where skip was raised)."""
     frames = _visible_frames(exc)
     if not frames:
         return None

@@ -4,24 +4,17 @@
 from __future__ import annotations
 
 import collections.abc
-from collections.abc import Callable
-from collections.abc import Iterable
-from collections.abc import Mapping
-from collections.abc import Sequence
-from collections.abc import Set as AbstractSet
 import pprint
-from typing import Any
-from typing import Literal
-from typing import Protocol
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Set as AbstractSet
+from typing import Any, Literal, Protocol
 from unicodedata import normalize
 
 from _pytest import outcomes
 from _pytest._io.pprint import PrettyPrinter
-from _pytest._io.saferepr import saferepr
-from _pytest._io.saferepr import saferepr_unlimited
+from _pytest._io.saferepr import saferepr, saferepr_unlimited
 from _pytest.compat import running_on_ci
 from _pytest.config import Config
-
 
 # The _reprcompare attribute on the util module is used by the new assertion
 # interpretation code and assertion rewriter to detect this plugin was
@@ -194,9 +187,7 @@ def assertrepr_compare(
     else:
         # XXX: "15 chars indentation" is wrong
         #      ("E       AssertionError: assert "); should use term width.
-        maxsize = (
-            80 - 15 - len(op) - 2
-        ) // 2  # 15 chars indentation, 1 space around op
+        maxsize = (80 - 15 - len(op) - 2) // 2  # 15 chars indentation, 1 space around op
 
         left_repr = saferepr(left, maxsize=maxsize, use_ascii=use_ascii)
         right_repr = saferepr(right, maxsize=maxsize, use_ascii=use_ascii)
@@ -268,10 +259,8 @@ def _compare_eq_any(
             approx_side = left if isinstance(left, ApproxBase) else right
             other_side = right if isinstance(left, ApproxBase) else left
 
-            explanation = approx_side._repr_compare(other_side)
-        elif type(left) is type(right) and (
-            isdatacls(left) or isattrs(left) or isnamedtuple(left)
-        ):
+            explanation = approx_side._repr_compare(other_side)  # type: ignore[union-attr]
+        elif type(left) is type(right) and (isdatacls(left) or isattrs(left) or isnamedtuple(left)):
             # Note: unlike dataclasses/attrs, namedtuples compare only the
             # field values, not the type or field names. But this branch
             # intentionally only handles the same-type case, which was often
@@ -291,9 +280,7 @@ def _compare_eq_any(
     return explanation
 
 
-def _diff_text(
-    left: str, right: str, highlighter: _HighlightFunc, verbose: int = 0
-) -> list[str]:
+def _diff_text(left: str, right: str, highlighter: _HighlightFunc, verbose: int = 0) -> list[str]:
     """Return the explanation for the diff between text.
 
     Unless --verbose is used this will skip leading and trailing
@@ -310,9 +297,7 @@ def _diff_text(
                 break
         if i > 42:
             i -= 10  # Provide some context
-            explanation = [
-                f"Skipping {i} identical leading characters in diff, use -v to show"
-            ]
+            explanation = [f"Skipping {i} identical leading characters in diff, use -v to show"]
             left = left[i:]
             right = right[i:]
         if len(left) == len(right):
@@ -322,8 +307,7 @@ def _diff_text(
             if i > 42:
                 i -= 10  # Provide some context
                 explanation += [
-                    f"Skipping {i} identical trailing "
-                    "characters in diff, use -v to show"
+                    f"Skipping {i} identical trailing characters in diff, use -v to show"
                 ]
                 left = left[:-i]
                 right = right[:-i]
@@ -365,10 +349,7 @@ def _compare_eq_iterable(
     # see https://github.com/pytest-dev/pytest/issues/3333
     explanation.extend(
         highlighter(
-            "\n".join(
-                line.rstrip()
-                for line in difflib.ndiff(right_formatting, left_formatting)
-            ),
+            "\n".join(line.rstrip() for line in difflib.ndiff(right_formatting, left_formatting)),
             lexer="diff",
         ).splitlines()
     )
@@ -425,9 +406,7 @@ def _compare_eq_sequence(
             extra = saferepr(right[len_left])
 
         if len_diff == 1:
-            explanation += [
-                f"{dir_with_more} contains one more item: {highlighter(extra)}"
-            ]
+            explanation += [f"{dir_with_more} contains one more item: {highlighter(extra)}"]
         else:
             explanation += [
                 f"{dir_with_more} contains {len_diff} more items, first extra item: {highlighter(extra)}"
@@ -525,9 +504,7 @@ def _compare_eq_dict(
         explanation += ["Differing items:"]
         for k in diff:
             explanation += [
-                highlighter(saferepr({k: left[k]}))
-                + " != "
-                + highlighter(saferepr({k: right[k]}))
+                highlighter(saferepr({k: left[k]})) + " != " + highlighter(saferepr({k: right[k]}))
             ]
     extra_left = set_left - set_right
     len_extra_left = len(extra_left)
@@ -550,9 +527,7 @@ def _compare_eq_dict(
     return explanation
 
 
-def _compare_eq_cls(
-    left: Any, right: Any, highlighter: _HighlightFunc, verbose: int
-) -> list[str]:
+def _compare_eq_cls(left: Any, right: Any, highlighter: _HighlightFunc, verbose: int) -> list[str]:
     if not has_default_eq(left):
         return []
     if isdatacls(left):
@@ -562,7 +537,7 @@ def _compare_eq_cls(
         fields_to_check = [info.name for info in all_fields if info.compare]
     elif isattrs(left):
         all_fields = left.__attrs_attrs__
-        fields_to_check = [field.name for field in all_fields if getattr(field, "eq")]
+        fields_to_check = [field.name for field in all_fields if field.eq]
     elif isnamedtuple(left):
         fields_to_check = left._fields
     else:
@@ -598,9 +573,7 @@ def _compare_eq_cls(
             ]
             explanation += [
                 indent + line
-                for line in _compare_eq_any(
-                    field_left, field_right, highlighter, verbose
-                )
+                for line in _compare_eq_any(field_left, field_right, highlighter, verbose)
             ]
     return explanation
 

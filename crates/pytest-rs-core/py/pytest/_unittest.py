@@ -24,7 +24,7 @@ class _SubtestRecorder:
 
     @staticmethod
     def _subtest_desc(subtest) -> str:
-        from unittest.case import _subtest_msg_sentinel
+        from unittest.case import _subtest_msg_sentinel  # type: ignore[attr-defined]
 
         from pytest._subtests import _description
 
@@ -106,9 +106,9 @@ def make_runner(cls, method_name):
         from unittest.case import _Outcome, _ShouldStop
 
         outcome = _Outcome(_SubtestRecorder(case))
-        expecting_failure = getattr(
-            method, "__unittest_expecting_failure__", False
-        ) or getattr(cls, "__unittest_expecting_failure__", False)
+        expecting_failure = getattr(method, "__unittest_expecting_failure__", False) or getattr(
+            cls, "__unittest_expecting_failure__", False
+        )
         outcome.expecting_failure = expecting_failure
         case._outcome = outcome
         try:

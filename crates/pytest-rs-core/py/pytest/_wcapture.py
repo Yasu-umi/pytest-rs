@@ -80,9 +80,7 @@ def parse_filter(arg, escape):
 
     parts = arg.split(":")
     if len(parts) > 5:
-        doc_url = (
-            "https://docs.python.org/3/library/warnings.html#describing-warning-filters"
-        )
+        doc_url = "https://docs.python.org/3/library/warnings.html#describing-warning-filters"
         error = (
             f"Too many fields ({len(parts)}), expected at most 5 separated by colons:\n\n"
             "  action:message:category:module:line\n\n"
@@ -101,9 +99,7 @@ def parse_filter(arg, escape):
     except ImportError:
         raise
     except Exception as e:
-        raise pytest.UsageError(
-            error_template.format(error=f"{type(e).__name__}: {e}")
-        ) from None
+        raise pytest.UsageError(error_template.format(error=f"{type(e).__name__}: {e}")) from None
     if message and escape:
         message = re.escape(message)
     if module and escape:
@@ -135,9 +131,7 @@ def _apply_filter(spec, escape):
     try:
         warnings.filterwarnings(*parse_filter(spec, escape=escape))
     except ImportError as e:
-        warnings.warn(
-            f"Failed to import filter module '{e.name}': {spec}", PytestConfigWarning
-        )
+        warnings.warn(f"Failed to import filter module '{e.name}': {spec}", PytestConfigWarning)
 
 
 def apply_session_filters(ini_specs, w_specs):

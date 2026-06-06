@@ -45,8 +45,6 @@ from pytest._outcomes import exit as exit
 from pytest._outcomes import fail as fail
 from pytest._outcomes import importorskip as importorskip
 from pytest._outcomes import skip as skip
-from pytest._subtests import Subtests as Subtests
-from pytest._subtests import subtests as subtests
 from pytest._outcomes import xfail as xfail
 from pytest._pytester import LineMatcher as LineMatcher
 from pytest._pytester import Pytester as Pytester
@@ -55,16 +53,16 @@ from pytest._pytester import Testdir as Testdir
 from pytest._pytester import pytester as pytester
 from pytest._pytester import testdir as testdir
 from pytest._raises import ExceptionInfo as ExceptionInfo
-from pytest._rewrite import register_assert_rewrite as register_assert_rewrite
 from pytest._raises import RaisesContext as RaisesContext
 from pytest._raises import raises as raises
+from pytest._rewrite import register_assert_rewrite as register_assert_rewrite
+from pytest._subtests import Subtests as Subtests
+from pytest._subtests import subtests as subtests
 from pytest._tmp_path import TempPathFactory as TempPathFactory
 from pytest._tmp_path import tmp_path as tmp_path
 from pytest._tmp_path import tmp_path_factory as tmp_path_factory
 from pytest._tmp_path import tmpdir as tmpdir
 from pytest._warning_types import PytestAssertRewriteWarning as PytestAssertRewriteWarning
-from pytest._xdist_fixtures import testrun_uid as testrun_uid
-from pytest._xdist_fixtures import worker_id as worker_id
 from pytest._warning_types import PytestCacheWarning as PytestCacheWarning
 from pytest._warning_types import PytestCollectionWarning as PytestCollectionWarning
 from pytest._warning_types import PytestConfigWarning as PytestConfigWarning
@@ -82,6 +80,8 @@ from pytest._warns import WarningsRecorder as WarningsRecorder
 from pytest._warns import deprecated_call as deprecated_call
 from pytest._warns import recwarn as recwarn
 from pytest._warns import warns as warns
+from pytest._xdist_fixtures import testrun_uid as testrun_uid
+from pytest._xdist_fixtures import worker_id as worker_id
 
 __version__ = "9.0.3"  # pytest API version this shim tracks
 version_tuple = (9, 0, 3)

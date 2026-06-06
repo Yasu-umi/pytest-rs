@@ -217,7 +217,9 @@ def suite_summary(results: list[FileResult], excluded: int) -> str:
     if skipped:
         notes.append(f"{skipped} skipped")
     # Files that died before running any test contribute no test counts.
-    dead = [r.file for r in results if r.status in ("error", "timeout") and r.passed + r.failed == 0]
+    dead = [
+        r.file for r in results if r.status in ("error", "timeout") and r.passed + r.failed == 0
+    ]
     if dead:
         notes.append(f"{len(dead)} file{'s' if len(dead) != 1 else ''} died: {', '.join(dead)}")
     if excluded:
@@ -258,7 +260,10 @@ def run_suite(suite: Suite, use_local: bool) -> tuple[list[FileResult], str]:
     scoreboard.mkdir(exist_ok=True)
     (scoreboard / f"{suite.name}.json").write_text(
         json.dumps(
-            [{k: v for k, v in result.__dict__.items() if k not in ("stdout", "stderr")} for result in results],
+            [
+                {k: v for k, v in result.__dict__.items() if k not in ("stdout", "stderr")}
+                for result in results
+            ],
             indent=2,
         )
         + "\n"

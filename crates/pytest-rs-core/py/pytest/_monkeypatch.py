@@ -107,9 +107,7 @@ class MonkeyPatch:
 
         if not isinstance(name, str):
             warnings.warn(
-                PytestWarning(
-                    f"Environment variable name {name!r} should be a str"
-                ),
+                PytestWarning(f"Environment variable name {name!r} should be a str"),
                 stacklevel=3,
             )
 

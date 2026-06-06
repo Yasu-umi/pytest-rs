@@ -39,8 +39,7 @@ class WarningsRecorder(_warnings.catch_warnings):
             if w.category == cls:
                 return self._list.pop(i)  # exact match, stop looking
             if issubclass(w.category, cls) and (
-                best_idx is None
-                or not issubclass(w.category, self._list[best_idx].category)
+                best_idx is None or not issubclass(w.category, self._list[best_idx].category)
             ):
                 best_idx = i
         if best_idx is not None:
@@ -79,9 +78,7 @@ class WarningsChecker(WarningsRecorder):
                 if not issubclass(exc, Warning):
                     raise TypeError(msg % type(exc))
             expected_warning_tup = expected_warning
-        elif isinstance(expected_warning, type) and issubclass(
-            expected_warning, Warning
-        ):
+        elif isinstance(expected_warning, type) and issubclass(expected_warning, Warning):
             expected_warning_tup = (expected_warning,)
         else:
             raise TypeError(msg % type(expected_warning))
@@ -91,8 +88,7 @@ class WarningsChecker(WarningsRecorder):
 
     def matches(self, warning):
         return issubclass(warning.category, self.expected_warning) and bool(
-            self.match_expr is None
-            or _re.search(self.match_expr, str(warning.message))
+            self.match_expr is None or _re.search(self.match_expr, str(warning.message))
         )
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -112,9 +108,7 @@ class WarningsChecker(WarningsRecorder):
             return _pformat([record.message for record in self], indent=2)
 
         try:
-            if not any(
-                issubclass(w.category, self.expected_warning) for w in self
-            ):
+            if not any(issubclass(w.category, self.expected_warning) for w in self):
                 fail(
                     f"DID NOT WARN. No warnings of type {self.expected_warning} were emitted.\n"
                     f" Emitted warnings: {found_str()}."

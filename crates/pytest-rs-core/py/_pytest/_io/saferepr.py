@@ -20,9 +20,7 @@ def _format_repr_exception(exc: BaseException, obj: object) -> str:
         raise
     except BaseException as inner_exc:
         exc_info = f"unpresentable exception ({_try_repr_or_str(inner_exc)})"
-    return (
-        f"<[{exc_info} raised in repr()] {type(obj).__name__} object at 0x{id(obj):x}>"
-    )
+    return f"<[{exc_info} raised in repr()] {type(obj).__name__} object at 0x{id(obj):x}>"
 
 
 def _ellipsize(s: str, maxsize: int) -> str:

@@ -509,7 +509,11 @@ impl Plugin for CovPlugin {
         monitoring.call_method1("use_tool_id", (TOOL_ID, "pytest-rs-cov"))?;
         monitoring.call_method1(
             "register_callback",
-            (TOOL_ID, &py_start_event, collector.bind(py).getattr("py_start")?),
+            (
+                TOOL_ID,
+                &py_start_event,
+                collector.bind(py).getattr("py_start")?,
+            ),
         )?;
         monitoring.call_method1(
             "register_callback",

@@ -232,9 +232,7 @@ class _NodeReporter:
                 skipreason = skipreason[9:]
             details = f"{filename}:{lineno}: {skipreason}"
 
-            skipped = ET.Element(
-                "skipped", type="pytest.skip", message=bin_xml_escape(skipreason)
-            )
+            skipped = ET.Element("skipped", type="pytest.skip", message=bin_xml_escape(skipreason))
             skipped.text = bin_xml_escape(details)
             self.append(skipped)
             self.write_captured_output(report)
@@ -386,7 +384,7 @@ class LogXML:
         reporter._add_simple("error", "internal error", str(excrepr))
 
     def pytest_sessionstart(self):
-        self.suite_start = datetime.datetime.now(datetime.timezone.utc)
+        self.suite_start = datetime.datetime.now(datetime.UTC)
         self._suite_start_monotonic = time.monotonic()
 
     def pytest_sessionfinish(self):
@@ -456,9 +454,7 @@ class _LongReprText:
     def __init__(self, text):
         self._text = text
         e_lines = [
-            line[1:].lstrip()
-            for line in text.splitlines()
-            if line.startswith("E ") or line == "E"
+            line[1:].lstrip() for line in text.splitlines() if line.startswith("E ") or line == "E"
         ]
         if e_lines:
             self.reprcrash = _CrashLocation("\n".join(e_lines))
@@ -535,8 +531,7 @@ class JunitState:
             get("junit_logging", "no"),
             get("junit_duration_report", "total"),
             get("junit_family", "xunit2"),
-            str(get("junit_log_passing_tests", "true")).strip().lower()
-            not in ("false", "0", "no"),
+            str(get("junit_log_passing_tests", "true")).strip().lower() not in ("false", "0", "no"),
         )
         self.log_xml.pytest_sessionstart()
 

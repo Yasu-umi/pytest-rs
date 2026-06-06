@@ -49,9 +49,7 @@ class Cache:
     def cache_dir_from(cls, rootdir, ini_cache_dir):
         """Resolve the `cache_dir` ini (default .pytest_cache) against the
         rootdir, with ~ and env vars expanded (pytest's resolve_from_str)."""
-        value = os.path.expanduser(
-            os.path.expandvars(ini_cache_dir or cls.default_cache_dir())
-        )
+        value = os.path.expanduser(os.path.expandvars(ini_cache_dir or cls.default_cache_dir()))
         return str(Path(rootdir) / value)
 
     @classmethod
@@ -72,9 +70,7 @@ class Cache:
 
         from pytest._warning_types import PytestCacheWarning
 
-        warnings.warn(
-            PytestCacheWarning(fmt.format(**args) if args else fmt), stacklevel=3
-        )
+        warnings.warn(PytestCacheWarning(fmt.format(**args) if args else fmt), stacklevel=3)
 
     def _mkdir(self, path):
         self._ensure_cache_dir_and_supporting_files()

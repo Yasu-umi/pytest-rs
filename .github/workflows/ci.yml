@@ -66,4 +66,10 @@ jobs:
         run: uv run ruff format --check crates conformance
 
       - name: mypy
-        run: uv run mypy
+        # The plugin py/ trees reuse top-level module names (helper.py), so
+        # each gets its own invocation (config covers core + conformance).
+        run: |
+          uv run mypy
+          for tree in crates/pytest-rs-asyncio crates/pytest-rs-benchmark crates/pytest-rs-cov crates/pytest-rs-mock; do
+            uv run mypy "$tree/py"
+          done

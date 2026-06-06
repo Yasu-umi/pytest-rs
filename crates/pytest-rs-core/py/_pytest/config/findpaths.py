@@ -6,7 +6,6 @@ from dataclasses import KW_ONLY, dataclass
 from pathlib import Path
 
 import iniconfig
-
 from pytest import UsageError
 from pytest._outcomes import fail
 
@@ -55,7 +54,9 @@ def _parse_ini_config(path):
         raise UsageError(str(exc)) from exc
 
 
-CFG_PYTEST_SECTION = "[pytest] section in {filename} files is no longer supported, change to [tool:pytest] instead."
+CFG_PYTEST_SECTION = (
+    "[pytest] section in {filename} files is no longer supported, change to [tool:pytest] instead."
+)
 
 
 def load_config_dict_from_file(filepath):
@@ -111,8 +112,7 @@ def load_config_dict_from_file(filepath):
             if pytest_config:
                 # TOML mode - preserve native TOML types.
                 return {
-                    k: ConfigValue(v, origin="file", mode="toml")
-                    for k, v in pytest_config.items()
+                    k: ConfigValue(v, origin="file", mode="toml") for k, v in pytest_config.items()
                 }
             # "pytest.toml" files are always the source of configuration,
             # even if empty.
@@ -136,8 +136,7 @@ def load_config_dict_from_file(filepath):
             if toml_config:
                 # TOML mode - preserve native TOML types.
                 return {
-                    k: ConfigValue(v, origin="file", mode="toml")
-                    for k, v in toml_config.items()
+                    k: ConfigValue(v, origin="file", mode="toml") for k, v in toml_config.items()
                 }
 
             elif ini_config is not None:
@@ -187,10 +186,7 @@ def locate_config(invocation_dir, args):
                         index = config_names.index(config_name)
                         for remainder in config_names[index + 1 :]:
                             p2 = base / remainder
-                            if (
-                                p2.is_file()
-                                and load_config_dict_from_file(p2) is not None
-                            ):
+                            if p2.is_file() and load_config_dict_from_file(p2) is not None:
                                 ignored_config_files.append(remainder)
                         return base, p, ini_config, ignored_config_files
     if found_pyproject_toml is not None:
@@ -235,9 +231,7 @@ def get_dirs_from_args(args):
 
     # These look like paths but may not exist
     possible_paths = (
-        absolutepath(get_file_part_from_node_id(arg))
-        for arg in args
-        if not is_option(arg)
+        absolutepath(get_file_part_from_node_id(arg)) for arg in args if not is_option(arg)
     )
 
     return [get_dir_from_path(path) for path in possible_paths if safe_exists(path)]
@@ -281,9 +275,7 @@ def determine_setup(*, inifile, override_ini, args, rootdir_cmd_arg, invocation_
             rootdir = inipath_.parent
     else:
         ancestor = get_common_ancestor(invocation_dir, dirs)
-        rootdir, inipath, inicfg, ignored_config_files = locate_config(
-            invocation_dir, [ancestor]
-        )
+        rootdir, inipath, inicfg, ignored_config_files = locate_config(invocation_dir, [ancestor])
         if rootdir is None and rootdir_cmd_arg is None:
             for possible_rootdir in (ancestor, *ancestor.parents):
                 if (possible_rootdir / "setup.py").is_file():
@@ -293,17 +285,13 @@ def determine_setup(*, inifile, override_ini, args, rootdir_cmd_arg, invocation_
                 if dirs != [ancestor]:
                     rootdir, inipath, inicfg, _ = locate_config(invocation_dir, dirs)
                 if rootdir is None:
-                    rootdir = get_common_ancestor(
-                        invocation_dir, [invocation_dir, ancestor]
-                    )
+                    rootdir = get_common_ancestor(invocation_dir, [invocation_dir, ancestor])
                     if is_fs_root(rootdir):
                         rootdir = ancestor
     if rootdir_cmd_arg:
         rootdir = absolutepath(os.path.expandvars(rootdir_cmd_arg))
         if not rootdir.is_dir():
-            raise UsageError(
-                f"Directory '{rootdir}' not found. Check your '--rootdir' option."
-            )
+            raise UsageError(f"Directory '{rootdir}' not found. Check your '--rootdir' option.")
 
     ini_overrides = parse_override_ini(override_ini)
     inicfg.update(ini_overrides)

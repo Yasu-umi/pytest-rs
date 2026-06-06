@@ -314,10 +314,7 @@ impl Engine {
         ];
         // os.environ (not Rust setenv: the Python dict snapshots the C
         // environ at import, and __setitem__ writes through via putenv).
-        let environ = py
-            .import("os")
-            .and_then(|os| os.getattr("environ"))
-            .ok();
+        let environ = py.import("os").and_then(|os| os.getattr("environ")).ok();
         // Restore values for the parent (we may ourselves be a worker of
         // an outer -n run, where these are already set).
         let saved: Vec<Option<String>> = ENV_KEYS
@@ -345,7 +342,11 @@ impl Engine {
             // Flush both runtimes' stdio: buffered bytes would be
             // duplicated into the child, whose fd 1 becomes the protocol
             // pipe.
-            let _ = py.run(c"import sys\nsys.stdout.flush()\nsys.stderr.flush()\n", None, None);
+            let _ = py.run(
+                c"import sys\nsys.stdout.flush()\nsys.stderr.flush()\n",
+                None,
+                None,
+            );
             let _ = std::io::stdout().flush();
             let _ = std::io::stderr().flush();
 

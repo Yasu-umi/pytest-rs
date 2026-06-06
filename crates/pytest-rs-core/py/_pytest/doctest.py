@@ -3,6 +3,7 @@
 Called from Rust after module collection when --doctest-modules is active,
 and for text files matching --doctest-glob patterns.
 """
+
 from __future__ import annotations
 
 import doctest
@@ -13,17 +14,18 @@ import sys
 import types
 import warnings
 from functools import cached_property
-from typing import Any, Iterable, List, Optional, Tuple
+from typing import Any
 
 import pytest
-from _pytest.outcomes import skip, fail
 
+from _pytest.outcomes import skip
 
 # ---------------------------------------------------------------------------
 # Exceptions
 # ---------------------------------------------------------------------------
 
-def _format_context_lines(dtest: doctest.DocTest, ex: doctest.Example) -> List[str]:
+
+def _format_context_lines(dtest: doctest.DocTest, ex: doctest.Example) -> list[str]:
     """Return source-context lines for a failing doctest example.
 
     Shows up to 10 lines from the docstring ending at the failing example,
@@ -31,7 +33,7 @@ def _format_context_lines(dtest: doctest.DocTest, ex: doctest.Example) -> List[s
     When lineno information is unavailable, shows a placeholder message.
     """
     if dtest.lineno is None:
-        lines: List[str] = ["EXAMPLE LOCATION UNKNOWN, not showing all tests of that example"]
+        lines: list[str] = ["EXAMPLE LOCATION UNKNOWN, not showing all tests of that example"]
         src_lines = ex.source.splitlines() or [""]
         for i, src_line in enumerate(src_lines):
             prompt = ">>> " if i == 0 else "... "
@@ -51,7 +53,7 @@ def _format_context_lines(dtest: doctest.DocTest, ex: doctest.Example) -> List[s
     window_end = ex.lineno + len(ex_src_lines) - 1
     window_start = max(0, ex.lineno - 9)
 
-    result: List[str] = []
+    result: list[str] = []
     for offset in range(window_start, window_end + 1):
         abs_line = dtest.lineno + offset + 1
         if offset in source_at:
@@ -132,6 +134,7 @@ class DoctestUnexpected(Exception):
 
     def _format(self) -> str:
         import traceback as tb_mod
+
         exc_type, exc_val, exc_tb = self._exc_info
         lines = _format_context_lines(self._test, self._example)
         lines.append(f"UNEXPECTED EXCEPTION: {exc_type.__name__}({exc_val})")
@@ -146,6 +149,7 @@ class DoctestUnexpected(Exception):
 def _format_unexpected(failure: doctest.UnexpectedException) -> str:
     """Format a doctest.UnexpectedException (used in continue-on-failure mode)."""
     import traceback as tb_mod
+
     test = failure.test
     ex = failure.example
     exc_type, exc_val, exc_tb = failure.exc_info
@@ -344,9 +348,7 @@ def _remove_unwanted_precision(want: str, got: str) -> str:
         except ValueError:
             continue
         if abs(g_val - w_val) <= 10 ** (-precision):
-            got = (
-                got[: g.start() + offset] + w.group() + got[g.end() + offset :]
-            )
+            got = got[: g.start() + offset] + w.group() + got[g.end() + offset :]
             offset += len(w.group()) - (g.end() - g.start())
     return got
 
@@ -355,7 +357,10 @@ def _remove_unwanted_precision(want: str, got: str) -> str:
 # DocTest runner
 # ---------------------------------------------------------------------------
 
-def _init_runner_class(continue_on_failure: bool, checker: Any, optionflags: int) -> doctest.DebugRunner:
+
+def _init_runner_class(
+    continue_on_failure: bool, checker: Any, optionflags: int
+) -> type[doctest.DebugRunner]:
     class PytestDoctestRunner(doctest.DebugRunner):
         def __init__(self) -> None:
             super().__init__(checker=checker, verbose=False, optionflags=optionflags)
@@ -372,6 +377,7 @@ def _init_runner_class(continue_on_failure: bool, checker: Any, optionflags: int
 
         def report_unexpected_exception(self, out, test, example, exc_info):  # type: ignore[override]
             from _pytest.outcomes import OutcomeException
+
             if issubclass(exc_info[0], OutcomeException):
                 raise exc_info[1]
             unexpected = doctest.UnexpectedException(test, example, exc_info)
@@ -394,6 +400,7 @@ def _init_runner_class(continue_on_failure: bool, checker: Any, optionflags: int
 # ---------------------------------------------------------------------------
 # Finder
 # ---------------------------------------------------------------------------
+
 
 def _make_finder(module: types.ModuleType) -> doctest.DocTestFinder:
     class MockAwareDocTestFinder(doctest.DocTestFinder):
@@ -422,6 +429,7 @@ def _make_finder(module: types.ModuleType) -> doctest.DocTestFinder:
 # Skip detection
 # ---------------------------------------------------------------------------
 
+
 def _check_all_skipped(test: doctest.DocTest) -> None:
     all_skipped = all(x.options.get(doctest.SKIP, False) for x in test.examples)
     if test.examples and all_skipped:
@@ -432,16 +440,17 @@ def _check_all_skipped(test: doctest.DocTest) -> None:
 # Doctest func factory
 # ---------------------------------------------------------------------------
 
+
 def _make_doctest_func(
     dtest: doctest.DocTest,
-    runner_cls: type,
+    runner_cls: type[doctest.DebugRunner],
     optionflags: int = 0,
-    module: Optional[types.ModuleType] = None,
-    extra_globs: Optional[dict] = None,
+    module: types.ModuleType | None = None,
+    extra_globs: dict | None = None,
 ):
     """Return a callable that runs `dtest`. Accepts doctest_namespace kwarg."""
 
-    def run_doctest(doctest_namespace: Optional[dict] = None, request: Any = None) -> None:
+    def run_doctest(doctest_namespace: dict | None = None, request: Any = None) -> None:
         _check_all_skipped(dtest)
         if extra_globs:
             dtest.globs.update(extra_globs)
@@ -465,13 +474,14 @@ def _make_doctest_func(
 # Public API called from Rust
 # ---------------------------------------------------------------------------
 
+
 def collect_module_doctests(
     module_name: str,
     path: str,
     nodeid_base: str,
     config: Any,
-    extra_globs: Optional[dict] = None,
-) -> List[Tuple[str, Any, int]]:
+    extra_globs: dict | None = None,
+) -> list[tuple[str, Any, int]]:
     """Return list of (nodeid, func, lineno) for all doctests in a Python module.
 
     Called from Rust after collect_module() when --doctest-modules is active.
@@ -480,6 +490,7 @@ def collect_module_doctests(
         module = sys.modules.get(module_name)
         if module is None:
             import importlib.util
+
             spec = importlib.util.spec_from_file_location(module_name, path)
             if spec is None or spec.loader is None:
                 return []
@@ -505,14 +516,16 @@ def collect_module_doctests(
     except Exception:
         return []
 
-    results: List[Tuple[str, Any, int]] = []
+    results: list[tuple[str, Any, int]] = []
     for dtest in sorted(tests, key=lambda t: t.lineno or 0):
         if not dtest.examples:
             continue
         # nodeid: e.g. "test_foo.py::test_foo.MyClass.method"
         nodeid = f"{nodeid_base}::{dtest.name}"
         lineno = dtest.lineno or 0
-        func = _make_doctest_func(dtest, runner_cls, optionflags=optionflags, module=module, extra_globs=extra_globs)
+        func = _make_doctest_func(
+            dtest, runner_cls, optionflags=optionflags, module=module, extra_globs=extra_globs
+        )
         results.append((nodeid, func, lineno))
 
     return results
@@ -522,8 +535,8 @@ def collect_textfile_doctests(
     path: str,
     nodeid_base: str,
     config: Any,
-    extra_globs: Optional[dict] = None,
-) -> List[Tuple[str, Any, int]]:
+    extra_globs: dict | None = None,
+) -> list[tuple[str, Any, int]]:
     """Return list of (nodeid, func, lineno) for doctests in a text file.
 
     Called from Rust for files matching --doctest-glob patterns.
@@ -576,6 +589,7 @@ def is_doctest_textfile(path: str, config: Any) -> bool:
             pass
         globs = globs_from_ini or ["test*.txt"]
     import fnmatch
+
     basename = os.path.basename(path)
     return any(fnmatch.fnmatch(basename, g) for g in globs)
 
@@ -591,6 +605,7 @@ def _get_ignore_import_errors(config: Any) -> bool:
 # doctest_namespace fixture (session-scoped, injected by Rust)
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="session")
 def doctest_namespace() -> dict:
     """Fixture providing a namespace dict injected into all doctests."""
@@ -600,6 +615,7 @@ def doctest_namespace() -> dict:
 # ---------------------------------------------------------------------------
 # Compatibility shims for code that imports internal pytest names
 # ---------------------------------------------------------------------------
+
 
 def _get_checker():
     """Return the output checker class (pytest public internal)."""
@@ -676,7 +692,7 @@ class DoctestItem(metaclass=_DoctestItemMeta):
         name_part = self.name.split("::", 1)[1] if "::" in self.name else self.name
         return filename, lineno, f"[doctest] {name_part}"
 
-    def _compute_lineno(self) -> Optional[int]:
+    def _compute_lineno(self) -> int | None:
         if not hasattr(self, "_pytester_path") or "::" not in self.name:
             return None
         relpath, dotname = self.name.split("::", 1)
@@ -687,12 +703,14 @@ class DoctestItem(metaclass=_DoctestItemMeta):
         try:
             import importlib.util as _ilu
             import types as _types
+
             spec = _ilu.spec_from_file_location("_ri_tmp_", abs_path)
             if spec is None or spec.loader is None:
                 return None
             mod = _types.ModuleType("_ri_tmp_")
             spec.loader.exec_module(mod)  # type: ignore[union-attr]
             import doctest as _dt
+
             for t in _dt.DocTestFinder().find(mod):
                 t_qualified = t.name.split(".", 1)[1] if "." in t.name else t.name
                 if t_qualified == qualified:

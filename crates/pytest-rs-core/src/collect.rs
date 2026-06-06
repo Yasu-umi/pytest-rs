@@ -192,7 +192,11 @@ pub fn module_name_for(path: &Path) -> (PathBuf, String) {
     let mut basedir = path.parent().unwrap_or(Path::new(".")).to_path_buf();
     let stem = path.file_stem().unwrap().to_string_lossy().to_string();
     // pkg/__init__.py imports as package "pkg", not "pkg.__init__".
-    let mut parts = if stem == "__init__" { vec![] } else { vec![stem] };
+    let mut parts = if stem == "__init__" {
+        vec![]
+    } else {
+        vec![stem]
+    };
     while basedir.join("__init__.py").exists() {
         parts.push(
             basedir
@@ -243,15 +247,20 @@ pub fn collect_all_python_files(
 
 fn collect_all_py_dir(dir: &Path, files: &mut Vec<PathBuf>, collect_in_virtualenv: bool) {
     const NORECURSE: &[&str] = &[
-        ".git", ".venv", "venv", "node_modules", "__pycache__", ".tox", ".eggs", "build", "dist",
+        ".git",
+        ".venv",
+        "venv",
+        "node_modules",
+        "__pycache__",
+        ".tox",
+        ".eggs",
+        "build",
+        "dist",
     ];
     let Ok(read_dir) = std::fs::read_dir(dir) else {
         return;
     };
-    let mut entries: Vec<_> = read_dir
-        .filter_map(Result::ok)
-        .map(|e| e.path())
-        .collect();
+    let mut entries: Vec<_> = read_dir.filter_map(Result::ok).map(|e| e.path()).collect();
     entries.sort();
     for path in entries {
         if path.is_dir() {
@@ -295,15 +304,20 @@ pub fn collect_doctest_textfiles(invocation_dir: &Path, paths: &[String]) -> Vec
 
 fn collect_textfiles_dir(dir: &Path, files: &mut Vec<PathBuf>) {
     const NORECURSE: &[&str] = &[
-        ".git", ".venv", "venv", "node_modules", "__pycache__", ".tox", ".eggs", "build", "dist",
+        ".git",
+        ".venv",
+        "venv",
+        "node_modules",
+        "__pycache__",
+        ".tox",
+        ".eggs",
+        "build",
+        "dist",
     ];
     let Ok(read_dir) = std::fs::read_dir(dir) else {
         return;
     };
-    let mut entries: Vec<_> = read_dir
-        .filter_map(Result::ok)
-        .map(|e| e.path())
-        .collect();
+    let mut entries: Vec<_> = read_dir.filter_map(Result::ok).map(|e| e.path()).collect();
     entries.sort();
     for path in entries {
         if path.is_dir() {

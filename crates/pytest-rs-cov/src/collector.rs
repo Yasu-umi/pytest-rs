@@ -85,7 +85,12 @@ impl LineCollector {
     /// gets local LINE events (effective immediately, before this frame's
     /// first line — coverage.py relies on the same ordering); everything
     /// returns DISABLE, so each code object pays one PY_START ever.
-    fn py_start(&self, py: Python<'_>, code: Bound<'_, PyAny>, _offset: i64) -> PyResult<Py<PyAny>> {
+    fn py_start(
+        &self,
+        py: Python<'_>,
+        code: Bound<'_, PyAny>,
+        _offset: i64,
+    ) -> PyResult<Py<PyAny>> {
         let key = code.as_ptr() as usize;
         let already_tracked = self
             .tracked_codes

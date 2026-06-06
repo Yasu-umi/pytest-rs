@@ -8,9 +8,9 @@ import inspect
 import itertools
 import unittest.mock
 import warnings
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional, Union
+from typing import Any, Union
 
 import pytest
 
@@ -32,7 +32,7 @@ from ._util import get_mock_module, parse_ini_boolean
 @dataclass
 class MockCacheItem:
     mock: MockType
-    patch: Optional[Any] = None
+    patch: Any | None = None
 
 
 @dataclass
@@ -107,6 +107,7 @@ class MockerFixture:
         :param bool return_value: Reset the return_value of mocks.
         :param bool side_effect: Reset the side_effect of mocks.
         """
+        supports_reset_mock_with_args: tuple[type[Any], ...]
         if hasattr(self, "AsyncMock"):
             supports_reset_mock_with_args = (self.Mock, self.AsyncMock)
         else:
@@ -198,7 +199,7 @@ class MockerFixture:
         spy_obj.spy_exception = None
         return spy_obj
 
-    def stub(self, name: Optional[str] = None) -> unittest.mock.MagicMock:
+    def stub(self, name: str | None = None) -> unittest.mock.MagicMock:
         """
         Create a stub method. It accepts any arguments. Ideal to register to
         callbacks in tests.
@@ -208,7 +209,7 @@ class MockerFixture:
         """
         return self.mock_module.MagicMock(spec=lambda *args, **kwargs: None, name=name)
 
-    def async_stub(self, name: Optional[str] = None) -> AsyncMockType:
+    def async_stub(self, name: str | None = None) -> AsyncMockType:
         """
         Create a async stub method. It accepts any arguments. Ideal to register to
         callbacks in tests.
@@ -396,8 +397,8 @@ package_mocker = pytest.fixture(scope="package")(_make_mocker())
 session_mocker = pytest.fixture(scope="session")(_make_mocker())
 
 
-_mock_module_patches = []
-_mock_module_originals = {}
+_mock_module_patches: list = []
+_mock_module_originals: dict = {}
 
 
 def assert_wrapper(__wrapped_mock_method__, *args, **kwargs):
@@ -615,28 +616,40 @@ def unwrap_assert_methods() -> None:
 def pytest_addoption(parser) -> None:
     parser.addini(
         "mock_traceback_monkeypatch",
-        "Monkeypatch the mock library to improve reporting of the "
-        "assert_called_... methods",
+        "Monkeypatch the mock library to improve reporting of the assert_called_... methods",
         default=True,
     )
     parser.addini(
         "mock_use_standalone_module",
-        'Use standalone "mock" (from PyPI) instead of builtin "unittest.mock" '
-        "on Python 3",
+        'Use standalone "mock" (from PyPI) instead of builtin "unittest.mock" on Python 3',
         default=False,
     )
 
 
 def pytest_configure(config) -> None:
     tb = config.getoption("--tb", default="auto")
-    if parse_ini_boolean(config.getini("mock_traceback_monkeypatch") if config.getini("mock_traceback_monkeypatch") is not None else True) and tb != "native":
+    if (
+        parse_ini_boolean(
+            config.getini("mock_traceback_monkeypatch")
+            if config.getini("mock_traceback_monkeypatch") is not None
+            else True
+        )
+        and tb != "native"
+    ):
         wrap_assert_methods(config)
 
 
 # Entry points used by the Rust plugin (pytest_configure semantics without
 # pluggy registration).
 def _configure(config, tb) -> None:
-    if parse_ini_boolean(config.getini("mock_traceback_monkeypatch") if config.getini("mock_traceback_monkeypatch") is not None else True) and tb != "native":
+    if (
+        parse_ini_boolean(
+            config.getini("mock_traceback_monkeypatch")
+            if config.getini("mock_traceback_monkeypatch") is not None
+            else True
+        )
+        and tb != "native"
+    ):
         wrap_assert_methods(config)
 
 

@@ -3,7 +3,7 @@
 # Marks added at runtime (node.add_marker / request.applymarker) for the
 # currently running item; the engine re-evaluates xfail against these and
 # clears the list per item.
-_added_marks = []
+_added_marks: list = []
 
 
 def record_added_mark(marker):

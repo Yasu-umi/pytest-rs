@@ -350,10 +350,7 @@ pub fn num_mock_patch_args(py: Python<'_>, func: &Bound<'_, PyAny>) -> usize {
     };
     // Both the stdlib and the rolling-backport `mock` define the sentinel;
     // like pytest, only consult already-imported modules (sys.modules).
-    let modules = py
-        .import("sys")
-        .and_then(|sys| sys.getattr("modules"))
-        .ok();
+    let modules = py.import("sys").and_then(|sys| sys.getattr("modules")).ok();
     let sentinels: Vec<Bound<'_, PyAny>> = ["unittest.mock", "mock"]
         .iter()
         .filter_map(|name| {
@@ -444,25 +441,19 @@ pub fn collect_doctests_from_module(
     sys_path_prepend(py, &basedir)?;
     let nodeid_base = file_nodeid(rootdir, path);
     let doctest_mod = py.import("_pytest.doctest")?;
-    let results = doctest_mod
-        .getattr("collect_module_doctests")?
-        .call1((
-            module_name.as_str(),
-            path.to_string_lossy().as_ref(),
-            nodeid_base.as_str(),
-            py_config.bind(py),
-        ))?;
+    let results = doctest_mod.getattr("collect_module_doctests")?.call1((
+        module_name.as_str(),
+        path.to_string_lossy().as_ref(),
+        nodeid_base.as_str(),
+        py_config.bind(py),
+    ))?;
     for item in results.try_iter()? {
         let tuple = item?;
         let nodeid: String = tuple.get_item(0)?.extract()?;
         let func: Py<PyAny> = tuple.get_item(1)?.extract()?;
         let lineno: u32 = tuple.get_item(2)?.extract()?;
         // Derive func_name from the last "::" component of the nodeid.
-        let func_name = nodeid
-            .rsplit("::")
-            .next()
-            .unwrap_or(&nodeid)
-            .to_string();
+        let func_name = nodeid.rsplit("::").next().unwrap_or(&nodeid).to_string();
         items.push(TestItem {
             nodeid,
             path: path.to_path_buf(),
@@ -493,23 +484,17 @@ pub fn collect_doctests_from_textfile(
 ) -> PyResult<()> {
     let nodeid_base = file_nodeid(rootdir, path);
     let doctest_mod = py.import("_pytest.doctest")?;
-    let results = doctest_mod
-        .getattr("collect_textfile_doctests")?
-        .call1((
-            path.to_string_lossy().as_ref(),
-            nodeid_base.as_str(),
-            py_config.bind(py),
-        ))?;
+    let results = doctest_mod.getattr("collect_textfile_doctests")?.call1((
+        path.to_string_lossy().as_ref(),
+        nodeid_base.as_str(),
+        py_config.bind(py),
+    ))?;
     for item in results.try_iter()? {
         let tuple = item?;
         let nodeid: String = tuple.get_item(0)?.extract()?;
         let func: Py<PyAny> = tuple.get_item(1)?.extract()?;
         let lineno: u32 = tuple.get_item(2)?.extract()?;
-        let func_name = nodeid
-            .rsplit("::")
-            .next()
-            .unwrap_or(&nodeid)
-            .to_string();
+        let func_name = nodeid.rsplit("::").next().unwrap_or(&nodeid).to_string();
         items.push(TestItem {
             nodeid,
             path: path.to_path_buf(),
@@ -531,11 +516,7 @@ pub fn collect_doctests_from_textfile(
 }
 
 /// Check whether a file path matches --doctest-glob patterns.
-pub fn is_doctest_textfile(
-    py: Python<'_>,
-    path: &Path,
-    py_config: &Py<PyAny>,
-) -> PyResult<bool> {
+pub fn is_doctest_textfile(py: Python<'_>, path: &Path, py_config: &Py<PyAny>) -> PyResult<bool> {
     let doctest_mod = py.import("_pytest.doctest")?;
     let result = doctest_mod
         .getattr("is_doctest_textfile")?
@@ -726,11 +707,7 @@ pub fn collect_conftest(
 
 /// A unique import name for a conftest whose module name is already taken
 /// by a *different* file in sys.modules; None when a plain import is safe.
-fn conftest_alias_name(
-    py: Python<'_>,
-    module_name: &str,
-    path: &Path,
-) -> PyResult<Option<String>> {
+fn conftest_alias_name(py: Python<'_>, module_name: &str, path: &Path) -> PyResult<Option<String>> {
     let sys_modules = py.import("sys")?.getattr("modules")?;
     let Ok(existing) = sys_modules.get_item(module_name) else {
         return Ok(None);
@@ -795,10 +772,7 @@ pub fn make_py_config(py: Python<'_>, config: &crate::config::Config) -> PyResul
     // namespace so conftests can stash flags on it.
     let option_ns = py.import("types")?.getattr("SimpleNamespace")?.call0()?;
     // Populate doctest-related option attributes so getoption() works.
-    option_ns.setattr(
-        "doctest_modules",
-        config.get_flag("doctest-modules"),
-    )?;
+    option_ns.setattr("doctest_modules", config.get_flag("doctest-modules"))?;
     option_ns.setattr(
         "doctest_continue_on_failure",
         config.get_flag("doctest-continue-on-failure"),
@@ -1192,11 +1166,9 @@ fn expand_parametrize(
         // pytest's force_tuple: only a single argname given as a *string*
         // takes each argvalue as the bare value; a one-element list
         // (["x"]) still expects one-element value collections.
-        let (argnames, force_scalar): (Vec<String>, bool) = match argnames_obj.extract::<String>()
-        {
+        let (argnames, force_scalar): (Vec<String>, bool) = match argnames_obj.extract::<String>() {
             Ok(joined) => {
-                let names: Vec<String> =
-                    joined.split(',').map(|s| s.trim().to_string()).collect();
+                let names: Vec<String> = joined.split(',').map(|s| s.trim().to_string()).collect();
                 let single = names.len() == 1;
                 (names, single)
             }
@@ -1213,38 +1185,37 @@ fn expand_parametrize(
         let mut sets = Vec::new();
         for (index, value_set) in argvalues.try_iter()?.enumerate() {
             let value_set = value_set?;
-            let (values, spec_id, hidden, extra_marks) = if value_set
-                .is_instance(&param_spec_cls)?
-            {
-                let values: Vec<Bound<'_, PyAny>> = value_set
-                    .getattr("values")?
-                    .try_iter()?
-                    .collect::<PyResult<_>>()?;
-                let id_obj = value_set.getattr("id")?;
-                let (spec_id, hidden) = if id_obj.is(&hidden_param) {
-                    (None, true)
-                } else {
-                    (id_obj.extract::<Option<String>>()?, false)
-                };
-                let extra_marks = value_set
-                    .getattr("marks")?
-                    .try_iter()?
-                    .map(|m| {
-                        let m = m?;
-                        Ok(MarkData {
-                            name: m.getattr("name")?.extract()?,
-                            obj: m.unbind(),
+            let (values, spec_id, hidden, extra_marks) =
+                if value_set.is_instance(&param_spec_cls)? {
+                    let values: Vec<Bound<'_, PyAny>> = value_set
+                        .getattr("values")?
+                        .try_iter()?
+                        .collect::<PyResult<_>>()?;
+                    let id_obj = value_set.getattr("id")?;
+                    let (spec_id, hidden) = if id_obj.is(&hidden_param) {
+                        (None, true)
+                    } else {
+                        (id_obj.extract::<Option<String>>()?, false)
+                    };
+                    let extra_marks = value_set
+                        .getattr("marks")?
+                        .try_iter()?
+                        .map(|m| {
+                            let m = m?;
+                            Ok(MarkData {
+                                name: m.getattr("name")?.extract()?,
+                                obj: m.unbind(),
+                            })
                         })
-                    })
-                    .collect::<PyResult<Vec<_>>>()?;
-                (values, spec_id, hidden, extra_marks)
-            } else if force_scalar {
-                (vec![value_set], None, false, Vec::new())
-            } else {
-                let values: Vec<Bound<'_, PyAny>> =
-                    value_set.try_iter()?.collect::<PyResult<_>>()?;
-                (values, None, false, Vec::new())
-            };
+                        .collect::<PyResult<Vec<_>>>()?;
+                    (values, spec_id, hidden, extra_marks)
+                } else if force_scalar {
+                    (vec![value_set], None, false, Vec::new())
+                } else {
+                    let values: Vec<Bound<'_, PyAny>> =
+                        value_set.try_iter()?.collect::<PyResult<_>>()?;
+                    (values, None, false, Vec::new())
+                };
 
             if values.len() != argnames.len() {
                 return Err(pyo3::exceptions::PyValueError::new_err(format!(
@@ -1875,7 +1846,11 @@ pub fn make_node(py: Python<'_>, item: &TestItem) -> PyResult<Py<PyAny>> {
         .rsplit("::")
         .next()
         .unwrap_or(item.func_name.as_str());
-    let node_cls = if item.is_doctest { "DoctestNode" } else { "Node" };
+    let node_cls = if item.is_doctest {
+        "DoctestNode"
+    } else {
+        "Node"
+    };
     let node = py.import("pytest._node")?.getattr(node_cls)?.call1((
         item.nodeid.as_str(),
         name,
@@ -1992,7 +1967,8 @@ fn cache_object<'py>(
 pub fn cache_lastfailed(py: Python<'_>, config: &crate::config::Config) -> Vec<String> {
     let read = || -> PyResult<Vec<String>> {
         let cache = cache_object(py, config)?;
-        let value = cache.call_method1("get", ("cache/lastfailed", pyo3::types::PyDict::new(py)))?;
+        let value =
+            cache.call_method1("get", ("cache/lastfailed", pyo3::types::PyDict::new(py)))?;
         // dict_keys is not extractable directly; materialize a list first.
         py.import("builtins")?
             .getattr("list")?
@@ -2015,10 +1991,8 @@ pub fn cache_write_session(
         dict.set_item(nodeid, true)?;
     }
     let proxy = make_py_config(py, config)?;
-    py.import("pytest.cacheprovider")?.call_method1(
-        "write_session_cache",
-        (proxy, dict, nodeids.to_vec()),
-    )?;
+    py.import("pytest.cacheprovider")?
+        .call_method1("write_session_cache", (proxy, dict, nodeids.to_vec()))?;
     Ok(())
 }
 
@@ -2056,7 +2030,6 @@ pub fn cache_nodeids(py: Python<'_>, config: &crate::config::Config) -> Vec<Stri
     read().unwrap_or_default()
 }
 
-
 /// --cache-show: print cache values/directories matching the glob.
 pub fn cache_show(py: Python<'_>, config: &crate::config::Config, glob: &str) -> PyResult<()> {
     let cache = cache_object(py, config)?;
@@ -2074,11 +2047,7 @@ pub fn cache_clear(py: Python<'_>, config: &crate::config::Config) -> PyResult<(
 
 /// Expand `testpaths` ini globs against the rootdir (sorted per entry,
 /// recursive ** supported), pytest's Config._decide_args.
-pub fn glob_testpaths(
-    py: Python<'_>,
-    rootdir: &Path,
-    entries: &[String],
-) -> PyResult<Vec<String>> {
+pub fn glob_testpaths(py: Python<'_>, rootdir: &Path, entries: &[String]) -> PyResult<Vec<String>> {
     let glob = py.import("glob")?;
     let kwargs = pyo3::types::PyDict::new(py);
     kwargs.set_item("recursive", true)?;
@@ -2235,7 +2204,11 @@ pub fn log_end_phase(py: Python<'_>) {
 
 /// Arm the junit XML writer (--junitxml): builds the LogXML from the
 /// junit_* ini settings and stamps the session start time.
-pub fn junit_configure(py: Python<'_>, config: &crate::config::Config, xmlpath: &str) -> PyResult<()> {
+pub fn junit_configure(
+    py: Python<'_>,
+    config: &crate::config::Config,
+    xmlpath: &str,
+) -> PyResult<()> {
     let settings = pyo3::types::PyDict::new(py);
     for key in [
         "junit_suite_name",
@@ -2355,10 +2328,7 @@ pub fn make_report_proxy(
         Outcome::Failed => ("failed", None),
         Outcome::Skipped => ("skipped", None),
         // pytest: expected failures are skipped/passed reports + .wasxfail.
-        Outcome::XFailed => (
-            "skipped",
-            Some(report.longrepr.clone().unwrap_or_default()),
-        ),
+        Outcome::XFailed => ("skipped", Some(report.longrepr.clone().unwrap_or_default())),
         Outcome::XPassed => ("passed", Some(String::new())),
     };
     let kwargs = PyDict::new(py);
@@ -2381,7 +2351,10 @@ pub fn make_report_proxy(
         .split_once("::")
         .map(|(_, rest)| rest.replace("::", "."))
         .unwrap_or_default();
-    kwargs.set_item("location", (file, lineno.map(|l| l.saturating_sub(1)), domain))?;
+    kwargs.set_item(
+        "location",
+        (file, lineno.map(|l| l.saturating_sub(1)), domain),
+    )?;
     kwargs.set_item("keywords", PyDict::new(py))?;
     kwargs.set_item("user_properties", pyo3::types::PyList::empty(py))?;
     if let Some(reason) = wasxfail {

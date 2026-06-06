@@ -1,7 +1,7 @@
 from pytest._capture import CaptureBase as CaptureBase
 from pytest._capture import CaptureFixture as CaptureFixture
-from pytest._capture import CaptureManager as CaptureManager
 from pytest._capture import CaptureIO as CaptureIO
+from pytest._capture import CaptureManager as CaptureManager
 from pytest._capture import CaptureResult as CaptureResult
 from pytest._capture import DontReadFromInput as DontReadFromInput
 from pytest._capture import EncodedFile as EncodedFile

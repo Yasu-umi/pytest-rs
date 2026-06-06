@@ -9,7 +9,6 @@ from __future__ import annotations
 from _pytest.compat import running_on_ci
 from _pytest.config import Config
 
-
 DEFAULT_MAX_LINES = 8
 DEFAULT_MAX_CHARS = DEFAULT_MAX_LINES * 80
 USAGE_MSG = "use '-vv' to show"
@@ -77,10 +76,7 @@ def _truncate_explanation(
     )
     # The truncation explanation add two lines to the output
     tolerable_max_lines = max_lines + 2
-    if (
-        len(input_lines) <= tolerable_max_lines
-        and input_char_count <= tolerable_max_chars
-    ):
+    if len(input_lines) <= tolerable_max_lines and input_char_count <= tolerable_max_chars:
         return input_lines
     # Truncate first to max_lines, and then truncate to max_chars if necessary
     if max_lines > 0:
@@ -90,9 +86,7 @@ def _truncate_explanation(
     truncated_char = True
     # We reevaluate the need to truncate chars following removal of some lines
     if len("".join(truncated_explanation)) > tolerable_max_chars and max_chars > 0:
-        truncated_explanation = _truncate_by_char_count(
-            truncated_explanation, max_chars
-        )
+        truncated_explanation = _truncate_by_char_count(truncated_explanation, max_chars)
     else:
         truncated_char = False
 

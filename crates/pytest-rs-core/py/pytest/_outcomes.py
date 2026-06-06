@@ -70,7 +70,7 @@ def importorskip(modname, minversion=None, reason=None):
 
 # pytest parity: the raising helpers expose their exception type
 # (`with pytest.raises(pytest.fail.Exception): ...`).
-skip.Exception = Skipped
-fail.Exception = Failed
-xfail.Exception = XFailed
-exit.Exception = Exit
+skip.Exception = Skipped  # type: ignore[attr-defined]
+fail.Exception = Failed  # type: ignore[attr-defined]
+xfail.Exception = XFailed  # type: ignore[attr-defined]
+exit.Exception = Exit  # type: ignore[attr-defined]

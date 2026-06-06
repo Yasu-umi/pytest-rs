@@ -34,8 +34,7 @@ impl Engine {
         let maxfail = config.maxfail();
         // --stepwise stops after the first failing item (--stepwise-skip
         // ignores the first one); the resume point persists via the cache.
-        let stepwise =
-            (config.get_flag("sw") || config.get_flag("sw-skip")) && maxfail.is_none();
+        let stepwise = (config.get_flag("sw") || config.get_flag("sw-skip")) && maxfail.is_none();
         let sw_skip = config.get_flag("sw-skip");
         let mut sw_failed_items = 0usize;
         // Collection errors (--continue-on-collection-errors) already count
@@ -418,7 +417,9 @@ pub(crate) fn run_one(
     // and context changes stay isolated between async tests. Sync tests run
     // unisolated in the root context (pytest behavior), so their
     // contextvar mutations are visible to later tests.
-    if item.is_coroutine && let Err(err) = python::begin_item_context(py) {
+    if item.is_coroutine
+        && let Err(err) = python::begin_item_context(py)
+    {
         reports.push(report_from_err(
             py,
             config,
@@ -788,9 +789,8 @@ pub(crate) fn run_one(
                         if let Some(code) = python::session_abort_code(py, &err) {
                             session.exit_code_override = Some(code);
                             session.abort_banner = python::session_abort_banner(py, &err);
-                            let (sub_reports, _) = python::pop_subtest_reports(
-                                py, config, item, quiet_subtests,
-                            );
+                            let (sub_reports, _) =
+                                python::pop_subtest_reports(py, config, item, quiet_subtests);
                             reports.extend(sub_reports);
                             teardown_one(py, plugins, session, config, item, xfail, &mut reports);
                             close_item_filters(py);
@@ -1163,7 +1163,9 @@ pub(crate) fn getfixturevalue(py: Python<'_>, name: &str) -> PyResult<Py<PyAny>>
     let (plugins, session, config, item) = unsafe { (&*plugins, &mut *session, &*config, &*item) };
     // pytest raises FixtureLookupError for unknown names (callers catch it).
     if name != "pytestconfig" && session.registry.lookup(name, &item.nodeid).is_none() {
-        let err_type = py.import("_pytest.fixtures")?.getattr("FixtureLookupError")?;
+        let err_type = py
+            .import("_pytest.fixtures")?
+            .getattr("FixtureLookupError")?;
         return Err(PyErr::from_value(
             err_type.call1((format!("fixture '{name}' not found"),))?,
         ));

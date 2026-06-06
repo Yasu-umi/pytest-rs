@@ -104,9 +104,7 @@ class LineMatcher:
 
         patterns = self._pattern_lines(patterns)
         for pattern in patterns:
-            if not any(
-                line == pattern or fnmatch.fnmatch(line, pattern) for line in self.lines
-            ):
+            if not any(line == pattern or fnmatch.fnmatch(line, pattern) for line in self.lines):
                 fail(f"fnmatch_lines_random: no line matches {pattern!r} in:\n{self}")
 
 
@@ -280,12 +278,18 @@ class Pytester:
         parents: dict = {}
         for line in result.outlines:
             line = line.strip()
-            if not line or line.startswith("=") or line.startswith("<") or line.startswith("no tests"):
+            if (
+                not line
+                or line.startswith("=")
+                or line.startswith("<")
+                or line.startswith("no tests")
+            ):
                 continue
             if "::" in line or line.endswith((".txt", ".rst", ".md")):
                 # Deduce type from nodeid
                 nodeid = line.split()[0] if line.split() else line
                 from _pytest.doctest import DoctestItem, DoctestModule, DoctestTextfile
+
                 filename = nodeid.split("::")[0]
                 if filename not in parents:
                     if filename.endswith((".txt", ".rst", ".md")):
@@ -352,9 +356,7 @@ class Pytester:
             result = self.path / example_path.name
             shutil.copy(example_path, result)
             return result
-        raise LookupError(
-            f'example "{example_path}" is not found as a file or directory'
-        )
+        raise LookupError(f'example "{example_path}" is not found as a file or directory')
 
     @staticmethod
     def _python_env():
@@ -365,9 +367,7 @@ class Pytester:
         env = os.environ.copy()
         shim_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         existing = env.get("PYTHONPATH")
-        env["PYTHONPATH"] = os.pathsep.join(
-            [shim_root, *([existing] if existing else [])]
-        )
+        env["PYTHONPATH"] = os.pathsep.join([shim_root, *([existing] if existing else [])])
         return env
 
     def runpython(self, script):

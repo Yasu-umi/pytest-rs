@@ -20,7 +20,11 @@ fn find_ini(start: &Path) -> (PathBuf, Option<String>, HashMap<String, String>) 
             && let Ok(content) = std::fs::read_to_string(&pyproject)
             && let Some(values) = parse_pyproject(&content)
         {
-            return (dir.to_path_buf(), Some("pyproject.toml".to_string()), values);
+            return (
+                dir.to_path_buf(),
+                Some("pyproject.toml".to_string()),
+                values,
+            );
         }
         let tox_ini = dir.join("tox.ini");
         if tox_ini.exists()
@@ -385,7 +389,7 @@ impl Config {
             "no-header",
             "no-summary",
             "continue-on-collection-errors",
-            "exact-mode",      // placeholder; harmless
+            "exact-mode", // placeholder; harmless
             "doctest-modules",
             "doctest-continue-on-failure",
             "doctest-ignore-import-errors",
@@ -430,10 +434,10 @@ impl Config {
             ("capture", None),
             ("doctest-glob", None),
             ("doctest-report", None),
-            ("ignore", None),             // accepted-but-inert (conformance runs files explicitly)
-            ("junit-xml", None),          // JUnit XML report path (--junitxml alias)
-            ("junit-prefix", None),       // classname prefix (--junitprefix alias)
-            ("dist", None), // accepted-but-inert: module-affinity load is the only mode
+            ("ignore", None), // accepted-but-inert (conformance runs files explicitly)
+            ("junit-xml", None), // JUnit XML report path (--junitxml alias)
+            ("junit-prefix", None), // classname prefix (--junitprefix alias)
+            ("dist", None),   // accepted-but-inert: module-affinity load is the only mode
             ("maxprocesses", None), // accepted-but-inert
             ("max-worker-restart", None), // accepted-but-inert: workers are not restarted
         ];
@@ -535,8 +539,7 @@ impl Config {
             Err(err)
                 if matches!(
                     err.kind(),
-                    clap::error::ErrorKind::DisplayHelp
-                        | clap::error::ErrorKind::DisplayVersion
+                    clap::error::ErrorKind::DisplayHelp | clap::error::ErrorKind::DisplayVersion
                 ) =>
             {
                 let _ = err.print();

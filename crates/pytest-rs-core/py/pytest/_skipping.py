@@ -97,9 +97,7 @@ def _is_module_mark(mark, module_name):
     if pytestmark is None:
         return False
     entries = pytestmark if isinstance(pytestmark, (list, tuple)) else [pytestmark]
-    return any(
-        entry is mark or getattr(entry, "mark", None) is mark for entry in entries
-    )
+    return any(entry is mark or getattr(entry, "mark", None) is mark for entry in entries)
 
 
 def evaluate_skip_marks(marks, module_name, config, namespaces=None):

@@ -1,4 +1,3 @@
-from pytest._outcomes import Exit as Exit, exit as exit  # noqa: F401
 from pytest import (  # noqa: F401
     Failed,
     OutcomeException,
@@ -9,5 +8,7 @@ from pytest import (  # noqa: F401
     skip,
     xfail,
 )
+from pytest._outcomes import Exit as Exit  # noqa: F401
+from pytest._outcomes import exit as exit
 
 from _pytest._stub import __getattr__  # noqa: E402, F401

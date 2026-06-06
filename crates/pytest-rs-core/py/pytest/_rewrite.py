@@ -27,7 +27,7 @@ _OPS = {
 
 # Module names (and their submodules) explicitly opted into rewriting via
 # pytest.register_assert_rewrite, e.g. bundled plugin shims like pytest_mock.
-_REGISTERED_MODULES = set()
+_REGISTERED_MODULES: set = set()
 
 
 def register_assert_rewrite(*names):
@@ -148,9 +148,7 @@ class _AssertRewriter(ast.NodeTransformer):
             from pytest._warning_types import PytestAssertRewriteWarning
 
             warnings.warn_explicit(
-                PytestAssertRewriteWarning(
-                    "assertion is always true, perhaps remove parentheses?"
-                ),
+                PytestAssertRewriteWarning("assertion is always true, perhaps remove parentheses?"),
                 category=None,
                 filename=self._path,
                 lineno=node.lineno,

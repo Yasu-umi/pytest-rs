@@ -9,6 +9,7 @@ from time import perf_counter
 
 def make_runner(func, args, kwargs):
     if args or kwargs:
+
         def runner(loops):
             it = range(loops)
             t0 = perf_counter()
@@ -17,6 +18,7 @@ def make_runner(func, args, kwargs):
             t1 = perf_counter()
             return t1 - t0
     else:
+
         def runner(loops):
             it = range(loops)
             t0 = perf_counter()
@@ -24,6 +26,7 @@ def make_runner(func, args, kwargs):
                 func()
             t1 = perf_counter()
             return t1 - t0
+
     return runner
 
 

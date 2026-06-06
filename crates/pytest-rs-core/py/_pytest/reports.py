@@ -2,7 +2,7 @@ class BaseReport:
     # pytest's BaseReport surface used by report consumers (junitxml):
     # captured-output properties derived from the (header, content)
     # sections list.
-    sections = []
+    sections: list = []
 
     def _join_sections(self, prefix):
         return "\n".join(

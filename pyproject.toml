@@ -32,10 +32,30 @@ dev = [
 [tool.ruff]
 target-version = "py313"
 line-length = 100
+# Upstream test suites checked out under conformance/suites are lint targets
+# of their own repos, not ours.
+extend-exclude = ["conformance/suites"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+ignore = [
+    "E501", # line length is the formatter's job; ports keep upstream's long literals
+    # bugbear rules upstream pytest ignores too — the py/ tree is a port of it
+    "B007",
+    "B011",
+    "B028",
+    "B905",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Vendored pytest-mock plugin: keep upstream's idioms.
+"crates/pytest-rs-mock/py/pytest_mock/*" = ["UP", "E402"]
 
 [tool.mypy]
 python_version = "3.13"
-files = ["crates/**/py/**/*.py", "conformance/runner.py"]
+# The plugin py/ trees reuse top-level module names (helper.py), which one
+# mypy invocation cannot hold together; CI checks them with separate runs.
+files = ["crates/pytest-rs-core/py", "conformance/runner.py"]
+# The bundled shims import each other across crate py/ roots resolved only
+# at runtime (sys.path assembled by the engine).
+ignore_missing_imports = true

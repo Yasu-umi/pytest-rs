@@ -76,9 +76,7 @@ class DontReadFromInput:
         return getattr(sys.__stdin__, "encoding", "UTF-8")
 
     def read(self, size=-1):
-        raise OSError(
-            "pytest: reading from stdin while output is captured!  Consider using `-s`."
-        )
+        raise OSError("pytest: reading from stdin while output is captured!  Consider using `-s`.")
 
     readline = read
 
@@ -86,9 +84,7 @@ class DontReadFromInput:
         return self.readline()
 
     def readlines(self, hint=-1):
-        raise OSError(
-            "pytest: reading from stdin while output is captured!  Consider using `-s`."
-        )
+        raise OSError("pytest: reading from stdin while output is captured!  Consider using `-s`.")
 
     def __iter__(self):
         return self
@@ -146,7 +142,7 @@ patchsysdict = {0: "stdin", 1: "stdout", 2: "stderr"}
 
 
 class CaptureBase:
-    EMPTY_BUFFER = None
+    EMPTY_BUFFER: str | bytes | None = None
 
 
 class NoCapture(CaptureBase):
@@ -206,10 +202,8 @@ class SysCaptureBase(CaptureBase):
         )
 
     def _assert_state(self, op, states):
-        assert self._state in states, (
-            "cannot {} in state {!r}: expected one of {}".format(
-                op, self._state, ", ".join(states)
-            )
+        assert self._state in states, "cannot {} in state {!r}: expected one of {}".format(
+            op, self._state, ", ".join(states)
         )
 
     def start(self):
@@ -313,10 +307,8 @@ class FDCaptureBase(CaptureBase):
         )
 
     def _assert_state(self, op, states):
-        assert self._state in states, (
-            "cannot {} in state {!r}: expected one of {}".format(
-                op, self._state, ", ".join(states)
-            )
+        assert self._state in states, "cannot {} in state {!r}: expected one of {}".format(
+            op, self._state, ", ".join(states)
         )
 
     def start(self):
@@ -482,9 +474,7 @@ def _get_multicapture(method):
     elif method == "no":
         return MultiCapture(in_=None, out=None, err=None)
     elif method == "tee-sys":
-        return MultiCapture(
-            in_=None, out=SysCapture(1, tee=True), err=SysCapture(2, tee=True)
-        )
+        return MultiCapture(in_=None, out=SysCapture(1, tee=True), err=SysCapture(2, tee=True))
     raise ValueError(f"unknown capturing method: {method!r}")
 
 
@@ -814,9 +804,7 @@ class CaptureFixture:
 
     def _start(self):
         if state.fixture is not None:
-            raise RuntimeError(
-                f"cannot use {self._name} and {state.fixture_name} at the same time"
-            )
+            raise RuntimeError(f"cannot use {self._name} and {state.fixture_name} at the same time")
         state.fixture = self
         if self._capture is None:
             if self._tee:

@@ -1,7 +1,5 @@
 """Adapted from pytest-mock v3.15.1 (MIT)."""
 
-from typing import Union
-
 _mock_module = None
 
 
@@ -18,7 +16,7 @@ def get_mock_module(config):
             config.getini("mock_use_standalone_module") or False
         )
         if use_standalone_module:
-            import mock
+            from unittest import mock
 
             _mock_module = mock
         else:
@@ -29,7 +27,7 @@ def get_mock_module(config):
     return _mock_module
 
 
-def parse_ini_boolean(value: Union[bool, str]) -> bool:
+def parse_ini_boolean(value: bool | str) -> bool:
     if isinstance(value, bool):
         return value
     if value.lower() == "true":

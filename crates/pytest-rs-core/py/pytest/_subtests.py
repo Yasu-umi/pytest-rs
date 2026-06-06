@@ -6,21 +6,21 @@ them into individual reports (upstream pytest's builtin subtests plugin).
 """
 
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pytest._fixtures import fixture
 
 # Per-item accumulator: the runner pops it after each call phase, and the
 # fixture clears it on creation so an aborted item can't leak records.
-_results: List[Dict[str, Any]] = []
+_results: list[dict[str, Any]] = []
 
 # --maxfail budget remaining for the session (None = unlimited). When a
 # failed subtest exhausts it, the exception propagates so the test body
 # stops, matching upstream's session.shouldfail check in __exit__.
-_fail_budget: Optional[int] = None
+_fail_budget: int | None = None
 
 
-def set_fail_budget(budget: Optional[int]) -> None:
+def set_fail_budget(budget: int | None) -> None:
     """Called by the runner before each item; also drops stale records."""
     global _fail_budget
     _fail_budget = budget
@@ -37,7 +37,7 @@ def _saferepr(obj: Any) -> str:
 class SubtestContext:
     """The values passed to Subtests.test() included in the test report."""
 
-    def __init__(self, *, msg: Optional[str] = None, kwargs: Optional[dict] = None):
+    def __init__(self, *, msg: str | None = None, kwargs: dict | None = None):
         self.msg = msg
         self.kwargs = dict(kwargs or {})
 
@@ -51,15 +51,15 @@ class SubtestContext:
     def __repr__(self) -> str:
         return f"SubtestContext(msg={self.msg!r}, kwargs={self.kwargs!r})"
 
-    def _to_json(self) -> Dict[str, Any]:
+    def _to_json(self) -> dict[str, Any]:
         return {"msg": self.msg, "kwargs": dict(self.kwargs)}
 
     @classmethod
-    def _from_json(cls, d: Dict[str, Any]) -> "SubtestContext":
+    def _from_json(cls, d: dict[str, Any]) -> "SubtestContext":
         return cls(msg=d["msg"], kwargs=d["kwargs"])
 
 
-def _description(msg: Optional[str], kwargs: dict) -> str:
+def _description(msg: str | None, kwargs: dict) -> str:
     parts = []
     if msg is not None:
         parts.append(f"[{msg}]")
@@ -74,15 +74,15 @@ class SubtestReport:
 
     def __init__(
         self,
-        nodeid: Optional[str] = None,
-        location: Optional[tuple] = None,
-        keywords: Optional[dict] = None,
-        outcome: Optional[str] = None,
-        when: Optional[str] = None,
+        nodeid: str | None = None,
+        location: tuple | None = None,
+        keywords: dict | None = None,
+        outcome: str | None = None,
+        when: str | None = None,
         longrepr: Any = None,
         sections: tuple = (),
         duration: float = 0.0,
-        context: Optional[SubtestContext] = None,
+        context: SubtestContext | None = None,
         **kw: Any,
     ) -> None:
         self.nodeid = nodeid
@@ -105,7 +105,7 @@ class SubtestReport:
     def _sub_test_description(self) -> str:
         return _description(self.context.msg, self.context.kwargs)
 
-    def _to_json(self) -> Dict[str, Any]:
+    def _to_json(self) -> dict[str, Any]:
         data = dict(getattr(self, "__dict__", {}))
         data.pop("context", None)
         data["_report_type"] = "SubTestReport"
@@ -113,7 +113,7 @@ class SubtestReport:
         return data
 
     @classmethod
-    def _from_json(cls, reportdict: Dict[str, Any]) -> "SubtestReport":
+    def _from_json(cls, reportdict: dict[str, Any]) -> "SubtestReport":
         report = cls()
         for key, value in reportdict.items():
             if key in ("_report_type", "_subtest.context"):
@@ -127,7 +127,7 @@ class _SubTestContextManager:
     """Records the subtest block's outcome; swallows ordinary failures so
     the enclosing test continues (upstream _SubTestContextManager)."""
 
-    def __init__(self, msg: Optional[str], kwargs: dict) -> None:
+    def __init__(self, msg: str | None, kwargs: dict) -> None:
         self.msg = msg
         self.kwargs = kwargs
 
@@ -140,7 +140,7 @@ class _SubTestContextManager:
         duration = time.perf_counter() - self._start
         from pytest._outcomes import Exit, Skipped, XFailed
 
-        record: Dict[str, Any] = {
+        record: dict[str, Any] = {
             "desc": _description(self.msg, self.kwargs),
             "duration": duration,
             "exc": None,
@@ -162,9 +162,7 @@ class _SubTestContextManager:
             record["exc"] = exc_val
         _results.append(record)
 
-        if exc_val is not None and isinstance(
-            exc_val, (KeyboardInterrupt, SystemExit, Exit)
-        ):
+        if exc_val is not None and isinstance(exc_val, (KeyboardInterrupt, SystemExit, Exit)):
             return False
         if record["outcome"] == "failed":
             global _fail_budget
@@ -175,7 +173,7 @@ class _SubTestContextManager:
         return True
 
     @staticmethod
-    def _raise_location(tb) -> Optional[str]:
+    def _raise_location(tb) -> str | None:
         """'file.py:line' of the innermost frame (the skip call site)."""
         if tb is None:
             return None
@@ -187,7 +185,7 @@ class _SubTestContextManager:
 class Subtests:
     """Declares subtests inside test functions via the test() method."""
 
-    def test(self, msg: Optional[str] = None, **kwargs: Any) -> _SubTestContextManager:
+    def test(self, msg: str | None = None, **kwargs: Any) -> _SubTestContextManager:
         return _SubTestContextManager(msg, kwargs)
 
 
@@ -198,19 +196,19 @@ def subtests():
     return Subtests()
 
 
-def pytest_report_to_serializable(report: Any) -> Optional[Dict[str, Any]]:
+def pytest_report_to_serializable(report: Any) -> dict[str, Any] | None:
     if isinstance(report, SubtestReport):
         return report._to_json()
     return None
 
 
-def pytest_report_from_serializable(data: Dict[str, Any]) -> Optional[SubtestReport]:
+def pytest_report_from_serializable(data: dict[str, Any]) -> SubtestReport | None:
     if data.get("_report_type") == "SubTestReport":
         return SubtestReport._from_json(data)
     return None
 
 
-def pop_results() -> List[Dict[str, Any]]:
+def pop_results() -> list[dict[str, Any]]:
     """Drain the accumulator (called by the runner after each call phase)."""
     out = list(_results)
     _results.clear()

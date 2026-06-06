@@ -184,7 +184,11 @@ impl AsyncioPlugin {
 
     /// The factory recorded for this item at collection time, as a
     /// (name, factory) pair from the _asyncio_loop_factory pseudo-mark.
-    fn item_factory(&self, py: Python<'_>, item: &TestItem) -> PyResult<Option<(String, Py<PyAny>)>> {
+    fn item_factory(
+        &self,
+        py: Python<'_>,
+        item: &TestItem,
+    ) -> PyResult<Option<(String, Py<PyAny>)>> {
         let Some(mark) = item.get_closest_marker("_asyncio_loop_factory") else {
             return Ok(None);
         };
@@ -255,9 +259,7 @@ impl AsyncioPlugin {
             for key in keys.try_iter()? {
                 let key = key?;
                 let factory = result.get_item(&key)?;
-                let name: String = key
-                    .extract()
-                    .map_err(|_| Self::invalid_factories_error())?;
+                let name: String = key.extract().map_err(|_| Self::invalid_factories_error())?;
                 if name.is_empty() || !factory.is_callable() {
                     return Err(Self::invalid_factories_error());
                 }
@@ -568,7 +570,10 @@ impl Plugin for AsyncioPlugin {
                     obj: mark.unbind(),
                 });
             }
-            let policy_def = ctx.session.registry.lookup("event_loop_policy", &item.nodeid);
+            let policy_def = ctx
+                .session
+                .registry
+                .lookup("event_loop_policy", &item.nodeid);
             let Some(policy_def) = policy_def else {
                 taken.push(item);
                 continue;
@@ -749,15 +754,18 @@ impl Plugin for AsyncioPlugin {
                             format!("Loop factory '{name}' is not available on this platform");
                         let kwargs = pytest_rs_core::pyo3::types::PyDict::new(py);
                         kwargs.set_item("reason", reason)?;
-                        let obj = py
-                            .import("types")?
-                            .getattr("SimpleNamespace")?
-                            .call((), Some(&{
+                        let obj = py.import("types")?.getattr("SimpleNamespace")?.call(
+                            (),
+                            Some(&{
                                 let ns = pytest_rs_core::pyo3::types::PyDict::new(py);
-                                ns.set_item("args", pytest_rs_core::pyo3::types::PyTuple::empty(py))?;
+                                ns.set_item(
+                                    "args",
+                                    pytest_rs_core::pyo3::types::PyTuple::empty(py),
+                                )?;
                                 ns.set_item("kwargs", kwargs)?;
                                 ns
-                            }))?;
+                            }),
+                        )?;
                         marks.push(pytest_rs_core::collect::MarkData {
                             name: "skip".to_string(),
                             obj: obj.unbind(),
