@@ -123,10 +123,17 @@ impl LineCollector {
             return;
         };
         // 3.13 fallback: classify the direction from the disassembled jump
-        // target when available.
+        // target. The event's destination can land past the target
+        // (FOR_ITER exhaustion skips the loop cleanup), so a forward jump
+        // is "at or beyond the target".
         let direction = if direction == 0 {
             match entry.jump_targets.as_ref().and_then(|t| t.get(&src_offset)) {
-                Some(target) if *target == dst_offset => 2,
+                Some(target)
+                    if (*target >= src_offset && dst_offset >= *target)
+                        || (*target < src_offset && dst_offset == *target) =>
+                {
+                    2
+                }
                 Some(_) => 1,
                 None => 0,
             }
