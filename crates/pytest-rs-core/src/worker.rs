@@ -348,10 +348,12 @@ impl Engine {
             }
             *prev_module = Some(module_instance);
 
+            let lineno = item.lineno;
             let reports =
                 crate::runner::run_one(py, &self.plugins, &mut self.session, &self.config, item);
             collection.last_nodeid = Some(item.nodeid.clone());
             for report in reports {
+                crate::runner::fire_logreport_hooks(py, &self.session, &report, Some(lineno));
                 send(&WorkerMsg::Report { report });
             }
         }

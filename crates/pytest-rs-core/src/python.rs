@@ -2331,6 +2331,56 @@ pub fn set_assertion_verbosity(py: Python<'_>, level: u8) {
         .and_then(|m| m.call_method1("set_verbosity", (level,)));
 }
 
+/// Build the Python TestReport proxy handed to pytest_runtest_logreport
+/// conftest hooks: a _pytest.reports.TestReport shim instance, whose
+/// passed/failed/skipped flags and capstdout/capstderr/caplog properties
+/// derive from the outcome and sections set here.
+pub fn make_report_proxy(
+    py: Python<'_>,
+    report: &crate::report::TestReport,
+    lineno: Option<u32>,
+) -> PyResult<Py<PyAny>> {
+    let (outcome, wasxfail) = match report.outcome {
+        Outcome::Passed => ("passed", None),
+        Outcome::Failed => ("failed", None),
+        Outcome::Skipped => ("skipped", None),
+        // pytest: expected failures are skipped/passed reports + .wasxfail.
+        Outcome::XFailed => (
+            "skipped",
+            Some(report.longrepr.clone().unwrap_or_default()),
+        ),
+        Outcome::XPassed => ("passed", Some(String::new())),
+    };
+    let kwargs = PyDict::new(py);
+    kwargs.set_item("nodeid", &report.nodeid)?;
+    kwargs.set_item(
+        "when",
+        match report.phase {
+            Phase::Setup => "setup",
+            Phase::Call => "call",
+            Phase::Teardown => "teardown",
+        },
+    )?;
+    kwargs.set_item("outcome", outcome)?;
+    kwargs.set_item("duration", report.duration.as_secs_f64())?;
+    kwargs.set_item("longrepr", report.longrepr.as_deref())?;
+    kwargs.set_item("sections", &report.sections)?;
+    let file = report.nodeid.split("::").next().unwrap_or("");
+    let domain = report
+        .nodeid
+        .split_once("::")
+        .map(|(_, rest)| rest.replace("::", "."))
+        .unwrap_or_default();
+    kwargs.set_item("location", (file, lineno.map(|l| l.saturating_sub(1)), domain))?;
+    kwargs.set_item("keywords", PyDict::new(py))?;
+    kwargs.set_item("user_properties", pyo3::types::PyList::empty(py))?;
+    if let Some(reason) = wasxfail {
+        kwargs.set_item("wasxfail", reason)?;
+    }
+    let cls = py.import("_pytest.reports")?.getattr("TestReport")?;
+    Ok(cls.call((), Some(&kwargs))?.unbind())
+}
+
 /// "Captured stdout/stderr {when}" then "Captured log {when}" report
 /// sections accumulated for the running item.
 pub fn log_failure_sections(py: Python<'_>) -> Vec<(String, String)> {

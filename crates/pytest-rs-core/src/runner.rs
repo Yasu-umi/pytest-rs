@@ -63,6 +63,7 @@ impl Engine {
                     $item,
                     last_nodeid.as_deref(),
                 ) {
+                    fire_logreport_hooks(py, session, &report, None);
                     failed += 1;
                     if !config.no_terminal()
                         && !config.quiet
@@ -152,6 +153,7 @@ impl Engine {
             last_nodeid = Some(item.nodeid.clone());
             let mut item_failed = false;
             for (i, report) in reports.into_iter().enumerate() {
+                fire_logreport_hooks(py, session, &report, Some(item.lineno));
                 if report.outcome == Outcome::Failed {
                     failed += 1;
                     item_failed = true;
@@ -1544,6 +1546,40 @@ struct XfailEval {
 
 /// Fire conftest pytest_runtest_{setup,call,teardown} hooks for an item
 /// (visibility-scoped by the conftest's directory, item kwarg).
+/// pytest_runtest_logreport conftest hooks, fired once per report as it is
+/// produced (pytest streams reports through this hook the same way).
+pub(crate) fn fire_logreport_hooks(
+    py: Python<'_>,
+    session: &Session,
+    report: &TestReport,
+    lineno: Option<u32>,
+) {
+    let funcs: Vec<Py<PyAny>> = session
+        .py_hooks
+        .iter()
+        .filter(|hook| {
+            hook.name == "pytest_runtest_logreport"
+                && report.nodeid.starts_with(hook.baseid.as_str())
+        })
+        .map(|hook| hook.func.clone_ref(py))
+        .collect();
+    if funcs.is_empty() {
+        return;
+    }
+    let proxy = match python::make_report_proxy(py, report, lineno) {
+        Ok(proxy) => proxy,
+        Err(err) => {
+            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+            return;
+        }
+    };
+    for func in funcs {
+        if let Err(err) = python::call_py_hook(py, &func, &[("report", proxy.clone_ref(py))]) {
+            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+        }
+    }
+}
+
 fn fire_runtest_py_hooks(
     py: Python<'_>,
     session: &Session,
