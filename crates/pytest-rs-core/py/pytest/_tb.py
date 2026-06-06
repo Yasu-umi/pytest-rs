@@ -136,7 +136,7 @@ def _source_block(frame, lineno):
 
 
 def _location_line(code, lineno, suffix):
-    """"relpath:lineno: suffix" with the path bold red under color."""
+    """ "relpath:lineno: suffix" with the path bold red under color."""
     return f"{_markup(_relpath(code.co_filename), 1, 31)}:{lineno}: {suffix}"
 
 
