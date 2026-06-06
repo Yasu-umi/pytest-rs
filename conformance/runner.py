@@ -200,8 +200,36 @@ def load_excluded(suite: Suite) -> dict[str, str]:
     return data.get("excluded", {})
 
 
-def run_suite(suite: Suite, use_local: bool) -> list[FileResult]:
-    print(f"=== {suite.name} @ {suite.tag} ===")
+def suite_summary(results: list[FileResult], excluded: int) -> str:
+    """Aligned stats: tests passed/graded (%), file tally, oddity notes.
+
+    "tests" counts individual test outcomes summed across every file;
+    "files" counts per-file runs (a file is all-pass only when its whole
+    run exited cleanly)."""
+    passed = sum(r.passed for r in results)
+    failed = sum(r.failed for r in results)
+    errors = sum(r.errors for r in results)
+    skipped = sum(r.skipped for r in results)
+    graded = passed + failed + errors
+    pct = f"{passed / graded * 100:5.1f}%" if graded else "    -"
+    files_ok = sum(1 for r in results if r.status == "passed")
+    notes = []
+    if skipped:
+        notes.append(f"{skipped} skipped")
+    # Files that died before running any test contribute no test counts.
+    dead = [r.file for r in results if r.status in ("error", "timeout") and r.passed + r.failed == 0]
+    if dead:
+        notes.append(f"{len(dead)} file{'s' if len(dead) != 1 else ''} died: {', '.join(dead)}")
+    if excluded:
+        notes.append(f"{excluded} files excluded")
+    note = f"  [{'; '.join(notes)}]" if notes else ""
+    return (
+        f"tests {passed:>5}/{graded:<5} ({pct})   "
+        f"files {files_ok:>2}/{len(results):<3} all-pass{note}"
+    )
+
+
+def run_suite(suite: Suite, use_local: bool) -> tuple[list[FileResult], str]:
     suite.fetch(use_local)
     files, excluded = suite.test_files()
     manifest_excluded = load_excluded(suite)
@@ -212,28 +240,9 @@ def run_suite(suite: Suite, use_local: bool) -> list[FileResult]:
     excluded += len(skipped_by_manifest)
     results = [suite.run_file(path) for path in files]
 
-    by_status: dict[str, int] = {}
-    for result in results:
-        by_status[result.status] = by_status.get(result.status, 0) + 1
-    passed = sum(r.passed for r in results)
-    failed = sum(r.failed for r in results)
-    skipped = sum(r.skipped for r in results)
-    errors = sum(r.errors for r in results)
-    collected = passed + failed + skipped + errors
-    # Files that died before running any test contribute no test counts.
-    unmeasured = sum(
-        1 for r in results if r.status in ("error", "timeout") and r.passed + r.failed == 0
-    )
-
-    print(
-        f"  files: {len(files) + excluded} total, {excluded} excluded, {len(files)} run -> "
-        + ", ".join(f"{count} {status}" for status, count in sorted(by_status.items()))
-    )
-    print(
-        f"  tests: {collected} ran -> {passed} passed, {failed} failed, "
-        f"{skipped} skipped, {errors} errors"
-        + (f" ({unmeasured} files unmeasured: died before running tests)" if unmeasured else "")
-    )
+    summary = suite_summary(results, excluded)
+    print(f"{suite.name} @ {suite.tag}")
+    print(f"  {summary}")
 
     for result in results:
         if result.status == "error" and (result.stdout or result.stderr):
@@ -254,7 +263,7 @@ def run_suite(suite: Suite, use_local: bool) -> list[FileResult]:
         )
         + "\n"
     )
-    return results
+    return results, summary
 
 
 def check_suite(suite: Suite, results: list[FileResult]) -> list[str]:
@@ -283,10 +292,17 @@ def main() -> None:
         sys.exit("build first: cargo build")
 
     violations: list[str] = []
+    summaries: list[tuple[str, str]] = []
     for suite in load_suites(args.suite):
-        results = run_suite(suite, args.local)
+        results, summary = run_suite(suite, args.local)
+        summaries.append((suite.name, summary))
         if args.check:
             violations.extend(check_suite(suite, results))
+
+    if len(summaries) > 1:
+        print("\n==== summary " + "=" * 67)
+        for name, line in summaries:
+            print(f"{name:<17} {line}")
 
     if violations:
         print("\nconformance regressions:")
