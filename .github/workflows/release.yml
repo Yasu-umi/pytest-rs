@@ -148,11 +148,29 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: create release with auto-generated notes
+      - uses: actions/checkout@v5
+        with:
+          path: repo
+
+      - name: create release (CHANGELOG section as notes, generated as fallback)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/* \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "$GITHUB_REF_NAME" \
-            --generate-notes
+          # Extract this tag's section from CHANGELOG.md ("## v0.0.1" until
+          # the next "## " heading), dropping the heading itself.
+          awk -v tag="$GITHUB_REF_NAME" '
+            $0 ~ "^## " tag "([^0-9.]|$)" { found=1; next }
+            found && /^## / { exit }
+            found { print }
+          ' repo/CHANGELOG.md > notes.md || true
+          if [ -s notes.md ]; then
+            gh release create "$GITHUB_REF_NAME" dist/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$GITHUB_REF_NAME" \
+              --notes-file notes.md
+          else
+            gh release create "$GITHUB_REF_NAME" dist/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$GITHUB_REF_NAME" \
+              --generate-notes
+          fi
