@@ -2,55 +2,77 @@
 
 pytest-rs is a re-implementation of the popular Python testing framework [pytest](https://github.com/pytest-dev/pytest) in Rust, focused on **speed**: a drop-in compatible runner where startup, collection, fixture orchestration, coverage measurement, and reporting are native code, while test bodies run on embedded CPython.
 
-> Note: This project is currently in active development (alpha stage). Many features are still under implementation and subject to change. See [docs/DESIGN.md](docs/DESIGN.md) for the architecture and roadmap.
-
-## Status
-
-- Import-based collection (`test_*.py`, `Test*` classes, `conftest.py`)
-- Fixtures: function/module/session scopes, autouse, generator teardown, dependencies
-- `@pytest.mark.parametrize`, `@pytest.mark.skip`, `pytest.raises` / `approx` / `skip` / `fail`
-- async tests & fixtures via the bundled `pytest-rs-asyncio` plugin (strict/auto mode)
-- pytest-compatible terminal output and exit codes
-- Plugin system: Rust traits mirroring pytest hooks, plugins as crates behind feature flags
+> Note: This project is currently in active development (alpha stage). Many features are still under implementation and subject to change. See [docs/DESIGN.md](https://github.com/Yasu-umi/pytest-rs/blob/main/docs/DESIGN.md) for the architecture and roadmap.
+>
+> pytest-rs is an independent project, not affiliated with or endorsed by the pytest project.
 
 ## Installation
 
-pytest-rs builds as a single binary via [maturin](https://github.com/PyO3/maturin); install it like any Python package:
+Prebuilt wheels are published to PyPI for Linux (x86_64 / aarch64) and macOS (arm64) on CPython 3.13 / 3.14:
 
-```toml
-[dependency-groups]
-dev = ["pytest-rs"]
-
-[tool.uv.sources]
-pytest-rs = { path = "../pytest-rs" }  # or a published index
+```sh
+uv add --dev pytest-rs    # or: pip install pytest-rs
 ```
 
-### Selecting plugins at install time
+Then run your existing suite, no changes needed:
 
-Bundled plugins (`asyncio`, `mock`, `cov`, `split`, `benchmark`, `xdist`)
-are Cargo features, all enabled by default. To build a binary with only some
-of them, pass build args to maturin from the consuming project:
-
-```toml
-[tool.uv]
-config-settings-package = { pytest-rs = { build-args = "--no-default-features --features asyncio,mock" } }
+```sh
+pytest-rs                       # whole suite, like `pytest`
+pytest-rs tests/test_foo.py     # one file
+pytest-rs -n 4                  # parallel workers (pytest-xdist compatible)
+pytest-rs --cov=mypkg           # native coverage (pytest-cov compatible)
 ```
 
-### Disabling plugins at runtime
+`pytest-rs` reads the same configuration pytest does (`pytest.ini`, `pyproject.toml` `[tool.pytest.ini_options]`, `tox.ini`, `setup.cfg`) and understands the familiar flags (`-v`, `-x`, `-k`, `-m`, `--lf`, `--tb=...`, `-p no:NAME`, ...). It installs alongside pytest without conflict — the `pytest` command is untouched.
 
-Like pytest, any bundled plugin can be turned off per run or per project
-without rebuilding:
+### Requirements
+
+- Linux or macOS (no Windows support yet)
+- CPython 3.13+ built with a shared libpython — true for uv-managed Pythons, python.org installers, Homebrew, conda, and distro packages. Plain pyenv builds need `PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install ...`.
+
+### Bundled plugins
+
+The compatibility layers for `pytest-asyncio`, `pytest-mock`, `pytest-cov`, `pytest-split`, `pytest-benchmark` and `pytest-xdist`-style `-n` parallelism are built in — no separate plugin installs. Two ways to turn features off:
+
+Per project or per run, like pytest (works with the prebuilt wheel):
 
 ```toml
 [tool.pytest.ini_options]
 addopts = "-p no:benchmark -p no:split"
 ```
 
+At build time, when installing from source — bundled plugins are Cargo features, all enabled by default:
+
+```toml
+[tool.uv]
+config-settings-package = { pytest-rs = { build-args = "--no-default-features --features asyncio,mock" } }
+```
+
+## Performance
+
+Native startup, collection, fixture orchestration, parallel workers (fork-based) and coverage measurement. Where it pays off:
+
+- suites with heavy fixture/parametrize orchestration and large collections
+- `--cov` runs (a native collector instead of a tracing hook)
+- `-n` parallel runs (fork workers instead of spawned interpreters)
+
+For small, CPU-bound suites the test bodies dominate and pytest-rs runs at parity with pytest. Try it on your own suite:
+
+```sh
+hyperfine -w 1 'pytest -q' 'pytest-rs'
+```
+
+## Known limitations
+
+- unix only (no Windows)
+- no `--pdb` / debugger integration yet
+- third-party pytest plugins are loaded via the `pytest11` entry point and the `pytest` API shim; plugins reaching deep into pytest internals may not work
+
 ## Conformance testing
 
 Compatibility is verified by running the **upstream test suites** of the libraries pytest-rs reproduces, unchanged, under pytest-rs (`conformance/`).
 
-Current results (`total = passed + failed + errors + skipped`; updated automatically by `conformance/runner.py`, refreshed by CI on every push to main — see [conformance/RESULTS.md](conformance/RESULTS.md) for per-file detail):
+Current results (`total = passed + failed + errors + skipped`; updated automatically by `conformance/runner.py`, refreshed by CI on every push to main — see [conformance/RESULTS.md](https://github.com/Yasu-umi/pytest-rs/blob/main/conformance/RESULTS.md) for per-file detail):
 
 <!-- conformance-results:start -->
 _linux (CI-verified)_
@@ -90,7 +112,7 @@ uv run --no-project python conformance/runner.py           # re-clones from upst
 | [pytest-split](https://github.com/jerry-git/pytest-split) | MIT | 0.9.0 |
 | [pytest-benchmark](https://github.com/ionelmc/pytest-benchmark) | BSD-2-Clause | v5.1.0 |
 
-pytest-rs reimplements the public APIs of these projects; it does not copy their source code. Credit for the API design and the test suites belongs to their respective authors.
+pytest-rs reimplements the public APIs of these projects. Parts of the bundled Python shims are ports of upstream code; see [THIRD-PARTY-NOTICES.md](https://github.com/Yasu-umi/pytest-rs/blob/main/THIRD-PARTY-NOTICES.md). Credit for the API design and the test suites belongs to their respective authors.
 
 ## License
 
