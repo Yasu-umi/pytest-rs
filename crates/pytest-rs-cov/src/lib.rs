@@ -383,6 +383,43 @@ impl CovPlugin {
         groups
     }
 
+    /// A string `[run]` option, same config sources as run_option_enabled.
+    fn run_option_value(rootdir: &Path, cov_config: Option<&str>, option: &str) -> Option<String> {
+        for candidate in [cov_config.unwrap_or(".coveragerc"), "setup.cfg", "tox.ini"] {
+            let Ok(content) = std::fs::read_to_string(rootdir.join(candidate)) else {
+                continue;
+            };
+            let mut in_run = false;
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if trimmed.starts_with('[') {
+                    in_run = trimmed == "[run]" || trimmed == "[coverage:run]";
+                    continue;
+                }
+                if in_run
+                    && let Some((key, value)) = trimmed.split_once('=')
+                    && key.trim() == option
+                {
+                    return Some(value.trim().trim_matches(['"', '\'']).to_string());
+                }
+            }
+        }
+        if let Ok(content) = std::fs::read_to_string(rootdir.join("pyproject.toml"))
+            && let Ok(document) = content.parse::<toml::Table>()
+            && let Some(value) = document
+                .get("tool")
+                .and_then(|tool| tool.get("coverage"))
+                .and_then(|coverage| coverage.get("run"))
+                .and_then(|run| run.get(option))
+        {
+            return value
+                .as_str()
+                .map(str::to_string)
+                .or_else(|| Some(value.to_string()));
+        }
+        None
+    }
+
     /// A boolean `[run]` option: from --cov-config / .coveragerc /
     /// setup.cfg / tox.ini (ini forms) or pyproject [tool.coverage.run].
     fn run_option_enabled(rootdir: &Path, cov_config: Option<&str>, option: &str) -> bool {
@@ -803,6 +840,37 @@ impl Plugin for CovPlugin {
             || Self::branch_enabled(&ctx.config.rootdir, ctx.config.get_value("cov-config"));
         self.path_aliases =
             Self::paths_aliases(&ctx.config.rootdir, ctx.config.get_value("cov-config"));
+
+        // pytest-cov parity for dynamic_context=test_function in the
+        // coverage config: fatal under xdist, a warning otherwise (the
+        // --cov-context option is the supported spelling).
+        if Self::run_option_value(
+            &ctx.config.rootdir,
+            ctx.config.get_value("cov-config"),
+            "dynamic_context",
+        )
+        .as_deref()
+            == Some("test_function")
+        {
+            if ctx.config.get_value("numprocesses").is_some() && !ctx.config.is_worker() {
+                let message = "Detected dynamic_context=test_function in coverage configuration. \
+                     This is known to cause issues when using xdist, see: \
+                     https://github.com/pytest-dev/pytest-cov/issues/604\n\
+                     It is recommended to use --cov-context instead.";
+                eprintln!("pytest_cov.DistCovError: {message}");
+                return Err(pytest_rs_core::python::usage_error(py, message));
+            }
+            let message = "Detected dynamic_context=test_function in coverage configuration. \
+                 This is unnecessary as this plugin provides the more complete \
+                 --cov-context option.";
+            let category = py
+                .import("pytest_cov")?
+                .getattr("CentralCovContextWarning")?;
+            py.import("warnings")?.call_method1(
+                "warn_explicit",
+                (message, category, "pytest_cov/plugin.py", 0),
+            )?;
+        }
 
         let monitoring = py.import("sys")?.getattr("monitoring")?;
         let events = monitoring.getattr("events")?;
