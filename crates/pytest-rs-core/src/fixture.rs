@@ -46,6 +46,9 @@ pub struct FixtureDef {
     /// @pytest.fixture(params=[...]) values; items using this fixture are
     /// expanded per param at collection time.
     pub params: Option<Py<PyAny>>,
+    /// @pytest.fixture(ids=...): a list of ids or a callable deriving one
+    /// per param value (nodeid suffixes and --setup-show display).
+    pub ids: Option<Py<PyAny>>,
 }
 
 /// All fixture definitions visible in this session, name -> defs ordered

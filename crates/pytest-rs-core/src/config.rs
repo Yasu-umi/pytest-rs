@@ -374,7 +374,7 @@ impl Config {
         // Core pytest options parsed into flags/values (queried via
         // get_flag/get_value); some are still inert and gain behavior as
         // features land.
-        const CORE_FLAGS: [&str; 18] = [
+        const CORE_FLAGS: [&str; 19] = [
             "strict-config",
             "strict-markers",
             "strict",
@@ -393,6 +393,7 @@ impl Config {
             "setup-only",      // run fixtures, skip the tests
             "setup-plan",      // like --setup-only (fixtures do execute here)
             "setup-show",      // run tests, narrating fixture setup/teardown
+            "traceconfig",     // accepted-but-inert: plugin trace header not implemented
         ];
         const CORE_VALUES: [(&str, Option<char>); 36] = [
             ("deselect", None),

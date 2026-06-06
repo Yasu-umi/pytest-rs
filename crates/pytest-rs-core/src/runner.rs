@@ -28,6 +28,9 @@ impl Engine {
         let mut prev_class: Option<String> = None;
         let mut current_file = String::new();
         let mut line = String::new();
+        // --setup-only prints no progress chars at all; pytest then also
+        // omits the closing "[100%]" fill on the narration line.
+        let mut any_char = false;
         let maxfail = config.maxfail();
         // --stepwise stops after the first failing item (--stepwise-skip
         // ignores the first one); the resume point persists via the cache.
@@ -42,6 +45,39 @@ impl Engine {
             .iter()
             .filter(|r| r.outcome == Outcome::Failed)
             .count();
+
+        // The last completed item: deferred scope-teardown failures report
+        // under it, like pytest where those finalizers run inside it.
+        let mut last_nodeid: Option<String> = None;
+        // A failing deferred teardown becomes an ERROR report: count it
+        // toward --maxfail and join its E to the previous progress chars.
+        macro_rules! report_scope_teardown {
+            ($scope:expr, $prev:expr, $item:expr) => {
+                if let Some(report) = teardown_scope_reported(
+                    py,
+                    plugins,
+                    session,
+                    config,
+                    $scope,
+                    $prev,
+                    $item,
+                    last_nodeid.as_deref(),
+                ) {
+                    failed += 1;
+                    if !config.no_terminal()
+                        && !config.quiet
+                        && config.verbose == 0
+                        && !session.live_logging
+                        && !current_file.is_empty()
+                    {
+                        print!("E");
+                        let _ = std::io::stdout().flush();
+                        line.push('E');
+                    }
+                    session.reports.push(report);
+                }
+            };
+        }
 
         for item in &items {
             if let Some(m) = maxfail
@@ -58,7 +94,7 @@ impl Engine {
             if let Some(prev) = &prev_class
                 && prev != &class_instance
             {
-                teardown_scope(py, plugins, session, config, Scope::Class, prev, item);
+                report_scope_teardown!(Scope::Class, prev, item);
             }
             prev_class = Some(class_instance);
 
@@ -66,9 +102,9 @@ impl Engine {
             if let Some(prev) = &prev_module
                 && prev != &module_instance
             {
-                teardown_scope(py, plugins, session, config, Scope::Module, prev, item);
+                report_scope_teardown!(Scope::Module, prev, item);
                 // Package-scoped fixtures are keyed per module instance.
-                teardown_scope(py, plugins, session, config, Scope::Package, prev, item);
+                report_scope_teardown!(Scope::Package, prev, item);
             }
             prev_module = Some(module_instance);
 
@@ -109,14 +145,19 @@ impl Engine {
             // how many failures remain before it must stop swallowing.
             python::set_subtest_fail_budget(py, maxfail.map(|m| m.saturating_sub(failed)));
             session.live_printed = 0;
+            session.streamed_chars = 0;
             let reports = run_one(py, plugins, session, config, item);
             live_flush(session, config, &reports);
             done += 1;
+            last_nodeid = Some(item.nodeid.clone());
             let mut item_failed = false;
-            for report in reports {
+            for (i, report) in reports.into_iter().enumerate() {
                 if report.outcome == Outcome::Failed {
                     failed += 1;
                     item_failed = true;
+                }
+                if report.progress_char().is_some() {
+                    any_char = true;
                 }
                 if config.no_terminal() {
                     // -p no:terminal: no progress output at all.
@@ -135,6 +176,9 @@ impl Engine {
                 } else if session.live_logging && !config.quiet {
                     // log_cli: outcome words print via live_flush (between
                     // the call phase and teardown logs).
+                } else if i < session.streamed_chars {
+                    // --setup-show already streamed this report's char
+                    // (between the item line and the TEARDOWN narration).
                 } else if !config.quiet
                     && let Some(c) = report.progress_char()
                 {
@@ -155,29 +199,30 @@ impl Engine {
                 }
             }
         }
+        // Final scope teardowns, before the progress line closes so a
+        // failing teardown's E joins the last test's progress chars.
+        if let Some(prev) = &prev_class.clone()
+            && let Some(last) = items.last()
+        {
+            report_scope_teardown!(Scope::Class, prev, last);
+        }
+        if let Some(prev) = &prev_module.clone()
+            && let Some(last) = items.last()
+        {
+            report_scope_teardown!(Scope::Module, prev, last);
+            report_scope_teardown!(Scope::Package, prev, last);
+        }
+        if let Some(last) = items.last() {
+            report_scope_teardown!(Scope::Session, "", last);
+        }
         if config.verbose == 0
             && !config.quiet
             && !config.no_terminal()
             && !session.live_logging
             && !current_file.is_empty()
+            && !(setup_show_active(config) && !any_char)
         {
             println!("{}", progress_suffix(&line, done, total));
-        }
-
-        // Final scope teardowns.
-        if let Some(prev) = &prev_class
-            && let Some(last) = items.last()
-        {
-            teardown_scope(py, plugins, session, config, Scope::Class, prev, last);
-        }
-        if let Some(prev) = &prev_module
-            && let Some(last) = items.last()
-        {
-            teardown_scope(py, plugins, session, config, Scope::Module, prev, last);
-            teardown_scope(py, plugins, session, config, Scope::Package, prev, last);
-        }
-        if let Some(last) = items.last() {
-            teardown_scope(py, plugins, session, config, Scope::Session, "", last);
         }
         // pytest prints the banner even when the budget was spent on the
         // very last test, so check the final count rather than the break.
@@ -300,6 +345,7 @@ pub(crate) fn run_one(
                 longrepr: Some(reason),
                 location: Some(location),
                 subtest_desc: None,
+                sections: Vec::new(),
             });
             return reports;
         }
@@ -350,6 +396,7 @@ pub(crate) fn run_one(
             longrepr: Some(format!("[NOTRUN] {}", xf.reason)),
             location: None,
             subtest_desc: None,
+            sections: Vec::new(),
         });
         return reports;
     }
@@ -582,6 +629,7 @@ pub(crate) fn run_one(
         longrepr: None,
         location: None,
         subtest_desc: None,
+        sections: Vec::new(),
     });
 
     if setup_show_active(config) {
@@ -596,15 +644,21 @@ pub(crate) fn run_one(
             }
         }
         names.sort_unstable();
+        // Narration must reach the real terminal, not the item capture.
+        // pytest's tw.line() style: a leading newline closes the current
+        // line, no trailing one (the outcome char appends right after).
+        python::capture_suspend(py);
         if names.is_empty() {
-            println!("        {}", item.nodeid);
+            print!("\n        {}", item.nodeid);
         } else {
-            println!(
-                "        {} (fixtures used: {})",
+            print!(
+                "\n        {} (fixtures used: {})",
                 item.nodeid,
                 names.join(", ")
             );
         }
+        let _ = std::io::stdout().flush();
+        python::capture_resume(py);
         if config.get_flag("setup-only") || config.get_flag("setup-plan") {
             // Fixtures only: tear down without calling the test.
             teardown_one(py, plugins, session, config, item, xfail, &mut reports);
@@ -633,6 +687,7 @@ pub(crate) fn run_one(
                     longrepr: Some(format!("[NOTRUN] {}", xf.reason)),
                     location: None,
                     subtest_desc: None,
+                    sections: Vec::new(),
                 });
                 teardown_one(py, plugins, session, config, item, true, &mut reports);
                 close_item_filters(py);
@@ -693,6 +748,7 @@ pub(crate) fn run_one(
             longrepr: None,
             location: None,
             subtest_desc: None,
+            sections: python::log_failure_sections(py),
         },
         Ok(false) => {
             if item.is_coroutine {
@@ -712,6 +768,7 @@ pub(crate) fn run_one(
                     ),
                     location: None,
                     subtest_desc: None,
+                    sections: Vec::new(),
                 }
             } else {
                 match python::call_with_kwargs(py, &callable, &kwargs) {
@@ -723,6 +780,7 @@ pub(crate) fn run_one(
                         longrepr: None,
                         location: None,
                         subtest_desc: None,
+                        sections: python::log_failure_sections(py),
                     },
                     Err(err) => {
                         if let Some(code) = python::session_abort_code(py, &err) {
@@ -830,8 +888,34 @@ fn teardown_one(
     xfail: bool,
     reports: &mut Vec<TestReport>,
 ) {
-    // log_cli: the call outcome prints before teardown records appear.
+    // log_cli: the call outcome prints before teardown records appear —
+    // with the item capture paused, so the words reach the real terminal.
+    if session.live_logging {
+        python::capture_suspend(py);
+    }
     live_flush(session, config, reports);
+    if session.live_logging {
+        python::capture_resume(py);
+    }
+    // --setup-show: the call outcome char prints before the TEARDOWN
+    // narration, right after the item line (pytest's logreport timing).
+    if setup_show_active(config)
+        && !session.live_logging
+        && config.verbose == 0
+        && !config.quiet
+        && !config.no_terminal()
+    {
+        python::capture_suspend(py);
+        while session.streamed_chars < reports.len() {
+            let report = &reports[session.streamed_chars];
+            session.streamed_chars += 1;
+            if let Some(c) = report.progress_char() {
+                print!("{c}");
+                let _ = std::io::stdout().flush();
+            }
+        }
+        python::capture_resume(py);
+    }
     let log_level_cfg: Option<String> = config
         .get_value("log-level")
         .map(str::to_string)
@@ -875,6 +959,7 @@ fn teardown_one(
             longrepr: None,
             location: None,
             subtest_desc: None,
+            sections: Vec::new(),
         });
     } else {
         let mut longrepr = errors.join("\n");
@@ -901,6 +986,7 @@ fn teardown_one(
             longrepr: Some(longrepr),
             location: None,
             subtest_desc: None,
+            sections: Vec::new(),
         });
     }
     python::log_finish_item(py);
@@ -909,11 +995,64 @@ fn teardown_one(
 /// Run (LIFO) and remove every pending finalizer of the given scope instance.
 /// Returns formatted errors. Also evicts cached fixture values of that
 /// instance.
+/// Run a deferred (module/class/package/session) scope teardown under a
+/// capture phase; failures become a teardown ERROR report attributed to
+/// the last completed item, like pytest where these finalizers run inside
+/// that item's teardown.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn teardown_scope_reported(
+    py: Python<'_>,
+    plugins: &[Box<dyn Plugin>],
+    session: &mut Session,
+    config: &Config,
+    scope: Scope,
+    instance: &str,
+    item: &TestItem,
+    report_nodeid: Option<&str>,
+) -> Option<TestReport> {
+    // No pending finalizers: still run teardown_scope (it evicts cached
+    // fixture values) but skip the capture round-trip.
+    let has_finalizers = session
+        .finalizers
+        .iter()
+        .any(|pf| pf.scope == scope && pf.instance == instance);
+    if has_finalizers {
+        python::capture_scope_teardown_begin(py);
+    }
+    let started = Instant::now();
+    let errors = teardown_scope(py, plugins, session, config, scope, instance, item);
+    if errors.is_empty() {
+        if has_finalizers {
+            python::log_finish_item(py);
+        }
+        return None;
+    }
+    let mut longrepr = errors.join("\n");
+    for (title, text) in python::log_failure_sections(py) {
+        longrepr.push_str(&format!(
+            "\n{:-^80}\n{}",
+            format!(" {title} "),
+            text.trim_end_matches('\n')
+        ));
+    }
+    python::log_finish_item(py);
+    Some(TestReport {
+        nodeid: report_nodeid.unwrap_or(&item.nodeid).to_string(),
+        phase: Phase::Teardown,
+        outcome: Outcome::Failed,
+        duration: started.elapsed(),
+        longrepr: Some(longrepr),
+        location: None,
+        subtest_desc: None,
+        sections: Vec::new(),
+    })
+}
+
 pub(crate) fn teardown_scope(
     py: Python<'_>,
     _plugins: &[Box<dyn Plugin>],
     session: &mut Session,
-    _config: &Config,
+    config: &Config,
     scope: Scope,
     instance: &str,
     _item: &TestItem,
@@ -935,7 +1074,13 @@ pub(crate) fn teardown_scope(
             Finalizer::GenNext(generator) => python::finalize_generator(py, generator),
         };
         if let Err(err) = result {
-            errors.push(python::format_exception(py, &err));
+            // pytest-style longrepr (source lines + E markers), like any
+            // other failing phase.
+            errors.push(python::format_test_failure(
+                py,
+                &err,
+                config.get_value("tb").unwrap_or("long"),
+            ));
         }
     }
     session
@@ -1272,13 +1417,17 @@ fn resolve_fixture_def(
     if setup_show_active(config) {
         let (scope_char, indent) = scope_display(def.scope);
         // Parametrized fixtures display their current param: name['spam'].
+        // With ids= the id shows instead of the value (pytest's
+        // cached_param).
         let display_name = match &fixture_param {
-            Some((_, value)) => {
-                let rendered = value
-                    .bind(py)
-                    .repr()
-                    .map(|repr| repr.to_string())
-                    .unwrap_or_default();
+            Some((index, value)) => {
+                let rendered =
+                    python::fixture_param_id(py, def.ids.as_ref(), value.bind(py), *index)
+                        .map(|id| id.bind(py).clone())
+                        .unwrap_or_else(|| value.bind(py).clone())
+                        .repr()
+                        .map(|repr| repr.to_string())
+                        .unwrap_or_default();
                 format!("{}[{rendered}]", def.name)
             }
             None => def.name.clone(),
@@ -1289,15 +1438,21 @@ fn resolve_fixture_def(
             .filter(|name| *name != "request")
             .collect();
         dep_names.sort_unstable();
+        // Narration must reach the real terminal, not the item capture.
+        // pytest's tw.line() style: a leading newline closes the current
+        // line, no trailing one.
+        python::capture_suspend(py);
         if dep_names.is_empty() {
-            println!("{:indent$}SETUP    {scope_char} {display_name}", "");
+            print!("\n{:indent$}SETUP    {scope_char} {display_name}", "");
         } else {
-            println!(
-                "{:indent$}SETUP    {scope_char} {display_name} (fixtures used: {})",
+            print!(
+                "\n{:indent$}SETUP    {scope_char} {display_name} (fixtures used: {})",
                 "",
                 dep_names.join(", ")
             );
         }
+        let _ = std::io::stdout().flush();
+        python::capture_resume(py);
         if let Ok(printer) = py
             .import("pytest._setupshow")
             .and_then(|m| m.getattr("teardown_printer"))
@@ -1510,6 +1665,7 @@ fn report_from_err(
             longrepr: python::outcome_msg(py, err),
             location: None,
             subtest_desc: None,
+            sections: Vec::new(),
         }
     } else if python::is_skipped(py, err) {
         // Imperative skips report where pytest.skip was raised; skips out
@@ -1532,6 +1688,7 @@ fn report_from_err(
             longrepr: python::outcome_msg(py, err),
             location,
             subtest_desc: None,
+            sections: Vec::new(),
         }
     } else {
         let mut longrepr =
@@ -1552,6 +1709,7 @@ fn report_from_err(
             longrepr: Some(longrepr),
             location: None,
             subtest_desc: None,
+            sections: Vec::new(),
         }
     }
 }

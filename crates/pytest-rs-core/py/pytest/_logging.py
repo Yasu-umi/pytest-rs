@@ -65,12 +65,18 @@ class _LiveLogHandler(logging.StreamHandler):
         self._header_printed = False
 
     def emit(self, record):
-        if not self._header_printed and self.when is not None:
-            self._header_printed = True
-            title = f" live log {self.when} "
-            self.stream.write(f"{title:-^80}\n")
-        super().emit(record)
-        self.flush()
+        from pytest import _capture
+
+        # Like pytest's _LiveLoggingStreamHandler: emit with the global
+        # capture suspended, so live records reach the real terminal even
+        # under fd-level capture.
+        with _capture.state.globally_disabled():
+            if not self._header_printed and self.when is not None:
+                self._header_printed = True
+                title = f" live log {self.when} "
+                self.stream.write(f"{title:-^80}\n")
+            super().emit(record)
+            self.flush()
 
 
 class DatetimeFormatter(logging.Formatter):
@@ -269,6 +275,13 @@ def log_cli_enabled():
 
 def start_phase(when, level=None):
     state.start_phase(when, level)
+
+
+def end_phase():
+    # Closes a phase outside the item cycle (the collection catching_logs):
+    # with a root handler attached, a module-level logging call during
+    # import cannot trigger logging.basicConfig (issue #6240).
+    state.end_phase()
 
 
 def finish_item():

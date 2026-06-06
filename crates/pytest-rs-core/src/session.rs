@@ -75,6 +75,9 @@ pub struct Session {
     pub live_progress: Option<(usize, usize)>,
     /// How many of the current item's reports already printed live.
     pub live_printed: usize,
+    /// --setup-show: reports whose progress char already streamed mid-item
+    /// (between the item line and the TEARDOWN narration).
+    pub streamed_chars: usize,
     /// Items dropped by selection (-k/-m/--lf), for the summary line.
     pub deselected: usize,
     /// The dropped items themselves, passed to pytest_deselected hooks.
@@ -106,6 +109,7 @@ impl Session {
             live_logging: false,
             live_progress: None,
             live_printed: 0,
+            streamed_chars: 0,
             deselected: 0,
             deselected_items: Vec::new(),
             collect_errors: Vec::new(),

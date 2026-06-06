@@ -34,6 +34,7 @@ fn send_collect_error(nodeid: &str, message: String) {
             longrepr: Some(message),
             location: None,
             subtest_desc: None,
+            sections: Vec::new(),
         },
     });
     send(&WorkerMsg::Report {
@@ -45,6 +46,7 @@ fn send_collect_error(nodeid: &str, message: String) {
             longrepr: None,
             location: None,
             subtest_desc: None,
+            sections: Vec::new(),
         },
     });
 }
@@ -60,6 +62,9 @@ struct WorkerCollection {
     /// How many session py_hooks have had pytest_configure fired.
     configured_hooks: usize,
     prev_class: Option<String>,
+    /// The last completed item: deferred scope-teardown failures report
+    /// under it (crate::runner::teardown_scope_reported).
+    last_nodeid: Option<String>,
 }
 
 impl Engine {
@@ -93,6 +98,7 @@ impl Engine {
         if let Err(err) = python::load_named_plugins(
             py,
             &named,
+            Some(&self.config.invocation_dir),
             &mut self.session.registry,
             &mut self.session.py_hooks,
         ) {
@@ -147,6 +153,9 @@ impl Engine {
         {
             return exit_code::INTERNAL_ERROR;
         }
+        // The inherited global capture saved the controller's terminal fds;
+        // rebuild it against this worker's own fds (fd 1 is the IPC pipe).
+        python::capture_reinit_post_fork(py);
         // Fork duplicates the parent's PRNG state into every worker;
         // reseed so workers diverge like freshly spawned processes do.
         let _ = py.run(
@@ -199,10 +208,11 @@ impl Engine {
             }
         }
 
-        // Final scope teardowns mirror run_items.
+        // Final scope teardowns mirror run_items; failures stream to the
+        // parent as teardown ERROR reports.
         if let Some(last) = collection.items.last() {
-            if let Some(prev) = &collection.prev_class {
-                crate::runner::teardown_scope(
+            if let Some(prev) = &collection.prev_class
+                && let Some(report) = crate::runner::teardown_scope_reported(
                     py,
                     &self.plugins,
                     &mut self.session,
@@ -210,10 +220,13 @@ impl Engine {
                     Scope::Class,
                     prev,
                     last,
-                );
+                    collection.last_nodeid.as_deref(),
+                )
+            {
+                send(&WorkerMsg::Report { report });
             }
-            if let Some(prev) = &prev_module {
-                crate::runner::teardown_scope(
+            if let Some(prev) = &prev_module
+                && let Some(report) = crate::runner::teardown_scope_reported(
                     py,
                     &self.plugins,
                     &mut self.session,
@@ -221,9 +234,12 @@ impl Engine {
                     Scope::Module,
                     prev,
                     last,
-                );
+                    collection.last_nodeid.as_deref(),
+                )
+            {
+                send(&WorkerMsg::Report { report });
             }
-            crate::runner::teardown_scope(
+            if let Some(report) = crate::runner::teardown_scope_reported(
                 py,
                 &self.plugins,
                 &mut self.session,
@@ -231,7 +247,10 @@ impl Engine {
                 Scope::Session,
                 "",
                 last,
-            );
+                collection.last_nodeid.as_deref(),
+            ) {
+                send(&WorkerMsg::Report { report });
+            }
         }
 
         let mut ctx = HookContext {
@@ -289,11 +308,11 @@ impl Engine {
             };
 
             let item = &collection.items[index];
+            let last_nodeid = collection.last_nodeid.clone();
             let class_instance = item.class_instance();
             if let Some(prev) = &collection.prev_class
                 && prev != &class_instance
-            {
-                crate::runner::teardown_scope(
+                && let Some(report) = crate::runner::teardown_scope_reported(
                     py,
                     &self.plugins,
                     &mut self.session,
@@ -301,15 +320,18 @@ impl Engine {
                     Scope::Class,
                     prev,
                     item,
-                );
+                    last_nodeid.as_deref(),
+                )
+            {
+                send(&WorkerMsg::Report { report });
             }
             collection.prev_class = Some(class_instance);
 
+            let item = &collection.items[index];
             let module_instance = item.module_instance();
             if let Some(prev) = prev_module
                 && prev != &module_instance
-            {
-                crate::runner::teardown_scope(
+                && let Some(report) = crate::runner::teardown_scope_reported(
                     py,
                     &self.plugins,
                     &mut self.session,
@@ -317,12 +339,16 @@ impl Engine {
                     Scope::Module,
                     prev,
                     item,
-                );
+                    last_nodeid.as_deref(),
+                )
+            {
+                send(&WorkerMsg::Report { report });
             }
             *prev_module = Some(module_instance);
 
             let reports =
                 crate::runner::run_one(py, &self.plugins, &mut self.session, &self.config, item);
+            collection.last_nodeid = Some(item.nodeid.clone());
             for report in reports {
                 send(&WorkerMsg::Report { report });
             }

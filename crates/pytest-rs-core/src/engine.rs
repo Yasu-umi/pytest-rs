@@ -97,12 +97,18 @@ impl Engine {
         self.session.live_logging = python::configure_logging(py, &self.config);
 
         // Global output capture: -s / --capture=no disable, default "fd"
-        // (approximated at the sys level).
+        // (dup2-based, so os.write and C-level output are captured too).
         let capture_mode = if self.config.get_flag("capture-disable") {
             "no"
         } else {
             self.config.get_value("capture").unwrap_or("fd")
         };
+        if !matches!(capture_mode, "fd" | "sys" | "no" | "tee-sys") {
+            eprintln!(
+                "error: argument --capture: invalid choice: '{capture_mode}' (choose from 'fd', 'sys', 'no', 'tee-sys')"
+            );
+            return exit_code::USAGE_ERROR;
+        }
         python::configure_capture(py, capture_mode);
 
         // Arm unknown-mark validation (PytestUnknownMarkWarning on access).
@@ -183,6 +189,7 @@ impl Engine {
                     longrepr: Some(err),
                     location: None,
                     subtest_desc: None,
+                    sections: Vec::new(),
                 });
             }
             // --maxfail aborting collection exits TESTS_FAILED with a
@@ -344,6 +351,8 @@ impl Engine {
             if let Err(err) = self.fire_py_sessionfinish(py, code) {
                 eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
             }
+            // Stop the session-wide capture (errors surface on stderr).
+            python::capture_session_end(py);
             if let Some(cache) = &self.cache {
                 cache.sessionfinish(py, &self.config, &self.session.reports);
             }
@@ -385,6 +394,8 @@ impl Engine {
         if let Err(err) = self.fire_sessionfinish(py, code) {
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
         }
+        // Stop the session-wide capture (errors surface on stderr).
+        python::capture_session_end(py);
         if let Some(cache) = &self.cache {
             cache.sessionfinish(py, &self.config, &self.session.reports);
         }
@@ -406,6 +417,7 @@ impl Engine {
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
         }
         self.print_warnings_summary(py);
+        self.print_passes();
         if let Some(banner) = &self.session.dist_banner {
             println!("{}", center_banner(banner));
         }
@@ -638,10 +650,9 @@ impl Engine {
         }
     }
 
-    /// The "short test summary info" section, controlled by -r chars
-    /// (default fE). Groups print in the order the chars were given,
-    /// matching pytest (a -> sxXEf, A -> PpsxXEf, F/S are old aliases).
-    fn print_short_summary(&self) {
+    /// The -r chars with aliases expanded, in the order they were given
+    /// (a -> sxXEf, A -> PpsxXEf, F/S are old aliases). Default fE.
+    fn report_chars(&self) -> String {
         let given = self.config.get_value("report-chars").unwrap_or("fE");
         let mut chars = String::new();
         for c in given.chars() {
@@ -659,6 +670,41 @@ impl Engine {
                 _ => {}
             }
         }
+        chars
+    }
+
+    /// -rP/-rA: the PASSES section, passed tests' captured output.
+    fn print_passes(&self) {
+        if !self.report_chars().contains('P') {
+            return;
+        }
+        let passed: Vec<_> = self
+            .session
+            .reports
+            .iter()
+            .filter(|r| {
+                r.outcome == Outcome::Passed
+                    && r.phase == Phase::Call
+                    && r.subtest_desc.is_none()
+            })
+            .collect();
+        if passed.is_empty() {
+            return;
+        }
+        println!("{}", center_banner("PASSES"));
+        for report in passed {
+            println!("{}", center_named(&Self::failure_title(&report.nodeid)));
+            for (title, text) in &report.sections {
+                println!("{:-^80}", format!(" {title} "));
+                println!("{}", text.trim_end_matches('\n'));
+            }
+        }
+    }
+
+    /// The "short test summary info" section, controlled by -r chars.
+    /// Groups print in the order the chars were given, matching pytest.
+    fn print_short_summary(&self) {
+        let chars = self.report_chars();
 
         let mut lines = Vec::new();
         for c in chars.chars() {
@@ -1137,6 +1183,7 @@ impl Engine {
             && let Err(err) = python::load_named_plugins(
                 py,
                 &named_plugins,
+                Some(&self.config.invocation_dir),
                 &mut self.session.registry,
                 &mut self.session.py_hooks,
             )
@@ -1227,6 +1274,15 @@ impl Engine {
         if let Err(err) = self.fire_py_hooks_simple(py, "pytest_configure") {
             errors.push((rootdir.clone(), python::format_exception(py, &err)));
         }
+        // pytest's catching_logs around pytest_collection: a root handler
+        // during import keeps module-level logging calls from triggering
+        // logging.basicConfig (issue #6240).
+        let log_level_cfg: Option<String> = self
+            .config
+            .get_value("log-level")
+            .map(str::to_string)
+            .or_else(|| self.config.get_ini("log_level").map(str::to_string));
+        python::log_start_phase(py, "collection", log_level_cfg.as_deref());
         for file in &files {
             // --maxfail aborts collection once the budget is spent on
             // collection errors, ignoring further files.
@@ -1257,14 +1313,30 @@ impl Engine {
                 }
                 continue;
             }
-            let module_ok = match python::collect_module(
+            // Import-time output attaches to a failing collect report as
+            // "Captured stdout/stderr" sections (pytest's
+            // pytest_make_collect_report capture).
+            python::capture_collect_begin(py);
+            let collect_result = python::collect_module(
                 py,
                 &rootdir,
                 file,
                 &mut self.session.items,
                 &mut self.session.registry,
                 &mut self.session.py_hooks,
-            ) {
+            );
+            let collect_sections = python::capture_collect_end(py);
+            let with_sections = |mut message: String| {
+                for (title, text) in &collect_sections {
+                    message.push_str(&format!(
+                        "\n{:-^80}\n{}",
+                        format!(" {title} "),
+                        text.trim_end_matches('\n')
+                    ));
+                }
+                message
+            };
+            let module_ok = match collect_result {
                 Ok(()) => true,
                 Err(err) => {
                     // pytest.skip(..., allow_module_level=True) or
@@ -1284,16 +1356,20 @@ impl Engine {
                                 longrepr: Some(reason),
                                 location: Some(location),
                                 subtest_desc: None,
+                                sections: Vec::new(),
                             });
                         }
-                        Some(Err(message)) => errors.push((file.clone(), message)),
+                        Some(Err(message)) => errors.push((file.clone(), with_sections(message))),
                         // CollectError carries a user-facing message, no traceback.
                         None => {
                             match python::collect_error_message(py, &err) {
-                                Some(message) => errors.push((file.clone(), message)),
-                                None => {
-                                    errors.push((file.clone(), python::format_exception(py, &err)))
+                                Some(message) => {
+                                    errors.push((file.clone(), with_sections(message)))
                                 }
+                                None => errors.push((
+                                    file.clone(),
+                                    with_sections(python::format_exception(py, &err)),
+                                )),
                             }
                             // Upstream DoctestModule: with --doctest-ignore-import-errors
                             // the doctest collector skips while the Module still errors.
@@ -1312,6 +1388,7 @@ impl Engine {
                                     )),
                                     location: Some(format!("{nodeid}:1")),
                                     subtest_desc: None,
+                                    sections: Vec::new(),
                                 });
                             }
                         }
@@ -1368,6 +1445,7 @@ impl Engine {
                                 )),
                                 location: Some(format!("{nodeid}:1")),
                                 subtest_desc: None,
+                                sections: Vec::new(),
                             });
                         } else {
                             errors.push((extra_file.clone(), python::format_exception(py, &err)));
@@ -1407,6 +1485,9 @@ impl Engine {
                 }
             }
         }
+
+        // Collection over: close its catching_logs phase.
+        python::log_end_phase(py);
 
         // Expand items over parametrized fixtures in their closure.
         let items = std::mem::take(&mut self.session.items);

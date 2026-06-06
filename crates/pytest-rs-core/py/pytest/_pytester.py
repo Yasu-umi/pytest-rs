@@ -352,8 +352,21 @@ class Pytester:
             f'example "{example_path}" is not found as a file or directory'
         )
 
-    def runpython(self, script):
+    @staticmethod
+    def _python_env():
+        """os.environ with the pytest/_pytest shim importable, matching a
+        real pytest install where the child just imports site-packages."""
         import os
+
+        env = os.environ.copy()
+        shim_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        existing = env.get("PYTHONPATH")
+        env["PYTHONPATH"] = os.pathsep.join(
+            [shim_root, *([existing] if existing else [])]
+        )
+        return env
+
+    def runpython(self, script):
         import subprocess
         import sys
         import time
@@ -365,7 +378,7 @@ class Pytester:
             capture_output=True,
             text=True,
             timeout=120,
-            env=os.environ.copy(),
+            env=self._python_env(),
         )
         duration = time.perf_counter() - start
         return RunResult(
@@ -376,7 +389,6 @@ class Pytester:
         )
 
     def runpython_c(self, command):
-        import os
         import subprocess
         import sys
         import time
@@ -388,7 +400,7 @@ class Pytester:
             capture_output=True,
             text=True,
             timeout=120,
-            env=os.environ.copy(),
+            env=self._python_env(),
         )
         duration = time.perf_counter() - start
         return RunResult(

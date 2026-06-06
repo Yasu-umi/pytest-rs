@@ -562,7 +562,7 @@ fn register_pytest_plugins(
             .map(|name| name?.extract::<String>())
             .collect::<PyResult<_>>()?,
     };
-    load_named_plugins(py, &names, registry, hooks)
+    load_named_plugins(py, &names, None, registry, hooks)
 }
 
 /// Import plugin modules by name (`-p NAME` / `pytest_plugins`) and register
@@ -570,14 +570,28 @@ fn register_pytest_plugins(
 pub fn load_named_plugins(
     py: Python<'_>,
     names: &[String],
+    search_dir: Option<&Path>,
     registry: &mut FixtureRegistry,
     hooks: &mut Vec<crate::session::PyHook>,
 ) -> PyResult<()> {
     for name in names {
         // Built-in plugin names ("pytester", ...) aren't importable modules;
         // they're provided natively, so only importable plugins register.
-        let Ok(plugin) = py.import(name.as_str()) else {
-            continue;
+        let plugin = match py.import(name.as_str()) {
+            Ok(plugin) => plugin,
+            // Under `python -m pytest` the invocation dir is sys.path[0],
+            // so -p resolves local plugin modules; emulate that for the
+            // import only, then drop the path entry again.
+            Err(_) => {
+                let Some(dir) = search_dir else { continue };
+                let dir = dir.to_string_lossy();
+                let sys_path = py.import("sys")?.getattr("path")?;
+                sys_path.call_method1("insert", (0, dir.as_ref()))?;
+                let result = py.import(name.as_str());
+                let _ = sys_path.call_method1("remove", (dir.as_ref(),));
+                let Ok(plugin) = result else { continue };
+                plugin
+            }
         };
         // Re-registering an already-seen plugin would duplicate its hooks.
         let already = hooks
@@ -1438,6 +1452,27 @@ pub fn collect_error_message(py: Python<'_>, err: &PyErr) -> Option<String> {
 }
 
 /// pytest-style id for one parameter value.
+/// The id object for one fixture param when @pytest.fixture(ids=...) was
+/// given: ids[index] for a list, ids(value) for a callable. None (absent
+/// ids, None entry, or error) falls back to the value-derived id.
+pub(crate) fn fixture_param_id(
+    py: Python<'_>,
+    ids: Option<&Py<PyAny>>,
+    value: &Bound<'_, PyAny>,
+    index: usize,
+) -> Option<Py<PyAny>> {
+    let ids = ids?.bind(py);
+    let id_obj = if ids.is_callable() {
+        ids.call1((value,)).ok()?
+    } else {
+        ids.get_item(index).ok()?
+    };
+    if id_obj.is_none() {
+        return None;
+    }
+    Some(id_obj.unbind())
+}
+
 fn id_for_value(value: &Bound<'_, PyAny>, argname: &str, index: usize) -> String {
     if value.is_none() {
         return "None".to_string();
@@ -1507,6 +1542,10 @@ pub(crate) fn register_fixture_def(
     } else {
         Some(params_obj.unbind())
     };
+    let ids = match marker.getattr("ids") {
+        Ok(ids_obj) if !ids_obj.is_none() => Some(ids_obj.unbind()),
+        _ => None,
+    };
     registry.register(FixtureDef {
         name,
         func: value.clone().unbind(),
@@ -1519,6 +1558,7 @@ pub(crate) fn register_fixture_def(
         baseid: baseid.to_string(),
         needs_instance,
         params,
+        ids,
     });
     Ok(())
 }
@@ -1557,7 +1597,10 @@ pub fn expand_fixture_params(
             let mut next = Vec::new();
             for (id, assignments) in &variants {
                 for (index, value) in values.iter().enumerate() {
-                    let part = id_for_value(value, &def.name, index);
+                    let part = fixture_param_id(py, def.ids.as_ref(), value, index)
+                        .and_then(|id_obj| id_obj.bind(py).str().ok())
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| id_for_value(value, &def.name, index));
                     let id = if id.is_empty() {
                         part
                     } else {
@@ -1791,6 +1834,7 @@ pub fn pop_subtest_reports(
                 longrepr,
                 location,
                 subtest_desc: Some(desc),
+                sections: Vec::new(),
             });
         }
         Ok((reports, failed_fixture_subs))
@@ -2075,9 +2119,14 @@ pub fn log_start_phase(py: Python<'_>, when: &str, level: Option<&str>) {
     let _ = py
         .import("pytest._logging")
         .and_then(|m| m.call_method1("start_phase", (when, level)));
-    let _ = py
+    if let Err(err) = py
         .import("pytest._capture")
-        .and_then(|m| m.call_method1("start_phase", (when,)));
+        .and_then(|m| m.call_method1("start_phase", (when,)))
+    {
+        // The capture restored the real fds before raising; surface the
+        // error like pytest does (a traceback on the real stderr).
+        eprintln!("{}", format_exception(py, &err));
+    }
 }
 
 /// Close the current item's logging capture (end of teardown).
@@ -2085,9 +2134,85 @@ pub fn log_finish_item(py: Python<'_>) {
     let _ = py
         .import("pytest._logging")
         .and_then(|m| m.call_method0("finish_item"));
+    if let Err(err) = py
+        .import("pytest._capture")
+        .and_then(|m| m.call_method0("finish_item"))
+    {
+        eprintln!("{}", format_exception(py, &err));
+    }
+}
+
+/// Arm capture for a deferred module/class/session scope teardown (its
+/// output reports as "Captured stdout teardown", pytest parity).
+pub fn capture_scope_teardown_begin(py: Python<'_>) {
     let _ = py
         .import("pytest._capture")
-        .and_then(|m| m.call_method0("finish_item"));
+        .and_then(|m| m.call_method0("begin_scope_teardown"));
+}
+
+/// Pause/resume the item capture around the runner's own mid-item terminal
+/// output (live-log outcome words print between the call and teardown
+/// phases, while the fd redirection is still armed).
+pub fn capture_suspend(py: Python<'_>) {
+    let _ = py
+        .import("pytest._capture")
+        .and_then(|m| m.call_method0("suspend_global"));
+}
+
+pub fn capture_resume(py: Python<'_>) {
+    let _ = py
+        .import("pytest._capture")
+        .and_then(|m| m.call_method0("resume_global"));
+}
+
+/// Capture around one file's collection (pytest wraps
+/// pytest_make_collect_report the same way).
+pub fn capture_collect_begin(py: Python<'_>) {
+    let _ = py
+        .import("pytest._capture")
+        .and_then(|m| m.call_method0("collect_begin"));
+}
+
+/// End the per-file collection capture, returning its report sections.
+pub fn capture_collect_end(py: Python<'_>) -> Vec<(String, String)> {
+    match py
+        .import("pytest._capture")
+        .and_then(|m| m.call_method0("collect_end"))
+        .and_then(|s| s.extract())
+    {
+        Ok(sections) => sections,
+        Err(err) => {
+            eprintln!("{}", format_exception(py, &err));
+            Vec::new()
+        }
+    }
+}
+
+/// Stop the session-wide global capture (pytest's stop_global_capturing);
+/// errors (e.g. a broken snap monkeypatch) surface on the real stderr.
+pub fn capture_session_end(py: Python<'_>) {
+    if let Err(err) = py
+        .import("pytest._capture")
+        .and_then(|m| m.call_method0("session_end"))
+    {
+        eprintln!("{}", format_exception(py, &err));
+    }
+}
+
+/// Recreate the global capture in a forked worker (the inherited one's
+/// saved fds point at the controller's terminal, not the IPC pipe).
+pub fn capture_reinit_post_fork(py: Python<'_>) {
+    let _ = py
+        .import("pytest._capture")
+        .and_then(|m| m.call_method0("reinit_post_fork"));
+}
+
+/// Close the collection-wide logging phase (pytest's catching_logs around
+/// pytest_collection).
+pub fn log_end_phase(py: Python<'_>) {
+    let _ = py
+        .import("pytest._logging")
+        .and_then(|m| m.call_method0("end_phase"));
 }
 
 /// Arm the global output capture ("fd"/"sys" capture, "no" disables).

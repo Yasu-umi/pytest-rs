@@ -35,6 +35,10 @@ pub struct TestReport {
     /// Subtest description like "[msg] (i=3)"; Some marks a subtest report.
     #[serde(default)]
     pub subtest_desc: Option<String>,
+    /// "Captured stdout/stderr/log {when}" sections for passing reports
+    /// (failures embed them in longrepr); shown by -rA/-rP's PASSES block.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sections: Vec<(String, String)>,
 }
 
 impl TestReport {

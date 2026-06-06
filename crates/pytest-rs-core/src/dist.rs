@@ -529,6 +529,7 @@ impl WorkerOwner {
                     )),
                     location: None,
                     subtest_desc: None,
+                    sections: Vec::new(),
                 },
                 worker: self.index,
             });
