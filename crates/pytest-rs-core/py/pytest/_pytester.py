@@ -247,8 +247,10 @@ class Pytester:
             env=env,
         )
         duration = time.perf_counter() - start
-        outlines = [_ANSI_RE.sub("", line) for line in proc.stdout.splitlines()]
-        errlines = [_ANSI_RE.sub("", line) for line in proc.stderr.splitlines()]
+        # Color is gated by --color/tty detection in the engine; pytester
+        # passes output through raw so color tests can assert escapes.
+        outlines = proc.stdout.splitlines()
+        errlines = proc.stderr.splitlines()
         return RunResult(proc.returncode, outlines, errlines, duration)
 
     runpytest_subprocess = runpytest

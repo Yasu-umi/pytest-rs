@@ -9,6 +9,68 @@ import linecache
 import os
 import traceback
 
+# Set by the engine when terminal color is on; gates pygments highlighting
+# and the red/bold markup below.
+_color = False
+
+
+def set_color(on):
+    global _color
+    _color = on
+
+
+def _markup(text, *codes):
+    if not _color:
+        return text
+    return "".join(f"\x1b[{c}m" for c in codes) + text + "\x1b[0m"
+
+
+def validate_theme():
+    """An error message when PYTEST_THEME / PYTEST_THEME_MODE is invalid
+    (only checked when color is on), else None — pytest's startup check."""
+    if not _color:
+        return None
+    theme = os.getenv("PYTEST_THEME")
+    if theme is not None:
+        try:
+            from pygments.styles import get_style_by_name
+
+            get_style_by_name(theme)
+        except Exception:
+            return (
+                f"PYTEST_THEME environment variable has an invalid value: {theme!r}. "
+                "Hint: See available pygments styles with `pygmentize -L styles`."
+            )
+    mode = os.getenv("PYTEST_THEME_MODE")
+    if mode is not None and mode not in ("dark", "light"):
+        return (
+            f"PYTEST_THEME_MODE environment variable has an invalid value: {mode!r}. "
+            "The allowed values are 'dark' (default) and 'light'."
+        )
+    return None
+
+
+def _highlight(source):
+    """pytest's TerminalWriter._highlight: pygments terminal colors with a
+    leading reset, plain passthrough when color is off or pygments fails."""
+    if not _color:
+        return source
+    try:
+        from pygments import highlight as pygments_highlight
+        from pygments.formatters.terminal import TerminalFormatter
+        from pygments.lexers.python import PythonLexer
+
+        mode = os.getenv("PYTEST_THEME_MODE", "dark")
+        style = os.getenv("PYTEST_THEME")
+        highlighted = pygments_highlight(
+            source, PythonLexer(), TerminalFormatter(bg=mode, style=style)
+        )
+        if highlighted.endswith("\n") and not source.endswith("\n"):
+            highlighted = highlighted[:-1]
+        return "\x1b[0m" + highlighted
+    except Exception:
+        return source
+
 
 def _visible_frames(exc):
     frames = []
@@ -47,37 +109,43 @@ def _exception_lines(exc):
     return text.splitlines() or [type(exc).__name__]
 
 
-def _format_last_frame(frame, lineno, exc):
-    lines = []
+def _source_block(frame, lineno):
+    """The frame's source from its definition to the failing line, the
+    whole block pygments-highlighted, '>' marking the failing line."""
     code = frame.f_code
     try:
         source, start = inspect.getsourcelines(code)
     except (OSError, TypeError):
         source, start = [], None
+    prefixes = []
+    contents = []
     if start is not None:
         for offset, raw in enumerate(source):
             current = start + offset
             if current > lineno:
                 break
-            prefix = ">   " if current == lineno else "    "
-            lines.append(f"{prefix}{raw.rstrip()}")
+            prefixes.append(">   " if current == lineno else "    ")
+            contents.append(raw.rstrip())
     else:
         stripped = linecache.getline(code.co_filename, lineno).rstrip()
         if stripped:
-            lines.append(f">   {stripped}")
-    for entry in _exception_lines(exc):
-        lines.append(f"E       {entry}")
-    lines.append("")
-    lines.append(f"{_relpath(code.co_filename)}:{lineno}: {type(exc).__name__}")
-    return lines
+            prefixes.append(">   ")
+            contents.append(stripped)
+    highlighted = _highlight("\n".join(contents)).split("\n")
+    return [f"{prefix}{line}" for prefix, line in zip(prefixes, highlighted)]
+
+
+def _location_line(code, lineno, suffix):
+    """"relpath:lineno: suffix" with the path bold red under color."""
+    return f"{_markup(_relpath(code.co_filename), 1, 31)}:{lineno}: {suffix}"
 
 
 def _format_short_frame(frame, lineno):
     code = frame.f_code
     source = linecache.getline(code.co_filename, lineno).strip()
-    lines = [f"{_relpath(code.co_filename)}:{lineno}: in {code.co_name}"]
+    lines = [_location_line(code, lineno, f"in {code.co_name}").rstrip()]
     if source:
-        lines.append(f"    {source}")
+        lines.append(f"    {_highlight(source)}")
     return lines
 
 
@@ -121,15 +189,22 @@ def format_exception(exc, style="long"):
         for frame, lineno in frames:
             lines.extend(_format_short_frame(frame, lineno))
         for entry in _exception_lines(exc):
-            lines.append(f"E       {entry}")
+            lines.append(_markup(f"E   {entry}", 1, 31))
         return "\n".join(lines)
 
-    # long (default): short entries for outer frames, full source for the
-    # failing frame.
-    for frame, lineno in frames[:-1]:
-        lines.extend(_format_short_frame(frame, lineno))
-    if len(frames) > 1:
-        lines.append("_ " * 20)
-    frame, lineno = frames[-1]
-    lines.extend(_format_last_frame(frame, lineno, exc))
+    # long (default): every frame shows its full source block with the
+    # failing line marked, frames separated by the "_ _ _" rule; the last
+    # frame carries the E lines and the exception name.
+    for index, (frame, lineno) in enumerate(frames):
+        last = index == len(frames) - 1
+        lines.extend(_source_block(frame, lineno))
+        if last:
+            for entry in _exception_lines(exc):
+                lines.append(_markup(f"E       {entry}", 1, 31))
+        lines.append("")
+        suffix = type(exc).__name__ if last else ""
+        lines.append(_location_line(frame.f_code, lineno, suffix))
+        if not last:
+            lines.append("_ " * 20)
+            lines.append("")
     return "\n".join(lines)

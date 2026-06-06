@@ -96,6 +96,24 @@ impl Engine {
         // live records with the progress output.
         self.session.live_logging = python::configure_logging(py, &self.config);
 
+        // Color decision: --color beats PY_COLORS / NO_COLOR / FORCE_COLOR,
+        // which beat isatty. Validated like pytest's choices.
+        let color_option = self.config.get_value("color");
+        if let Some(choice) = color_option
+            && !matches!(choice, "yes" | "no" | "auto")
+        {
+            eprintln!(
+                "error: argument --color: invalid choice: '{choice}' (choose from 'yes', 'no', 'auto')"
+            );
+            return exit_code::USAGE_ERROR;
+        }
+        crate::tw::set_enabled(crate::tw::should_colorize(color_option));
+        python::set_tb_color(py, crate::tw::enabled());
+        if let Some(message) = python::invalid_theme_message(py) {
+            eprintln!("ERROR: {message}");
+            return exit_code::USAGE_ERROR;
+        }
+
         // Global output capture: -s / --capture=no disable, default "fd"
         // (dup2-based, so os.write and C-level output are captured too).
         let capture_mode = if self.config.get_flag("capture-disable") {
@@ -545,16 +563,16 @@ impl Engine {
             )
         };
         let color = if selected == 0 && deselected == 0 {
-            "\x1b[33m" // yellow
+            crate::tw::YELLOW
         } else {
-            "\x1b[32m" // green
+            crate::tw::GREEN
         };
         println!();
         if self.config.quiet {
             // -q: the bare summary line, no banner.
-            println!("{color}{body}\x1b[0m");
+            println!("{}", crate::tw::markup(&body, &[color]));
         } else {
-            println!("{color}{}\x1b[0m", center_banner(&body));
+            println!("{}", crate::tw::markup(&center_banner(&body), &[color]));
         }
     }
 
@@ -577,7 +595,10 @@ impl Engine {
         if self.config.quiet || self.config.no_terminal() {
             return;
         }
-        println!("{}", center_banner("test session starts"));
+        println!(
+            "{}",
+            crate::tw::markup(&center_banner("test session starts"), &[crate::tw::BOLD])
+        );
         println!(
             "platform {} -- pytest-rs {}",
             std::env::consts::OS,
@@ -720,7 +741,10 @@ impl Engine {
             if let Some(desc) = &report.subtest_desc {
                 name = format!("{name} {desc}");
             }
-            println!("{}", center_named(&name));
+            println!(
+                "{}",
+                crate::tw::markup(&center_named(&name), &[crate::tw::RED, crate::tw::BOLD])
+            );
             if report.longrepr.is_some() {
                 println!("{}", Self::render_longrepr(report));
             }

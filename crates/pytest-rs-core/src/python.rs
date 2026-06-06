@@ -2320,6 +2320,24 @@ pub fn configure_capture(py: Python<'_>, mode: &str) {
         .and_then(|m| m.call_method1("configure", (mode,)));
 }
 
+/// Tell the traceback formatter whether terminal color is on (E lines,
+/// file:line markup, pygments source highlighting).
+pub fn set_tb_color(py: Python<'_>, on: bool) {
+    let _ = py
+        .import("pytest._tb")
+        .and_then(|m| m.call_method1("set_color", (on,)));
+}
+
+/// PYTEST_THEME / PYTEST_THEME_MODE validation (color mode only): the
+/// pytest startup error message, or None.
+pub fn invalid_theme_message(py: Python<'_>) -> Option<String> {
+    py.import("pytest._tb")
+        .and_then(|m| m.call_method0("validate_theme"))
+        .ok()
+        .and_then(|value| value.extract::<Option<String>>().ok())
+        .flatten()
+}
+
 /// Tell the tmp_path factory the explicit --basetemp directory (cleared at
 /// session start, kept after the run, like pytest).
 pub fn configure_basetemp(py: Python<'_>, path: &str) {

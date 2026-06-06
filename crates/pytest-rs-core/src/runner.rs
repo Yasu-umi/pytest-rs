@@ -120,7 +120,10 @@ impl Engine {
                 && file != current_file
             {
                 if !current_file.is_empty() {
-                    println!("{}", progress_suffix(&line, done, total));
+                    println!(
+                        "{}",
+                        progress_suffix(&line, done, total, fill_color(py, session, false))
+                    );
                 }
                 line = format!("{file} ");
                 print!("{line}");
@@ -164,12 +167,20 @@ impl Engine {
                     // -p no:terminal: no progress output at all.
                 } else if config.verbose > 0 {
                     if report.phase == Phase::Call || report.outcome != Outcome::Passed {
+                        let word = outcome_word(&report);
+                        let plain = format!("{} {}", item.nodeid, word);
+                        let rendered = format!(
+                            "{} {}",
+                            item.nodeid,
+                            crate::tw::markup(&word, outcome_codes(&report))
+                        );
                         println!(
-                            "{}",
-                            with_progress(
-                                &format!("{} {}", item.nodeid, outcome_word(&report)),
+                            "{rendered}{}",
+                            progress_suffix(
+                                &plain,
                                 done,
-                                total
+                                total,
+                                fill_color(py, session, done == total)
                             )
                         );
                         let _ = std::io::stdout().flush();
@@ -183,7 +194,10 @@ impl Engine {
                 } else if !config.quiet
                     && let Some(c) = report.progress_char()
                 {
-                    print!("{c}");
+                    print!(
+                        "{}",
+                        crate::tw::markup(&c.to_string(), outcome_codes(&report))
+                    );
                     let _ = std::io::stdout().flush();
                     line.push(c);
                 }
@@ -223,7 +237,10 @@ impl Engine {
             && !current_file.is_empty()
             && (!setup_show_active(config) || any_char)
         {
-            println!("{}", progress_suffix(&line, done, total));
+            println!(
+                "{}",
+                progress_suffix(&line, done, total, fill_color(py, session, true))
+            );
         }
         // pytest prints the banner even when the budget was spent on the
         // very last test, so check the final count rather than the break.
@@ -256,6 +273,41 @@ fn live_flush(session: &mut Session, config: &Config, reports: &[TestReport]) {
             let _ = std::io::stdout().flush();
         }
     }
+}
+
+/// SGR codes for a report's outcome (progress letters, verbose words).
+fn outcome_codes(report: &TestReport) -> &'static [u8] {
+    use crate::tw;
+    match report.outcome {
+        Outcome::Passed => &[tw::GREEN],
+        Outcome::Failed => &[tw::RED],
+        Outcome::Skipped | Outcome::XFailed | Outcome::XPassed => &[tw::YELLOW],
+    }
+}
+
+/// The progress-fill / summary main color from the session so far.
+fn fill_color(py: Python<'_>, session: &Session, finished: bool) -> u8 {
+    let mut failed = 0usize;
+    let mut errors = 0usize;
+    let mut xpassed = 0usize;
+    let mut passed = 0usize;
+    for report in &session.reports {
+        match (report.phase, report.outcome) {
+            (Phase::Call, Outcome::Passed) => passed += 1,
+            (Phase::Call, Outcome::Failed) => failed += 1,
+            (Phase::Setup | Phase::Teardown, Outcome::Failed) => errors += 1,
+            (_, Outcome::XPassed) => xpassed += 1,
+            _ => {}
+        }
+    }
+    crate::tw::main_color(
+        failed,
+        errors,
+        python::warning_count(py),
+        xpassed,
+        passed,
+        finished,
+    )
 }
 
 /// The verbose outcome word for a report: "PASSED", "SKIPPED (why)",
@@ -296,14 +348,15 @@ fn term_width() -> usize {
 
 /// The padding + percentage that completes an already-printed progress
 /// line of `body`'s width (the body itself streamed char by char).
-fn progress_suffix(body: &str, done: usize, total: usize) -> String {
+fn progress_suffix(body: &str, done: usize, total: usize, color: u8) -> String {
     let pct = format!("[{:>3}%]", done * 100 / total);
     let pad = term_width().saturating_sub(body.chars().count() + pct.len());
-    if pad > 0 {
+    let suffix = if pad > 0 {
         format!("{}{pct}", " ".repeat(pad))
     } else {
         format!(" {pct}")
-    }
+    };
+    crate::tw::markup(&suffix, &[color])
 }
 
 /// "body        [ 33%]" — the percentage right-aligned at the terminal edge.
@@ -912,7 +965,10 @@ fn teardown_one(
             let report = &reports[session.streamed_chars];
             session.streamed_chars += 1;
             if let Some(c) = report.progress_char() {
-                print!("{c}");
+                print!(
+                    "{}",
+                    crate::tw::markup(&c.to_string(), outcome_codes(report))
+                );
                 let _ = std::io::stdout().flush();
             }
         }
@@ -1765,50 +1821,90 @@ pub fn summary_line(
             _ => {}
         }
     }
-    let mut parts = Vec::new();
+    use crate::tw;
+    let mut parts: Vec<(String, u8)> = Vec::new();
     if failed > 0 {
-        parts.push(format!("{failed} failed"));
+        parts.push((format!("{failed} failed"), tw::RED));
     }
     if passed > 0 {
-        parts.push(format!("{passed} passed"));
+        parts.push((format!("{passed} passed"), tw::GREEN));
     }
     if skipped > 0 {
-        parts.push(format!("{skipped} skipped"));
+        parts.push((format!("{skipped} skipped"), tw::YELLOW));
     }
     if subtests_passed > 0 {
-        parts.push(format!("{subtests_passed} subtests passed"));
+        parts.push((format!("{subtests_passed} subtests passed"), tw::GREEN));
     }
     if deselected > 0 {
-        parts.push(format!("{deselected} deselected"));
+        parts.push((format!("{deselected} deselected"), tw::YELLOW));
     }
     if xfailed > 0 {
-        parts.push(format!("{xfailed} xfailed"));
+        parts.push((format!("{xfailed} xfailed"), tw::YELLOW));
     }
     if xpassed > 0 {
-        parts.push(format!("{xpassed} xpassed"));
+        parts.push((format!("{xpassed} xpassed"), tw::YELLOW));
     }
     if warning_count > 0 {
-        parts.push(format!(
-            "{warning_count} warning{}",
-            if warning_count == 1 { "" } else { "s" }
+        parts.push((
+            format!(
+                "{warning_count} warning{}",
+                if warning_count == 1 { "" } else { "s" }
+            ),
+            tw::YELLOW,
         ));
     }
     if errors > 0 {
-        parts.push(format!(
-            "{errors} error{}",
-            if errors == 1 { "" } else { "s" }
+        parts.push((
+            format!("{errors} error{}", if errors == 1 { "" } else { "s" }),
+            tw::RED,
         ));
     }
     if parts.is_empty() {
-        parts.push("no tests ran".to_string());
+        parts.push(("no tests ran".to_string(), tw::YELLOW));
     }
-    let body = format!("{} in {:.2}s", parts.join(", "), elapsed.as_secs_f64());
-    let color = if failed > 0 || errors > 0 {
-        "\x1b[31m" // red
-    } else {
-        "\x1b[32m" // green
-    };
-    format!("{color}{}\x1b[0m", crate::engine::center_banner(&body))
+    let main = tw::main_color(
+        failed,
+        errors,
+        warning_count,
+        xpassed,
+        passed + subtests_passed,
+        true,
+    );
+    let plain_parts: Vec<&str> = parts.iter().map(|(text, _)| text.as_str()).collect();
+    let plain_body = format!(
+        "{} in {:.2}s",
+        plain_parts.join(", "),
+        elapsed.as_secs_f64()
+    );
+    let banner = crate::engine::center_banner(&plain_body);
+    if !tw::enabled() {
+        return banner;
+    }
+    // pytest's nesting: the left banner segment opens the main color
+    // without a reset, each count carries its own color (bold when it
+    // matches the main color), the tail segments re-open the main color.
+    let (left, right) = banner.split_once(&plain_body).unwrap_or_default();
+    let mut out = String::new();
+    out.push_str(&tw::open(&[main]));
+    out.push_str(left);
+    for (i, (text, color)) in parts.iter().enumerate() {
+        if i > 0 {
+            out.push_str(&tw::open(&[main]));
+            out.push_str(", ");
+        }
+        let codes: &[u8] = if *color == main {
+            &[*color, tw::BOLD]
+        } else {
+            &[*color]
+        };
+        out.push_str(&tw::markup(text, codes));
+    }
+    out.push_str(&tw::markup(
+        &format!(" in {:.2}s", elapsed.as_secs_f64()),
+        &[main],
+    ));
+    out.push_str(&tw::markup(right, &[main]));
+    out
 }
 
 /// --setup-show display attributes: (scope letter, indent width).
