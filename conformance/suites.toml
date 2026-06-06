@@ -92,7 +92,7 @@ enabled = true
 repo = "https://github.com/Textualize/rich"
 tag = "v14.2.0"
 testpaths = ["tests"]
-deps = ["markdown-it-py", "pygments"]
+deps = ["markdown-it-py", "pygments", "attrs"]
 # Flat package layout: the checkout root is the import path.
 pythonpath = ["."]
 category = "real-world"
