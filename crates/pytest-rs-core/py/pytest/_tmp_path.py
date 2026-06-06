@@ -181,6 +181,22 @@ class LocalPath:
     def exists(self):
         return self._path.exists()
 
+    def check(self, **kwargs):
+        """py.path.local.check: bare = exists, kwargs assert properties
+        (dir=1, file=1, exists=1; 0 negates)."""
+        if not kwargs:
+            return self._path.exists()
+        probes = {
+            "dir": self._path.is_dir,
+            "file": self._path.is_file,
+            "exists": self._path.exists,
+        }
+        for key, expected in kwargs.items():
+            probe = probes.get(key)
+            if probe is None or bool(probe()) != bool(expected):
+                return False
+        return True
+
     def isfile(self):
         return self._path.is_file()
 

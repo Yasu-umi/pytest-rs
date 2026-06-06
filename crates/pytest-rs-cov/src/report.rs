@@ -192,13 +192,9 @@ fn missing_with_arcs(row: &FileRow) -> String {
         .join(", ")
 }
 
-/// The pytest-cov terminal section (term / term-missing).
-pub fn render_term(
-    data: &CoverageData,
-    missing: bool,
-    skip_covered: bool,
-    python_version: &str,
-) -> String {
+/// The "tests coverage" section header (printed whenever any coverage
+/// report was requested, table or not — pytest-cov does the same).
+pub fn render_header(python_version: &str) -> String {
     let mut out = String::new();
     out.push_str(&pytest_rs_core::engine::center_with("tests coverage", '='));
     out.push('\n');
@@ -211,6 +207,12 @@ pub fn render_term(
         '_',
     ));
     out.push('\n');
+    out
+}
+
+/// The pytest-cov terminal table (term / term-missing), header excluded.
+pub fn render_term(data: &CoverageData, missing: bool, skip_covered: bool) -> String {
+    let mut out = String::new();
     out.push('\n');
 
     let name_width = data

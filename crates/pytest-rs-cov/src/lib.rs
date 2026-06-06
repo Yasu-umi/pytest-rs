@@ -44,6 +44,11 @@ const PTH_LINE: &str = "import os, runpy; os.environ.get(\"PYTEST_RS_COV_OUT\") 
 enum ReportKind {
     Term,
     TermMissing,
+    Annotate,
+    Html,
+    Json,
+    Markdown,
+    MarkdownAppend,
     Xml,
     Lcov,
 }
@@ -77,6 +82,8 @@ pub struct CovPlugin {
     child_out_dir: Option<PathBuf>,
     /// coverage [paths] groups (canonical first).
     path_aliases: Vec<Vec<String>>,
+    /// "Coverage X written to ..." lines for the terminal section.
+    report_messages: Vec<String>,
     /// The sys.monitoring tool id actually claimed (COVERAGE_ID unless a
     /// .pth child collector from an outer session got there first).
     tool_id: u8,
@@ -99,6 +106,7 @@ impl CovPlugin {
             branch: false,
             child_out_dir: None,
             path_aliases: Vec::new(),
+            report_messages: Vec::new(),
             tool_id: TOOL_ID,
         }
     }
@@ -126,12 +134,18 @@ impl CovPlugin {
                 "term-missing" => ReportKind::TermMissing,
                 "xml" => ReportKind::Xml,
                 "lcov" => ReportKind::Lcov,
+                "annotate" => ReportKind::Annotate,
+                "html" => ReportKind::Html,
+                "json" => ReportKind::Json,
+                "markdown" => ReportKind::Markdown,
+                "markdown-append" => ReportKind::MarkdownAppend,
                 other => {
                     return Err(pytest_rs_core::python::usage_error(
                         py,
                         &format!(
                             "--cov-report={other} is not supported by pytest-rs \
-                             (supported: term, term-missing, xml, lcov)"
+                             (supported: term, term-missing, annotate, html, xml, json, \
+                             lcov, markdown, markdown-append)"
                         ),
                     ));
                 }
@@ -161,6 +175,24 @@ impl CovPlugin {
                 dest,
                 skip_covered,
             });
+        }
+        // pytest-cov parity: markdown and markdown-append on one file clash.
+        let markdown_dest = |target: ReportKind| {
+            reports
+                .iter()
+                .filter(move |r| r.kind == target)
+                .filter_map(|r| r.dest.clone())
+                .collect::<std::collections::HashSet<_>>()
+        };
+        if markdown_dest(ReportKind::Markdown)
+            .intersection(&markdown_dest(ReportKind::MarkdownAppend))
+            .next()
+            .is_some()
+        {
+            return Err(pytest_rs_core::python::usage_error(
+                py,
+                "markdown and markdown-append options cannot point to the same file.",
+            ));
         }
         Ok(reports)
     }
@@ -329,7 +361,7 @@ impl CovPlugin {
             }
         }
         if let Ok(content) = std::fs::read_to_string(rootdir.join("pyproject.toml"))
-            && let Ok(document) = content.parse::<toml::Value>()
+            && let Ok(document) = content.parse::<toml::Table>()
             && let Some(paths) = document
                 .get("tool")
                 .and_then(|tool| tool.get("coverage"))
@@ -380,7 +412,7 @@ impl CovPlugin {
             }
         }
         if let Ok(content) = std::fs::read_to_string(rootdir.join("pyproject.toml"))
-            && let Ok(document) = content.parse::<toml::Value>()
+            && let Ok(document) = content.parse::<toml::Table>()
             && let Some(value) = document
                 .get("tool")
                 .and_then(|tool| tool.get("coverage"))
@@ -392,6 +424,89 @@ impl CovPlugin {
                 .unwrap_or_else(|| value.as_str().is_some_and(truthy));
         }
         false
+    }
+
+    /// Reports rendered by the coverage package from the freshly written
+    /// `.coverage` data file (annotate/html/json/markdown). Returns the
+    /// "Coverage ... written" line, or None when coverage isn't installed
+    /// (a warning was already issued for the data file).
+    fn coverage_package_report(
+        &self,
+        ctx: &mut HookContext,
+        kind: ReportKind,
+        dest: Option<&str>,
+    ) -> PyResult<Option<String>> {
+        let py = ctx.py;
+        let Ok(coverage_mod) = py.import("coverage") else {
+            return Ok(None);
+        };
+        let data_path = Self::data_file_path(ctx);
+        if !data_path.exists() {
+            return Ok(None);
+        }
+        let kwargs = core_pyo3::types::PyDict::new(py);
+        kwargs.set_item("data_file", data_path.to_string_lossy().as_ref())?;
+        let cov = coverage_mod.getattr("Coverage")?.call((), Some(&kwargs))?;
+        cov.call_method0("load")?;
+        let rootdir = &ctx.config.rootdir;
+        let message = match kind {
+            ReportKind::Html => {
+                let dir = dest.unwrap_or("htmlcov");
+                let kwargs = core_pyo3::types::PyDict::new(py);
+                kwargs.set_item("directory", rootdir.join(dir).to_string_lossy().as_ref())?;
+                cov.call_method("html_report", (), Some(&kwargs))?;
+                format!("Coverage HTML written to dir {dir}")
+            }
+            ReportKind::Annotate => {
+                let kwargs = core_pyo3::types::PyDict::new(py);
+                if let Some(dir) = dest {
+                    kwargs.set_item("directory", rootdir.join(dir).to_string_lossy().as_ref())?;
+                }
+                cov.call_method("annotate", (), Some(&kwargs))?;
+                match dest {
+                    Some(dir) => format!("Coverage annotated source written to dir {dir}"),
+                    None => "Coverage annotated source written next to source".to_string(),
+                }
+            }
+            ReportKind::Json => {
+                let file = dest.unwrap_or("coverage.json");
+                let kwargs = core_pyo3::types::PyDict::new(py);
+                kwargs.set_item("outfile", rootdir.join(file).to_string_lossy().as_ref())?;
+                cov.call_method("json_report", (), Some(&kwargs))?;
+                format!("Coverage JSON written to file {file}")
+            }
+            ReportKind::Markdown | ReportKind::MarkdownAppend => {
+                let append = kind == ReportKind::MarkdownAppend;
+                let file = dest.unwrap_or("coverage.md");
+                let handle = py.import("builtins")?.call_method1(
+                    "open",
+                    (
+                        rootdir.join(file).to_string_lossy().as_ref(),
+                        if append { "a" } else { "w" },
+                    ),
+                )?;
+                let kwargs = core_pyo3::types::PyDict::new(py);
+                kwargs.set_item("output_format", "markdown")?;
+                kwargs.set_item("file", &handle)?;
+                cov.call_method("report", (), Some(&kwargs))?;
+                handle.call_method0("close")?;
+                if append {
+                    format!("Coverage Markdown information appended to file {file}")
+                } else {
+                    format!("Coverage Markdown information written to file {file}")
+                }
+            }
+            _ => unreachable!("delegated kinds only"),
+        };
+        Ok(Some(message))
+    }
+
+    /// The `.coverage` data file location (COVERAGE_FILE honored).
+    fn data_file_path(ctx: &HookContext) -> PathBuf {
+        match std::env::var("COVERAGE_FILE") {
+            Ok(value) => ctx.config.rootdir.join(value),
+            Err(_) => ctx.config.rootdir.join(".coverage"),
+        }
     }
 
     /// pytest-cov parity: persist the merged hits as a `.coverage` data file
@@ -414,10 +529,7 @@ impl CovPlugin {
             );
             return Ok(());
         };
-        let data_path = match std::env::var("COVERAGE_FILE") {
-            Ok(value) => ctx.config.rootdir.join(value),
-            Err(_) => ctx.config.rootdir.join(".coverage"),
-        };
+        let data_path = Self::data_file_path(ctx);
         let append = ctx.config.get_flag("cov-append") && data_path.exists();
         if !append {
             let _ = std::fs::remove_file(&data_path);
@@ -874,23 +986,39 @@ impl Plugin for CovPlugin {
             .unwrap_or_else(|_| ctx.config.rootdir.clone());
         let data = self.build_data(&rootdir, hits, arcs);
 
+        let mut messages = Vec::new();
         for spec in &self.reports {
-            let (default_dest, content) = match spec.kind {
+            let (default_dest, content, label) = match spec.kind {
                 ReportKind::Xml => (
                     "coverage.xml",
                     report::render_xml(&data, &ctx.config.rootdir.to_string_lossy()),
+                    "XML",
                 ),
-                ReportKind::Lcov => ("coverage.lcov", report::render_lcov(&data)),
+                ReportKind::Lcov => ("coverage.lcov", report::render_lcov(&data), "LCOV"),
+                ReportKind::Annotate
+                | ReportKind::Html
+                | ReportKind::Json
+                | ReportKind::Markdown
+                | ReportKind::MarkdownAppend => {
+                    if let Some(message) =
+                        self.coverage_package_report(ctx, spec.kind, spec.dest.as_deref())?
+                    {
+                        messages.push(message);
+                    }
+                    continue;
+                }
                 ReportKind::Term | ReportKind::TermMissing => continue,
             };
             let dest = spec
                 .dest
                 .clone()
                 .unwrap_or_else(|| default_dest.to_string());
-            let path = ctx.config.rootdir.join(dest);
+            let path = ctx.config.rootdir.join(&dest);
             std::fs::write(&path, content)
                 .map_err(|e| core_pyo3::exceptions::PyOSError::new_err(e.to_string()))?;
+            messages.push(format!("Coverage {label} written to file {dest}"));
         }
+        self.report_messages = messages;
 
         if let Some(fail_under) = self.fail_under {
             let total = data.total_percent();
@@ -937,7 +1065,7 @@ impl Plugin for CovPlugin {
             ReportKind::TermMissing => Some((true, spec.skip_covered)),
             _ => None,
         });
-        if let Some((missing, skip_covered)) = term_spec {
+        if !self.reports.is_empty() {
             let version_info = ctx.py.import("sys")?.getattr("version_info")?;
             let python_version = format!(
                 "{}.{}.{}-{}-{}",
@@ -947,17 +1075,35 @@ impl Plugin for CovPlugin {
                 version_info.getattr("releaselevel")?,
                 version_info.getattr("serial")?,
             );
-            out.push_str(&report::render_term(
-                data,
-                missing,
-                skip_covered,
-                &python_version,
-            ));
+            out.push_str(&report::render_header(&python_version));
+        }
+        if let Some((missing, skip_covered)) = term_spec {
+            out.push_str(&report::render_term(data, missing, skip_covered));
+        }
+        for message in &self.report_messages {
+            out.push_str(message);
+            out.push('\n');
         }
         if let Some(message) = &self.fail_under_message {
             out.push_str(message);
             out.push('\n');
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod run_option_tests {
+    #[test]
+    fn pyproject_branch_true() {
+        let dir = std::env::temp_dir().join("ptrs-runopt-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("pyproject.toml"),
+            "[tool.coverage.run]\nbranch=true\n",
+        )
+        .unwrap();
+        assert!(super::CovPlugin::run_option_enabled(&dir, None, "branch"));
     }
 }
