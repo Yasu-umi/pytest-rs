@@ -32,7 +32,13 @@ const TOOL_ID: u8 = 1;
 const SHIM_FILES: &[(&str, &str)] = &[
     ("__init__.py", include_str!("../py/pytest_cov/__init__.py")),
     ("plugin.py", include_str!("../py/pytest_cov/plugin.py")),
+    ("_child.py", include_str!("../py/pytest_cov/_child.py")),
 ];
+
+/// Site .pth hook for subprocess coverage: a no-op unless the running
+/// pytest-rs session exported the activation env vars (pytest-cov ships
+/// the same kind of hook at install time).
+const PTH_LINE: &str = "import os, runpy; os.environ.get(\"PYTEST_RS_COV_OUT\") and os.environ.get(\"PYTEST_RS_COV_CHILD\") and runpy.run_path(os.environ[\"PYTEST_RS_COV_CHILD\"], run_name=\"pytest_rs_cov_child\")\n";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ReportKind {
@@ -67,6 +73,13 @@ pub struct CovPlugin {
     worker_arcs: ArcMap,
     /// Branch coverage (--cov-branch / [run] branch = true).
     branch: bool,
+    /// Dump directory for subprocess coverage (children write, we merge).
+    child_out_dir: Option<PathBuf>,
+    /// coverage [paths] groups (canonical first).
+    path_aliases: Vec<Vec<String>>,
+    /// The sys.monitoring tool id actually claimed (COVERAGE_ID unless a
+    /// .pth child collector from an outer session got there first).
+    tool_id: u8,
 }
 
 impl CovPlugin {
@@ -84,6 +97,9 @@ impl CovPlugin {
             worker_hits: HashMap::new(),
             worker_arcs: HashMap::new(),
             branch: false,
+            child_out_dir: None,
+            path_aliases: Vec::new(),
+            tool_id: TOOL_ID,
         }
     }
 
@@ -271,6 +287,70 @@ impl CovPlugin {
         Self::run_option_enabled(rootdir, cov_config, "branch")
     }
 
+    /// coverage `[paths]` groups: each is (canonical, aliases) — measured
+    /// paths under an alias report as the canonical path (subset of
+    /// coverage.py's path aliasing: literal prefixes, no globs).
+    fn paths_aliases(rootdir: &Path, cov_config: Option<&str>) -> Vec<Vec<String>> {
+        let mut groups: Vec<Vec<String>> = Vec::new();
+        for candidate in [cov_config.unwrap_or(".coveragerc"), "setup.cfg", "tox.ini"] {
+            let Ok(content) = std::fs::read_to_string(rootdir.join(candidate)) else {
+                continue;
+            };
+            let mut in_paths = false;
+            let mut current: Vec<String> = Vec::new();
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if trimmed.starts_with('[') {
+                    if !current.is_empty() {
+                        groups.push(std::mem::take(&mut current));
+                    }
+                    in_paths = trimmed == "[paths]" || trimmed == "[coverage:paths]";
+                    continue;
+                }
+                if !in_paths || trimmed.is_empty() || trimmed.starts_with(['#', ';']) {
+                    continue;
+                }
+                if let Some((_, value)) = trimmed.split_once('=') {
+                    if !current.is_empty() {
+                        groups.push(std::mem::take(&mut current));
+                    }
+                    if !value.trim().is_empty() {
+                        current.push(value.trim().to_string());
+                    }
+                } else if line.starts_with([' ', '\t']) {
+                    current.push(trimmed.to_string());
+                }
+            }
+            if !current.is_empty() {
+                groups.push(current);
+            }
+            if !groups.is_empty() {
+                return groups;
+            }
+        }
+        if let Ok(content) = std::fs::read_to_string(rootdir.join("pyproject.toml"))
+            && let Ok(document) = content.parse::<toml::Value>()
+            && let Some(paths) = document
+                .get("tool")
+                .and_then(|tool| tool.get("coverage"))
+                .and_then(|coverage| coverage.get("paths"))
+                .and_then(|paths| paths.as_table())
+        {
+            for value in paths.values() {
+                if let Some(items) = value.as_array() {
+                    let group: Vec<String> = items
+                        .iter()
+                        .filter_map(|item| item.as_str().map(str::to_string))
+                        .collect();
+                    if group.len() > 1 {
+                        groups.push(group);
+                    }
+                }
+            }
+        }
+        groups
+    }
+
     /// A boolean `[run]` option: from --cov-config / .coveragerc /
     /// setup.cfg / tox.ini (ini forms) or pyproject [tool.coverage.run].
     fn run_option_enabled(rootdir: &Path, cov_config: Option<&str>, option: &str) -> bool {
@@ -397,11 +477,19 @@ impl CovPlugin {
             let Some(analysis) = analysis::analyze(&source_text, &self.exclude_patterns) else {
                 continue; // unparseable: skip rather than misreport
             };
-            // Non-excluded observed lines are executable by definition;
-            // the union keeps the numerator inside the denominator when
+            // Runtime events on continuation lines fold onto the
+            // statement's first line (coverage.py's multiline map); the
+            // union then keeps the numerator inside the denominator when
             // the analysis disagrees with CPython's actual events.
+            let fold = |line: u32| analysis.multiline.get(&line).copied().unwrap_or(line);
             let covered: BTreeSet<u32> = hits
-                .map(|lines| lines.difference(&analysis.excluded).copied().collect())
+                .map(|lines| {
+                    lines
+                        .iter()
+                        .map(|line| fold(*line))
+                        .filter(|line| !analysis.excluded.contains(line))
+                        .collect()
+                })
                 .unwrap_or_default();
             let mut executable = analysis.executable;
             executable.extend(covered.iter().copied());
@@ -420,6 +508,12 @@ impl CovPlugin {
                 && let Some(file_arcs) = arcs.get(&path.to_string_lossy().to_string())
             {
                 for (src, dst, direction) in file_arcs {
+                    let src = &fold(*src);
+                    let dst = &if *dst > 0 {
+                        i64::from(fold(*dst as u32))
+                    } else {
+                        *dst
+                    };
                     let Some(dests) = branches.get(src) else {
                         continue;
                     };
@@ -465,11 +559,22 @@ impl CovPlugin {
                     }
                 }
             }
-            let name = path
+            let mut name = path
                 .strip_prefix(rootdir)
                 .unwrap_or(&path)
                 .to_string_lossy()
                 .to_string();
+            // [paths] aliasing: an alias prefix reports as the canonical one.
+            'groups: for group in &self.path_aliases {
+                let canonical = &group[0];
+                for alias in &group[1..] {
+                    let prefix = format!("{}{}", alias.trim_end_matches('/'), '/');
+                    if let Some(rest) = name.strip_prefix(&prefix) {
+                        name = format!("{}/{rest}", canonical.trim_end_matches('/'));
+                        break 'groups;
+                    }
+                }
+            }
             rows.push(FileRow {
                 name,
                 executable,
@@ -584,6 +689,8 @@ impl Plugin for CovPlugin {
 
         self.branch = ctx.config.get_flag("cov-branch")
             || Self::branch_enabled(&ctx.config.rootdir, ctx.config.get_value("cov-config"));
+        self.path_aliases =
+            Self::paths_aliases(&ctx.config.rootdir, ctx.config.get_value("cov-config"));
 
         let monitoring = py.import("sys")?.getattr("monitoring")?;
         let events = monitoring.getattr("events")?;
@@ -613,6 +720,20 @@ impl Plugin for CovPlugin {
                 }
             }
         }
+        // COVERAGE_ID, unless an outer session's .pth child collector holds
+        // it (nested pytest-rs runs); free slots 3-5 are fallbacks.
+        self.tool_id = [TOOL_ID, 3, 4, 5]
+            .into_iter()
+            .find(|candidate| {
+                monitoring
+                    .call_method1("use_tool_id", (*candidate, "pytest-rs-cov"))
+                    .is_ok()
+            })
+            .ok_or_else(|| {
+                core_pyo3::exceptions::PyRuntimeError::new_err(
+                    "no free sys.monitoring tool id for coverage",
+                )
+            })?;
         let collector = Py::new(
             py,
             LineCollector::new(
@@ -624,34 +745,72 @@ impl Plugin for CovPlugin {
                 local_events,
                 disable,
                 monitoring.clone().unbind(),
-                TOOL_ID,
+                self.tool_id,
             ),
         )?;
 
-        monitoring.call_method1("use_tool_id", (TOOL_ID, "pytest-rs-cov"))?;
         monitoring.call_method1(
             "register_callback",
             (
-                TOOL_ID,
+                self.tool_id,
                 &py_start_event,
                 collector.bind(py).getattr("py_start")?,
             ),
         )?;
         monitoring.call_method1(
             "register_callback",
-            (TOOL_ID, &line_event, collector.bind(py).getattr("line")?),
+            (
+                self.tool_id,
+                &line_event,
+                collector.bind(py).getattr("line")?,
+            ),
         )?;
         for (event, method) in &branch_events {
             monitoring.call_method1(
                 "register_callback",
-                (TOOL_ID, event, collector.bind(py).getattr(*method)?),
+                (self.tool_id, event, collector.bind(py).getattr(*method)?),
             )?;
         }
         // Globally only the PY_START gate; LINE events arm per tracked code
         // object (coverage.py's sysmon core layout).
-        monitoring.call_method1("set_events", (TOOL_ID, &py_start_event))?;
+        monitoring.call_method1("set_events", (self.tool_id, &py_start_event))?;
         monitoring.call_method0("restart_events")?;
         self.collector = Some(collector);
+
+        // Subprocess coverage: python children self-measure via the site
+        // .pth hook (a no-op without these env vars) and dump for merging.
+        let out_dir = std::env::temp_dir().join(format!("pytest-rs-cov-{}", std::process::id()));
+        std::fs::create_dir_all(&out_dir)
+            .map_err(|e| core_pyo3::exceptions::PyOSError::new_err(e.to_string()))?;
+        let environ = py.import("os")?.getattr("environ")?;
+        environ.set_item("PYTEST_RS_COV_OUT", out_dir.to_string_lossy())?;
+        environ.set_item(
+            "PYTEST_RS_COV_CHILD",
+            pytest_rs_core::python::shim_root()
+                .join("pytest_cov")
+                .join("_child.py")
+                .to_string_lossy(),
+        )?;
+        environ.set_item("PYTEST_RS_COV_ROOT", with_sep(&rootdir))?;
+        environ.set_item(
+            "PYTEST_RS_COV_SOURCES",
+            self.sources
+                .iter()
+                .map(|source| with_sep(source))
+                .collect::<Vec<_>>()
+                .join(":"),
+        )?;
+        environ.set_item("PYTEST_RS_COV_BRANCH", if self.branch { "1" } else { "0" })?;
+        self.child_out_dir = Some(out_dir);
+        // The hook itself goes into the environment's site-packages once
+        // (pytest-cov installs its equivalent at package-install time).
+        if let Ok(paths) = py.import("sysconfig")?.call_method0("get_paths")
+            && let Ok(Some(purelib)) = paths
+                .get_item("purelib")
+                .map(|p| p.extract::<String>().ok())
+        {
+            let _ = std::fs::write(Path::new(&purelib).join("pytest-rs-cov.pth"), PTH_LINE);
+        }
         Ok(())
     }
 
@@ -661,11 +820,36 @@ impl Plugin for CovPlugin {
         };
         let py = ctx.py;
         let monitoring = py.import("sys")?.getattr("monitoring")?;
-        monitoring.call_method1("set_events", (TOOL_ID, 0))?;
-        monitoring.call_method1("free_tool_id", (TOOL_ID,))?;
+        monitoring.call_method1("set_events", (self.tool_id, 0))?;
+        monitoring.call_method1("free_tool_id", (self.tool_id,))?;
 
         let mut hits = collector.borrow(py).take_hits();
         let mut arcs = collector.borrow(py).take_arcs();
+        // Merge subprocess dumps (this process's children, parent or
+        // worker alike), then drop the dump dir.
+        if let Some(out_dir) = self.child_out_dir.take() {
+            if let Ok(entries) = std::fs::read_dir(&out_dir) {
+                for entry in entries.filter_map(Result::ok) {
+                    let Ok(content) = std::fs::read_to_string(entry.path()) else {
+                        continue;
+                    };
+                    let Ok(dump) = serde_json::from_str::<CovDump>(&content) else {
+                        continue;
+                    };
+                    for (file, lines) in dump.hits {
+                        hits.entry(file).or_default().extend(lines);
+                    }
+                    for (file, file_arcs) in dump.arcs {
+                        arcs.entry(file).or_default().extend(file_arcs);
+                    }
+                }
+            }
+            let _ = std::fs::remove_dir_all(&out_dir);
+            let _ = py
+                .import("os")
+                .and_then(|os| os.getattr("environ"))
+                .and_then(|environ| environ.call_method1("pop", ("PYTEST_RS_COV_OUT", py.None())));
+        }
         if ctx.config.is_worker() {
             // Workers don't report: hits and arcs travel to the parent.
             self.dump_payload = Some(

@@ -22,6 +22,7 @@ struct Walker<'a> {
     spans: Vec<Span>,
     branches: BTreeMap<u32, Vec<i64>>,
     loops: BTreeSet<u32>,
+    multiline: BTreeMap<u32, u32>,
 }
 
 /// Branch destination for "control leaves the enclosing scope".
@@ -29,6 +30,9 @@ pub const EXIT: i64 = -1;
 
 pub struct FileAnalysis {
     pub executable: BTreeSet<u32>,
+    /// Continuation line -> first line of its statement (coverage.py folds
+    /// multi-line statements onto their first line, runtime events too).
+    pub multiline: BTreeMap<u32, u32>,
     /// for/while header lines (their "iterate" jump lands on the header's
     /// own advance instructions, unlike if fall-throughs).
     pub loops: BTreeSet<u32>,
@@ -56,6 +60,7 @@ pub fn analyze(source: &str, excludes: &[regex::Regex]) -> Option<FileAnalysis> 
         spans: Vec::new(),
         branches: BTreeMap::new(),
         loops: BTreeSet::new(),
+        multiline: BTreeMap::new(),
     };
     walker.visit_body(&parsed.syntax().body, EXIT);
 
@@ -79,6 +84,7 @@ pub fn analyze(source: &str, excludes: &[regex::Regex]) -> Option<FileAnalysis> 
     Some(FileAnalysis {
         executable: walker.lines.difference(&excluded).copied().collect(),
         loops: walker.loops,
+        multiline: walker.multiline,
         excluded,
         branches,
     })
@@ -139,6 +145,15 @@ impl Walker<'_> {
         None
     }
 
+    /// Fold the lines of `range` onto the statement's first line.
+    fn fold_multiline(&mut self, header: TextSize, range: ruff_text_size::TextRange) {
+        let first = self.line(header);
+        let last = self.line(range.end());
+        for line in (first + 1)..=last {
+            self.multiline.insert(line, first);
+        }
+    }
+
     fn add_branch(&mut self, line: u32, dests: [i64; 2]) {
         // A branch with both sides landing on the same line is no branch
         // (e.g. a one-line suite).
@@ -175,6 +190,7 @@ impl Walker<'_> {
             Stmt::If(if_stmt) => {
                 self.mark(start);
                 self.record_span(stmt, start);
+                self.fold_multiline(start, if_stmt.test.range());
                 let line = self.line(start);
                 // Chain: each tested clause branches to its body or onward
                 // to the next clause / past the statement. Constant tests
@@ -221,6 +237,7 @@ impl Walker<'_> {
             Stmt::While(while_stmt) => {
                 self.mark(start);
                 self.record_span(stmt, start);
+                self.fold_multiline(start, while_stmt.test.range());
                 let line = self.line(start);
                 let exit_to = self.first_line(&while_stmt.orelse).unwrap_or(next);
                 if !is_constant_literal(&while_stmt.test)
@@ -236,6 +253,7 @@ impl Walker<'_> {
             Stmt::For(for_stmt) => {
                 self.mark(start);
                 self.record_span(stmt, start);
+                self.fold_multiline(start, for_stmt.iter.range());
                 let line = self.line(start);
                 let exit_to = self.first_line(&for_stmt.orelse).unwrap_or(next);
                 if let Some(body_first) = self.first_line(&for_stmt.body) {
@@ -248,6 +266,9 @@ impl Walker<'_> {
             Stmt::With(with_stmt) => {
                 self.mark(start);
                 self.record_span(stmt, start);
+                if let Some(last_item) = with_stmt.items.last() {
+                    self.fold_multiline(start, last_item.range());
+                }
                 self.visit_body(&with_stmt.body, next);
             }
             Stmt::Try(try_stmt) => {
@@ -265,6 +286,7 @@ impl Walker<'_> {
             Stmt::Match(match_stmt) => {
                 self.mark(start);
                 self.record_span(stmt, start);
+                self.fold_multiline(start, match_stmt.subject.range());
                 for case in &match_stmt.cases {
                     self.mark(case.range.start());
                     self.visit_body(&case.body, next);
@@ -276,6 +298,7 @@ impl Walker<'_> {
                 if !is_constant_literal(&expr_stmt.value) {
                     self.mark(start);
                     self.record_span(stmt, start);
+                    self.fold_multiline(start, stmt.range());
                 }
             }
             // Compile-time directives: no bytecode, no events.
@@ -285,6 +308,7 @@ impl Walker<'_> {
             _ => {
                 self.mark(start);
                 self.record_span(stmt, start);
+                self.fold_multiline(start, stmt.range());
             }
         }
     }
