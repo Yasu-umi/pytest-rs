@@ -171,8 +171,10 @@ impl Engine {
             None,
         );
 
-        let mut collection = WorkerCollection::default();
-        collection.configured_hooks = self.session.py_hooks.len();
+        let mut collection = WorkerCollection {
+            configured_hooks: self.session.py_hooks.len(),
+            ..WorkerCollection::default()
+        };
         for item in std::mem::take(&mut self.session.items) {
             let file = item.nodeid.split("::").next().unwrap_or("");
             collection

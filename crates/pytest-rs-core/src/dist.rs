@@ -188,7 +188,7 @@ impl Engine {
         let mut initial: Vec<Option<WorkerProc>> = (0..workers).map(|_| None).collect();
 
         let mut handles = Vec::new();
-        for index in 0..workers {
+        for (index, slot) in initial.iter_mut().enumerate().take(workers) {
             let owner = WorkerOwner {
                 queue: Arc::clone(&queue),
                 sender: sender.clone(),
@@ -197,7 +197,7 @@ impl Engine {
                 worker_count: workers,
                 max_restart,
                 testrun_uid: testrun_uid.clone(),
-                initial: initial[index].take(),
+                initial: slot.take(),
             };
             handles.push(std::thread::spawn(move || owner.run()));
         }

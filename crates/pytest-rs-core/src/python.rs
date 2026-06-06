@@ -764,7 +764,7 @@ fn import_module_from_path<'py>(
 ) -> PyResult<Bound<'py, PyModule>> {
     let sys_modules = py.import("sys")?.getattr("modules")?;
     if let Ok(existing) = sys_modules.get_item(name) {
-        return existing.downcast_into::<PyModule>().map_err(Into::into);
+        return existing.cast_into::<PyModule>().map_err(Into::into);
     }
     let util = py.import("importlib.util")?;
     let spec = util
@@ -774,7 +774,7 @@ fn import_module_from_path<'py>(
     sys_modules.set_item(name, &module)?;
     spec.getattr("loader")?
         .call_method1("exec_module", (&module,))?;
-    module.downcast_into::<PyModule>().map_err(Into::into)
+    module.cast_into::<PyModule>().map_err(Into::into)
 }
 
 /// Build the Config proxy passed to conftest hooks. One proxy per process
@@ -1341,8 +1341,8 @@ fn expand_parametrize(
                 sets.iter().filter_map(|set| set.id_part.clone()).collect();
             let mut suffixes: std::collections::HashMap<String, usize> =
                 std::collections::HashMap::new();
-            for index in 0..sets.len() {
-                let Some(id) = sets[index].id_part.clone() else {
+            for set in sets.iter_mut() {
+                let Some(id) = set.id_part.clone() else {
                     continue;
                 };
                 if counts[&Some(id.clone())] <= 1 {
@@ -1360,7 +1360,7 @@ fn expand_parametrize(
                     new_id = format!("{id}{sep}{counter}");
                 }
                 existing.insert(new_id.clone());
-                sets[index].id_part = Some(new_id);
+                set.id_part = Some(new_id);
                 *counter += 1;
             }
         }

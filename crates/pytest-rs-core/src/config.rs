@@ -576,8 +576,8 @@ impl Config {
                 flags.insert(flag.to_string());
             }
         }
-        if let Some(parsed) = matches.get_many::<String>("cache-show")
-            && let Some(last) = parsed.last()
+        if let Some(mut parsed) = matches.get_many::<String>("cache-show")
+            && let Some(last) = parsed.next_back()
         {
             values.insert("cache-show".to_string(), last.clone());
         }

@@ -673,7 +673,7 @@ impl Engine {
             // Text-file doctest (e.g. "test_fail.txt")
             return format!("[doctest] {nodeid}");
         }
-        let after = nodeid.splitn(2, "::").nth(1).unwrap_or(nodeid);
+        let after = nodeid.split_once("::").map(|x| x.1).unwrap_or(nodeid);
         if after.contains('.') {
             // Module doctest (e.g. "file.py::module.Class.method")
             format!("[doctest] {after}")
@@ -1356,9 +1356,9 @@ impl Engine {
                 // For scanned files, the glob loop below handles them.
                 let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
                 let is_text_doctest = matches!(ext, "txt" | "rst" | "md");
-                if is_text_doctest {
-                    if let Ok(py_config) = python::make_py_config(py, &self.config) {
-                        if let Err(err) = python::collect_doctests_from_textfile(
+                if is_text_doctest
+                    && let Ok(py_config) = python::make_py_config(py, &self.config)
+                        && let Err(err) = python::collect_doctests_from_textfile(
                             py,
                             &rootdir,
                             file,
@@ -1367,8 +1367,6 @@ impl Engine {
                         ) {
                             errors.push((file.clone(), python::format_exception(py, &err)));
                         }
-                    }
-                }
                 continue;
             }
             // Import-time output attaches to a failing collect report as
@@ -1455,9 +1453,9 @@ impl Engine {
                 }
             };
             // --doctest-modules: collect doctests from each successfully-imported module.
-            if module_ok && self.config.get_flag("doctest-modules") {
-                if let Ok(py_config) = python::make_py_config(py, &self.config) {
-                    if let Err(err) = python::collect_doctests_from_module(
+            if module_ok && self.config.get_flag("doctest-modules")
+                && let Ok(py_config) = python::make_py_config(py, &self.config)
+                    && let Err(err) = python::collect_doctests_from_module(
                         py,
                         &rootdir,
                         file,
@@ -1467,8 +1465,6 @@ impl Engine {
                         // Non-fatal: log as collect error and continue.
                         errors.push((file.clone(), python::format_exception(py, &err)));
                     }
-                }
-            }
         }
 
         // --doctest-modules: also scan ALL .py files (not just test files) for doctests.
@@ -1517,8 +1513,8 @@ impl Engine {
         // even without explicit --doctest-modules or --doctest-glob flags, mirroring
         // upstream pytest's _is_doctest() behavior.
         let scan_text_files = true;
-        if scan_text_files {
-            if let Ok(py_config) = python::make_py_config(py, &self.config) {
+        if scan_text_files
+            && let Ok(py_config) = python::make_py_config(py, &self.config) {
                 let text_files =
                     crate::collect::collect_doctest_textfiles(&self.config.invocation_dir, &paths);
                 for tf in text_files {
@@ -1526,23 +1522,19 @@ impl Engine {
                     if files.contains(&tf) {
                         continue;
                     }
-                    match python::is_doctest_textfile(py, &tf, &py_config) {
-                        Ok(true) => {
-                            if let Err(err) = python::collect_doctests_from_textfile(
-                                py,
-                                &rootdir,
-                                &tf,
-                                &py_config,
-                                &mut self.session.items,
-                            ) {
-                                errors.push((tf.clone(), python::format_exception(py, &err)));
-                            }
-                        }
-                        _ => {}
+                    if let Ok(true) = python::is_doctest_textfile(py, &tf, &py_config)
+                        && let Err(err) = python::collect_doctests_from_textfile(
+                            py,
+                            &rootdir,
+                            &tf,
+                            &py_config,
+                            &mut self.session.items,
+                        )
+                    {
+                        errors.push((tf.clone(), python::format_exception(py, &err)));
                     }
                 }
             }
-        }
 
         // Collection over: close its catching_logs phase.
         python::log_end_phase(py);

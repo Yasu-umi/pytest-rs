@@ -209,7 +209,7 @@ impl AsyncioPlugin {
             })
             .map(|hook| (hook.baseid.len(), hook.func.clone_ref(py)))
             .collect();
-        funcs.sort_by(|a, b| b.0.cmp(&a.0));
+        funcs.sort_by_key(|func| std::cmp::Reverse(func.0));
         funcs
     }
 

@@ -220,7 +220,7 @@ impl Engine {
             && !config.no_terminal()
             && !session.live_logging
             && !current_file.is_empty()
-            && !(setup_show_active(config) && !any_char)
+            && (!setup_show_active(config) || any_char)
         {
             println!("{}", progress_suffix(&line, done, total));
         }

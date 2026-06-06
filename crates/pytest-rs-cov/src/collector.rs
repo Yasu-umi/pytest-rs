@@ -10,6 +10,9 @@ use std::sync::{Arc, Mutex};
 
 use pyo3::prelude::*;
 
+/// id(code) -> (pinned code object, filename) for tracked code.
+type TrackedCodes = Mutex<HashMap<usize, (Py<PyAny>, Arc<str>)>>;
+
 #[pyclass]
 pub struct LineCollector {
     /// rootdir with a trailing separator, for prefix matching.
@@ -20,10 +23,10 @@ pub struct LineCollector {
     /// The embedded shim dir; never measured.
     shim_root: String,
     hits: Mutex<HashMap<String, BTreeSet<u32>>>,
-    /// id(code) -> (pinned code object, filename) for tracked code. The
-    /// pin keeps the code object alive so its id is never reused; the
-    /// cached filename spares the LINE callback per-line getattrs.
-    tracked_codes: Mutex<HashMap<usize, (Py<PyAny>, Arc<str>)>>,
+    /// The pin keeps each tracked code object alive so its id is never
+    /// reused; the cached filename spares the LINE callback per-line
+    /// getattrs.
+    tracked_codes: TrackedCodes,
     disable: Py<PyAny>,
     /// sys.monitoring.events.LINE, for set_local_events.
     line_event: Py<PyAny>,
