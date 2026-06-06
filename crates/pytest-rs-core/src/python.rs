@@ -1567,8 +1567,22 @@ pub fn expand_fixture_params(
 ) -> PyResult<Vec<TestItem>> {
     let mut expanded = Vec::new();
     for item in items {
+        // @pytest.mark.usefixtures names parametrize the item exactly like
+        // signature fixtures do (pytest builds one closure from both).
+        let mut requested = item.fixture_names.clone();
+        for mark in item.marks.iter().filter(|m| m.name == "usefixtures") {
+            if let Ok(args) = mark.obj.bind(py).getattr("args")
+                && let Ok(names) = args.extract::<Vec<String>>()
+            {
+                for name in names {
+                    if !requested.contains(&name) {
+                        requested.push(name);
+                    }
+                }
+            }
+        }
         let parametrized: Vec<_> = registry
-            .closure_for(&item.nodeid, &item.fixture_names)
+            .closure_for(&item.nodeid, &requested)
             .into_iter()
             .filter(|def| def.params.is_some())
             .collect();
