@@ -41,13 +41,29 @@ class DoctestNode:
 
     _pytest_doctest_item = True
 
-    def __init__(self, nodeid, name, marks, fixturenames=None, function=None):
+    def __init__(
+        self, nodeid, name, marks, fixturenames=None, function=None, path=None, lineno=None
+    ):
         self.nodeid = nodeid
         self.name = name
         self.own_markers = list(marks)
         self.fixturenames = list(fixturenames or [])
         self.function = function
         self.obj = function
+        self.path = path
+        self.lineno = lineno
+
+    def warn(self, warning):
+        """Issue a warning attributed to this item's definition site
+        (pytest's Node.warn: warn_explicit with the item location)."""
+        import warnings
+
+        warnings.warn_explicit(
+            warning,
+            category=None,
+            filename=self.path or "<unknown>",
+            lineno=self.lineno or 0,
+        )
 
     def get_closest_marker(self, name, default=None):
         for marker in self.own_markers:
@@ -80,13 +96,29 @@ class DoctestNode:
 
 
 class Node:
-    def __init__(self, nodeid, name, marks, fixturenames=None, function=None):
+    def __init__(
+        self, nodeid, name, marks, fixturenames=None, function=None, path=None, lineno=None
+    ):
         self.nodeid = nodeid
         self.name = name
         self.own_markers = list(marks)
         self.fixturenames = list(fixturenames or [])
         self.function = function
         self.obj = function
+        self.path = path
+        self.lineno = lineno
+
+    def warn(self, warning):
+        """Issue a warning attributed to this item's definition site
+        (pytest's Node.warn: warn_explicit with the item location)."""
+        import warnings
+
+        warnings.warn_explicit(
+            warning,
+            category=None,
+            filename=self.path or "<unknown>",
+            lineno=self.lineno or 0,
+        )
 
     def get_closest_marker(self, name, default=None):
         for marker in self.own_markers:

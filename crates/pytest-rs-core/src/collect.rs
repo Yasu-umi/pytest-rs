@@ -67,6 +67,7 @@ pub fn collect_test_files(
     paths: &[String],
     collect_in_virtualenv: bool,
     python_files: &[String],
+    keep_duplicates: bool,
 ) -> Result<Vec<PathBuf>, String> {
     let args: Vec<String> = if paths.is_empty() {
         vec![".".to_string()]
@@ -88,7 +89,9 @@ pub fn collect_test_files(
             // An explicitly given directory is collected even if it is a
             // virtualenv root; only recursion skips them.
             collect_dir(&path, files.as_mut(), collect_in_virtualenv, python_files)?;
-        } else if !files.contains(&path) {
+        } else if keep_duplicates || !files.contains(&path) {
+            // --keep-duplicates: a file given twice collects twice (pytest
+            // keeps duplicated args).
             files.push(path);
         }
     }

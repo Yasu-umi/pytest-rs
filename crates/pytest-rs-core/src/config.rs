@@ -374,7 +374,7 @@ impl Config {
         // Core pytest options parsed into flags/values (queried via
         // get_flag/get_value); some are still inert and gain behavior as
         // features land.
-        const CORE_FLAGS: [&str; 19] = [
+        const CORE_FLAGS: [&str; 20] = [
             "strict-config",
             "strict-markers",
             "strict",
@@ -394,8 +394,9 @@ impl Config {
             "setup-plan",      // like --setup-only (fixtures do execute here)
             "setup-show",      // run tests, narrating fixture setup/teardown
             "traceconfig",     // accepted-but-inert: plugin trace header not implemented
+            "keep-duplicates", // collect the same file once per duplicated arg
         ];
-        const CORE_VALUES: [(&str, Option<char>); 36] = [
+        const CORE_VALUES: [(&str, Option<char>); 37] = [
             ("deselect", None),
             ("log-level", None),
             ("log-format", None),
@@ -428,7 +429,8 @@ impl Config {
             ("doctest-glob", None),
             ("doctest-report", None),
             ("ignore", None),             // accepted-but-inert (conformance runs files explicitly)
-            ("junit-xml", None),          // accepted-but-inert: JUnit XML output not implemented
+            ("junit-xml", None),          // JUnit XML report path (--junitxml alias)
+            ("junit-prefix", None),       // classname prefix (--junitprefix alias)
             ("dist", None), // accepted-but-inert: module-affinity load is the only mode
             ("maxprocesses", None), // accepted-but-inert
             ("max-worker-restart", None), // accepted-but-inert: workers are not restarted
@@ -493,6 +495,8 @@ impl Config {
             arg = match name {
                 "rootdir-opt" => arg.long("rootdir"),
                 "last-failed-no-failures" => arg.long(name).alias("lfnf"),
+                "junit-xml" => arg.long(name).alias("junitxml"),
+                "junit-prefix" => arg.long(name).alias("junitprefix"),
                 _ => arg.long(name),
             };
             if let Some(short) = short {

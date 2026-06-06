@@ -959,19 +959,11 @@ fn teardown_one(
             longrepr: None,
             location: None,
             subtest_desc: None,
-            sections: Vec::new(),
+            // The teardown report carries the item's full captured output
+            // (pytest writes junit system-out from it).
+            sections: python::log_failure_sections(py),
         });
     } else {
-        let mut longrepr = errors.join("\n");
-        // pytest parity: failing teardown reports carry the per-phase
-        // "Captured log {when}" sections too.
-        for (title, text) in python::log_failure_sections(py) {
-            longrepr.push_str(&format!(
-                "\n{:-^80}\n{}",
-                format!(" {title} "),
-                text.trim_end_matches('\n')
-            ));
-        }
         reports.push(TestReport {
             nodeid: item.nodeid.clone(),
             phase: Phase::Teardown,
@@ -983,10 +975,12 @@ fn teardown_one(
                 Outcome::Failed
             },
             duration: teardown_started.elapsed(),
-            longrepr: Some(longrepr),
+            longrepr: Some(errors.join("\n")),
             location: None,
             subtest_desc: None,
-            sections: Vec::new(),
+            // "Captured stdout/log {when}" report sections; the terminal
+            // appends them to the longrepr at render time.
+            sections: python::log_failure_sections(py),
         });
     }
     python::log_finish_item(py);
@@ -1027,24 +1021,17 @@ pub(crate) fn teardown_scope_reported(
         }
         return None;
     }
-    let mut longrepr = errors.join("\n");
-    for (title, text) in python::log_failure_sections(py) {
-        longrepr.push_str(&format!(
-            "\n{:-^80}\n{}",
-            format!(" {title} "),
-            text.trim_end_matches('\n')
-        ));
-    }
+    let sections = python::log_failure_sections(py);
     python::log_finish_item(py);
     Some(TestReport {
         nodeid: report_nodeid.unwrap_or(&item.nodeid).to_string(),
         phase: Phase::Teardown,
         outcome: Outcome::Failed,
         duration: started.elapsed(),
-        longrepr: Some(longrepr),
+        longrepr: Some(errors.join("\n")),
         location: None,
         subtest_desc: None,
-        sections: Vec::new(),
+        sections,
     })
 }
 
@@ -1691,25 +1678,21 @@ fn report_from_err(
             sections: Vec::new(),
         }
     } else {
-        let mut longrepr =
-            python::format_test_failure(py, err, config.get_value("tb").unwrap_or("long"));
-        // pytest parity: failing reports carry "Captured log {when}" sections.
-        for (title, text) in python::log_failure_sections(py) {
-            longrepr.push_str(&format!(
-                "\n{:-^80}\n{}",
-                format!(" {title} "),
-                text.trim_end_matches('\n')
-            ));
-        }
         TestReport {
             nodeid: item.nodeid.clone(),
             phase,
             outcome: Outcome::Failed,
             duration: started.elapsed(),
-            longrepr: Some(longrepr),
+            longrepr: Some(python::format_test_failure(
+                py,
+                err,
+                config.get_value("tb").unwrap_or("long"),
+            )),
             location: None,
             subtest_desc: None,
-            sections: Vec::new(),
+            // "Captured stdout/log {when}" report sections; the terminal
+            // appends them to the longrepr at render time.
+            sections: python::log_failure_sections(py),
         }
     }
 }

@@ -19,6 +19,9 @@ from pytest._capture import capteesys as capteesys
 from pytest._fixtures import FixtureFunctionMarker as FixtureFunctionMarker
 from pytest._fixtures import FixtureLookupError as FixtureLookupError
 from pytest._fixtures import fixture as fixture
+from pytest._junitxml import record_property as record_property
+from pytest._junitxml import record_testsuite_property as record_testsuite_property
+from pytest._junitxml import record_xml_attribute as record_xml_attribute
 from pytest._logging import LogCaptureFixture as LogCaptureFixture
 from pytest._logging import caplog as caplog
 from pytest._marks import HIDDEN_PARAM as HIDDEN_PARAM

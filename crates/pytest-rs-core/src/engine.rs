@@ -111,6 +111,21 @@ impl Engine {
         }
         python::configure_capture(py, capture_mode);
 
+        // --junitxml: arm the XML writer (workers never write; the parent
+        // streams every report through it at session end).
+        if let Some(path) = self.config.get_value("junit-xml").map(str::to_string)
+            && !self.config.is_worker()
+        {
+            if std::path::Path::new(&path).is_dir() {
+                eprintln!("ERROR: --junitxml must be a filename, given: {path}");
+                return exit_code::USAGE_ERROR;
+            }
+            if let Err(err) = python::junit_configure(py, &self.config, &path) {
+                eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+                return exit_code::INTERNAL_ERROR;
+            }
+        }
+
         // Arm unknown-mark validation (PytestUnknownMarkWarning on access).
         if let Err(err) = python::configure_mark_generator(
             py,
@@ -214,6 +229,7 @@ impl Engine {
                 if let Some(cache) = &self.cache {
                     cache.sessionfinish(py, &self.config, &self.session.reports);
                 }
+                self.write_junit_xml(py);
                 if !self.config.no_terminal() {
                     self.print_short_summary();
                     let banner = if maxfail_hit {
@@ -356,8 +372,11 @@ impl Engine {
             if let Some(cache) = &self.cache {
                 cache.sessionfinish(py, &self.config, &self.session.reports);
             }
-            if !self.config.no_terminal() {
+            if self.config.no_terminal() {
+                self.write_junit_xml(py);
+            } else {
                 self.print_warnings_summary(py);
+                self.write_junit_xml(py);
                 self.print_short_summary();
                 println!(
                     "{}",
@@ -404,6 +423,7 @@ impl Engine {
         }
 
         if self.config.no_terminal() {
+            self.write_junit_xml(py);
             return code;
         }
         if let Some(banner) = &self.session.abort_banner {
@@ -418,6 +438,7 @@ impl Engine {
         }
         self.print_warnings_summary(py);
         self.print_passes();
+        self.write_junit_xml(py);
         if let Some(banner) = &self.session.dist_banner {
             println!("{}", center_banner(banner));
         }
@@ -603,10 +624,43 @@ impl Engine {
                 _ => "setup",
             };
             println!("{}", center_with(&format!("ERROR at {when} of {name}"), '_'));
-            if let Some(longrepr) = &report.longrepr {
-                println!("{longrepr}");
+            if report.longrepr.is_some() {
+                println!("{}", Self::render_longrepr(report));
             }
         }
+    }
+
+    /// --junitxml: stream every report through the LogXML writer and emit
+    /// the "generated xml file" separator (hidden under -q, like pytest).
+    fn write_junit_xml(&mut self, py: Python<'_>) {
+        if self.config.get_value("junit-xml").is_none() || self.config.is_worker() {
+            return;
+        }
+        match python::junit_write(py, &self.session) {
+            Ok(path) => {
+                if !self.config.no_terminal() && !self.config.quiet {
+                    println!("{}", center_with(&format!("generated xml file: {path}"), '-'));
+                }
+            }
+            Err(err) => {
+                eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+            }
+        }
+    }
+
+    /// A failing report's terminal text: the longrepr followed by its
+    /// "Captured stdout/stderr/log {when}" sections (kept separate on the
+    /// report so junitxml can read them structured).
+    fn render_longrepr(report: &crate::report::TestReport) -> String {
+        let mut text = report.longrepr.clone().unwrap_or_default();
+        for (title, body) in &report.sections {
+            text.push_str(&format!(
+                "\n{:-^80}\n{}",
+                format!(" {title} "),
+                body.trim_end_matches('\n')
+            ));
+        }
+        text
     }
 
     /// Return the display title for a failure section heading.
@@ -644,8 +698,8 @@ impl Engine {
                 name = format!("{name} {desc}");
             }
             println!("{}", center_named(&name));
-            if let Some(longrepr) = &report.longrepr {
-                println!("{longrepr}");
+            if report.longrepr.is_some() {
+                println!("{}", Self::render_longrepr(report));
             }
         }
     }
@@ -1168,6 +1222,7 @@ impl Engine {
             &paths,
             self.config.get_flag("collect-in-virtualenv"),
             &python_files,
+            self.config.get_flag("keep-duplicates"),
         )?;
 
         // -p NAME (non-"no:") plugins import before conftests, like

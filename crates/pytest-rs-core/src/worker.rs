@@ -378,6 +378,7 @@ impl Engine {
             &paths,
             self.config.get_flag("collect-in-virtualenv"),
             &python_files,
+            self.config.get_flag("keep-duplicates"),
         ) else {
             return;
         };
