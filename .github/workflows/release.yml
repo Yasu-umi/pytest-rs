@@ -1,0 +1,136 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  # Dry run: builds and smoke-tests the wheels, skips publishing.
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  check-version:
+    name: tag matches pyproject version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: check
+        if: github.event_name == 'push'
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          if [ "$tag" != "$version" ]; then
+            echo "tag v$tag does not match pyproject version $version"
+            exit 1
+          fi
+
+  wheels:
+    name: wheel ${{ matrix.platform.name }} py${{ matrix.python-version }}
+    needs: check-version
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.13", "3.14"]
+        platform:
+          - { name: linux-x86_64, runner: ubuntu-latest, manylinux: "2_28" }
+          - { name: linux-aarch64, runner: ubuntu-24.04-arm, manylinux: "2_28" }
+          - { name: macos-aarch64, runner: macos-latest, manylinux: auto }
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          args: --release -o dist -i python${{ matrix.python-version }}
+          manylinux: ${{ matrix.platform.manylinux }}
+
+      - uses: astral-sh/setup-uv@v7
+
+      - name: smoke test (install wheel into a fresh venv and run it)
+        run: |
+          uv venv --python ${{ matrix.python-version }} smokevenv
+          uv pip install --python smokevenv/bin/python dist/*.whl
+          mkdir smoke && cd smoke
+          cat > test_smoke.py <<'EOF'
+          import pytest
+
+          @pytest.fixture
+          def num():
+              return 42
+
+          def test_fixture(num):
+              assert num == 42
+
+          @pytest.mark.parametrize("x", [1, 2])
+          def test_param(x):
+              assert x > 0
+          EOF
+          ../smokevenv/bin/pytest-rs test_smoke.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ matrix.platform.name }}-py${{ matrix.python-version }}
+          path: dist/*.whl
+
+  sdist:
+    name: sdist
+    needs: check-version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: -o dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  publish:
+    name: publish to PyPI
+    needs: [wheels, sdist]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      # PyPI Trusted Publishing (OIDC).
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          path: dist
+          merge-multiple: true
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
+
+  github-release:
+    name: GitHub release
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: create release with auto-generated notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes
