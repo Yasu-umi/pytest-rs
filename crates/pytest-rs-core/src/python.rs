@@ -2323,6 +2323,14 @@ pub fn configure_capture(py: Python<'_>, mode: &str) {
         .and_then(|m| m.call_method1("configure", (mode,)));
 }
 
+/// Tell the assert-rewrite explainer the -v level (full iterable diffs
+/// need -v, identical dict items unfold at -vv, like pytest).
+pub fn set_assertion_verbosity(py: Python<'_>, level: u8) {
+    let _ = py
+        .import("pytest._rewrite")
+        .and_then(|m| m.call_method1("set_verbosity", (level,)));
+}
+
 /// "Captured stdout/stderr {when}" then "Captured log {when}" report
 /// sections accumulated for the running item.
 pub fn log_failure_sections(py: Python<'_>) -> Vec<(String, String)> {

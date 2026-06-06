@@ -32,7 +32,15 @@ def _relpath(path):
 
 def _exception_lines(exc):
     text = f"{type(exc).__name__}: {exc}" if str(exc) else type(exc).__name__
-    if isinstance(exc, AssertionError) and str(exc).startswith("assert"):
+    if (
+        isinstance(exc, AssertionError)
+        and str(exc).startswith("assert")
+        # pytest's exconly(tryshort=True) quirk: the prefix is stripped only
+        # when saferepr(exc) starts with "AssertionError('assert " — a quote
+        # anywhere in the message flips repr to double quotes and the
+        # "AssertionError: " stays.
+        and repr(exc).startswith("AssertionError('assert ")
+    ):
         # pytest's exconly(tryshort=True): only rewritten-assert explanations
         # drop the type name; raised AssertionErrors keep it.
         text = str(exc)

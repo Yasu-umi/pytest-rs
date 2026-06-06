@@ -48,19 +48,58 @@ def _is_rewrite_target(origin):
     )
 
 
-def _explain_eq(left, right):
-    """Extra explanation lines for a failed `==`, matching what pytest's
-    assertion plugin appends (assertrepr_compare's body, summary line
-    excluded — the engine renders that part itself)."""
-    try:
-        from _pytest.assertion.util import _compare_eq_any
+# -v/-vv level, set by the engine at startup: full iterable diffs need
+# verbose >= 1, "Omitting N identical items" folds below 2 (pytest gates
+# its explanations on config verbosity the same way).
+_verbosity = 0
 
-        lines = _compare_eq_any(left, right, lambda text, *args, **kwargs: text, 0)
+
+def set_verbosity(level):
+    global _verbosity
+    _verbosity = level
+
+
+def _explain_op(op, left, right):
+    """Extra explanation lines for a failed comparison, matching pytest's
+    assertrepr_compare op dispatch (summary line excluded — the engine
+    renders that part itself)."""
+    try:
+        from _pytest.assertion import util
+
+        def highlighter(text, *args, **kwargs):
+            return text
+
+        lines = None
+        if op == "==":
+            lines = util._compare_eq_any(left, right, highlighter, _verbosity)
+        elif op == "not in":
+            if util.istext(left) and util.istext(right):
+                lines = util._notin_text(left, right, _verbosity)
+        elif op == "!=":
+            if util.isset(left) and util.isset(right):
+                lines = ["Both sets are equal"]
+        elif op == ">=":
+            if util.isset(left) and util.isset(right):
+                lines = util._compare_gte_set(left, right, highlighter, _verbosity)
+        elif op == "<=":
+            if util.isset(left) and util.isset(right):
+                lines = util._compare_lte_set(left, right, highlighter, _verbosity)
+        elif op == ">":
+            if util.isset(left) and util.isset(right):
+                lines = util._compare_gt_set(left, right, highlighter, _verbosity)
+        elif op == "<":
+            if util.isset(left) and util.isset(right):
+                lines = util._compare_lt_set(left, right, highlighter, _verbosity)
         if not lines:
             return ""
         return "\n  " + "\n  ".join(lines)
     except Exception:
         return ""
+
+
+def _explain_eq(left, right):
+    """Backwards-compatible alias (modules rewritten by an older engine)."""
+    return _explain_op("==", left, right)
 
 
 class _AssertRewriter(ast.NodeTransformer):
@@ -128,29 +167,31 @@ class _AssertRewriter(ast.NodeTransformer):
             ast.Constant(f" {op} "),
             repr_of(right_name),
         ]
-        if isinstance(test.ops[0], ast.Eq):
-            # pytest parity: a failed == on iterables appends diff lines.
-            explain = ast.Call(
-                func=ast.Attribute(
-                    value=ast.Attribute(
-                        value=ast.Call(
-                            func=ast.Name(id="__import__", ctx=ast.Load()),
-                            args=[ast.Constant("pytest._rewrite")],
-                            keywords=[],
-                        ),
-                        attr="_rewrite",
-                        ctx=ast.Load(),
+        # pytest parity: a failed comparison appends op-specific explanation
+        # lines (diffs for ==, "is contained here" for not in, set details
+        # for ordering ops).
+        explain = ast.Call(
+            func=ast.Attribute(
+                value=ast.Attribute(
+                    value=ast.Call(
+                        func=ast.Name(id="__import__", ctx=ast.Load()),
+                        args=[ast.Constant("pytest._rewrite")],
+                        keywords=[],
                     ),
-                    attr="_explain_eq",
+                    attr="_rewrite",
                     ctx=ast.Load(),
                 ),
-                args=[
-                    ast.Name(id=left_name, ctx=ast.Load()),
-                    ast.Name(id=right_name, ctx=ast.Load()),
-                ],
-                keywords=[],
-            )
-            values.append(ast.FormattedValue(value=explain, conversion=-1, format_spec=None))
+                attr="_explain_op",
+                ctx=ast.Load(),
+            ),
+            args=[
+                ast.Constant(op),
+                ast.Name(id=left_name, ctx=ast.Load()),
+                ast.Name(id=right_name, ctx=ast.Load()),
+            ],
+            keywords=[],
+        )
+        values.append(ast.FormattedValue(value=explain, conversion=-1, format_spec=None))
         message = ast.JoinedStr(values=values)
         raise_stmt = ast.Raise(
             exc=ast.Call(

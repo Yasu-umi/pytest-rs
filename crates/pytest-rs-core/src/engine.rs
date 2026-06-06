@@ -110,6 +110,7 @@ impl Engine {
             return exit_code::USAGE_ERROR;
         }
         python::configure_capture(py, capture_mode);
+        python::set_assertion_verbosity(py, self.config.verbose);
 
         // --junitxml: arm the XML writer (workers never write; the parent
         // streams every report through it at session end).
