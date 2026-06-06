@@ -88,8 +88,8 @@
       "file": "testing/test_collection.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 55,
-      "failed": 57,
+      "passed": 57,
+      "failed": 55,
       "skipped": 4,
       "errors": 0
     },
@@ -187,8 +187,8 @@
       "file": "testing/test_mark.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 41,
-      "failed": 64,
+      "passed": 42,
+      "failed": 63,
       "skipped": 0,
       "errors": 0
     },
@@ -331,8 +331,8 @@
       "file": "testing/test_terminal.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 64,
-      "failed": 127,
+      "passed": 65,
+      "failed": 126,
       "skipped": 2,
       "errors": 0
     },

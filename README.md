@@ -79,7 +79,7 @@ _linux (CI-verified)_
 
 | suite | tag | passed | failed | errors | skipped | total | pass % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 1182 | 835 | 0 | 22 | 2039 | 58.0% | 5 | 45 | 63 |
+| pytest | 9.0.3 | 1186 | 831 | 0 | 22 | 2039 | 58.2% | 5 | 45 | 63 |
 | pytest-asyncio | v1.4.0 | 262 | 0 | 1 | 0 | 263 | 99.6% | 29 | 30 | 0 |
 | pytest-mock | v3.15.1 | 85 | 0 | 0 | 5 | 90 | 94.4% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 47 | 159 | 0 | 3 | 209 | 22.5% | 0 | 1 | 0 |
