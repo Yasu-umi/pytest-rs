@@ -19,7 +19,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pytest | 9.0.3 | 1186 | 831 | 0 | 22 | 2039 | 58.2% | 5 | 45 | 63 |
 | pytest-asyncio | v1.4.0 | 262 | 0 | 1 | 0 | 263 | 99.6% | 29 | 30 | 0 |
 | pytest-mock | v3.15.1 | 85 | 0 | 0 | 5 | 90 | 94.4% | 1 | 1 | 0 |
-| pytest-cov | v7.1.0 | 47 | 159 | 0 | 3 | 209 | 22.5% | 0 | 1 | 0 |
+| pytest-cov | v7.1.0 | 84 | 122 | 0 | 3 | 209 | 40.2% | 0 | 1 | 0 |
 | pytest-xdist | v3.8.0 | 62 | 36 | 0 | 0 | 98 | 63.3% | 0 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 40 | 82 | 0 | 1 | 123 | 32.5% | 2 | 7 | 6 |
@@ -133,7 +133,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| tests/test_pytest_cov.py | failed | 47 | 159 | 0 | 3 |
+| tests/test_pytest_cov.py | failed | 84 | 122 | 0 | 3 |
 
 </details>
 
