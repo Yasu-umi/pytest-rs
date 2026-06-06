@@ -12,6 +12,7 @@ readme = "../../README.md"
 pytest-rs-core = { workspace = true }
 pyo3 = { workspace = true }
 regex = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 toml = { workspace = true }
 ruff_python_parser = { workspace = true }

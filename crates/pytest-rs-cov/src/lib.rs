@@ -9,13 +9,20 @@ mod report;
 use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 
-use collector::LineCollector;
+use collector::{ArcMap, LineCollector};
 use pytest_rs_core::config::{OptDef, OptionParser};
 use pytest_rs_core::hooks::{HookContext, Plugin};
 use pytest_rs_core::pyo3 as core_pyo3;
 use report::{CoverageData, FileRow};
 
 use core_pyo3::prelude::*;
+
+/// Worker -> parent coverage payload (hits and, in branch mode, arcs).
+#[derive(serde::Serialize, serde::Deserialize)]
+struct CovDump {
+    hits: HashMap<String, BTreeSet<u32>>,
+    arcs: ArcMap,
+}
 
 /// sys.monitoring's reserved coverage tool slot.
 const TOOL_ID: u8 = 1;
@@ -56,6 +63,10 @@ pub struct CovPlugin {
     dump_payload: Option<String>,
     /// Parent mode: hits merged in from workers via pytest_worker_load.
     worker_hits: HashMap<String, BTreeSet<u32>>,
+    /// Parent mode: executed branch arcs merged in from workers.
+    worker_arcs: ArcMap,
+    /// Branch coverage (--cov-branch / [run] branch = true).
+    branch: bool,
 }
 
 impl CovPlugin {
@@ -71,6 +82,8 @@ impl CovPlugin {
             fail_under_message: None,
             dump_payload: None,
             worker_hits: HashMap::new(),
+            worker_arcs: HashMap::new(),
+            branch: false,
         }
     }
 
@@ -250,6 +263,17 @@ impl CovPlugin {
     /// coverage `[run] relative_files`: from --cov-config / .coveragerc /
     /// setup.cfg / tox.ini (ini forms) or pyproject [tool.coverage.run].
     fn relative_files_enabled(rootdir: &Path, cov_config: Option<&str>) -> bool {
+        Self::run_option_enabled(rootdir, cov_config, "relative_files")
+    }
+
+    /// coverage `[run] branch`, same config sources.
+    fn branch_enabled(rootdir: &Path, cov_config: Option<&str>) -> bool {
+        Self::run_option_enabled(rootdir, cov_config, "branch")
+    }
+
+    /// A boolean `[run]` option: from --cov-config / .coveragerc /
+    /// setup.cfg / tox.ini (ini forms) or pyproject [tool.coverage.run].
+    fn run_option_enabled(rootdir: &Path, cov_config: Option<&str>, option: &str) -> bool {
         let truthy = |value: &str| {
             matches!(
                 value.trim().to_ascii_lowercase().as_str(),
@@ -269,7 +293,7 @@ impl CovPlugin {
                 }
                 if in_run
                     && let Some((key, value)) = trimmed.split_once('=')
-                    && key.trim() == "relative_files"
+                    && key.trim() == option
                 {
                     return truthy(value);
                 }
@@ -281,7 +305,7 @@ impl CovPlugin {
                 .get("tool")
                 .and_then(|tool| tool.get("coverage"))
                 .and_then(|coverage| coverage.get("run"))
-                .and_then(|run| run.get("relative_files"))
+                .and_then(|run| run.get(option))
         {
             return value
                 .as_bool()
@@ -351,7 +375,12 @@ impl CovPlugin {
         Ok(())
     }
 
-    fn build_data(&self, rootdir: &Path, hits: HashMap<String, BTreeSet<u32>>) -> CoverageData {
+    fn build_data(
+        &self,
+        rootdir: &Path,
+        hits: HashMap<String, BTreeSet<u32>>,
+        arcs: ArcMap,
+    ) -> CoverageData {
         // Report set: every hit file, plus (with explicit --cov=src) every
         // .py file under the sources, so never-imported files show as 0%.
         let mut files: BTreeSet<PathBuf> = hits.keys().map(PathBuf::from).collect();
@@ -376,6 +405,66 @@ impl CovPlugin {
                 .unwrap_or_default();
             let mut executable = analysis.executable;
             executable.extend(covered.iter().copied());
+            // Branch mode: reconcile executed bytecode arcs against the
+            // source-level branch map. Arcs whose source line is not a
+            // branch point (asserts, ternaries) are ignored; destinations
+            // with no exact match attribute to EXIT when the branch can
+            // leave the scope.
+            let branches = if self.branch {
+                analysis.branches
+            } else {
+                Default::default()
+            };
+            let mut taken: std::collections::BTreeMap<u32, BTreeSet<i64>> = Default::default();
+            if self.branch
+                && let Some(file_arcs) = arcs.get(&path.to_string_lossy().to_string())
+            {
+                for (src, dst, direction) in file_arcs {
+                    let Some(dests) = branches.get(src) else {
+                        continue;
+                    };
+                    let resolved = match direction {
+                        // Fall-through: into the body. An arc staying on
+                        // the header line is a loop's advance machinery; a
+                        // same-line arc elsewhere is a short-circuit
+                        // (and/or) step, not a branch outcome.
+                        1 => {
+                            if *dst == dests[0] {
+                                Some(dests[0])
+                            } else if *dst == i64::from(*src) {
+                                analysis.loops.contains(src).then(|| dests[0])
+                            } else {
+                                Some(dests[0])
+                            }
+                        }
+                        // Jump: away from the body. Implicit-return
+                        // attribution can make the destination look like a
+                        // body line; never resolve a jump to the body.
+                        2 => dests[1..]
+                            .iter()
+                            .find(|d| *d == dst)
+                            .or_else(|| dests[1..].iter().find(|d| **d == analysis::EXIT))
+                            .or(dests.last())
+                            .copied(),
+                        // Unknown (3.13 without dis info): exact, loop
+                        // advance, then exit.
+                        _ => {
+                            if dests.contains(dst) {
+                                Some(*dst)
+                            } else if *dst == i64::from(*src) && analysis.loops.contains(src) {
+                                Some(dests[0])
+                            } else if dests.contains(&analysis::EXIT) {
+                                Some(analysis::EXIT)
+                            } else {
+                                None
+                            }
+                        }
+                    };
+                    if let Some(dest) = resolved {
+                        taken.entry(*src).or_default().insert(dest);
+                    }
+                }
+            }
             let name = path
                 .strip_prefix(rootdir)
                 .unwrap_or(&path)
@@ -385,10 +474,15 @@ impl CovPlugin {
                 name,
                 executable,
                 covered,
+                branches,
+                taken,
             });
         }
         rows.sort_by(|a, b| a.name.cmp(&b.name));
-        CoverageData { rows }
+        CoverageData {
+            rows,
+            branch: self.branch,
+        }
     }
 }
 
@@ -420,7 +514,7 @@ impl Plugin for CovPlugin {
         ));
         parser.add_option(OptDef::flag(
             "--cov-branch",
-            "accepted but inert: branch coverage is not implemented yet",
+            "measure branch coverage in addition to line coverage",
         ));
         parser.add_option(OptDef::value(
             "--cov-config",
@@ -488,19 +582,47 @@ impl Plugin for CovPlugin {
             text
         };
 
+        self.branch = ctx.config.get_flag("cov-branch")
+            || Self::branch_enabled(&ctx.config.rootdir, ctx.config.get_value("cov-config"));
+
         let monitoring = py.import("sys")?.getattr("monitoring")?;
         let events = monitoring.getattr("events")?;
         let disable = monitoring.getattr("DISABLE")?.unbind();
         let py_start_event = events.getattr("PY_START")?;
         let line_event = events.getattr("LINE")?;
+        // Branch events: 3.14 has per-direction BRANCH_LEFT/BRANCH_RIGHT
+        // (independently DISABLEable); 3.13 only the combined BRANCH.
+        let mut local_events: i64 = line_event.extract()?;
+        let mut branch_events: Vec<(Bound<'_, core_pyo3::PyAny>, &str)> = Vec::new();
+        let mut need_jump_targets = false;
+        if self.branch {
+            match (
+                events.getattr("BRANCH_LEFT"),
+                events.getattr("BRANCH_RIGHT"),
+            ) {
+                (Ok(left), Ok(right)) => {
+                    local_events |= left.extract::<i64>()? | right.extract::<i64>()?;
+                    branch_events.push((left, "branch_left"));
+                    branch_events.push((right, "branch_right"));
+                }
+                _ => {
+                    let combined = events.getattr("BRANCH")?;
+                    local_events |= combined.extract::<i64>()?;
+                    branch_events.push((combined, "branch_compat"));
+                    need_jump_targets = true;
+                }
+            }
+        }
         let collector = Py::new(
             py,
             LineCollector::new(
                 with_sep(&rootdir),
                 self.sources.iter().map(|source| with_sep(source)).collect(),
                 with_sep(&pytest_rs_core::python::shim_root()),
+                self.branch,
+                need_jump_targets,
+                local_events,
                 disable,
-                line_event.clone().unbind(),
                 monitoring.clone().unbind(),
                 TOOL_ID,
             ),
@@ -519,6 +641,12 @@ impl Plugin for CovPlugin {
             "register_callback",
             (TOOL_ID, &line_event, collector.bind(py).getattr("line")?),
         )?;
+        for (event, method) in &branch_events {
+            monitoring.call_method1(
+                "register_callback",
+                (TOOL_ID, event, collector.bind(py).getattr(*method)?),
+            )?;
+        }
         // Globally only the PY_START gate; LINE events arm per tracked code
         // object (coverage.py's sysmon core layout).
         monitoring.call_method1("set_events", (TOOL_ID, &py_start_event))?;
@@ -537,10 +665,11 @@ impl Plugin for CovPlugin {
         monitoring.call_method1("free_tool_id", (TOOL_ID,))?;
 
         let mut hits = collector.borrow(py).take_hits();
+        let mut arcs = collector.borrow(py).take_arcs();
         if ctx.config.is_worker() {
-            // Workers don't report: hits travel to the parent for merging.
+            // Workers don't report: hits and arcs travel to the parent.
             self.dump_payload = Some(
-                serde_json::to_string(&hits)
+                serde_json::to_string(&CovDump { hits, arcs })
                     .map_err(|e| core_pyo3::exceptions::PyValueError::new_err(e.to_string()))?,
             );
             return Ok(());
@@ -550,13 +679,16 @@ impl Plugin for CovPlugin {
         for (file, lines) in self.worker_hits.drain() {
             hits.entry(file).or_default().extend(lines);
         }
+        for (file, file_arcs) in self.worker_arcs.drain() {
+            arcs.entry(file).or_default().extend(file_arcs);
+        }
         self.write_data_file(ctx, &hits)?;
         let rootdir = ctx
             .config
             .rootdir
             .canonicalize()
             .unwrap_or_else(|_| ctx.config.rootdir.clone());
-        let data = self.build_data(&rootdir, hits);
+        let data = self.build_data(&rootdir, hits, arcs);
 
         for spec in &self.reports {
             let (default_dest, content) = match spec.kind {
@@ -601,10 +733,13 @@ impl Plugin for CovPlugin {
     }
 
     fn pytest_worker_load(&mut self, _ctx: &mut HookContext, payload: &str) -> PyResult<()> {
-        let hits: HashMap<String, BTreeSet<u32>> = serde_json::from_str(payload)
+        let dump: CovDump = serde_json::from_str(payload)
             .map_err(|e| core_pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-        for (file, lines) in hits {
+        for (file, lines) in dump.hits {
             self.worker_hits.entry(file).or_default().extend(lines);
+        }
+        for (file, file_arcs) in dump.arcs {
+            self.worker_arcs.entry(file).or_default().extend(file_arcs);
         }
         Ok(())
     }
