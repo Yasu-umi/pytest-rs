@@ -877,6 +877,12 @@ fn teardown_one(
             subtest_desc: None,
         });
     } else {
+        let mut longrepr = errors.join("\n");
+        // pytest parity: failing teardown reports carry the per-phase
+        // "Captured log {when}" sections too.
+        for (title, text) in python::log_failure_sections(py) {
+            longrepr.push_str(&format!("\n{:-^80}\n{text}", format!(" {title} ")));
+        }
         reports.push(TestReport {
             nodeid: item.nodeid.clone(),
             phase: Phase::Teardown,
@@ -888,7 +894,7 @@ fn teardown_one(
                 Outcome::Failed
             },
             duration: teardown_started.elapsed(),
-            longrepr: Some(errors.join("\n")),
+            longrepr: Some(longrepr),
             location: None,
             subtest_desc: None,
         });

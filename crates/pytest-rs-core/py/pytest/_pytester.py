@@ -90,6 +90,14 @@ class LineMatcher:
             else:
                 fail(f"re_match_lines: no line matches {pattern!r} in:\n{self}")
 
+    def no_re_match_line(self, pattern):
+        __tracebackhide__ = True
+        import re
+
+        for line in self.lines:
+            if re.match(pattern, line):
+                fail(f"no_re_match_line: unexpectedly matched {pattern!r}: {line!r}")
+
     def fnmatch_lines_random(self, patterns):
         __tracebackhide__ = True
         import fnmatch
