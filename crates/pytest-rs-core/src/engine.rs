@@ -96,6 +96,15 @@ impl Engine {
         // live records with the progress output.
         self.session.live_logging = python::configure_logging(py, &self.config);
 
+        // Global output capture: -s / --capture=no disable, default "fd"
+        // (approximated at the sys level).
+        let capture_mode = if self.config.get_flag("capture-disable") {
+            "no"
+        } else {
+            self.config.get_value("capture").unwrap_or("fd")
+        };
+        python::configure_capture(py, capture_mode);
+
         // Arm unknown-mark validation (PytestUnknownMarkWarning on access).
         if let Err(err) = python::configure_mark_generator(
             py,

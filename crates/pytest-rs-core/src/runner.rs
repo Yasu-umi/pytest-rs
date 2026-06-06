@@ -881,7 +881,11 @@ fn teardown_one(
         // pytest parity: failing teardown reports carry the per-phase
         // "Captured log {when}" sections too.
         for (title, text) in python::log_failure_sections(py) {
-            longrepr.push_str(&format!("\n{:-^80}\n{text}", format!(" {title} ")));
+            longrepr.push_str(&format!(
+                "\n{:-^80}\n{}",
+                format!(" {title} "),
+                text.trim_end_matches('\n')
+            ));
         }
         reports.push(TestReport {
             nodeid: item.nodeid.clone(),
@@ -1534,7 +1538,11 @@ fn report_from_err(
             python::format_test_failure(py, err, config.get_value("tb").unwrap_or("long"));
         // pytest parity: failing reports carry "Captured log {when}" sections.
         for (title, text) in python::log_failure_sections(py) {
-            longrepr.push_str(&format!("\n{:-^80}\n{text}", format!(" {title} ")));
+            longrepr.push_str(&format!(
+                "\n{:-^80}\n{}",
+                format!(" {title} "),
+                text.trim_end_matches('\n')
+            ));
         }
         TestReport {
             nodeid: item.nodeid.clone(),

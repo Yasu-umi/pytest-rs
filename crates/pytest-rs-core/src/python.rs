@@ -2075,6 +2075,9 @@ pub fn log_start_phase(py: Python<'_>, when: &str, level: Option<&str>) {
     let _ = py
         .import("pytest._logging")
         .and_then(|m| m.call_method1("start_phase", (when, level)));
+    let _ = py
+        .import("pytest._capture")
+        .and_then(|m| m.call_method1("start_phase", (when,)));
 }
 
 /// Close the current item's logging capture (end of teardown).
@@ -2082,14 +2085,33 @@ pub fn log_finish_item(py: Python<'_>) {
     let _ = py
         .import("pytest._logging")
         .and_then(|m| m.call_method0("finish_item"));
+    let _ = py
+        .import("pytest._capture")
+        .and_then(|m| m.call_method0("finish_item"));
 }
 
-/// "Captured log {when}" report sections accumulated for the running item.
+/// Arm the global output capture ("fd"/"sys" capture, "no" disables).
+pub fn configure_capture(py: Python<'_>, mode: &str) {
+    let _ = py
+        .import("pytest._capture")
+        .and_then(|m| m.call_method1("configure", (mode,)));
+}
+
+/// "Captured stdout/stderr {when}" then "Captured log {when}" report
+/// sections accumulated for the running item.
 pub fn log_failure_sections(py: Python<'_>) -> Vec<(String, String)> {
-    py.import("pytest._logging")
+    let mut sections: Vec<(String, String)> = py
+        .import("pytest._capture")
         .and_then(|m| m.call_method0("failure_sections"))
-        .and_then(|sections| sections.extract())
-        .unwrap_or_default()
+        .and_then(|s| s.extract())
+        .unwrap_or_default();
+    sections.extend(
+        py.import("pytest._logging")
+            .and_then(|m| m.call_method0("failure_sections"))
+            .and_then(|s| s.extract::<Vec<(String, String)>>())
+            .unwrap_or_default(),
+    );
+    sections
 }
 
 pub fn warning_count(py: Python<'_>) -> usize {
