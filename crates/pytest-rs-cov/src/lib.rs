@@ -538,6 +538,42 @@ impl CovPlugin {
         Ok(Some(message))
     }
 
+    /// --cov-append: fold the previous runs' lines (already merged into
+    /// the data file by write_data_file) back into this run's hits so the
+    /// terminal/xml reports show the union, like pytest-cov.
+    fn merge_appended_data(
+        &self,
+        ctx: &mut HookContext,
+        hits: &mut HashMap<String, BTreeSet<u32>>,
+    ) -> PyResult<()> {
+        let py = ctx.py;
+        let Ok(coverage_mod) = py.import("coverage") else {
+            return Ok(());
+        };
+        let data_path = Self::data_file_path(ctx);
+        if !data_path.exists() {
+            return Ok(());
+        }
+        let data = coverage_mod
+            .getattr("CoverageData")?
+            .call1((data_path.to_string_lossy().as_ref(),))?;
+        data.call_method0("read")?;
+        let rootdir = &ctx.config.rootdir;
+        for file in data.call_method0("measured_files")?.try_iter()? {
+            let file: String = file?.extract()?;
+            let lines: Option<Vec<u32>> = data.call_method1("lines", (&file,))?.extract()?;
+            let Some(lines) = lines else { continue };
+            // Data may hold rootdir-relative paths ([run] relative_files).
+            let absolute = if Path::new(&file).is_absolute() {
+                file
+            } else {
+                rootdir.join(&file).to_string_lossy().to_string()
+            };
+            hits.entry(absolute).or_default().extend(lines);
+        }
+        Ok(())
+    }
+
     /// The `.coverage` data file location (COVERAGE_FILE honored).
     fn data_file_path(ctx: &HookContext) -> PathBuf {
         match std::env::var("COVERAGE_FILE") {
@@ -777,7 +813,7 @@ impl Plugin for CovPlugin {
         ));
         parser.add_option(OptDef::flag(
             "--cov-append",
-            "accepted but inert: append mode is not implemented yet",
+            "do not delete coverage but append to current (combined report)",
         ));
         parser.add_option(OptDef::flag(
             "--no-cov-on-fail",
@@ -1047,6 +1083,9 @@ impl Plugin for CovPlugin {
             arcs.entry(file).or_default().extend(file_arcs);
         }
         self.write_data_file(ctx, &hits)?;
+        if ctx.config.get_flag("cov-append") {
+            self.merge_appended_data(ctx, &mut hits)?;
+        }
         let rootdir = ctx
             .config
             .rootdir
