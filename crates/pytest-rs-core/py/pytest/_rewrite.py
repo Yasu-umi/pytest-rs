@@ -50,12 +50,9 @@ def _is_rewrite_target(origin):
 
 def _explain_eq(left, right):
     """Extra explanation lines for a failed `==`, matching what pytest's
-    assertion plugin appends (iterable diff via _compare_eq_iterable)."""
+    assertion plugin appends (assertrepr_compare's body, summary line
+    excluded — the engine renders that part itself)."""
     try:
-        if isinstance(left, (str, bytes)) or isinstance(right, (str, bytes)):
-            return ""
-        if not (hasattr(left, "__iter__") and hasattr(right, "__iter__")):
-            return ""
         from _pytest.assertion.util import _compare_eq_any
 
         lines = _compare_eq_any(left, right, lambda text, *args, **kwargs: text, 0)
