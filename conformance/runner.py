@@ -63,6 +63,9 @@ class Suite:
         self.local = config.get("local")
         self.deps: list[str] = config.get("deps", [])
         self.exclude: list[str] = config.get("exclude", [])
+        # Node ids never run (flaky under load; they would destabilize the
+        # committed results the release gate compares against).
+        self.deselect: list[str] = config.get("deselect", [])
         self.checkout = CACHE / f"{self.name}-{self.tag}"
         self.src_dir: Path | None = None
 
@@ -124,6 +127,12 @@ class Suite:
 
     def run_file(self, path: Path) -> FileResult:
         rel = str(path.relative_to(self.checkout))
+        deselects = [
+            arg
+            for nodeid in self.deselect
+            if nodeid.split("::")[0] == rel
+            for arg in ("--deselect", nodeid)
+        ]
         env = dict(os.environ)
         deps_dir = self.deps_dir()
         extra_paths = [str(p) for p in [self.src_dir, deps_dir] if p is not None]
@@ -131,7 +140,7 @@ class Suite:
             env["PYTHONPATH"] = ":".join(extra_paths)
         try:
             proc = subprocess.run(
-                [str(BINARY), rel],
+                [str(BINARY), rel, *deselects],
                 cwd=self.checkout,
                 capture_output=True,
                 text=True,
