@@ -31,25 +31,42 @@ jobs:
     permissions:
       actions: read
     steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 20
+
       - name: wait for the commit's CI run to succeed
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # The tag usually lands while the commit's CI is still running;
-          # poll until it concludes (up to ~30 min).
+          # Bot commits (the conformance auto-refresh, pushed with
+          # GITHUB_TOKEN) never trigger CI; walk back to the nearest
+          # ancestor that has a run.
+          target=""
+          for sha in $(git rev-list -n 10 "$GITHUB_SHA"); do
+            count=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow CI \
+              --commit "$sha" --json databaseId --jq 'length')
+            if [ "$count" != "0" ]; then
+              target="$sha"
+              break
+            fi
+            echo "no CI run for $sha; trying its parent"
+          done
+          if [ -z "$target" ]; then
+            echo "no CI run found near $GITHUB_SHA"; exit 1
+          fi
+          # The tag usually lands while that run is still going; poll
+          # until it concludes (up to ~30 min).
           for _ in $(seq 60); do
             json=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow CI \
-              --commit "$GITHUB_SHA" --json status,conclusion --limit 1)
+              --commit "$target" --json status,conclusion --limit 1)
             status=$(echo "$json" | python3 -c "import json,sys; runs=json.load(sys.stdin); print(runs[0]['status'] if runs else 'missing')")
             conclusion=$(echo "$json" | python3 -c "import json,sys; runs=json.load(sys.stdin); print(runs[0]['conclusion'] if runs else '')")
-            if [ "$status" = "missing" ]; then
-              echo "no CI run found for $GITHUB_SHA"; exit 1
-            fi
             if [ "$status" = "completed" ]; then
               [ "$conclusion" = "success" ] && exit 0
-              echo "CI for $GITHUB_SHA concluded: $conclusion"; exit 1
+              echo "CI for $target concluded: $conclusion"; exit 1
             fi
-            echo "CI for $GITHUB_SHA is $status; waiting..."
+            echo "CI for $target is $status; waiting..."
             sleep 30
           done
           echo "timed out waiting for CI"; exit 1
