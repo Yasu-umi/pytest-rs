@@ -25,6 +25,64 @@ jobs:
             exit 1
           fi
 
+  ci-green:
+    name: CI passed for the tagged commit
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    steps:
+      - name: wait for the commit's CI run to succeed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The tag usually lands while the commit's CI is still running;
+          # poll until it concludes (up to ~30 min).
+          for _ in $(seq 60); do
+            json=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow CI \
+              --commit "$GITHUB_SHA" --json status,conclusion --limit 1)
+            status=$(echo "$json" | python3 -c "import json,sys; runs=json.load(sys.stdin); print(runs[0]['status'] if runs else 'missing')")
+            conclusion=$(echo "$json" | python3 -c "import json,sys; runs=json.load(sys.stdin); print(runs[0]['conclusion'] if runs else '')")
+            if [ "$status" = "missing" ]; then
+              echo "no CI run found for $GITHUB_SHA"; exit 1
+            fi
+            if [ "$status" = "completed" ]; then
+              [ "$conclusion" = "success" ] && exit 0
+              echo "CI for $GITHUB_SHA concluded: $conclusion"; exit 1
+            fi
+            echo "CI for $GITHUB_SHA is $status; waiting..."
+            sleep 30
+          done
+          echo "timed out waiting for CI"; exit 1
+
+  conformance-clean:
+    name: conformance gate + no drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - uses: astral-sh/setup-uv@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: py3.13
+
+      - name: build
+        run: cargo build
+
+      - name: conformance (expected gate + committed results must match)
+        run: |
+          export LD_LIBRARY_PATH="$(python -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR"))'):${LD_LIBRARY_PATH:-}"
+          python conformance/runner.py --check
+          # Releasing requires the committed results to be current: any
+          # regenerated diff means the tag was cut before CI refreshed them.
+          git diff --exit-code conformance/scoreboard conformance/RESULTS.md README.md
+
   wheels:
     name: wheel ${{ matrix.platform.name }} py${{ matrix.python-version }}
     needs: check-version
@@ -48,29 +106,50 @@ jobs:
       # rust-version (container builds bring their own toolchain).
       - uses: dtolnay/rust-toolchain@stable
 
+      # Both platforms link a python-build-standalone CPython so the
+      # recorded libpython reference has the plain libpython3.X leaf name.
+      # The manylinux images ship no libpython at all, and macOS framework
+      # pythons record ".../Python.framework/Versions/3.X/Python" — a leaf
+      # the launcher's (DY)LD_LIBRARY_PATH lookup can never match.
+      - name: link python (macos host)
+        if: startsWith(matrix.platform.name, 'macos')
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          export PATH="$HOME/.local/bin:$PATH"
+          uv python install ${{ matrix.python-version }}
+          sudo ln -sf "$(uv python find --managed-python ${{ matrix.python-version }})" /usr/local/bin/python-embed
+
       - uses: PyO3/maturin-action@v1
         with:
           command: build
           args: --release -o dist -i /usr/local/bin/python-embed
           manylinux: ${{ matrix.platform.manylinux }}
-          # The manylinux images' pythons ship no libpython (shared or
-          # static), which an embedding binary links against. Install a
-          # python-build-standalone CPython (shared libpython) in the
-          # container and build against that; at runtime the launcher
-          # resolves the user environment's libpython via LD_LIBRARY_PATH.
           before-script-linux: |
             curl -LsSf https://astral.sh/uv/install.sh | sh
             export PATH="$HOME/.local/bin:$PATH"
             uv python install ${{ matrix.python-version }}
             ln -sf "$(uv python find --managed-python ${{ matrix.python-version }})" /usr/local/bin/python-embed
-        if: startsWith(matrix.platform.name, 'linux')
 
-      - uses: PyO3/maturin-action@v1
-        with:
-          command: build
-          args: --release -o dist -i python${{ matrix.python-version }}
-          manylinux: ${{ matrix.platform.manylinux }}
-        if: startsWith(matrix.platform.name, 'macos')
+      - name: assert the engine links a plain libpython leaf name
+        # Regression gate for the v0.0.1 macos wheels: a framework python
+        # records ".../Python.framework/Versions/3.X/Python", whose leaf
+        # ("Python") the launcher's loader-path lookup can never resolve.
+        run: |
+          wheel=$(ls dist/*.whl | head -1)
+          unzip -o -q "$wheel" -d /tmp/wheelcheck
+          bin=$(find /tmp/wheelcheck -name pytest-rs-bin | head -1)
+          if [ "$(uname)" = "Darwin" ]; then
+            ref=$(otool -L "$bin" | grep -i python | awk '{print $1}' | head -1)
+          else
+            # "libpython3.13.so.1.0 => not found" is fine here: only the
+            # referenced (leaf) name matters, resolution is the launcher's job.
+            ref=$(ldd "$bin" 2>/dev/null | grep -i libpython | awk '{print $1}' | head -1)
+          fi
+          echo "libpython reference: ${ref:-<none>}"
+          case "${ref##*/}" in
+            libpython3.*) echo ok ;;
+            *) echo "engine must reference libpython3.X by leaf name"; exit 1 ;;
+          esac
 
       - uses: astral-sh/setup-uv@v7
 
@@ -119,7 +198,7 @@ jobs:
 
   publish:
     name: publish to PyPI
-    needs: [wheels, sdist]
+    needs: [wheels, sdist, ci-green, conformance-clean]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     environment: pypi
