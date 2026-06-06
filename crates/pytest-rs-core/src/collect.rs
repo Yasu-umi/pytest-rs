@@ -67,6 +67,7 @@ pub fn collect_test_files(
     paths: &[String],
     collect_in_virtualenv: bool,
     python_files: &[String],
+    norecursedirs: &[String],
     keep_duplicates: bool,
 ) -> Result<Vec<PathBuf>, String> {
     let args: Vec<String> = if paths.is_empty() {
@@ -88,7 +89,13 @@ pub fn collect_test_files(
         if meta.is_dir() {
             // An explicitly given directory is collected even if it is a
             // virtualenv root; only recursion skips them.
-            collect_dir(&path, files.as_mut(), collect_in_virtualenv, python_files)?;
+            collect_dir(
+                &path,
+                files.as_mut(),
+                collect_in_virtualenv,
+                python_files,
+                norecursedirs,
+            )?;
         } else if keep_duplicates || !files.contains(&path) {
             // --keep-duplicates: a file given twice collects twice (pytest
             // keeps duplicated args).
@@ -109,18 +116,8 @@ fn collect_dir(
     files: &mut Vec<PathBuf>,
     collect_in_virtualenv: bool,
     python_files: &[String],
+    norecursedirs: &[String],
 ) -> Result<(), String> {
-    const NORECURSE: &[&str] = &[
-        ".git",
-        ".venv",
-        "venv",
-        "node_modules",
-        "__pycache__",
-        ".tox",
-        ".eggs",
-        "build",
-        "dist",
-    ];
     let mut entries: Vec<_> = std::fs::read_dir(dir)
         .map_err(|e| format!("{}: {e}", dir.display()))?
         .filter_map(Result::ok)
@@ -130,11 +127,18 @@ fn collect_dir(
     for path in entries {
         if path.is_dir() {
             let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            if !NORECURSE.contains(&name)
-                && !name.starts_with('.')
+            // __pycache__ never holds source files; skipping it is just speed.
+            if name != "__pycache__"
+                && !matches_norecurse(&path, name, norecursedirs)
                 && (collect_in_virtualenv || !in_venv(&path))
             {
-                collect_dir(&path, files, collect_in_virtualenv, python_files)?;
+                collect_dir(
+                    &path,
+                    files,
+                    collect_in_virtualenv,
+                    python_files,
+                    norecursedirs,
+                )?;
             }
         } else if is_test_file(&path, python_files) && path.is_file() && !files.contains(&path) {
             // Overlapping arguments ("pytest a a/b") collect each file
@@ -143,6 +147,24 @@ fn collect_dir(
         }
     }
     Ok(())
+}
+
+/// pytest's fnmatch_ex over norecursedirs: a bare pattern matches the
+/// directory basename, a pattern with "/" matches the whole path (relative
+/// patterns get a "*/" prefix).
+fn matches_norecurse(path: &Path, name: &str, patterns: &[String]) -> bool {
+    patterns.iter().any(|pattern| {
+        if pattern.contains('/') {
+            let full = path.to_string_lossy();
+            if path.is_absolute() && !pattern.starts_with('/') {
+                wildcard_match(&format!("*/{pattern}"), &full)
+            } else {
+                wildcard_match(pattern, &full)
+            }
+        } else {
+            wildcard_match(pattern, name)
+        }
+    })
 }
 
 /// A file collected during directory recursion: its name matches one of the

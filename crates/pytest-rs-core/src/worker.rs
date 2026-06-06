@@ -377,11 +377,13 @@ impl Engine {
             }
         }
         let python_files = self.config.python_files_patterns();
+        let norecursedirs = self.config.norecursedirs_patterns();
         let Ok(files) = crate::collect::collect_test_files(
             &self.config.invocation_dir,
             &paths,
             self.config.get_flag("collect-in-virtualenv"),
             &python_files,
+            &norecursedirs,
             self.config.get_flag("keep-duplicates"),
         ) else {
             return;

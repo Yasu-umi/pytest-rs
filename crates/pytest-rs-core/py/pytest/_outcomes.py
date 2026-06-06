@@ -58,13 +58,18 @@ def importorskip(modname, minversion=None, reason=None):
     try:
         mod = importlib.import_module(modname)
     except ImportError as exc:
-        raise Skipped(msg=reason or f"could not import {modname!r}: {exc}") from None
+        # pytest parity: importorskip may skip whole modules at import time.
+        skipped = Skipped(msg=reason or f"could not import {modname!r}: {exc}")
+        skipped.allow_module_level = True
+        raise skipped from None
     if minversion is not None:
         version = getattr(mod, "__version__", None)
         if version is None or version < minversion:
-            raise Skipped(
+            skipped = Skipped(
                 msg=f"module {modname!r} has __version__ {version}, required is: {minversion!r}"
             )
+            skipped.allow_module_level = True
+            raise skipped
     return mod
 
 

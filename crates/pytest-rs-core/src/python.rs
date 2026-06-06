@@ -1161,8 +1161,18 @@ fn expand_parametrize(
 
     for mark in marks.iter().filter(|m| m.name == "parametrize") {
         let args = mark.obj.bind(py).getattr("args")?;
-        let argnames_obj = args.get_item(0)?;
-        let argvalues = args.get_item(1)?;
+        let kwargs = mark.obj.bind(py).getattr("kwargs")?;
+        // Both spellings are valid: positional or argnames=/argvalues= keywords.
+        let argnames_obj = if args.len()? > 0 {
+            args.get_item(0)?
+        } else {
+            kwargs.get_item("argnames")?
+        };
+        let argvalues = if args.len()? > 1 {
+            args.get_item(1)?
+        } else {
+            kwargs.get_item("argvalues")?
+        };
         // pytest's force_tuple: only a single argname given as a *string*
         // takes each argvalue as the bare value; a one-element list
         // (["x"]) still expects one-element value collections.

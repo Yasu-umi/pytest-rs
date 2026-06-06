@@ -719,6 +719,30 @@ impl Config {
             .unwrap_or_else(|| vec!["test_*.py".to_string(), "*_test.py".to_string()])
     }
 
+    /// norecursedirs ini patterns: directory basenames (fnmatch) skipped
+    /// during collection recursion (pytest's defaults).
+    pub fn norecursedirs_patterns(&self) -> Vec<String> {
+        self.get_ini("norecursedirs")
+            .map(|value| value.split_whitespace().map(str::to_string).collect())
+            .filter(|patterns: &Vec<String>| !patterns.is_empty())
+            .unwrap_or_else(|| {
+                [
+                    "*.egg",
+                    ".*",
+                    "_darcs",
+                    "build",
+                    "CVS",
+                    "dist",
+                    "node_modules",
+                    "venv",
+                    "{arch}",
+                ]
+                .iter()
+                .map(|s| s.to_string())
+                .collect()
+            })
+    }
+
     /// The effective failure budget: -x/--exitfirst means 1, otherwise the
     /// --maxfail=N value (0 disables, as in pytest).
     pub fn maxfail(&self) -> Option<usize> {
