@@ -32,7 +32,7 @@ pytest-rs --cov=mypkg           # native coverage (pytest-cov compatible)
 
 ### Bundled plugins
 
-The compatibility layers for `pytest-asyncio`, `pytest-mock`, `pytest-cov`, `pytest-split`, `pytest-benchmark` and `pytest-xdist`-style `-n` parallelism are built in — no separate plugin installs. Two ways to turn features off:
+The compatibility layers for `pytest-asyncio`, `anyio`'s pytest plugin, `pytest-mock`, `pytest-cov`, `pytest-split`, `pytest-benchmark` and `pytest-xdist`-style `-n` parallelism are built in — no separate plugin installs (the anyio layer runs tests through the installed `anyio` library's backends, so `anyio` itself must be in the environment as usual). Two ways to turn features off:
 
 Per project or per run, like pytest (works with the prebuilt wheel):
 
@@ -123,7 +123,7 @@ uv run --no-project python conformance/runner.py           # re-clones from upst
 | [pytest-split](https://github.com/jerry-git/pytest-split) | MIT | 0.9.0 |
 | [pytest-benchmark](https://github.com/ionelmc/pytest-benchmark) | BSD-2-Clause | v5.1.0 |
 
-pytest-rs reimplements the public APIs of these projects. Parts of the bundled Python shims are ports of upstream code; see [THIRD-PARTY-NOTICES.md](https://github.com/Yasu-umi/pytest-rs/blob/main/THIRD-PARTY-NOTICES.md). Credit for the API design and the test suites belongs to their respective authors.
+pytest-rs reimplements the public APIs of these projects, plus [anyio](https://github.com/agronholm/anyio)'s pytest plugin (MIT). Parts of the bundled Python shims are ports of upstream code; see [THIRD-PARTY-NOTICES.md](https://github.com/Yasu-umi/pytest-rs/blob/main/THIRD-PARTY-NOTICES.md). Credit for the API design and the test suites belongs to their respective authors.
 
 ## License
 

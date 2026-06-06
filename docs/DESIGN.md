@@ -27,7 +27,7 @@ Where the speed comes from:
 ## Decisions (fixed)
 
 - **Drop-in pytest compatibility** is the target, not a new convention. The old `fix_` prefix POC is discarded.
-- **Plugins are Rust crates** implementing a pluggy-like `Plugin` trait, compiled in via feature flags. Bundled: asyncio, mock, cov, split, benchmark. Third-party plugins (e.g. a future pytest-aiohttp) slot in the same way.
+- **Plugins are Rust crates** implementing a pluggy-like `Plugin` trait, compiled in via feature flags. Bundled: asyncio, anyio, mock, cov, split, benchmark. Third-party plugins (e.g. a future pytest-aiohttp) slot in the same way.
 - **Coverage is Rust-native** via `sys.monitoring` (PEP 669, Python 3.12+) — coverage.py is not used.
 - **Parser**: `ruff_python_parser` / `ruff_python_ast` (git-pinned; unpublished on crates.io). `rustpython-parser` is dropped.
 - **pyo3**: latest. Workspace pins exactly one version; plugin crates use it via `pytest_rs_core::pyo3` re-export.
@@ -42,6 +42,7 @@ crates/
   pytest-rs-core/        # engine: config, collection, fixtures, runner, report,
                          #   hook traits + PluginManager, pyo3 boundary, embedded pytest shim
   pytest-rs-asyncio/     # event-loop lifecycle, async test/fixture execution (LoopRunner trait)
+  pytest-rs-anyio/       # anyio-marked tests/fixtures via the installed anyio's TestRunner
   pytest-rs-mock/        # `mocker` fixture (embedded Python shim wrapping unittest.mock)
   pytest-rs-cov/         # sys.monitoring native coverage, term/xml/lcov reports
   pytest-rs-split/       # --splits/--group, .test_durations
@@ -116,10 +117,12 @@ Key structural rules:
   Never crate-to-crate Rust deps between plugins. This is how pytest-aiohttp plugs in later.
 - **Entry-point autoload** (pytest's setuptools plugin loading): installed `pytest11` entry
   points import under the shim and register their module-level fixtures and `pytest_*`
-  hooks — pure fixture-provider plugins (Faker, requests-mock, respx, time-machine, anyio,
+  hooks — pure fixture-provider plugins (Faker, requests-mock, respx, time-machine,
   pytest-aiohttp) work as-is. Distributions pytest-rs bundles natively (pytest-asyncio,
   -mock, -cov, -split, -benchmark, -xdist) are skipped: their upstream modules target real
-  pytest internals. `PYTEST_DISABLE_PLUGIN_AUTOLOAD` and `-p no:NAME` (entry-point or
+  pytest internals. anyio is deliberately *not* skipped: its plugin module's fixtures
+  (anyio_backend & friends) register through autoload, while the hooks pytest-rs cannot
+  emulate from Python live in the native anyio crate. `PYTEST_DISABLE_PLUGIN_AUTOLOAD` and `-p no:NAME` (entry-point or
   module name) opt out. Divergence: a plugin that fails to import warns
   (PytestConfigWarning) and is skipped instead of aborting the run — plugins built against
   pluggy/`_pytest` internals would otherwise make every run on that venv unusable. Loaded
@@ -179,6 +182,7 @@ Key structural rules:
 | Plugin | Mechanism | Hooks (main) |
 |---|---|---|
 | **asyncio** | `asyncio_mode auto/strict`, loop cache per `loop_scope`, `LoopRunner` trait (asyncio now; trio/uvloop later). Owns running coroutines: async tests via `pytest_pyfunc_call`, async (gen) fixtures via `pytest_fixture_setup` + finalizer driving `__anext__` | pyfunc_call, fixture_setup, collection_modifyitems, sessionfinish |
+| **anyio** | `anyio_mode auto/strict` (strict default). The real anyio dist stays entry-point autoloaded (anyio_backend & friends register as plugin fixtures, incl. user conftest overrides); the crate ports only the runner glue from `anyio.pytest_plugin` (lease-counted `get_runner`, backend `TestRunner`s — asyncio and trio both work). anyio-marked coroutine tests get a usefixtures("anyio_backend") mark + per-backend item cloning at collection (param expansion already ran); the backend value reaches hooks via fixture kwargs → engine fixture cache → raw param. Async (gen) fixtures run per backend (`pytest_fixture_cache_key` suffix); asyncgen fixtures hold their runner lease open setup→teardown, so a module-scoped one shares its loop with the module's tests, like upstream | pyfunc_call, fixture_setup, fixture_cache_key, collection_modifyitems |
 | **mock** | Adapted upstream pytest-mock shim shipped as a real `pytest_mock` package in the shim dir (assert-rewritten, so `assert_called_*` introspection diffs match pytest). Fixtures: `mocker` + class/module/package/session variants; `stopall` via generator-fixture teardown; assert-method traceback wrapping (`mock_traceback_monkeypatch`) | configure (write package, wrap asserts, register fixtures), sessionfinish (unwrap) |
 | **cov** | `sys.monitoring` tool id 1 (COVERAGE_ID), LINE events, Rust `#[pyclass]` callback returning `DISABLE` (each line costs one callback ever). Hits in `HashMap<file, BTreeSet<u32>>` (roaring deferred to M4 merge work). Denominator from ruff AST executable-line analysis + `exclude_lines` regexes (.coveragerc / --cov-config / pyproject; default `# pragma: no cover`); observed-but-unanalyzed lines union into the denominator. Reports: term/term-missing (+skip-covered), Cobertura XML, lcov (HTML/JSON later; branch coverage deferred). `--cov-fail-under` forces exit code 1 | configure (start monitoring), sessionfinish (stop, build report, fail_under), terminal_summary |
 | **split** | `.test_durations` JSON (nodeid → seconds, legacy list format accepted), `--splits N --group K`, algorithms `duration_based_chunks` (order-preserving) / `least_duration` (LPT greedy), unknown tests get mean duration of the relevant cached set; `--store-durations` aggregates `TestReport.duration` per nodeid | addoption, configure (validation), collection_modifyitems, sessionfinish (store) |

@@ -7,6 +7,8 @@ fn build_plugins() -> Vec<Box<dyn Plugin>> {
     let mut plugins: Vec<Box<dyn Plugin>> = Vec::new();
     #[cfg(feature = "asyncio")]
     plugins.push(Box::new(pytest_rs_asyncio::AsyncioPlugin::new()));
+    #[cfg(feature = "anyio")]
+    plugins.push(Box::new(pytest_rs_anyio::AnyioPlugin::new()));
     #[cfg(feature = "mock")]
     plugins.push(Box::new(pytest_rs_mock::MockPlugin::new()));
     #[cfg(feature = "cov")]

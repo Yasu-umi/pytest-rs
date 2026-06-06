@@ -527,12 +527,20 @@ dependencies = [
 name = "pytest-rs"
 version = "0.0.2"
 dependencies = [
+ "pytest-rs-anyio",
  "pytest-rs-asyncio",
  "pytest-rs-benchmark",
  "pytest-rs-core",
  "pytest-rs-cov",
  "pytest-rs-mock",
  "pytest-rs-split",
+]
+
+[[package]]
+name = "pytest-rs-anyio"
+version = "0.0.2"
+dependencies = [
+ "pytest-rs-core",
 ]
 
 [[package]]

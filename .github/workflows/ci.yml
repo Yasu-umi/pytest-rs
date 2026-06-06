@@ -100,6 +100,6 @@ jobs:
         # each gets its own invocation (config covers core + conformance).
         run: |
           uv run --no-sync mypy
-          for tree in crates/pytest-rs-asyncio crates/pytest-rs-benchmark crates/pytest-rs-cov crates/pytest-rs-mock; do
+          for tree in crates/pytest-rs-asyncio crates/pytest-rs-anyio crates/pytest-rs-benchmark crates/pytest-rs-cov crates/pytest-rs-mock; do
             uv run --no-sync mypy "$tree/py"
           done

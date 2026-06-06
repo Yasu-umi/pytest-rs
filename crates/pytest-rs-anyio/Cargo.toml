@@ -1,0 +1,15 @@
+[package]
+name = "pytest-rs-anyio"
+version = "0.0.2"
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = "../../README.md"
+
+[dependencies]
+pytest-rs-core = { workspace = true }
+
+[lints]
+workspace = true

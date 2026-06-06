@@ -20,6 +20,7 @@ todo = "warn"
 [workspace.dependencies]
 pytest-rs-core = { path = "crates/pytest-rs-core" }
 pytest-rs-asyncio = { path = "crates/pytest-rs-asyncio" }
+pytest-rs-anyio = { path = "crates/pytest-rs-anyio" }
 pytest-rs-mock = { path = "crates/pytest-rs-mock" }
 pytest-rs-cov = { path = "crates/pytest-rs-cov" }
 pytest-rs-split = { path = "crates/pytest-rs-split" }

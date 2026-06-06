@@ -1557,6 +1557,47 @@ pub(crate) fn register_fixture_def(
     Ok(())
 }
 
+/// Unwrap a pytest.param(...) entry in @pytest.fixture(params=[...]) into
+/// (value, explicit id, extra item marks). Plain values pass through.
+pub fn unwrap_fixture_param(
+    py: Python<'_>,
+    value: &Bound<'_, PyAny>,
+) -> PyResult<(Py<PyAny>, Option<String>, Vec<MarkData>)> {
+    let param_spec_cls = py.import("pytest")?.getattr("ParamSpec")?;
+    if !value.is_instance(&param_spec_cls)? {
+        return Ok((value.clone().unbind(), None, Vec::new()));
+    }
+    let values: Vec<Bound<'_, PyAny>> = value
+        .getattr("values")?
+        .try_iter()?
+        .collect::<PyResult<_>>()?;
+    let inner = match values.as_slice() {
+        [single] => single.clone().unbind(),
+        many => pyo3::types::PyTuple::new(py, many)?.into_any().unbind(),
+    };
+    // HIDDEN_PARAM (or any non-string id) falls back to value derivation.
+    let id = value
+        .getattr("id")?
+        .extract::<Option<String>>()
+        .unwrap_or(None);
+    let mut marks = Vec::new();
+    for mark in value.getattr("marks")?.try_iter()? {
+        let mark = mark?;
+        // pytest.param normalizes decorators to Marks; stay defensive.
+        let mark = match mark.getattr("mark") {
+            Ok(inner) if inner.hasattr("name")? => inner,
+            _ => mark,
+        };
+        if let Ok(name) = mark.getattr("name").and_then(|n| n.extract::<String>()) {
+            marks.push(MarkData {
+                name,
+                obj: mark.unbind(),
+            });
+        }
+    }
+    Ok((inner, id, marks))
+}
+
 /// Expand items over parametrized fixtures in their closure: an item using
 /// a fixture with `params=[...]` becomes one item per param value, with the
 /// param id appended to the nodeid.
@@ -1593,7 +1634,8 @@ pub fn expand_fixture_params(
 
         // Cartesian product over each parametrized fixture's values.
         type Assignment = (String, usize, Py<PyAny>);
-        let mut variants: Vec<(String, Vec<Assignment>)> = vec![(String::new(), Vec::new())];
+        type Variant = (String, Vec<Assignment>, Vec<MarkData>);
+        let mut variants: Vec<Variant> = vec![(String::new(), Vec::new(), Vec::new())];
         for def in &parametrized {
             let values: Vec<Bound<'_, PyAny>> = def
                 .params
@@ -1603,12 +1645,19 @@ pub fn expand_fixture_params(
                 .try_iter()?
                 .collect::<PyResult<_>>()?;
             let mut next = Vec::new();
-            for (id, assignments) in &variants {
-                for (index, value) in values.iter().enumerate() {
-                    let part = fixture_param_id(py, def.ids.as_ref(), value, index)
-                        .and_then(|id_obj| id_obj.bind(py).str().ok())
-                        .map(|s| s.to_string())
-                        .unwrap_or_else(|| id_for_value(value, &def.name, index));
+            for (id, assignments, variant_marks) in &variants {
+                for (index, wrapped) in values.iter().enumerate() {
+                    // pytest.param(...) entries carry the value, an explicit
+                    // id, and marks applied to the expanded item.
+                    let (value, spec_id, extra_marks) = unwrap_fixture_param(py, wrapped)?;
+                    let value_bound = value.bind(py);
+                    let part = spec_id
+                        .or_else(|| {
+                            fixture_param_id(py, def.ids.as_ref(), value_bound, index)
+                                .and_then(|id_obj| id_obj.bind(py).str().ok())
+                                .map(|s| s.to_string())
+                        })
+                        .unwrap_or_else(|| id_for_value(value_bound, &def.name, index));
                     let id = if id.is_empty() {
                         part
                     } else {
@@ -1618,14 +1667,22 @@ pub fn expand_fixture_params(
                         .iter()
                         .map(|(n, i, v)| (n.clone(), *i, v.clone_ref(py)))
                         .collect::<Vec<_>>();
-                    assignments.push((def.name.clone(), index, value.clone().unbind()));
-                    next.push((id, assignments));
+                    assignments.push((def.name.clone(), index, value.clone_ref(py)));
+                    let mut variant_marks: Vec<MarkData> = variant_marks
+                        .iter()
+                        .map(|m| MarkData {
+                            name: m.name.clone(),
+                            obj: m.obj.clone_ref(py),
+                        })
+                        .collect();
+                    variant_marks.extend(extra_marks);
+                    next.push((id, assignments, variant_marks));
                 }
             }
             variants = next;
         }
 
-        for (id, assignments) in variants {
+        for (id, assignments, variant_marks) in variants {
             let nodeid = if item.nodeid.ends_with(']') {
                 format!("{}-{id}]", &item.nodeid[..item.nodeid.len() - 1])
             } else {
@@ -1650,6 +1707,7 @@ pub fn expand_fixture_params(
                         name: m.name.clone(),
                         obj: m.obj.clone_ref(py),
                     })
+                    .chain(variant_marks)
                     .collect(),
                 callspec: item
                     .callspec
