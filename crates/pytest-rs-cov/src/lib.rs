@@ -489,7 +489,10 @@ impl Plugin for CovPlugin {
         };
 
         let monitoring = py.import("sys")?.getattr("monitoring")?;
+        let events = monitoring.getattr("events")?;
         let disable = monitoring.getattr("DISABLE")?.unbind();
+        let py_start_event = events.getattr("PY_START")?;
+        let line_event = events.getattr("LINE")?;
         let collector = Py::new(
             py,
             LineCollector::new(
@@ -497,16 +500,25 @@ impl Plugin for CovPlugin {
                 self.sources.iter().map(|source| with_sep(source)).collect(),
                 with_sep(&pytest_rs_core::python::shim_root()),
                 disable,
+                line_event.clone().unbind(),
+                monitoring.clone().unbind(),
+                TOOL_ID,
             ),
         )?;
 
-        let line_event = monitoring.getattr("events")?.getattr("LINE")?;
         monitoring.call_method1("use_tool_id", (TOOL_ID, "pytest-rs-cov"))?;
         monitoring.call_method1(
             "register_callback",
-            (TOOL_ID, &line_event, collector.bind(py)),
+            (TOOL_ID, &py_start_event, collector.bind(py).getattr("py_start")?),
         )?;
-        monitoring.call_method1("set_events", (TOOL_ID, &line_event))?;
+        monitoring.call_method1(
+            "register_callback",
+            (TOOL_ID, &line_event, collector.bind(py).getattr("line")?),
+        )?;
+        // Globally only the PY_START gate; LINE events arm per tracked code
+        // object (coverage.py's sysmon core layout).
+        monitoring.call_method1("set_events", (TOOL_ID, &py_start_event))?;
+        monitoring.call_method0("restart_events")?;
         self.collector = Some(collector);
         Ok(())
     }
