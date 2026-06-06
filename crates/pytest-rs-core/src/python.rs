@@ -2296,6 +2296,14 @@ pub fn configure_capture(py: Python<'_>, mode: &str) {
         .and_then(|m| m.call_method1("configure", (mode,)));
 }
 
+/// Tell the tmp_path factory the explicit --basetemp directory (cleared at
+/// session start, kept after the run, like pytest).
+pub fn configure_basetemp(py: Python<'_>, path: &str) {
+    let _ = py
+        .import("pytest._tmp_path")
+        .and_then(|m| m.call_method1("configure", (path,)));
+}
+
 /// Tell the assert-rewrite explainer the -v level (full iterable diffs
 /// need -v, identical dict items unfold at -vv, like pytest).
 pub fn set_assertion_verbosity(py: Python<'_>, level: u8) {

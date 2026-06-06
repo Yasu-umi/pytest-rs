@@ -12,6 +12,9 @@ jobs:
   rust:
     name: rust (python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    permissions:
+      # The conformance step auto-commits refreshed linux results on main.
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -47,9 +50,26 @@ jobs:
         run: cargo build
 
       - name: conformance (upstream test suites)
+        # One canonical environment for the committed results: linux on a
+        # single python version. Regressions against expected/*.toml fail here.
+        if: matrix.python-version == '3.13'
         run: |
           export LD_LIBRARY_PATH="$(python -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR"))'):${LD_LIBRARY_PATH:-}"
           python conformance/runner.py --check
+
+      - name: commit refreshed conformance results
+        # The runner rewrites scoreboard/RESULTS.md/README on every run; on
+        # main the bot commits whatever changed (GITHUB_TOKEN pushes do not
+        # retrigger workflows).
+        if: matrix.python-version == '3.13' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          if ! git diff --quiet conformance/scoreboard conformance/RESULTS.md README.md; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add conformance/scoreboard conformance/RESULTS.md README.md
+            git commit -m "conformance: refresh linux results"
+            git push
+          fi
 
   python-lint:
     name: python lint (ruff + mypy)

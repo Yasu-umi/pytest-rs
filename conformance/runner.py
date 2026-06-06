@@ -11,16 +11,24 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
 import tomllib
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 CACHE = ROOT / ".tmp" / "conformance"
 BINARY = ROOT / "target" / "debug" / "pytest-rs"
+# Results are platform-scoped: counts differ between linux and darwin
+# (platform-specific skips, system deps), so each platform owns its
+# scoreboard; linux is canonical (regenerated and committed from CI).
+PLATFORM = "linux" if sys.platform.startswith("linux") else sys.platform
+SCOREBOARD = ROOT / "conformance" / "scoreboard"
+RESULTS_DOC = ROOT / "conformance" / "RESULTS.md"
 TIMEOUT_S = 120
 
 SUMMARY_RE = re.compile(
@@ -115,8 +123,6 @@ class Suite:
         return kept, len(files) - len(kept)
 
     def run_file(self, path: Path) -> FileResult:
-        import os
-
         rel = str(path.relative_to(self.checkout))
         env = dict(os.environ)
         deps_dir = self.deps_dir()
@@ -201,17 +207,17 @@ def load_excluded(suite: Suite) -> dict[str, str]:
 
 
 def suite_summary(results: list[FileResult], excluded: int) -> str:
-    """Aligned stats: tests passed/graded (%), file tally, oddity notes.
+    """Aligned stats: tests passed/total (%), file tally, oddity notes.
 
-    "tests" counts individual test outcomes summed across every file;
-    "files" counts per-file runs (a file is all-pass only when its whole
-    run exited cleanly)."""
+    "tests" counts individual test outcomes summed across every file, with
+    total = passed + failed + errors + skipped; "files" counts per-file runs
+    (a file is all-pass only when its whole run exited cleanly)."""
     passed = sum(r.passed for r in results)
     failed = sum(r.failed for r in results)
     errors = sum(r.errors for r in results)
     skipped = sum(r.skipped for r in results)
-    graded = passed + failed + errors
-    pct = f"{passed / graded * 100:5.1f}%" if graded else "    -"
+    total = passed + failed + errors + skipped
+    pct = f"{passed / total * 100:5.1f}%" if total else "    -"
     files_ok = sum(1 for r in results if r.status == "passed")
     notes = []
     if skipped:
@@ -226,12 +232,12 @@ def suite_summary(results: list[FileResult], excluded: int) -> str:
         notes.append(f"{excluded} files excluded")
     note = f"  [{'; '.join(notes)}]" if notes else ""
     return (
-        f"tests {passed:>5}/{graded:<5} ({pct})   "
+        f"tests {passed:>5}/{total:<5} ({pct})   "
         f"files {files_ok:>2}/{len(results):<3} all-pass{note}"
     )
 
 
-def run_suite(suite: Suite, use_local: bool) -> tuple[list[FileResult], str]:
+def run_suite(suite: Suite, use_local: bool, jobs: int) -> tuple[list[FileResult], str]:
     suite.fetch(use_local)
     files, excluded = suite.test_files()
     manifest_excluded = load_excluded(suite)
@@ -240,7 +246,12 @@ def run_suite(suite: Suite, use_local: bool) -> tuple[list[FileResult], str]:
     ]
     files = [f for f in files if str(f.relative_to(suite.checkout)) not in manifest_excluded]
     excluded += len(skipped_by_manifest)
-    results = [suite.run_file(path) for path in files]
+    # Warm the deps --target install once, before workers race for it.
+    suite.deps_dir()
+    # Each file is its own pytest-rs process (private basetemp), so files
+    # run in parallel; results keep the deterministic input order.
+    with ThreadPoolExecutor(max_workers=jobs) as pool:
+        results = list(pool.map(suite.run_file, files))
 
     summary = suite_summary(results, excluded)
     print(f"{suite.name} @ {suite.tag}")
@@ -256,19 +267,135 @@ def run_suite(suite: Suite, use_local: bool) -> tuple[list[FileResult], str]:
                 print(result.stderr.rstrip())
             print(f"  --- end: {result.file} ---")
 
-    scoreboard = ROOT / "conformance" / "scoreboard"
-    scoreboard.mkdir(exist_ok=True)
-    (scoreboard / f"{suite.name}.json").write_text(
+    (SCOREBOARD / PLATFORM).mkdir(parents=True, exist_ok=True)
+    (SCOREBOARD / PLATFORM / f"{suite.name}.json").write_text(
         json.dumps(
-            [
-                {k: v for k, v in result.__dict__.items() if k not in ("stdout", "stderr")}
-                for result in results
-            ],
+            {
+                "suite": suite.name,
+                "tag": suite.tag,
+                "excluded_files": excluded,
+                "files": [
+                    {k: v for k, v in result.__dict__.items() if k not in ("stdout", "stderr")}
+                    for result in results
+                ],
+            },
             indent=2,
         )
         + "\n"
     )
     return results, summary
+
+
+def load_scoreboards(suites: list[Suite], platform: str) -> list[dict]:
+    boards = []
+    for suite in suites:
+        path = SCOREBOARD / platform / f"{suite.name}.json"
+        if path.exists():
+            boards.append(json.loads(path.read_text()))
+    return boards
+
+
+def scoreboard_platforms() -> list[str]:
+    """Platforms with committed results, canonical (linux) first."""
+    if not SCOREBOARD.is_dir():
+        return []
+    found = sorted(p.name for p in SCOREBOARD.iterdir() if p.is_dir())
+    return sorted(found, key=lambda name: (name != "linux", name))
+
+
+def cross_suite_table(boards: list[dict]) -> list[str]:
+    """The cross-suite markdown table (shared by RESULTS.md and README.md)."""
+    lines = [
+        "| suite | tag | passed | failed | errors | skipped | total | pass % "
+        "| files all-pass | files run | files excluded |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+    ]
+    for board in boards:
+        files = board["files"]
+        passed = sum(f["passed"] for f in files)
+        failed = sum(f["failed"] for f in files)
+        errors = sum(f["errors"] for f in files)
+        skipped = sum(f["skipped"] for f in files)
+        total = passed + failed + errors + skipped
+        pct = f"{passed / total * 100:.1f}%" if total else "-"
+        files_ok = sum(1 for f in files if f["status"] == "passed")
+        lines.append(
+            f"| {board['suite']} | {board['tag']} | {passed} | {failed} | {errors} "
+            f"| {skipped} | {total} | {pct} | {files_ok} | {len(files)} "
+            f"| {board['excluded_files']} |"
+        )
+    return lines
+
+
+def render_results_doc(suites: list[Suite]) -> str:
+    """RESULTS.md rendered from the committed scoreboard JSONs: per platform,
+    the cross-suite table plus per-file detail, with total = passed + failed +
+    errors + skipped per file."""
+    lines = [
+        "# Conformance results",
+        "",
+        "Auto-generated by `conformance/runner.py` — do not edit by hand. Every run",
+        "rewrites the current platform's `conformance/scoreboard/<platform>/*.json`,",
+        "this file and the README table. Linux is canonical: CI re-runs the suites",
+        "and auto-commits updated results on pushes to main.",
+        "",
+        "Accounting: `total = passed + failed + errors + skipped`, summed over the",
+        "upstream test files of each suite. `skipped` counts tests the upstream",
+        "suites explicitly skip when run under pytest-rs. Excluded files (the",
+        "per-suite lists in `conformance/expected/*.toml` plus path patterns in",
+        "`conformance/suites.toml`) are not run at all and only show up in the",
+        '"files excluded" column.',
+        "",
+    ]
+    for platform in scoreboard_platforms():
+        boards = load_scoreboards(suites, platform)
+        if not boards:
+            continue
+        label = " (CI-verified)" if platform == "linux" else " (dev snapshot)"
+        lines.append(f"## {platform}{label}")
+        lines.append("")
+        lines.extend(cross_suite_table(boards))
+        lines.append("")
+        for board in boards:
+            files = board["files"]
+            lines.append(f"### {board['suite']} @ {board['tag']}")
+            lines.append("")
+            lines.append(f"<details><summary>per-file detail ({len(files)} files)</summary>")
+            lines.append("")
+            lines.append("| file | status | passed | failed | errors | skipped |")
+            lines.append("|---|---|---:|---:|---:|---:|")
+            for f in files:
+                lines.append(
+                    f"| {f['file']} | {f['status']} | {f['passed']} | {f['failed']} "
+                    f"| {f['errors']} | {f['skipped']} |"
+                )
+            lines.append("")
+            lines.append("</details>")
+            lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+README_DOC = ROOT / "README.md"
+README_MARKERS = ("<!-- conformance-results:start -->", "<!-- conformance-results:end -->")
+
+
+def update_readme_table(suites: list[Suite]) -> None:
+    """Splice the canonical platform's cross-suite table between the README's
+    marker comments (linux preferred — it is what CI verifies)."""
+    platforms = scoreboard_platforms()
+    if not platforms:
+        return
+    platform = platforms[0]
+    boards = load_scoreboards(suites, platform)
+    start, end = README_MARKERS
+    text = README_DOC.read_text()
+    if start not in text or end not in text:
+        return
+    head, rest = text.split(start, 1)
+    _, tail = rest.split(end, 1)
+    label = "CI-verified" if platform == "linux" else "dev snapshot"
+    table = "\n".join([f"_{platform} ({label})_", "", *cross_suite_table(boards)])
+    README_DOC.write_text(f"{head}{start}\n{table}\n{end}{tail}")
 
 
 def check_suite(suite: Suite, results: list[FileResult]) -> list[str]:
@@ -291,6 +418,12 @@ def main() -> None:
         action="store_true",
         help="use sibling checkouts (e.g. ../pytest) instead of cloning pinned tags",
     )
+    parser.add_argument(
+        "--jobs",
+        type=int,
+        default=os.cpu_count() or 4,
+        help="test files run in parallel (each is its own pytest-rs process)",
+    )
     args = parser.parse_args()
 
     if not BINARY.exists():
@@ -299,10 +432,17 @@ def main() -> None:
     violations: list[str] = []
     summaries: list[tuple[str, str]] = []
     for suite in load_suites(args.suite):
-        results, summary = run_suite(suite, args.local)
+        results, summary = run_suite(suite, args.local, args.jobs)
         summaries.append((suite.name, summary))
         if args.check:
             violations.extend(check_suite(suite, results))
+
+    # Rewrite the human-readable results doc and README table from the
+    # committed scoreboards plus this run's update. CI auto-commits the
+    # refreshed linux results on main; regressions below still hard-fail.
+    all_suites = load_suites(None)
+    RESULTS_DOC.write_text(render_results_doc(all_suites))
+    update_readme_table(all_suites)
 
     if len(summaries) > 1:
         print("\n==== summary " + "=" * 67)

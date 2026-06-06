@@ -232,9 +232,14 @@ class Pytester:
             existing = env.get("PYTHONPATH")
             entries = [*self._syspaths, *([existing] if existing else [])]
             env["PYTHONPATH"] = os.pathsep.join(entries)
+        # Upstream pytester parity: nested runs get a numbered --basetemp
+        # under this pytester dir, so their tmp dirs are cleaned up with it
+        # (a later user-passed --basetemp still wins).
+        n = sum(1 for p in self.path.glob("runpytest-*"))
+        basetemp = self.path / f"runpytest-{n}"
         start = time.perf_counter()
         proc = subprocess.run(
-            [exe, *[str(arg) for arg in args]],
+            [exe, f"--basetemp={basetemp}", *[str(arg) for arg in args]],
             cwd=self.path,
             capture_output=True,
             text=True,

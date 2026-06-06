@@ -110,6 +110,9 @@ impl Engine {
             return exit_code::USAGE_ERROR;
         }
         python::configure_capture(py, capture_mode);
+        if let Some(basetemp) = self.config.get_value("basetemp") {
+            python::configure_basetemp(py, basetemp);
+        }
         python::set_assertion_verbosity(py, self.config.verbose);
         python::set_assertion_truncation(
             py,

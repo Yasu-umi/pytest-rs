@@ -1,0 +1,16 @@
+{
+  "suite": "pytest-xdist",
+  "tag": "v3.8.0",
+  "excluded_files": 6,
+  "files": [
+    {
+      "file": "testing/acceptance_test.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 63,
+      "failed": 35,
+      "skipped": 0,
+      "errors": 0
+    }
+  ]
+}

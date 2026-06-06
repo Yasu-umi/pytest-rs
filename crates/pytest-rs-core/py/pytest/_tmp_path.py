@@ -5,18 +5,86 @@ import tempfile
 
 from pytest._fixtures import fixture
 
+_BASETEMP_PREFIX = "pytest-rs-basetemp-"
+# A SIGKILLed session (timeouts, ^C -9) never reaches the factory teardown;
+# sweep leftovers this much older than now before creating a new basetemp.
+# Generous so concurrently live sessions are never touched.
+_STALE_SECONDS = 3 * 60 * 60
+
+# --basetemp value, set by the engine at startup (None → mkdtemp per run).
+_given_basetemp = None
+
+
+def configure(basetemp):
+    global _given_basetemp
+    _given_basetemp = basetemp
+
+
+def rm_rf(path):
+    """shutil.rmtree clearing read-only bits on the way (pytest's rm_rf):
+    plain rmtree silently leaves e.g. chmod-0 dirs made by tests behind."""
+    import os
+    import shutil
+    import stat
+
+    def onexc(func, failed, exc):
+        for target in (os.path.dirname(failed), failed):
+            try:
+                os.chmod(target, os.stat(target).st_mode | stat.S_IRWXU)
+            except OSError:
+                pass
+        try:
+            func(failed)
+        except OSError:
+            pass
+
+    try:
+        shutil.rmtree(path, onexc=onexc)
+    except OSError:
+        pass
+
+
+def _sweep_stale_basetemps():
+    """Best-effort removal of basetemps left behind by killed sessions."""
+    import time
+
+    cutoff = time.time() - _STALE_SECONDS
+    try:
+        entries = list(pathlib.Path(tempfile.gettempdir()).iterdir())
+    except OSError:
+        return
+    for entry in entries:
+        if not entry.name.startswith(_BASETEMP_PREFIX):
+            continue
+        try:
+            if entry.stat().st_mtime < cutoff:
+                rm_rf(entry)
+        except OSError:
+            continue
+
 
 class TempPathFactory:
     """Factory for session-scoped temporary directories."""
 
     def __init__(self, basetemp=None):
-        self._basetemp = pathlib.Path(basetemp) if basetemp else None
+        basetemp = basetemp if basetemp is not None else _given_basetemp
+        self._given = basetemp is not None
+        self._basetemp = None
+        if self._given:
+            # pytest semantics for an explicit --basetemp: cleared at session
+            # start, kept after the run.
+            path = pathlib.Path(basetemp)
+            if path.exists():
+                rm_rf(path)
+            path.mkdir(parents=True, exist_ok=True)
+            self._basetemp = path.resolve()
 
     def getbasetemp(self):
         if self._basetemp is None:
+            _sweep_stale_basetemps()
             # resolve() so chdir(tmp_path) round-trips through os.getcwd()
             # (macOS /tmp is a symlink to /private/tmp).
-            self._basetemp = pathlib.Path(tempfile.mkdtemp(prefix="pytest-rs-basetemp-")).resolve()
+            self._basetemp = pathlib.Path(tempfile.mkdtemp(prefix=_BASETEMP_PREFIX)).resolve()
         return self._basetemp
 
     def mktemp(self, basename, numbered=True):
@@ -38,12 +106,12 @@ class TempPathFactory:
 
 @fixture(scope="session")
 def tmp_path_factory():
-    import shutil
-
     factory = TempPathFactory()
     yield factory
-    if factory._basetemp is not None:
-        shutil.rmtree(factory._basetemp, ignore_errors=True)
+    # Auto-created basetemps are removed with the session; an explicit
+    # --basetemp survives the run (pytest semantics).
+    if factory._basetemp is not None and not factory._given:
+        rm_rf(factory._basetemp)
 
 
 @fixture
