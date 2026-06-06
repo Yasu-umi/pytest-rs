@@ -2331,6 +2331,16 @@ pub fn set_assertion_verbosity(py: Python<'_>, level: u8) {
         .and_then(|m| m.call_method1("set_verbosity", (level,)));
 }
 
+/// Pass the truncation_limit_lines / truncation_limit_chars ini values to
+/// the assert-rewrite explainer (None keeps pytest's defaults: 8 lines,
+/// 640 chars).
+pub fn set_assertion_truncation(py: Python<'_>, lines: Option<&str>, chars: Option<&str>) {
+    let parse = |value: Option<&str>| value.and_then(|s| s.trim().parse::<i64>().ok());
+    let _ = py
+        .import("pytest._rewrite")
+        .and_then(|m| m.call_method1("set_truncation_limits", (parse(lines), parse(chars))));
+}
+
 /// Build the Python TestReport proxy handed to pytest_runtest_logreport
 /// conftest hooks: a _pytest.reports.TestReport shim instance, whose
 /// passed/failed/skipped flags and capstdout/capstderr/caplog properties

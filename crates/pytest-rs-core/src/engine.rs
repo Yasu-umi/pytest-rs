@@ -111,6 +111,11 @@ impl Engine {
         }
         python::configure_capture(py, capture_mode);
         python::set_assertion_verbosity(py, self.config.verbose);
+        python::set_assertion_truncation(
+            py,
+            self.config.get_ini("truncation_limit_lines"),
+            self.config.get_ini("truncation_limit_chars"),
+        );
 
         // --junitxml: arm the XML writer (workers never write; the parent
         // streams every report through it at session end).

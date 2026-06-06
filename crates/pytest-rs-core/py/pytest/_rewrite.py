@@ -53,48 +53,77 @@ def _is_rewrite_target(origin):
 # its explanations on config verbosity the same way).
 _verbosity = 0
 
+# truncation_limit_lines / truncation_limit_chars ini values, set by the
+# engine at startup (None means "use pytest's defaults": 8 lines, 640 chars).
+_truncation_lines = None
+_truncation_chars = None
+
 
 def set_verbosity(level):
     global _verbosity
     _verbosity = level
 
 
-def _explain_op(op, left, right):
-    """Extra explanation lines for a failed comparison, matching pytest's
-    assertrepr_compare op dispatch (summary line excluded — the engine
-    renders that part itself)."""
+def set_truncation_limits(lines, chars):
+    global _truncation_lines, _truncation_chars
+    _truncation_lines = lines
+    _truncation_chars = chars
+
+
+class _RewriteConfig:
+    """Just enough of pytest's Config for util.assertrepr_compare."""
+
+    def get_verbosity(self, verbosity_type=None):
+        return _verbosity
+
+    def get_terminal_writer(self):
+        return self
+
+    def _highlight(self, source, lexer="python"):
+        return source
+
+
+def _format_assert(op, left, right):
+    """The full AssertionError text after "assert " for a failed comparison:
+    pytest's assertrepr_compare explanation (saferepr'd summary + op-specific
+    diff lines), truncated like pytest's callbinrepr unless -vv/CI/ini opt
+    out."""
+    fallback = f"{left!r} {op} {right!r}"
     try:
-        from _pytest.assertion import util
-
-        def highlighter(text, *args, **kwargs):
-            return text
-
-        lines = None
-        if op == "==":
-            lines = util._compare_eq_any(left, right, highlighter, _verbosity)
-        elif op == "not in":
-            if util.istext(left) and util.istext(right):
-                lines = util._notin_text(left, right, _verbosity)
-        elif op == "!=":
-            if util.isset(left) and util.isset(right):
-                lines = ["Both sets are equal"]
-        elif op == ">=":
-            if util.isset(left) and util.isset(right):
-                lines = util._compare_gte_set(left, right, highlighter, _verbosity)
-        elif op == "<=":
-            if util.isset(left) and util.isset(right):
-                lines = util._compare_lte_set(left, right, highlighter, _verbosity)
-        elif op == ">":
-            if util.isset(left) and util.isset(right):
-                lines = util._compare_gt_set(left, right, highlighter, _verbosity)
-        elif op == "<":
-            if util.isset(left) and util.isset(right):
-                lines = util._compare_lt_set(left, right, highlighter, _verbosity)
-        if not lines:
-            return ""
-        return "\n  " + "\n  ".join(lines)
+        from _pytest import outcomes
+        from _pytest.assertion import truncate, util
+        from _pytest.compat import running_on_ci
     except Exception:
-        return ""
+        return fallback
+    try:
+        expl = util.assertrepr_compare(_RewriteConfig(), op, left, right)
+        if not expl:
+            return fallback
+        max_lines = int(
+            _truncation_lines if _truncation_lines is not None else truncate.DEFAULT_MAX_LINES
+        )
+        max_chars = int(
+            _truncation_chars if _truncation_chars is not None else truncate.DEFAULT_MAX_CHARS
+        )
+        should_truncate = (
+            _verbosity < 2 and not running_on_ci() and (max_lines > 0 or max_chars > 0)
+        )
+        if should_truncate:
+            expl = truncate._truncate_explanation(expl, max_lines=max_lines, max_chars=max_chars)
+        expl = [line.replace("\n", "\\n") for line in expl]
+        return expl[0] + "".join("\n  " + line for line in expl[1:])
+    except outcomes.Exit:
+        raise
+    except Exception:
+        return fallback
+
+
+def _explain_op(op, left, right):
+    """Backwards-compatible alias (modules rewritten by an older engine):
+    explanation lines only, the summary was rendered by the caller."""
+    explained = _format_assert(op, left, right)
+    summary, newline, rest = explained.partition("\n")
+    return newline + rest if rest else ""
 
 
 def _explain_eq(left, right):
@@ -155,21 +184,9 @@ class _AssertRewriter(ast.NodeTransformer):
             comparators=[ast.Name(id=right_name, ctx=ast.Load())],
         )
 
-        def repr_of(name):
-            return ast.FormattedValue(
-                value=ast.Name(id=name, ctx=ast.Load()), conversion=ord("r"), format_spec=None
-            )
-
-        values = [
-            *self._user_msg_prefix(node),
-            ast.Constant("assert "),
-            repr_of(left_name),
-            ast.Constant(f" {op} "),
-            repr_of(right_name),
-        ]
-        # pytest parity: a failed comparison appends op-specific explanation
-        # lines (diffs for ==, "is contained here" for not in, set details
-        # for ordering ops).
+        # pytest parity: a failed comparison renders assertrepr_compare's
+        # explanation (saferepr'd summary, op-specific diff lines, runtime
+        # truncation), all composed by the engine's runtime helper.
         explain = ast.Call(
             func=ast.Attribute(
                 value=ast.Attribute(
@@ -181,7 +198,7 @@ class _AssertRewriter(ast.NodeTransformer):
                     attr="_rewrite",
                     ctx=ast.Load(),
                 ),
-                attr="_explain_op",
+                attr="_format_assert",
                 ctx=ast.Load(),
             ),
             args=[
@@ -191,7 +208,11 @@ class _AssertRewriter(ast.NodeTransformer):
             ],
             keywords=[],
         )
-        values.append(ast.FormattedValue(value=explain, conversion=-1, format_spec=None))
+        values = [
+            *self._user_msg_prefix(node),
+            ast.Constant("assert "),
+            ast.FormattedValue(value=explain, conversion=-1, format_spec=None),
+        ]
         message = ast.JoinedStr(values=values)
         raise_stmt = ast.Raise(
             exc=ast.Call(
