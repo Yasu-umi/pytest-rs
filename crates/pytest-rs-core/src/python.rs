@@ -1671,6 +1671,50 @@ pub fn skip_location_override(py: Python<'_>, err: &PyErr) -> Option<String> {
     err.value(py).getattr("_location").ok()?.extract().ok()
 }
 
+/// Wire session-wide logging handlers (log_file / log_cli) from CLI + ini
+/// settings; returns whether live (log_cli) logging is enabled.
+pub fn configure_logging(py: Python<'_>, config: &crate::config::Config) -> bool {
+    let setting = |cli: &str, ini: &str| -> Option<String> {
+        config
+            .get_value(cli)
+            .map(str::to_string)
+            .or_else(|| config.get_ini(ini).map(str::to_string))
+    };
+    let result: PyResult<bool> = (|| {
+        let settings = pyo3::types::PyDict::new(py);
+        for (cli, ini) in [
+            ("log-level", "log_level"),
+            ("log-format", "log_format"),
+            ("log-date-format", "log_date_format"),
+            ("log-cli-level", "log_cli_level"),
+            ("log-cli-format", "log_cli_format"),
+            ("log-cli-date-format", "log_cli_date_format"),
+            ("log-file", "log_file"),
+            ("log-file-level", "log_file_level"),
+            ("log-file-mode", "log_file_mode"),
+            ("log-file-format", "log_file_format"),
+            ("log-file-date-format", "log_file_date_format"),
+            ("log-disable", "log_disable"),
+        ] {
+            if let Some(value) = setting(cli, ini) {
+                settings.set_item(ini, value)?;
+            }
+        }
+        // log_cli is ini-only; --log-cli-level on the command line (not the
+        // log_cli_level ini) also auto-enables live logging.
+        if let Some(value) = config.get_ini("log_cli") {
+            settings.set_item("log_cli", value)?;
+        }
+        if config.get_value("log-cli-level").is_some() {
+            settings.set_item("log_cli_level_from_cli", "1")?;
+        }
+        let module = py.import("pytest._logging")?;
+        module.getattr("configure")?.call1((settings,))?;
+        module.getattr("log_cli_enabled")?.call0()?.extract()
+    })();
+    result.unwrap_or(false)
+}
+
 /// Tell the subtests fixture how many failures remain in the --maxfail
 /// budget (None = unlimited); exhausting it stops swallowing failures.
 pub fn set_subtest_fail_budget(py: Python<'_>, budget: Option<usize>) {

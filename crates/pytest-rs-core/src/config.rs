@@ -392,9 +392,20 @@ impl Config {
             "setup-plan",      // like --setup-only (fixtures do execute here)
             "setup-show",      // run tests, narrating fixture setup/teardown
         ];
-        const CORE_VALUES: [(&str, Option<char>); 25] = [
+        const CORE_VALUES: [(&str, Option<char>); 36] = [
             ("deselect", None),
             ("log-level", None),
+            ("log-format", None),
+            ("log-date-format", None),
+            ("log-cli-level", None),
+            ("log-cli-format", None),
+            ("log-cli-date-format", None),
+            ("log-file", None),
+            ("log-file-level", None),
+            ("log-file-mode", None),
+            ("log-file-format", None),
+            ("log-file-date-format", None),
+            ("log-disable", None),
             ("last-failed-no-failures", None),
             ("report-chars", Some('r')),
             ("markexpr", Some('m')),
@@ -573,7 +584,7 @@ impl Config {
             if name == "plugin" {
                 plugin_opts = parsed.iter().map(|v| v.to_string()).collect();
             }
-            if matches!(name, "deselect" | "doctest-glob") {
+            if matches!(name, "deselect" | "doctest-glob" | "log-disable") {
                 // Every occurrence matters (newline-joined for get_values).
                 let joined = parsed
                     .iter()

@@ -68,6 +68,9 @@ pub struct Session {
     /// Fatal distribution condition (crashed-worker budget exhausted),
     /// shown as a banner before the short summary.
     pub dist_banner: Option<String>,
+    /// log_cli live logging: the runner prints per-item headers and
+    /// word-style outcomes so log records interleave with progress.
+    pub live_logging: bool,
     /// Items dropped by selection (-k/-m/--lf), for the summary line.
     pub deselected: usize,
     /// The dropped items themselves, passed to pytest_deselected hooks.
@@ -96,6 +99,7 @@ impl Session {
             worker_warnings: Vec::new(),
             worker_warning_count: 0,
             dist_banner: None,
+            live_logging: false,
             deselected: 0,
             deselected_items: Vec::new(),
             collect_errors: Vec::new(),

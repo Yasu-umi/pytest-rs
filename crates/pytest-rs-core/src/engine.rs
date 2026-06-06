@@ -81,6 +81,10 @@ impl Engine {
             eprintln!("ERROR: {}", err.value(py));
             return exit_code::USAGE_ERROR;
         }
+        // Session-wide logging handlers: log_file writes, log_cli interleaves
+        // live records with the progress output.
+        self.session.live_logging = python::configure_logging(py, &self.config);
+
         // Arm unknown-mark validation (PytestUnknownMarkWarning on access).
         if let Err(err) = python::configure_mark_generator(
             py,

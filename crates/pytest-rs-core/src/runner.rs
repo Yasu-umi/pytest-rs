@@ -77,13 +77,24 @@ impl Engine {
                 .split_once("::")
                 .map(|(f, _)| f.to_string())
                 .unwrap_or_else(|| item.nodeid.clone());
-            if config.verbose == 0 && !config.quiet && !config.no_terminal() && file != current_file
+            if config.verbose == 0
+                && !config.quiet
+                && !config.no_terminal()
+                && !session.live_logging
+                && file != current_file
             {
                 if !current_file.is_empty() {
                     println!("{}", with_progress(&line, done, total));
                 }
                 line = format!("{file} ");
                 current_file = file;
+            }
+
+            // log_cli: the item header prints on its own line up front so
+            // live log records appear under it.
+            if session.live_logging && !config.no_terminal() && !config.quiet {
+                println!("{} ", item.nodeid);
+                let _ = std::io::stdout().flush();
             }
 
             // Failed subtests share the --maxfail budget: tell the fixture
@@ -100,34 +111,21 @@ impl Engine {
                 if config.no_terminal() {
                     // -p no:terminal: no progress output at all.
                 } else if config.verbose > 0 {
-                    // pytest appends the reason to skip/xfail words: "XFAIL (why)".
-                    let reasoned = |word: &str| match report.longrepr.as_deref() {
-                        Some(reason) if !reason.is_empty() && !reason.contains('\n') => {
-                            format!("{word} ({reason})")
-                        }
-                        _ => word.to_string(),
-                    };
-                    let word = if let Some(desc) = &report.subtest_desc {
-                        match report.outcome {
-                            Outcome::Failed => format!("SUBFAILED{desc}"),
-                            Outcome::Skipped => reasoned(&format!("SUBSKIPPED{desc}")),
-                            Outcome::XFailed => reasoned(&format!("SUBXFAIL{desc}")),
-                            _ => format!("SUBPASSED{desc}"),
-                        }
-                    } else {
-                        match report.outcome {
-                            Outcome::Passed => "PASSED".to_string(),
-                            Outcome::Failed => "FAILED".to_string(),
-                            Outcome::Skipped => reasoned("SKIPPED"),
-                            Outcome::XFailed => reasoned("XFAIL"),
-                            Outcome::XPassed => "XPASS".to_string(),
-                        }
-                    };
                     if report.phase == Phase::Call || report.outcome != Outcome::Passed {
                         println!(
                             "{}",
-                            with_progress(&format!("{} {}", item.nodeid, word), done, total)
+                            with_progress(
+                                &format!("{} {}", item.nodeid, outcome_word(&report)),
+                                done,
+                                total
+                            )
                         );
+                        let _ = std::io::stdout().flush();
+                    }
+                } else if session.live_logging && !config.quiet {
+                    // log_cli: the outcome word alone, under the live records.
+                    if report.phase == Phase::Call || report.outcome != Outcome::Passed {
+                        println!("{}", with_progress(&outcome_word(&report), done, total));
                         let _ = std::io::stdout().flush();
                     }
                 } else if !config.quiet
@@ -144,7 +142,11 @@ impl Engine {
                 }
             }
         }
-        if config.verbose == 0 && !config.quiet && !config.no_terminal() && !current_file.is_empty()
+        if config.verbose == 0
+            && !config.quiet
+            && !config.no_terminal()
+            && !session.live_logging
+            && !current_file.is_empty()
         {
             println!("{}", with_progress(&line, done, total));
         }
@@ -173,6 +175,33 @@ impl Engine {
         }
 
         session.items = items;
+    }
+}
+
+/// The verbose outcome word for a report: "PASSED", "SKIPPED (why)",
+/// "SUBFAILED[desc]", ... (pytest appends reasons to skip/xfail words).
+fn outcome_word(report: &TestReport) -> String {
+    let reasoned = |word: &str| match report.longrepr.as_deref() {
+        Some(reason) if !reason.is_empty() && !reason.contains('\n') => {
+            format!("{word} ({reason})")
+        }
+        _ => word.to_string(),
+    };
+    if let Some(desc) = &report.subtest_desc {
+        match report.outcome {
+            Outcome::Failed => format!("SUBFAILED{desc}"),
+            Outcome::Skipped => reasoned(&format!("SUBSKIPPED{desc}")),
+            Outcome::XFailed => reasoned(&format!("SUBXFAIL{desc}")),
+            _ => format!("SUBPASSED{desc}"),
+        }
+    } else {
+        match report.outcome {
+            Outcome::Passed => "PASSED".to_string(),
+            Outcome::Failed => "FAILED".to_string(),
+            Outcome::Skipped => reasoned("SKIPPED"),
+            Outcome::XFailed => reasoned("XFAIL"),
+            Outcome::XPassed => "XPASS".to_string(),
+        }
     }
 }
 

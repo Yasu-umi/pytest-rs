@@ -49,6 +49,42 @@ class LogCaptureHandler(logging.StreamHandler):
         self.stream = io.StringIO()
 
 
+class _LiveLogHandler(logging.StreamHandler):
+    """log_cli live terminal handler: prints a centered "live log {when}"
+    section header before the first record of each phase."""
+
+    def __init__(self):
+        import sys
+
+        super().__init__(sys.stdout)
+        self.when = None
+        self._header_printed = False
+
+    def set_when(self, when):
+        self.when = when
+        self._header_printed = False
+
+    def emit(self, record):
+        if not self._header_printed and self.when is not None:
+            self._header_printed = True
+            title = f" live log {self.when} "
+            self.stream.write(f"{title:-^80}\n")
+        super().emit(record)
+        self.flush()
+
+
+def _parse_level(value):
+    """An int log level from an int-ish or name string, else None."""
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        pass
+    named = logging.getLevelName(str(value).strip().upper())
+    return named if isinstance(named, int) else None
+
+
 class LoggingState:
     """Per-run logging plugin state (pytest's LoggingPlugin equivalent);
     config.pluginmanager.getplugin("logging-plugin") returns this."""
@@ -64,6 +100,79 @@ class LoggingState:
         self.sections = []  # finished (when, text) pairs for the current item
         self.when = None
         self._root_level_restore = None
+        # Session-wide handlers, wired by configure().
+        self.log_cli_enabled = False
+        self.log_cli_handler = None
+        self.log_file_handler = None
+        self._report_formatter = None
+
+    def configure(self, settings):
+        """Wire session handlers from CLI/ini settings (a str->str dict with
+        keys like log_cli, log_cli_level, log_file, log_disable...)."""
+        import os
+        import sys
+
+        def get(key):
+            value = settings.get(key)
+            return value if value not in (None, "") else None
+
+        log_level = _parse_level(get("log_level"))
+        log_format = get("log_format") or DEFAULT_LOG_FORMAT
+        log_date_format = get("log_date_format")
+        # Captured-section formatter follows log_format/log_date_format ini.
+        self._report_formatter = logging.Formatter(log_format, datefmt=log_date_format)
+        self.caplog_handler.setFormatter(self._report_formatter)
+        self.report_handler.setFormatter(self._report_formatter)
+
+        root = logging.getLogger()
+        explicit_levels = []
+
+        # --- log_file -----------------------------------------------------
+        log_file = get("log_file")
+        if log_file:
+            mode = get("log_file_mode") or "w"
+            os.makedirs(os.path.dirname(os.path.abspath(log_file)), exist_ok=True)
+            handler = logging.FileHandler(log_file, mode=mode, encoding="utf-8")
+            file_level = _parse_level(get("log_file_level"))
+            effective = file_level if file_level is not None else log_level
+            handler.setLevel(effective if effective is not None else logging.NOTSET)
+            fmt = get("log_file_format") or log_format
+            datefmt = get("log_file_date_format") or log_date_format
+            handler.setFormatter(logging.Formatter(fmt, datefmt=datefmt))
+            self.log_file_handler = handler
+            root.addHandler(handler)
+            if effective is not None:
+                explicit_levels.append(effective)
+
+        # --- log_cli ------------------------------------------------------
+        cli_level = _parse_level(get("log_cli_level"))
+        log_cli = str(settings.get("log_cli", "")).strip().lower() in ("true", "1", "yes", "on")
+        # The log_cli_level *ini* sets the level but does not enable live
+        # logging by itself; the --log-cli-level CLI option does.
+        self.log_cli_enabled = log_cli or get("log_cli_level_from_cli") is not None
+        if self.log_cli_enabled:
+            handler = _LiveLogHandler()
+            effective = cli_level if cli_level is not None else log_level
+            handler.setLevel(effective if effective is not None else logging.NOTSET)
+            fmt = get("log_cli_format") or log_format
+            datefmt = get("log_cli_date_format") or log_date_format
+            handler.setFormatter(logging.Formatter(fmt, datefmt=datefmt))
+            self.log_cli_handler = handler
+            root.addHandler(handler)
+            if effective is not None:
+                explicit_levels.append(effective)
+            sys.stdout.flush()
+
+        # An explicit level lowers the root logger so records reach the
+        # session handlers; without one the root default (WARNING) stands.
+        if explicit_levels:
+            root.setLevel(min([root.level, *explicit_levels]))
+
+        # --logger-disable / log_disable.
+        for name in (get("log_disable") or "").split("\n"):
+            name = name.strip()
+            if name:
+                logging.getLogger(name).disabled = True
 
     def _set_level_config(self, level):
         if level is None:
@@ -85,6 +194,8 @@ class LoggingState:
             self.sections = []
         self._set_level_config(level)
         self.when = when
+        if self.log_cli_handler is not None:
+            self.log_cli_handler.set_when(when)
         for handler in (self.caplog_handler, self.report_handler):
             handler.reset()
             if self.log_level is not None:
@@ -127,6 +238,14 @@ class LoggingState:
 
 
 state = LoggingState()
+
+
+def configure(settings):
+    state.configure(settings)
+
+
+def log_cli_enabled():
+    return state.log_cli_enabled
 
 
 def start_phase(when, level=None):
