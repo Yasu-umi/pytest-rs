@@ -207,6 +207,8 @@ impl Engine {
             match msg {
                 ParentMsg::Run { nodeids } => {
                     self.run_batch(py, &mut collection, &mut prev_module, &nodeids);
+                    // xdist's [setproctitle] extra: idle between batches.
+                    python::worker_set_title(py, "[pytest-xdist idle]");
                     send(&WorkerMsg::Done);
                 }
                 ParentMsg::Shutdown => break,
@@ -352,6 +354,8 @@ impl Engine {
             *prev_module = Some(module_instance);
 
             let lineno = item.lineno;
+            // xdist's [setproctitle] extra: the running item shows in ps.
+            python::worker_set_title(py, &format!("[pytest-xdist running] {}", item.nodeid));
             let reports =
                 crate::runner::run_one(py, &self.plugins, &mut self.session, &self.config, item);
             collection.last_nodeid = Some(item.nodeid.clone());

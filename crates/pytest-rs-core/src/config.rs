@@ -844,16 +844,19 @@ impl Config {
             .filter(|&n| n > 0)
     }
 
-    /// -n N (xdist-style): Some(N) requests distributed execution. "auto"
-    /// and "logical" map to the CPU count; 0 means in-process.
-    pub fn numprocesses(&self) -> Option<usize> {
-        let value = self.get_value("numprocesses")?;
-        let n = match value {
-            "auto" | "logical" => std::thread::available_parallelism()
-                .map(std::num::NonZero::get)
-                .unwrap_or(1),
-            other => other.parse().ok()?,
-        };
-        (n > 0).then_some(n)
+    /// The raw -n value (xdist-style): "auto" / "logical" / a number.
+    /// Resolution of auto/logical (psutil probe, env override, conftest
+    /// pytest_xdist_auto_num_workers hooks) happens in the engine where
+    /// the interpreter is available.
+    pub fn numprocesses_spec(&self) -> Option<&str> {
+        self.get_value("numprocesses")
+    }
+
+    /// --maxprocesses: caps -n auto / -n logical (not explicit -n N),
+    /// like upstream xdist.
+    pub fn maxprocesses(&self) -> Option<usize> {
+        self.get_value("maxprocesses")
+            .and_then(|v| v.parse().ok())
+            .filter(|&n| n > 0)
     }
 }

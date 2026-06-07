@@ -171,7 +171,14 @@ Key structural rules:
 
 ### Multi-process execution (`-n N`, default 1) *(landed in M4)*
 
-- `-n 0`/absent: everything in-process (no worker overhead at all). `-n auto` = CPU count.
+- `-n 0`/absent: everything in-process (no worker overhead at all). `-n auto`/`-n logical`
+  resolve like upstream xdist: `PYTEST_XDIST_AUTO_NUM_WORKERS` env override, then conftest
+  `pytest_xdist_auto_num_workers` hooks (firstresult), then psutil if installed (the
+  `pytest-xdist[psutil]` extra — physical cores for auto, logical for logical), then
+  sched_getaffinity/cpu_count. `--maxprocesses` caps auto/logical only. The
+  `[setproctitle]` extra also works: workers retitle per item ("[pytest-xdist running]
+  nodeid" / idle), import-probed like upstream — extras need no special wiring, they are
+  plain installed packages the embedded interpreter feature-detects the same way xdist does.
 - `-n N`: main process collects (import once, applies -k/-m/modifyitems), then starts N
   workers. On unix the workers **fork off the already-imported parent** (after collection,
   before any thread exists): imported test modules, conftests, and the fixture registry

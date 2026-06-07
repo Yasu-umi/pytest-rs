@@ -2674,6 +2674,35 @@ pub fn set_session_items(py: Python<'_>, items: &[crate::collect::TestItem]) -> 
     Ok(())
 }
 
+/// Upstream xdist's default auto/logical worker-count detection: the
+/// PYTEST_XDIST_AUTO_NUM_WORKERS env override, psutil if installed (the
+/// pytest-xdist[psutil] extra), then sched_getaffinity/cpu_count.
+pub fn xdist_auto_num_workers(py: Python<'_>, logical: bool) -> usize {
+    py.import("pytest._xdist_fixtures")
+        .and_then(|m| m.call_method1("auto_num_workers", (logical,)))
+        .and_then(|n| n.extract())
+        .unwrap_or_else(|_| {
+            std::thread::available_parallelism()
+                .map(std::num::NonZero::get)
+                .unwrap_or(1)
+        })
+}
+
+/// Set the worker process title (the pytest-xdist[setproctitle] extra);
+/// best-effort no-op when setproctitle is not installed. Availability is
+/// probed once per process: the per-item call must stay free when the
+/// extra is absent.
+pub fn worker_set_title(py: Python<'_>, title: &str) {
+    static AVAILABLE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    let available = *AVAILABLE.get_or_init(|| py.import("setproctitle").is_ok());
+    if !available {
+        return;
+    }
+    let _ = py
+        .import("pytest._xdist_fixtures")
+        .and_then(|m| m.call_method1("set_worker_title", (title,)));
+}
+
 /// Register the default 'terminalreporter' plugin (the stand-in that
 /// reporter-replacing plugins like pytest-sugar unregister). Must run
 /// before python pytest_configure hooks fire.

@@ -473,7 +473,7 @@ impl Engine {
         }
 
         #[cfg(feature = "xdist")]
-        match self.config.numprocesses() {
+        match self.resolve_numprocesses(py) {
             Some(workers) => self.run_dist(py, workers),
             None => self.run_items(py),
         }
@@ -1437,6 +1437,43 @@ impl Engine {
             python::call_py_hook(py, func, &[("session", session.clone_ref(py))])?;
         }
         Ok(())
+    }
+
+    /// Resolve -n: "auto"/"logical" go through conftest
+    /// pytest_xdist_auto_num_workers hooks (firstresult, LIFO like pluggy),
+    /// falling back to upstream xdist's default detection (the
+    /// PYTEST_XDIST_AUTO_NUM_WORKERS env override, psutil if installed —
+    /// the pytest-xdist[psutil] extra: physical cores for auto — then
+    /// sched_getaffinity/cpu_count). --maxprocesses caps auto/logical
+    /// only, like upstream.
+    #[cfg(feature = "xdist")]
+    fn resolve_numprocesses(&mut self, py: Python<'_>) -> Option<usize> {
+        let value = self.config.numprocesses_spec()?.to_string();
+        let n = match value.as_str() {
+            "auto" | "logical" => {
+                let hook_funcs: Vec<Py<pyo3::PyAny>> = self
+                    .session
+                    .py_hooks
+                    .iter()
+                    .filter(|hook| hook.name == "pytest_xdist_auto_num_workers")
+                    .map(|hook| hook.func.clone_ref(py))
+                    .collect();
+                let from_hook = hook_funcs.iter().rev().find_map(|func| {
+                    let config = python::make_py_config(py, &self.config).ok()?;
+                    python::call_py_hook(py, func, &[("config", config)])
+                        .ok()
+                        .and_then(|res| res.bind(py).extract::<usize>().ok())
+                });
+                let n = from_hook
+                    .unwrap_or_else(|| python::xdist_auto_num_workers(py, value == "logical"));
+                match self.config.maxprocesses() {
+                    Some(max) => n.min(max),
+                    None => n,
+                }
+            }
+            other => other.parse().ok()?,
+        };
+        (n > 0).then_some(n)
     }
 
     /// pytest_sessionfinish conftest/plugin hooks (session is not modeled;
