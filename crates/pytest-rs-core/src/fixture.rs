@@ -95,26 +95,38 @@ impl FixtureRegistry {
         })
     }
 
-    /// The transitive fixture closure for an item: requested names plus
-    /// autouse, following dependencies, deduped, in discovery order.
+    /// The transitive fixture closure for an item, in pytest's
+    /// getfixtureclosure order: autouse + requested names seed the list,
+    /// each fixture's own dependencies append at the end as discovered,
+    /// then a stable sort puts higher-scoped fixtures first. Parametrized
+    /// fixtures expand as ID/axis order from this.
     pub fn closure_for(&self, nodeid: &str, requested: &[String]) -> Vec<Arc<FixtureDef>> {
         let mut seen: HashSet<String> = HashSet::new();
-        let mut ordered: Vec<Arc<FixtureDef>> = Vec::new();
-        let mut queue: Vec<String> = Vec::new();
+        let mut names: Vec<String> = Vec::new();
         for def in self.autouse_for(nodeid) {
-            queue.push(def.name.clone());
-        }
-        queue.extend(requested.iter().cloned());
-        while let Some(name) = queue.pop() {
-            if name == "request" || !seen.insert(name.clone()) {
-                continue;
+            if seen.insert(def.name.clone()) {
+                names.push(def.name.clone());
             }
-            if let Some(def) = self.lookup(&name, nodeid) {
-                queue.extend(def.param_names.iter().cloned());
+        }
+        for name in requested {
+            if name != "request" && seen.insert(name.clone()) {
+                names.push(name.clone());
+            }
+        }
+        let mut ordered: Vec<Arc<FixtureDef>> = Vec::new();
+        let mut i = 0;
+        while i < names.len() {
+            if let Some(def) = self.lookup(&names[i], nodeid) {
+                for dep in &def.param_names {
+                    if dep != "request" && seen.insert(dep.clone()) {
+                        names.push(dep.clone());
+                    }
+                }
                 ordered.push(def);
             }
+            i += 1;
         }
-        ordered.sort_by(|a, b| a.name.cmp(&b.name));
+        ordered.sort_by_key(|def| std::cmp::Reverse(def.scope));
         ordered
     }
 

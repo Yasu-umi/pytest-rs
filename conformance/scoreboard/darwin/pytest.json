@@ -188,8 +188,8 @@
       "file": "testing/test_mark.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 42,
-      "failed": 64,
+      "passed": 43,
+      "failed": 63,
       "skipped": 0,
       "errors": 0
     },

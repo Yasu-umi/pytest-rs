@@ -1510,6 +1510,20 @@ pub(crate) fn fixture_param_id(
     Some(id_obj.unbind())
 }
 
+/// pytest's ascii_escaped for str ids ("\x00" -> "\\x00"); printable
+/// ASCII passes through untouched.
+fn ascii_escaped_str(value: &Bound<'_, PyAny>, s: String) -> String {
+    if s.chars().all(|c| matches!(c, ' '..='~')) {
+        return s;
+    }
+    value
+        .call_method1("encode", ("unicode_escape",))
+        .and_then(|b| b.call_method1("decode", ("ascii",)))
+        .and_then(|s| s.extract::<String>())
+        .unwrap_or(s)
+}
+
+/// pytest's _idval: how one parametrize value renders in the test ID.
 fn id_for_value(value: &Bound<'_, PyAny>, argname: &str, index: usize) -> String {
     if value.is_none() {
         return "None".to_string();
@@ -1518,24 +1532,56 @@ fn id_for_value(value: &Bound<'_, PyAny>, argname: &str, index: usize) -> String
         return if b.is_true() { "True" } else { "False" }.to_string();
     }
     if let Ok(s) = value.extract::<String>() {
-        // pytest ascii-escapes string ids ("\x00" -> "\\x00"); printable
-        // ASCII passes through untouched.
-        if s.chars().all(|c| matches!(c, ' '..='~')) {
-            return s;
-        }
-        if let Ok(escaped) = value
-            .call_method1("encode", ("unicode_escape",))
-            .and_then(|b| b.call_method1("decode", ("ascii",)))
-            .and_then(|s| s.extract::<String>())
-        {
-            return escaped;
-        }
-        return s;
+        return ascii_escaped_str(value, s);
     }
-    if (value.cast::<pyo3::types::PyInt>().is_ok() || value.cast::<pyo3::types::PyFloat>().is_ok())
-        && let Ok(repr) = value.repr()
+    // bytes: ascii_escaped = decode("ascii", "backslashreplace") with
+    // non-printables escaped.
+    if let Ok(bytes) = value.cast::<pyo3::types::PyBytes>() {
+        return bytes
+            .as_bytes()
+            .iter()
+            .map(|&b| {
+                if matches!(b, 0x20..=0x7e) {
+                    (b as char).to_string()
+                } else {
+                    format!("\\x{b:02x}")
+                }
+            })
+            .collect();
+    }
+    // Numbers and enums all render via str() (upstream hits the number
+    // branch first, so IntEnum is "30", plain Enum "Color.RED" — both str).
+    let py = value.py();
+    let is_enum = py
+        .import("enum")
+        .and_then(|m| m.getattr("Enum"))
+        .and_then(|cls| value.is_instance(&cls))
+        .unwrap_or(false);
+    if (is_enum
+        || value.cast::<pyo3::types::PyInt>().is_ok()
+        || value.cast::<pyo3::types::PyFloat>().is_ok()
+        || value.cast::<pyo3::types::PyComplex>().is_ok())
+        && let Ok(s) = value.str()
     {
-        return repr.to_string();
+        return s.to_string();
+    }
+    // re.Pattern: the (escaped) pattern text.
+    let is_pattern = py
+        .import("re")
+        .and_then(|m| m.getattr("Pattern"))
+        .and_then(|cls| value.is_instance(&cls))
+        .unwrap_or(false);
+    if is_pattern
+        && let Ok(pattern) = value.getattr("pattern")
+        && let Ok(s) = pattern.extract::<String>()
+    {
+        return ascii_escaped_str(&pattern, s);
+    }
+    // Classes and functions render as their __name__.
+    if let Ok(name) = value.getattr("__name__")
+        && let Ok(s) = name.extract::<String>()
+    {
+        return s;
     }
     format!("{argname}{index}")
 }
@@ -1663,11 +1709,33 @@ pub fn expand_fixture_params(
     items: Vec<TestItem>,
     registry: &FixtureRegistry,
 ) -> PyResult<Vec<TestItem>> {
+    // The function's nodeid without the parametrize suffix: consecutive
+    // items sharing it are the direct-parametrize variants of one function.
+    fn base(nodeid: &str) -> &str {
+        nodeid.split('[').next().unwrap_or(nodeid)
+    }
+
     let mut expanded = Vec::new();
-    for item in items {
+    let mut iter = items.into_iter().peekable();
+    while let Some(first) = iter.next() {
+        // Group one function's direct-parametrize variants: upstream
+        // parametrizes fixtures per-function (pytest_generate_tests), so
+        // the fixture axis is shared by — and varies slower than — the
+        // direct axis.
+        let mut group = vec![first];
+        while let Some(next) = iter.peek() {
+            if base(&next.nodeid) == base(&group[0].nodeid) {
+                group.push(iter.next().expect("peeked"));
+            } else {
+                break;
+            }
+        }
+        let item = &group[0];
         // @pytest.mark.usefixtures names parametrize the item exactly like
-        // signature fixtures do (pytest builds one closure from both).
-        let mut requested = item.fixture_names.clone();
+        // signature fixtures do; pytest's closure puts them first
+        // (initialnames = usefixtures + argnames), so their params expand
+        // as the outer axis and lead the test ID.
+        let mut requested = Vec::new();
         for mark in item.marks.iter().filter(|m| m.name == "usefixtures") {
             if let Ok(args) = mark.obj.bind(py).getattr("args")
                 && let Ok(names) = args.extract::<Vec<String>>()
@@ -1677,6 +1745,11 @@ pub fn expand_fixture_params(
                         requested.push(name);
                     }
                 }
+            }
+        }
+        for name in &item.fixture_names {
+            if !requested.contains(name) {
+                requested.push(name.clone());
             }
         }
         let parametrized: Vec<_> = registry
@@ -1697,7 +1770,7 @@ pub fn expand_fixture_params(
             .filter(|def| !item.callspec.iter().any(|(name, _)| name == &def.name))
             .collect();
         if parametrized.is_empty() {
-            expanded.push(item);
+            expanded.extend(group);
             continue;
         }
 
@@ -1751,40 +1824,52 @@ pub fn expand_fixture_params(
             variants = next;
         }
 
+        // Fixture params are the outer axis: their id parts lead and they
+        // vary slower than the direct-parametrize axis (upstream parametrizes
+        // fixtures before the function's own parametrize marks).
         for (id, assignments, variant_marks) in variants {
-            let nodeid = if item.nodeid.ends_with(']') {
-                format!("{}-{id}]", &item.nodeid[..item.nodeid.len() - 1])
-            } else {
-                format!("{}[{id}]", item.nodeid)
-            };
-            expanded.push(TestItem {
-                nodeid,
-                path: item.path.clone(),
-                module_name: item.module_name.clone(),
-                func_name: item.func_name.clone(),
-                func: item.func.clone_ref(py),
-                cls: item.cls.as_ref().map(|c| c.clone_ref(py)),
-                is_coroutine: item.is_coroutine,
-                is_doctest: item.is_doctest,
-                lineno: item.lineno,
-                fixture_names: item.fixture_names.clone(),
-                extra_fixture_names: item.extra_fixture_names.clone(),
-                marks: item
-                    .marks
-                    .iter()
-                    .map(|m| MarkData {
-                        name: m.name.clone(),
-                        obj: m.obj.clone_ref(py),
-                    })
-                    .chain(variant_marks)
-                    .collect(),
-                callspec: item
-                    .callspec
-                    .iter()
-                    .map(|(n, v)| (n.clone(), v.clone_ref(py)))
-                    .collect(),
-                fixture_params: assignments,
-            });
+            for item in &group {
+                let nodeid = match item.nodeid.find('[') {
+                    Some(pos) => {
+                        format!("{}[{id}-{}", &item.nodeid[..pos], &item.nodeid[pos + 1..])
+                    }
+                    None => format!("{}[{id}]", item.nodeid),
+                };
+                expanded.push(TestItem {
+                    nodeid,
+                    path: item.path.clone(),
+                    module_name: item.module_name.clone(),
+                    func_name: item.func_name.clone(),
+                    func: item.func.clone_ref(py),
+                    cls: item.cls.as_ref().map(|c| c.clone_ref(py)),
+                    is_coroutine: item.is_coroutine,
+                    is_doctest: item.is_doctest,
+                    lineno: item.lineno,
+                    fixture_names: item.fixture_names.clone(),
+                    extra_fixture_names: item.extra_fixture_names.clone(),
+                    marks: item
+                        .marks
+                        .iter()
+                        .map(|m| MarkData {
+                            name: m.name.clone(),
+                            obj: m.obj.clone_ref(py),
+                        })
+                        .chain(variant_marks.iter().map(|m| MarkData {
+                            name: m.name.clone(),
+                            obj: m.obj.clone_ref(py),
+                        }))
+                        .collect(),
+                    callspec: item
+                        .callspec
+                        .iter()
+                        .map(|(n, v)| (n.clone(), v.clone_ref(py)))
+                        .collect(),
+                    fixture_params: assignments
+                        .iter()
+                        .map(|(n, i, v)| (n.clone(), *i, v.clone_ref(py)))
+                        .collect(),
+                });
+            }
         }
     }
     Ok(expanded)

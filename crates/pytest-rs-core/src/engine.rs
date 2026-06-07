@@ -1592,8 +1592,22 @@ impl Engine {
         // Collection over: close its catching_logs phase.
         python::log_end_phase(py);
 
-        // Expand items over parametrized fixtures in their closure.
-        let items = std::mem::take(&mut self.session.items);
+        // Expand items over parametrized fixtures in their closure; plugins
+        // first get to inject closure-affecting marks (anyio's usefixtures).
+        let mut items = std::mem::take(&mut self.session.items);
+        {
+            let mut ctx = HookContext {
+                py,
+                session: &mut self.session,
+                config: &self.config,
+            };
+            for plugin in &self.plugins {
+                if let Err(err) = plugin.pytest_collection_preexpand(&mut ctx, &mut items) {
+                    self.session.items = items;
+                    return Err(python::format_exception(py, &err));
+                }
+            }
+        }
         match python::expand_fixture_params(py, items, &self.session.registry) {
             Ok(expanded) => self.session.items = expanded,
             Err(err) => return Err(python::format_exception(py, &err)),

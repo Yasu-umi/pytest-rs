@@ -44,6 +44,18 @@ pub trait Plugin: Send {
         Ok(())
     }
 
+    /// Runs after collection but before parametrized-fixture expansion:
+    /// marks added here (e.g. usefixtures) participate in the fixture
+    /// closure and its param axes, like upstream pytest_pycollect_makeitem
+    /// mark injection.
+    fn pytest_collection_preexpand(
+        &self,
+        _ctx: &mut HookContext,
+        _items: &mut Vec<TestItem>,
+    ) -> PyResult<()> {
+        Ok(())
+    }
+
     fn pytest_collection_modifyitems(
         &self,
         _ctx: &mut HookContext,

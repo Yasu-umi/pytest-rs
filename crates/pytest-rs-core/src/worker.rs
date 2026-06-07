@@ -446,6 +446,18 @@ impl Engine {
             &mut self.session.py_hooks,
         )
         .map_err(|err| python::format_exception(py, &err))?;
+        {
+            let mut ctx = HookContext {
+                py,
+                session: &mut self.session,
+                config: &self.config,
+            };
+            for plugin in &self.plugins {
+                plugin
+                    .pytest_collection_preexpand(&mut ctx, &mut new_items)
+                    .map_err(|err| python::format_exception(py, &err))?;
+            }
+        }
         let new_items = python::expand_fixture_params(py, new_items, &self.session.registry)
             .map_err(|err| python::format_exception(py, &err))?;
 

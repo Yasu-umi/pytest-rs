@@ -210,21 +210,19 @@ impl Plugin for AnyioPlugin {
     }
 
     /// Marked (or auto-mode) coroutine tests implicitly request the
-    /// anyio_backend fixture (upstream applies usefixtures in
-    /// pytest_pycollect_makeitem); param expansion already ran, so items
-    /// are cloned per backend here, like the asyncio policy expansion.
-    fn pytest_collection_modifyitems(
+    /// anyio_backend fixture: a usefixtures mark is injected before fixture
+    /// param expansion (upstream applies it in pytest_pycollect_makeitem),
+    /// so the engine expands the backend axis like any parametrized
+    /// fixture — outermost, leading the test ID.
+    fn pytest_collection_preexpand(
         &self,
         ctx: &mut HookContext,
         items: &mut Vec<TestItem>,
     ) -> PyResult<()> {
         let py = ctx.py;
-        let pre = std::mem::take(items);
-        let mut taken = Vec::new();
-        for mut item in pre {
+        for item in items.iter_mut() {
             let marked = item.get_closest_marker("anyio").is_some();
             if self.mode == Mode::Strict && !marked {
-                taken.push(item);
                 continue;
             }
             // Hypothesis wraps async tests in a sync shim; its coroutine
@@ -236,7 +234,97 @@ impl Plugin for AnyioPlugin {
                     .call1((item.func.bind(py),))?
                     .is_none();
             if !async_like {
-                taken.push(item);
+                continue;
+            }
+            if self.mode == Mode::Auto && !marked {
+                let mark = py
+                    .import("pytest")?
+                    .getattr("mark")?
+                    .getattr("anyio")?
+                    .getattr("mark")?;
+                item.marks.push(MarkData {
+                    name: "anyio".to_string(),
+                    obj: mark.unbind(),
+                });
+            }
+            // Already requested through the signature, an existing
+            // usefixtures mark, or a direct parametrize of the fixture name
+            // (the callspec value overrides the fixture).
+            let already_requested = item.fixture_names.iter().any(|n| n == "anyio_backend")
+                || item
+                    .callspec
+                    .iter()
+                    .any(|(name, _)| name == "anyio_backend")
+                || Self::usefixtures_names(py, item).any(|name| name == "anyio_backend");
+            if already_requested {
+                continue;
+            }
+            if ctx
+                .session
+                .registry
+                .lookup("anyio_backend", &item.nodeid)
+                .is_none()
+            {
+                // No anyio_backend fixture visible (anyio not installed):
+                // leave the item to the engine's native-support failure.
+                continue;
+            }
+            let usefixtures_mark = py
+                .import("pytest")?
+                .getattr("mark")?
+                .getattr("usefixtures")?
+                .call1(("anyio_backend",))?
+                .getattr("mark")?;
+            // Insert at the front: marks are closest-first, and upstream's
+            // injection lands on the function itself, ahead of class- or
+            // module-level usefixtures in the closure.
+            item.marks.insert(
+                0,
+                MarkData {
+                    name: "usefixtures".to_string(),
+                    obj: usefixtures_mark.unbind(),
+                },
+            );
+        }
+        Ok(())
+    }
+
+    /// Fallback for items that skipped pytest_collection_preexpand (param
+    /// expansion already ran): clone per backend, like the asyncio policy
+    /// expansion.
+    fn pytest_collection_modifyitems(
+        &self,
+        ctx: &mut HookContext,
+        items: &mut Vec<TestItem>,
+    ) -> PyResult<()> {
+        let py = ctx.py;
+        let pre = std::mem::take(items);
+        // Pass 1: keep as-is, or queue for backend cloning (with the
+        // anyio_backend def to expand from).
+        enum Disposition {
+            Keep(TestItem),
+            Expand(
+                TestItem,
+                std::sync::Arc<pytest_rs_core::fixture::FixtureDef>,
+            ),
+        }
+        let mut dispositions = Vec::new();
+        for mut item in pre {
+            let marked = item.get_closest_marker("anyio").is_some();
+            if self.mode == Mode::Strict && !marked {
+                dispositions.push(Disposition::Keep(item));
+                continue;
+            }
+            // Hypothesis wraps async tests in a sync shim; its coroutine
+            // inner_test makes the item anyio-run like a plain async test.
+            let async_like = item.is_coroutine
+                || !self
+                    .helper(py)?
+                    .getattr("hypothesis_async_inner")?
+                    .call1((item.func.bind(py),))?
+                    .is_none();
+            if !async_like {
+                dispositions.push(Disposition::Keep(item));
                 continue;
             }
             if self.mode == Mode::Auto && !marked {
@@ -260,13 +348,13 @@ impl Plugin for AnyioPlugin {
                     .any(|(name, _)| name == "anyio_backend")
                 || Self::usefixtures_names(py, &item).any(|name| name == "anyio_backend");
             if already_requested {
-                taken.push(item);
+                dispositions.push(Disposition::Keep(item));
                 continue;
             }
             let Some(def) = ctx.session.registry.lookup("anyio_backend", &item.nodeid) else {
                 // No anyio_backend fixture visible (anyio not installed):
                 // leave the item to the engine's native-support failure.
-                taken.push(item);
+                dispositions.push(Disposition::Keep(item));
                 continue;
             };
             // The runner resolves usefixtures-named fixtures before the
@@ -288,11 +376,45 @@ impl Plugin for AnyioPlugin {
                 .fixture_params
                 .iter()
                 .any(|(name, _, _)| name == "anyio_backend");
-            let Some(params) = def.params.as_ref().filter(|_| !already_assigned) else {
-                taken.push(item);
+            if already_assigned || def.params.is_none() {
+                dispositions.push(Disposition::Keep(item));
                 continue;
+            }
+            dispositions.push(Disposition::Expand(item, def));
+        }
+
+        // Pass 2: clone queued items per backend. Upstream requests the
+        // fixture before parametrization, so the backend axis is the
+        // outermost one: it leads the test ID and varies slowest across one
+        // function's direct-parametrize variants (grouped by base nodeid).
+        fn base(nodeid: &str) -> &str {
+            nodeid.split('[').next().unwrap_or(nodeid)
+        }
+        let mut taken = Vec::new();
+        let mut iter = dispositions.into_iter().peekable();
+        while let Some(disposition) = iter.next() {
+            let (first, def) = match disposition {
+                Disposition::Keep(item) => {
+                    taken.push(item);
+                    continue;
+                }
+                Disposition::Expand(item, def) => (item, def),
             };
-            let values: Vec<Py<PyAny>> = params
+            let mut group = vec![first];
+            while let Some(Disposition::Expand(next, _)) = iter.peek() {
+                if base(&next.nodeid) == base(&group[0].nodeid) {
+                    let Some(Disposition::Expand(next, _)) = iter.next() else {
+                        unreachable!("peeked Expand");
+                    };
+                    group.push(next);
+                } else {
+                    break;
+                }
+            }
+            let values: Vec<Py<PyAny>> = def
+                .params
+                .as_ref()
+                .expect("queued with params above")
                 .bind(py)
                 .try_iter()?
                 .map(|value| value.map(|v| v.unbind()))
@@ -301,45 +423,48 @@ impl Plugin for AnyioPlugin {
                 let (value, spec_id, extra_marks) =
                     pytest_rs_core::python::unwrap_fixture_param(py, wrapped.bind(py))?;
                 let id = spec_id.unwrap_or_else(|| Self::param_id(py, &def, &value, index));
-                let nodeid = if item.nodeid.ends_with(']') {
-                    format!("{}-{id}]", &item.nodeid[..item.nodeid.len() - 1])
-                } else {
-                    format!("{}[{id}]", item.nodeid)
-                };
-                let mut fixture_params: Vec<(String, usize, Py<PyAny>)> = item
-                    .fixture_params
-                    .iter()
-                    .map(|(name, idx, val)| (name.clone(), *idx, val.clone_ref(py)))
-                    .collect();
-                fixture_params.push(("anyio_backend".to_string(), index, value));
-                taken.push(TestItem {
-                    nodeid,
-                    path: item.path.clone(),
-                    module_name: item.module_name.clone(),
-                    func_name: item.func_name.clone(),
-                    func: item.func.clone_ref(py),
-                    cls: item.cls.as_ref().map(|cls| cls.clone_ref(py)),
-                    is_coroutine: item.is_coroutine,
-                    is_doctest: item.is_doctest,
-                    fixture_names: item.fixture_names.clone(),
-                    extra_fixture_names: item.extra_fixture_names.clone(),
-                    marks: item
-                        .marks
+                for item in &group {
+                    let nodeid = match item.nodeid.find('[') {
+                        Some(pos) => {
+                            format!("{}[{id}-{}", &item.nodeid[..pos], &item.nodeid[pos + 1..])
+                        }
+                        None => format!("{}[{id}]", item.nodeid),
+                    };
+                    let mut fixture_params: Vec<(String, usize, Py<PyAny>)> = item
+                        .fixture_params
                         .iter()
-                        .map(|mark| MarkData {
-                            name: mark.name.clone(),
-                            obj: mark.obj.clone_ref(py),
-                        })
-                        .chain(extra_marks)
-                        .collect(),
-                    callspec: item
-                        .callspec
-                        .iter()
-                        .map(|(name, value)| (name.clone(), value.clone_ref(py)))
-                        .collect(),
-                    fixture_params,
-                    lineno: item.lineno,
-                });
+                        .map(|(name, idx, val)| (name.clone(), *idx, val.clone_ref(py)))
+                        .collect();
+                    fixture_params.push(("anyio_backend".to_string(), index, value.clone_ref(py)));
+                    taken.push(TestItem {
+                        nodeid,
+                        path: item.path.clone(),
+                        module_name: item.module_name.clone(),
+                        func_name: item.func_name.clone(),
+                        func: item.func.clone_ref(py),
+                        cls: item.cls.as_ref().map(|cls| cls.clone_ref(py)),
+                        is_coroutine: item.is_coroutine,
+                        is_doctest: item.is_doctest,
+                        fixture_names: item.fixture_names.clone(),
+                        extra_fixture_names: item.extra_fixture_names.clone(),
+                        marks: item
+                            .marks
+                            .iter()
+                            .chain(extra_marks.iter())
+                            .map(|mark| MarkData {
+                                name: mark.name.clone(),
+                                obj: mark.obj.clone_ref(py),
+                            })
+                            .collect(),
+                        callspec: item
+                            .callspec
+                            .iter()
+                            .map(|(name, value)| (name.clone(), value.clone_ref(py)))
+                            .collect(),
+                        fixture_params,
+                        lineno: item.lineno,
+                    });
+                }
             }
         }
         *items = taken;
