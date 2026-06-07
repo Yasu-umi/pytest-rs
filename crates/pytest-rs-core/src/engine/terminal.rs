@@ -110,7 +110,7 @@ impl Engine {
         println!("-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html");
     }
 
-    pub(crate) fn print_header(&self) {
+    pub(crate) fn print_header(&self, py: Python<'_>) {
         if self.config.quiet || self.config.no_terminal() {
             return;
         }
@@ -118,9 +118,16 @@ impl Engine {
             "{}",
             crate::tw::markup(&center_banner("test session starts"), &[crate::tw::BOLD])
         );
+        // Upstream's "platform darwin -- Python 3.13.2, pytest-9.0.3, ..."
+        // shape (sys.platform naming), with pytest-rs as the tool.
+        let platform = match std::env::consts::OS {
+            "macos" => "darwin",
+            "windows" => "win32",
+            other => other,
+        };
+        let version = py.version().split_whitespace().next().unwrap_or("");
         println!(
-            "platform {} -- pytest-rs {}",
-            std::env::consts::OS,
+            "platform {platform} -- Python {version}, pytest-rs-{}",
             env!("CARGO_PKG_VERSION"),
         );
         // pytest shows the cachedir only when it is non-default or -v.
@@ -272,6 +279,14 @@ impl Engine {
                 "{}",
                 crate::tw::markup(&center_named(&name), &[crate::tw::RED, crate::tw::BOLD])
             );
+            // xdist parity: reports from -n workers open with upstream's
+            // getworkerinfoline ("[gw0] darwin -- Python 3.13.2 /usr/bin/...").
+            if let (Some(worker), Some(suffix)) = (
+                self.session.report_workers.get(&report.nodeid),
+                self.session.worker_platinfo.as_deref(),
+            ) {
+                println!("[gw{worker}] {suffix}");
+            }
             if report.longrepr.is_some() {
                 println!("{}", Self::render_longrepr(report));
             }
@@ -408,7 +423,11 @@ impl Engine {
         }
     }
 
-    pub(crate) fn print_plugin_summaries(&mut self, py: Python<'_>) -> PyResult<()> {
+    pub(crate) fn print_plugin_summaries(
+        &mut self,
+        py: Python<'_>,
+        exitstatus: i32,
+    ) -> PyResult<()> {
         let mut out = String::new();
         let mut ctx = HookContext {
             py,
@@ -420,6 +439,40 @@ impl Engine {
         }
         if !out.is_empty() {
             println!("{out}");
+        }
+        // conftest/plugin pytest_terminal_summary impls (native mode): the
+        // terminalreporter kwarg is the default stand-in writing to stdout.
+        // Delegated mode replays these from _reporter.finish instead.
+        if self.session.custom_reporter.is_none() {
+            let funcs: Vec<Py<PyAny>> = self
+                .session
+                .py_hooks
+                .iter()
+                .filter(|hook| hook.name == "pytest_terminal_summary")
+                .map(|hook| hook.func.clone_ref(py))
+                .collect();
+            if !funcs.is_empty() {
+                let reporter = py.import("pytest._reporter")?.getattr("_default")?;
+                if !reporter.is_none() {
+                    let config = python::make_py_config(py, &self.config)?;
+                    let status: Py<PyAny> = exitstatus.into_pyobject(py)?.into_any().unbind();
+                    for func in funcs {
+                        if let Err(err) = python::call_py_hook(
+                            py,
+                            &func,
+                            &[
+                                ("terminalreporter", reporter.clone().unbind()),
+                                ("exitstatus", status.clone_ref(py)),
+                                ("config", config.clone_ref(py)),
+                            ],
+                        ) {
+                            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+                        }
+                    }
+                    // The stand-in buffers through a TerminalWriter on
+                    // sys.stdout; nothing to flush explicitly.
+                }
+            }
         }
         Ok(())
     }

@@ -15,7 +15,7 @@
 //! replaced while --max-worker-restart's budget lasts; an exhausted budget
 //! aborts undispatched work (xdist's shutdown semantics).
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::io::{BufRead, BufReader, Lines, Read, Write};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex, mpsc};
@@ -41,6 +41,11 @@ enum Event {
     Warnings {
         lines: Vec<String>,
         count: usize,
+    },
+    /// A worker's config.workeroutput JSON (xdist data exchange).
+    Workeroutput {
+        worker: usize,
+        payload: String,
     },
     /// Passthrough/diagnostic output, printed as-is.
     Output(String),
@@ -98,6 +103,13 @@ impl WorkQueue {
         state.queue.pop_front()
     }
 
+    /// -x/--maxfail: stop dispatching new batches; workers finish what
+    /// they hold (upstream DSession waits for workers before interrupting).
+    fn stop(&self) {
+        let mut state = self.state.lock().expect("work queue lock poisoned");
+        state.queue.clear();
+    }
+
     /// Crash bookkeeping, atomically: spend a restart and requeue the
     /// unfinished remainder, or exhaust the budget and abort.
     fn crash(&self, remaining: Vec<String>) -> CrashAction {
@@ -120,18 +132,106 @@ impl WorkQueue {
 }
 
 impl Engine {
+    /// The controller banner: "created: N/N workers" + "N workers [M items]"
+    /// (-q collapses to "bringing up nodes...", -v adds the scheduler line).
+    pub(crate) fn print_dist_banner(&self, workers: usize) {
+        if self.config.no_terminal() {
+            return;
+        }
+        if self.config.quiet {
+            // Upstream -q: a single terse line instead of worker details.
+            println!("bringing up nodes...");
+            return;
+        }
+        let dist_mode = self.config.get_value("dist").unwrap_or("load");
+        let noun = if workers == 1 { "worker" } else { "workers" };
+        println!("created: {workers}/{workers} {noun}");
+        if self.config.verbose > 0 {
+            // Upstream -v narration, e.g. "scheduling tests via
+            // LoadScheduling".
+            let scheduler = match dist_mode {
+                "each" => "EachScheduling",
+                "loadscope" => "LoadScopeScheduling",
+                "loadfile" => "LoadFileScheduling",
+                "loadgroup" => "LoadGroupScheduling",
+                "worksteal" => "WorkStealingScheduling",
+                _ => "LoadScheduling",
+            };
+            println!("scheduling tests via {scheduler}");
+        }
+        let item_noun = if self.session.items.len() == 1 {
+            "item"
+        } else {
+            "items"
+        };
+        println!(
+            "{} {} [{} {}]",
+            workers,
+            noun,
+            self.session.items.len(),
+            item_noun
+        );
+    }
+
+    /// --dist=loadgroup: the item's scheduling group — its xdist_group mark
+    /// names, sorted and joined with "_" (upstream LoadGroupScheduling).
+    fn xdist_group_of(py: Python<'_>, item: &crate::collect::TestItem) -> Option<String> {
+        let mut names: Vec<String> = item
+            .marks
+            .iter()
+            .filter(|mark| mark.name == "xdist_group")
+            .filter_map(|mark| {
+                let obj = mark.obj.bind(py);
+                obj.getattr("kwargs")
+                    .ok()
+                    .and_then(|kwargs| kwargs.get_item("name").ok())
+                    .and_then(|value| value.extract().ok())
+                    .or_else(|| {
+                        obj.getattr("args")
+                            .ok()
+                            .and_then(|args| args.get_item(0).ok())
+                            .and_then(|value| value.extract().ok())
+                    })
+            })
+            .collect();
+        if names.is_empty() {
+            return None;
+        }
+        names.sort();
+        Some(names.join("_"))
+    }
+
     pub(crate) fn run_dist(&mut self, py: Python<'_>, workers: usize) {
         let dist_mode = self.config.get_value("dist").unwrap_or("load");
         let per_module = matches!(dist_mode, "loadscope" | "loadfile" | "loadgroup");
 
+        // loadgroup: same-group items always batch together (one worker),
+        // and their -v nodeids display as "nodeid@group".
+        let mut nodeid_groups: HashMap<String, String> = HashMap::new();
+        let mut group_batches: HashMap<String, usize> = HashMap::new();
         let mut batches: VecDeque<Vec<String>> = VecDeque::new();
         for item in &self.session.items {
+            if dist_mode == "loadgroup"
+                && let Some(group) = Self::xdist_group_of(py, item)
+            {
+                nodeid_groups.insert(item.nodeid.clone(), group.clone());
+                match group_batches.get(&group) {
+                    Some(&index) => batches[index].push(item.nodeid.clone()),
+                    None => {
+                        group_batches.insert(group, batches.len());
+                        batches.push_back(vec![item.nodeid.clone()]);
+                    }
+                }
+                continue;
+            }
             let file = item.nodeid.split("::").next().unwrap_or("");
             let same_module = per_module
                 && batches.back().is_some_and(|batch: &Vec<String>| {
-                    batch
-                        .first()
-                        .is_some_and(|first| first.split("::").next().unwrap_or("") == file)
+                    batch.first().is_some_and(|first| {
+                        first.split("::").next().unwrap_or("") == file
+                            // Never fold ungrouped items into a group batch.
+                            && !nodeid_groups.contains_key(first)
+                    })
                 });
             if same_module {
                 batches
@@ -150,11 +250,25 @@ impl Engine {
             }
         }
 
-        if !self.config.quiet && !self.config.no_terminal() {
-            let noun = if workers == 1 { "worker" } else { "workers" };
-            println!("created: {workers}/{workers} {noun}");
-            println!("{} {} [{} items]", workers, noun, self.session.items.len());
-        }
+        self.print_dist_banner(workers);
+
+        // The "[gw0] darwin -- Python 3.13.2 /usr/bin/python" failure-repr
+        // prefix (upstream getworkerinfoline); workers share our interpreter.
+        self.session.worker_platinfo = py
+            .import("sys")
+            .and_then(|sys| {
+                let platform: String = sys.getattr("platform")?.extract()?;
+                let executable: String = sys.getattr("executable")?.extract()?;
+                let version: (u32, u32, u32) = sys
+                    .getattr("version_info")?
+                    .get_item(pyo3::types::PySlice::new(py, 0, 3, 1))?
+                    .extract()?;
+                Ok(format!(
+                    "{platform} -- Python {}.{}.{} {executable}",
+                    version.0, version.1, version.2
+                ))
+            })
+            .ok();
 
         // Restart budget shared across workers (no flag = unlimited).
         let max_restart: Option<isize> = self
@@ -175,18 +289,60 @@ impl Engine {
                     .unwrap_or(0)
         );
 
+        // xdist data exchange: one controller-side node per worker;
+        // conftest pytest_configure_node hooks fill node.workerinput
+        // before the worker starts.
+        let configure_node_hooks: Vec<Py<pyo3::PyAny>> = self
+            .session
+            .py_hooks
+            .iter()
+            .filter(|hook| hook.name == "pytest_configure_node")
+            .map(|hook| hook.func.clone_ref(py))
+            .collect();
+        let nodes: Vec<Option<Py<pyo3::PyAny>>> = (0..workers)
+            .map(|index| {
+                let node =
+                    crate::python::make_worker_node(py, index, workers, &testrun_uid, &self.config)
+                        .ok()?;
+                for func in &configure_node_hooks {
+                    if let Err(err) =
+                        crate::python::call_py_hook(py, func, &[("node", node.clone_ref(py))])
+                    {
+                        eprintln!(
+                            "INTERNAL ERROR: {}",
+                            crate::python::format_exception(py, &err)
+                        );
+                    }
+                }
+                Some(node)
+            })
+            .collect();
+        // The (possibly hook-extended) workerinput each worker receives.
+        let worker_inputs: Vec<Option<String>> = nodes
+            .iter()
+            .map(|node| {
+                node.as_ref()
+                    .and_then(|node| crate::python::worker_node_input_json(py, node))
+            })
+            .collect();
+
         // Fork workers before any thread exists (fork + threads don't
         // mix); a worker that fails to fork falls back to spawning.
+        // Explicit --tx specs mean "fresh subprocess" (upstream popen):
+        // spawn so worker-side pytest_configure runs with workerinput set.
         #[cfg(unix)]
-        let mut initial: Vec<Option<WorkerProc>> =
-            if std::env::var_os("PYTEST_RS_DIST_SPAWN").is_none() {
-                self.fork_workers(py, workers, &testrun_uid)
-            } else {
-                (0..workers).map(|_| None).collect()
-            };
+        let mut initial: Vec<Option<WorkerProc>> = if std::env::var_os("PYTEST_RS_DIST_SPAWN")
+            .is_none()
+            && self.config.get_value("tx").is_none()
+        {
+            self.fork_workers(py, workers, &testrun_uid, &worker_inputs)
+        } else {
+            (0..workers).map(|_| None).collect()
+        };
         #[cfg(not(unix))]
         let mut initial: Vec<Option<WorkerProc>> = (0..workers).map(|_| None).collect();
 
+        let worker_chdirs = self.config.tx_worker_chdirs();
         let mut handles = Vec::new();
         for (index, slot) in initial.iter_mut().enumerate().take(workers) {
             let owner = WorkerOwner {
@@ -197,6 +353,11 @@ impl Engine {
                 worker_count: workers,
                 max_restart,
                 testrun_uid: testrun_uid.clone(),
+                workerinput_json: worker_inputs.get(index).cloned().flatten(),
+                chdir: worker_chdirs
+                    .as_ref()
+                    .and_then(|chdirs| chdirs.get(index).cloned())
+                    .flatten(),
                 initial: slot.take(),
             };
             handles.push(std::thread::spawn(move || owner.run()));
@@ -209,6 +370,14 @@ impl Engine {
         let show_progress =
             !self.config.quiet && !self.config.no_terminal() && self.config.verbose == 0;
         let mut printed = 0usize;
+        // Outcome lines printed so far (the -v progress percentage).
+        let mut verbose_done = 0usize;
+        // -x/--maxfail across all workers: stop dispatching once reached
+        // (workers drain their running batches; exit is INTERRUPTED, the
+        // upstream DSession behavior).
+        let maxfail = self.config.maxfail();
+        let mut failed = 0usize;
+        let mut maxfail_hit = false;
         // Progress chars leave the line open; any full-line output must
         // close it first or fnmatch-style consumers see merged lines.
         let mut line_open = false;
@@ -226,8 +395,18 @@ impl Engine {
                                 Outcome::XFailed => "XFAIL",
                                 Outcome::XPassed => "XPASS",
                             };
-                            // xdist verbose format: "[gw0] PASSED test_a.py::test"
-                            println!("[gw{worker}] {word} {}", report.nodeid);
+                            // xdist verbose format: the relayed logstart
+                            // line, then "[gw0] [ 50%] PASSED test_a.py::test"
+                            // (loadgroup nodeids display as "nodeid@group").
+                            verbose_done += 1;
+                            let total = self.session.items.len().max(1);
+                            let pct = (verbose_done * 100 / total).min(100);
+                            let display = match nodeid_groups.get(&report.nodeid) {
+                                Some(group) => format!("{}@{group}", report.nodeid),
+                                None => report.nodeid.clone(),
+                            };
+                            println!("{display} ");
+                            println!("[gw{worker}] [{pct:>3}%] {word} {display}");
                         }
                     } else if show_progress && let Some(c) = report.progress_char() {
                         print!("{c}");
@@ -238,6 +417,20 @@ impl Engine {
                             line_open = false;
                         }
                         let _ = std::io::stdout().flush();
+                    }
+                    if report.outcome == Outcome::Failed {
+                        // The failure repr's "[gw0] darwin -- Python ..." line.
+                        self.session
+                            .report_workers
+                            .insert(report.nodeid.clone(), worker);
+                        failed += 1;
+                        if let Some(max) = maxfail
+                            && failed >= max
+                            && !maxfail_hit
+                        {
+                            maxfail_hit = true;
+                            queue.stop();
+                        }
                     }
                     // Delegated mode: the replacement reporter renders the
                     // arrival-order progress (xdist drives it the same way).
@@ -255,6 +448,11 @@ impl Engine {
                     reports.push(report);
                 }
                 Event::Extra { plugin, payload } => extras.push((plugin, payload)),
+                Event::Workeroutput { worker, payload } => {
+                    if let Some(Some(node)) = nodes.get(worker) {
+                        crate::python::worker_node_set_output(py, node, &payload);
+                    }
+                }
                 Event::Warnings { lines, count } => {
                     self.session.worker_warnings.extend(lines);
                     self.session.worker_warning_count += count;
@@ -276,6 +474,39 @@ impl Engine {
         }
         for handle in handles {
             let _ = handle.join();
+        }
+
+        if maxfail_hit {
+            // Upstream DSession: -x/--maxfail interrupts the session (exit
+            // 2) with the "stopping after N failures" banner.
+            self.session.stopped_after = Some(failed);
+            self.session.exit_code_override = Some(crate::report::exit_code::INTERRUPTED);
+        }
+
+        // All workers are down: conftest pytest_testnodedown hooks see the
+        // final node.workeroutput (upstream fires one per departing node).
+        let testnodedown_hooks: Vec<Py<pyo3::PyAny>> = self
+            .session
+            .py_hooks
+            .iter()
+            .filter(|hook| hook.name == "pytest_testnodedown")
+            .map(|hook| hook.func.clone_ref(py))
+            .collect();
+        if !testnodedown_hooks.is_empty() {
+            for node in nodes.iter().flatten() {
+                for func in &testnodedown_hooks {
+                    if let Err(err) = crate::python::call_py_hook(
+                        py,
+                        func,
+                        &[("node", node.clone_ref(py)), ("error", py.None())],
+                    ) {
+                        eprintln!(
+                            "INTERNAL ERROR: {}",
+                            crate::python::format_exception(py, &err)
+                        );
+                    }
+                }
+            }
         }
 
         self.session.reports = reports;
@@ -317,13 +548,15 @@ impl Engine {
         py: Python<'_>,
         count: usize,
         testrun_uid: &str,
+        worker_inputs: &[Option<String>],
     ) -> Vec<Option<WorkerProc>> {
         use std::os::fd::FromRawFd;
 
-        const ENV_KEYS: [&str; 3] = [
+        const ENV_KEYS: [&str; 4] = [
             "PYTEST_XDIST_WORKER",
             "PYTEST_XDIST_WORKER_COUNT",
             "PYTEST_XDIST_TESTRUNUID",
+            "PYTEST_RS_WORKERINPUT",
         ];
         // os.environ (not Rust setenv: the Python dict snapshots the C
         // environ at import, and __setitem__ writes through via putenv).
@@ -351,6 +584,14 @@ impl Engine {
                 let _ = environ.set_item(ENV_KEYS[0], format!("gw{index}"));
                 let _ = environ.set_item(ENV_KEYS[1], count.to_string());
                 let _ = environ.set_item(ENV_KEYS[2], testrun_uid);
+                match worker_inputs.get(index).and_then(Option::as_deref) {
+                    Some(json) => {
+                        let _ = environ.set_item(ENV_KEYS[3], json);
+                    }
+                    None => {
+                        let _ = environ.call_method1("pop", (ENV_KEYS[3], py.None()));
+                    }
+                }
             }
             // Flush both runtimes' stdio: buffered bytes would be
             // duplicated into the child, whose fd 1 becomes the protocol
@@ -496,6 +737,10 @@ struct WorkerOwner {
     worker_count: usize,
     max_restart: Option<isize>,
     testrun_uid: String,
+    /// node.workerinput as JSON (pytest_configure_node additions).
+    workerinput_json: Option<String>,
+    /// --tx popen//chdir=DIR: the worker's working directory.
+    chdir: Option<String>,
     /// A pre-forked worker for this slot; replacements (after a crash)
     /// always spawn — re-forking is unsafe once threads exist.
     initial: Option<WorkerProc>,
@@ -504,7 +749,8 @@ struct WorkerOwner {
 impl WorkerOwner {
     fn spawn(&self) -> std::io::Result<WorkerProc> {
         let exe = std::env::current_exe()?;
-        let mut child = Command::new(exe)
+        let mut command = Command::new(exe);
+        command
             .args(&self.argv)
             .arg("--worker")
             .env("PYTEST_XDIST_WORKER", format!("gw{}", self.index))
@@ -512,8 +758,14 @@ impl WorkerOwner {
             .env("PYTEST_XDIST_TESTRUNUID", &self.testrun_uid)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
-            .spawn()?;
+            .stderr(Stdio::inherit());
+        if let Some(json) = &self.workerinput_json {
+            command.env("PYTEST_RS_WORKERINPUT", json);
+        }
+        if let Some(dir) = &self.chdir {
+            command.current_dir(dir);
+        }
+        let mut child = command.spawn()?;
         let stdin: Box<dyn Write + Send> =
             Box::new(child.stdin.take().expect("worker stdin is piped"));
         let stdout: Box<dyn Read + Send> =
@@ -540,6 +792,11 @@ impl WorkerOwner {
             Some(remaining.remove(0))
         };
         let action = self.queue.crash(remaining);
+        // Upstream's pytest_testnodedown narration for a crashed node.
+        let _ = self.sender.send(Event::Output(format!(
+            "[gw{}] node down: Not properly terminated",
+            self.index
+        )));
         if let (Some(running), CrashAction::Replace | CrashAction::Abort) = (&running, &action) {
             let _ = self.sender.send(Event::Report {
                 report: TestReport {
@@ -654,6 +911,12 @@ impl WorkerOwner {
                     Some(WorkerMsg::Warnings { lines, count }) => {
                         let _ = self.sender.send(Event::Warnings { lines, count });
                     }
+                    Some(WorkerMsg::Workeroutput { payload }) => {
+                        let _ = self.sender.send(Event::Workeroutput {
+                            worker: self.index,
+                            payload,
+                        });
+                    }
                     Some(WorkerMsg::Bye) => break 'work,
                     None => {
                         let _ = self.sender.send(Event::Output(line));
@@ -662,18 +925,38 @@ impl WorkerOwner {
             }
         }
 
-        // Drain post-shutdown frames (warnings, plugin dumps, bye).
+        // Drain post-shutdown frames: final scope-teardown failure reports,
+        // warnings, plugin dumps, bye.
         for line in proc.lines {
             let Ok(line) = line else { break };
+            if line.trim().is_empty() {
+                // encode_frame's leading newline (and stray blank output).
+                continue;
+            }
             match decode_frame(&line) {
+                Some(WorkerMsg::Report { report }) => {
+                    let _ = self.sender.send(Event::Report {
+                        report,
+                        worker: self.index,
+                    });
+                }
                 Some(WorkerMsg::Extra { plugin, payload }) => {
                     let _ = self.sender.send(Event::Extra { plugin, payload });
                 }
                 Some(WorkerMsg::Warnings { lines, count }) => {
                     let _ = self.sender.send(Event::Warnings { lines, count });
                 }
-                Some(WorkerMsg::Bye) | None => {}
+                Some(WorkerMsg::Workeroutput { payload }) => {
+                    let _ = self.sender.send(Event::Workeroutput {
+                        worker: self.index,
+                        payload,
+                    });
+                }
+                Some(WorkerMsg::Bye) => {}
                 Some(_) => {}
+                None => {
+                    let _ = self.sender.send(Event::Output(line));
+                }
             }
         }
         proc.handle.wait();

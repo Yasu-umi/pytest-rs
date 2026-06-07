@@ -344,6 +344,13 @@ impl Config {
             }
             idx += 1;
         }
+        // PYTEST_ADDOPTS env args sit between ini addopts and the CLI
+        // (upstream: ini addopts, then env, then command line).
+        if let Ok(env_addopts) = std::env::var("PYTEST_ADDOPTS")
+            && !env_addopts.trim().is_empty()
+        {
+            argv.splice(1..1, shlex_split(&env_addopts));
+        }
         let addopts = override_addopts.or_else(|| ini_file.get("addopts").cloned());
         if let Some(addopts) = addopts {
             // shlex-style splitting: `-m "not performance"` is one argument.
@@ -486,6 +493,15 @@ impl Config {
                     .hide(true),
             );
         }
+        if has_xdist {
+            // xdist's `-d`: distribute with the default load scheduler.
+            cmd = cmd.arg(
+                clap::Arg::new("dist-load")
+                    .short('d')
+                    .action(clap::ArgAction::SetTrue)
+                    .hide(true),
+            );
+        }
         cmd = cmd.arg(
             clap::Arg::new("capture-disable")
                 .short('s')
@@ -515,6 +531,15 @@ impl Config {
                 .value_name("GLOB")
                 .num_args(0..=1)
                 .default_missing_value("*")
+                .action(clap::ArgAction::Append)
+                .hide(true),
+        );
+        cmd = cmd.arg(
+            clap::Arg::new("debug")
+                .long("debug")
+                .value_name("DEBUG_FILE_NAME")
+                .num_args(0..=1)
+                .default_missing_value("pytestdebug.log")
                 .action(clap::ArgAction::Append)
                 .hide(true),
         );
@@ -649,10 +674,18 @@ impl Config {
                 flags.insert(flag.to_string());
             }
         }
+        if has_xdist && matches.get_flag("dist-load") {
+            flags.insert("dist-load".to_string());
+        }
         if let Some(mut parsed) = matches.get_many::<String>("cache-show")
             && let Some(last) = parsed.next_back()
         {
             values.insert("cache-show".to_string(), last.clone());
+        }
+        if let Some(mut parsed) = matches.get_many::<String>("debug")
+            && let Some(last) = parsed.next_back()
+        {
+            values.insert("debug".to_string(), last.clone());
         }
         let mut plugin_opts = Vec::new();
         for (name, _) in CORE_VALUES {

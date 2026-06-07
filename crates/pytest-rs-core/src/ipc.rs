@@ -29,6 +29,9 @@ pub enum WorkerMsg {
     Extra { plugin: String, payload: String },
     /// Warnings captured in this worker, for the parent's summary.
     Warnings { lines: Vec<String>, count: usize },
+    /// The worker's config.workeroutput as JSON (xdist data exchange:
+    /// surfaces as node.workeroutput in pytest_testnodedown).
+    Workeroutput { payload: String },
     /// Clean shutdown.
     Bye,
 }

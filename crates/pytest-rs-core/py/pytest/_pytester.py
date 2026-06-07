@@ -712,11 +712,16 @@ def _make_runner_dir(request, tmp_path_factory, cls):
     runner._test_tmproot = tmp_path_factory.mktemp(f"tmp-{name}", numbered=True)
     old_temproot = os.environ.get("PYTEST_DEBUG_TEMPROOT")
     os.environ["PYTEST_DEBUG_TEMPROOT"] = str(runner._test_tmproot)
+    # Upstream pytester sanitizes the outer PYTEST_ADDOPTS at setup; a test
+    # monkeypatch.setenv afterwards still reaches the nested run.
+    old_addopts = os.environ.pop("PYTEST_ADDOPTS", None)
     yield runner
     if old_temproot is None:
         os.environ.pop("PYTEST_DEBUG_TEMPROOT", None)
     else:
         os.environ["PYTEST_DEBUG_TEMPROOT"] = old_temproot
+    if old_addopts is not None:
+        os.environ["PYTEST_ADDOPTS"] = old_addopts
     for entry in runner._syspaths:
         if entry in sys.path:
             sys.path.remove(entry)

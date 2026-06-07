@@ -629,3 +629,62 @@ pub fn warn_explicit_at(
         .call_method1("warn_explicit", (message, category, filename, lineno))?;
     Ok(())
 }
+
+/// A controller-side WorkerNode for the xdist data-exchange hooks
+/// (pytest_configure_node / pytest_testnodedown). workerinput starts with
+/// the base keys upstream xdist always provides.
+pub fn make_worker_node(
+    py: Python<'_>,
+    index: usize,
+    worker_count: usize,
+    testrun_uid: &str,
+    config: &crate::config::Config,
+) -> PyResult<Py<PyAny>> {
+    let workerinput = pyo3::types::PyDict::new(py);
+    workerinput.set_item("workerid", format!("gw{index}"))?;
+    workerinput.set_item("workercount", worker_count)?;
+    workerinput.set_item("testrunuid", testrun_uid)?;
+    let config_proxy = make_py_config(py, config)?;
+    Ok(py
+        .import("pytest._dist")?
+        .getattr("WorkerNode")?
+        .call1((format!("gw{index}"), config_proxy, workerinput))?
+        .unbind())
+}
+
+/// node.workerinput as JSON for the worker process (None when nothing
+/// beyond the base keys was added, or when a value isn't serializable).
+pub fn worker_node_input_json(py: Python<'_>, node: &Py<PyAny>) -> Option<String> {
+    let input = node.bind(py).getattr("workerinput").ok()?;
+    py.import("json")
+        .and_then(|json| json.call_method1("dumps", (input,)))
+        .and_then(|s| s.extract())
+        .ok()
+}
+
+/// This worker's config.workeroutput as JSON (None when empty).
+pub fn worker_output_json(py: Python<'_>) -> Option<String> {
+    let output = py
+        .import("pytest._dist")
+        .and_then(|m| m.getattr("workeroutput"))
+        .ok()?;
+    if output.len().ok()? == 0 {
+        return None;
+    }
+    py.import("json")
+        .and_then(|json| json.call_method1("dumps", (output,)))
+        .and_then(|s| s.extract())
+        .ok()
+}
+
+/// Merge a worker's streamed workeroutput JSON into its node.
+pub fn worker_node_set_output(py: Python<'_>, node: &Py<PyAny>, payload: &str) {
+    let _ = py
+        .import("json")
+        .and_then(|json| json.call_method1("loads", (payload,)))
+        .and_then(|data| {
+            node.bind(py)
+                .getattr("workeroutput")?
+                .call_method1("update", (data,))
+        });
+}

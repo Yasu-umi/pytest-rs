@@ -59,6 +59,20 @@ impl Engine {
             eprintln!("INTERNAL ERROR: failed to install pytest shim: {err}");
             return exit_code::INTERNAL_ERROR;
         }
+        // --debug: pytest's debug trace file (minimal: create the file and
+        // announce it on stderr like upstream).
+        if let Some(name) = self.config.get_value("debug") {
+            let path = self.config.invocation_dir.join(name);
+            let _ = std::fs::write(
+                &path,
+                format!(
+                    "versions pytest-rs-{}, python-{}\n",
+                    env!("CARGO_PKG_VERSION"),
+                    py.version().split_whitespace().next().unwrap_or("")
+                ),
+            );
+            eprintln!("writing pytestdebug information to {}", path.display());
+        }
         if let Some(report) = self.config.get_value("doctest-report") {
             const CHOICES: &[&str] = &["none", "cdiff", "udiff", "ndiff", "only_first_failure"];
             if !CHOICES.iter().any(|c| c.eq_ignore_ascii_case(report)) {
@@ -209,7 +223,7 @@ impl Engine {
 
         // --cache-show: display cache contents instead of running tests.
         if let Some(glob) = self.config.get_value("cache-show").map(str::to_string) {
-            self.print_header();
+            self.print_header(py);
             let glob = if glob.is_empty() { "*" } else { &glob };
             return match python::cache_show(py, &self.config, glob) {
                 Ok(()) => exit_code::OK,
@@ -258,8 +272,22 @@ impl Engine {
             // "stopping after N failures" banner; otherwise INTERRUPTED.
             let maxfail_hit = self.config.maxfail().is_some_and(|m| n_collect_errors >= m);
             if !self.config.get_flag("continue-on-collection-errors") || maxfail_hit {
+                // Under -n, xdist reports collection errors as plain errors
+                // (exit 1, no Interrupted banner) below the worker banner.
+                #[cfg(feature = "xdist")]
+                let dist_workers = if maxfail_hit {
+                    None
+                } else {
+                    self.resolve_numprocesses(py)
+                };
+                #[cfg(not(feature = "xdist"))]
+                let dist_workers: Option<usize> = None;
                 if !self.config.no_terminal() {
-                    if !self.config.quiet {
+                    #[cfg(feature = "xdist")]
+                    if let Some(workers) = dist_workers {
+                        self.print_dist_banner(workers);
+                    }
+                    if dist_workers.is_none() && !self.config.quiet {
                         let n_items = self.session.items.len();
                         println!(
                             "collected {n_items} item{} / {n_collect_errors} error{}",
@@ -276,15 +304,17 @@ impl Engine {
                 self.write_junit_xml(py);
                 if !self.config.no_terminal() {
                     self.print_short_summary();
-                    let banner = if maxfail_hit {
-                        format!("stopping after {n_collect_errors} failures")
-                    } else {
-                        format!(
-                            "Interrupted: {n_collect_errors} error{} during collection",
-                            if n_collect_errors == 1 { "" } else { "s" }
-                        )
-                    };
-                    println!("{}", center_with(&banner, '!'));
+                    if dist_workers.is_none() {
+                        let banner = if maxfail_hit {
+                            format!("stopping after {n_collect_errors} failures")
+                        } else {
+                            format!(
+                                "Interrupted: {n_collect_errors} error{} during collection",
+                                if n_collect_errors == 1 { "" } else { "s" }
+                            )
+                        };
+                        println!("{}", center_with(&banner, '!'));
+                    }
                     println!(
                         "{}",
                         crate::runner::summary_line(
@@ -295,7 +325,7 @@ impl Engine {
                         )
                     );
                 }
-                let code = if maxfail_hit {
+                let code = if maxfail_hit || dist_workers.is_some() {
                     exit_code::TESTS_FAILED
                 } else {
                     exit_code::INTERRUPTED
@@ -307,14 +337,16 @@ impl Engine {
                         eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
                     }
                     let banner = if maxfail_hit {
-                        format!("stopping after {n_collect_errors} failures")
-                    } else {
-                        format!(
+                        Some(format!("stopping after {n_collect_errors} failures"))
+                    } else if dist_workers.is_none() {
+                        Some(format!(
                             "Interrupted: {n_collect_errors} error{} during collection",
                             if n_collect_errors == 1 { "" } else { "s" }
-                        )
+                        ))
+                    } else {
+                        None
                     };
-                    python::reporter_finish(py, &self.config, code, Some(&banner));
+                    python::reporter_finish(py, &self.config, code, banner.as_deref());
                 }
                 return code;
             }
@@ -335,7 +367,11 @@ impl Engine {
                 eprintln!("ERROR: {}", err.value(py));
                 return exit_code::USAGE_ERROR;
             }
-            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+            // Upstream pytest_internalerror: the traceback goes to the
+            // terminal (stdout), each line prefixed "INTERNALERROR> ".
+            for line in python::format_exception(py, &err).lines() {
+                println!("INTERNALERROR> {line}");
+            }
             return exit_code::INTERNAL_ERROR;
         }
         if let Some(cache) = &mut self.cache {
@@ -515,7 +551,7 @@ impl Engine {
             // Delegated mode: the replacement reporter renders the
             // summaries the engine just suppressed.
             if self.session.custom_reporter.is_some() && !self.config.is_worker() {
-                if let Err(err) = self.print_plugin_summaries(py) {
+                if let Err(err) = self.print_plugin_summaries(py, code) {
                     eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
                 }
                 let banner = self
@@ -539,7 +575,7 @@ impl Engine {
         // until after the run, like pytest's terminal reporter.
         self.print_collect_errors();
         self.print_failures();
-        if let Err(err) = self.print_plugin_summaries(py) {
+        if let Err(err) = self.print_plugin_summaries(py, code) {
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
         }
         self.print_warnings_summary(py);
@@ -759,7 +795,7 @@ impl Engine {
         if self.session.custom_reporter.is_some() {
             python::reporter_sessionstart(py, &self.config);
         } else {
-            self.print_header();
+            self.print_header(py);
             if let Err(err) = self.print_py_report_header(py) {
                 errors.push((rootdir.clone(), python::format_exception(py, &err)));
             }
@@ -873,7 +909,13 @@ impl Engine {
                                 }
                                 None => errors.push((
                                     file.clone(),
-                                    with_sections(python::format_exception(py, &err)),
+                                    // pytest-style frames + E lines (upstream
+                                    // collect errors honor --tb).
+                                    with_sections(python::format_test_failure(
+                                        py,
+                                        &err,
+                                        self.config.get_value("tb").unwrap_or("long"),
+                                    )),
                                 )),
                             }
                             // Upstream DoctestModule: with --doctest-ignore-import-errors

@@ -99,7 +99,7 @@ impl Engine {
                 &[
                     ("config", config_proxy.clone_ref(py)),
                     ("items", node_list.clone().unbind().into_any()),
-                    ("session", py.None()),
+                    ("session", python::make_session_proxy(py, &self.config)?),
                 ],
             )?;
         }
@@ -271,10 +271,12 @@ impl Engine {
             .filter(|hook| hook.name == "pytest_collection_finish")
             .map(|hook| hook.func.clone_ref(py))
             .collect();
+        // Publish session.items / session.testscollected regardless of
+        // hook presence: pytest_sessionfinish readers need them too.
+        python::set_session_items(py, &self.session.items)?;
         if hook_funcs.is_empty() && self.session.custom_reporter.is_none() {
             return Ok(());
         }
-        python::set_session_items(py, &self.session.items)?;
         let session = python::make_session_proxy(py, &self.config)?;
         for func in &hook_funcs {
             python::call_py_hook(py, func, &[("session", session.clone_ref(py))])?;
@@ -296,6 +298,7 @@ impl Engine {
             return Ok(());
         }
         let config_proxy = python::make_py_config(py, &self.config)?;
+        let session_proxy = python::make_session_proxy(py, &self.config)?;
         let exitstatus = code.into_pyobject(py)?.unbind().into_any();
         for func in &hook_funcs {
             python::call_py_hook(
@@ -303,7 +306,7 @@ impl Engine {
                 func,
                 &[
                     ("config", config_proxy.clone_ref(py)),
-                    ("session", py.None()),
+                    ("session", session_proxy.clone_ref(py)),
                     ("exitstatus", exitstatus.clone_ref(py)),
                 ],
             )?;

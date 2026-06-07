@@ -65,6 +65,12 @@ pub struct Session {
     /// Warnings forwarded from -n workers, merged into the summary.
     pub worker_warnings: Vec<String>,
     pub worker_warning_count: usize,
+    /// Which -n worker produced each failed report (nodeid -> gw index),
+    /// for the "[gw0] darwin -- Python ..." line atop each failure repr.
+    pub report_workers: HashMap<String, usize>,
+    /// The shared "darwin -- Python 3.13.2 /usr/bin/python" suffix of that
+    /// line (upstream getworkerinfoline; our workers share the interpreter).
+    pub worker_platinfo: Option<String>,
     /// Fatal distribution condition (crashed-worker budget exhausted),
     /// shown as a banner before the short summary.
     pub dist_banner: Option<String>,
@@ -112,6 +118,8 @@ impl Session {
             abort_banner: None,
             worker_warnings: Vec::new(),
             worker_warning_count: 0,
+            report_workers: HashMap::new(),
+            worker_platinfo: None,
             dist_banner: None,
             live_logging: false,
             live_progress: None,

@@ -71,10 +71,15 @@ impl Engine {
     /// The spawned-worker entry (--worker): a fresh process, so register
     /// fixtures and import every test module before running anything.
     pub(crate) fn run_worker(&mut self, py: Python<'_>) -> i32 {
-        // Tests print via Python: alias sys.stdout to stderr so fd 1 stays
-        // a clean protocol channel (the parent forwards stderr as-is).
+        // Test prints (-s) flow over fd 1 as passthrough lines — the parent
+        // forwards non-frame lines to its stdout, like upstream's relay.
+        // Line buffering keeps them ordered against protocol frames.
         if py
-            .run(c"import sys\nsys.stdout = sys.stderr\n", None, None)
+            .run(
+                c"import sys\ntry:\n    sys.stdout.reconfigure(line_buffering=True)\nexcept Exception:\n    pass\n",
+                None,
+                None,
+            )
             .is_err()
         {
             return exit_code::INTERNAL_ERROR;
@@ -151,7 +156,11 @@ impl Engine {
         // controller; workers must never drive it (stdout is the IPC pipe).
         self.session.custom_reporter = None;
         if py
-            .run(c"import sys\nsys.stdout = sys.stderr\n", None, None)
+            .run(
+                c"import sys\ntry:\n    sys.stdout.reconfigure(line_buffering=True)\nexcept Exception:\n    pass\n",
+                None,
+                None,
+            )
             .is_err()
         {
             return exit_code::INTERNAL_ERROR;
@@ -293,6 +302,10 @@ impl Engine {
                 count: warning_count,
             });
         }
+        // config.workeroutput travels back for pytest_testnodedown.
+        if let Some(payload) = python::worker_output_json(py) {
+            send(&WorkerMsg::Workeroutput { payload });
+        }
         send(&WorkerMsg::Bye);
         exit_code::OK
     }
@@ -356,6 +369,12 @@ impl Engine {
             let lineno = item.lineno;
             // xdist's [setproctitle] extra: the running item shows in ps.
             python::worker_set_title(py, &format!("[pytest-xdist running] {}", item.nodeid));
+            let _ = crate::runner::fire_runtest_py_hooks(
+                py,
+                &self.session,
+                item,
+                "pytest_runtest_logstart",
+            );
             let reports =
                 crate::runner::run_one(py, &self.plugins, &mut self.session, &self.config, item);
             collection.last_nodeid = Some(item.nodeid.clone());
@@ -363,6 +382,13 @@ impl Engine {
                 crate::runner::fire_logreport_hooks(py, &self.session, &report, Some(lineno));
                 send(&WorkerMsg::Report { report });
             }
+            let item = &collection.items[index];
+            let _ = crate::runner::fire_runtest_py_hooks(
+                py,
+                &self.session,
+                item,
+                "pytest_runtest_logfinish",
+            );
         }
     }
 

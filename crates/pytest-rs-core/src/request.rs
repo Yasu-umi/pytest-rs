@@ -128,17 +128,40 @@ impl PyConfig {
     }
 
     /// xdist parity: present (with the worker id) only in -n workers, so
-    /// `hasattr(config, "workerinput")` detects worker processes.
+    /// `hasattr(config, "workerinput")` detects worker processes. Custom
+    /// entries set by controller-side pytest_configure_node hooks arrive
+    /// as JSON via PYTEST_RS_WORKERINPUT.
     #[getter]
     fn workerinput<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         match std::env::var("PYTEST_XDIST_WORKER") {
             Ok(worker_id) => {
                 let dict = pyo3::types::PyDict::new(py);
                 dict.set_item("workerid", worker_id)?;
+                if let Ok(count) = std::env::var("PYTEST_XDIST_WORKER_COUNT") {
+                    dict.set_item("workercount", count.parse::<usize>().unwrap_or(1))?;
+                }
+                if let Ok(uid) = std::env::var("PYTEST_XDIST_TESTRUNUID") {
+                    dict.set_item("testrunuid", uid)?;
+                }
+                if let Ok(json) = std::env::var("PYTEST_RS_WORKERINPUT")
+                    && let Ok(extra) = py.import("json")?.call_method1("loads", (json,))
+                {
+                    dict.call_method1("update", (extra,))?;
+                }
                 Ok(dict.into_any())
             }
             Err(_) => Err(pyo3::exceptions::PyAttributeError::new_err("workerinput")),
         }
+    }
+
+    /// xdist parity: a worker-only dict the controller receives back in
+    /// pytest_testnodedown (node.workeroutput).
+    #[getter]
+    fn workeroutput<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        if std::env::var("PYTEST_XDIST_WORKER").is_err() {
+            return Err(pyo3::exceptions::PyAttributeError::new_err("workeroutput"));
+        }
+        py.import("pytest._dist")?.getattr("workeroutput")
     }
 
     #[getter]
