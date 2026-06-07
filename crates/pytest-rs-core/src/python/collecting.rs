@@ -691,13 +691,12 @@ pub(crate) fn expand_parametrize(
             }
             Err(_) => (argnames_obj.extract()?, false),
         };
-        let explicit_ids: Option<Vec<Option<String>>> = mark
-            .obj
-            .bind(py)
-            .getattr("kwargs")?
-            .get_item("ids")
-            .ok()
-            .and_then(|ids| ids.extract().ok());
+        let ids_obj = mark.obj.bind(py).getattr("kwargs")?.get_item("ids").ok();
+        let explicit_ids: Option<Vec<Option<String>>> =
+            ids_obj.as_ref().and_then(|ids| ids.extract().ok());
+        // ids=callable: idfn(val) per value, None falling through to the
+        // default id for that value (upstream _idval_from_function).
+        let ids_callable = ids_obj.filter(|ids| ids.is_callable());
         // indirect=True routes every argname's value to the same-named
         // fixture's request.param; indirect=["x"] only the listed ones.
         let indirect_obj = mark
@@ -776,6 +775,30 @@ pub(crate) fn expand_parametrize(
             let id_part = if hidden {
                 None
             } else {
+                let from_callable = || -> PyResult<Option<String>> {
+                    let Some(idfn) = ids_callable.as_ref() else {
+                        return Ok(None);
+                    };
+                    let mut parts = Vec::new();
+                    for (argname, value) in argnames.iter().zip(values.iter()) {
+                        let id = idfn.call1((value,)).map_err(|err| {
+                            collect_error(
+                                py,
+                                &format!(
+                                    "{nodeid}: error raised while trying to determine id of \
+                                     parameter '{argname}' at position {index}\n{}",
+                                    err.value(py)
+                                ),
+                            )
+                        })?;
+                        parts.push(
+                            user_id_from_value(py, &id)
+                                .unwrap_or_else(|| id_for_value(value, argname, index)),
+                        );
+                    }
+                    Ok(Some(parts.join("-")))
+                };
+                let callable_id = from_callable()?;
                 Some(
                     spec_id
                         .or_else(|| {
@@ -783,6 +806,7 @@ pub(crate) fn expand_parametrize(
                                 .as_ref()
                                 .and_then(|ids| ids.get(index).cloned().flatten())
                         })
+                        .or(callable_id)
                         .unwrap_or_else(|| {
                             let parts: Vec<String> = argnames
                                 .iter()
@@ -1041,6 +1065,23 @@ pub(crate) fn fixture_param_id(
 
 /// pytest's ascii_escaped for str ids ("\x00" -> "\\x00"); printable
 /// ASCII passes through untouched.
+/// Upstream's _idval_from_value applied to a user-supplied id (an
+/// `ids=` callable or list entry): strings ascii-escape, numbers/bools
+/// stringify, anything else falls through to the default id (None).
+pub(crate) fn user_id_from_value(py: Python<'_>, id: &Bound<'_, PyAny>) -> Option<String> {
+    let _ = py;
+    if id.is_none() {
+        return None;
+    }
+    if let Ok(text) = id.extract::<String>() {
+        return Some(ascii_escaped_str(id, text));
+    }
+    if id.extract::<bool>().is_ok() || id.extract::<i64>().is_ok() || id.extract::<f64>().is_ok() {
+        return id.str().ok().map(|s| s.to_string());
+    }
+    None
+}
+
 pub(crate) fn ascii_escaped_str(value: &Bound<'_, PyAny>, s: String) -> String {
     if s.chars().all(|c| matches!(c, ' '..='~')) {
         return s;

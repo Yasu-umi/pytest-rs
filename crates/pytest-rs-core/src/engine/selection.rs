@@ -31,24 +31,39 @@ impl Engine {
 
     /// --strict-markers / --strict (CLI or ini): every mark must be
     /// registered in the `markers` ini option or be a builtin/bundled one.
-    pub(crate) fn check_strict_markers(&self) -> Result<(), String> {
+    pub(crate) fn check_strict_markers(&self, py: Python<'_>) -> Result<(), String> {
         if !self.strict_markers() {
             return Ok(());
         }
 
-        let registered: std::collections::HashSet<String> = self
-            .config
-            .get_ini("markers")
-            .map(|lines| {
-                lines
-                    .lines()
-                    .filter_map(|line| {
-                        let name = line.trim().split([':', '(']).next()?.trim();
-                        (!name.is_empty()).then(|| name.to_string())
-                    })
-                    .collect()
+        // Read through the config proxy: plugins register their markers at
+        // configure time via addinivalue_line("markers", ...), which lands
+        // there, not in the Rust-side ini snapshot.
+        let proxy_lines: Vec<String> = python::existing_py_config(py)
+            .and_then(|proxy| {
+                let value = proxy.bind(py).call_method1("getini", ("markers",)).ok()?;
+                value.extract::<Vec<String>>().ok().or_else(|| {
+                    value
+                        .extract::<Option<String>>()
+                        .ok()
+                        .flatten()
+                        .map(|raw| raw.lines().map(str::to_string).collect())
+                })
             })
             .unwrap_or_default();
+        let ini_lines = self
+            .config
+            .get_ini("markers")
+            .map(|lines| lines.lines().map(str::to_string).collect::<Vec<_>>())
+            .unwrap_or_default();
+        let registered: std::collections::HashSet<String> = proxy_lines
+            .iter()
+            .chain(ini_lines.iter())
+            .filter_map(|line| {
+                let name = line.trim().split([':', '(']).next()?.trim();
+                (!name.is_empty()).then(|| name.to_string())
+            })
+            .collect();
 
         for item in &self.session.items {
             for mark in &item.marks {

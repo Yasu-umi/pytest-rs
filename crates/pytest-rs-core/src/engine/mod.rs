@@ -320,7 +320,7 @@ impl Engine {
             }
         }
 
-        if let Err(message) = self.check_strict_markers() {
+        if let Err(message) = self.check_strict_markers(py) {
             println!("{message}");
             return exit_code::USAGE_ERROR;
         }
