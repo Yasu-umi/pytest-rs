@@ -147,6 +147,9 @@ impl Engine {
         // flag); plugins must still see this process as a worker (e.g. cov
         // ships its hits via pytest_worker_dump instead of reporting).
         self.config.mark_worker();
+        // A reporter replacement detected pre-fork belongs to the
+        // controller; workers must never drive it (stdout is the IPC pipe).
+        self.session.custom_reporter = None;
         if py
             .run(c"import sys\nsys.stdout = sys.stderr\n", None, None)
             .is_err()

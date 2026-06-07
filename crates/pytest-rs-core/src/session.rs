@@ -91,6 +91,10 @@ pub struct Session {
     /// Plugin-set session.shouldfail message (e.g. pytest-timeout's
     /// session deadline): aborts the run with a "!!! msg !!!" banner.
     pub shouldfail: Option<String>,
+    /// The python plugin object that replaced the 'terminalreporter'
+    /// plugin (pytest-sugar/pytest-pretty); the engine drives it through
+    /// reporter hook calls instead of rendering natively.
+    pub custom_reporter: Option<Py<PyAny>>,
 }
 
 impl Session {
@@ -118,6 +122,7 @@ impl Session {
             collect_errors: Vec::new(),
             stopped_after: None,
             shouldfail: None,
+            custom_reporter: None,
         }
     }
 

@@ -57,6 +57,15 @@ jobs:
           export LD_LIBRARY_PATH="$(python -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR"))'):${LD_LIBRARY_PATH:-}"
           python conformance/runner.py --check
 
+      - name: plugin smoke (sugar/pretty byte-diff, fixture plugins)
+        # Third-party plugins running through the shim: reporter
+        # replacements diff byte-for-byte against real pytest; fixture
+        # providers run functional demos. See conformance/plugin_smoke.py.
+        if: matrix.python-version == '3.13'
+        run: |
+          export LD_LIBRARY_PATH="$(python -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR"))'):${LD_LIBRARY_PATH:-}"
+          python conformance/plugin_smoke.py
+
       - name: commit refreshed conformance results
         # The runner rewrites scoreboard/RESULTS.md/README on every run; on
         # main the bot commits whatever changed (GITHUB_TOKEN pushes do not

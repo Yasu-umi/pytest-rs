@@ -114,6 +114,26 @@ Key structural rules:
   `node.config`, `item.session.config/shouldfail`, `pytest_report_header`, and `--markers`
   round out the plugin-facing surface (pytest-timeout runs fully: signal + thread methods,
   marker/ini/CLI config, session timeout, custom-hook overrides from conftest).
+- **Terminal-reporter replacement** (pytest-sugar/pytest-pretty): a default
+  `TerminalReporter` (trimmed port of upstream's, `_pytest.terminal`) registers as the
+  `terminalreporter` plugin before python `pytest_configure` fires. A plugin that
+  unregisters it and registers its own subclass flips the engine into *delegated mode*
+  (`Config::reporter_delegated`): every native terminal print is suppressed (the
+  `no_terminal()` gate) and `pytest._reporter` drives the replacement object through the
+  hook calls upstream pluggy would make — `pytest_sessionstart` (it owns the header; the
+  native header only prints when output stays native), `pytest_collection_finish`
+  ("collected N items"), `pytest_deselected`, `pytest_runtest_logstart/logreport/logfinish`
+  per item (after conftest impls, pluggy LIFO), `pytest_collectreport` for collection
+  errors, and the end-of-run summary sequence (`summary_errors → summary_failures →
+  warnings → passes → other plugins' pytest_terminal_summary → short_test_summary →
+  summary_stats`, upstream's sessionfinish-wrapper order). The report proxy's string
+  longrepr grows upstream's `.reprcrash`/`.chain` surface so crash-message suffixes and
+  pretty's failure table work. Native runs pay nothing: the default reporter is inert and
+  the engine renders in Rust. `-n` runs feed the controller-side reporter in arrival order
+  (xdist behavior); forked workers drop the inherited replacement (stdout is the IPC pipe).
+  pytest-pretty's output is byte-identical to real pytest 9.0.3 on the mixed-outcome demo;
+  sugar needs a tty (or `--force-sugar`), upstream behavior. Not delegated: --collect-only
+  trees and --cache-show stay native.
 - **`pytest_collection_preexpand`** (pytest-rs-specific hook): runs after collection but
   before parametrized-fixture expansion, so plugins can inject closure-affecting marks —
   anyio's usefixtures("anyio_backend") injection lands here, making the backend a normal

@@ -55,10 +55,17 @@ class HookRelay:
 class PluginManager:
     def __init__(self) -> None:
         self._plugins: list[Any] = []
-        self._specs: dict[str, dict[str, Any]] = {}
+        self._names: dict[str, Any] = {}
+        # Core firstresult hookspecs the relay must honor even though no
+        # plugin registers them via pytest_addhooks.
+        self._specs: dict[str, dict[str, Any]] = {
+            "pytest_report_teststatus": {"firstresult": True},
+        }
         self.hook = HookRelay(self)
 
     def getplugin(self, name: str) -> Any:
+        if name in self._names:
+            return self._names[name]
         if name in ("logging-plugin", "logging"):
             from pytest import _logging
 
@@ -92,14 +99,20 @@ class PluginManager:
         if plugin is None or plugin in self._plugins:
             return None
         self._plugins.append(plugin)
+        if name is not None:
+            self._names[name] = plugin
         addhooks = getattr(plugin, "pytest_addhooks", None)
         if callable(addhooks):
             addhooks(**_accepted_kwargs(addhooks, {"pluginmanager": self}))
         return plugin
 
     def unregister(self, plugin: Any = None, name: str | None = None) -> None:
+        if plugin is None and name is not None:
+            plugin = self._names.get(name)
         if plugin in self._plugins:
             self._plugins.remove(plugin)
+        for key in [k for k, v in self._names.items() if v is plugin]:
+            del self._names[key]
         return None
 
     def is_registered(self, plugin: Any) -> bool:

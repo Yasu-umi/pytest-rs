@@ -206,6 +206,11 @@ pub struct Config {
     /// specs (pytest_addoption): applied after plugin load, where clap
     /// cannot know them. Space-separated values are not supported.
     pub plugin_args: Vec<String>,
+    /// A plugin replaced the 'terminalreporter' plugin during configure
+    /// (pytest-sugar/pytest-pretty): native terminal output is suppressed
+    /// and the engine drives the replacement object instead. Set once,
+    /// after python pytest_configure hooks fire.
+    reporter_delegated: std::sync::atomic::AtomicBool,
 }
 
 /// pytest's rootdir-discovery inputs: cwd plus every arg token that exists
@@ -696,6 +701,7 @@ impl Config {
             ini_file,
             config_file_name,
             plugin_args,
+            reporter_delegated: std::sync::atomic::AtomicBool::new(false),
         })
     }
 
@@ -739,13 +745,41 @@ impl Config {
     }
 
     /// `-p no:terminal` disables the terminal reporter entirely. Workers
-    /// are always silent: their stdout is the IPC channel.
+    /// are always silent: their stdout is the IPC channel. A python plugin
+    /// replacing the 'terminalreporter' plugin also silences native output
+    /// (the engine drives the replacement instead).
     pub fn no_terminal(&self) -> bool {
+        self.is_worker()
+            || self.reporter_delegated()
+            || self
+                .plugin_opts
+                .iter()
+                .any(|spec| spec == "no:terminal" || spec == "no:terminalreporter")
+    }
+
+    /// A python plugin owns terminal output (see `set_reporter_delegated`).
+    pub fn reporter_delegated(&self) -> bool {
+        self.reporter_delegated
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// no_terminal() minus reporter delegation: output a replacement
+    /// reporter does NOT produce itself (the --collect-only tree is
+    /// base-class behavior upstream reporter plugins inherit) still prints
+    /// natively in delegated mode.
+    pub fn no_terminal_explicit(&self) -> bool {
         self.is_worker()
             || self
                 .plugin_opts
                 .iter()
                 .any(|spec| spec == "no:terminal" || spec == "no:terminalreporter")
+    }
+
+    /// Flip native terminal output off: a plugin registered its own
+    /// 'terminalreporter' during pytest_configure.
+    pub fn set_reporter_delegated(&self) {
+        self.reporter_delegated
+            .store(true, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// `-p no:NAME` for a bundled plugin.

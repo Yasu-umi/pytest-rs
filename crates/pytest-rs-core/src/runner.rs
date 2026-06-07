@@ -143,6 +143,9 @@ impl Engine {
                 python::log_set_live_when(py, "start");
             }
             let _ = fire_runtest_py_hooks(py, session, item, "pytest_runtest_logstart");
+            if session.custom_reporter.is_some() && !config.is_worker() {
+                python::reporter_logstart(py, item);
+            }
 
             // Failed subtests share the --maxfail budget: tell the fixture
             // how many failures remain before it must stop swallowing.
@@ -207,6 +210,9 @@ impl Engine {
                 python::log_set_live_when(py, "finish");
             }
             let _ = fire_runtest_py_hooks(py, session, item, "pytest_runtest_logfinish");
+            if session.custom_reporter.is_some() && !config.is_worker() {
+                python::reporter_logfinish(py, item);
+            }
             if stepwise && item_failed {
                 sw_failed_items += 1;
                 if !(sw_skip && sw_failed_items == 1) {
@@ -1688,7 +1694,8 @@ pub(crate) fn fire_logreport_hooks(
         })
         .map(|hook| hook.func.clone_ref(py))
         .collect();
-    if funcs.is_empty() {
+    let delegated = session.custom_reporter.is_some();
+    if funcs.is_empty() && !delegated {
         return;
     }
     let proxy = match python::make_report_proxy(py, report, lineno) {
@@ -1702,6 +1709,11 @@ pub(crate) fn fire_logreport_hooks(
         if let Err(err) = python::call_py_hook(py, &func, &[("report", proxy.clone_ref(py))]) {
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
         }
+    }
+    // The replacement reporter's pytest_runtest_logreport runs after the
+    // conftest impls (pluggy LIFO: the reporter registered first).
+    if delegated {
+        python::reporter_logreport(py, proxy.bind(py));
     }
 }
 

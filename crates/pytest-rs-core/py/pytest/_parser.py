@@ -99,6 +99,19 @@ def option_lookup(dest: str) -> tuple[bool, Any]:
     return (True, spec["default"])
 
 
+class OptionNamespace:
+    """config.option: explicit attributes win; unset names fall back to the
+    plugin-registered option defaults (pytest's argparse namespace carries
+    every registered option's default, e.g. sugar's `config.option.tb_summary`)."""
+
+    def __getattr__(self, name: str) -> Any:
+        # Only reached when the attribute is not set on the instance.
+        registered, default = option_lookup(name)
+        if registered:
+            return default
+        raise AttributeError(name)
+
+
 def apply_cli_args(namespace: Any, tokens: list[str]) -> list[str]:
     """Apply deferred CLI tokens (`--flag=value`, or `--flag` optionally
     followed by its separate value token) against the registered option

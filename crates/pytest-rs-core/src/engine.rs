@@ -193,11 +193,13 @@ impl Engine {
             return self.run_worker(py);
         }
 
-        self.print_header();
+        // The session header prints from collect() once plugins are loaded
+        // (a reporter-replacing plugin owns it in delegated mode).
         self.cache = Some(crate::cache::CacheState::new(py, &self.config));
 
         // --cache-show: display cache contents instead of running tests.
         if let Some(glob) = self.config.get_value("cache-show").map(str::to_string) {
+            self.print_header();
             let glob = if glob.is_empty() { "*" } else { &glob };
             return match python::cache_show(py, &self.config, glob) {
                 Ok(()) => exit_code::OK,
@@ -226,6 +228,11 @@ impl Engine {
                 self.session
                     .collect_errors
                     .push((nodeid.clone(), err.clone()));
+                // Delegated mode: the replacement reporter sees a failed
+                // CollectReport (sugar prints these instantly).
+                if self.session.custom_reporter.is_some() {
+                    python::reporter_collect_error(py, &nodeid, &err);
+                }
                 self.session.reports.push(crate::report::TestReport {
                     nodeid,
                     phase: Phase::Setup,
@@ -278,11 +285,28 @@ impl Engine {
                         )
                     );
                 }
-                return if maxfail_hit {
+                let code = if maxfail_hit {
                     exit_code::TESTS_FAILED
                 } else {
                     exit_code::INTERRUPTED
                 };
+                if self.session.custom_reporter.is_some() && !self.config.is_worker() {
+                    // pytest fires sessionfinish even on aborted collection
+                    // (pretty's wall-clock end time comes from it).
+                    if let Err(err) = self.fire_py_sessionfinish(py, code) {
+                        eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+                    }
+                    let banner = if maxfail_hit {
+                        format!("stopping after {n_collect_errors} failures")
+                    } else {
+                        format!(
+                            "Interrupted: {n_collect_errors} error{} during collection",
+                            if n_collect_errors == 1 { "" } else { "s" }
+                        )
+                    };
+                    python::reporter_finish(py, &self.config, code, Some(&banner));
+                }
+                return code;
             }
         }
 
@@ -320,6 +344,15 @@ impl Engine {
         // Plugins may also expand items (e.g. loop-factory
         // parametrization), so saturate against growth.
         self.session.deselected = collected.saturating_sub(n_items);
+        // Collection settled: pytest_collection_finish python hooks see the
+        // final item set (sugar's progress total comes from here).
+        if let Err(err) = self.fire_py_collection_finish(py) {
+            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+        }
+        // The replacement reporter prints its own "collected N items" line.
+        if self.session.custom_reporter.is_some() {
+            python::reporter_collection_finish(py, &self.config, collected);
+        }
         if !self.config.quiet && !self.config.no_terminal() {
             let deselected = self.session.deselected;
             if deselected > 0 {
@@ -349,7 +382,10 @@ impl Engine {
         }
 
         if self.config.collect_only {
-            if !self.config.no_terminal() {
+            // The --collect-only tree prints natively even in delegated
+            // mode: upstream reporter plugins inherit it from the base
+            // class rather than reimplementing it.
+            if !self.config.no_terminal_explicit() {
                 if self.config.quiet_level >= 2 {
                     // -qq: per-file counts ("test_x.py: 3").
                     let mut counts: Vec<(String, usize)> = Vec::new();
@@ -370,7 +406,22 @@ impl Engine {
                 } else {
                     self.print_collect_tree();
                 }
-                self.print_collect_only_summary(started.elapsed());
+                if self.session.custom_reporter.is_some() {
+                    // The closing stats line is the replacement reporter's
+                    // (upstream collect-only still runs its sessionfinish
+                    // wrapper, e.g. pretty's "Results:" table).
+                    let code = if n_items == 0 {
+                        exit_code::NO_TESTS_COLLECTED
+                    } else {
+                        exit_code::OK
+                    };
+                    if let Err(err) = self.fire_py_sessionfinish(py, code) {
+                        eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+                    }
+                    python::reporter_finish(py, &self.config, code, None);
+                } else {
+                    self.print_collect_only_summary(started.elapsed());
+                }
             }
             return if n_items == 0 {
                 exit_code::NO_TESTS_COLLECTED
@@ -401,6 +452,9 @@ impl Engine {
             }
             if self.config.no_terminal() {
                 self.write_junit_xml(py);
+                if self.session.custom_reporter.is_some() && !self.config.is_worker() {
+                    python::reporter_finish(py, &self.config, code, None);
+                }
             } else {
                 self.print_warnings_summary(py);
                 self.write_junit_xml(py);
@@ -451,6 +505,24 @@ impl Engine {
 
         if self.config.no_terminal() {
             self.write_junit_xml(py);
+            // Delegated mode: the replacement reporter renders the
+            // summaries the engine just suppressed.
+            if self.session.custom_reporter.is_some() && !self.config.is_worker() {
+                if let Err(err) = self.print_plugin_summaries(py) {
+                    eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+                }
+                let banner = self
+                    .session
+                    .shouldfail
+                    .clone()
+                    .or(self.session.abort_banner.clone())
+                    .or_else(|| {
+                        self.session
+                            .stopped_after
+                            .map(|n| format!("stopping after {n} failures"))
+                    });
+                python::reporter_finish(py, &self.config, code, banner.as_deref());
+            }
             return code;
         }
         if let Some(banner) = &self.session.abort_banner {
@@ -1158,7 +1230,8 @@ impl Engine {
             .filter(|hook| hook.name == "pytest_deselected")
             .map(|hook| hook.func.clone_ref(py))
             .collect();
-        if hook_funcs.is_empty() {
+        let delegated = self.session.custom_reporter.is_some();
+        if hook_funcs.is_empty() && !delegated {
             return Ok(());
         }
         let nodes: Vec<Py<pyo3::PyAny>> = self
@@ -1174,6 +1247,11 @@ impl Engine {
                 func,
                 &[("items", node_list.clone().unbind().into_any())],
             )?;
+        }
+        // The replacement reporter's own pytest_deselected hookimpl (stats
+        // bookkeeping behind "X deselected" in its summary).
+        if delegated {
+            python::reporter_deselected(py, node_list.as_any());
         }
         Ok(())
     }
@@ -1318,6 +1396,47 @@ impl Engine {
             plugin.pytest_sessionfinish(&mut ctx, code)?;
         }
         self.fire_py_sessionfinish(py, code)
+    }
+
+    /// pytest_sessionstart conftest/plugin hooks (sugar reads its theme
+    /// config here, pretty stamps its wall-clock start).
+    fn fire_py_sessionstart(&mut self, py: Python<'_>) -> PyResult<()> {
+        let hook_funcs: Vec<Py<pyo3::PyAny>> = self
+            .session
+            .py_hooks
+            .iter()
+            .filter(|hook| hook.name == "pytest_sessionstart")
+            .map(|hook| hook.func.clone_ref(py))
+            .collect();
+        if hook_funcs.is_empty() {
+            return Ok(());
+        }
+        let session = python::make_session_proxy(py, &self.config)?;
+        for func in &hook_funcs {
+            python::call_py_hook(py, func, &[("session", session.clone_ref(py))])?;
+        }
+        Ok(())
+    }
+
+    /// pytest_collection_finish conftest/plugin hooks, with the final item
+    /// set on session.items (sugar's tests_count comes from here).
+    fn fire_py_collection_finish(&mut self, py: Python<'_>) -> PyResult<()> {
+        let hook_funcs: Vec<Py<pyo3::PyAny>> = self
+            .session
+            .py_hooks
+            .iter()
+            .filter(|hook| hook.name == "pytest_collection_finish")
+            .map(|hook| hook.func.clone_ref(py))
+            .collect();
+        if hook_funcs.is_empty() && self.session.custom_reporter.is_none() {
+            return Ok(());
+        }
+        python::set_session_items(py, &self.session.items)?;
+        let session = python::make_session_proxy(py, &self.config)?;
+        for func in &hook_funcs {
+            python::call_py_hook(py, func, &[("session", session.clone_ref(py))])?;
+        }
+        Ok(())
     }
 
     /// pytest_sessionfinish conftest/plugin hooks (session is not modeled;
@@ -1503,13 +1622,36 @@ impl Engine {
         if let Err(err) = self.apply_plugin_cli_args(py) {
             return Err(python::format_exception(py, &err));
         }
+        // The default 'terminalreporter' plugin registers before configure
+        // so reporter-replacing plugins (pytest-sugar/pretty) find it.
+        if let Err(err) = python::reporter_setup(py, &self.config) {
+            errors.push((rootdir.clone(), python::format_exception(py, &err)));
+        }
         // conftest pytest_configure hooks run once conftests are loaded.
         if let Err(err) = self.fire_py_hooks_simple(py, "pytest_configure") {
             errors.push((rootdir.clone(), python::format_exception(py, &err)));
         }
-        // pytest_report_header lines print under the rootdir/configfile
-        // header (e.g. pytest-timeout's "timeout: 1.0s" block).
-        if let Err(err) = self.print_py_report_header(py) {
+        // A plugin swapped in its own terminal reporter: suppress native
+        // terminal output and drive the replacement object instead.
+        if let Some(reporter) = python::reporter_replacement(py) {
+            self.session.custom_reporter = Some(reporter);
+            self.config.set_reporter_delegated();
+        }
+        // The session header: the replacement reporter's pytest_sessionstart
+        // owns it in delegated mode (upstream prints it from that hook);
+        // otherwise the native header plus pytest_report_header lines
+        // (e.g. pytest-timeout's "timeout: 1.0s" block).
+        if self.session.custom_reporter.is_some() {
+            python::reporter_sessionstart(py, &self.config);
+        } else {
+            self.print_header();
+            if let Err(err) = self.print_py_report_header(py) {
+                errors.push((rootdir.clone(), python::format_exception(py, &err)));
+            }
+        }
+        // pytest_sessionstart python hooks fire before collection, like
+        // upstream (the native-plugin pass fired before the header).
+        if let Err(err) = self.fire_py_sessionstart(py) {
             errors.push((rootdir.clone(), python::format_exception(py, &err)));
         }
         // --markers: list registered markers (configure hooks above already

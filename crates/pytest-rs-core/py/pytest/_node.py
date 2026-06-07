@@ -106,11 +106,17 @@ class DoctestNode:
 
 # Session.shouldfail set by plugins (pytest-timeout's session deadline):
 # the runner polls this between items and aborts with the message banner.
-_session_state = {"shouldfail": None}
+_session_state: dict = {"shouldfail": None, "items": []}
 
 
 def session_shouldfail():
     return _session_state["shouldfail"]
+
+
+def set_session_items(items):
+    """Collected item proxies, published once collection finishes (the
+    engine fires pytest_collection_finish with them on the session)."""
+    _session_state["items"] = list(items)
 
 
 class _NodeSession:
@@ -126,6 +132,14 @@ class _NodeSession:
     @shouldfail.setter
     def shouldfail(self, value):
         _session_state["shouldfail"] = value
+
+    @property
+    def items(self):
+        return _session_state["items"]
+
+    @property
+    def testscollected(self):
+        return len(_session_state["items"])
 
 
 class Node(Item):

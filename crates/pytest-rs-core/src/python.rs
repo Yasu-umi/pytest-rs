@@ -804,8 +804,41 @@ pub fn make_py_config(py: Python<'_>, config: &crate::config::Config) -> PyResul
         return Ok(proxy.clone_ref(py));
     }
     // `config.option` is the argparse namespace in pytest; expose a mutable
-    // namespace so conftests can stash flags on it.
-    let option_ns = py.import("types")?.getattr("SimpleNamespace")?.call0()?;
+    // namespace so conftests can stash flags on it. Unset names fall back
+    // to plugin-registered option defaults (pytest._parser.OptionNamespace).
+    let option_ns = py
+        .import("pytest._parser")?
+        .getattr("OptionNamespace")?
+        .call0()?;
+    // Native options plugins commonly read via config.option.<dest>
+    // (sugar's print_failure checks option.tbstyle, etc.).
+    // -q decrements like upstream's argparse count (-q → verbose -1).
+    option_ns.setattr("verbose", config.verbose as i32 - config.quiet_level as i32)?;
+    option_ns.setattr("quiet", config.quiet)?;
+    option_ns.setattr("tbstyle", config.get_value("tb").unwrap_or("auto"))?;
+    option_ns.setattr(
+        "showcapture",
+        config.get_value("show-capture").unwrap_or("all"),
+    )?;
+    option_ns.setattr("no_header", config.get_flag("no-header"))?;
+    option_ns.setattr("no_summary", config.get_flag("no-summary"))?;
+    option_ns.setattr("fulltrace", config.get_flag("full-trace"))?;
+    option_ns.setattr("xfail_tb", config.get_flag("xfail-tb"))?;
+    option_ns.setattr("traceconfig", false)?;
+    option_ns.setattr("debug", false)?;
+    option_ns.setattr(
+        "capture",
+        if config.get_flag("capture-disable") {
+            "no"
+        } else {
+            config.get_value("capture").unwrap_or("fd")
+        },
+    )?;
+    option_ns.setattr("color", config.get_value("color").unwrap_or("auto"))?;
+    option_ns.setattr("collectonly", config.collect_only)?;
+    if let Some(chars) = config.get_value("report-chars") {
+        option_ns.setattr("reportchars", chars)?;
+    }
     // Populate doctest-related option attributes so getoption() works.
     option_ns.setattr("doctest_modules", config.get_flag("doctest-modules"))?;
     option_ns.setattr(
@@ -2615,6 +2648,203 @@ pub fn set_assertion_truncation(py: Python<'_>, lines: Option<&str>, chars: Opti
     let _ = py
         .import("pytest._rewrite")
         .and_then(|m| m.call_method1("set_truncation_limits", (parse(lines), parse(chars))));
+}
+
+/// The Session proxy passed to pytest_sessionstart /
+/// pytest_collection_finish python hooks (config + shouldfail + items).
+pub fn make_session_proxy(py: Python<'_>, config: &crate::config::Config) -> PyResult<Py<PyAny>> {
+    let config_proxy = make_py_config(py, config)?;
+    Ok(py
+        .import("pytest._node")?
+        .getattr("_NodeSession")?
+        .call1((config_proxy,))?
+        .unbind())
+}
+
+/// Publish the collected items on the session proxy (session.items /
+/// session.testscollected), once collection settles.
+pub fn set_session_items(py: Python<'_>, items: &[crate::collect::TestItem]) -> PyResult<()> {
+    let nodes = pyo3::types::PyList::empty(py);
+    for item in items {
+        nodes.append(make_node(py, item)?)?;
+    }
+    py.import("pytest._node")?
+        .getattr("set_session_items")?
+        .call1((nodes,))?;
+    Ok(())
+}
+
+/// Register the default 'terminalreporter' plugin (the stand-in that
+/// reporter-replacing plugins like pytest-sugar unregister). Must run
+/// before python pytest_configure hooks fire.
+pub fn reporter_setup(py: Python<'_>, config: &crate::config::Config) -> PyResult<()> {
+    let config_proxy = make_py_config(py, config)?;
+    py.import("pytest._reporter")?
+        .getattr("setup")?
+        .call1((config_proxy,))?;
+    Ok(())
+}
+
+/// The plugin object that replaced 'terminalreporter' during configure,
+/// or None when terminal output stays native.
+pub fn reporter_replacement(py: Python<'_>) -> Option<Py<PyAny>> {
+    let result = py
+        .import("pytest._reporter")
+        .and_then(|m| m.getattr("replacement"))
+        .and_then(|f| f.call0());
+    match result {
+        Ok(reporter) if !reporter.is_none() => Some(reporter.unbind()),
+        _ => None,
+    }
+}
+
+/// Drive the replacement reporter's pytest_sessionstart (it owns the
+/// session header in delegated mode).
+pub fn reporter_sessionstart(py: Python<'_>, config: &crate::config::Config) {
+    let result = (|| -> PyResult<()> {
+        let session = make_session_proxy(py, config)?;
+        py.import("pytest._reporter")?
+            .getattr("sessionstart")?
+            .call1((session,))?;
+        Ok(())
+    })();
+    if let Err(err) = result {
+        eprintln!("INTERNAL ERROR: {}", format_exception(py, &err));
+    }
+}
+
+/// Drive the replacement reporter's pytest_collection_finish ("collected N
+/// items" line). `numcollected` includes deselected items.
+pub fn reporter_collection_finish(
+    py: Python<'_>,
+    config: &crate::config::Config,
+    numcollected: usize,
+) {
+    let result = (|| -> PyResult<()> {
+        let session = make_session_proxy(py, config)?;
+        py.import("pytest._reporter")?
+            .getattr("collection_finish")?
+            .call1((session, numcollected))?;
+        Ok(())
+    })();
+    if let Err(err) = result {
+        eprintln!("INTERNAL ERROR: {}", format_exception(py, &err));
+    }
+}
+
+/// Drive the replacement reporter's pytest_deselected (stats bookkeeping
+/// behind the "X deselected" counts).
+pub fn reporter_deselected(py: Python<'_>, items: &Bound<'_, PyAny>) {
+    let result = (|| -> PyResult<()> {
+        py.import("pytest._reporter")?
+            .getattr("deselected")?
+            .call1((items,))?;
+        Ok(())
+    })();
+    if let Err(err) = result {
+        eprintln!("INTERNAL ERROR: {}", format_exception(py, &err));
+    }
+}
+
+/// The (file, lineno0, domain) location tuple for an item, as upstream
+/// reports it to pytest_runtest_logstart/logfinish.
+fn item_location<'py>(py: Python<'py>, item: &TestItem) -> PyResult<Bound<'py, PyAny>> {
+    let file = item.nodeid.split("::").next().unwrap_or("");
+    let domain = item
+        .nodeid
+        .split_once("::")
+        .map(|(_, rest)| rest.replace("::", "."))
+        .unwrap_or_default();
+    Ok((file, item.lineno.saturating_sub(1), domain)
+        .into_pyobject(py)?
+        .into_any())
+}
+
+/// Drive the replacement reporter's pytest_runtest_logstart.
+pub fn reporter_logstart(py: Python<'_>, item: &TestItem) {
+    let result = (|| -> PyResult<()> {
+        let location = item_location(py, item)?;
+        py.import("pytest._reporter")?
+            .getattr("logstart")?
+            .call1((item.nodeid.as_str(), location))?;
+        Ok(())
+    })();
+    if let Err(err) = result {
+        eprintln!("INTERNAL ERROR: {}", format_exception(py, &err));
+    }
+}
+
+/// Drive the replacement reporter's pytest_runtest_logreport.
+pub fn reporter_logreport(py: Python<'_>, report: &Bound<'_, PyAny>) {
+    let result = (|| -> PyResult<()> {
+        py.import("pytest._reporter")?
+            .getattr("logreport")?
+            .call1((report,))?;
+        Ok(())
+    })();
+    if let Err(err) = result {
+        eprintln!("INTERNAL ERROR: {}", format_exception(py, &err));
+    }
+}
+
+/// Drive the replacement reporter's pytest_runtest_logfinish.
+pub fn reporter_logfinish(py: Python<'_>, item: &TestItem) {
+    let result = (|| -> PyResult<()> {
+        let location = item_location(py, item)?;
+        py.import("pytest._reporter")?
+            .getattr("logfinish")?
+            .call1((item.nodeid.as_str(), location))?;
+        Ok(())
+    })();
+    if let Err(err) = result {
+        eprintln!("INTERNAL ERROR: {}", format_exception(py, &err));
+    }
+}
+
+/// Feed a collection error to the replacement reporter as a failed
+/// CollectReport (sugar prints these instantly; the base records stats).
+pub fn reporter_collect_error(py: Python<'_>, nodeid: &str, longrepr: &str) {
+    let result = (|| -> PyResult<()> {
+        let kwargs = PyDict::new(py);
+        kwargs.set_item("nodeid", nodeid)?;
+        kwargs.set_item("outcome", "failed")?;
+        kwargs.set_item("longrepr", longrepr)?;
+        let file = nodeid.split("::").next().unwrap_or(nodeid);
+        kwargs.set_item("location", (file, py.None(), file))?;
+        kwargs.set_item("result", pyo3::types::PyList::empty(py))?;
+        kwargs.set_item("sections", pyo3::types::PyList::empty(py))?;
+        let report = py
+            .import("_pytest.reports")?
+            .getattr("CollectReport")?
+            .call((), Some(&kwargs))?;
+        py.import("pytest._reporter")?
+            .getattr("collectreport")?
+            .call1((report,))?;
+        Ok(())
+    })();
+    if let Err(err) = result {
+        eprintln!("INTERNAL ERROR: {}", format_exception(py, &err));
+    }
+}
+
+/// End-of-run summaries through the replacement reporter (upstream's
+/// pytest_terminal_summary / sessionfinish wrapper order).
+pub fn reporter_finish(
+    py: Python<'_>,
+    config: &crate::config::Config,
+    exitstatus: i32,
+    shouldfail: Option<&str>,
+) {
+    let result = (|| -> PyResult<()> {
+        let session = make_session_proxy(py, config)?;
+        py.import("pytest._reporter")?
+            .getattr("finish")?
+            .call1((session, exitstatus, shouldfail))?;
+        Ok(())
+    })();
+    if let Err(err) = result {
+        eprintln!("INTERNAL ERROR: {}", format_exception(py, &err));
+    }
 }
 
 /// Build the Python TestReport proxy handed to pytest_runtest_logreport

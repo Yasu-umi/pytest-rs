@@ -49,6 +49,23 @@ impl PyConfig {
             .clone_ref(py))
     }
 
+    /// pytest's Config.issue_config_time_warning: a warning raised during
+    /// configure (no test to attribute it to); the session warning capture
+    /// records it for the warnings summary.
+    #[pyo3(signature = (warning, stacklevel = 2))]
+    fn issue_config_time_warning(
+        &self,
+        py: Python<'_>,
+        warning: Py<PyAny>,
+        stacklevel: i32,
+    ) -> PyResult<()> {
+        let kwargs = pyo3::types::PyDict::new(py);
+        kwargs.set_item("stacklevel", stacklevel)?;
+        py.import("warnings")?
+            .call_method("warn", (warning,), Some(&kwargs))?;
+        Ok(())
+    }
+
     fn getini(&self, py: Python<'_>, name: &str) -> PyResult<Py<PyAny>> {
         let raw = self
             .ini
@@ -140,6 +157,14 @@ impl PyConfig {
     #[getter]
     fn pluginmanager<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         py.import("pytest._pluginmanager")?.getattr("pluginmanager")
+    }
+
+    /// config.hook: the pluggy-lite hook relay (config.hook.<name>(**kw)
+    /// dispatches to every registered plugin, e.g. sugar's header calling
+    /// config.hook.pytest_report_header).
+    #[getter]
+    fn hook<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        self.pluginmanager(py)?.getattr("hook")
     }
 
     /// A TerminalWriter on the ORIGINAL stdout (sys.__stdout__, fd 1) —

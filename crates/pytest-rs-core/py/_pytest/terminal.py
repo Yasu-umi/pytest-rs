@@ -1,7 +1,21 @@
-"""Terminal-reporting helpers ported from pytest's _pytest/terminal.py
-(upstream unit-tests these directly)."""
+"""Terminal-reporting helpers ported from pytest's _pytest/terminal.py.
+
+Two consumers:
+- upstream unit-tests exercise the summary-stats logic directly;
+- reporter-replacing plugins (pytest-sugar, pytest-pretty) subclass
+  TerminalReporter and rely on its writer/progress/summary surface. The
+  engine renders natively unless such a plugin registers itself as the
+  'terminalreporter' plugin; then it drives the replacement through
+  pytest._reporter, so the base-class behavior here is what those plugins
+  inherit.
+"""
 
 import datetime
+import os
+import sys
+from pathlib import Path
+
+from _pytest._io import TerminalWriter
 
 
 def _plugin_nameversions(plugininfo):
@@ -91,10 +105,136 @@ def pluralize(count, noun):
     return count, noun + "s" if count != 1 else noun
 
 
+class WarningReport:
+    """A summary entry for stats['warnings'] (upstream's WarningReport)."""
+
+    count_towards_summary = True
+
+    def __init__(self, message, nodeid=None, fslocation=None):
+        self.message = message
+        self.nodeid = nodeid
+        self.fslocation = fslocation
+
+    def get_location(self, config=None):
+        if self.nodeid:
+            return self.nodeid
+        if self.fslocation:
+            filename, linenum = self.fslocation[:2]
+            return f"{filename}:{linenum}"
+        return None
+
+
+class _CallableBool:
+    """isatty should be a method but upstream wrongly made it a boolean;
+    support both probes (upstream's compat.CallableBool)."""
+
+    def __init__(self, value):
+        self._value = bool(value)
+
+    def __bool__(self):
+        return self._value
+
+    def __call__(self):
+        return self._value
+
+
+def _getreportopt(config):
+    """Trimmed getreportopt: expand the -r option chars (default 'fE'
+    plus warnings)."""
+    reportchars = ""
+    try:
+        reportchars = config.getoption("r", None) or config.getoption("reportchars", None) or "fE"
+    except Exception:
+        reportchars = "fE"
+    if "w" not in reportchars:
+        reportchars += "w"
+    reportopts = ""
+    for char in reportchars:
+        if char == "a":
+            reportopts = "sxXEf"
+        elif char == "A":
+            reportopts = "PpsxXEf"
+        elif char == "N":
+            reportopts = ""
+        elif char not in reportopts:
+            reportopts += char
+    return reportopts
+
+
+def _default_teststatus(report):
+    """The (category, letter, word) fallback when no plugin answers
+    pytest_report_teststatus (upstream's runner/skipping defaults)."""
+    if hasattr(report, "wasxfail"):
+        if report.skipped:
+            return "xfailed", "x", "XFAIL"
+        if report.passed:
+            return "xpassed", "X", "XPASS"
+    when = getattr(report, "when", "call")
+    if when in ("setup", "teardown"):
+        if report.failed:
+            return "error", "E", "ERROR"
+        if report.skipped:
+            return "skipped", "s", "SKIPPED"
+        return "", "", ""
+    if report.passed:
+        return "passed", ".", "PASSED"
+    if report.skipped:
+        return "skipped", "s", "SKIPPED"
+    if report.failed:
+        return "failed", "F", "FAILED"
+    return "", "", ""
+
+
+def _crash_message(rep):
+    """The one-line crash message for short-summary suffixes: upstream reads
+    longrepr.reprcrash.message; the shim's longrepr is a formatted string,
+    so fall back to its first 'E ' line."""
+    longrepr = getattr(rep, "longrepr", None)
+    if longrepr is None:
+        return None
+    reprcrash = getattr(longrepr, "reprcrash", None)
+    if reprcrash is not None:
+        return getattr(reprcrash, "message", None)
+    if isinstance(longrepr, str):
+        for line in longrepr.splitlines():
+            if line.startswith("E ") or line.startswith("E\t"):
+                return line[1:].strip()
+        for line in longrepr.splitlines():
+            if line.strip():
+                return line.strip()
+    return None
+
+
+def _get_raw_skip_reason(rep):
+    """The reason suffix for verbose SKIPPED/XFAIL/XPASS words (upstream's
+    _get_raw_skip_reason, recovered from the shim's data)."""
+    wasxfail = getattr(rep, "wasxfail", None)
+    if wasxfail is not None and wasxfail:
+        return str(wasxfail)
+    reason = _crash_message(rep) or ""
+    if reason.startswith("Skipped: "):
+        reason = reason[len("Skipped: ") :]
+    elif reason == "Skipped":
+        reason = ""
+    return reason
+
+
+_verbose_word_for = {
+    "failed": "FAILED",
+    "error": "ERROR",
+    "passed": "PASSED",
+    "skipped": "SKIPPED",
+    "xfailed": "XFAIL",
+    "xpassed": "XPASS",
+}
+
+
 class TerminalReporter:
-    """Trimmed port of upstream's TerminalReporter: only the summary-stats
-    logic that upstream unit-tests directly (terminal output itself is the
-    engine's)."""
+    """Trimmed port of upstream's TerminalReporter: the summary-stats logic
+    that upstream unit-tests directly, plus the writer/progress/summary
+    surface that reporter-replacing plugins (pytest-sugar/pretty) subclass.
+    Native runs never instantiate hook behavior from this class — the
+    engine renders in Rust; only a registered replacement gets driven."""
 
     def __init__(self, config, file=None):
         self.config = config
@@ -103,17 +243,699 @@ class TerminalReporter:
         self._numcollected = 0
         self._main_color = None
         self._known_types = None
+        self._showfspath = None
         self._progress_nodeids_reported = set()
+        self._tests_ran = False
+        self._already_displayed_warnings = None
+        try:
+            self.startpath = Path(os.getcwd())
+        except OSError:
+            self.startpath = Path(".")
+        if file is None:
+            file = sys.__stdout__ or sys.stdout
+        self._tw = TerminalWriter(file)
+        color = self._getoption("color", "auto")
+        if color == "yes":
+            self._tw.hasmarkup = True
+        elif color == "no":
+            self._tw.hasmarkup = False
+        self._screen_width = self._tw.fullwidth
+        self.currentfspath = None
+        self.reportchars = _getreportopt(config)
+        self.foldskipped = bool(self._getoption("fold_skipped", True))
+        self.hasmarkup = self._tw.hasmarkup
+        self.isatty = _CallableBool(bool(getattr(file, "isatty", lambda: False)()))
+        self._show_progress_info = self._determine_show_progress_info()
+        import time
+
+        self._sessionstarttime = time.time()
+
+    # ---- config access (defensive: upstream unit-tests hand minimal
+    # config doubles to this class) --------------------------------------
+
+    def _getoption(self, name, default=None):
+        getoption = getattr(self.config, "getoption", None)
+        if callable(getoption):
+            try:
+                value = getoption(name, default)
+                return default if value is None else value
+            except Exception:
+                return default
+        return default
+
+    def _getini(self, name, default=None):
+        getini = getattr(self.config, "getini", None)
+        if callable(getini):
+            try:
+                value = getini(name)
+                return default if value is None else value
+            except Exception:
+                return default
+        return default
+
+    def _determine_show_progress_info(self):
+        if self._getoption("capture", "fd") == "no":
+            return False
+        if self._getoption("setupshow", False):
+            return False
+        cfg = self._getini("console_output_style", "progress")
+        if cfg in {"progress", "progress-even-when-capture-no"}:
+            return "progress"
+        if cfg == "count":
+            return "count"
+        if cfg == "times":
+            return "times"
+        return False
+
+    @property
+    def verbosity(self):
+        try:
+            return int(self._getoption("verbose", 0) or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    @property
+    def showheader(self):
+        return self.verbosity >= 0
+
+    @property
+    def no_header(self):
+        return bool(self._getoption("no_header", False))
+
+    @property
+    def no_summary(self):
+        return bool(self._getoption("no_summary", False))
+
+    @property
+    def showfspath(self):
+        if self._showfspath is None:
+            return self.verbosity >= 0
+        return self._showfspath
+
+    @showfspath.setter
+    def showfspath(self, value):
+        self._showfspath = value
+
+    @property
+    def showlongtestinfo(self):
+        return self.verbosity > 0
 
     @property
     def reported_progress(self):
         """The amount of items reported in the progress so far."""
         return len(self._progress_nodeids_reported)
 
+    def hasopt(self, char):
+        char = {"xfailed": "x", "skipped": "s"}.get(char, char)
+        return char in self.reportchars
+
+    # ---- writer surface --------------------------------------------------
+
+    def write_fspath_result(self, nodeid, res, **markup):
+        fspath = nodeid.split("::")[0]
+        if self.currentfspath is None or fspath != self.currentfspath:
+            if self.currentfspath is not None and self._show_progress_info:
+                self._write_progress_information_filling_space()
+            self.currentfspath = fspath
+            self._tw.line()
+            self._tw.write(fspath + " ")
+        self._tw.write(res, flush=True, **markup)
+
+    def write_ensure_prefix(self, prefix, extra="", **kwargs):
+        if self.currentfspath != prefix:
+            self._tw.line()
+            self.currentfspath = prefix
+            self._tw.write(prefix)
+        if extra:
+            self._tw.write(extra, **kwargs)
+            self.currentfspath = -2
+
+    def ensure_newline(self):
+        if self.currentfspath:
+            self._tw.line()
+            self.currentfspath = None
+
+    def wrap_write(self, content, *, flush=False, margin=8, line_sep="\n", **markup):
+        """Wrap message with margin for progress info."""
+        import textwrap
+
+        width_of_current_line = self._tw.width_of_current_line
+        wrapped = line_sep.join(
+            textwrap.wrap(
+                " " * width_of_current_line + content,
+                width=self._screen_width - margin,
+                drop_whitespace=True,
+                replace_whitespace=False,
+            ),
+        )
+        wrapped = wrapped[width_of_current_line:]
+        self._tw.write(wrapped, flush=flush, **markup)
+
+    def write(self, content, *, flush=False, **markup):
+        self._tw.write(content, flush=flush, **markup)
+
+    def write_raw(self, content, *, flush=False):
+        self._tw.write_raw(content, flush=flush)
+
+    def flush(self):
+        self._tw.flush()
+
+    def write_line(self, line, **markup):
+        if not isinstance(line, str):
+            line = str(line, errors="replace")
+        self.ensure_newline()
+        self._tw.line(line, **markup)
+
+    def rewrite(self, line, **markup):
+        """Rewinds the terminal cursor to the beginning and writes the
+        given line."""
+        erase = markup.pop("erase", False)
+        if erase:
+            fill_count = self._tw.fullwidth - len(line) - 1
+            fill = " " * fill_count
+        else:
+            fill = ""
+        line = str(line)
+        self._tw.write("\r" + line + fill, **markup)
+
+    def write_sep(self, sep, title=None, fullwidth=None, **markup):
+        self.ensure_newline()
+        self._tw.sep(sep, title, fullwidth, **markup)
+
+    def section(self, title, sep="=", **kw):
+        self._tw.sep(sep, title, **kw)
+
+    def line(self, msg, **kw):
+        self._tw.line(msg, **kw)
+
+    def _add_stats(self, category, items):
+        set_main_color = category not in self.stats
+        self.stats.setdefault(category, []).extend(items)
+        if set_main_color:
+            self._set_main_color()
+
+    # ---- hook methods (driven via pytest._reporter when a replacement is
+    # registered; subclasses inherit / override these) ---------------------
+
+    def pytest_internalerror(self, excrepr):
+        for line in str(excrepr).split("\n"):
+            self.write_line("INTERNALERROR> " + line)
+        return True
+
+    def pytest_warning_recorded(self, warning_message, nodeid):
+        fslocation = (
+            getattr(warning_message, "filename", None),
+            getattr(warning_message, "lineno", None),
+        )
+        self._add_stats(
+            "warnings",
+            [WarningReport(str(warning_message), nodeid=nodeid, fslocation=fslocation)],
+        )
+
+    def pytest_deselected(self, items):
+        self._add_stats("deselected", items)
+
+    def pytest_runtest_logstart(self, nodeid, location):
+        fspath, lineno, domain = location
+        # Ensure that the path is printed before the 1st test of a module
+        # starts running.
+        if self.showlongtestinfo:
+            line = self._locationline(nodeid, fspath, lineno, domain)
+            self.write_ensure_prefix(line, "")
+            self.flush()
+        elif self.showfspath:
+            self.write_fspath_result(nodeid, "")
+            self.flush()
+
+    def _gettestkindstatus(self, report):
+        """Resolve (category, letter, word) through the registered
+        pytest_report_teststatus hooks, falling back to the defaults."""
+        res = None
+        try:
+            from pytest._pluginmanager import pluginmanager
+
+            res = pluginmanager.hook.pytest_report_teststatus(report=report, config=self.config)
+        except Exception:
+            res = None
+        if not res:
+            res = _default_teststatus(report)
+        return res
+
+    def pytest_runtest_logreport(self, report):
+        self._tests_ran = True
+        rep = report
+        category, letter, word = self._gettestkindstatus(rep)
+        if not isinstance(word, tuple):
+            markup = None
+        else:
+            word, markup = word
+        self._add_stats(category, [rep])
+        if not letter and not word:
+            # Probably passed setup/teardown.
+            return
+        if markup is None:
+            was_xfail = hasattr(report, "wasxfail")
+            if rep.passed and not was_xfail:
+                markup = {"green": True}
+            elif rep.passed and was_xfail:
+                markup = {"yellow": True}
+            elif rep.failed:
+                markup = {"red": True}
+            elif rep.skipped:
+                markup = {"yellow": True}
+            else:
+                markup = {}
+        self._progress_nodeids_reported.add(rep.nodeid)
+        if self.verbosity <= 0:
+            # The fspath prefix is pytest_runtest_logstart's job
+            # (write_fspath_result there); here only the letter, upstream.
+            self._tw.write(letter, **markup)
+            if self._show_progress_info and not self._is_last_item:
+                self._write_progress_information_if_past_edge()
+        else:
+            line = self._locationline(rep.nodeid, *rep.location)
+            self.write_ensure_prefix(line, word, **markup)
+            if rep.skipped or hasattr(report, "wasxfail"):
+                reason = _get_raw_skip_reason(rep)
+                if reason:
+                    self.wrap_write(f" ({reason})")
+            if self._show_progress_info:
+                self._write_progress_information_filling_space()
+        self.flush()
+
+    def pytest_runtest_logfinish(self, nodeid):
+        if self.verbosity <= 0 and self._show_progress_info and self._is_last_item:
+            self._write_progress_information_filling_space()
+
     @property
     def _is_last_item(self):
-        assert self._session is not None
+        if self._session is None:
+            return False
         return self.reported_progress == self._session.testscollected
+
+    def _get_progress_information_message(self):
+        collected = self._session.testscollected if self._session else 0
+        if self._show_progress_info == "count":
+            if collected:
+                progress = self.reported_progress
+                counter_format = f"{{:{len(str(collected))}d}}"
+                format_string = f" [{counter_format}/{{}}]"
+                return format_string.format(progress, collected)
+            return f" [ {collected} / {collected} ]"
+        if collected:
+            return f" [{self.reported_progress * 100 // collected:3d}%]"
+        return " [100%]"
+
+    def _write_progress_information_if_past_edge(self):
+        w = self._width_of_current_line
+        if self._show_progress_info == "count":
+            num_tests = self._session.testscollected if self._session else 0
+            progress_length = len(f" [{num_tests}/{num_tests}]")
+        else:
+            progress_length = len(" [100%]")
+        past_edge = w + progress_length + 1 >= self._screen_width
+        if past_edge:
+            main_color, _ = self._get_main_color()
+            msg = self._get_progress_information_message()
+            self._tw.write(msg + "\n", **{main_color: True})
+
+    def _write_progress_information_filling_space(self):
+        color, _ = self._get_main_color()
+        msg = self._get_progress_information_message()
+        w = self._width_of_current_line
+        fill = self._tw.fullwidth - w - 1
+        self.write(msg.rjust(fill), flush=True, **{color: True})
+
+    @property
+    def _width_of_current_line(self):
+        """Return the width of the current line."""
+        return self._tw.width_of_current_line
+
+    def pytest_collectreport(self, report):
+        if report.failed:
+            self._add_stats("error", [report])
+        elif report.skipped:
+            self._add_stats("skipped", [report])
+        self._numcollected += len(getattr(report, "result", ()) or ())
+
+    def report_collect(self, final=False):
+        if self.verbosity < 0:
+            return
+        errors = len(self.stats.get("error", []))
+        skipped = len(self.stats.get("skipped", []))
+        deselected = len(self.stats.get("deselected", []))
+        selected = self._numcollected - deselected
+        line = "collected " if final else "collecting "
+        line += str(self._numcollected) + " item" + ("" if self._numcollected == 1 else "s")
+        if errors:
+            line += f" / {errors} error{'s' if errors != 1 else ''}"
+        if deselected:
+            line += f" / {deselected} deselected"
+        if skipped:
+            line += f" / {skipped} skipped"
+        if self._numcollected > selected:
+            line += f" / {selected} selected"
+        if self.isatty():
+            self.rewrite(line, bold=True, erase=True)
+            if final:
+                self.write("\n")
+        else:
+            # Piped -v shows upstream's collection-start "collecting ... "
+            # prefix on the same line (pytest_collection writes it unflushed).
+            if final and self.verbosity >= 1:
+                self.write("collecting ... ", bold=True)
+            self.write_line(line)
+
+    def pytest_sessionstart(self, session):
+        import platform
+        import time
+
+        self._session = session
+        self._sessionstarttime = time.time()
+        if not self.showheader:
+            return
+        self.write_sep("=", "test session starts", bold=True)
+        if not self.no_header:
+            verinfo = platform.python_version()
+            import pytest
+
+            msg = f"platform {sys.platform} -- Python {verinfo}, pytest-{pytest.__version__}"
+            try:
+                import pluggy
+
+                msg += f", pluggy-{pluggy.__version__}"
+            except Exception:
+                pass
+            if self.verbosity > 0:
+                msg += " -- " + str(sys.executable)
+            self.write_line(msg)
+            try:
+                from pytest._pluginmanager import pluginmanager
+
+                lines = pluginmanager.hook.pytest_report_header(
+                    config=self.config, start_path=self.startpath
+                )
+            except Exception:
+                lines = []
+            self._write_report_lines_from_hooks(lines or [])
+
+    def _write_report_lines_from_hooks(self, lines):
+        for line_or_lines in reversed(lines):
+            if isinstance(line_or_lines, str):
+                self.write_line(line_or_lines)
+            else:
+                for line in line_or_lines:
+                    self.write_line(line)
+
+    def pytest_collection_finish(self, session):
+        self.report_collect(True)
+        # --collect-only: the engine prints the tree natively; open the
+        # blank line above it like upstream's _printcollecteditems flow
+        # (suppressed under -q, like upstream's verbose > -1 check).
+        if (
+            self._getoption("collectonly", False)
+            and getattr(session, "items", None)
+            and self.verbosity > -1
+        ):
+            self._tw.line("")
+
+    def pytest_sessionfinish(self, session, exitstatus):
+        self._tw.line("")
+        self.summary_stats()
+
+    def _locationline(self, nodeid, fspath, lineno, domain):
+        def mkrel(nodeid):
+            line = nodeid
+            if domain and line.endswith(domain):
+                line = line[: -len(domain)]
+                values = domain.split("[")
+                values[0] = values[0].replace(".", "::")  # don't replace '.' in params
+                line += "[".join(values)
+            return line
+
+        # fspath comes from testid which has a "/"-normalized path.
+        if fspath:
+            res = mkrel(nodeid)
+            if self.verbosity >= 2 and nodeid.split("::")[0] != fspath.replace("\\", "/"):
+                res += " <- " + fspath
+        else:
+            res = "[location]"
+        return res + " "
+
+    def _getfailureheadline(self, rep):
+        head_line = getattr(rep, "head_line", None)
+        if head_line:
+            return head_line
+        return "test session"  # XXX?
+
+    def _getcrashline(self, rep):
+        try:
+            return str(rep.longrepr.reprcrash)
+        except AttributeError:
+            try:
+                return str(rep.longrepr)[:50]
+            except AttributeError:
+                return ""
+
+    #
+    # Summaries for sessionfinish.
+    #
+    def getreports(self, name):
+        return [x for x in self.stats.get(name, ()) if not hasattr(x, "_pdbshown")]
+
+    def summary_warnings(self):
+        if self.hasopt("w"):
+            all_warnings = self.stats.get("warnings")
+            if not all_warnings:
+                return
+
+            final = self._already_displayed_warnings is not None
+            if final:
+                warning_reports = all_warnings[self._already_displayed_warnings :]
+            else:
+                warning_reports = all_warnings
+            self._already_displayed_warnings = len(warning_reports)
+            if not warning_reports:
+                return
+
+            reports_grouped_by_message = {}
+            for wr in warning_reports:
+                reports_grouped_by_message.setdefault(wr.message, []).append(wr)
+
+            title = "warnings summary (final)" if final else "warnings summary"
+            self.write_sep("=", title, yellow=True, bold=False)
+            for message, message_reports in reports_grouped_by_message.items():
+                locations = []
+                for w in message_reports:
+                    location = w.get_location(self.config)
+                    if location:
+                        locations.append(location)
+                if locations:
+                    self._tw.line("\n".join(map(str, locations)))
+                    lines = message.splitlines()
+                    indented = "\n".join("  " + x for x in lines)
+                    message = indented.rstrip()
+                else:
+                    message = message.rstrip()
+                self._tw.line(message)
+                self._tw.line()
+            self._tw.line("-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html")
+
+    def summary_passes(self):
+        self.summary_passes_combined("passed", "PASSES", "P")
+
+    def summary_xpasses(self):
+        self.summary_passes_combined("xpassed", "XPASSES", "X")
+
+    def summary_passes_combined(self, which_reports, sep_title, needed_opt):
+        if self._getoption("tbstyle", "auto") != "no":
+            if self.hasopt(needed_opt):
+                reports = self.getreports(which_reports)
+                if not reports:
+                    return
+                self.write_sep("=", sep_title)
+                for rep in reports:
+                    if rep.sections:
+                        msg = self._getfailureheadline(rep)
+                        self.write_sep("_", msg, green=True, bold=True)
+                        self._outrep_summary(rep)
+
+    def summary_failures(self):
+        style = self._getoption("tbstyle", "auto")
+        self.summary_failures_combined("failed", "FAILURES", style=style)
+
+    def summary_xfailures(self):
+        show_tb = self._getoption("xfail_tb", False)
+        style = self._getoption("tbstyle", "auto") if show_tb else "no"
+        self.summary_failures_combined("xfailed", "XFAILURES", style=style)
+
+    def summary_failures_combined(self, which_reports, sep_title, *, style, needed_opt=None):
+        if style != "no":
+            if not needed_opt or self.hasopt(needed_opt):
+                reports = self.getreports(which_reports)
+                if not reports:
+                    return
+                self.write_sep("=", sep_title)
+                if style == "line":
+                    for rep in reports:
+                        line = self._getcrashline(rep)
+                        self.write_line(line)
+                else:
+                    for rep in reports:
+                        msg = self._getfailureheadline(rep)
+                        self.write_sep("_", msg, red=True, bold=True)
+                        self._outrep_summary(rep)
+
+    def summary_errors(self):
+        if self._getoption("tbstyle", "auto") != "no":
+            reports = self.getreports("error")
+            if not reports:
+                return
+            self.write_sep("=", "ERRORS")
+            for rep in self.stats["error"]:
+                msg = self._getfailureheadline(rep)
+                when = getattr(rep, "when", "collect")
+                if when == "collect":
+                    msg = "ERROR collecting " + msg
+                else:
+                    msg = f"ERROR at {when} of {msg}"
+                self.write_sep("_", msg, red=True, bold=True)
+                self._outrep_summary(rep)
+
+    def _outrep_summary(self, rep):
+        rep.toterminal(self._tw)
+        showcapture = self._getoption("showcapture", "all")
+        if showcapture == "no":
+            return
+        for secname, content in getattr(rep, "sections", ()) or ():
+            if showcapture != "all" and showcapture not in secname:
+                continue
+            self._tw.sep("-", secname)
+            if content[-1:] == "\n":
+                content = content[:-1]
+            self._tw.line(content)
+
+    def summary_stats(self):
+        import time
+
+        if self.verbosity < -1:
+            return
+
+        session_duration = time.time() - self._sessionstarttime
+        (parts, main_color) = self.build_summary_stats_line()
+        line_parts = []
+
+        display_sep = self.verbosity >= 0
+        if display_sep:
+            fullwidth = self._tw.fullwidth
+        for text, markup in parts:
+            with_markup = self._tw.markup(text, **markup)
+            if display_sep:
+                fullwidth += len(with_markup) - len(text)
+            line_parts.append(with_markup)
+        msg = ", ".join(line_parts)
+
+        main_markup = {main_color: True}
+        duration = f" in {format_session_duration(session_duration)}"
+        duration_with_markup = self._tw.markup(duration, **main_markup)
+        if display_sep:
+            fullwidth += len(duration_with_markup) - len(duration)
+        msg += duration_with_markup
+
+        if display_sep:
+            markup_for_end_sep = self._tw.markup("", **main_markup)
+            if markup_for_end_sep.endswith("\x1b[0m"):
+                markup_for_end_sep = markup_for_end_sep[:-4]
+            fullwidth += len(markup_for_end_sep)
+            msg += markup_for_end_sep
+
+        if display_sep:
+            self.write_sep("=", msg, fullwidth=fullwidth, **main_markup)
+        else:
+            self.write_line(msg, **main_markup)
+
+    def short_test_summary(self):
+        if not self.reportchars:
+            return
+
+        def show_simple(lines, *, stat):
+            failed = self.stats.get(stat, [])
+            if not failed:
+                return
+            color = _color_for_type.get(stat, _color_for_type_default)
+            word = _verbose_word_for.get(stat, stat.upper())
+            for rep in failed:
+                line = f"{self._tw.markup(word, **{color: True})} {rep.nodeid}"
+                msg = _crash_message(rep)
+                if msg:
+                    max_len = self._tw.fullwidth - len(word) - len(rep.nodeid) - 4
+                    if max_len > 5:
+                        msg = msg.replace("\n", " ")
+                        if len(msg) > max_len:
+                            msg = msg[: max_len - 3] + "..."
+                        line += f" - {msg}"
+                lines.append(line)
+
+        def show_xfailed(lines):
+            for rep in self.stats.get("xfailed", []):
+                markup_word = self._tw.markup("XFAIL", yellow=True)
+                line = f"{markup_word} {rep.nodeid}"
+                reason = getattr(rep, "wasxfail", None)
+                if reason:
+                    line += " - " + str(reason)
+                lines.append(line)
+
+        def show_xpassed(lines):
+            for rep in self.stats.get("xpassed", []):
+                markup_word = self._tw.markup("XPASS", yellow=True)
+                line = f"{markup_word} {rep.nodeid}"
+                reason = getattr(rep, "wasxfail", None)
+                if reason:
+                    line += " - " + str(reason)
+                lines.append(line)
+
+        def show_skipped(lines):
+            skipped = self.stats.get("skipped", [])
+            if not skipped:
+                return
+            markup_word = self._tw.markup("SKIPPED", yellow=True)
+            if self.foldskipped:
+                by_reason = {}
+                for rep in skipped:
+                    reason = _crash_message(rep) or ""
+                    if reason.startswith("Skipped: "):
+                        reason = reason[len("Skipped: ") :]
+                    by_reason.setdefault(reason, []).append(rep)
+                for reason, reps in by_reason.items():
+                    lines.append(f"{markup_word} [{len(reps)}] {reason}")
+            else:
+                for rep in skipped:
+                    reason = _crash_message(rep) or ""
+                    lines.append(f"{markup_word} {rep.nodeid} - {reason}")
+
+        from functools import partial
+
+        reportchar_actions = {
+            "x": show_xfailed,
+            "X": show_xpassed,
+            "f": partial(show_simple, stat="failed"),
+            "s": show_skipped,
+            "p": partial(show_simple, stat="passed"),
+            "E": partial(show_simple, stat="error"),
+        }
+
+        lines = []
+        for char in self.reportchars:
+            action = reportchar_actions.get(char)
+            if action:  # skipping e.g. "P" (passed with output) here.
+                action(lines)
+
+        if lines:
+            self.write_sep("=", "short test summary info", cyan=True, bold=True)
+            for line in lines:
+                self.write_line(line)
+
+    # ---- summary-stats logic (upstream unit-tested) ----------------------
 
     def _get_main_color(self):
         if self._main_color is None or self._known_types is None or self._is_last_item:

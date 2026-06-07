@@ -239,6 +239,19 @@ impl Engine {
                         }
                         let _ = std::io::stdout().flush();
                     }
+                    // Delegated mode: the replacement reporter renders the
+                    // arrival-order progress (xdist drives it the same way).
+                    if self.session.custom_reporter.is_some() {
+                        match crate::python::make_report_proxy(py, &report, None) {
+                            Ok(proxy) => crate::python::reporter_logreport(py, proxy.bind(py)),
+                            Err(err) => {
+                                eprintln!(
+                                    "INTERNAL ERROR: {}",
+                                    crate::python::format_exception(py, &err)
+                                );
+                            }
+                        }
+                    }
                     reports.push(report);
                 }
                 Event::Extra { plugin, payload } => extras.push((plugin, payload)),

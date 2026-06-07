@@ -50,13 +50,13 @@ config-settings-package = { pytest-rs = { build-args = "--no-default-features --
 
 ### Third-party plugins (not reimplemented, loaded as-is)
 
-Installed `pytest11` entry points load through the `pytest` API shim — plugins pytest-rs does **not** reimplement can still work as-is. The supported surface includes fixtures, markers, `pytest_addoption` (plugin `--flags` and ini options), `config.stash`, custom hookspecs (`pytest_addhooks`), and `pytest_runtest_protocol`/`pytest_runtest_call` hookwrappers. Spot-verified status:
+Installed `pytest11` entry points load through the `pytest` API shim — plugins pytest-rs does **not** reimplement can still work as-is. The supported surface includes fixtures, markers, `pytest_addoption` (plugin `--flags` and ini options), `config.stash`, custom hookspecs (`pytest_addhooks`), `pytest_runtest_protocol`/`pytest_runtest_call` hookwrappers, and terminal-reporter replacement (a plugin that unregisters the `terminalreporter` plugin and registers its own subclass takes over the output — pytest-rs suppresses its native rendering and drives the replacement through the same hooks pluggy would). Spot-verified status:
 
 | status | plugins |
 |---|---|
 | works — upstream test suite gates CI | `pytest-timeout` (40/41, see conformance below); `anyio`'s own plugin module also loads this way |
-| works — smoke-tested | `Faker`, `time-machine`, `requests-mock`, `pytest-randomly` (test reordering + seed header) |
-| loads, but no visible effect | `pytest-sugar`, `pytest-pretty` — they replace pytest's terminal reporter object, which pytest-rs owns natively; runs are unaffected |
+| works — plugin-smoke gates CI (functional demos, `conformance/plugin_smoke.py`) | `Faker`, `time-machine`, `requests-mock`, `pytest-randomly` (test reordering + seed header) |
+| works — plugin-smoke gates CI (terminal output byte-diffed against real pytest 9.0.3) | `pytest-pretty`, `pytest-sugar` (progress bar, instant failures; activates on a tty or `--force-sugar`) — reporter replacement |
 | not working yet | `pytest-env` — needs the `pytest_load_initial_conftests` early hook |
 
 A plugin that fails to import (e.g. it reaches into pytest/pluggy internals the shim doesn't provide) warns and is skipped without breaking the run. `-p no:NAME` and `PYTEST_DISABLE_PLUGIN_AUTOLOAD` opt out, like pytest.
