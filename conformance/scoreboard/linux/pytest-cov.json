@@ -8,8 +8,8 @@
       "file": "tests/test_pytest_cov.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 179,
-      "failed": 27,
+      "passed": 182,
+      "failed": 24,
       "skipped": 3,
       "errors": 0
     }
