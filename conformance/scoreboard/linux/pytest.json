@@ -206,8 +206,8 @@
       "file": "testing/test_nodes.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 1,
-      "failed": 7,
+      "passed": 3,
+      "failed": 5,
       "skipped": 0,
       "errors": 0
     },
@@ -305,8 +305,8 @@
       "file": "testing/test_skipping.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 70,
-      "failed": 22,
+      "passed": 90,
+      "failed": 2,
       "skipped": 0,
       "errors": 0
     },
