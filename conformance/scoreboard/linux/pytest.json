@@ -278,8 +278,8 @@
       "file": "testing/test_session.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 3,
-      "failed": 14,
+      "passed": 4,
+      "failed": 13,
       "skipped": 0,
       "errors": 0
     },
