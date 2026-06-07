@@ -1165,10 +1165,14 @@ fn collect_class(
 
     for pair in cls_dict.call_method0("items")?.try_iter()? {
         let (name, value): (String, Bound<'_, PyAny>) = pair?.extract()?;
-        // cls.__dict__ stores staticmethods as descriptors; unwrap so mark
-        // reading and async introspection see the underlying function.
-        let is_static = value.is_instance(&py.import("builtins")?.getattr("staticmethod")?)?;
-        let value = if is_static {
+        // cls.__dict__ stores staticmethods/classmethods as descriptors;
+        // unwrap so mark reading and async introspection see the underlying
+        // function (#12863). The runner re-binds via the instance, so the
+        // descriptor semantics are preserved at call time.
+        let builtins = py.import("builtins")?;
+        let is_static = value.is_instance(&builtins.getattr("staticmethod")?)?;
+        let is_classmethod = value.is_instance(&builtins.getattr("classmethod")?)?;
+        let value = if is_static || is_classmethod {
             value.getattr("__func__")?
         } else {
             value
@@ -1231,7 +1235,13 @@ fn push_test_items(
 ) -> PyResult<()> {
     let flags = async_flags(py, func)?;
     let mut fixture_names = param_names(py, func)?;
-    if cls.is_some() && fixture_names.first().map(String::as_str) == Some("self") {
+    // `cls` covers classmethods, re-bound through the instance at run time.
+    if cls.is_some()
+        && matches!(
+            fixture_names.first().map(String::as_str),
+            Some("self") | Some("cls")
+        )
+    {
         fixture_names.remove(0);
     }
     // @unittest.mock.patch-injected leading params are not fixture requests.
@@ -1260,7 +1270,7 @@ fn push_test_items(
         }
     }
 
-    let variants = expand_parametrize(py, &marks, &format!("{nodeid_prefix}::{name}"))?;
+    let variants = expand_parametrize(py, &marks, &format!("{nodeid_prefix}::{name}"), Some(func))?;
     for variant in variants {
         let nodeid = match &variant.id {
             Some(id) => format!("{nodeid_prefix}::{name}[{id}]"),
@@ -1311,6 +1321,7 @@ fn expand_parametrize(
     py: Python<'_>,
     marks: &[MarkData],
     nodeid: &str,
+    func: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<Vec<ParamVariant>> {
     struct ParamSet {
         /// None hides the set from the test ID (pytest.HIDDEN_PARAM).
@@ -1422,11 +1433,25 @@ fn expand_parametrize(
                 };
 
             if values.len() != argnames.len() {
-                return Err(pyo3::exceptions::PyValueError::new_err(format!(
-                    "parametrize: {} argnames but {} values",
+                // Upstream ParameterSet._for_parametrize wording, raised as
+                // a bare CollectError (message only, no traceback).
+                let names_repr = format!(
+                    "[{}]",
+                    argnames
+                        .iter()
+                        .map(|n| format!("'{n}'"))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+                let values_repr: String = pyo3::types::PyTuple::new(py, values.iter())?
+                    .repr()?
+                    .extract()?;
+                let message = format!(
+                    "{nodeid}: in \"parametrize\" the number of names ({}):\n  {names_repr}\nmust be equal to the number of values ({}):\n  {values_repr}",
                     argnames.len(),
                     values.len()
-                )));
+                );
+                return Err(collect_error(py, &message));
             }
 
             let id_part = if hidden {
@@ -1543,6 +1568,41 @@ fn expand_parametrize(
                 set.id_part = Some(new_id);
                 *counter += 1;
             }
+        }
+        if sets.is_empty() {
+            // Upstream: empty argvalues collect one NOTSET parameter set
+            // carrying the empty_parameter_set_mark (default skip; a user
+            // ids callable is never invoked, #13031).
+            let mark_decorator = py
+                .import("_pytest.mark")?
+                .getattr("get_empty_parameterset_mark")?
+                .call1((
+                    existing_py_config(py).unwrap_or_else(|| py.None()),
+                    argnames.clone(),
+                    func.map(|f| f.clone().unbind())
+                        .unwrap_or_else(|| py.None()),
+                ))?;
+            let mark_obj = mark_decorator.getattr("mark")?;
+            let mark_name: String = mark_obj.getattr("name")?.extract()?;
+            let notset = py.import("_pytest.compat")?.getattr("NOTSET")?;
+            let mut params: Vec<(String, Py<PyAny>)> = Vec::new();
+            let mut indirect_params: Vec<(String, usize, Py<PyAny>)> = Vec::new();
+            for argname in argnames.iter().cloned() {
+                if is_indirect(&argname) {
+                    indirect_params.push((argname, 0usize, notset.clone().unbind()));
+                } else {
+                    params.push((argname, notset.clone().unbind()));
+                }
+            }
+            sets.push(ParamSet {
+                id_part: Some("NOTSET".to_string()),
+                params,
+                indirect_params,
+                extra_marks: vec![MarkData {
+                    name: mark_name,
+                    obj: mark_obj.unbind(),
+                }],
+            });
         }
         dims.push(Dim { sets });
     }
@@ -2047,20 +2107,20 @@ pub fn expand_fixture_params(
 /// mark or a list, and normalizes bare MarkDecorators (e.g.
 /// `pytestmark = pytest.mark.asyncio`) to their Mark.
 fn read_marks(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<Vec<MarkData>> {
+    // get_unpacked_marks (upstream): classes merge their whole MRO's own
+    // pytestmark lists, base classes first; MarkDecorators unwrap to Marks.
     let mut marks = Vec::new();
-    let Ok(pytestmark) = obj.getattr("pytestmark") else {
+    let Ok(entries) = py
+        .import("pytest._marks")
+        .and_then(|m| m.getattr("get_unpacked_marks"))
+        .and_then(|f| f.call1((obj,)))
+    else {
         return Ok(marks);
     };
-    let entries: Vec<Bound<'_, PyAny>> = match pytestmark.try_iter() {
-        Ok(iter) => iter.collect::<PyResult<_>>()?,
-        Err(_) => vec![pytestmark],
+    let Ok(iter) = entries.try_iter() else {
+        return Ok(marks);
     };
-    for entry in entries {
-        // A bare MarkDecorator carries the Mark in its `mark` attribute.
-        let mark = match entry.getattr("mark") {
-            Ok(inner) if inner.hasattr("name")? => inner,
-            _ => entry,
-        };
+    for mark in iter.flatten() {
         // Defensive: skip entries without a string name (stubs, mocks).
         let Ok(name) = mark.getattr("name").and_then(|n| n.extract::<String>()) else {
             continue;
@@ -2070,7 +2130,6 @@ fn read_marks(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<Vec<MarkData>>
             obj: mark.unbind(),
         });
     }
-    let _ = py;
     Ok(marks)
 }
 
@@ -2765,6 +2824,42 @@ pub fn tmp_path_record_call(py: Python<'_>, nodeid: &str, passed: Option<bool>) 
     let _ = py
         .import("pytest._tmp_path")
         .and_then(|m| m.call_method1("record_call", (nodeid, passed)));
+}
+
+/// The -k matching name set for an item (upstream KeywordMatcher.from_item):
+/// node-chain names (path components, class names, test name with params),
+/// names assigned directly on the test function, and mark names.
+pub fn keyword_match_names(py: Python<'_>, item: &TestItem) -> Vec<String> {
+    let mut names: Vec<String> = Vec::new();
+    let (file_part, rest) = item
+        .nodeid
+        .split_once("::")
+        .unwrap_or((item.nodeid.as_str(), ""));
+    // Subdirectory and module-file names (upstream includes every chain
+    // node below the root directory).
+    for component in std::path::Path::new(file_part).components() {
+        names.push(component.as_os_str().to_string_lossy().to_string());
+    }
+    for part in rest.split("::") {
+        if !part.is_empty() {
+            names.push(part.to_string());
+        }
+    }
+    // Names attached to the function through direct assignment.
+    if let Ok(dict) = item.func.bind(py).getattr("__dict__")
+        && let Ok(keys) = dict.call_method0("keys")
+        && let Ok(iter) = keys.try_iter()
+    {
+        for key in iter.flatten() {
+            if let Ok(name) = key.extract::<String>() {
+                names.push(name);
+            }
+        }
+    }
+    for mark in &item.marks {
+        names.push(mark.name.clone());
+    }
+    names
 }
 
 /// Install the sys.unraisablehook capture (upstream unraisableexception

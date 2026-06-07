@@ -322,15 +322,15 @@ impl Engine {
         }
 
         let collected = self.session.items.len();
-        if let Err(err) = self.apply_selection(py) {
+        if let Err(err) = self.apply_deselect() {
+            eprintln!("INTERNAL ERROR: {err}");
+            return exit_code::INTERNAL_ERROR;
+        }
+        if let Err(err) = self.fire_collection_modifyitems(py) {
             if python::is_usage_error(py, &err) {
                 eprintln!("ERROR: {}", err.value(py));
                 return exit_code::USAGE_ERROR;
             }
-            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
-            return exit_code::INTERNAL_ERROR;
-        }
-        if let Err(err) = self.fire_collection_modifyitems(py) {
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
             return exit_code::INTERNAL_ERROR;
         }
@@ -361,19 +361,25 @@ impl Engine {
         }
         if !self.config.quiet && !self.config.no_terminal() {
             let deselected = self.session.deselected;
+            // -v shows the live "collecting ..." prefix resolved in place.
+            let prefix = if self.config.verbose > 0 {
+                "collecting ... "
+            } else {
+                ""
+            };
             if deselected > 0 {
                 println!(
-                    "collected {collected} items / {deselected} deselected / {n_items} selected"
+                    "{prefix}collected {collected} items / {deselected} deselected / {n_items} selected"
                 );
             } else if n_collect_errors > 0 {
                 println!(
-                    "collected {n_items} item{} / {n_collect_errors} error{}",
+                    "{prefix}collected {n_items} item{} / {n_collect_errors} error{}",
                     if n_items == 1 { "" } else { "s" },
                     if n_collect_errors == 1 { "" } else { "s" }
                 );
             } else {
                 println!(
-                    "collected {n_items} item{}",
+                    "{prefix}collected {n_items} item{}",
                     if n_items == 1 { "" } else { "s" }
                 );
             }
@@ -1077,10 +1083,9 @@ impl Engine {
         Ok(())
     }
 
-    /// --deselect / -m / -k deselection (pytest applies these before plugin
-    /// collection_modifyitems hooks; --deselect runs first as its hookimpl
-    /// is not trylast like the -m/-k one).
-    fn apply_selection(&mut self, py: Python<'_>) -> PyResult<()> {
+    /// --deselect runs before the modifyitems hooks (upstream main.py's
+    /// hookimpl is not trylast like the -m/-k one).
+    fn apply_deselect(&mut self) -> Result<(), String> {
         if let Some(prefixes) = self.config.get_values("deselect") {
             let prefixes: Vec<String> = prefixes.iter().map(|s| s.to_string()).collect();
             // pytest matches by plain nodeid prefix (main.py).
@@ -1091,55 +1096,70 @@ impl Engine {
             self.session.items = kept;
             self.session.deselected_items.extend(removed);
         }
-        if let Some(expr) = self.config.get_value("markexpr").map(str::to_string) {
-            let expr = expr.trim().to_string();
-            let mut error = None;
-            let (kept, removed): (Vec<_>, Vec<_>) =
-                self.session.items.drain(..).partition(|item| {
-                    match crate::markexpr::evaluate(&expr, |name| {
-                        item.marks.iter().any(|mark| mark.name == name)
-                    }) {
-                        Ok(keep) => keep,
-                        Err(message) => {
-                            error.get_or_insert(message);
-                            true
+        Ok(())
+    }
+
+    /// -m / -k deselection (upstream's trylast collection_modifyitems
+    /// hookimpl: runs after conftest/plugin hooks).
+    fn apply_selection(&mut self, py: Python<'_>) -> PyResult<()> {
+        // -k runs before -m, like upstream pytest_collection_modifyitems.
+        if let Some(expr) = self.config.get_value("keyword").map(str::to_string) {
+            let expr = expr.trim_start().to_string();
+            if !expr.is_empty() {
+                let shim = py.import("pytest._expression")?;
+                // Compile errors surface as UsageError with upstream wording.
+                let compiled = shim.call_method1("compile_for_engine", (expr.as_str(), "-k"))?;
+                let mut error: Option<PyErr> = None;
+                let (kept, removed): (Vec<_>, Vec<_>) =
+                    self.session.items.drain(..).partition(|item| {
+                        let names = python::keyword_match_names(py, item);
+                        match shim
+                            .call_method1("evaluate_keywords", (&compiled, names))
+                            .and_then(|value| value.extract::<bool>())
+                        {
+                            Ok(keep) => keep,
+                            Err(err) => {
+                                error.get_or_insert(err);
+                                true
+                            }
                         }
-                    }
-                });
-            self.session.items = kept;
-            self.session.deselected_items.extend(removed);
-            if let Some(message) = error {
-                return Err(python::usage_error(
-                    py,
-                    &format!("Wrong expression passed to '-m': {expr}: {message}"),
-                ));
+                    });
+                self.session.items = kept;
+                self.session.deselected_items.extend(removed);
+                if let Some(err) = error {
+                    return Err(err);
+                }
             }
         }
-        if let Some(expr) = self.config.get_value("keyword").map(str::to_string) {
+        if let Some(expr) = self.config.get_value("markexpr").map(str::to_string) {
             let expr = expr.trim().to_string();
-            let mut error = None;
-            let (kept, removed): (Vec<_>, Vec<_>) =
-                self.session.items.drain(..).partition(|item| {
-                    // -k matches case-insensitively against the test name part.
-                    let name = item.nodeid.split_once("::").map_or("", |(_, n)| n);
-                    let haystack = name.to_lowercase();
-                    match crate::markexpr::evaluate(&expr, |token| {
-                        haystack.contains(&token.to_lowercase())
-                    }) {
-                        Ok(keep) => keep,
-                        Err(message) => {
-                            error.get_or_insert(message);
-                            true
+            if !expr.is_empty() {
+                let shim = py.import("pytest._expression")?;
+                let compiled = shim.call_method1("compile_for_engine", (expr.as_str(), "-m"))?;
+                let mut error: Option<PyErr> = None;
+                let (kept, removed): (Vec<_>, Vec<_>) =
+                    self.session.items.drain(..).partition(|item| {
+                        let marks: Vec<Py<PyAny>> = item
+                            .marks
+                            .iter()
+                            .map(|mark| mark.obj.clone_ref(py))
+                            .collect();
+                        match shim
+                            .call_method1("evaluate_marks", (&compiled, marks))
+                            .and_then(|value| value.extract::<bool>())
+                        {
+                            Ok(keep) => keep,
+                            Err(err) => {
+                                error.get_or_insert(err);
+                                true
+                            }
                         }
-                    }
-                });
-            self.session.items = kept;
-            self.session.deselected_items.extend(removed);
-            if let Some(message) = error {
-                return Err(python::usage_error(
-                    py,
-                    &format!("Wrong expression passed to '-k': {expr}: {message}"),
-                ));
+                    });
+                self.session.items = kept;
+                self.session.deselected_items.extend(removed);
+                if let Some(err) = error {
+                    return Err(err);
+                }
             }
         }
         Ok(())
@@ -1157,6 +1177,13 @@ impl Engine {
             self.session.items = items;
             return Err(err);
         }
+        // -k/-m deselection runs after the conftest hooks (so dynamically
+        // added markers are visible, upstream's trylast hookimpl) but
+        // before the bundled plugins' hooks (pytest-split must split the
+        // already-deselected set).
+        self.session.items = items;
+        self.apply_selection(py)?;
+        let mut items = std::mem::take(&mut self.session.items);
         {
             let mut ctx = HookContext {
                 py,
@@ -1325,12 +1352,17 @@ impl Engine {
         // Read through the config proxy: configure-time
         // addinivalue_line("markers", ...) lands there, not in self.config.
         let config_proxy = python::make_py_config(py, &self.config)?;
-        let registered = config_proxy
-            .bind(py)
-            .call_method1("getini", ("markers",))?
-            .extract::<Option<String>>()?
-            .unwrap_or_default();
-        for line in registered.lines() {
+        let value = config_proxy.bind(py).call_method1("getini", ("markers",))?;
+        // getini("markers") is a linelist (upstream); tolerate a raw string.
+        let registered: Vec<String> = value.extract::<Vec<String>>().or_else(|_| {
+            value.extract::<Option<String>>().map(|raw| {
+                raw.unwrap_or_default()
+                    .lines()
+                    .map(str::to_string)
+                    .collect()
+            })
+        })?;
+        for line in &registered {
             let line = line.trim();
             if !line.is_empty() {
                 println!("@pytest.mark.{line}\n");

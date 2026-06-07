@@ -1,4 +1,10 @@
-from pytest._marks import Mark, MarkDecorator, MarkGenerator  # noqa: F401
+from pytest._marks import (  # noqa: F401  # noqa: F401
+    Mark,
+    MarkDecorator,
+    MarkGenerator,
+    get_unpacked_marks,
+    store_mark,
+)
 from pytest._marks import ParamSpec as ParameterSet  # noqa: F401
 
 from _pytest._stub import __getattr__  # noqa: E402, F401

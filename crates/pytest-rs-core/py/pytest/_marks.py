@@ -68,20 +68,62 @@ class MarkDecorator:
         )
 
     def __call__(self, *args, **kwargs):
-        if len(args) == 1 and not kwargs and (callable(args[0]) or isinstance(args[0], type)):
+        if args and not kwargs:
             func = args[0]
-            if hasattr(func, "_pytestfixturefunction"):
-                # Marks applied to a fixture are inert (#3364).
-                import warnings
-
-                from _pytest.deprecated import MARKED_FIXTURE
-
-                warnings.warn(MARKED_FIXTURE, stacklevel=2)
-            existing = list(getattr(func, "pytestmark", []))
-            existing.append(self.mark)
-            func.pytestmark = existing
-            return func
+            is_class = isinstance(func, type)
+            # For staticmethods/classmethods, the marks are eventually
+            # fetched from the function object, not the descriptor (#12863).
+            unwrapped = func
+            if isinstance(func, staticmethod | classmethod):
+                unwrapped = func.__func__
+            # Lambdas are mark arguments, not decoration targets (upstream
+            # istestfunc excludes "<lambda>").
+            istestfunc = (
+                callable(unwrapped) and getattr(unwrapped, "__name__", "<lambda>") != "<lambda>"
+            )
+            if len(args) == 1 and (istestfunc or is_class):
+                store_mark(unwrapped, self.mark)
+                return func
         return self.with_args(*args, **kwargs)
+
+
+def get_unpacked_marks(obj, *, consider_mro=True):
+    """Obtain the unpacked marks that are stored on an object (upstream
+    _pytest.mark.structures.get_unpacked_marks).
+
+    If obj is a class and consider_mro is true, return marks applied to
+    this class and all of its super-classes in MRO order (base first)."""
+    if isinstance(obj, type):
+        if not consider_mro:
+            mark_lists = [obj.__dict__.get("pytestmark", [])]
+        else:
+            mark_lists = [x.__dict__.get("pytestmark", []) for x in reversed(obj.__mro__)]
+        mark_list = []
+        for item in mark_lists:
+            if isinstance(item, list):
+                mark_list.extend(item)
+            else:
+                mark_list.append(item)
+    else:
+        mark_attribute = getattr(obj, "pytestmark", [])
+        if isinstance(mark_attribute, list):
+            mark_list = mark_attribute
+        else:
+            mark_list = [mark_attribute]
+    return [getattr(mark, "mark", mark) for mark in mark_list]
+
+
+def store_mark(obj, mark, *, stacklevel=3):
+    """Store a Mark on an object (upstream store_mark): reassigns pytestmark
+    from the object's OWN marks so inherited lists are never mutated."""
+    if hasattr(obj, "_pytestfixturefunction"):
+        # Marks applied to a fixture are inert (#3364).
+        import warnings
+
+        from _pytest.deprecated import MARKED_FIXTURE
+
+        warnings.warn(MARKED_FIXTURE, stacklevel=stacklevel)
+    obj.pytestmark = [*get_unpacked_marks(obj, consider_mro=False), mark]
 
 
 class MarkGenerator:
@@ -97,7 +139,7 @@ class MarkGenerator:
             # Known-marks set is a cache; refresh from the (mutable) ini
             # before deciding the mark really is unknown.
             if name not in self._markers:
-                for line in (self._config.getini("markers") or "").splitlines():
+                for line in self._config.getini("markers") or []:
                     marker = line.split(":")[0].split("(")[0].strip()
                     if marker:
                         self._markers.add(marker)
@@ -146,4 +188,9 @@ class ParamSpec:
 def param(*values, marks=(), id=None):
     if not isinstance(marks, list | tuple):
         marks = [marks]
+    if id is not None and id is not HIDDEN_PARAM and not isinstance(id, str):
+        raise TypeError(
+            "Expected id to be a string or a `pytest.HIDDEN_PARAM` sentinel, "
+            f"got {type(id)}: {id!r}"
+        )
     return ParamSpec(values, [decorator.mark for decorator in marks], id)

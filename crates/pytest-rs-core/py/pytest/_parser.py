@@ -79,14 +79,32 @@ def _strtobool(value: str) -> bool:
     raise ValueError(f"invalid truth value {value!r}")
 
 
+#: Core inis with linelist semantics (pytest's builtin addini types):
+#: getini returns a list of non-empty lines.
+_LINELIST_INIS = {
+    "markers",
+    "filterwarnings",
+    "norecursedirs",
+    "testpaths",
+    "python_files",
+    "python_classes",
+    "python_functions",
+    "usefixtures",
+}
+
+
 def ini_lookup(name: str, raw: str | None) -> Any:
     """Resolve one ini value: the configured string converted per the
     registered spec's type, or the spec default when unset."""
     spec = ini_specs.get(name)
     if raw is None:
-        return spec["default"] if spec is not None else None
+        if spec is not None:
+            return spec["default"]
+        return [] if name in _LINELIST_INIS else None
     if spec is not None and spec["type"] == "bool":
         return _strtobool(raw)
+    if spec is None and name in _LINELIST_INIS:
+        return [line.strip() for line in raw.splitlines() if line.strip()]
     return raw
 
 

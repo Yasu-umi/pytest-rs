@@ -658,7 +658,8 @@ fn run_one_body(
         }
         // @pytest.mark.usefixtures (and the usefixtures ini option): named
         // fixtures are set up before the test's own, values not passed in.
-        // Farthest mark first (module -> class -> function), like pytest.
+        // Mark order follows iter_markers (upstream _getusefixturesnames):
+        // function marks, class marks base-class-first, module marks.
         let usefixtures: Vec<String> = config
             .get_ini("usefixtures")
             .map(|value| {
@@ -672,7 +673,6 @@ fn run_one_body(
             .chain(
                 item.marks
                     .iter()
-                    .rev()
                     .filter(|mark| mark.name == "usefixtures")
                     .flat_map(|mark| {
                         mark.obj

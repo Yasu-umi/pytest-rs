@@ -140,3 +140,7 @@ def hookspec(function=None, **kwargs):
 
 # Upstream name for the plugin manager (config.pluginmanager's type).
 PytestPluginManager = PluginManager
+
+#: Public names (upstream curates this list; the public surface here is
+#: exactly the non-underscore module globals).
+__all__ = sorted(name for name in globals() if not name.startswith("_"))

@@ -8,7 +8,6 @@ pub mod fixture;
 pub mod hooks;
 #[cfg(feature = "xdist")]
 pub mod ipc;
-pub mod markexpr;
 pub mod python;
 pub mod report;
 pub mod request;
