@@ -105,6 +105,12 @@ class ExitCode(_enum.IntEnum):
     NO_TESTS_COLLECTED = 5
 
 
+def console_main() -> int:
+    """In-process invocation entry point (`python -m pytest`). pytest-rs
+    runs as its own binary; re-run via the `pytest-rs` executable instead."""
+    raise NotImplementedError("pytest.console_main is not supported by pytest-rs")
+
+
 def hookimpl(function=None, **kwargs):
     """Record hook implementation options on the function (inert for now:
     conftest hook functions are not yet called by the runner)."""
