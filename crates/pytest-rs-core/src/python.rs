@@ -202,6 +202,28 @@ fn xunit_record(
     );
 }
 
+/// unittest.SkipTest raised by an xunit setup hook (e.g. setUpModule)
+/// becomes a pytest Skipped, like upstream's makereport conversion.
+pub fn map_skiptest(py: Python<'_>, err: PyErr) -> PyErr {
+    let is_skiptest = py
+        .import("unittest")
+        .and_then(|m| m.getattr("SkipTest"))
+        .map(|skiptest| err.matches(py, &skiptest).unwrap_or(false))
+        .unwrap_or(false);
+    if !is_skiptest {
+        return err;
+    }
+    let msg = err.value(py).to_string();
+    match py
+        .import("pytest._outcomes")
+        .and_then(|m| m.getattr("Skipped"))
+        .and_then(|skipped| skipped.call1((msg,)))
+    {
+        Ok(exc) => PyErr::from_value(exc),
+        Err(_) => err,
+    }
+}
+
 /// xunit-style setup hooks (setup_module / setup_function for plain
 /// functions, setup_class / setup_method for Test classes). Teardowns are
 /// pushed onto the session finalizer stack at the matching scope, so they
@@ -234,16 +256,25 @@ pub fn ensure_xunit_setup(
         }
         Some(None) => {}
         None => {
-            let setup_result: PyResult<()> = match module.getattr("setup_module") {
-                Ok(setup) => call_optional.call1((setup, &module)).map(|_| ()),
-                Err(_) => Ok(()),
+            // unittest's module-level aliases take priority (upstream's
+            // ("setUpModule", "setup_module") first-non-fixture lookup).
+            let setup_fn = ["setUpModule", "setup_module"]
+                .iter()
+                .find_map(|name| module.getattr(name).ok());
+            let setup_result: PyResult<()> = match setup_fn {
+                Some(setup) => call_optional.call1((setup, &module)).map(|_| ()),
+                None => Ok(()),
             };
             if let Err(err) = setup_result {
+                let err = map_skiptest(py, err);
                 xunit_record(py, session, false, module_instance, Some(&err));
                 return Err(err);
             }
             xunit_record(py, session, false, module_instance.clone(), None);
-            if let Ok(teardown) = module.getattr("teardown_module") {
+            let teardown_fn = ["tearDownModule", "teardown_module"]
+                .iter()
+                .find_map(|name| module.getattr(name).ok());
+            if let Some(teardown) = teardown_fn {
                 let finalizer = bind.call1((teardown, &module))?;
                 session.finalizers.push(crate::session::PendingFinalizer {
                     scope: Scope::Module,
@@ -913,17 +944,22 @@ fn introspect_namespace(
                 .call1((&value,))?
                 .extract()?;
             if is_testcase {
-                collect_testcase(
-                    py,
-                    &value,
-                    &name,
-                    nodeid_base,
-                    module_name,
-                    path,
-                    &module_marks,
-                    items,
-                    registry,
-                )?;
+                // Abstract TestCase classes are not collected (#12275).
+                let is_abstract: bool =
+                    inspect.getattr("isabstract")?.call1((&value,))?.extract()?;
+                if !is_abstract {
+                    collect_testcase(
+                        py,
+                        &value,
+                        &name,
+                        nodeid_base,
+                        module_name,
+                        path,
+                        &module_marks,
+                        items,
+                        registry,
+                    )?;
+                }
             } else if name.starts_with("Test") {
                 collect_class(
                     py,
@@ -1014,6 +1050,34 @@ fn collect_testcase(
         }
     }
 
+    // Upstream's injected autouse fixtures: setUpClass/tearDownClass
+    // (+doClassCleanups), pytest-style setup_class/teardown_class and
+    // setup_method/teardown_method. Skipped classes don't register them
+    // (upstream gates on _is_skipped(cls)).
+    let class_skipped: bool = cls
+        .getattr("__unittest_skip__")
+        .and_then(|v| v.extract())
+        .unwrap_or(false);
+    if !class_skipped {
+        for (factory, needs_instance) in [
+            ("make_setup_method_fixture", true),
+            ("make_class_fixture", false),
+            ("make_setup_class_fixture", false),
+        ] {
+            let fixture = unittest_shim.getattr(factory)?.call1((cls,))?;
+            if !fixture.is_none() {
+                register_fixture_def(
+                    py,
+                    "",
+                    &fixture,
+                    &format!("{class_nodeid}::"),
+                    needs_instance,
+                    registry,
+                )?;
+            }
+        }
+    }
+
     // dir() includes inherited test methods, matching unittest collection.
     let mut names: Vec<String> = py
         .import("builtins")?
@@ -1021,10 +1085,31 @@ fn collect_testcase(
         .call1((cls,))?
         .extract()?;
     names.sort();
+    names.retain(|name| {
+        name.starts_with("test")
+            && cls
+                .getattr(name.as_str())
+                .map(|method| {
+                    // Methods opting out via __test__ = False (issue1558).
+                    method.is_callable()
+                        && method
+                            .getattr("__test__")
+                            .and_then(|v| v.extract::<bool>())
+                            .unwrap_or(true)
+                })
+                .unwrap_or(false)
+    });
+    // No test methods: unittest's runTest fallback collects as a single
+    // item (upstream skips twisted.trial's own runTest; twisted-less here).
+    if names.is_empty()
+        && cls
+            .getattr("runTest")
+            .map(|method| method.is_callable())
+            .unwrap_or(false)
+    {
+        names.push("runTest".to_string());
+    }
     for name in names {
-        if !name.starts_with("test") {
-            continue;
-        }
         let Ok(method) = cls.getattr(name.as_str()) else {
             continue;
         };
@@ -1835,6 +1920,24 @@ pub fn expand_fixture_params(
             .filter(|def| !item.callspec.iter().any(|(name, _)| name == &def.name))
             .collect();
         if parametrized.is_empty() {
+            expanded.extend(group);
+            continue;
+        }
+        // unittest.TestCase methods do not support fixture parametrization
+        // (upstream TestCaseFunction is nofuncargs): the item stays
+        // unexpanded and errors at setup with upstream's message.
+        if item.func.bind(py).hasattr("make_case").unwrap_or(false) {
+            let msg = format!(
+                "{} does not support fixtures, maybe unittest.TestCase subclass?\n\
+                 Node id: {}\n\
+                 Function type: TestCaseFunction",
+                item.func_name, item.nodeid
+            );
+            for item in &group {
+                item.func
+                    .bind(py)
+                    .setattr("_pytest_unsupported_fixtures", &msg)?;
+            }
             expanded.extend(group);
             continue;
         }

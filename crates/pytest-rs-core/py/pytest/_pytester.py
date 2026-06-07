@@ -457,11 +457,26 @@ class Pytester:
 
 
 class _OutcomeReport:
-    def __init__(self, nodeid):
+    def __init__(self, nodeid, outcome=None, when="call", longrepr=None):
         self.nodeid = nodeid
+        self.when = when
+        self.outcome = outcome
+        self.longrepr = longrepr
+
+    @property
+    def passed(self):
+        return self.outcome == "passed"
+
+    @property
+    def skipped(self):
+        return self.outcome == "skipped"
+
+    @property
+    def failed(self):
+        return self.outcome == "failed"
 
     def __repr__(self):
-        return f"<OutcomeReport {self.nodeid!r}>"
+        return f"<OutcomeReport {self.nodeid!r} {self.when} {self.outcome}>"
 
 
 class InlineRunResult:
@@ -506,7 +521,7 @@ class InlineRunResult:
             )
             if bucket is not None and is_test_node and nodeid not in seen:
                 seen.add(nodeid)
-                outcomes[bucket].append(_OutcomeReport(nodeid))
+                outcomes[bucket].append(_OutcomeReport(nodeid, bucket))
         # Collect-level reports (e.g. a skipped DoctestModule, a module that
         # failed to import) have no per-item lines; the final summary counts
         # are authoritative, so pad each bucket up to them. Upstream's
@@ -520,8 +535,40 @@ class InlineRunResult:
         }
         for bucket, want in expected.items():
             while len(outcomes[bucket]) < want:
-                outcomes[bucket].append(_OutcomeReport("<collect report>"))
+                outcomes[bucket].append(_OutcomeReport("<collect report>", bucket))
         return outcomes["passed"], outcomes["skipped"], outcomes["failed"]
+
+    def _teardown_reports(self):
+        """Failed teardown reports parsed from the "ERROR at teardown of X"
+        failure sections."""
+        import re
+
+        text = "\n".join(self._result.outlines)
+        return [
+            _OutcomeReport(match.group(1), "failed", "teardown", match.group(2))
+            for match in re.finditer(
+                r"_{6,} ERROR at teardown of (.+?) _{6,}\n(.*?)(?=\n_{6,} |\n={6,} |\Z)",
+                text,
+                re.S,
+            )
+        ]
+
+    def matchreport(self, inamepart="", when=None):
+        """The single report whose nodeid's last part contains inamepart
+        (HookRecorder.matchreport: call reports unless `when` says else)."""
+        if when == "teardown":
+            candidates = self._teardown_reports()
+        else:
+            passed, skipped, failed = self.listoutcomes()
+            candidates = [*passed, *skipped, *failed]
+        values = [
+            rep for rep in candidates if not inamepart or inamepart in rep.nodeid.split("::")[-1]
+        ]
+        if not values:
+            raise ValueError(f"could not find test report matching {inamepart!r}")
+        if len(values) > 1:
+            raise ValueError(f"found 2 or more testreports matching {inamepart!r}: {values}")
+        return values[0]
 
     def assertoutcome(self, passed=0, skipped=0, failed=0):
         __tracebackhide__ = True

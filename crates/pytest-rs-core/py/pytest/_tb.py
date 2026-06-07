@@ -174,6 +174,22 @@ def format_exception(exc, style="long"):
         return "\n".join(parts)
     if style == "native":
         return "".join(traceback.format_exception(exc))
+    # Exception groups render natively (upstream: the pytest-style frame
+    # repr cannot show sub-exception trees). A non-group context exception
+    # keeps its pytest-style block first, like upstream's chain repr.
+    if isinstance(exc, BaseExceptionGroup):
+        parts = []
+        context = exc.__cause__ if exc.__cause__ is not None else exc.__context__
+        if context is not None and not exc.__suppress_context__:
+            parts.append(format_exception(context, style))
+            parts.append("")
+            if exc.__cause__ is not None:
+                parts.append("The above exception was the direct cause of the following exception:")
+            else:
+                parts.append("During handling of the above exception, another exception occurred:")
+            parts.append("")
+        parts.append("".join(traceback.format_exception(exc, chain=False)).rstrip("\n"))
+        return "\n".join(parts)
 
     frames = _visible_frames(exc)
     if not frames:

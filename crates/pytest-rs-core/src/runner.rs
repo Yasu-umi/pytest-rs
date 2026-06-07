@@ -628,6 +628,17 @@ fn run_one_body(
 
         set_resolve_ctx_instance(py, instance.as_ref());
 
+        // TestCase items poisoned by fixture parametrization error at setup
+        // with upstream's bare nofuncargs message (no traceback).
+        if let Ok(msg) = item.func.bind(py).getattr("_pytest_unsupported_fixtures") {
+            let failed = py
+                .import("pytest._outcomes")?
+                .getattr("Failed")?
+                .call1((msg,))?;
+            failed.setattr("pytrace", false)?;
+            return Err(PyErr::from_value(failed));
+        }
+
         // xunit-style setup_module/setup_class/setup_method/setup_function.
         python::ensure_xunit_setup(py, session, item, instance.as_ref())?;
 
@@ -1273,6 +1284,17 @@ fn set_resolve_ctx_instance(py: Python<'_>, instance: Option<&Py<PyAny>>) {
     });
 }
 
+/// The running item's class instance (TestCase or fresh Test class
+/// instance), if any — backs `request.instance` / `request.cls`.
+pub(crate) fn current_resolve_instance(py: Python<'_>) -> Option<Py<PyAny>> {
+    RESOLVE_CTX.with(|stack| {
+        stack
+            .borrow()
+            .last()
+            .and_then(|ctx| ctx.class_instance.as_ref().map(|obj| obj.clone_ref(py)))
+    })
+}
+
 /// `request.getfixturevalue(name)`: dynamic fixture resolution from Python
 /// while a test item is running (fixture setup, the test body, or teardown).
 #[allow(unsafe_code)]
@@ -1893,6 +1915,10 @@ fn report_from_err(
     started: Instant,
     err: &PyErr,
 ) -> TestReport {
+    // Raw unittest.SkipTest (e.g. from a plain test function) skips like
+    // pytest.skip — upstream's makereport conversion (#13985).
+    let mapped = python::map_skiptest(py, err.clone_ref(py));
+    let err = &mapped;
     if python::is_xfailed(py, err) {
         TestReport {
             nodeid: item.nodeid.clone(),

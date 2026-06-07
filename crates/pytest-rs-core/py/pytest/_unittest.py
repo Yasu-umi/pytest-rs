@@ -74,6 +74,111 @@ class _SubtestRecorder:
         pass
 
 
+def _process_teardown_exceptions(cls):
+    """Raise errors collected by doClassCleanups (upstream
+    process_teardown_exceptions)."""
+    exc_infos = getattr(cls, "tearDown_exceptions", None)
+    if not exc_infos:
+        return
+    exceptions = [exc for (_, exc, _) in exc_infos]
+    # A single exception is raised directly for a more readable error.
+    if len(exceptions) == 1:
+        raise exceptions[0]
+    raise ExceptionGroup("Unittest class cleanup errors", exceptions)
+
+
+def make_class_fixture(cls):
+    """Upstream _register_unittest_setup_class_fixture: a class-scoped
+    autouse fixture invoking setUpClass/tearDownClass + doClassCleanups."""
+    import pytest
+
+    setup = getattr(cls, "setUpClass", None)
+    teardown = getattr(cls, "tearDownClass", None)
+    if setup is None and teardown is None:
+        return None
+    cleanup = getattr(cls, "doClassCleanups", lambda: None)
+
+    @pytest.fixture(
+        scope="class",
+        autouse=True,
+        name=f"_unittest_setUpClass_fixture_{cls.__qualname__}",
+    )
+    def unittest_setup_class_fixture():
+        if setup is not None:
+            try:
+                setup()
+            except unittest.SkipTest as e:
+                raise Skipped(msg=str(e)) from None
+            # unittest does not call the cleanup function for every
+            # BaseException, so we follow this here (upstream).
+            except Exception:
+                cleanup()
+                _process_teardown_exceptions(cls)
+                raise
+        yield
+        try:
+            if teardown is not None:
+                teardown()
+        finally:
+            cleanup()
+            _process_teardown_exceptions(cls)
+
+    return unittest_setup_class_fixture
+
+
+def make_setup_class_fixture(cls):
+    """Upstream _register_setup_class_fixture: pytest-style
+    setup_class/teardown_class on a TestCase class."""
+    import pytest
+    from pytest._xunit import call_optional
+
+    setup = getattr(cls, "setup_class", None)
+    teardown = getattr(cls, "teardown_class", None)
+    if setup is None and teardown is None:
+        return None
+
+    @pytest.fixture(
+        scope="class",
+        autouse=True,
+        name=f"_xunit_setup_class_fixture_{cls.__qualname__}",
+    )
+    def xunit_setup_class_fixture():
+        if setup is not None:
+            call_optional(getattr(setup, "__func__", setup), cls)
+        yield
+        if teardown is not None:
+            call_optional(getattr(teardown, "__func__", teardown), cls)
+
+    return xunit_setup_class_fixture
+
+
+def make_setup_method_fixture(cls):
+    """Upstream _register_unittest_setup_method_fixture: pytest-style
+    setup_method/teardown_method on a TestCase class (bound per test to
+    the same instance the runner uses)."""
+    import pytest
+
+    setup = getattr(cls, "setup_method", None)
+    teardown = getattr(cls, "teardown_method", None)
+    if setup is None and teardown is None:
+        return None
+
+    @pytest.fixture(
+        scope="function",
+        autouse=True,
+        name=f"_unittest_setup_method_fixture_{cls.__qualname__}",
+    )
+    def unittest_setup_method_fixture(self, request):
+        method = getattr(self, request.node.name.split("[")[0], None)
+        if setup is not None:
+            setup(self, method)
+        yield
+        if teardown is not None:
+            teardown(self, method)
+
+    return unittest_setup_method_fixture
+
+
 def make_runner(cls, method_name):
     """A zero-arg callable running setUp/method/tearDown with SkipTest
     mapped onto pytest's Skipped. A unittest _Outcome backs self.subTest().
@@ -125,31 +230,71 @@ def make_runner(cls, method_name):
         )
         outcome.expecting_failure = expecting_failure
         case._outcome = outcome
-        try:
-            case.setUp()
-        except unittest.SkipTest as e:
-            raise Skipped(msg=str(e)) from None
+        primary = None
         try:
             try:
-                method()
+                case.setUp()
             except unittest.SkipTest as e:
                 raise Skipped(msg=str(e)) from None
-            except _ShouldStop:
-                # subTest aborts the body once an expected failure is seen
-                # (TestCase.run catches this in its outer part executor).
-                pass
+            try:
+                try:
+                    method()
+                except unittest.SkipTest as e:
+                    raise Skipped(msg=str(e)) from None
+                except _ShouldStop:
+                    # subTest aborts the body once an expected failure is seen
+                    # (TestCase.run catches this in its outer part executor).
+                    pass
+                except BaseException as exc:
+                    if expecting_failure:
+                        # @unittest.expectedFailure: any body exception is
+                        # the expected failure (xfail).
+                        from pytest._outcomes import XFailed
+
+                        raise XFailed(str(exc) or "expected failure") from exc
+                    raise
+                else:
+                    if expecting_failure:
+                        from pytest._outcomes import Failed
+
+                        failure = Failed(msg="Unexpected success")
+                        # Upstream: bare message, no traceback.
+                        failure.pytrace = False
+                        raise failure
+            finally:
+                case.tearDown()
+        except BaseException as exc:
+            primary = exc
         finally:
-            case.tearDown()
             case._outcome = None
+        # addCleanup functions run LIFO even when setUp/call/tearDown failed
+        # (unittest's doCleanups); the primary exception wins, else the
+        # first cleanup error surfaces.
+        cleanup_error = None
+        while case._cleanups:
+            function, args, kwargs = case._cleanups.pop()
+            try:
+                function(*args, **kwargs)
+            except Exception as exc:
+                if cleanup_error is None:
+                    cleanup_error = exc
+        if primary is not None:
+            raise primary
+        if cleanup_error is not None:
+            raise cleanup_error
         if expecting_failure and outcome.expectedFailure is not None:
             # A subtest raised under @expectedFailure: surface it as xfail.
             from pytest._outcomes import XFailed
 
-            exc = outcome.expectedFailure[1]
-            if isinstance(exc, XFailed):
-                raise exc
-            raise XFailed(str(exc) or "expected failure")
+            expected = outcome.expectedFailure[1]
+            if isinstance(expected, XFailed):
+                raise expected
+            raise XFailed(str(expected) or "expected failure")
 
+    # request.function.__name__ and failure headers show the test method,
+    # not this shim.
+    run.__name__ = method_name
+    run.__qualname__ = f"{cls.__qualname__}.{method_name}"
     run.make_case = make_case
     return run
 

@@ -260,8 +260,8 @@
       "file": "testing/test_runner_xunit.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 7,
-      "failed": 6,
+      "passed": 8,
+      "failed": 5,
       "skipped": 0,
       "errors": 0
     },
@@ -359,8 +359,8 @@
       "file": "testing/test_unittest.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 27,
-      "failed": 43,
+      "passed": 57,
+      "failed": 13,
       "skipped": 9,
       "errors": 0
     },

@@ -430,18 +430,9 @@ impl Engine {
             };
         }
         if n_items == 0 {
-            // Module-level skips count as a run that skipped everything
-            // (exit 0), not as "no tests collected".
-            let code = if self
-                .session
-                .reports
-                .iter()
-                .any(|r| r.outcome == Outcome::Skipped)
-            {
-                exit_code::OK
-            } else {
-                exit_code::NO_TESTS_COLLECTED
-            };
+            // Upstream: zero collected items is NO_TESTS_COLLECTED even when
+            // module-level skips produced skip reports.
+            let code = exit_code::NO_TESTS_COLLECTED;
             if let Err(err) = self.fire_py_sessionfinish(py, code) {
                 eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
             }
@@ -732,7 +723,14 @@ impl Engine {
             println!("{err}");
         }
         for report in phase_errors {
-            let name = report.nodeid.rsplit("::").next().unwrap_or(&report.nodeid);
+            // Upstream head_line: the domain parts (class + method) joined
+            // with "." — "MyTestCase.test", "test_foo".
+            let domain: Vec<&str> = report.nodeid.split("::").skip(1).collect();
+            let name = if domain.is_empty() {
+                report.nodeid.clone()
+            } else {
+                domain.join(".")
+            };
             let when = match report.phase {
                 Phase::Teardown => "teardown",
                 _ => "setup",
@@ -791,12 +789,13 @@ impl Engine {
             return format!("[doctest] {nodeid}");
         }
         let after = nodeid.split_once("::").map(|x| x.1).unwrap_or(nodeid);
-        if after.contains('.') {
+        if after.contains('.') && !after.contains("::") {
             // Module doctest (e.g. "file.py::module.Class.method")
             format!("[doctest] {after}")
         } else {
-            // Regular test: use the last "::" component
-            nodeid.rsplit("::").next().unwrap_or(nodeid).to_string()
+            // Upstream head_line: domain parts (class + method) joined
+            // with "." — "MyTestCase.test_method", "test_foo".
+            after.split("::").collect::<Vec<_>>().join(".")
         }
     }
 
@@ -2003,6 +2002,19 @@ fn short_message(longrepr: &str) -> Option<String> {
             .map(|rest| rest.trim_start().to_string())
     });
     from_e_line
+        .or_else(|| {
+            // Native exception-group repr: the group's own message line
+            // ("ExceptionGroup: ... (2 sub-exceptions)"), not the box art.
+            longrepr
+                .lines()
+                .find(|line| line.trim_end().ends_with("sub-exceptions)"))
+                .or_else(|| {
+                    longrepr
+                        .lines()
+                        .find(|line| line.trim_end().ends_with("sub-exception)"))
+                })
+                .map(|line| line.trim().trim_start_matches('|').trim().to_string())
+        })
         .or_else(|| {
             longrepr
                 .lines()

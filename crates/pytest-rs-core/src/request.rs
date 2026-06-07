@@ -284,7 +284,16 @@ impl PyRequest {
     /// The class containing the test, or None for functions/doctests.
     #[getter]
     fn cls(&self, py: Python<'_>) -> Py<PyAny> {
-        py.None()
+        crate::runner::current_resolve_instance(py)
+            .map(|instance| instance.bind(py).get_type().unbind().into_any())
+            .unwrap_or_else(|| py.None())
+    }
+
+    /// The test instance the item runs on (a fresh Test class instance, or
+    /// the unittest.TestCase instance), or None for plain functions.
+    #[getter]
+    fn instance(&self, py: Python<'_>) -> Py<PyAny> {
+        crate::runner::current_resolve_instance(py).unwrap_or_else(|| py.None())
     }
 
     /// The module containing the test, or None for doctests.
