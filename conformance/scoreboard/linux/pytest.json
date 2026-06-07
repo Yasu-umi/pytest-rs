@@ -89,9 +89,9 @@
       "file": "testing/test_collection.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 56,
-      "failed": 56,
-      "skipped": 4,
+      "passed": 58,
+      "failed": 55,
+      "skipped": 3,
       "errors": 0
     },
     {
@@ -109,7 +109,7 @@
       "exit_code": 1,
       "passed": 69,
       "failed": 139,
-      "skipped": 0,
+      "skipped": 1,
       "errors": 0
     },
     {
@@ -188,8 +188,8 @@
       "file": "testing/test_mark.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 45,
-      "failed": 61,
+      "passed": 76,
+      "failed": 30,
       "skipped": 0,
       "errors": 0
     },
@@ -332,8 +332,8 @@
       "file": "testing/test_terminal.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 99,
-      "failed": 116,
+      "passed": 101,
+      "failed": 114,
       "skipped": 2,
       "errors": 10
     },
@@ -348,10 +348,10 @@
     },
     {
       "file": "testing/test_tmpdir.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 11,
-      "failed": 28,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 39,
+      "failed": 0,
       "skipped": 1,
       "errors": 0
     },
@@ -368,8 +368,8 @@
       "file": "testing/test_unraisableexception.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 0,
-      "failed": 11,
+      "passed": 10,
+      "failed": 1,
       "skipped": 0,
       "errors": 0
     },
@@ -395,8 +395,8 @@
       "file": "testing/deprecated_test.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 0,
-      "failed": 11,
+      "passed": 10,
+      "failed": 5,
       "skipped": 0,
       "errors": 0
     },

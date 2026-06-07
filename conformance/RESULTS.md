@@ -16,7 +16,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | pass % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 1297 | 825 | 42 | 24 | 2188 | 59.3% | 5 | 45 | 63 |
+| pytest | 9.0.3 | 1380 | 747 | 42 | 24 | 2193 | 62.9% | 6 | 45 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 85 | 0 | 0 | 5 | 90 | 94.4% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 142 | 64 | 0 | 3 | 209 | 67.9% | 0 | 1 | 0 |
@@ -45,9 +45,9 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_cacheprovider.py | failed | 36 | 21 | 0 | 0 |
 | testing/test_capture.py | failed | 106 | 1 | 0 | 1 |
 | testing/test_collect_imported_tests.py | failed | 2 | 1 | 0 | 0 |
-| testing/test_collection.py | failed | 56 | 56 | 0 | 4 |
+| testing/test_collection.py | failed | 58 | 55 | 0 | 3 |
 | testing/test_compat.py | failed | 6 | 4 | 0 | 0 |
-| testing/test_config.py | failed | 69 | 139 | 0 | 0 |
+| testing/test_config.py | failed | 69 | 139 | 0 | 1 |
 | testing/test_conftest.py | failed | 20 | 22 | 11 | 1 |
 | testing/test_doctest.py | passed | 139 | 0 | 0 | 1 |
 | testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 |
@@ -56,7 +56,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_junitxml.py | failed | 127 | 9 | 1 | 0 |
 | testing/test_link_resolve.py | failed | 0 | 1 | 0 | 0 |
 | testing/test_main.py | failed | 1 | 12 | 11 | 0 |
-| testing/test_mark.py | failed | 45 | 61 | 0 | 0 |
+| testing/test_mark.py | failed | 76 | 30 | 0 | 0 |
 | testing/test_monkeypatch.py | passed | 33 | 0 | 0 | 2 |
 | testing/test_nodes.py | failed | 1 | 7 | 0 | 0 |
 | testing/test_pastebin.py | failed | 0 | 5 | 3 | 0 |
@@ -72,14 +72,14 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_skipping.py | failed | 70 | 22 | 0 | 0 |
 | testing/test_stepwise.py | failed | 3 | 15 | 0 | 0 |
 | testing/test_subtests.py | failed | 29 | 5 | 0 | 0 |
-| testing/test_terminal.py | failed | 99 | 116 | 10 | 2 |
+| testing/test_terminal.py | failed | 101 | 114 | 10 | 2 |
 | testing/test_threadexception.py | failed | 0 | 2 | 6 | 0 |
-| testing/test_tmpdir.py | failed | 11 | 28 | 0 | 1 |
+| testing/test_tmpdir.py | passed | 39 | 0 | 0 | 1 |
 | testing/test_unittest.py | failed | 57 | 13 | 0 | 9 |
-| testing/test_unraisableexception.py | failed | 0 | 11 | 0 | 0 |
+| testing/test_unraisableexception.py | failed | 10 | 1 | 0 | 0 |
 | testing/test_warnings.py | failed | 35 | 8 | 0 | 1 |
 | testing/acceptance_test.py | failed | 22 | 58 | 0 | 2 |
-| testing/deprecated_test.py | failed | 0 | 11 | 0 | 0 |
+| testing/deprecated_test.py | failed | 10 | 5 | 0 | 0 |
 | testing/python/show_fixtures_per_test.py | failed | 0 | 8 | 0 | 0 |
 
 </details>
