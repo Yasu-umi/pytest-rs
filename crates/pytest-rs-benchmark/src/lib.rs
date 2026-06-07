@@ -29,6 +29,11 @@ import pytest
 @pytest.fixture
 def benchmark():
     raise NotImplementedError("the benchmark fixture is provided natively by pytest-rs-benchmark")
+
+
+@pytest.fixture
+def benchmark_weave(benchmark):
+    return benchmark.weave
 "#;
 
 pub struct BenchmarkPlugin {

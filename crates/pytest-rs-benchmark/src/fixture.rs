@@ -418,6 +418,16 @@ impl BenchmarkFixture {
             .expect("min_time lock poisoned") = Some(value);
     }
 
+    /// Upstream's benchmark.weave (aspect mode): requires the aspectlib
+    /// extra, which pytest-rs does not reproduce — same ImportError as
+    /// upstream without it.
+    #[pyo3(signature = (_target = None, **_kwargs))]
+    fn weave(&self, _target: Option<Py<PyAny>>, _kwargs: Option<Py<PyDict>>) -> PyResult<()> {
+        Err(pyo3::exceptions::PyImportError::new_err(
+            "Please install aspectlib or pytest-benchmark[aspect]",
+        ))
+    }
+
     #[getter]
     fn disabled(&self) -> bool {
         self.config.disabled

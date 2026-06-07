@@ -36,6 +36,8 @@ tag = "v7.1.0"
 testpaths = ["tests"]
 local = "conformance/suites/pytest-cov"
 deps = ["coverage", "process-tests"]
+# One 209-test file: long under full pool load, must not hit the timeout.
+slow_files = ["tests/test_pytest_cov.py"]
 enabled = true
 
 [pytest-xdist]

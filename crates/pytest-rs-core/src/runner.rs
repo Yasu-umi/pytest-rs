@@ -601,14 +601,29 @@ fn run_one_body(
             }
         }
         fire_runtest_py_hooks(py, session, item, "pytest_runtest_setup")?;
-        // A fresh class instance per test (pytest behavior).
+        // A fresh class instance per test (pytest behavior). For
+        // unittest.TestCase items the shim runner creates the case;
+        // exposing it here lets @pytest.fixture METHODS on the TestCase
+        // bind to the instance the test runs on (upstream item.instance).
         let instance: Option<Py<PyAny>> = match &item.cls {
             Some(cls) => Some(cls.bind(py).call0()?.unbind()),
-            None => None,
+            None => {
+                let func = item.func.bind(py);
+                if func.hasattr("make_case")? {
+                    Some(func.call_method0("make_case")?.unbind())
+                } else {
+                    None
+                }
+            }
         };
-        let callable = match &instance {
-            Some(instance) => instance.bind(py).getattr(item.func_name.as_str())?.unbind(),
-            None => item.func.clone_ref(py),
+        // unittest items keep the shim runner (setUp/tearDown/skip
+        // handling) — only pytest classes rebind the method on the
+        // fresh instance.
+        let callable = match (&item.cls, &instance) {
+            (Some(_), Some(instance)) => {
+                instance.bind(py).getattr(item.func_name.as_str())?.unbind()
+            }
+            _ => item.func.clone_ref(py),
         };
 
         set_resolve_ctx_instance(py, instance.as_ref());

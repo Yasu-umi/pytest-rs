@@ -922,6 +922,7 @@ fn introspect_namespace(
                     path,
                     &module_marks,
                     items,
+                    registry,
                 )?;
             } else if name.starts_with("Test") {
                 collect_class(
@@ -988,12 +989,30 @@ fn collect_testcase(
     path: &Path,
     module_marks: &[MarkData],
     items: &mut Vec<TestItem>,
+    registry: &mut FixtureRegistry,
 ) -> PyResult<()> {
     let unittest_shim = py.import("pytest._unittest")?;
     let make_runner = unittest_shim.getattr("make_runner")?;
     let class_nodeid = format!("{nodeid_base}::{cls_name}");
     let mut class_marks = read_marks(py, cls)?;
     class_marks.extend(clone_marks(py, module_marks));
+
+    // @pytest.fixture methods on the TestCase (upstream supports them,
+    // typically autouse=True stashing values on self); they bind to the
+    // same instance the test runs on via the runner's make_case().
+    for pair in cls.getattr("__dict__")?.call_method0("items")?.try_iter()? {
+        let (name, value): (String, Bound<'_, PyAny>) = pair?.extract()?;
+        if value.is_callable() && value.hasattr("_pytestfixturefunction")? {
+            register_fixture_def(
+                py,
+                &name,
+                &value,
+                &format!("{class_nodeid}::"),
+                true,
+                registry,
+            )?;
+        }
+    }
 
     // dir() includes inherited test methods, matching unittest collection.
     let mut names: Vec<String> = py

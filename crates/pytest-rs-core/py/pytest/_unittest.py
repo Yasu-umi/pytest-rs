@@ -76,7 +76,12 @@ class _SubtestRecorder:
 
 def make_runner(cls, method_name):
     """A zero-arg callable running setUp/method/tearDown with SkipTest
-    mapped onto pytest's Skipped. A unittest _Outcome backs self.subTest()."""
+    mapped onto pytest's Skipped. A unittest _Outcome backs self.subTest().
+
+    The callable also exposes make_case(): the engine calls it before
+    fixture setup so @pytest.fixture(autouse=True) METHODS defined on the
+    TestCase bind to the same instance the test runs on (upstream's
+    item.instance)."""
 
     def _skipped_at(msg, func):
         """Skipped exception located at the test's definition line, so the
@@ -93,9 +98,18 @@ def make_runner(cls, method_name):
             exc._location = f"{filename}:{code.co_firstlineno}"
         return exc
 
+    pending = []
+
+    def make_case():
+        """Create (and queue) the next run's TestCase instance — the
+        fixture-binding instance the engine passes to fixture methods."""
+        case = cls(method_name)
+        pending.append(case)
+        return case
+
     def run():
         __tracebackhide__ = True
-        case = cls(method_name)
+        case = pending.pop() if pending else cls(method_name)
         method = getattr(case, method_name)
         # Class-level skip decorators.
         if getattr(cls, "__unittest_skip__", False):
@@ -136,6 +150,7 @@ def make_runner(cls, method_name):
                 raise exc
             raise XFailed(str(exc) or "expected failure")
 
+    run.make_case = make_case
     return run
 
 

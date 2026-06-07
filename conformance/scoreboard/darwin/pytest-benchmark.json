@@ -62,8 +62,8 @@
       "file": "tests/test_with_testcase.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 0,
-      "failed": 2,
+      "passed": 1,
+      "failed": 1,
       "skipped": 0,
       "errors": 0
     }
