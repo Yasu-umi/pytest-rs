@@ -6,6 +6,8 @@
 "tests/test_sample.py" = "passed"
 "tests/test_pedantic.py" = "passed"
 "tests/test_calibration.py" = "passed"
+# test_benchmark.py itself still fails wholesale (storage/compare/usage
+# clusters), but its passing count is tracked in the scoreboard.
 
 [excluded]
 # These import pytest_benchmark internals (stats/utils/storage/cli modules);

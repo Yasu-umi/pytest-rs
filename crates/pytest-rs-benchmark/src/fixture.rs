@@ -13,6 +13,13 @@ use crate::stats::Stats;
 pub struct BenchResult {
     pub fullname: String,
     pub name: String,
+    /// The benchmark group (marker group= / runtime benchmark.group).
+    #[serde(default)]
+    pub group: Option<String>,
+    /// @pytest.mark.parametrize params as (argname, str(value)), for
+    /// --benchmark-group-by param:NAME.
+    #[serde(default)]
+    pub params: Vec<(String, String)>,
     pub stats: Stats,
 }
 
@@ -30,6 +37,8 @@ pub struct BenchConfig {
     /// One extra invocation under cProfile after the timed rounds
     /// (--benchmark-cprofile / @pytest.mark.benchmark(cprofile=True)).
     pub cprofile: bool,
+    /// gc.disable() around the timed loops (--benchmark-disable-gc).
+    pub disable_gc: bool,
 }
 
 impl Default for BenchConfig {
@@ -43,6 +52,7 @@ impl Default for BenchConfig {
             warmup: false,
             warmup_iterations: 100_000,
             cprofile: false,
+            disable_gc: false,
         }
     }
 }
@@ -64,10 +74,10 @@ impl BenchConfig {
                 "warmup" => self.warmup = value.extract()?,
                 "warmup_iterations" => self.warmup_iterations = value.extract()?,
                 "cprofile" => self.cprofile = value.extract()?,
-                "disable_gc" | "timer" | "group" => {
-                    // group is handled by the caller (it lands on the
-                    // fixture, not the config); disable_gc/timer are not
-                    // reproduced yet.
+                "disable_gc" => self.disable_gc = value.extract()?,
+                "timer" | "group" => {
+                    // Handled by the caller: group lands on the fixture,
+                    // timer is a callable injected into it.
                 }
                 _ => {}
             }
@@ -126,6 +136,11 @@ pub struct BenchmarkFixture {
     timer: Mutex<Option<Py<PyAny>>>,
     /// `benchmark._min_time` override (calibration tests set it directly).
     min_time_override: Mutex<Option<f64>>,
+    /// @pytest.mark.parametrize params as (argname, str(value)).
+    params: Vec<(String, String)>,
+    /// Which mode already consumed the fixture ("benchmark(...)" or
+    /// "benchmark.pedantic(...)"); a second use raises FixtureAlreadyUsed.
+    used: Mutex<Option<&'static str>>,
     #[pyo3(get)]
     extra_info: Py<PyDict>,
     #[pyo3(get, set)]
@@ -139,6 +154,7 @@ impl BenchmarkFixture {
         config: BenchConfig,
         helper: Py<PyModule>,
         results: ResultStore,
+        params: Vec<(String, String)>,
     ) -> PyResult<Self> {
         Ok(Self {
             nodeid,
@@ -148,9 +164,29 @@ impl BenchmarkFixture {
             recorded: Mutex::new(None),
             timer: Mutex::new(None),
             min_time_override: Mutex::new(None),
+            params,
+            used: Mutex::new(None),
             extra_info: PyDict::new(py).unbind(),
             group: py.None(),
         })
+    }
+
+    /// Upstream's FixtureAlreadyUsed guard: the fixture runs one
+    /// benchmark per test, in one mode.
+    fn mark_used(&self, py: Python<'_>, mode: &'static str) -> PyResult<()> {
+        let mut used = self.used.lock().expect("used lock poisoned");
+        if let Some(previous) = *used {
+            let exc = self
+                .helper
+                .bind(py)
+                .getattr("FixtureAlreadyUsed")?
+                .call1((format!(
+                    "Fixture can only be used once. Previously it was used in {previous} mode."
+                ),))?;
+            return Err(PyErr::from_value(exc));
+        }
+        *used = Some(mode);
+        Ok(())
     }
 
     /// The injected timer or None (helper functions default to
@@ -178,6 +214,16 @@ impl BenchmarkFixture {
             .next()
             .unwrap_or(&self.nodeid)
             .to_string();
+        // The group is read at record time: tests may assign
+        // benchmark.group at runtime, on top of the marker's group=.
+        let group = {
+            let bound = self.group.bind(py);
+            if bound.is_none() {
+                None
+            } else {
+                Some(bound.str()?.to_string())
+            }
+        };
         let stats = Stats::from_rounds(times, iterations);
         let py_stats = Py::new(
             py,
@@ -203,6 +249,8 @@ impl BenchmarkFixture {
             .push(BenchResult {
                 fullname: self.nodeid.clone(),
                 name,
+                group,
+                params: self.params.clone(),
                 stats,
             });
         Ok(())
@@ -293,6 +341,7 @@ impl BenchmarkFixture {
         args: Py<PyTuple>,
         kwargs: Option<Py<PyDict>>,
     ) -> PyResult<Py<PyAny>> {
+        self.mark_used(py, "benchmark(...)")?;
         let helper = self.helper.bind(py);
         let kwargs_obj = match &kwargs {
             Some(kwargs) => kwargs.bind(py).as_any().clone(),
@@ -305,6 +354,7 @@ impl BenchmarkFixture {
                 args.bind(py),
                 &kwargs_obj,
                 timer.bind(py),
+                self.config.disable_gc,
             ))?;
             let (duration, loops) = self.calibrate(py, &runner)?;
             let rounds = self.round_count(duration);
@@ -400,6 +450,7 @@ impl BenchmarkFixture {
         iterations: Option<Py<PyAny>>,
         warmup_rounds: Option<Py<PyAny>>,
     ) -> PyResult<Py<PyAny>> {
+        self.mark_used(py, "benchmark.pedantic(...)")?;
         // Validation before anything runs (upstream raises without calling
         // setup or the target).
         let rounds = positive_int(py, rounds.as_ref(), 1, 1, "rounds")?;

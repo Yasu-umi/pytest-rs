@@ -8,11 +8,11 @@ per-iteration overhead matches pytest-benchmark's generated runner.
 from time import perf_counter
 
 
-def make_runner(func, args, kwargs, timer=None):
+def make_runner(func, args, kwargs, timer=None, disable_gc=False):
     timer = timer or perf_counter
     if args or kwargs:
 
-        def runner(loops):
+        def timed(loops):
             it = range(loops)
             t0 = timer()
             for _ in it:
@@ -21,13 +21,27 @@ def make_runner(func, args, kwargs, timer=None):
             return t1 - t0
     else:
 
-        def runner(loops):
+        def timed(loops):
             it = range(loops)
             t0 = timer()
             for _ in it:
                 func()
             t1 = timer()
             return t1 - t0
+
+    if not disable_gc:
+        return timed
+
+    def runner(loops):
+        import gc
+
+        gc_enabled = gc.isenabled()
+        gc.disable()
+        try:
+            return timed(loops)
+        finally:
+            if gc_enabled:
+                gc.enable()
 
     return runner
 
@@ -89,3 +103,19 @@ def cprofile_call(func, args, kwargs, loops=1):
     for _ in range(max(loops, 1)):
         result = profile.runcall(func, *args, **kwargs)
     return result
+
+
+class FixtureAlreadyUsed(Exception):
+    """The benchmark fixture ran already in this test (upstream's
+    pytest_benchmark.fixture.FixtureAlreadyUsed)."""
+
+
+def resolve_timer(spec):
+    """--benchmark-timer=module.attr (upstream's NameWrapper-ed dotted
+    lookup, e.g. time.time or time.perf_counter)."""
+    module_name, _, attr = spec.rpartition(".")
+    if not module_name:
+        raise ValueError(f"Value for --benchmark-timer must be in dotted form. Got: {spec!r}")
+    import importlib
+
+    return getattr(importlib.import_module(module_name), attr)

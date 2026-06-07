@@ -36,6 +36,9 @@ pub struct BenchmarkPlugin {
     only: bool,
     skip: bool,
     sort: String,
+    group_by: String,
+    /// --benchmark-timer dotted name, resolved per fixture creation.
+    timer_spec: Option<String>,
     json_path: Option<String>,
     helper: Option<Py<PyModule>>,
     results: ResultStore,
@@ -48,6 +51,8 @@ impl BenchmarkPlugin {
             only: false,
             skip: false,
             sort: "min".to_string(),
+            group_by: "group".to_string(),
+            timer_spec: None,
             json_path: None,
             helper: None,
             results: Arc::new(Mutex::new(Vec::new())),
@@ -124,6 +129,12 @@ impl Plugin for BenchmarkPlugin {
             "Column to sort the result table by: min, max, mean, stddev, name",
         ));
         parser.add_option(OptDef::value(
+            "--benchmark-group-by",
+            Some("group"),
+            "How to group tests in the result tables: group, name, func, \
+             fullname, fullfunc, param or param:NAME (comma-combinable)",
+        ));
+        parser.add_option(OptDef::value(
             "--benchmark-cprofile",
             None,
             "Run the benchmarked function once more under cProfile (the \
@@ -131,9 +142,12 @@ impl Plugin for BenchmarkPlugin {
         ));
         // Accepted-but-inert pytest-benchmark options (storage/comparison
         // features are not reproduced).
-        for inert in [
-            "--benchmark-group-by",
+        parser.add_option(OptDef::value(
             "--benchmark-timer",
+            None,
+            "Timer to use as a dotted name (e.g. time.time, time.perf_counter)",
+        ));
+        for inert in [
             "--benchmark-save",
             "--benchmark-compare",
             "--benchmark-storage",
@@ -143,6 +157,10 @@ impl Plugin for BenchmarkPlugin {
         ] {
             parser.add_option(OptDef::value(inert, None, "accepted but inert"));
         }
+        parser.add_option(OptDef::flag(
+            "--benchmark-disable-gc",
+            "Disable the garbage collector around the timed loops",
+        ));
         parser.add_option(OptDef::flag("--benchmark-autosave", "accepted but inert"));
         parser.add_option(OptDef::flag("--benchmark-verbose", "accepted but inert"));
     }
@@ -179,6 +197,22 @@ impl Plugin for BenchmarkPlugin {
         if ctx.config.get_value("benchmark-cprofile").is_some() {
             self.config.cprofile = true;
         }
+        if ctx.config.get_flag("benchmark-disable-gc") {
+            self.config.disable_gc = true;
+        }
+        self.timer_spec = ctx.config.get_value("benchmark-timer").map(str::to_string);
+        if let Some(value) = ctx.config.get_value("benchmark-group-by") {
+            self.group_by = value.to_string();
+        }
+        if self.only && self.config.disabled {
+            // Upstream's pytest_addoption-time conflict check.
+            let exc = py.import("pytest")?.getattr("UsageError")?.call1((
+                "Can't have both --benchmark-only and --benchmark-disable options. Note \
+                 that --benchmark-disable is automatically activated if xdist is on or \
+                 you're missing the statistics dependency.",
+            ))?;
+            return Err(PyErr::from_value(exc));
+        }
 
         let helper = PyModule::from_code(
             py,
@@ -203,10 +237,7 @@ impl Plugin for BenchmarkPlugin {
         ctx: &mut HookContext,
         items: &mut Vec<TestItem>,
     ) -> PyResult<()> {
-        if self.only {
-            items.retain(Self::uses_benchmark);
-        }
-        if self.skip {
+        if self.skip && !self.only {
             // pytest-benchmark skips (not deselects) benchmark tests.
             let py = ctx.py;
             let skip_mark = py
@@ -222,6 +253,32 @@ impl Plugin for BenchmarkPlugin {
                 )?
                 .getattr("mark")?;
             for item in items.iter_mut().filter(|item| Self::uses_benchmark(item)) {
+                item.marks.push(pytest_rs_core::collect::MarkData {
+                    name: "skip".to_string(),
+                    obj: skip_mark.clone().unbind(),
+                });
+            }
+        }
+        if self.only {
+            // Upstream SKIPS non-benchmark tests (their fixtures never
+            // run) rather than deselecting them.
+            let py = ctx.py;
+            let skip_mark = py
+                .import("pytest")?
+                .getattr("mark")?
+                .getattr("skip")?
+                .call(
+                    (),
+                    Some(
+                        &[(
+                            "reason",
+                            "Skipping non-benchmark (--benchmark-only active).",
+                        )]
+                        .into_py_dict(py)?,
+                    ),
+                )?
+                .getattr("mark")?;
+            for item in items.iter_mut().filter(|item| !Self::uses_benchmark(item)) {
                 item.marks.push(pytest_rs_core::collect::MarkData {
                     name: "skip".to_string(),
                     obj: skip_mark.clone().unbind(),
@@ -265,16 +322,57 @@ impl Plugin for BenchmarkPlugin {
                 group = Some(value.unbind());
             }
         }
+        // @pytest.mark.parametrize params as (argname, str(value)), for
+        // --benchmark-group-by param:NAME.
+        let params: Vec<(String, String)> = item
+            .callspec
+            .iter()
+            .map(|(name, value)| {
+                let rendered = value
+                    .bind(py)
+                    .str()
+                    .map(|s| s.to_string())
+                    .unwrap_or_default();
+                (name.clone(), rendered)
+            })
+            .collect();
         let fixture = BenchmarkFixture::new(
             py,
             item.nodeid.clone(),
             config,
             helper.clone_ref(py),
             Arc::clone(&self.results),
+            params,
         )?;
         let fixture = Py::new(py, fixture)?;
         if let Some(group) = group {
             fixture.bind(py).setattr("group", group)?;
+        }
+        // Timer: the marker's timer= callable wins over --benchmark-timer.
+        let mut timer: Option<Py<PyAny>> = None;
+        for mark in &item.marks {
+            if mark.name != "benchmark" {
+                continue;
+            }
+            if let Ok(kwargs) = mark.obj.bind(py).getattr("kwargs")
+                && let Ok(kwargs) = kwargs.cast_into::<core_pyo3::types::PyDict>()
+                && let Ok(Some(value)) = kwargs.get_item("timer")
+            {
+                timer = Some(value.unbind());
+            }
+        }
+        if timer.is_none()
+            && let Some(spec) = &self.timer_spec
+        {
+            timer = Some(
+                helper
+                    .bind(py)
+                    .call_method1("resolve_timer", (spec.as_str(),))?
+                    .unbind(),
+            );
+        }
+        if let Some(timer) = timer {
+            fixture.bind(py).setattr("_timer", timer)?;
         }
         Ok(Some(FixtureValue {
             value: fixture.into_any(),
@@ -290,7 +388,7 @@ impl Plugin for BenchmarkPlugin {
         if results.is_empty() {
             return Ok(());
         }
-        out.push_str(&report::render_table(&results, &self.sort));
+        out.push_str(&report::render_table(&results, &self.sort, &self.group_by));
         Ok(())
     }
 

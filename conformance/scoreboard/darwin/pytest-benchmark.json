@@ -8,8 +8,8 @@
       "file": "tests/test_benchmark.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 5,
-      "failed": 48,
+      "passed": 23,
+      "failed": 30,
       "skipped": 0,
       "errors": 0
     },

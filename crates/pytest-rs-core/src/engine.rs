@@ -1741,6 +1741,9 @@ impl Engine {
             // "Captured stdout/stderr" sections (pytest's
             // pytest_make_collect_report capture).
             python::capture_collect_begin(py);
+            // Where this file's items start: --doctest-modules inserts the
+            // module's doctest items BEFORE its functions (upstream order).
+            let file_items_start = self.session.items.len();
             let collect_result = python::collect_module(
                 py,
                 &rootdir,
@@ -1824,16 +1827,26 @@ impl Engine {
             if module_ok
                 && self.config.get_flag("doctest-modules")
                 && let Ok(py_config) = python::make_py_config(py, &self.config)
-                && let Err(err) = python::collect_doctests_from_module(
+            {
+                let doctests_start = self.session.items.len();
+                match python::collect_doctests_from_module(
                     py,
                     &rootdir,
                     file,
                     &py_config,
                     &mut self.session.items,
-                )
-            {
-                // Non-fatal: log as collect error and continue.
-                errors.push((file.clone(), python::format_exception(py, &err)));
+                ) {
+                    Ok(()) => {
+                        // The module's doctests run BEFORE its functions
+                        // (upstream collects the DoctestModule first).
+                        let n_doctests = self.session.items.len().saturating_sub(doctests_start);
+                        self.session.items[file_items_start..].rotate_right(n_doctests);
+                    }
+                    Err(err) => {
+                        // Non-fatal: log as collect error and continue.
+                        errors.push((file.clone(), python::format_exception(py, &err)));
+                    }
+                }
             }
         }
 

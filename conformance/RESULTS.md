@@ -380,13 +380,13 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | pass % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 1269 | 853 | 42 | 24 | 2188 | 58.0% | 5 | 45 | 63 |
+| pytest | 9.0.3 | 1268 | 854 | 42 | 24 | 2188 | 58.0% | 5 | 45 | 63 |
 | pytest-asyncio | v1.4.0 | 262 | 0 | 1 | 0 | 263 | 99.6% | 29 | 30 | 0 |
 | pytest-mock | v3.15.1 | 85 | 0 | 0 | 5 | 90 | 94.4% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 142 | 63 | 0 | 4 | 209 | 67.9% | 0 | 1 | 0 |
 | pytest-xdist | v3.8.0 | 63 | 34 | 0 | 0 | 97 | 64.9% | 0 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
-| pytest-benchmark | v5.1.0 | 72 | 50 | 0 | 1 | 123 | 58.5% | 4 | 7 | 6 |
+| pytest-benchmark | v5.1.0 | 90 | 32 | 0 | 1 | 123 | 73.2% | 4 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 41 | 97.6% | 1 | 1 | 0 |
 | anyio | 4.13.0 | 2859 | 1 | 0 | 302 | 3162 | 90.4% | 25 | 26 | 0 |
 | click | 8.3.1 | 1313 | 0 | 0 | 22 | 1335 | 98.4% | 20 | 20 | 0 |
@@ -411,7 +411,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_collect_imported_tests.py | failed | 2 | 1 | 0 | 0 |
 | testing/test_collection.py | failed | 57 | 55 | 0 | 4 |
 | testing/test_compat.py | failed | 6 | 4 | 0 | 0 |
-| testing/test_config.py | failed | 70 | 138 | 0 | 0 |
+| testing/test_config.py | failed | 69 | 139 | 0 | 0 |
 | testing/test_conftest.py | failed | 20 | 22 | 11 | 1 |
 | testing/test_doctest.py | passed | 139 | 0 | 0 | 1 |
 | testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 |
@@ -533,7 +533,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| tests/test_benchmark.py | failed | 5 | 48 | 0 | 0 |
+| tests/test_benchmark.py | failed | 23 | 30 | 0 | 0 |
 | tests/test_calibration.py | passed | 34 | 0 | 0 | 0 |
 | tests/test_normal.py | passed | 10 | 0 | 0 | 0 |
 | tests/test_pedantic.py | passed | 19 | 0 | 0 | 0 |
