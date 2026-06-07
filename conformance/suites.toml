@@ -62,6 +62,27 @@ tag = "v5.1.0"
 testpaths = ["tests"]
 enabled = true
 
+[anyio]
+repo = "https://github.com/agronholm/anyio"
+# 4.13.0+: the re-entrant runner guard wording in pytest-rs-anyio matches
+# anyio master as of this tag.
+tag = "4.13.0"
+testpaths = ["tests"]
+# anyio itself is installed as a dep so its pytest11 entry point (the
+# upstream anyio plugin's fixtures) autoloads; the src/ checkout shadows
+# the import at the same version.
+deps = [
+    "anyio==4.13.0",
+    "trio",
+    "hypothesis",
+    "psutil",
+    "trustme",
+    "truststore",
+    "uvloop",
+    "blockbuster",
+]
+enabled = true
+
 # --- Real-world projects: famous suites that must pass wholesale, as
 # --- drop-in evidence (no pytest-rs-specific relationship).
 

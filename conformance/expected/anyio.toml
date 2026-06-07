@@ -1,0 +1,32 @@
+# Upstream anyio test files that must keep passing under pytest-rs.
+# This list only grows; a regression here fails CI.
+#
+# Not pinned: tests/test_pytest_plugin.py (34/35 — the remaining test
+# asserts caplog structure across a pytester subprocess boundary).
+
+[files]
+"tests/streams/test_buffered.py" = "passed"
+"tests/streams/test_file.py" = "passed"
+"tests/streams/test_memory.py" = "passed"
+"tests/streams/test_stapled.py" = "passed"
+"tests/streams/test_text.py" = "passed"
+"tests/streams/test_tls.py" = "passed"
+"tests/test_all_attributes.py" = "passed"
+"tests/test_contextmanagers.py" = "passed"
+"tests/test_debugging.py" = "passed"
+"tests/test_deprecations.py" = "passed"
+"tests/test_eventloop.py" = "passed"
+"tests/test_fileio.py" = "passed"
+"tests/test_from_thread.py" = "passed"
+"tests/test_functools.py" = "passed"
+"tests/test_lowlevel.py" = "passed"
+"tests/test_signals.py" = "passed"
+"tests/test_sockets.py" = "passed"
+"tests/test_subprocesses.py" = "passed"
+"tests/test_synchronization.py" = "passed"
+"tests/test_taskgroups.py" = "passed"
+"tests/test_tempfile.py" = "passed"
+"tests/test_to_interpreter.py" = "passed"
+"tests/test_to_process.py" = "passed"
+"tests/test_to_thread.py" = "passed"
+"tests/test_typedattr.py" = "passed"

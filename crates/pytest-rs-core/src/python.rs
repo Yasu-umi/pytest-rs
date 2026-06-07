@@ -67,6 +67,28 @@ pub fn install_shim(py: Python<'_>) -> PyResult<PathBuf> {
     }
     sys_path_prepend(py, &shim_root)?;
 
+    // Under real pytest, `__main__` is the console script (or pytest's
+    // `__main__.py` under `python -m pytest`) and always has a `__file__`.
+    // The embedded interpreter's `__main__` has none, which breaks code
+    // that monkeypatches it (e.g. anyio's to_process tests). Point it at
+    // the shim's `pytest/__main__.py` — a real file with the upstream
+    // name-guard, so re-importing it as `__mp_main__` (multiprocessing,
+    // anyio workers) is a no-op `import pytest`.
+    py.run(
+        c"import sys
+_main = sys.modules['__main__']
+if not hasattr(_main, '__file__'):
+    import os
+    _main.__file__ = os.path.join(_shim_root, 'pytest', '__main__.py')
+",
+        None,
+        Some(&{
+            let locals = pyo3::types::PyDict::new(py);
+            locals.set_item("_shim_root", shim_root.to_string_lossy())?;
+            locals
+        }),
+    )?;
+
     // Expose the Rust-backed request type for `_pytest.fixtures` imports.
     let pytest_module = py.import("pytest")?;
     pytest_module.setattr("FixtureRequest", py.get_type::<crate::request::PyRequest>())?;
@@ -628,7 +650,7 @@ pub fn load_entrypoint_plugins(
     py.run(
         c"from importlib.metadata import distributions\n\
 bundled = {name.lower() for name in bundled}\n\
-result = sorted({(ep.name, ep.value.split(':')[0].strip()) for dist in distributions() if (dist.metadata['Name'] or '').lower() not in bundled for ep in dist.entry_points if ep.group == 'pytest11'})\n",
+result = sorted({(ep.name, ep.value.split(':')[0].strip()) for dist in distributions() if ((dist.metadata.get('Name') if dist.metadata else None) or '').lower() not in bundled for ep in dist.entry_points if ep.group == 'pytest11'})\n",
         Some(&globals),
         None,
     )?;
@@ -1669,6 +1691,10 @@ pub fn expand_fixture_params(
                     .iter()
                     .any(|(name, _, _)| name == &def.name)
             })
+            // Direct parametrize of a closure fixture name replaces the
+            // fixture outright (PseudoFixtureDef bypass), so its own params
+            // must not add an expansion axis.
+            .filter(|def| !item.callspec.iter().any(|(name, _)| name == &def.name))
             .collect();
         if parametrized.is_empty() {
             expanded.push(item);

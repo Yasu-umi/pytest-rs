@@ -90,8 +90,8 @@
       "status": "failed",
       "exit_code": 1,
       "passed": 57,
-      "failed": 56,
-      "skipped": 3,
+      "failed": 55,
+      "skipped": 4,
       "errors": 0
     },
     {
