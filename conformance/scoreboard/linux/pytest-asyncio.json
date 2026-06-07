@@ -222,12 +222,12 @@
     },
     {
       "file": "tests/test_port_factories.py",
-      "status": "error",
-      "exit_code": 2,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 6,
       "failed": 0,
       "skipped": 0,
-      "errors": 1
+      "errors": 0
     },
     {
       "file": "tests/test_set_event_loop.py",

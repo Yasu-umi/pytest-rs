@@ -141,10 +141,10 @@
     },
     {
       "file": "tests/test_pytest_plugin.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 34,
-      "failed": 1,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 35,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },
