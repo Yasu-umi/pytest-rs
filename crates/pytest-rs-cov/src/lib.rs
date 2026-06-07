@@ -1187,6 +1187,27 @@ impl Plugin for CovPlugin {
         {
             let _ = std::fs::write(Path::new(&purelib).join("pytest-rs-cov.pth"), PTH_LINE);
         }
+        // Children spawned via sys.executable run the VIRTUAL_ENV python,
+        // which only processes its own site-packages .pth files.
+        if let Ok(venv) = std::env::var("VIRTUAL_ENV") {
+            let venv = Path::new(&venv);
+            let mut site_dirs: Vec<std::path::PathBuf> = Vec::new();
+            if let Ok(entries) = std::fs::read_dir(venv.join("lib")) {
+                for entry in entries.filter_map(Result::ok) {
+                    let dir = entry.path().join("site-packages");
+                    if dir.is_dir() {
+                        site_dirs.push(dir);
+                    }
+                }
+            }
+            let windows_dir = venv.join("Lib").join("site-packages");
+            if windows_dir.is_dir() {
+                site_dirs.push(windows_dir);
+            }
+            for dir in site_dirs {
+                let _ = std::fs::write(dir.join("pytest-rs-cov.pth"), PTH_LINE);
+            }
+        }
         Ok(())
     }
 

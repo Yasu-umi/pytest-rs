@@ -225,7 +225,16 @@ class _AssertRewriter(ast.NodeTransformer):
             body=[raise_stmt],
             orelse=[],
         )
-        statements = [assign_left, assign_right, check]
+        # Upstream parity: clear the temporaries after a passing assert —
+        # they live in the frame, and leak tests (weakref + gc.collect
+        # inside the test) would see the asserted values kept alive.
+        clear = ast.Delete(
+            targets=[
+                ast.Name(id=left_name, ctx=ast.Del()),
+                ast.Name(id=right_name, ctx=ast.Del()),
+            ]
+        )
+        statements = [assign_left, assign_right, check, clear]
         for statement in statements:
             for child in ast.walk(statement):
                 ast.copy_location(child, node)
@@ -268,8 +277,15 @@ class _RewriteLoader(importlib.machinery.SourceFileLoader):
 
     def source_to_code(self, data, path, *, _optimize=-1):
         tree = ast.parse(data, filename=path)
-        _AssertRewriter(path).visit(tree)
-        ast.fix_missing_locations(tree)
+        # Upstream opt-out: a module docstring containing PYTEST_DONT_REWRITE
+        # compiles verbatim.
+        try:
+            docstring = ast.get_docstring(tree, clean=False)
+        except Exception:
+            docstring = None
+        if not (docstring and "PYTEST_DONT_REWRITE" in docstring):
+            _AssertRewriter(path).visit(tree)
+            ast.fix_missing_locations(tree)
         return compile(tree, path, "exec", dont_inherit=True, optimize=_optimize)
 
 

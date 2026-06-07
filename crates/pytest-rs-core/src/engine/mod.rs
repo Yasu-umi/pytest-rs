@@ -661,6 +661,7 @@ impl Engine {
             &python_files,
             &norecursedirs,
             self.config.get_flag("keep-duplicates"),
+            &crate::collect::CollectIgnores::from_config(&self.config),
         )?;
 
         // -p NAME (non-"no:") plugins import before conftests, like

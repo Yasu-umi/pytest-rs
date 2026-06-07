@@ -61,6 +61,54 @@ impl TestItem {
     }
 }
 
+/// --ignore / --ignore-glob filters, pruned during collection traversal
+/// (an ignored directory is never walked).
+#[derive(Default)]
+pub struct CollectIgnores {
+    /// Canonicalized --ignore paths; a directory ignores its whole tree.
+    paths: Vec<PathBuf>,
+    /// --ignore-glob patterns, fnmatch-style against the full path
+    /// (upstream pytest_ignore_collect).
+    globs: Vec<String>,
+}
+
+impl CollectIgnores {
+    pub fn from_config(config: &crate::config::Config) -> Self {
+        // Both the as-given and canonicalized forms: directory walks see
+        // symlinked paths uncanonicalized, explicit args canonicalized.
+        let mut paths = Vec::new();
+        for value in config.get_values("ignore").unwrap_or_default() {
+            let path = config.invocation_dir.join(value);
+            if let Ok(canonical) = std::fs::canonicalize(&path)
+                && canonical != path
+            {
+                paths.push(canonical);
+            }
+            paths.push(path);
+        }
+        Self {
+            paths,
+            globs: config
+                .get_values("ignore-glob")
+                .unwrap_or_default()
+                .iter()
+                .map(|value| value.to_string())
+                .collect(),
+        }
+    }
+
+    fn is_ignored(&self, path: &Path) -> bool {
+        if self.paths.iter().any(|ignore| path.starts_with(ignore)) {
+            return true;
+        }
+        if self.globs.is_empty() {
+            return false;
+        }
+        let text = path.to_string_lossy();
+        self.globs.iter().any(|glob| wildcard_match(glob, &text))
+    }
+}
+
 /// Expand CLI path arguments into the ordered list of test files.
 pub fn collect_test_files(
     invocation_dir: &Path,
@@ -69,6 +117,7 @@ pub fn collect_test_files(
     python_files: &[String],
     norecursedirs: &[String],
     keep_duplicates: bool,
+    ignores: &CollectIgnores,
 ) -> Result<Vec<PathBuf>, String> {
     let args: Vec<String> = if paths.is_empty() {
         vec![".".to_string()]
@@ -86,6 +135,11 @@ pub fn collect_test_files(
         let path = invocation_dir.join(arg);
         let path = std::fs::canonicalize(&path).unwrap_or(path);
         let meta = std::fs::metadata(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+        // --ignore applies to explicit args too (upstream
+        // pytest_ignore_collect covers the whole collection tree).
+        if ignores.is_ignored(&path) {
+            continue;
+        }
         if meta.is_dir() {
             // An explicitly given directory is collected even if it is a
             // virtualenv root; only recursion skips them.
@@ -95,6 +149,7 @@ pub fn collect_test_files(
                 collect_in_virtualenv,
                 python_files,
                 norecursedirs,
+                ignores,
             )?;
         } else if keep_duplicates || !files.contains(&path) {
             // --keep-duplicates: a file given twice collects twice (pytest
@@ -117,6 +172,7 @@ fn collect_dir(
     collect_in_virtualenv: bool,
     python_files: &[String],
     norecursedirs: &[String],
+    ignores: &CollectIgnores,
 ) -> Result<(), String> {
     let mut entries: Vec<_> = std::fs::read_dir(dir)
         .map_err(|e| format!("{}: {e}", dir.display()))?
@@ -125,6 +181,10 @@ fn collect_dir(
         .collect();
     entries.sort();
     for path in entries {
+        if ignores.is_ignored(&path) {
+            // --ignore/--ignore-glob prune the tree before any walk.
+            continue;
+        }
         if path.is_dir() {
             let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
             // __pycache__ never holds source files; skipping it is just speed.
@@ -138,6 +198,7 @@ fn collect_dir(
                     collect_in_virtualenv,
                     python_files,
                     norecursedirs,
+                    ignores,
                 )?;
             }
         } else if is_test_file(&path, python_files) && path.is_file() && !files.contains(&path) {

@@ -29,9 +29,35 @@ class ExceptionInfo[E: BaseException]:
     def typename(self):
         return self.type.__name__ if self.type else None
 
+    def __repr__(self):
+        # Upstream shape: "<ExceptionInfo ValueError('boom') tblen=2>" —
+        # suites assert messages against str(excinfo).
+        if self.value is None:
+            return "<ExceptionInfo for raises contextmanager>"
+        try:
+            from _pytest._io.saferepr import saferepr
+
+            shown = saferepr(self.value)
+        except Exception:
+            shown = repr(self.value)
+        tblen = 0
+        tb = self.tb
+        while tb is not None:
+            tblen += 1
+            tb = tb.tb_next
+        return f"<{type(self).__name__} {shown} tblen={tblen}>"
+
     def match(self, regexp):
-        if not _re.search(regexp, str(self.value)):
-            fail(f"Regex pattern did not match.\n Regex: {regexp!r}\n Input: {str(self.value)!r}")
+        # Upstream stringify_exception: PEP-678 __notes__ join the message.
+        value = str(self.value)
+        try:
+            notes = getattr(self.value, "__notes__", [])
+        except Exception:
+            notes = []
+        if notes:
+            value = "\n".join([value, *map(str, notes)])
+        if not _re.search(regexp, value):
+            fail(f"Regex pattern did not match.\n Regex: {regexp!r}\n Input: {value!r}")
         return True
 
 

@@ -30,6 +30,14 @@ if _venv:
             _added = _sys.path[_before:]
             del _sys.path[_before:]
             _sys.path[:0] = _added
+    # Real pytest run from a venv has sys.executable = the venv python;
+    # tests spawning subprocesses through sys.executable expect the venv
+    # site-packages to be importable there.
+    for _exe in (('bin', 'python'), ('Scripts', 'python.exe')):
+        _candidate = _os.path.join(_venv, *_exe)
+        if _os.path.isfile(_candidate):
+            _sys.executable = _candidate
+            break
 ",
         None,
         None,

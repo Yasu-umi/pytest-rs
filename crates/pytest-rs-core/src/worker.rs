@@ -418,6 +418,7 @@ impl Engine {
             &python_files,
             &norecursedirs,
             self.config.get_flag("keep-duplicates"),
+            &crate::collect::CollectIgnores::from_config(&self.config),
         ) else {
             return;
         };

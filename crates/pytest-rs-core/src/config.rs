@@ -430,7 +430,7 @@ impl Config {
             "traceconfig",     // accepted-but-inert: plugin trace header not implemented
             "keep-duplicates", // collect the same file once per duplicated arg
         ];
-        const CORE_VALUES: [(&str, Option<char>); 40] = [
+        const CORE_VALUES: [(&str, Option<char>); 41] = [
             ("confcutdir", None),
             ("deselect", None),
             ("log-level", None),
@@ -463,13 +463,14 @@ impl Config {
             ("capture", None),
             ("doctest-glob", None),
             ("doctest-report", None),
-            ("ignore", None), // accepted-but-inert (conformance runs files explicitly)
-            ("junit-xml", None), // JUnit XML report path (--junitxml alias)
-            ("junit-prefix", None), // classname prefix (--junitprefix alias)
-            ("dist", None),   // accepted-but-inert: module-affinity load is the only mode
+            ("ignore", None),             // paths pruned from collection
+            ("ignore-glob", None),        // fnmatch patterns pruned from collection
+            ("junit-xml", None),          // JUnit XML report path (--junitxml alias)
+            ("junit-prefix", None),       // classname prefix (--junitprefix alias)
+            ("dist", None), // accepted-but-inert: module-affinity load is the only mode
             ("maxprocesses", None), // accepted-but-inert
             ("max-worker-restart", None), // accepted-but-inert: workers are not restarted
-            ("tx", None),     // xdist gateway specs ("2*popen", "popen//chdir=DIR")
+            ("tx", None),   // xdist gateway specs ("2*popen", "popen//chdir=DIR")
             ("rsyncdir", None), // accepted-but-inert: fork workers share the filesystem
         ];
         // Without the xdist feature these options stay unregistered, so
@@ -701,7 +702,13 @@ impl Config {
             }
             if matches!(
                 name,
-                "deselect" | "doctest-glob" | "log-disable" | "tx" | "rsyncdir"
+                "deselect"
+                    | "doctest-glob"
+                    | "log-disable"
+                    | "tx"
+                    | "rsyncdir"
+                    | "ignore"
+                    | "ignore-glob"
             ) {
                 // Every occurrence matters (newline-joined for get_values).
                 let joined = parsed
