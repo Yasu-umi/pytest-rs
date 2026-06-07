@@ -38,6 +38,7 @@ from pytest._node import Collector as Collector
 from pytest._node import File as File
 from pytest._node import Function as Function
 from pytest._node import Item as Item
+from pytest._node import Session as Session
 from pytest._outcomes import Exit as Exit
 from pytest._outcomes import Failed as Failed
 from pytest._outcomes import OutcomeException as OutcomeException

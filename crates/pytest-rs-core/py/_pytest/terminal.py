@@ -649,6 +649,17 @@ class TerminalReporter:
 
     def pytest_collection_finish(self, session):
         self.report_collect(True)
+        # Upstream: plugins contribute trailing collection lines (e.g.
+        # pytest-run-parallel's "Collected N items to run in parallel").
+        try:
+            lines = self.config.hook.pytest_report_collectionfinish(
+                config=self.config,
+                start_path=self.startpath,
+                items=getattr(session, "items", None) or [],
+            )
+            self._write_report_lines_from_hooks(lines or [])
+        except Exception:
+            pass
         # --collect-only: the engine prints the tree natively; open the
         # blank line above it like upstream's _printcollecteditems flow
         # (suppressed under -q, like upstream's verbose > -1 check).

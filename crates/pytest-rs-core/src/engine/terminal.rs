@@ -444,13 +444,15 @@ impl Engine {
         // terminalreporter kwarg is the default stand-in writing to stdout.
         // Delegated mode replays these from _reporter.finish instead.
         if self.session.custom_reporter.is_none() {
-            let funcs: Vec<Py<PyAny>> = self
-                .session
-                .py_hooks
-                .iter()
-                .filter(|hook| hook.name == "pytest_terminal_summary")
-                .map(|hook| hook.func.clone_ref(py))
-                .collect();
+            let mut funcs: Vec<Py<PyAny>> =
+                python::instance_hook_funcs(py, "pytest_terminal_summary");
+            funcs.extend(
+                self.session
+                    .py_hooks
+                    .iter()
+                    .filter(|hook| hook.name == "pytest_terminal_summary")
+                    .map(|hook| hook.func.clone_ref(py)),
+            );
             if !funcs.is_empty() {
                 let reporter = py.import("pytest._reporter")?.getattr("_default")?;
                 if !reporter.is_none() {

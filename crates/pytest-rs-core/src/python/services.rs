@@ -688,3 +688,13 @@ pub fn worker_node_set_output(py: Python<'_>, node: &Py<PyAny>, payload: &str) {
                 .call_method1("update", (data,))
         });
 }
+
+/// Hook impls registered on plugin instances via pluginmanager.register
+/// (e.g. pytest-run-parallel's runner object); module-level impls live in
+/// session.py_hooks instead.
+pub fn instance_hook_funcs(py: Python<'_>, name: &str) -> Vec<Py<PyAny>> {
+    py.import("pytest._pluginmanager")
+        .and_then(|m| m.call_method1("instance_hook_impls", (name,)))
+        .and_then(|impls| impls.extract())
+        .unwrap_or_default()
+}

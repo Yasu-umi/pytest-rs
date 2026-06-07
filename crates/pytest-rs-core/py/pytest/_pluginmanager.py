@@ -10,6 +10,55 @@ import inspect
 from typing import Any
 
 
+def instance_hook_impls(name: str) -> list:
+    """Hook impls registered on non-module plugin objects (instances
+    registered at configure time, e.g. pytest-run-parallel's runner).
+    Module-level impls fire via the engine's py_hooks instead, and the
+    'terminalreporter' plugin is driven through its own delegation path;
+    both are excluded here to avoid double dispatch."""
+    import types
+
+    reporter = pluginmanager.getplugin("terminalreporter")
+    impls = []
+    for plugin in pluginmanager._plugins:
+        if isinstance(plugin, types.ModuleType) or plugin is reporter:
+            continue
+        func = getattr(plugin, name, None)
+        if callable(func):
+            impls.append(func)
+    return impls
+
+
+class _Result:
+    """pluggy's old-style hookwrapper outcome (get_result/force_result)."""
+
+    def __init__(self, result: Any) -> None:
+        self._result = result
+        self._exception: BaseException | None = None
+
+    def get_result(self) -> Any:
+        if self._exception is not None:
+            raise self._exception
+        return self._result
+
+    def force_result(self, result: Any) -> None:
+        self._result = result
+        self._exception = None
+
+    def force_exception(self, exception: BaseException) -> None:
+        self._exception = exception
+
+    @property
+    def exception(self) -> BaseException | None:
+        return self._exception
+
+    @property
+    def excinfo(self):
+        if self._exception is None:
+            return None
+        return (type(self._exception), self._exception, self._exception.__traceback__)
+
+
 def _accepted_kwargs(func: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
     """pluggy passes each hookimpl only the arguments its signature names."""
     try:
@@ -30,17 +79,69 @@ class HookCaller:
     def __call__(self, **kwargs: Any) -> Any:
         kwargs = self._fix_path_args(kwargs)
         firstresult = self._pm._specs.get(self._name, {}).get("firstresult", False)
-        results = []
+        impls = []
         for plugin in reversed(self._pm._plugins):
             func = getattr(plugin, self._name, None)
-            if not callable(func):
+            if callable(func):
+                impls.append(func)
+        # pluggy wrapper semantics: wrapper/hookwrapper impls surround the
+        # plain impls (run-parallel wraps pytest_report_teststatus this way).
+        wrappers = []
+        plain = []
+        for func in impls:
+            opts = getattr(func, "pytest_impl", None) or {}
+            if opts.get("wrapper") or opts.get("hookwrapper"):
+                wrappers.append((func, bool(opts.get("hookwrapper"))))
+            else:
+                plain.append(func)
+
+        started = []
+        for func, old_style in wrappers:
+            gen = func(**_accepted_kwargs(func, kwargs))
+            if not inspect.isgenerator(gen):
+                # A non-generator "wrapper" already ran to completion.
                 continue
+            try:
+                next(gen)
+            except StopIteration:
+                continue
+            started.append((gen, old_style))
+
+        result: Any = None
+        results = []
+        for func in plain:
             res = func(**_accepted_kwargs(func, kwargs))
             if res is not None:
                 if firstresult:
-                    return res
+                    results = res
+                    break
                 results.append(res)
-        return None if firstresult else results
+        if firstresult:
+            result = results if results else None
+        else:
+            result = results
+
+        # Unwind innermost-first. New-style wrappers receive the result at
+        # their yield and their return value replaces it; old-style
+        # hookwrappers receive a Result outcome object.
+        for gen, old_style in reversed(started):
+            if old_style:
+                outcome = _Result(result)
+                try:
+                    gen.send(outcome)
+                    gen.close()
+                except StopIteration:
+                    pass
+                except Exception:
+                    raise
+                result = outcome.get_result()
+            else:
+                try:
+                    gen.send(result)
+                    gen.close()
+                except StopIteration as stop:
+                    result = stop.value
+        return result
 
     def _fix_path_args(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         """Upstream PathAwareHookProxy: hooks with py.path arguments accept
@@ -60,6 +161,11 @@ class HookCaller:
         kwargs = dict(kwargs)
         path_value = kwargs.pop(path_var, None)
         fspath_value = kwargs.pop(fspath_var, None)
+        if path_value is None and fspath_value is None:
+            # Explicit Nones: nothing to translate.
+            kwargs[path_var] = None
+            kwargs[fspath_var] = None
+            return kwargs
         if fspath_value is not None:
             warnings.warn(
                 HOOK_LEGACY_PATH_ARG.format(pylib_path_arg=fspath_var, pathlib_path_arg=path_var),

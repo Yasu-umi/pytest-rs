@@ -179,6 +179,26 @@ pub fn set_session_items(py: Python<'_>, items: &[crate::collect::TestItem]) -> 
     Ok(())
 }
 
+/// Write back `item.obj` swaps a plugin made on the published session
+/// items (pytest-run-parallel wraps test functions for threaded repeats
+/// during pytest_collection_finish).
+pub fn apply_session_obj_overrides(py: Python<'_>, items: &mut [TestItem]) -> PyResult<()> {
+    let overrides: Vec<(String, Py<PyAny>)> = py
+        .import("pytest._node")?
+        .call_method0("session_obj_overrides")?
+        .extract()?;
+    if overrides.is_empty() {
+        return Ok(());
+    }
+    let by_nodeid: std::collections::HashMap<String, Py<PyAny>> = overrides.into_iter().collect();
+    for item in items.iter_mut() {
+        if let Some(obj) = by_nodeid.get(&item.nodeid) {
+            item.func = obj.clone_ref(py);
+        }
+    }
+    Ok(())
+}
+
 /// Call a Python callable with keyword arguments resolved from fixtures.
 pub fn call_with_kwargs<'py>(
     py: Python<'py>,

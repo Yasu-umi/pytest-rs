@@ -6,10 +6,11 @@ Two kinds of checks over the demo suite in conformance/plugin-smoke/:
 - reporter replacement (pytest-sugar, pytest-pretty): the full terminal
   output must match real pytest byte-for-byte after normalizing timings,
   versions and paths;
-- fixture providers (Faker, time-machine, requests-mock) and test-order
-  control (pytest-randomly): functional demos that exercise the plugin's
-  fixture/CLI so a silently-broken autoload fails instead of passing
-  vacuously.
+- fixture providers (Faker, time-machine, requests-mock), test-order
+  control (pytest-randomly), snapshot assertions (inline-snapshot) and
+  threaded repeat runs (pytest-run-parallel): functional demos that
+  exercise the plugin's fixture/CLI so a silently-broken autoload fails
+  instead of passing vacuously.
 
 Usage:
     python conformance/plugin_smoke.py
@@ -39,6 +40,8 @@ DEPS = [
     "time-machine",
     "requests-mock",
     "pytest-randomly",
+    "inline-snapshot",
+    "pytest-run-parallel",
     "requests",
 ]
 TIMEOUT_S = 120
@@ -142,6 +145,27 @@ def check_fixture_plugins(workdir: Path, env: dict[str, str]) -> list[str]:
     return []
 
 
+def check_snapshot_parallel(workdir: Path, env: dict[str, str]) -> list[str]:
+    """inline-snapshot (snapshot() comparison + its --inline-snapshot flag)
+    and pytest-run-parallel (--parallel-threads=2 really runs each test on
+    two threads — the demo records thread idents)."""
+    code, out = run(
+        [
+            str(BINARY),
+            "test_snapshot_parallel.py",
+            "-p",
+            "no:randomly",
+            "--inline-snapshot=disable",
+            "--parallel-threads=2",
+        ],
+        workdir,
+        env,
+    )
+    if code != 0 or "3 passed" not in out:
+        return [f"snapshot/parallel: expected 3 passed (exit 0), got exit {code}\n{out}"]
+    return []
+
+
 def check_randomly(workdir: Path, env: dict[str, str]) -> list[str]:
     """pytest-randomly: the seed header prints, and the same seed yields
     the same (shuffled) collection order on a rerun."""
@@ -182,6 +206,10 @@ def main() -> int:
                 lambda: check_fixture_plugins(workdir, env),
             ),
             ("pytest-randomly", lambda: check_randomly(workdir, env)),
+            (
+                "inline-snapshot + pytest-run-parallel",
+                lambda: check_snapshot_parallel(workdir, env),
+            ),
             (
                 "pytest-pretty (reporter byte-diff)",
                 lambda: check_reporter_diff("pretty", ["-p", "no:sugar"], workdir, env),

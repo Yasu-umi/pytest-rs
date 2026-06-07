@@ -55,7 +55,7 @@ Installed `pytest11` entry points load through the `pytest` API shim — plugins
 | status | plugins |
 |---|---|
 | works — upstream test suite gates CI | `pytest-timeout` (40/41, see conformance below); `anyio`'s own plugin module also loads this way |
-| works — plugin-smoke gates CI (functional demos, `conformance/plugin_smoke.py`) | `Faker`, `time-machine`, `requests-mock`, `pytest-randomly` (test reordering + seed header) |
+| works — plugin-smoke gates CI (functional demos, `conformance/plugin_smoke.py`) | `Faker`, `time-machine`, `requests-mock`, `pytest-randomly` (test reordering + seed header), `inline-snapshot` (snapshot assertions + `--inline-snapshot` flag), `pytest-run-parallel` (`--parallel-threads` really runs each test on N threads) |
 | works — plugin-smoke gates CI (terminal output byte-diffed against real pytest 9.0.3) | `pytest-pretty`, `pytest-sugar` (progress bar, instant failures; activates on a tty or `--force-sugar`) — reporter replacement |
 | not working yet | `pytest-env` — needs the `pytest_load_initial_conftests` early hook |
 

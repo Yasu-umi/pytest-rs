@@ -183,8 +183,21 @@ impl Engine {
             return Ok(());
         }
         let parser = py.import("pytest._parser")?.getattr("parser")?.unbind();
+        // Upstream signature: pytest_addoption(parser, pluginmanager) —
+        // call_py_hook only passes what each impl's signature requests.
+        let pluginmanager = py
+            .import("pytest._pluginmanager")?
+            .getattr("pluginmanager")?
+            .unbind();
         for func in &hook_funcs {
-            python::call_py_hook(py, func, &[("parser", parser.clone_ref(py))])?;
+            python::call_py_hook(
+                py,
+                func,
+                &[
+                    ("parser", parser.clone_ref(py)),
+                    ("pluginmanager", pluginmanager.clone_ref(py)),
+                ],
+            )?;
         }
         Ok(())
     }
@@ -264,13 +277,16 @@ impl Engine {
     /// pytest_collection_finish conftest/plugin hooks, with the final item
     /// set on session.items (sugar's tests_count comes from here).
     pub(crate) fn fire_py_collection_finish(&mut self, py: Python<'_>) -> PyResult<()> {
-        let hook_funcs: Vec<Py<pyo3::PyAny>> = self
-            .session
-            .py_hooks
-            .iter()
-            .filter(|hook| hook.name == "pytest_collection_finish")
-            .map(|hook| hook.func.clone_ref(py))
-            .collect();
+        // Instance-registered plugin impls first (pytest-run-parallel's
+        // runner is tryfirst: it wraps item.obj before reporters look).
+        let mut hook_funcs = python::instance_hook_funcs(py, "pytest_collection_finish");
+        hook_funcs.extend(
+            self.session
+                .py_hooks
+                .iter()
+                .filter(|hook| hook.name == "pytest_collection_finish")
+                .map(|hook| hook.func.clone_ref(py)),
+        );
         // Publish session.items / session.testscollected regardless of
         // hook presence: pytest_sessionfinish readers need them too.
         python::set_session_items(py, &self.session.items)?;
@@ -281,6 +297,9 @@ impl Engine {
         for func in &hook_funcs {
             python::call_py_hook(py, func, &[("session", session.clone_ref(py))])?;
         }
+        // Plugins may swap item.obj on the published items here
+        // (pytest-run-parallel wraps test functions for threaded repeats).
+        python::apply_session_obj_overrides(py, &mut self.session.items)?;
         Ok(())
     }
 

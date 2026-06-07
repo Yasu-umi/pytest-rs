@@ -28,6 +28,17 @@ class Collector:
         """An error during collection, shown without a traceback."""
 
 
+class Session(Collector):
+    """Stub session collector (annotations/isinstance upstream, e.g.
+    pytest-run-parallel's pytest_runtestloop signature)."""
+
+    class Failed(Exception):
+        """Signals a stop as failed test run (upstream)."""
+
+    class Interrupted(KeyboardInterrupt):
+        """Signals an interrupted test run (upstream)."""
+
+
 class Item:
     """Stub item base (annotations/isinstance upstream)."""
 
@@ -125,6 +136,15 @@ def set_session_items(items):
     """Collected item proxies, published once collection finishes (the
     engine fires pytest_collection_finish with them on the session)."""
     _session_state["items"] = list(items)
+
+
+def session_obj_overrides():
+    """(nodeid, obj) for items whose `obj` a plugin swapped after they were
+    published (pytest-run-parallel wraps test functions for threaded
+    repeats); the engine writes these back into its own items."""
+    return [
+        (node.nodeid, node.obj) for node in _session_state["items"] if node.obj is not node.function
+    ]
 
 
 class _NodeSession:
