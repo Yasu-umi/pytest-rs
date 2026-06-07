@@ -1,0 +1,320 @@
+//! Progress chars, outcome words/colors, summary line, error reports.
+
+#[allow(unused_imports)]
+use super::*;
+use crate::collect::TestItem;
+use crate::config::Config;
+use crate::fixture::Scope;
+use crate::python;
+use crate::report::{Outcome, Phase, TestReport};
+use crate::session::Session;
+use std::time::{Duration, Instant};
+
+/// log_cli live mode: print outcome words for reports not yet printed
+/// (the call outcome appears between the call and teardown log sections).
+pub(crate) fn live_flush(session: &mut Session, config: &Config, reports: &[TestReport]) {
+    if !session.live_logging || config.verbose != 0 || config.quiet || config.no_terminal() {
+        session.live_printed = reports.len();
+        return;
+    }
+    let Some((done, total)) = session.live_progress else {
+        session.live_printed = reports.len();
+        return;
+    };
+    while session.live_printed < reports.len() {
+        let report = &reports[session.live_printed];
+        session.live_printed += 1;
+        if report.phase == Phase::Call || report.outcome != Outcome::Passed {
+            println!("{}", with_progress(&outcome_word(report), done, total));
+            let _ = std::io::stdout().flush();
+        }
+    }
+}
+
+/// SGR codes for a report's outcome (progress letters, verbose words).
+pub(crate) fn outcome_codes(report: &TestReport) -> &'static [u8] {
+    use crate::tw;
+    match report.outcome {
+        Outcome::Passed => &[tw::GREEN],
+        Outcome::Failed => &[tw::RED],
+        Outcome::Skipped | Outcome::XFailed | Outcome::XPassed => &[tw::YELLOW],
+    }
+}
+
+/// The progress-fill / summary main color from the session so far.
+pub(crate) fn fill_color(py: Python<'_>, session: &Session, finished: bool) -> u8 {
+    let mut failed = 0usize;
+    let mut errors = 0usize;
+    let mut xpassed = 0usize;
+    let mut passed = 0usize;
+    for report in &session.reports {
+        match (report.phase, report.outcome) {
+            (Phase::Call, Outcome::Passed) => passed += 1,
+            (Phase::Call, Outcome::Failed) => failed += 1,
+            (Phase::Setup | Phase::Teardown, Outcome::Failed) => errors += 1,
+            (_, Outcome::XPassed) => xpassed += 1,
+            _ => {}
+        }
+    }
+    crate::tw::main_color(
+        failed,
+        errors,
+        python::warning_count(py),
+        xpassed,
+        passed,
+        finished,
+    )
+}
+
+/// The verbose outcome word for a report: "PASSED", "SKIPPED (why)",
+/// "SUBFAILED[desc]", ... (pytest appends reasons to skip/xfail words).
+pub(crate) fn outcome_word(report: &TestReport) -> String {
+    let reasoned = |word: &str| match report.longrepr.as_deref() {
+        Some(reason) if !reason.is_empty() && !reason.contains('\n') => {
+            format!("{word} ({reason})")
+        }
+        _ => word.to_string(),
+    };
+    if let Some(desc) = &report.subtest_desc {
+        match report.outcome {
+            Outcome::Failed => format!("SUBFAILED{desc}"),
+            Outcome::Skipped => reasoned(&format!("SUBSKIPPED{desc}")),
+            Outcome::XFailed => reasoned(&format!("SUBXFAIL{desc}")),
+            _ => format!("SUBPASSED{desc}"),
+        }
+    } else {
+        match report.outcome {
+            Outcome::Passed => "PASSED".to_string(),
+            Outcome::Failed => "FAILED".to_string(),
+            Outcome::Skipped => reasoned("SKIPPED"),
+            Outcome::XFailed => reasoned("XFAIL"),
+            Outcome::XPassed => "XPASS".to_string(),
+        }
+    }
+}
+
+/// Terminal width for right-aligning the progress percentage, like
+/// pytest's TerminalWriter (COLUMNS env, else 80).
+pub(crate) fn term_width() -> usize {
+    std::env::var("COLUMNS")
+        .ok()
+        .and_then(|c| c.trim().parse().ok())
+        .unwrap_or(80)
+}
+
+/// The padding + percentage that completes an already-printed progress
+/// line of `body`'s width (the body itself streamed char by char).
+pub(crate) fn progress_suffix(body: &str, done: usize, total: usize, color: u8) -> String {
+    let pct = format!("[{:>3}%]", done * 100 / total);
+    let pad = term_width().saturating_sub(body.chars().count() + pct.len());
+    let suffix = if pad > 0 {
+        format!("{}{pct}", " ".repeat(pad))
+    } else {
+        format!(" {pct}")
+    };
+    crate::tw::markup(&suffix, &[color])
+}
+
+/// "body        [ 33%]" — the percentage right-aligned at the terminal edge.
+pub(crate) fn with_progress(body: &str, done: usize, total: usize) -> String {
+    let pct = format!("[{:>3}%]", done * 100 / total);
+    let pad = term_width().saturating_sub(body.chars().count() + pct.len());
+    if pad > 0 {
+        format!("{body}{}{pct}", " ".repeat(pad))
+    } else {
+        format!("{body} {pct}")
+    }
+}
+
+pub(crate) fn report_from_err(
+    py: Python<'_>,
+    config: &Config,
+    item: &TestItem,
+    phase: Phase,
+    started: Instant,
+    err: &PyErr,
+) -> TestReport {
+    // Raw unittest.SkipTest (e.g. from a plain test function) skips like
+    // pytest.skip — upstream's makereport conversion (#13985).
+    let mapped = python::map_skiptest(py, err.clone_ref(py));
+    let err = &mapped;
+    if python::is_xfailed(py, err) {
+        TestReport {
+            nodeid: item.nodeid.clone(),
+            phase,
+            outcome: Outcome::XFailed,
+            duration: started.elapsed(),
+            longrepr: python::outcome_msg(py, err),
+            location: None,
+            subtest_desc: None,
+            sections: Vec::new(),
+        }
+    } else if python::is_skipped(py, err) {
+        // Imperative skips report where pytest.skip was raised; skips out
+        // of fixtures/xunit setup report the item's definition site instead
+        // (pytest's _use_item_location), so the user knows which test. An
+        // explicit `_location` on the exception (unittest decorators) wins.
+        let location = python::skip_location_override(py, err).or_else(|| {
+            if phase == Phase::Setup {
+                let file = item.nodeid.split("::").next().unwrap_or("");
+                Some(format!("{file}:{}", item.lineno))
+            } else {
+                python::raise_location(py, err)
+            }
+        });
+        TestReport {
+            nodeid: item.nodeid.clone(),
+            phase,
+            outcome: Outcome::Skipped,
+            duration: started.elapsed(),
+            longrepr: python::outcome_msg(py, err),
+            location,
+            subtest_desc: None,
+            sections: Vec::new(),
+        }
+    } else {
+        TestReport {
+            nodeid: item.nodeid.clone(),
+            phase,
+            outcome: Outcome::Failed,
+            duration: started.elapsed(),
+            longrepr: Some(python::format_test_failure(
+                py,
+                err,
+                config.get_value("tb").unwrap_or("long"),
+            )),
+            location: None,
+            subtest_desc: None,
+            // "Captured stdout/log {when}" report sections; the terminal
+            // appends them to the longrepr at render time.
+            sections: python::log_failure_sections(py),
+        }
+    }
+}
+
+pub fn summary_line(
+    reports: &[TestReport],
+    deselected: usize,
+    warning_count: usize,
+    elapsed: Duration,
+) -> String {
+    let mut passed = 0usize;
+    let mut failed = 0usize;
+    let mut errors = 0usize;
+    let mut skipped = 0usize;
+    let mut xfailed = 0usize;
+    let mut xpassed = 0usize;
+    let mut subtests_passed = 0usize;
+    for report in reports {
+        // Passed subtests count their own category; other subtest outcomes
+        // fold into the regular buckets (upstream report_teststatus).
+        if report.subtest_desc.is_some() && report.outcome == Outcome::Passed {
+            subtests_passed += 1;
+            continue;
+        }
+        match (report.phase, report.outcome) {
+            (Phase::Call, Outcome::Passed) => passed += 1,
+            (Phase::Call, Outcome::Failed) => failed += 1,
+            (Phase::Call, Outcome::Skipped) | (Phase::Setup, Outcome::Skipped) => skipped += 1,
+            (Phase::Setup, Outcome::Failed) | (Phase::Teardown, Outcome::Failed) => errors += 1,
+            (_, Outcome::XFailed) => xfailed += 1,
+            (_, Outcome::XPassed) => xpassed += 1,
+            _ => {}
+        }
+    }
+    use crate::tw;
+    let mut parts: Vec<(String, u8)> = Vec::new();
+    if failed > 0 {
+        parts.push((format!("{failed} failed"), tw::RED));
+    }
+    if passed > 0 {
+        parts.push((format!("{passed} passed"), tw::GREEN));
+    }
+    if skipped > 0 {
+        parts.push((format!("{skipped} skipped"), tw::YELLOW));
+    }
+    if subtests_passed > 0 {
+        parts.push((format!("{subtests_passed} subtests passed"), tw::GREEN));
+    }
+    if deselected > 0 {
+        parts.push((format!("{deselected} deselected"), tw::YELLOW));
+    }
+    if xfailed > 0 {
+        parts.push((format!("{xfailed} xfailed"), tw::YELLOW));
+    }
+    if xpassed > 0 {
+        parts.push((format!("{xpassed} xpassed"), tw::YELLOW));
+    }
+    if warning_count > 0 {
+        parts.push((
+            format!(
+                "{warning_count} warning{}",
+                if warning_count == 1 { "" } else { "s" }
+            ),
+            tw::YELLOW,
+        ));
+    }
+    if errors > 0 {
+        parts.push((
+            format!("{errors} error{}", if errors == 1 { "" } else { "s" }),
+            tw::RED,
+        ));
+    }
+    if parts.is_empty() {
+        parts.push(("no tests ran".to_string(), tw::YELLOW));
+    }
+    let main = tw::main_color(
+        failed,
+        errors,
+        warning_count,
+        xpassed,
+        passed + subtests_passed,
+        true,
+    );
+    let plain_parts: Vec<&str> = parts.iter().map(|(text, _)| text.as_str()).collect();
+    let plain_body = format!(
+        "{} in {:.2}s",
+        plain_parts.join(", "),
+        elapsed.as_secs_f64()
+    );
+    let banner = crate::engine::center_banner(&plain_body);
+    if !tw::enabled() {
+        return banner;
+    }
+    // pytest's nesting: the left banner segment opens the main color
+    // without a reset, each count carries its own color (bold when it
+    // matches the main color), the tail segments re-open the main color.
+    let (left, right) = banner.split_once(&plain_body).unwrap_or_default();
+    let mut out = String::new();
+    out.push_str(&tw::open(&[main]));
+    out.push_str(left);
+    for (i, (text, color)) in parts.iter().enumerate() {
+        if i > 0 {
+            out.push_str(&tw::open(&[main]));
+            out.push_str(", ");
+        }
+        let codes: &[u8] = if *color == main {
+            &[*color, tw::BOLD]
+        } else {
+            &[*color]
+        };
+        out.push_str(&tw::markup(text, codes));
+    }
+    out.push_str(&tw::markup(
+        &format!(" in {:.2}s", elapsed.as_secs_f64()),
+        &[main],
+    ));
+    out.push_str(&tw::markup(right, &[main]));
+    out
+}
+
+/// --setup-show display attributes: (scope letter, indent width).
+pub(crate) fn scope_display(scope: Scope) -> (char, usize) {
+    match scope {
+        Scope::Session => ('S', 0),
+        Scope::Package => ('P', 2),
+        Scope::Module => ('M', 4),
+        Scope::Class => ('C', 6),
+        Scope::Function => ('F', 8),
+    }
+}
