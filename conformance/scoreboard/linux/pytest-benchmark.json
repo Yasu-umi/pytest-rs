@@ -8,17 +8,17 @@
       "file": "tests/test_benchmark.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 4,
-      "failed": 49,
+      "passed": 5,
+      "failed": 48,
       "skipped": 0,
       "errors": 0
     },
     {
       "file": "tests/test_calibration.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 4,
-      "failed": 30,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 34,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },
@@ -33,10 +33,10 @@
     },
     {
       "file": "tests/test_pedantic.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 18,
-      "failed": 1,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 19,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },

@@ -22,7 +22,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pytest-cov | v7.1.0 | 142 | 64 | 0 | 3 | 209 | 67.9% | 0 | 1 | 0 |
 | pytest-xdist | v3.8.0 | 63 | 34 | 0 | 0 | 97 | 64.9% | 0 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
-| pytest-benchmark | v5.1.0 | 40 | 82 | 0 | 1 | 123 | 32.5% | 2 | 7 | 6 |
+| pytest-benchmark | v5.1.0 | 72 | 50 | 0 | 1 | 123 | 58.5% | 4 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 41 | 97.6% | 1 | 1 | 0 |
 | anyio | 4.13.0 | 3119 | 1 | 0 | 42 | 3162 | 98.6% | 25 | 26 | 0 |
 | click | 8.3.1 | 1314 | 0 | 0 | 21 | 1335 | 98.4% | 20 | 20 | 0 |
@@ -169,10 +169,10 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| tests/test_benchmark.py | failed | 4 | 49 | 0 | 0 |
-| tests/test_calibration.py | failed | 4 | 30 | 0 | 0 |
+| tests/test_benchmark.py | failed | 5 | 48 | 0 | 0 |
+| tests/test_calibration.py | passed | 34 | 0 | 0 | 0 |
 | tests/test_normal.py | passed | 10 | 0 | 0 | 0 |
-| tests/test_pedantic.py | failed | 18 | 1 | 0 | 0 |
+| tests/test_pedantic.py | passed | 19 | 0 | 0 | 0 |
 | tests/test_sample.py | passed | 4 | 0 | 0 | 0 |
 | tests/test_skip.py | no-tests | 0 | 0 | 0 | 1 |
 | tests/test_with_testcase.py | failed | 0 | 2 | 0 | 0 |
