@@ -49,12 +49,25 @@ jobs:
       - name: build
         run: cargo build
 
+      - name: cache conformance checkouts + deps
+        # Suite clones and `uv pip --target` dep installs are pure network
+        # cost; the runner skips both when the cache restores (.deps.txt
+        # markers gate per-suite reinstalls on suites.toml changes).
+        if: matrix.python-version == '3.13'
+        uses: actions/cache@v4
+        with:
+          path: .tmp/conformance
+          key: conformance-${{ runner.os }}-${{ hashFiles('conformance/suites.toml', 'conformance/plugin_smoke.py') }}
+          restore-keys: |
+            conformance-${{ runner.os }}-
+
       - name: conformance (upstream test suites)
         # One canonical environment for the committed results: linux on a
         # single python version. Regressions against expected/*.toml fail here.
         if: matrix.python-version == '3.13'
         run: |
           export LD_LIBRARY_PATH="$(python -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR"))'):${LD_LIBRARY_PATH:-}"
+          export PYTHONUNBUFFERED=1
           python conformance/runner.py --check
 
       - name: plugin smoke (sugar/pretty byte-diff, fixture plugins)

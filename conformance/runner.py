@@ -261,7 +261,9 @@ def suite_summary(results: list[FileResult], excluded: int) -> str:
     )
 
 
-def run_suite(suite: Suite, use_local: bool, jobs: int) -> tuple[list[FileResult], str]:
+def prepare_suite(suite: Suite, use_local: bool) -> tuple[list[Path], int]:
+    """Clone the checkout, scan test files and warm the deps --target
+    install (workers must not race for it)."""
     suite.fetch(use_local)
     files, excluded = suite.test_files()
     manifest_excluded = load_excluded(suite)
@@ -270,45 +272,93 @@ def run_suite(suite: Suite, use_local: bool, jobs: int) -> tuple[list[FileResult
     ]
     files = [f for f in files if str(f.relative_to(suite.checkout)) not in manifest_excluded]
     excluded += len(skipped_by_manifest)
-    # Warm the deps --target install once, before workers race for it.
     suite.deps_dir()
-    # Each file is its own pytest-rs process (private basetemp), so files
-    # run in parallel; results keep the deterministic input order.
+    return files, excluded
+
+
+def expected_costs(suite: Suite) -> dict[str, int]:
+    """Rough per-file runtime proxy from the committed scoreboard (test
+    counts): the global pool submits expensive files first so the slowest
+    ones never start at the tail."""
+    path = SCOREBOARD / PLATFORM / f"{suite.name}.json"
+    if not path.exists():
+        path = SCOREBOARD / "linux" / f"{suite.name}.json"
+    if not path.exists():
+        return {}
+    board = json.loads(path.read_text())
+    return {
+        entry["file"]: entry.get("passed", 0) + entry.get("failed", 0) + entry.get("errors", 0)
+        for entry in board.get("files", [])
+    }
+
+
+def run_suites(
+    suites: list[Suite], use_local: bool, jobs: int
+) -> list[tuple[Suite, list[FileResult], str]]:
+    """Run every suite's files through ONE pool (suites used to run
+    sequentially: each suite's slowest files idled the other workers).
+    Results keep the per-suite deterministic file order."""
+    # Clone + deps installs are network-bound; warm them in parallel.
+    with ThreadPoolExecutor(max_workers=min(8, max(len(suites), 1))) as pool:
+        prepared = list(pool.map(lambda suite: prepare_suite(suite, use_local), suites))
+
+    work: list[tuple[int, int, Suite, Path]] = []
+    cost_of: dict[tuple[int, int], int] = {}
+    for suite_index, (suite, (files, _)) in enumerate(zip(suites, prepared)):
+        costs = expected_costs(suite)
+        for file_index, path in enumerate(files):
+            work.append((suite_index, file_index, suite, path))
+            cost_of[(suite_index, file_index)] = costs.get(str(path.relative_to(suite.checkout)), 0)
+    work.sort(key=lambda item: cost_of[(item[0], item[1])], reverse=True)
+
+    slots: list[list[FileResult | None]] = [
+        [None] * len(files) for _, (files, _) in zip(suites, prepared)
+    ]
     with ThreadPoolExecutor(max_workers=jobs) as pool:
-        results = list(pool.map(suite.run_file, files))
+        futures = {
+            pool.submit(suite.run_file, path): (suite_index, file_index)
+            for suite_index, file_index, suite, path in work
+        }
+        for future in futures:
+            suite_index, file_index = futures[future]
+            slots[suite_index][file_index] = future.result()
 
-    summary = suite_summary(results, excluded)
-    print(f"{suite.name} @ {suite.tag}")
-    print(f"  {summary}")
+    out: list[tuple[Suite, list[FileResult], str]] = []
+    for suite_index, (suite, (_, excluded)) in enumerate(zip(suites, prepared)):
+        results = [r for r in slots[suite_index] if r is not None]
+        summary = suite_summary(results, excluded)
+        print(f"{suite.name} @ {suite.tag}")
+        print(f"  {summary}")
 
-    for result in results:
-        if result.status == "error" and (result.stdout or result.stderr):
-            print(f"\n  --- error dump: {result.file} (exit {result.exit_code}) ---")
-            if result.stdout:
-                print(result.stdout.rstrip())
-            if result.stderr:
-                print("  [stderr]")
-                print(result.stderr.rstrip())
-            print(f"  --- end: {result.file} ---")
+        for result in results:
+            if result.status == "error" and (result.stdout or result.stderr):
+                print(f"\n  --- error dump: {result.file} (exit {result.exit_code}) ---")
+                if result.stdout:
+                    print(result.stdout.rstrip())
+                if result.stderr:
+                    print("  [stderr]")
+                    print(result.stderr.rstrip())
+                print(f"  --- end: {result.file} ---")
 
-    (SCOREBOARD / PLATFORM).mkdir(parents=True, exist_ok=True)
-    (SCOREBOARD / PLATFORM / f"{suite.name}.json").write_text(
-        json.dumps(
-            {
-                "suite": suite.name,
-                "tag": suite.tag,
-                "category": suite.category,
-                "excluded_files": excluded,
-                "files": [
-                    {k: v for k, v in result.__dict__.items() if k not in ("stdout", "stderr")}
-                    for result in results
-                ],
-            },
-            indent=2,
+        (SCOREBOARD / PLATFORM).mkdir(parents=True, exist_ok=True)
+        (SCOREBOARD / PLATFORM / f"{suite.name}.json").write_text(
+            json.dumps(
+                {
+                    "suite": suite.name,
+                    "tag": suite.tag,
+                    "category": suite.category,
+                    "excluded_files": excluded,
+                    "files": [
+                        {k: v for k, v in result.__dict__.items() if k not in ("stdout", "stderr")}
+                        for result in results
+                    ],
+                },
+                indent=2,
+            )
+            + "\n"
         )
-        + "\n"
-    )
-    return results, summary
+        out.append((suite, results, summary))
+    return out
 
 
 def load_scoreboards(suites: list[Suite], platform: str) -> list[dict]:
@@ -472,8 +522,7 @@ def main() -> None:
 
     violations: list[str] = []
     summaries: list[tuple[str, str]] = []
-    for suite in load_suites(args.suite):
-        results, summary = run_suite(suite, args.local, args.jobs)
+    for suite, results, summary in run_suites(load_suites(args.suite), args.local, args.jobs):
         summaries.append((suite.name, summary))
         if args.check:
             violations.extend(check_suite(suite, results))
