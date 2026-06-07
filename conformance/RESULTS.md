@@ -16,13 +16,14 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | pass % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 1194 | 823 | 0 | 22 | 2039 | 58.6% | 5 | 45 | 63 |
+| pytest | 9.0.3 | 1238 | 884 | 42 | 24 | 2188 | 56.6% | 5 | 45 | 63 |
 | pytest-asyncio | v1.4.0 | 262 | 0 | 1 | 0 | 263 | 99.6% | 29 | 30 | 0 |
 | pytest-mock | v3.15.1 | 85 | 0 | 0 | 5 | 90 | 94.4% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 142 | 64 | 0 | 3 | 209 | 67.9% | 0 | 1 | 0 |
 | pytest-xdist | v3.8.0 | 63 | 34 | 0 | 0 | 97 | 64.9% | 0 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 40 | 82 | 0 | 1 | 123 | 32.5% | 2 | 7 | 6 |
+| anyio | 4.13.0 | 3119 | 1 | 0 | 42 | 3162 | 98.6% | 25 | 26 | 0 |
 | click | 8.3.1 | 1314 | 0 | 0 | 21 | 1335 | 98.4% | 20 | 20 | 0 |
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
@@ -46,18 +47,18 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_collection.py | failed | 57 | 55 | 0 | 4 |
 | testing/test_compat.py | failed | 6 | 4 | 0 | 0 |
 | testing/test_config.py | failed | 65 | 143 | 0 | 0 |
-| testing/test_conftest.py | failed | 3 | 39 | 0 | 1 |
+| testing/test_conftest.py | failed | 3 | 39 | 11 | 1 |
 | testing/test_doctest.py | passed | 139 | 0 | 0 | 1 |
 | testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 |
 | testing/test_faulthandler.py | failed | 2 | 10 | 0 | 0 |
 | testing/test_helpconfig.py | failed | 2 | 10 | 0 | 0 |
-| testing/test_junitxml.py | failed | 127 | 9 | 0 | 0 |
+| testing/test_junitxml.py | failed | 127 | 9 | 1 | 0 |
 | testing/test_link_resolve.py | failed | 0 | 1 | 0 | 0 |
-| testing/test_main.py | failed | 1 | 12 | 0 | 0 |
-| testing/test_mark.py | failed | 42 | 63 | 0 | 0 |
+| testing/test_main.py | failed | 1 | 12 | 11 | 0 |
+| testing/test_mark.py | failed | 42 | 64 | 0 | 0 |
 | testing/test_monkeypatch.py | passed | 33 | 0 | 0 | 2 |
 | testing/test_nodes.py | failed | 1 | 7 | 0 | 0 |
-| testing/test_pastebin.py | failed | 0 | 5 | 0 | 0 |
+| testing/test_pastebin.py | failed | 0 | 5 | 3 | 0 |
 | testing/test_pytester.py | failed | 14 | 39 | 0 | 0 |
 | testing/test_python_path.py | failed | 0 | 6 | 0 | 0 |
 | testing/test_recwarn.py | passed | 63 | 0 | 0 | 0 |
@@ -70,13 +71,13 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_skipping.py | failed | 70 | 22 | 0 | 0 |
 | testing/test_stepwise.py | failed | 2 | 16 | 0 | 0 |
 | testing/test_subtests.py | failed | 29 | 5 | 0 | 0 |
-| testing/test_terminal.py | failed | 73 | 118 | 0 | 2 |
-| testing/test_threadexception.py | failed | 0 | 2 | 0 | 0 |
+| testing/test_terminal.py | failed | 97 | 118 | 10 | 2 |
+| testing/test_threadexception.py | failed | 0 | 2 | 6 | 0 |
 | testing/test_tmpdir.py | failed | 11 | 28 | 0 | 1 |
 | testing/test_unittest.py | failed | 27 | 43 | 0 | 9 |
 | testing/test_unraisableexception.py | failed | 0 | 11 | 0 | 0 |
 | testing/test_warnings.py | failed | 35 | 8 | 0 | 1 |
-| testing/acceptance_test.py | failed | 0 | 0 | 0 | 0 |
+| testing/acceptance_test.py | failed | 20 | 60 | 0 | 2 |
 | testing/deprecated_test.py | failed | 0 | 11 | 0 | 0 |
 | testing/python/show_fixtures_per_test.py | failed | 0 | 8 | 0 | 0 |
 
@@ -174,6 +175,41 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_sample.py | passed | 4 | 0 | 0 | 0 |
 | tests/test_skip.py | no-tests | 0 | 0 | 0 | 1 |
 | tests/test_with_testcase.py | failed | 0 | 2 | 0 | 0 |
+
+</details>
+
+### anyio @ 4.13.0
+
+<details><summary>per-file detail (26 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/streams/test_buffered.py | passed | 28 | 0 | 0 | 0 |
+| tests/streams/test_file.py | passed | 40 | 0 | 0 | 0 |
+| tests/streams/test_memory.py | passed | 109 | 0 | 0 | 0 |
+| tests/streams/test_stapled.py | passed | 24 | 0 | 0 | 0 |
+| tests/streams/test_text.py | passed | 24 | 0 | 0 | 0 |
+| tests/streams/test_tls.py | passed | 68 | 0 | 0 | 0 |
+| tests/test_all_attributes.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_contextmanagers.py | passed | 49 | 0 | 0 | 0 |
+| tests/test_debugging.py | passed | 31 | 0 | 0 | 1 |
+| tests/test_deprecations.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_eventloop.py | passed | 17 | 0 | 0 | 1 |
+| tests/test_fileio.py | passed | 244 | 0 | 0 | 22 |
+| tests/test_from_thread.py | passed | 195 | 0 | 0 | 4 |
+| tests/test_functools.py | passed | 132 | 0 | 0 | 0 |
+| tests/test_lowlevel.py | passed | 44 | 0 | 0 | 0 |
+| tests/test_pytest_plugin.py | failed | 34 | 1 | 0 | 0 |
+| tests/test_signals.py | passed | 12 | 0 | 0 | 0 |
+| tests/test_sockets.py | passed | 1189 | 0 | 0 | 0 |
+| tests/test_subprocesses.py | passed | 76 | 0 | 0 | 4 |
+| tests/test_synchronization.py | passed | 235 | 0 | 0 | 0 |
+| tests/test_taskgroups.py | passed | 393 | 0 | 0 | 10 |
+| tests/test_tempfile.py | passed | 60 | 0 | 0 | 0 |
+| tests/test_to_interpreter.py | passed | 12 | 0 | 0 | 0 |
+| tests/test_to_process.py | passed | 36 | 0 | 0 | 0 |
+| tests/test_to_thread.py | passed | 64 | 0 | 0 | 0 |
+| tests/test_typedattr.py | passed | 1 | 0 | 0 | 0 |
 
 </details>
 

@@ -119,7 +119,7 @@
       "passed": 3,
       "failed": 39,
       "skipped": 1,
-      "errors": 0
+      "errors": 11
     },
     {
       "file": "testing/test_doctest.py",
@@ -164,7 +164,7 @@
       "passed": 127,
       "failed": 9,
       "skipped": 0,
-      "errors": 0
+      "errors": 1
     },
     {
       "file": "testing/test_link_resolve.py",
@@ -182,14 +182,14 @@
       "passed": 1,
       "failed": 12,
       "skipped": 0,
-      "errors": 0
+      "errors": 11
     },
     {
       "file": "testing/test_mark.py",
       "status": "failed",
       "exit_code": 1,
       "passed": 42,
-      "failed": 63,
+      "failed": 64,
       "skipped": 0,
       "errors": 0
     },
@@ -218,7 +218,7 @@
       "passed": 0,
       "failed": 5,
       "skipped": 0,
-      "errors": 0
+      "errors": 3
     },
     {
       "file": "testing/test_pytester.py",
@@ -332,10 +332,10 @@
       "file": "testing/test_terminal.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 73,
+      "passed": 97,
       "failed": 118,
       "skipped": 2,
-      "errors": 0
+      "errors": 10
     },
     {
       "file": "testing/test_threadexception.py",
@@ -344,7 +344,7 @@
       "passed": 0,
       "failed": 2,
       "skipped": 0,
-      "errors": 0
+      "errors": 6
     },
     {
       "file": "testing/test_tmpdir.py",
@@ -386,9 +386,9 @@
       "file": "testing/acceptance_test.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 0,
-      "failed": 0,
-      "skipped": 0,
+      "passed": 20,
+      "failed": 60,
+      "skipped": 2,
       "errors": 0
     },
     {
