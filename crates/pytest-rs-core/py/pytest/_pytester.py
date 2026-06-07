@@ -237,6 +237,12 @@ class Pytester:
         # (a later user-passed --basetemp still wins).
         n = sum(1 for p in self.path.glob("runpytest-*"))
         basetemp = self.path / f"runpytest-{n}"
+        # The child relays its log records here; they are replayed into this
+        # process after the run (upstream's in-process runpytest propagates
+        # the inner run's records to the parent's caplog).
+        relay = self.path / f".logrelay-{n}"
+        relay.unlink(missing_ok=True)
+        env["PYTEST_RS_LOG_RELAY"] = str(relay)
         start = time.perf_counter()
         # cwd inherits like upstream's subprocess runs: the pytester fixture
         # chdir'd to self.path at setup, and a test that os.chdir()s deeper
@@ -249,11 +255,37 @@ class Pytester:
             env=env,
         )
         duration = time.perf_counter() - start
+        self._replay_child_logs(relay)
         # Color is gated by --color/tty detection in the engine; pytester
         # passes output through raw so color tests can assert escapes.
         outlines = proc.stdout.splitlines()
         errlines = proc.stderr.splitlines()
         return RunResult(proc.returncode, outlines, errlines, duration)
+
+    @staticmethod
+    def _replay_child_logs(path):
+        """Re-emit log records the child run relayed (PYTEST_RS_LOG_RELAY)
+        into this process's logging system, gated by each logger's effective
+        level like a live emission would be."""
+        import io
+        import logging
+        import pickle
+
+        try:
+            data = path.read_bytes()
+        except OSError:
+            return
+        path.unlink(missing_ok=True)
+        buf = io.BytesIO(data)
+        while True:
+            try:
+                payload = pickle.load(buf)
+            except Exception:
+                break
+            record = logging.makeLogRecord(payload)
+            logger = logging.getLogger(record.name)
+            if logger.isEnabledFor(record.levelno):
+                logger.handle(record)
 
     runpytest_subprocess = runpytest
     runpytest_inprocess = runpytest

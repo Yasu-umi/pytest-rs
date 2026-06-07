@@ -9,7 +9,7 @@ use pytest_rs_core::collect::TestItem;
 use pytest_rs_core::config::{OptDef, OptionParser};
 use pytest_rs_core::fixture::{FixtureDef, Scope};
 use pytest_rs_core::hooks::{FixtureValue, HookContext, HookResult, Plugin};
-use pytest_rs_core::pyo3::exceptions::PyRuntimeError;
+use pytest_rs_core::pyo3::exceptions::{PyOSError, PyRuntimeError};
 use pytest_rs_core::pyo3::prelude::*;
 use pytest_rs_core::pyo3::types::PyModule;
 use pytest_rs_core::session::Finalizer;
@@ -18,7 +18,17 @@ use pytest_rs_core::session::Finalizer;
 type NamedFactories = Vec<(String, Py<PyAny>)>;
 
 const HELPER: &str = include_str!("../py/helper.py");
-const PYTEST_ASYNCIO_SHIM: &str = include_str!("../py/pytest_asyncio_shim.py");
+
+/// The `pytest_asyncio` shim, written to the per-run shim dir as a real
+/// package so upstream `import pytest_asyncio.plugin` resolves through
+/// normal import machinery (and `_unused_port` is monkeypatchable).
+const SHIM_FILES: &[(&str, &str)] = &[
+    (
+        "__init__.py",
+        include_str!("../py/pytest_asyncio/__init__.py"),
+    ),
+    ("plugin.py", include_str!("../py/pytest_asyncio/plugin.py")),
+];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
@@ -530,17 +540,21 @@ impl Plugin for AsyncioPlugin {
         )?;
         self.helper = Some(module.unbind());
 
-        // `import pytest_asyncio` in upstream suites resolves to our shim.
-        let shim = PyModule::from_code(
+        // `import pytest_asyncio` in upstream suites resolves to our shim:
+        // a real package in the shim dir (which leads sys.path), so
+        // `pytest_asyncio.plugin` is importable and monkeypatchable.
+        let package_root = pytest_rs_core::python::shim_root().join("pytest_asyncio");
+        std::fs::create_dir_all(&package_root).map_err(|e| PyOSError::new_err(e.to_string()))?;
+        for (rel, content) in SHIM_FILES {
+            std::fs::write(package_root.join(rel), content)
+                .map_err(|e| PyOSError::new_err(e.to_string()))?;
+        }
+        let plugin_module = ctx.py.import("pytest_asyncio.plugin")?;
+        pytest_rs_core::python::register_plugin_fixtures(
             ctx.py,
-            CString::new(PYTEST_ASYNCIO_SHIM)?.as_c_str(),
-            c"pytest_rs_asyncio/pytest_asyncio_shim.py",
-            c"pytest_asyncio",
+            &plugin_module,
+            &mut ctx.session.registry,
         )?;
-        ctx.py
-            .import("sys")?
-            .getattr("modules")?
-            .set_item("pytest_asyncio", shim)?;
         Ok(())
     }
 

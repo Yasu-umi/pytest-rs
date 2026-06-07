@@ -79,6 +79,36 @@ class _LiveLogHandler(logging.StreamHandler):
             self.flush()
 
 
+class _RelayHandler(logging.Handler):
+    """PYTEST_RS_LOG_RELAY: pickle every record captured during a phase
+    into the named file; the parent pytester run replays them into its own
+    logging system (upstream's in-process runpytest propagates the inner
+    run's records to the parent's caplog live). Attached to root only
+    alongside the phase handlers — a permanent root handler would turn the
+    suite-under-test's logging.basicConfig() into a no-op and suppress
+    logging.lastResort."""
+
+    def __init__(self, path):
+        super().__init__(logging.NOTSET)
+        self._path = path
+
+    def emit(self, record):
+        import pickle
+
+        # SocketHandler-style: merge args into msg and drop unpicklables.
+        payload = dict(record.__dict__)
+        payload["msg"] = record.getMessage()
+        payload["args"] = None
+        payload["exc_info"] = None
+        payload.pop("message", None)
+        try:
+            data = pickle.dumps(payload)
+        except Exception:
+            return
+        with open(self._path, "ab") as f:
+            f.write(data)
+
+
 class DatetimeFormatter(logging.Formatter):
     """%f (microseconds) support in datefmt, like upstream pytest."""
 
@@ -122,6 +152,7 @@ class LoggingState:
         self.log_cli_enabled = False
         self.log_cli_handler = None
         self.log_file_handler = None
+        self.relay_handler = None
         self._report_formatter = None
 
     def configure(self, settings):
@@ -192,6 +223,11 @@ class LoggingState:
             if name:
                 logging.getLogger(name).disabled = True
 
+        # A pytester parent asked for this run's records (see _RelayHandler).
+        relay_path = os.environ.get("PYTEST_RS_LOG_RELAY")
+        if relay_path:
+            self.relay_handler = _RelayHandler(relay_path)
+
     def _set_level_config(self, level):
         if level is None:
             self.log_level = None
@@ -226,6 +262,8 @@ class LoggingState:
             root.setLevel(min(root.level, self.log_level))
         root.addHandler(self.caplog_handler)
         root.addHandler(self.report_handler)
+        if self.relay_handler is not None:
+            root.addHandler(self.relay_handler)
 
     def end_phase(self):
         if self.when is None:
@@ -233,6 +271,8 @@ class LoggingState:
         root = logging.getLogger()
         root.removeHandler(self.caplog_handler)
         root.removeHandler(self.report_handler)
+        if self.relay_handler is not None:
+            root.removeHandler(self.relay_handler)
         if self._root_level_restore is not None:
             root.setLevel(self._root_level_restore)
             self._root_level_restore = None
