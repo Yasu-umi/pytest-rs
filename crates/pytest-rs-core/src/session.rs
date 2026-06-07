@@ -88,6 +88,9 @@ pub struct Session {
     /// Set when --maxfail/-x stopped the run, with the failure count, for
     /// the "stopping after N failures" banner.
     pub stopped_after: Option<usize>,
+    /// Plugin-set session.shouldfail message (e.g. pytest-timeout's
+    /// session deadline): aborts the run with a "!!! msg !!!" banner.
+    pub shouldfail: Option<String>,
 }
 
 impl Session {
@@ -114,6 +117,7 @@ impl Session {
             deselected_items: Vec::new(),
             collect_errors: Vec::new(),
             stopped_after: None,
+            shouldfail: None,
         }
     }
 

@@ -97,9 +97,27 @@ Key structural rules:
 - **firstresult** hooks return `PyResult<Option<T>>`; the manager stops at the first `Some`.
   The core owns the actual test call (`pytest_pyfunc_call` firstresult; asyncio claims async
   items). Same for `pytest_fixture_setup`.
-- **hookwrapper** semantics (`around_runtest_call` RAII guards) turned out unnecessary for v1:
-  benchmark times inside its fixture and split reads `TestReport.duration` — deferred until a
-  plugin actually needs it.
+- **hookwrapper** semantics for *python* hooks landed with pytest-timeout support:
+  `pytest_runtest_protocol` (around the whole item) and `pytest_runtest_call` (around the
+  call phase) generator hookimpls run pluggy-style — pre-yield part before the phase,
+  post-yield after, LIFO unwind. Other py hook names still drive generators to completion
+  in place. Native (Rust) plugins haven't needed wrapper semantics: benchmark times inside
+  its fixture and split reads `TestReport.duration`.
+- **pluggy-lite shim pluginmanager** (`pytest._pluginmanager`): autoloaded plugin modules and
+  conftests register into it; `config.pluginmanager.hook.<name>(**kw)` dispatches custom
+  hooks (kwarg-filtered, LIFO, `firstresult` honored via `pytest_addhooks` +
+  `add_hookspecs`). `pytest_addoption(parser)` fires against a parser shim
+  (`pytest._parser`) that records option/ini specs: `config.getoption()/getini()` fall back
+  to plugin-declared defaults (typed, e.g. bool inis), and unknown `--flag[=value]` CLI
+  tokens deferred at clap time resolve against those specs after plugin load (unregistered
+  leftovers usage-error, pytest parity). `config.stash` (`pytest.Stash/StashKey`),
+  `node.config`, `item.session.config/shouldfail`, `pytest_report_header`, and `--markers`
+  round out the plugin-facing surface (pytest-timeout runs fully: signal + thread methods,
+  marker/ini/CLI config, session timeout, custom-hook overrides from conftest).
+- **`pytest_collection_preexpand`** (pytest-rs-specific hook): runs after collection but
+  before parametrized-fixture expansion, so plugins can inject closure-affecting marks —
+  anyio's usefixtures("anyio_backend") injection lands here, making the backend a normal
+  outermost fixture-param axis exactly like upstream's makeitem-time injection.
 - **Plugin-provided fixtures** two ways (both landed in M6):
   - *PySource*: the plugin ships an embedded Python package written into the per-run shim dir
     and registered via `python::register_plugin_fixtures` — mock's `pytest_mock` package.
@@ -127,8 +145,9 @@ Key structural rules:
   (PytestConfigWarning) and is skipped instead of aborting the run — plugins built against
   pluggy/`_pytest` internals would otherwise make every run on that venv unusable. Loaded
   in the controller before conftests and mirrored in spawned workers (forked workers
-  inherit). Known gap: `request.getfixturevalue` is not implemented, so plugins resolving
-  fixtures dynamically (Faker's `faker` fixture) error at setup.
+  inherit). Autoloaded modules also register into the shim pluginmanager, so plugins
+  shipping their own hookspecs (pytest-timeout's `pytest_timeout_set_timer`) dispatch and
+  are overridable from conftests.
 
 ### Multi-process execution (`-n N`, default 1) *(landed in M4)*
 
@@ -182,7 +201,7 @@ Key structural rules:
 | Plugin | Mechanism | Hooks (main) |
 |---|---|---|
 | **asyncio** | `asyncio_mode auto/strict`, loop cache per `loop_scope`, `LoopRunner` trait (asyncio now; trio/uvloop later). Owns running coroutines: async tests via `pytest_pyfunc_call`, async (gen) fixtures via `pytest_fixture_setup` + finalizer driving `__anext__` | pyfunc_call, fixture_setup, collection_modifyitems, sessionfinish |
-| **anyio** | `anyio_mode auto/strict` (strict default). The real anyio dist stays entry-point autoloaded (anyio_backend & friends register as plugin fixtures, incl. user conftest overrides); the crate ports only the runner glue from `anyio.pytest_plugin` (lease-counted `get_runner`, backend `TestRunner`s — asyncio and trio both work). anyio-marked coroutine tests get a usefixtures("anyio_backend") mark + per-backend item cloning at collection (param expansion already ran); the backend value reaches hooks via fixture kwargs → engine fixture cache → raw param. Async (gen) fixtures run per backend (`pytest_fixture_cache_key` suffix); asyncgen fixtures hold their runner lease open setup→teardown, so a module-scoped one shares its loop with the module's tests, like upstream | pyfunc_call, fixture_setup, fixture_cache_key, collection_modifyitems |
+| **anyio** | `anyio_mode auto/strict` (strict default). The real anyio dist stays entry-point autoloaded (anyio_backend & friends register as plugin fixtures, incl. user conftest overrides); the crate ports only the runner glue from `anyio.pytest_plugin` (lease-counted `get_runner`, backend `TestRunner`s — asyncio, asyncio+uvloop and trio all work). anyio-marked coroutine tests get a usefixtures("anyio_backend") mark injected in `pytest_collection_preexpand` (function-level, so the backend expands as the outermost fixture-param axis with upstream-identical IDs and ordering); a clone-per-backend fallback remains in collection_modifyitems. The backend value reaches hooks via fixture kwargs → callspec → engine fixture cache → raw param. Async (gen) fixtures run per backend (`pytest_fixture_cache_key` suffix); asyncgen fixtures hold their runner lease open setup→teardown, so a module-scoped one shares its loop with the module's tests, like upstream | pyfunc_call, fixture_setup, fixture_cache_key, collection_preexpand, collection_modifyitems |
 | **mock** | Adapted upstream pytest-mock shim shipped as a real `pytest_mock` package in the shim dir (assert-rewritten, so `assert_called_*` introspection diffs match pytest). Fixtures: `mocker` + class/module/package/session variants; `stopall` via generator-fixture teardown; assert-method traceback wrapping (`mock_traceback_monkeypatch`) | configure (write package, wrap asserts, register fixtures), sessionfinish (unwrap) |
 | **cov** | `sys.monitoring` tool id 1 (COVERAGE_ID), LINE events, Rust `#[pyclass]` callback returning `DISABLE` (each line costs one callback ever). Hits in `HashMap<file, BTreeSet<u32>>` (roaring deferred to M4 merge work). Denominator from ruff AST executable-line analysis + `exclude_lines` regexes (.coveragerc / --cov-config / pyproject; default `# pragma: no cover`); observed-but-unanalyzed lines union into the denominator. Reports: term/term-missing (+skip-covered), Cobertura XML, lcov (HTML/JSON later; branch coverage deferred). `--cov-fail-under` forces exit code 1 | configure (start monitoring), sessionfinish (stop, build report, fail_under), terminal_summary |
 | **split** | `.test_durations` JSON (nodeid → seconds, legacy list format accepted), `--splits N --group K`, algorithms `duration_based_chunks` (order-preserving) / `least_duration` (LPT greedy), unknown tests get mean duration of the relevant cached set; `--store-durations` aggregates `TestReport.duration` per nodeid | addoption, configure (validation), collection_modifyitems, sessionfinish (store) |
@@ -221,21 +240,30 @@ Key structural rules:
 ## Conformance testing
 
 Compatibility is verified by running the **upstream test suites of the libraries being
-reproduced** (pytest, pytest-asyncio, pytest-mock, pytest-cov, pytest-split, pytest-benchmark)
-under pytest-rs, as-is.
+reproduced** under pytest-rs, as-is, in two categories:
 
-- `conformance/` harness: pins each upstream repo at a known tag (checkout or sdist), runs its
-  test suite with pytest-rs, and compares against an expected-results manifest
-  (`conformance/<lib>/expected.toml`: pass / xfail-with-reason / excluded-with-reason).
-- CI gate: the pass set may only grow; any newly-failing previously-passing upstream test fails CI.
-- Exclusions are explicit and justified: tests that import library internals (`_pytest.*`,
-  pluggy internals, pytest-rs doesn't have them) or test the plugin's packaging rather than
-  behavior. Tests using the `pytester` fixture are a large category in pytest's own suite —
-  supporting `pytester` (running pytest-rs as the sub-runner) is itself a milestone goal because
-  it unlocks most upstream behavioral tests.
-- Per-milestone targets: M1 picks a small curated subset (e.g. pytest's fixture/collection
-  acceptance tests); each milestone expands the manifest rather than writing parallel
-  hand-written compat tests.
+- *pytest & plugin ecosystem* (the APIs pytest-rs reimplements): pytest itself,
+  pytest-asyncio, pytest-mock, pytest-cov, pytest-xdist, pytest-split, pytest-benchmark,
+  pytest-timeout, anyio.
+- *Real-world projects* (drop-in evidence — their suites run unchanged): click, jinja,
+  marshmallow, rich. jinja and marshmallow pass 100%.
+
+Harness (`conformance/runner.py`):
+
+- `conformance/suites.toml` pins each upstream repo at a release tag; the runner clones the
+  tag (or uses the submodule checkout with `--local`), installs suite deps into a `--target`
+  dir (dist-info included, so a suite's own `pytest11` entry point autoloads — how anyio and
+  pytest-timeout exercise the autoload path), and runs file by file.
+- Results land in `conformance/scoreboard/<platform>/*.json` (linux = canonical, CI
+  bot-refreshed on main pushes; darwin = dev) and regenerate `conformance/RESULTS.md` plus
+  the README table.
+- CI gate: `conformance/expected/<name>.toml` pins files that must keep passing — the list
+  only grows; a regression fails CI. `[excluded]` entries are explicit and justified (tests
+  of pytest/pluggy internals, packaging tests). The release gate additionally requires
+  ci-green and a drift-free scoreboard.
+- `pytester` is supported (nested sessions run the pytest-rs binary as the sub-runner),
+  which is what unlocked the bulk of upstream behavioral tests; the remaining pytester gaps
+  are its in-process APIs (`inline_genitems`, `parseconfig(ure)`, `spawn_pytest`, `run`).
 
 ## Risks
 

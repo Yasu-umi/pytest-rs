@@ -738,6 +738,32 @@ class CaptureState:
 state = CaptureState()
 
 
+class _GlobalCaptureManager:
+    """The object pluginmanager.getplugin("capturemanager") hands out:
+    plugins (e.g. pytest-timeout before dumping stacks and os._exit) use it
+    to suspend the global capture so their output reaches the real
+    terminal, and to read what the test captured so far."""
+
+    def suspend_global_capture(self, item=None, in_=False):
+        if state.fixture is not None and state.fixture._capture is not None:
+            if state.fixture._capture.is_started():
+                state.fixture._suspend()
+        if state._installed and state._capture is not None and state._capture.is_started():
+            state._capture.suspend_capturing(in_=bool(item) or in_)
+
+    def resume_global_capture(self):
+        if state._installed and state._capture is not None:
+            state._capture.resume_capturing()
+
+    def read_global_capture(self):
+        if state._capture is None:
+            return ("", "")
+        return state._capture.readouterr()
+
+
+manager = _GlobalCaptureManager()
+
+
 def configure(mode):
     state.configure(mode)
 

@@ -238,9 +238,11 @@ class Pytester:
         n = sum(1 for p in self.path.glob("runpytest-*"))
         basetemp = self.path / f"runpytest-{n}"
         start = time.perf_counter()
+        # cwd inherits like upstream's subprocess runs: the pytester fixture
+        # chdir'd to self.path at setup, and a test that os.chdir()s deeper
+        # means the nested run to resolve relative args from there.
         proc = subprocess.run(
             [exe, f"--basetemp={basetemp}", *[str(arg) for arg in args]],
-            cwd=self.path,
             capture_output=True,
             text=True,
             timeout=timeout if timeout is not None else 120,

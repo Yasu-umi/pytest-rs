@@ -202,6 +202,10 @@ pub struct Config {
     ini_file: HashMap<String, String>,
     /// The config file's basename, for the "configfile:" header line.
     pub config_file_name: Option<String>,
+    /// Unknown `--flag[=value]` tokens deferred for python-plugin option
+    /// specs (pytest_addoption): applied after plugin load, where clap
+    /// cannot know them. Space-separated values are not supported.
+    pub plugin_args: Vec<String>,
 }
 
 /// pytest's rootdir-discovery inputs: cwd plus every arg token that exists
@@ -388,7 +392,8 @@ impl Config {
         // Core pytest options parsed into flags/values (queried via
         // get_flag/get_value); some are still inert and gain behavior as
         // features land.
-        const CORE_FLAGS: [&str; 20] = [
+        const CORE_FLAGS: [&str; 21] = [
+            "markers", // list registered markers (ini + plugin-registered) and exit
             "strict-config",
             "strict-markers",
             "strict",
@@ -410,7 +415,8 @@ impl Config {
             "traceconfig",     // accepted-but-inert: plugin trace header not implemented
             "keep-duplicates", // collect the same file once per duplicated arg
         ];
-        const CORE_VALUES: [(&str, Option<char>); 37] = [
+        const CORE_VALUES: [(&str, Option<char>); 38] = [
+            ("confcutdir", None),
             ("deselect", None),
             ("log-level", None),
             ("log-format", None),
@@ -540,6 +546,47 @@ impl Config {
             cmd = cmd.arg(arg);
         }
 
+        // Long flags clap doesn't know are deferred for python-plugin
+        // option specs (pytest_addoption runs after the interpreter is up).
+        // Only the self-contained `--flag` / `--flag=value` forms are
+        // recognized; unregistered leftovers usage-error at configure.
+        let known_longs: HashSet<String> = cmd
+            .get_arguments()
+            .flat_map(|arg| {
+                arg.get_long().into_iter().map(str::to_string).chain(
+                    arg.get_all_aliases()
+                        .into_iter()
+                        .flatten()
+                        .map(str::to_string),
+                )
+            })
+            .collect();
+        let mut plugin_args = Vec::new();
+        let mut kept = Vec::new();
+        let mut tokens = argv.into_iter().enumerate().peekable();
+        while let Some((idx, token)) = tokens.next() {
+            if idx == 0 || !token.starts_with("--") || token == "--" {
+                kept.push(token);
+                continue;
+            }
+            let name = token[2..].split('=').next().unwrap_or("");
+            if known_longs.contains(name) {
+                kept.push(token);
+                continue;
+            }
+            // A separate value token (`--flag value`) is deferred with the
+            // flag; whether the spec consumes it is decided at apply time.
+            let space_value = !token.contains('=');
+            plugin_args.push(token);
+            if space_value
+                && let Some((_, next)) = tokens.peek()
+                && !next.starts_with('-')
+            {
+                plugin_args.push(tokens.next().expect("peeked").1);
+            }
+        }
+        let argv = kept;
+
         let matches = match cmd.try_get_matches_from(argv) {
             Ok(matches) => matches,
             // --help/--version display and exit 0, like pytest (even when
@@ -648,6 +695,7 @@ impl Config {
             ini_overrides,
             ini_file,
             config_file_name,
+            plugin_args,
         })
     }
 

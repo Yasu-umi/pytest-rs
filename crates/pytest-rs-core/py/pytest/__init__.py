@@ -59,6 +59,8 @@ from pytest._raises import raises as raises
 from pytest._raises_group import RaisesExc as RaisesExc
 from pytest._raises_group import RaisesGroup as RaisesGroup
 from pytest._rewrite import register_assert_rewrite as register_assert_rewrite
+from pytest._stash import Stash as Stash
+from pytest._stash import StashKey as StashKey
 from pytest._subtests import Subtests as Subtests
 from pytest._subtests import subtests as subtests
 from pytest._tmp_path import TempPathFactory as TempPathFactory

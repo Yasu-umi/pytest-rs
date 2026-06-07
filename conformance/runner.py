@@ -130,6 +130,10 @@ class Suite:
         files: list[Path] = []
         for testpath in self.testpaths:
             base = self.checkout / testpath
+            # Flat-layout suites point straight at a test file.
+            if base.is_file():
+                files.append(base)
+                continue
             files.extend(sorted(base.rglob("test_*.py")))
             files.extend(sorted(p for p in base.rglob("*_test.py") if p not in files))
         kept = [f for f in files if not any(part in self.exclude for part in f.parts)]

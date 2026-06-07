@@ -6,7 +6,9 @@ use std::sync::Mutex;
 use pyo3::prelude::*;
 
 /// A (subset of the) pytest `Config` API passed to conftest hooks.
-#[pyclass(name = "Config")]
+/// `dict`: plugins set ad-hoc attributes on config (pytest-timeout's
+/// `config._env_timeout`), like upstream's plain-Python Config.
+#[pyclass(name = "Config", dict)]
 pub struct PyConfig {
     rootdir: String,
     ini: Mutex<HashMap<String, String>>,
@@ -14,6 +16,10 @@ pub struct PyConfig {
     /// Python so conftest hooks can stash flags on it.
     #[pyo3(get)]
     option: Py<PyAny>,
+    /// Lazily-created `pytest.Stash`; the config proxy is a session
+    /// singleton, so plugin data stored here (e.g. pytest-timeout's
+    /// session deadline) persists across hooks.
+    stash: pyo3::sync::PyOnceLock<Py<PyAny>>,
 }
 
 impl PyConfig {
@@ -22,18 +28,40 @@ impl PyConfig {
             rootdir,
             ini: Mutex::new(ini),
             option,
+            stash: pyo3::sync::PyOnceLock::new(),
         }
     }
 }
 
 #[pymethods]
 impl PyConfig {
-    fn getini(&self, name: &str) -> Option<String> {
-        self.ini
+    #[getter]
+    fn stash(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        Ok(self
+            .stash
+            .get_or_try_init(py, || -> PyResult<Py<PyAny>> {
+                Ok(py
+                    .import("pytest._stash")?
+                    .getattr("Stash")?
+                    .call0()?
+                    .unbind())
+            })?
+            .clone_ref(py))
+    }
+
+    fn getini(&self, py: Python<'_>, name: &str) -> PyResult<Py<PyAny>> {
+        let raw = self
+            .ini
             .lock()
             .expect("config lock poisoned")
             .get(name)
-            .cloned()
+            .cloned();
+        // Plugin-registered ini specs (parser.addini) supply type
+        // conversion and defaults for values the Rust config doesn't know.
+        Ok(py
+            .import("pytest._parser")?
+            .call_method1("ini_lookup", (name, raw))?
+            .unbind())
     }
 
     /// Append one line to a line-list ini option (e.g. "markers").
@@ -56,10 +84,20 @@ impl PyConfig {
         // Normalize: "--foo-bar" → "foo_bar", "foo-bar" → "foo_bar"
         let attr = name.trim_start_matches('-').replace('-', "_");
         let ns = self.option.bind(py);
-        match ns.getattr(attr.as_str()) {
-            Ok(v) => Ok(v.into()),
-            Err(_) => Ok(default.unwrap_or_else(|| py.None())),
+        if let Ok(v) = ns.getattr(attr.as_str()) {
+            return Ok(v.into());
         }
+        // Plugin-registered options (parser.addoption) behave as if parsed
+        // with their declared default; the default= argument only covers
+        // unregistered names (pytest semantics).
+        let (registered, value): (bool, Py<PyAny>) = py
+            .import("pytest._parser")?
+            .call_method1("option_lookup", (attr.as_str(),))?
+            .extract()?;
+        if registered {
+            return Ok(value);
+        }
+        Ok(default.unwrap_or_else(|| py.None()))
     }
 
     #[pyo3(signature = (name, default = None))]
@@ -104,6 +142,22 @@ impl PyConfig {
         py.import("pytest._pluginmanager")?.getattr("pluginmanager")
     }
 
+    /// A TerminalWriter on the ORIGINAL stdout (sys.__stdout__, fd 1) —
+    /// upstream's is created before capture replaces sys.stdout, so
+    /// out-of-band dumps (pytest-timeout's stack dump before os._exit)
+    /// reach the real terminal once capture is suspended.
+    fn get_terminal_writer<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let stdout = py.import("sys")?.getattr("__stdout__")?;
+        let file = if stdout.is_none() {
+            py.None().into_bound(py)
+        } else {
+            stdout
+        };
+        py.import("_pytest._io")?
+            .getattr("TerminalWriter")?
+            .call1((file,))
+    }
+
     /// The pytest `config.cache` API (a pytest._cache.Cache).
     #[getter]
     fn cache<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -112,7 +166,12 @@ impl PyConfig {
             "cache_dir_from",
             (
                 self.rootdir.as_str(),
-                self.getini("cache_dir").unwrap_or_default(),
+                self.ini
+                    .lock()
+                    .expect("config lock poisoned")
+                    .get("cache_dir")
+                    .cloned()
+                    .unwrap_or_default(),
             ),
         )?;
         cls.call1((dir,))

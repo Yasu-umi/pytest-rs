@@ -476,6 +476,9 @@ impl Engine {
                 center_with(&format!("stopping after {n} failures"), '!')
             );
         }
+        if let Some(msg) = &self.session.shouldfail {
+            println!("{}", center_with(msg, '!'));
+        }
         let warning_count = python::warning_count(py) + self.session.worker_warning_count;
         println!(
             "\n{}",
@@ -1176,6 +1179,117 @@ impl Engine {
     }
 
     /// Fire conftest hooks that only take `config` (e.g. pytest_configure).
+    /// pytest_addoption(parser) for python plugins/conftests: the shim
+    /// parser records option/ini specs so config.getoption()/getini() can
+    /// resolve plugin-declared defaults (full CLI parsing stays Rust-side).
+    fn fire_py_addoption_hooks(&mut self, py: Python<'_>) -> PyResult<()> {
+        let hook_funcs: Vec<Py<pyo3::PyAny>> = self
+            .session
+            .py_hooks
+            .iter()
+            .filter(|hook| hook.name == "pytest_addoption")
+            .map(|hook| hook.func.clone_ref(py))
+            .collect();
+        if hook_funcs.is_empty() {
+            return Ok(());
+        }
+        let parser = py.import("pytest._parser")?.getattr("parser")?.unbind();
+        for func in &hook_funcs {
+            python::call_py_hook(py, func, &[("parser", parser.clone_ref(py))])?;
+        }
+        Ok(())
+    }
+
+    /// Deferred `--flag[=value]` tokens (unknown to clap) resolve against
+    /// the python-plugin option specs onto config.option; unregistered
+    /// leftovers usage-error like pytest's "unrecognized arguments".
+    fn apply_plugin_cli_args(&mut self, py: Python<'_>) -> PyResult<()> {
+        if self.config.plugin_args.is_empty() {
+            return Ok(());
+        }
+        let config_proxy = python::make_py_config(py, &self.config)?;
+        let option = config_proxy.bind(py).getattr("option")?;
+        let unknown: Vec<String> = py
+            .import("pytest._parser")?
+            .call_method1("apply_cli_args", (option, self.config.plugin_args.clone()))?
+            .extract()?;
+        if !unknown.is_empty() {
+            return Err(python::usage_error(
+                py,
+                &format!("unrecognized arguments: {}", unknown.join(" ")),
+            ));
+        }
+        Ok(())
+    }
+
+    /// --markers: ini/plugin-registered marker lines first (each as
+    /// `@pytest.mark.<line>`), then pytest's builtin markers verbatim.
+    fn print_markers(&mut self, py: Python<'_>) -> PyResult<()> {
+        // Read through the config proxy: configure-time
+        // addinivalue_line("markers", ...) lands there, not in self.config.
+        let config_proxy = python::make_py_config(py, &self.config)?;
+        let registered = config_proxy
+            .bind(py)
+            .call_method1("getini", ("markers",))?
+            .extract::<Option<String>>()?
+            .unwrap_or_default();
+        for line in registered.lines() {
+            let line = line.trim();
+            if !line.is_empty() {
+                println!("@pytest.mark.{line}\n");
+            }
+        }
+        for line in [
+            "@pytest.mark.filterwarnings(warning): add a warning filter to the given test. see https://docs.pytest.org/en/stable/how-to/capture-warnings.html#pytest-mark-filterwarnings",
+            "@pytest.mark.skip(reason=None): skip the given test function with an optional reason. Example: skip(reason=\"no way of currently testing this\") skips the test.",
+            "@pytest.mark.skipif(condition, ..., *, reason=...): skip the given test function if any of the conditions evaluate to True. Example: skipif(sys.platform == 'win32') skips the test if we are on the win32 platform. See https://docs.pytest.org/en/stable/reference/reference.html#pytest-mark-skipif",
+            "@pytest.mark.xfail(condition, ..., *, reason=..., run=True, raises=None, strict=xfail_strict): mark the test function as an expected failure if any of the conditions evaluate to True. Optionally specify a reason for better reporting and run=False if you don't even want to execute the test function. If only specific exception(s) are expected, you can list them in raises, and if the test fails in other ways, it will be reported as a true failure. See https://docs.pytest.org/en/stable/reference/reference.html#pytest-mark-xfail",
+            "@pytest.mark.parametrize(argnames, argvalues): call a test function multiple times passing in different arguments in turn. argvalues generally needs to be a list of values if argnames specifies only one name or a list of tuples of values if argnames specifies multiple names. Example: @parametrize('arg1', [1,2]) would lead to two calls of the decorated test function, one with arg1=1 and another with arg1=2. see https://docs.pytest.org/en/stable/how-to/parametrize.html for more info and examples.",
+            "@pytest.mark.usefixtures(fixturename1, fixturename2, ...): mark tests as needing all of the specified fixtures. see https://docs.pytest.org/en/stable/explanation/fixtures.html#usefixtures",
+            "@pytest.mark.tryfirst: mark a hook implementation function such that the plugin machinery will try to call it first/as early as possible. DEPRECATED, use @pytest.hookimpl(tryfirst=True) instead.",
+            "@pytest.mark.trylast: mark a hook implementation function such that the plugin machinery will try to call it last/as late as possible. DEPRECATED, use @pytest.hookimpl(trylast=True) instead.",
+        ] {
+            println!("{line}\n");
+        }
+        Ok(())
+    }
+
+    /// pytest_report_header py hooks: each returns a str or list of str,
+    /// printed under the session header.
+    fn print_py_report_header(&mut self, py: Python<'_>) -> PyResult<()> {
+        if self.config.quiet || self.config.no_terminal() {
+            return Ok(());
+        }
+        let hook_funcs: Vec<Py<pyo3::PyAny>> = self
+            .session
+            .py_hooks
+            .iter()
+            .filter(|hook| hook.name == "pytest_report_header")
+            .map(|hook| hook.func.clone_ref(py))
+            .collect();
+        if hook_funcs.is_empty() {
+            return Ok(());
+        }
+        let config_proxy = python::make_py_config(py, &self.config)?;
+        for func in &hook_funcs {
+            let result = python::call_py_hook(py, func, &[("config", config_proxy.clone_ref(py))])?;
+            let result = result.bind(py);
+            if result.is_none() {
+                continue;
+            }
+            let lines: Vec<String> = match result.extract::<String>() {
+                Ok(line) => vec![line],
+                Err(_) => result.extract().unwrap_or_default(),
+            };
+            for block in lines {
+                for line in block.split('\n') {
+                    println!("{line}");
+                }
+            }
+        }
+        Ok(())
+    }
+
     fn fire_py_hooks_simple(&mut self, py: Python<'_>, name: &str) -> PyResult<()> {
         let hook_funcs: Vec<Py<pyo3::PyAny>> = self
             .session
@@ -1379,9 +1493,32 @@ impl Engine {
             }
         }
 
+        // Plugin/conftest pytest_addoption hooks record their option and
+        // ini specs (defaults for getoption/getini) before configure.
+        if let Err(err) = self.fire_py_addoption_hooks(py) {
+            errors.push((rootdir.clone(), python::format_exception(py, &err)));
+        }
+        // CLI tokens clap didn't know resolve against the specs registered
+        // above; anything still unknown is a usage error (pytest parity).
+        if let Err(err) = self.apply_plugin_cli_args(py) {
+            return Err(python::format_exception(py, &err));
+        }
         // conftest pytest_configure hooks run once conftests are loaded.
         if let Err(err) = self.fire_py_hooks_simple(py, "pytest_configure") {
             errors.push((rootdir.clone(), python::format_exception(py, &err)));
+        }
+        // pytest_report_header lines print under the rootdir/configfile
+        // header (e.g. pytest-timeout's "timeout: 1.0s" block).
+        if let Err(err) = self.print_py_report_header(py) {
+            errors.push((rootdir.clone(), python::format_exception(py, &err)));
+        }
+        // --markers: list registered markers (configure hooks above already
+        // ran their addinivalue_line("markers", ...)) and skip collection.
+        if self.config.get_flag("markers") {
+            if let Err(err) = self.print_markers(py) {
+                errors.push((rootdir.clone(), python::format_exception(py, &err)));
+            }
+            return Ok(errors);
         }
         // pytest's catching_logs around pytest_collection: a root handler
         // during import keeps module-level logging calls from triggering

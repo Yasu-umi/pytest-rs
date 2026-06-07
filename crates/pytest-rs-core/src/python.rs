@@ -690,6 +690,12 @@ result = sorted({(ep.name, ep.value.split(':')[0].strip()) for dist in distribut
         for hook in &mut hooks[before..] {
             hook.plugin_module = Some(module_name.clone());
         }
+        // Track the module in the shim pluginmanager so its custom-hook
+        // impls are reachable via config.pluginmanager.hook.<name> and its
+        // pytest_addhooks specs register (pluggy registration parity).
+        py.import("pytest._pluginmanager")?
+            .getattr("pluginmanager")?
+            .call_method1("register", (&plugin,))?;
     }
     Ok(())
 }
@@ -724,7 +730,14 @@ pub fn collect_conftest(
     sys_path_prepend(py, rootdir)?;
     register_pytest_plugins(py, &module, registry, hooks)?;
     register_fixtures_from(py, &module, &baseid, registry)?;
-    scan_py_hooks(&module, &baseid, hooks)
+    scan_py_hooks(&module, &baseid, hooks)?;
+    // Conftests are plugins too: custom-hook impls they define (e.g. an
+    // override of pytest_timeout_set_timer) dispatch through the shim
+    // pluginmanager's hook relay, LIFO like pluggy.
+    py.import("pytest._pluginmanager")?
+        .getattr("pluginmanager")?
+        .call_method1("register", (&module,))?;
+    Ok(())
 }
 
 /// A unique import name for a conftest whose module name is already taken
@@ -2096,6 +2109,12 @@ pub fn make_node(py: Python<'_>, item: &TestItem) -> PyResult<Py<PyAny>> {
         item.path.to_string_lossy().as_ref(),
         item.lineno,
     ))?;
+    // node.config: plugins reach the pluginmanager and stash through it
+    // (e.g. pytest-timeout's item.config.pluginmanager.hook). The proxy is
+    // initialized at configure time, well before any node exists.
+    if let Some(proxy) = CONFIG_PROXY.get() {
+        node.setattr("config", proxy.bind(py))?;
+    }
     Ok(node.unbind())
 }
 
@@ -2121,10 +2140,10 @@ pub fn scan_py_hooks(
     Ok(())
 }
 
-/// Call a conftest hook with only the keyword arguments its signature
-/// requests. Generator hooks (pytest wrapper style: `return (yield)`) are
-/// driven to completion: setup before the yield, the rest right after.
-pub fn call_py_hook(
+/// Call a conftest/plugin hook with only the keyword arguments its
+/// signature requests, without driving generator results — callers that
+/// wrap a phase (hookwrappers) advance/finish the generator themselves.
+pub fn call_py_hook_raw(
     py: Python<'_>,
     func: &Py<PyAny>,
     available: &[(&str, Py<PyAny>)],
@@ -2138,19 +2157,31 @@ pub fn call_py_hook(
         }
     }
     let empty = pyo3::types::PyTuple::empty(py);
-    let result = func.call(empty, Some(&kwargs))?;
+    Ok(func.call(empty, Some(&kwargs))?.unbind())
+}
+
+/// Call a conftest hook with only the keyword arguments its signature
+/// requests. Generator hooks (pytest wrapper style: `return (yield)`) are
+/// driven to completion: setup before the yield, the rest right after.
+pub fn call_py_hook(
+    py: Python<'_>,
+    func: &Py<PyAny>,
+    available: &[(&str, Py<PyAny>)],
+) -> PyResult<Py<PyAny>> {
+    let result = call_py_hook_raw(py, func, available)?;
+    let result = result.bind(py);
 
     let inspect = py.import("inspect")?;
     let is_generator: bool = inspect
         .getattr("isgenerator")?
-        .call1((&result,))?
+        .call1((result,))?
         .extract()?;
     if !is_generator {
-        return Ok(result.unbind());
+        return Ok(result.clone().unbind());
     }
     // Drive the wrapper: run to the yield, then to completion.
     let next_fn = py.import("builtins")?.getattr("next")?;
-    if let Err(err) = next_fn.call1((&result,)) {
+    if let Err(err) = next_fn.call1((result,)) {
         if err.is_instance_of::<pyo3::exceptions::PyStopIteration>(py) {
             return Ok(py.None());
         }
@@ -2163,6 +2194,16 @@ pub fn call_py_hook(
         Err(err) if err.is_instance_of::<pyo3::exceptions::PyStopIteration>(py) => Ok(py.None()),
         Err(err) => Err(err),
     }
+}
+
+/// Plugin-set session.shouldfail message (pytest._node._session_state),
+/// polled by the runner between items.
+pub fn session_shouldfail(py: Python<'_>) -> Option<String> {
+    py.import("pytest._node")
+        .and_then(|m| m.call_method0("session_shouldfail"))
+        .ok()?
+        .extract()
+        .ok()?
 }
 
 /// Evaluate a (skipif) condition string in a test module's namespace.

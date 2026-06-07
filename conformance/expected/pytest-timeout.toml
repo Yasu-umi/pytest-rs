@@ -1,0 +1,8 @@
+# Upstream pytest-timeout test files that must keep passing under pytest-rs.
+# This list only grows; a regression here fails CI.
+#
+# Two pytester.spawn_pytest tests (pexpect-driven interactive sessions, a
+# deliberate pytester gap) are deselected in suites.toml.
+
+[files]
+"test_pytest_timeout.py" = "passed"

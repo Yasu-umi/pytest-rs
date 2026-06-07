@@ -213,6 +213,12 @@ impl Engine {
                     break;
                 }
             }
+            // Plugin-set session.shouldfail (pytest-timeout's session
+            // deadline) aborts the run with its message banner.
+            if let Some(msg) = python::session_shouldfail(py) {
+                session.shouldfail = Some(msg);
+                break;
+            }
         }
         // Final scope teardowns, before the progress line closes so a
         // failing teardown's E joins the last test's progress chars.
@@ -371,6 +377,41 @@ fn with_progress(body: &str, done: usize, total: usize) -> String {
 }
 
 pub(crate) fn run_one(
+    py: Python<'_>,
+    plugins: &[Box<dyn Plugin>],
+    session: &mut Session,
+    config: &Config,
+    item: &TestItem,
+) -> Vec<TestReport> {
+    // pytest_runtest_protocol hookwrappers (e.g. pytest-timeout's timer)
+    // surround the whole setup/call/teardown protocol: their pre-yield part
+    // runs now, the rest after the item finishes.
+    let wrappers =
+        match start_runtest_py_wrappers(py, session, item, "pytest_runtest_protocol", false) {
+            Ok(wrappers) => wrappers,
+            Err(err) => {
+                return vec![report_from_err(
+                    py,
+                    config,
+                    item,
+                    Phase::Setup,
+                    Instant::now(),
+                    &err,
+                )];
+            }
+        };
+    let reports = run_one_body(py, plugins, session, config, item);
+    if let Err(err) = finish_runtest_py_wrappers(py, &wrappers) {
+        eprintln!(
+            "pytest_runtest_protocol wrapper teardown failed for {}: {}",
+            item.nodeid,
+            err.value(py)
+        );
+    }
+    reports
+}
+
+fn run_one_body(
     py: Python<'_>,
     plugins: &[Box<dyn Plugin>],
     session: &mut Session,
@@ -759,23 +800,38 @@ pub(crate) fn run_one(
     }
     python::log_start_phase(py, "call", log_level_cfg.as_deref());
     let call_started = Instant::now();
-    let call_result = (|| -> PyResult<bool> {
-        fire_runtest_py_hooks(py, session, item, "pytest_runtest_call")?;
-        let mut ctx = HookContext {
-            py,
-            session,
-            config,
+    // pytest_runtest_call hookwrappers surround just the call phase; their
+    // post-yield part runs after the test body, pass or fail.
+    let (call_wrappers, wrapper_start_err) =
+        match start_runtest_py_wrappers(py, session, item, "pytest_runtest_call", true) {
+            Ok(wrappers) => (wrappers, None),
+            Err(err) => (Vec::new(), Some(err)),
         };
-        for plugin in plugins {
-            if plugin
-                .pytest_pyfunc_call(&mut ctx, item, &callable, &kwargs)?
-                .is_some()
-            {
-                return Ok(true);
+    let call_result = if let Some(err) = wrapper_start_err {
+        Err(err)
+    } else {
+        (|| -> PyResult<bool> {
+            let mut ctx = HookContext {
+                py,
+                session,
+                config,
+            };
+            for plugin in plugins {
+                if plugin
+                    .pytest_pyfunc_call(&mut ctx, item, &callable, &kwargs)?
+                    .is_some()
+                {
+                    return Ok(true);
+                }
             }
-        }
-        Ok(false)
-    })();
+            Ok(false)
+        })()
+    };
+    // The original error wins over a wrapper-teardown one.
+    let call_result = match finish_runtest_py_wrappers(py, &call_wrappers) {
+        Ok(()) => call_result,
+        Err(err) => call_result.and(Err(err)),
+    };
 
     // Quiet subtest verbosity (default) hides non-failed subtest reports.
     let quiet_subtests = config
@@ -1667,6 +1723,68 @@ fn fire_runtest_py_hooks(
     let node = python::make_node(py, item)?;
     for func in funcs {
         python::call_py_hook(py, &func, &[("item", node.clone_ref(py))])?;
+    }
+    Ok(())
+}
+
+/// Start `name` py hookwrappers around a phase: generator-function impls
+/// (pluggy wrapper style, e.g. pytest-timeout's timer) advance to their
+/// yield and are returned so the caller finishes them once the wrapped
+/// phase is over. Plain impls either run immediately (`call_plain`, the
+/// pytest_runtest_call behavior) or are skipped — a plain
+/// pytest_runtest_protocol impl REPLACES the protocol upstream
+/// (firstresult), which pytest-rs does not emulate; invoking it for side
+/// effects would run foreign protocol code on top of ours.
+fn start_runtest_py_wrappers(
+    py: Python<'_>,
+    session: &Session,
+    item: &TestItem,
+    name: &str,
+    call_plain: bool,
+) -> PyResult<Vec<Py<PyAny>>> {
+    let funcs: Vec<Py<PyAny>> = session
+        .py_hooks
+        .iter()
+        .filter(|hook| hook.name == name && item.nodeid.starts_with(hook.baseid.as_str()))
+        .map(|hook| hook.func.clone_ref(py))
+        .collect();
+    if funcs.is_empty() {
+        return Ok(Vec::new());
+    }
+    let node = python::make_node(py, item)?;
+    let next_fn = py.import("builtins")?.getattr("next")?;
+    let isgenfunc = py.import("inspect")?.getattr("isgeneratorfunction")?;
+    let mut wrappers = Vec::new();
+    for func in funcs {
+        if !isgenfunc.call1((func.bind(py),))?.extract::<bool>()? {
+            if call_plain {
+                python::call_py_hook(py, &func, &[("item", node.clone_ref(py))])?;
+            }
+            continue;
+        }
+        let result = python::call_py_hook_raw(py, &func, &[("item", node.clone_ref(py))])?;
+        let bound = result.bind(py);
+        match next_fn.call1((bound,)) {
+            Ok(_) => wrappers.push(result.clone_ref(py)),
+            Err(err) if err.is_instance_of::<pyo3::exceptions::PyStopIteration>(py) => {}
+            Err(err) => return Err(err),
+        }
+    }
+    Ok(wrappers)
+}
+
+/// Finish started hookwrappers in reverse order (pluggy unwinds LIFO).
+fn finish_runtest_py_wrappers(py: Python<'_>, wrappers: &[Py<PyAny>]) -> PyResult<()> {
+    for wrapper in wrappers.iter().rev() {
+        match wrapper.bind(py).call_method1("send", (py.None(),)) {
+            Ok(_) => {
+                return Err(pyo3::exceptions::PyRuntimeError::new_err(
+                    "hook wrapper yielded more than once",
+                ));
+            }
+            Err(err) if err.is_instance_of::<pyo3::exceptions::PyStopIteration>(py) => {}
+            Err(err) => return Err(err),
+        }
     }
     Ok(())
 }

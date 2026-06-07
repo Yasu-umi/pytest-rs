@@ -62,6 +62,22 @@ tag = "v5.1.0"
 testpaths = ["tests"]
 enabled = true
 
+[pytest-timeout]
+repo = "https://github.com/pytest-dev/pytest-timeout"
+tag = "2.4.0"
+testpaths = ["test_pytest_timeout.py"]
+# The dist install (entry point metadata) drives autoload; the flat-layout
+# checkout shadows the import at the same version.
+deps = ["pytest-timeout==2.4.0", "pexpect"]
+pythonpath = ["."]
+# pytester.spawn_pytest (pexpect-driven interactive sessions) is a
+# deliberate pytester gap; deselect so the rest gates as all-pass.
+deselect = [
+    "test_pytest_timeout.py::test_suppresses_timeout_when_debugger_is_entered[pdb-set_trace()]",
+    "test_pytest_timeout.py::test_disable_debugger_detection_flag[pdb-set_trace()]",
+]
+enabled = true
+
 [anyio]
 repo = "https://github.com/agronholm/anyio"
 # 4.13.0+: the re-entrant runner guard wording in pytest-rs-anyio matches

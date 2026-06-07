@@ -104,6 +104,30 @@ class DoctestNode:
         record_added_mark(marker)
 
 
+# Session.shouldfail set by plugins (pytest-timeout's session deadline):
+# the runner polls this between items and aborts with the message banner.
+_session_state = {"shouldfail": None}
+
+
+def session_shouldfail():
+    return _session_state["shouldfail"]
+
+
+class _NodeSession:
+    """Minimal stand-in for pytest's Session as seen from item.session."""
+
+    def __init__(self, config):
+        self.config = config
+
+    @property
+    def shouldfail(self):
+        return _session_state["shouldfail"]
+
+    @shouldfail.setter
+    def shouldfail(self, value):
+        _session_state["shouldfail"] = value
+
+
 class Node(Item):
     def __init__(
         self, nodeid, name, marks, fixturenames=None, function=None, path=None, lineno=None
@@ -125,6 +149,12 @@ class Node(Item):
         for marker in self.own_markers:
             keywords[marker.name] = marker
         return keywords
+
+    @property
+    def session(self):
+        """item.session shim: enough for plugins reaching
+        item.session.config (e.g. pytest-timeout's session deadline)."""
+        return _NodeSession(getattr(self, "config", None))
 
     def warn(self, warning):
         """Issue a warning attributed to this item's definition site

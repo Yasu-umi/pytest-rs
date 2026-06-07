@@ -48,6 +48,19 @@ At build time, when installing from source — bundled plugins are Cargo feature
 config-settings-package = { pytest-rs = { build-args = "--no-default-features --features asyncio,mock" } }
 ```
 
+### Third-party plugins (not reimplemented, loaded as-is)
+
+Installed `pytest11` entry points load through the `pytest` API shim — plugins pytest-rs does **not** reimplement can still work as-is. The supported surface includes fixtures, markers, `pytest_addoption` (plugin `--flags` and ini options), `config.stash`, custom hookspecs (`pytest_addhooks`), and `pytest_runtest_protocol`/`pytest_runtest_call` hookwrappers. Spot-verified status:
+
+| status | plugins |
+|---|---|
+| works — upstream test suite gates CI | `pytest-timeout` (40/41, see conformance below); `anyio`'s own plugin module also loads this way |
+| works — smoke-tested | `Faker`, `time-machine`, `requests-mock`, `pytest-randomly` (test reordering + seed header) |
+| loads, but no visible effect | `pytest-sugar`, `pytest-pretty` — they replace pytest's terminal reporter object, which pytest-rs owns natively; runs are unaffected |
+| not working yet | `pytest-env` — needs the `pytest_load_initial_conftests` early hook |
+
+A plugin that fails to import (e.g. it reaches into pytest/pluggy internals the shim doesn't provide) warns and is skipped without breaking the run. `-p no:NAME` and `PYTEST_DISABLE_PLUGIN_AUTOLOAD` opt out, like pytest.
+
 ## Performance
 
 Native startup, collection, fixture orchestration, parallel workers (fork-based) and coverage measurement. Where it pays off:
@@ -66,7 +79,7 @@ hyperfine -w 1 'pytest -q' 'pytest-rs'
 
 - unix only (no Windows)
 - no `--pdb` / debugger integration yet
-- third-party pytest plugins are loaded via the `pytest11` entry point and the `pytest` API shim; plugins reaching deep into pytest internals may not work
+- third-party pytest plugins are loaded via the `pytest11` entry point and the `pytest` API shim; plugins reaching deep into pytest internals may not work (see "Third-party plugins" above for verified examples)
 
 ## Conformance testing
 
