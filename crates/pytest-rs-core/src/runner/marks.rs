@@ -16,12 +16,20 @@ pub(crate) fn marks_for_eval(py: Python<'_>, item: &TestItem) -> Vec<(String, Py
 }
 
 /// conftest pytest_markeval_namespace hook results (usually none).
-pub(crate) fn markeval_namespaces(py: Python<'_>, session: &Session) -> Vec<Py<PyAny>> {
-    let hooks: Vec<&crate::session::PyHook> = session
+pub(crate) fn markeval_namespaces(
+    py: Python<'_>,
+    session: &Session,
+    item: &TestItem,
+) -> Vec<Py<PyAny>> {
+    // Only conftests on the item's path apply; closest first (upstream's
+    // LIFO hook results), so the deepest conftest's names win.
+    let mut hooks: Vec<&crate::session::PyHook> = session
         .py_hooks
         .iter()
         .filter(|hook| hook.name == "pytest_markeval_namespace")
+        .filter(|hook| hook.baseid.is_empty() || item.nodeid.starts_with(hook.baseid.as_str()))
         .collect();
+    hooks.sort_by_key(|hook| std::cmp::Reverse(hook.baseid.len()));
     if hooks.is_empty() {
         return Vec::new();
     }
@@ -60,7 +68,7 @@ pub(crate) fn evaluate_skip_marks(
                 marks_for_eval(py, item),
                 item.module_name.as_str(),
                 config_obj,
-                markeval_namespaces(py, session),
+                markeval_namespaces(py, session, item),
             ),
         )?
         .extract()
@@ -127,7 +135,7 @@ pub(crate) fn evaluate_xfail_marks(
             item.module_name.as_str(),
             config_obj,
             strict_default,
-            markeval_namespaces(py, session),
+            markeval_namespaces(py, session, item),
         ),
     )?;
     if result.is_none() {

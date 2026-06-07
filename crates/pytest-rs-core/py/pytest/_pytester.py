@@ -372,6 +372,64 @@ class Pytester:
                 items.append(item)
         return items, reprec
 
+    def getitems(self, source):
+        """Collect Function item nodes from the source in-process (a light
+        collection: module import + test functions/Test-class methods with
+        merged marks — enough for the mark-evaluation tests; no fixtures)."""
+        import importlib.util
+        import sys
+
+        from pytest._marks import get_unpacked_marks
+        from pytest._node import Function
+
+        path = self.makepyfile(source)
+        module_name = path.stem
+        spec = importlib.util.spec_from_file_location(module_name, path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+
+        config = self._request.config if self._request is not None else None
+        module_marks = get_unpacked_marks(module)
+
+        def make_item(func, nodeid_name, extra_marks):
+            marks = [*get_unpacked_marks(func), *extra_marks, *module_marks]
+            lineno = getattr(getattr(func, "__code__", None), "co_firstlineno", 0)
+            node = Function(
+                f"{path.name}::{nodeid_name}",
+                nodeid_name.rsplit("::", 1)[-1],
+                marks,
+                [],
+                func,
+                str(path),
+                lineno,
+            )
+            node.module = module
+            node.parent = None
+            if config is not None:
+                node.config = config
+            return node
+
+        items = []
+        for name, obj in vars(module).items():
+            if name.startswith("test") and callable(obj) and not isinstance(obj, type):
+                items.append(make_item(obj, name, []))
+            elif name.startswith("Test") and isinstance(obj, type):
+                class_marks = get_unpacked_marks(obj)
+                for mname, mobj in vars(obj).items():
+                    mobj = getattr(mobj, "__func__", mobj)
+                    if mname.startswith("test") and callable(mobj):
+                        items.append(make_item(mobj, f"{name}::{mname}", class_marks))
+        return items
+
+    def getitem(self, source, funcname="test_func"):
+        """The single collected item named funcname (upstream getitem)."""
+        for item in self.getitems(source):
+            if item.name == funcname:
+                return item
+        fail(f"{funcname!r} item not found in module:\n{source}")
+
     def mkpydir(self, name):
         path = self.path / name
         path.mkdir(parents=True)
