@@ -284,6 +284,14 @@ pub fn collect_conftest(
 ) -> PyResult<()> {
     let (basedir, module_name) = module_name_for(path);
     sys_path_prepend(py, &basedir)?;
+    let sys_path_dbg: Vec<String> = py.import("sys")?.getattr("path")?.extract()?;
+    eprintln!(
+        "DEBUG collect_conftest: path={}, module_name={}, basedir={}, sys_path[0..3]={:?}",
+        path.display(),
+        module_name,
+        basedir.display(),
+        &sys_path_dbg[..sys_path_dbg.len().min(3)]
+    );
     // Conftests in nested directories (without __init__.py) all resolve to
     // the module name "conftest"; a plain import would alias them to the
     // first one imported. Import shadowed ones under a unique name instead.

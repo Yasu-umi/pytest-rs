@@ -66,6 +66,8 @@ pub struct CovPlugin {
     sources: Vec<PathBuf>,
     reports: Vec<ReportSpec>,
     fail_under: Option<f64>,
+    /// --cov-precision / [report] precision: Cover column decimals.
+    precision: usize,
     exclude_patterns: Vec<regex::Regex>,
     collector: Option<Py<LineCollector>>,
     data: Option<CoverageData>,
@@ -96,6 +98,7 @@ impl CovPlugin {
             sources: Vec::new(),
             reports: Vec::new(),
             fail_under: None,
+            precision: 0,
             exclude_patterns: Vec::new(),
             collector: None,
             data: None,
@@ -385,18 +388,32 @@ impl CovPlugin {
 
     /// A string `[run]` option, same config sources as run_option_enabled.
     fn run_option_value(rootdir: &Path, cov_config: Option<&str>, option: &str) -> Option<String> {
+        Self::section_option_value(rootdir, cov_config, "run", option)
+    }
+
+    /// One option from a coverage config section ([SECTION] in
+    /// .coveragerc/setup.cfg/tox.ini — also the [coverage:SECTION]
+    /// spelling — or [tool.coverage.SECTION] in pyproject.toml).
+    fn section_option_value(
+        rootdir: &Path,
+        cov_config: Option<&str>,
+        section: &str,
+        option: &str,
+    ) -> Option<String> {
+        let prefixed = format!("[{section}]");
+        let spelled = format!("[coverage:{section}]");
         for candidate in [cov_config.unwrap_or(".coveragerc"), "setup.cfg", "tox.ini"] {
             let Ok(content) = std::fs::read_to_string(rootdir.join(candidate)) else {
                 continue;
             };
-            let mut in_run = false;
+            let mut in_section = false;
             for line in content.lines() {
                 let trimmed = line.trim();
                 if trimmed.starts_with('[') {
-                    in_run = trimmed == "[run]" || trimmed == "[coverage:run]";
+                    in_section = trimmed == prefixed || trimmed == spelled;
                     continue;
                 }
-                if in_run
+                if in_section
                     && let Some((key, value)) = trimmed.split_once('=')
                     && key.trim() == option
                 {
@@ -409,8 +426,8 @@ impl CovPlugin {
             && let Some(value) = document
                 .get("tool")
                 .and_then(|tool| tool.get("coverage"))
-                .and_then(|coverage| coverage.get("run"))
-                .and_then(|run| run.get(option))
+                .and_then(|coverage| coverage.get(section))
+                .and_then(|table| table.get(option))
         {
             return value
                 .as_str()
@@ -418,6 +435,14 @@ impl CovPlugin {
                 .or_else(|| Some(value.to_string()));
         }
         None
+    }
+
+    /// Truthy ini value ("true"/"1"/"yes"/"on", case-insensitive).
+    fn truthy(value: &str) -> bool {
+        matches!(
+            value.to_ascii_lowercase().as_str(),
+            "true" | "1" | "yes" | "on"
+        )
     }
 
     /// A boolean `[run]` option: from --cov-config / .coveragerc /
@@ -488,7 +513,17 @@ impl CovPlugin {
         let rootdir = &ctx.config.rootdir;
         let message = match kind {
             ReportKind::Html => {
-                let dir = dest.unwrap_or("htmlcov");
+                let configured = Self::section_option_value(
+                    &ctx.config.rootdir,
+                    ctx.config.get_value("cov-config"),
+                    "html",
+                    "directory",
+                );
+                let dir = dest
+                    .map(str::to_string)
+                    .or(configured)
+                    .unwrap_or_else(|| "htmlcov".to_string());
+                let dir = dir.as_str();
                 let kwargs = core_pyo3::types::PyDict::new(py);
                 kwargs.set_item("directory", rootdir.join(dir).to_string_lossy().as_ref())?;
                 cov.call_method("html_report", (), Some(&kwargs))?;
@@ -545,6 +580,7 @@ impl CovPlugin {
         &self,
         ctx: &mut HookContext,
         hits: &mut HashMap<String, BTreeSet<u32>>,
+        arcs: &mut ArcMap,
     ) -> PyResult<()> {
         let py = ctx.py;
         let Ok(coverage_mod) = py.import("coverage") else {
@@ -565,11 +601,21 @@ impl CovPlugin {
             let Some(lines) = lines else { continue };
             // Data may hold rootdir-relative paths ([run] relative_files).
             let absolute = if Path::new(&file).is_absolute() {
-                file
+                file.clone()
             } else {
                 rootdir.join(&file).to_string_lossy().to_string()
             };
-            hits.entry(absolute).or_default().extend(lines);
+            hits.entry(absolute.clone()).or_default().extend(lines);
+        }
+        // Previous branch runs' arcs come from the sidecar (the data file
+        // itself only holds lines).
+        let sidecar = Self::arcs_sidecar_path(ctx);
+        if let Ok(text) = std::fs::read_to_string(&sidecar)
+            && let Ok(prior) = serde_json::from_str::<HashMap<String, Vec<(u32, i64, u8)>>>(&text)
+        {
+            for (file, file_arcs) in prior {
+                arcs.entry(file).or_default().extend(file_arcs);
+            }
         }
         Ok(())
     }
@@ -590,6 +636,7 @@ impl CovPlugin {
         &self,
         ctx: &mut HookContext,
         hits: &HashMap<String, BTreeSet<u32>>,
+        arcs: &ArcMap,
     ) -> PyResult<()> {
         let py = ctx.py;
         let Ok(coverage_mod) = py.import("coverage") else {
@@ -637,7 +684,29 @@ impl CovPlugin {
         }
         data.call_method1("add_lines", (lines,))?;
         data.call_method0("write")?;
+        // Branch arcs use an internal representation (src, dst, direction)
+        // that coverage.py's data model cannot hold; a sidecar JSON next to
+        // the data file lets --cov-append restore them.
+        let sidecar = Self::arcs_sidecar_path(ctx);
+        if arcs.values().any(|file_arcs| !file_arcs.is_empty()) {
+            let serializable: HashMap<&String, Vec<(u32, i64, u8)>> = arcs
+                .iter()
+                .map(|(file, file_arcs)| (file, file_arcs.iter().copied().collect()))
+                .collect();
+            if let Ok(text) = serde_json::to_string(&serializable) {
+                let _ = std::fs::write(&sidecar, text);
+            }
+        } else if !append {
+            let _ = std::fs::remove_file(&sidecar);
+        }
         Ok(())
+    }
+
+    /// The branch-arcs sidecar next to the `.coverage` data file.
+    fn arcs_sidecar_path(ctx: &HookContext) -> PathBuf {
+        let mut path = Self::data_file_path(ctx).into_os_string();
+        path.push(".pytest-rs-arcs");
+        PathBuf::from(path)
     }
 
     fn build_data(
@@ -815,6 +884,16 @@ impl Plugin for CovPlugin {
             "--cov-append",
             "do not delete coverage but append to current (combined report)",
         ));
+        parser.add_option(OptDef::value(
+            "--cov-precision",
+            None,
+            "override the reporting precision (decimals in the Cover column)",
+        ));
+        parser.add_option(OptDef::flag(
+            "--cov-reset",
+            "accepted but inert: resets preceding --cov options (positional \
+             option order is not tracked; later --cov values still apply)",
+        ));
         parser.add_option(OptDef::flag(
             "--no-cov-on-fail",
             "accepted but inert: reports are cheap enough to always print",
@@ -838,10 +917,55 @@ impl Plugin for CovPlugin {
                 .map_err(|e| core_pyo3::exceptions::PyOSError::new_err(e.to_string()))?;
         }
 
-        let Some(cov_values) = ctx.config.get_values("cov") else {
+        let Some(mut cov_values) = ctx
+            .config
+            .get_values("cov")
+            .map(|values| values.iter().map(|v| v.to_string()).collect::<Vec<_>>())
+        else {
             return Ok(());
         };
+        // --cov-reset clears the --cov options seen so far; option order
+        // matters, so rescan argv when it appears.
+        if ctx.config.get_flag("cov-reset") {
+            let mut rescanned: Vec<String> = Vec::new();
+            for arg in &ctx.config.effective_args {
+                if arg == "--cov" {
+                    rescanned.push(String::new());
+                } else if let Some(value) = arg.strip_prefix("--cov=") {
+                    rescanned.push(value.to_string());
+                } else if arg == "--cov-reset" {
+                    rescanned.clear();
+                }
+            }
+            if rescanned.is_empty() {
+                return Ok(());
+            }
+            cov_values = rescanned;
+        }
         if ctx.config.get_flag("no-cov") {
+            // Cov options appearing AFTER --no-cov: tell the user, like
+            // pytest-cov (a printed line plus a warning). Options given
+            // before --no-cov (e.g. --cov --no-cov) stay silent.
+            let args = &ctx.config.effective_args;
+            let after_no_cov = args
+                .iter()
+                .rposition(|arg| arg == "--no-cov")
+                .map(|pos| &args[pos + 1..])
+                .unwrap_or(&[]);
+            if after_no_cov
+                .iter()
+                .any(|arg| arg == "--cov" || arg.starts_with("--cov=") || arg.starts_with("--cov-"))
+            {
+                let message = "Coverage disabled via --no-cov switch!";
+                println!("WARNING: {message}");
+                let _ = pytest_rs_core::python::warn_explicit_at(
+                    py,
+                    "PytestWarning",
+                    message,
+                    "pytest_cov/plugin.py",
+                    0,
+                );
+            }
             return Ok(());
         }
         self.enabled = true;
@@ -856,6 +980,42 @@ impl Plugin for CovPlugin {
             .map(|value| Self::resolve_source(&rootdir, value))
             .collect();
         self.reports = Self::parse_reports(py, ctx.config.get_values("cov-report"))?;
+        let cov_config = ctx.config.get_value("cov-config");
+        let plain_rootdir = ctx.config.rootdir.clone();
+        // [report] show_missing / skip_covered upgrade the term spec like
+        // the --cov-report=term-missing:skip-covered spellings.
+        if Self::section_option_value(&plain_rootdir, cov_config, "report", "show_missing")
+            .is_some_and(|value| Self::truthy(&value))
+        {
+            for spec in &mut self.reports {
+                if matches!(spec.kind, ReportKind::Term) {
+                    spec.kind = ReportKind::TermMissing;
+                }
+            }
+        }
+        if Self::section_option_value(&plain_rootdir, cov_config, "report", "skip_covered")
+            .is_some_and(|value| Self::truthy(&value))
+        {
+            for spec in &mut self.reports {
+                if matches!(spec.kind, ReportKind::Term | ReportKind::TermMissing) {
+                    spec.skip_covered = true;
+                }
+            }
+        }
+        self.precision = ctx
+            .config
+            .get_value("cov-precision")
+            .map(str::to_string)
+            .or_else(|| {
+                Self::section_option_value(&plain_rootdir, cov_config, "report", "precision")
+            })
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(0);
+        // NOTE: [report] fail_under is deliberately NOT read from the
+        // coverage config: our native measurement can undercount versus
+        // coverage.py (subprocess merge gaps), so honoring a project's
+        // fail_under gate would fail runs that real pytest-cov passes
+        // (pytest-split's own suite sets fail_under=90).
         self.fail_under = ctx
             .config
             .get_value("cov-fail-under")
@@ -1082,10 +1242,10 @@ impl Plugin for CovPlugin {
         for (file, file_arcs) in self.worker_arcs.drain() {
             arcs.entry(file).or_default().extend(file_arcs);
         }
-        self.write_data_file(ctx, &hits)?;
         if ctx.config.get_flag("cov-append") {
-            self.merge_appended_data(ctx, &mut hits)?;
+            self.merge_appended_data(ctx, &mut hits, &mut arcs)?;
         }
+        self.write_data_file(ctx, &hits, &arcs)?;
         let rootdir = ctx
             .config
             .rootdir
@@ -1167,6 +1327,16 @@ impl Plugin for CovPlugin {
         let Some(data) = &self.data else {
             return Ok(());
         };
+        // --no-cov-on-fail: a failing session prints no coverage at all.
+        if ctx.config.get_flag("no-cov-on-fail")
+            && ctx
+                .session
+                .reports
+                .iter()
+                .any(|report| report.outcome == pytest_rs_core::report::Outcome::Failed)
+        {
+            return Ok(());
+        }
         let term_spec = self.reports.iter().find_map(|spec| match spec.kind {
             ReportKind::Term => Some((false, spec.skip_covered)),
             ReportKind::TermMissing => Some((true, spec.skip_covered)),
@@ -1185,7 +1355,12 @@ impl Plugin for CovPlugin {
             out.push_str(&report::render_header(&python_version));
         }
         if let Some((missing, skip_covered)) = term_spec {
-            out.push_str(&report::render_term(data, missing, skip_covered));
+            out.push_str(&report::render_term(
+                data,
+                missing,
+                skip_covered,
+                self.precision,
+            ));
         }
         for message in &self.report_messages {
             out.push_str(message);

@@ -155,6 +155,12 @@ impl Engine {
     /// only, like upstream.
     #[cfg(feature = "xdist")]
     pub(crate) fn resolve_numprocesses(&mut self, py: Python<'_>) -> Option<usize> {
+        // --tx gateway specs without -n: one worker per expanded spec.
+        if self.config.numprocesses_spec().is_none()
+            && let Some(workers) = self.config.tx_worker_chdirs()
+        {
+            return (!workers.is_empty()).then_some(workers.len());
+        }
         let value = self.config.numprocesses_spec()?.to_string();
         let n = match value.as_str() {
             "auto" | "logical" => {

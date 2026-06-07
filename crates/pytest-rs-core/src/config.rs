@@ -202,6 +202,9 @@ pub struct Config {
     ini_file: HashMap<String, String>,
     /// The config file's basename, for the "configfile:" header line.
     pub config_file_name: Option<String>,
+    /// The full argument list after addopts splicing — for plugins with
+    /// position-sensitive options (pytest-cov's --cov-reset / --no-cov).
+    pub effective_args: Vec<String>,
     /// Unknown `--flag[=value]` tokens deferred for python-plugin option
     /// specs (pytest_addoption): applied after plugin load, where clap
     /// cannot know them. Space-separated values are not supported.
@@ -420,7 +423,7 @@ impl Config {
             "traceconfig",     // accepted-but-inert: plugin trace header not implemented
             "keep-duplicates", // collect the same file once per duplicated arg
         ];
-        const CORE_VALUES: [(&str, Option<char>); 38] = [
+        const CORE_VALUES: [(&str, Option<char>); 40] = [
             ("confcutdir", None),
             ("deselect", None),
             ("log-level", None),
@@ -459,12 +462,18 @@ impl Config {
             ("dist", None),   // accepted-but-inert: module-affinity load is the only mode
             ("maxprocesses", None), // accepted-but-inert
             ("max-worker-restart", None), // accepted-but-inert: workers are not restarted
+            ("tx", None),     // xdist gateway specs ("2*popen", "popen//chdir=DIR")
+            ("rsyncdir", None), // accepted-but-inert: fork workers share the filesystem
         ];
         // Without the xdist feature these options stay unregistered, so
         // `-n` is an unknown-option usage error, like pytest without the
         // pytest-xdist plugin installed.
-        let xdist_only =
-            |name: &str| matches!(name, "numprocesses" | "dist" | "maxprocesses" | "worker");
+        let xdist_only = |name: &str| {
+            matches!(
+                name,
+                "numprocesses" | "dist" | "maxprocesses" | "worker" | "tx" | "rsyncdir"
+            )
+        };
         let has_xdist = cfg!(feature = "xdist");
         for flag in CORE_FLAGS {
             if !has_xdist && xdist_only(flag) {
@@ -592,6 +601,7 @@ impl Config {
         }
         let argv = kept;
 
+        let effective_args = argv.clone();
         let matches = match cmd.try_get_matches_from(argv) {
             Ok(matches) => matches,
             // --help/--version display and exit 0, like pytest (even when
@@ -656,7 +666,10 @@ impl Config {
             if name == "plugin" {
                 plugin_opts = parsed.iter().map(|v| v.to_string()).collect();
             }
-            if matches!(name, "deselect" | "doctest-glob" | "log-disable") {
+            if matches!(
+                name,
+                "deselect" | "doctest-glob" | "log-disable" | "tx" | "rsyncdir"
+            ) {
                 // Every occurrence matters (newline-joined for get_values).
                 let joined = parsed
                     .iter()
@@ -700,6 +713,7 @@ impl Config {
             ini_overrides,
             ini_file,
             config_file_name,
+            effective_args,
             plugin_args,
             reporter_delegated: std::sync::atomic::AtomicBool::new(false),
         })
@@ -850,6 +864,32 @@ impl Config {
     /// the interpreter is available.
     pub fn numprocesses_spec(&self) -> Option<&str> {
         self.get_value("numprocesses")
+    }
+
+    /// --tx gateway specs expanded to one entry per worker: the worker's
+    /// chdir directory (None for plain popen). "2*popen" repeats; only
+    /// local popen gateways are supported.
+    pub fn tx_worker_chdirs(&self) -> Option<Vec<Option<String>>> {
+        let specs = self.get_values("tx")?;
+        let mut workers = Vec::new();
+        for spec in specs {
+            let (count, rest) = match spec.split_once('*') {
+                Some((n, rest)) => (n.parse::<usize>().unwrap_or(1), rest),
+                None => (1, spec),
+            };
+            let mut parts = rest.split("//");
+            if parts.next() != Some("popen") {
+                continue; // ssh/socket gateways are not supported
+            }
+            let chdir = parts
+                .filter_map(|attr| attr.strip_prefix("chdir="))
+                .last()
+                .map(str::to_string);
+            for _ in 0..count {
+                workers.push(chdir.clone());
+            }
+        }
+        (!workers.is_empty()).then_some(workers)
     }
 
     /// --maxprocesses: caps -n auto / -n logical (not explicit -n N),

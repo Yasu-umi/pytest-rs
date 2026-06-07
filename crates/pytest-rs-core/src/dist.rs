@@ -410,6 +410,16 @@ impl Engine {
                         libc::close(*fd);
                     }
                 }
+                // --tx popen//chdir=DIR: this worker runs in DIR.
+                if let Some(Some(dir)) = self
+                    .config
+                    .tx_worker_chdirs()
+                    .as_ref()
+                    .and_then(|chdirs| chdirs.get(index))
+                    .map(|chdir| chdir.as_ref())
+                {
+                    let _ = std::env::set_current_dir(dir);
+                }
                 let code = self.run_worker_forked(py);
                 std::process::exit(code);
             }

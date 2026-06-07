@@ -93,24 +93,25 @@ impl CoverageData {
     }
 }
 
-/// Display percentage, coverage.py-style (display_covered): rounded, but
-/// 0% and 100% only appear when exact.
-fn percent_display(covered: usize, total: usize) -> String {
+/// Display percentage, coverage.py-style (display_covered): rounded to
+/// `precision` decimals, but 0% and 100% only appear when exact.
+fn percent_display(covered: usize, total: usize, precision: usize) -> String {
     if total == 0 || covered == total {
-        return "100%".to_string();
+        return format!("{:.precision$}%", 100.0_f64);
     }
     if covered == 0 {
-        return "0%".to_string();
+        return format!("{:.precision$}%", 0.0_f64);
     }
     let pct = covered as f64 / total as f64 * 100.0;
-    let display = if pct > 0.0 && pct < 1.0 {
-        1.0
-    } else if pct > 99.0 && pct < 100.0 {
-        99.0
+    let unit = 10.0_f64.powi(-(precision as i32));
+    let display = if pct > 0.0 && pct < unit {
+        unit
+    } else if pct > 100.0 - unit && pct < 100.0 {
+        100.0 - unit
     } else {
-        pct.round()
+        (pct / unit).round() * unit
     };
-    format!("{display:.0}%")
+    format!("{display:.precision$}%")
 }
 
 fn percent_exact_units(covered: usize, total: usize) -> f64 {
@@ -211,7 +212,12 @@ pub fn render_header(python_version: &str) -> String {
 }
 
 /// The pytest-cov terminal table (term / term-missing), header excluded.
-pub fn render_term(data: &CoverageData, missing: bool, skip_covered: bool) -> String {
+pub fn render_term(
+    data: &CoverageData,
+    missing: bool,
+    skip_covered: bool,
+    precision: usize,
+) -> String {
     let mut out = String::new();
     out.push('\n');
 
@@ -223,6 +229,18 @@ pub fn render_term(data: &CoverageData, missing: bool, skip_covered: bool) -> St
         .max()
         .unwrap_or(4);
     let branch = data.branch;
+    // The Cover column grows with --cov-precision ("88.888889%").
+    let cover_width = data
+        .rows
+        .iter()
+        .map(|row| {
+            let (covered_units, total_units) = row.units();
+            percent_display(covered_units, total_units, precision).len()
+        })
+        .chain(["Cover".len()])
+        .max()
+        .unwrap_or(5)
+        + 2;
     let render_row = |name: &str,
                       stmts: usize,
                       miss: usize,
@@ -234,7 +252,7 @@ pub fn render_term(data: &CoverageData, missing: bool, skip_covered: bool) -> St
         if branch {
             line.push_str(&format!("{branches:>9}{partial:>9}"));
         }
-        line.push_str(&format!("{cover:>7}"));
+        line.push_str(&format!("{cover:>cover_width$}"));
         if let Some(ranges) = ranges
             && !ranges.is_empty()
         {
@@ -243,7 +261,7 @@ pub fn render_term(data: &CoverageData, missing: bool, skip_covered: bool) -> St
         line
     };
     let header = format!(
-        "{:<name_width$}{:>8}{:>7}{}{:>7}{}",
+        "{:<name_width$}{:>8}{:>7}{}{:>cover_width$}{}",
         "Name",
         "Stmts",
         "Miss",
@@ -280,7 +298,7 @@ pub fn render_term(data: &CoverageData, missing: bool, skip_covered: bool) -> St
             row.miss(),
             row.n_branches(),
             row.n_partial(),
-            percent_display(covered_units, total_units),
+            percent_display(covered_units, total_units, precision),
             ranges,
         ));
         out.push('\n');
@@ -295,7 +313,7 @@ pub fn render_term(data: &CoverageData, missing: bool, skip_covered: bool) -> St
         data.total_miss(),
         data.total_branches(),
         data.total_partial(),
-        percent_display(total_covered, total_units),
+        percent_display(total_covered, total_units, precision),
         None,
     ));
     out.push('\n');

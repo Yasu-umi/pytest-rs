@@ -380,11 +380,11 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | pass % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 1404 | 723 | 42 | 24 | 2193 | 64.0% | 6 | 45 | 63 |
+| pytest | 9.0.3 | 1405 | 722 | 42 | 24 | 2193 | 64.1% | 6 | 45 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 85 | 0 | 0 | 5 | 90 | 94.4% | 1 | 1 | 0 |
-| pytest-cov | v7.1.0 | 142 | 63 | 0 | 4 | 209 | 67.9% | 0 | 1 | 0 |
-| pytest-xdist | v3.8.0 | 63 | 34 | 0 | 0 | 97 | 64.9% | 0 | 1 | 6 |
+| pytest-cov | v7.1.0 | 182 | 23 | 0 | 4 | 209 | 87.1% | 0 | 1 | 0 |
+| pytest-xdist | v3.8.0 | 65 | 32 | 0 | 0 | 97 | 67.0% | 0 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 91 | 31 | 0 | 1 | 123 | 74.0% | 4 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 41 | 97.6% | 1 | 1 | 0 |
@@ -417,7 +417,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 |
 | testing/test_faulthandler.py | failed | 2 | 10 | 0 | 0 |
 | testing/test_helpconfig.py | failed | 2 | 10 | 0 | 0 |
-| testing/test_junitxml.py | failed | 127 | 9 | 1 | 0 |
+| testing/test_junitxml.py | failed | 128 | 8 | 1 | 0 |
 | testing/test_link_resolve.py | failed | 0 | 1 | 0 | 0 |
 | testing/test_main.py | failed | 1 | 12 | 11 | 0 |
 | testing/test_mark.py | failed | 76 | 30 | 0 | 0 |
@@ -503,7 +503,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| tests/test_pytest_cov.py | failed | 142 | 63 | 0 | 4 |
+| tests/test_pytest_cov.py | failed | 182 | 23 | 0 | 4 |
 
 </details>
 
@@ -513,7 +513,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| testing/acceptance_test.py | failed | 63 | 34 | 0 | 0 |
+| testing/acceptance_test.py | failed | 65 | 32 | 0 | 0 |
 
 </details>
 
