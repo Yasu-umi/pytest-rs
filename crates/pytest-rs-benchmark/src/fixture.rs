@@ -27,6 +27,9 @@ pub struct BenchConfig {
     pub calibration_precision: usize,
     pub warmup: bool,
     pub warmup_iterations: usize,
+    /// One extra invocation under cProfile after the timed rounds
+    /// (--benchmark-cprofile / @pytest.mark.benchmark(cprofile=True)).
+    pub cprofile: bool,
 }
 
 impl Default for BenchConfig {
@@ -39,7 +42,37 @@ impl Default for BenchConfig {
             calibration_precision: 10,
             warmup: false,
             warmup_iterations: 100_000,
+            cprofile: false,
         }
+    }
+}
+
+impl BenchConfig {
+    /// Apply @pytest.mark.benchmark(...) kwargs over the CLI/ini config,
+    /// like upstream's marker-beats-options resolution.
+    pub fn apply_marker_kwargs(&mut self, kwargs: &Bound<'_, PyDict>) -> PyResult<()> {
+        for (key, value) in kwargs.iter() {
+            let key: String = match key.extract() {
+                Ok(key) => key,
+                Err(_) => continue,
+            };
+            match key.as_str() {
+                "min_time" => self.min_time = value.extract()?,
+                "max_time" => self.max_time = value.extract()?,
+                "min_rounds" => self.min_rounds = value.extract()?,
+                "calibration_precision" => self.calibration_precision = value.extract()?,
+                "warmup" => self.warmup = value.extract()?,
+                "warmup_iterations" => self.warmup_iterations = value.extract()?,
+                "cprofile" => self.cprofile = value.extract()?,
+                "disable_gc" | "timer" | "group" => {
+                    // group is handled by the caller (it lands on the
+                    // fixture, not the config); disable_gc/timer are not
+                    // reproduced yet.
+                }
+                _ => {}
+            }
+        }
+        Ok(())
     }
 }
 
@@ -88,6 +121,11 @@ pub struct BenchmarkFixture {
     helper: Py<PyModule>,
     results: ResultStore,
     recorded: Mutex<Option<Py<PyStats>>>,
+    /// Injected timer (upstream's `benchmark._timer`, settable by tests);
+    /// None means perf_counter.
+    timer: Mutex<Option<Py<PyAny>>>,
+    /// `benchmark._min_time` override (calibration tests set it directly).
+    min_time_override: Mutex<Option<f64>>,
     #[pyo3(get)]
     extra_info: Py<PyDict>,
     #[pyo3(get, set)]
@@ -108,9 +146,29 @@ impl BenchmarkFixture {
             helper,
             results,
             recorded: Mutex::new(None),
+            timer: Mutex::new(None),
+            min_time_override: Mutex::new(None),
             extra_info: PyDict::new(py).unbind(),
             group: py.None(),
         })
+    }
+
+    /// The injected timer or None (helper functions default to
+    /// perf_counter when given None).
+    fn timer_obj(&self, py: Python<'_>) -> Py<PyAny> {
+        self.timer
+            .lock()
+            .expect("timer lock poisoned")
+            .as_ref()
+            .map(|t| t.clone_ref(py))
+            .unwrap_or_else(|| py.None())
+    }
+
+    fn effective_min_time(&self) -> f64 {
+        self.min_time_override
+            .lock()
+            .expect("min_time lock poisoned")
+            .unwrap_or(self.config.min_time)
     }
 
     fn record(&self, py: Python<'_>, times: &[f64], iterations: usize) -> PyResult<()> {
@@ -150,32 +208,57 @@ impl BenchmarkFixture {
         Ok(())
     }
 
-    /// Grow `loops` until one round meets min_time (pytest-benchmark's
-    /// calibration loop).
-    fn calibrate(
-        &self,
-        py: Python<'_>,
-        runner: &Bound<'_, PyAny>,
-        first_duration: f64,
-    ) -> PyResult<(usize, f64)> {
+    /// pytest-benchmark's _calibrate_timer: grow `loops` ×10 until the
+    /// round duration reaches an estimation threshold, then jump straight
+    /// to the projected count (bailing at 1 when the function is much
+    /// slower than the timer resolution). The warmup budget re-measures
+    /// inside the loop, keeping the minimum (real wall-clock bounded).
+    fn calibrate(&self, py: Python<'_>, runner: &Bound<'_, PyAny>) -> PyResult<(f64, usize)> {
         let helper = self.helper.bind(py);
-        let resolution: f64 = helper.getattr("resolution")?.call0()?.extract()?;
+        let timer = self.timer_obj(py);
+        let precision: f64 = helper
+            .getattr("resolution")?
+            .call1((timer.bind(py),))?
+            .extract()?;
         let min_time = self
-            .config
-            .min_time
-            .max(resolution * self.config.calibration_precision as f64);
+            .effective_min_time()
+            .max(precision * self.config.calibration_precision as f64);
+        let min_time_estimate = min_time * 5.0 / self.config.calibration_precision as f64;
 
+        let wall_clock = helper.getattr("wall_clock")?;
         let mut loops = 1usize;
-        let mut duration = first_duration;
-        while duration < min_time {
-            loops = if duration < min_time / 10.0 {
-                loops.saturating_mul(10)
+        loop {
+            let mut duration: f64 = runner.call1((loops,))?.extract()?;
+            if self.config.warmup {
+                let warmup_start: f64 = wall_clock.call0()?.extract()?;
+                let mut warmup_iterations = 0usize;
+                loop {
+                    let now: f64 = wall_clock.call0()?.extract()?;
+                    if now - warmup_start >= self.config.max_time
+                        || warmup_iterations >= self.config.warmup_iterations
+                    {
+                        break;
+                    }
+                    let measured: f64 = runner.call1((loops,))?.extract()?;
+                    duration = duration.min(measured);
+                    warmup_iterations += loops;
+                }
+            }
+            if duration >= min_time {
+                return Ok((duration, loops));
+            }
+            if duration >= min_time_estimate {
+                // Coarse estimation of the number of loops.
+                loops = (min_time * loops as f64 / duration).ceil() as usize;
+                if loops == 1 {
+                    // Nothing to calibrate if the function is 100 times
+                    // slower than the timer resolution.
+                    return Ok((duration, loops));
+                }
             } else {
-                loops.saturating_mul(2)
-            };
-            duration = runner.call1((loops,))?.extract()?;
+                loops = loops.saturating_mul(10);
+            }
         }
-        Ok((loops, duration))
     }
 
     fn run_rounds(
@@ -184,13 +267,19 @@ impl BenchmarkFixture {
         loops: usize,
         round_duration: f64,
     ) -> PyResult<Vec<f64>> {
-        let rounds = ((self.config.max_time / round_duration.max(1e-9)).ceil() as usize)
-            .clamp(self.config.min_rounds, 10_000);
+        let rounds = self.round_count(round_duration);
         let mut times = Vec::with_capacity(rounds);
         for _ in 0..rounds {
             times.push(runner.call1((loops,))?.extract()?);
         }
         Ok(times)
+    }
+
+    /// ceil(max_time / duration) clamped below by min_rounds (upstream).
+    fn round_count(&self, round_duration: f64) -> usize {
+        ((self.config.max_time / round_duration.max(1e-12)).ceil() as usize)
+            .max(self.config.min_rounds)
+            .min(100_000_000)
     }
 }
 
@@ -209,27 +298,74 @@ impl BenchmarkFixture {
             Some(kwargs) => kwargs.bind(py).as_any().clone(),
             None => PyDict::new(py).into_any(),
         };
-        // One timed call: calibration seed plus the caller's return value.
-        let (first_duration, result): (f64, Py<PyAny>) = helper
-            .getattr("timed_call")?
-            .call1((func.bind(py), args.bind(py), &kwargs_obj))?
-            .extract()?;
-        if self.config.disabled {
-            return Ok(result);
+        if !self.config.disabled {
+            let timer = self.timer_obj(py);
+            let runner = helper.getattr("make_runner")?.call1((
+                func.bind(py),
+                args.bind(py),
+                &kwargs_obj,
+                timer.bind(py),
+            ))?;
+            let (duration, loops) = self.calibrate(py, &runner)?;
+            let rounds = self.round_count(duration);
+            // Pre-measurement warmup rounds, bounded like upstream's _raw.
+            if self.config.warmup {
+                let warmup_rounds =
+                    rounds.min((self.config.warmup_iterations / loops.max(1)).max(1));
+                for _ in 0..warmup_rounds {
+                    runner.call1((loops,))?;
+                }
+            }
+            let times = self.run_rounds(&runner, loops, duration)?;
+            self.record(py, &times, loops)?;
+            // cprofile: the profiled invocations REPLACE the final plain
+            // call (upstream profiles loops_range invocations).
+            if self.config.cprofile {
+                let result = helper.getattr("cprofile_call")?.call1((
+                    func.bind(py),
+                    args.bind(py),
+                    &kwargs_obj,
+                    loops,
+                ))?;
+                return Ok(result.unbind());
+            }
         }
+        // The caller's return value comes from one plain final call, like
+        // upstream's _raw (also the only call in disabled mode).
+        let kwargs_dict = kwargs_obj.cast::<PyDict>()?;
+        let result = func
+            .bind(py)
+            .call(args.bind(py).clone(), Some(kwargs_dict))?;
+        Ok(result.unbind())
+    }
 
-        let runner =
-            helper
-                .getattr("make_runner")?
-                .call1((func.bind(py), args.bind(py), &kwargs_obj))?;
-        if self.config.warmup {
-            let warmup_loops = self.config.warmup_iterations.max(1);
-            runner.call1((warmup_loops,))?;
+    /// Upstream's `benchmark._timer` (calibration tests inject fake
+    /// timers directly on the fixture).
+    #[getter(_timer)]
+    fn get_timer(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        if let Some(timer) = self.timer.lock().expect("timer lock poisoned").as_ref() {
+            return Ok(timer.clone_ref(py));
         }
-        let (loops, duration) = self.calibrate(py, &runner, first_duration)?;
-        let times = self.run_rounds(&runner, loops, duration)?;
-        self.record(py, &times, loops)?;
-        Ok(result)
+        Ok(py.import("time")?.getattr("perf_counter")?.unbind())
+    }
+
+    #[setter(_timer)]
+    fn set_timer(&self, value: Py<PyAny>) {
+        *self.timer.lock().expect("timer lock poisoned") = Some(value);
+    }
+
+    /// Upstream's `benchmark._min_time` (settable for calibration tests).
+    #[getter(_min_time)]
+    fn get_min_time(&self) -> f64 {
+        self.effective_min_time()
+    }
+
+    #[setter(_min_time)]
+    fn set_min_time(&self, value: f64) {
+        *self
+            .min_time_override
+            .lock()
+            .expect("min_time lock poisoned") = Some(value);
     }
 
     #[getter]
@@ -306,6 +442,7 @@ impl BenchmarkFixture {
             Ok(())
         };
 
+        let timer = self.timer_obj(py);
         let make_result_runner = helper.getattr("make_result_runner")?;
         for _ in 0..warmup_rounds {
             apply_setup(py, &mut call_args, &mut call_kwargs)?;
@@ -313,6 +450,7 @@ impl BenchmarkFixture {
                 target.bind(py),
                 call_args.bind(py),
                 call_kwargs.bind(py),
+                timer.bind(py),
             ))?;
             runner.call1((iterations,))?;
         }
@@ -325,6 +463,7 @@ impl BenchmarkFixture {
                 target.bind(py),
                 call_args.bind(py),
                 call_kwargs.bind(py),
+                timer.bind(py),
             ))?;
             let (duration, round_result): (f64, Py<PyAny>) =
                 runner.call1((iterations,))?.extract()?;
@@ -343,6 +482,16 @@ impl BenchmarkFixture {
         }
         if !self.config.disabled {
             self.record(py, &times, iterations)?;
+        }
+        // cprofile: one more invocation under the profiler (with a fresh
+        // setup), like upstream's pedantic path.
+        if self.config.cprofile {
+            apply_setup(py, &mut call_args, &mut call_kwargs)?;
+            helper.getattr("cprofile_call")?.call1((
+                target.bind(py),
+                call_args.bind(py),
+                call_kwargs.bind(py),
+            ))?;
         }
         Ok(result)
     }

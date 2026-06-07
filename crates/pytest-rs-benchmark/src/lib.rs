@@ -123,6 +123,12 @@ impl Plugin for BenchmarkPlugin {
             Some("min"),
             "Column to sort the result table by: min, max, mean, stddev, name",
         ));
+        parser.add_option(OptDef::value(
+            "--benchmark-cprofile",
+            None,
+            "Run the benchmarked function once more under cProfile (the \
+             profile table column to sort by upstream; table not rendered)",
+        ));
         // Accepted-but-inert pytest-benchmark options (storage/comparison
         // features are not reproduced).
         for inert in [
@@ -169,6 +175,9 @@ impl Plugin for BenchmarkPlugin {
         }
         if let Some(value) = ctx.config.get_value("benchmark-sort") {
             self.sort = value.to_string();
+        }
+        if ctx.config.get_value("benchmark-cprofile").is_some() {
+            self.config.cprofile = true;
         }
 
         let helper = PyModule::from_code(
@@ -237,15 +246,38 @@ impl Plugin for BenchmarkPlugin {
         let Some(helper) = &self.helper else {
             return Ok(None);
         };
+        // @pytest.mark.benchmark(...) kwargs override the CLI/ini config
+        // for this item; `group` lands on the fixture itself.
+        let mut config = self.config.clone();
+        let mut group: Option<Py<PyAny>> = None;
+        for mark in &item.marks {
+            if mark.name != "benchmark" {
+                continue;
+            }
+            let Ok(kwargs) = mark.obj.bind(py).getattr("kwargs") else {
+                continue;
+            };
+            let Ok(kwargs) = kwargs.cast_into::<core_pyo3::types::PyDict>() else {
+                continue;
+            };
+            config.apply_marker_kwargs(&kwargs)?;
+            if let Ok(Some(value)) = kwargs.get_item("group") {
+                group = Some(value.unbind());
+            }
+        }
         let fixture = BenchmarkFixture::new(
             py,
             item.nodeid.clone(),
-            self.config.clone(),
+            config,
             helper.clone_ref(py),
             Arc::clone(&self.results),
         )?;
+        let fixture = Py::new(py, fixture)?;
+        if let Some(group) = group {
+            fixture.bind(py).setattr("group", group)?;
+        }
         Ok(Some(FixtureValue {
-            value: Py::new(py, fixture)?.into_any(),
+            value: fixture.into_any(),
             finalizer: None,
         }))
     }

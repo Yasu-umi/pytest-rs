@@ -4,6 +4,8 @@
 [files]
 "tests/test_normal.py" = "passed"
 "tests/test_sample.py" = "passed"
+"tests/test_pedantic.py" = "passed"
+"tests/test_calibration.py" = "passed"
 
 [excluded]
 # These import pytest_benchmark internals (stats/utils/storage/cli modules);

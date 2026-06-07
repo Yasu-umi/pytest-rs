@@ -60,6 +60,9 @@ enabled = true
 repo = "https://github.com/ionelmc/pytest-benchmark"
 tag = "v5.1.0"
 testpaths = ["tests"]
+# Wall-clock-bound calibration tests (warmup budgets of max_time=10s per
+# loop level); upstream pytest needs ~3m20s for the file, pytest-rs ~2m40s.
+slow_files = ["tests/test_calibration.py"]
 enabled = true
 
 [pytest-timeout]

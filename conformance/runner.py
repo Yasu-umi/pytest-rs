@@ -72,6 +72,10 @@ class Suite:
         # Extra PYTHONPATH entries relative to the checkout (e.g. "." for
         # flat package layouts).
         self.pythonpath: list[str] = config.get("pythonpath", [])
+        # Files that legitimately run for minutes (wall-clock-bound
+        # upstream too): they get a 3x timeout and submit first so they
+        # never start at the tail of the pool.
+        self.slow_files: list[str] = config.get("slow_files", [])
         self.checkout = CACHE / f"{self.name}-{self.tag}"
         self.src_dir: Path | None = None
 
@@ -153,13 +157,14 @@ class Suite:
         extra_paths.extend(str((self.checkout / entry).resolve()) for entry in self.pythonpath)
         if extra_paths:
             env["PYTHONPATH"] = ":".join(extra_paths)
+        timeout = TIMEOUT_S * 3 if rel in self.slow_files else TIMEOUT_S
         try:
             proc = subprocess.run(
                 [str(BINARY), rel, *deselects],
                 cwd=self.checkout,
                 capture_output=True,
                 text=True,
-                timeout=TIMEOUT_S,
+                timeout=timeout,
                 env=env,
             )
         except subprocess.TimeoutExpired:
@@ -308,7 +313,10 @@ def run_suites(
         costs = expected_costs(suite)
         for file_index, path in enumerate(files):
             work.append((suite_index, file_index, suite, path))
-            cost_of[(suite_index, file_index)] = costs.get(str(path.relative_to(suite.checkout)), 0)
+            rel = str(path.relative_to(suite.checkout))
+            # Declared-slow files outrank every test-count estimate.
+            cost = 10_000_000 if rel in suite.slow_files else costs.get(rel, 0)
+            cost_of[(suite_index, file_index)] = cost
     work.sort(key=lambda item: cost_of[(item[0], item[1])], reverse=True)
 
     slots: list[list[FileResult | None]] = [
