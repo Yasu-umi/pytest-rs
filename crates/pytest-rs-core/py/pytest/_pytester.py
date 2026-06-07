@@ -220,9 +220,30 @@ class Pytester:
         self._syspaths.insert(0, entry)
 
     def runpytest(self, *args, timeout=None):
+        # Upstream's (default) in-process runs share the outer test's
+        # warning-filter state: mirror the item's filterwarnings marks into
+        # the child as -W options (farthest first, so the closest wins).
+        return self._runpytest(args, timeout=timeout, forward_filters=True)
+
+    def _runpytest(self, args, *, timeout=None, forward_filters=False):
         import os
         import subprocess
         import time
+
+        forwarded_filters = []
+        if forward_filters and self._request is not None:
+            # Only the outer item's filterwarnings marks — forwarding the
+            # whole session ini filter set (e.g. a suite-wide "error")
+            # changes far more child behavior than upstream's in-process
+            # nesting is worth. The child applies these at the LOWEST
+            # priority (before its own ini filters), matching upstream's
+            # in-process nesting where the inner run's filters layer on top.
+            marks = [
+                str(mark.args[0])
+                for mark in self._request.node.iter_markers("filterwarnings")
+                if mark.args
+            ]
+            forwarded_filters = list(reversed(marks))  # farthest first
 
         exe = os.environ.get("PYTEST_RS_EXE")
         if exe is None:
@@ -243,6 +264,10 @@ class Pytester:
         relay = self.path / f".logrelay-{n}"
         relay.unlink(missing_ok=True)
         env["PYTEST_RS_LOG_RELAY"] = str(relay)
+        if forwarded_filters:
+            env["PYTEST_RS_FORWARDED_FILTERS"] = "\n".join(forwarded_filters)
+        else:
+            env.pop("PYTEST_RS_FORWARDED_FILTERS", None)
         start = time.perf_counter()
         # cwd inherits like upstream's subprocess runs: the pytester fixture
         # chdir'd to self.path at setup, and a test that os.chdir()s deeper
@@ -287,7 +312,10 @@ class Pytester:
             if logger.isEnabledFor(record.levelno):
                 logger.handle(record)
 
-    runpytest_subprocess = runpytest
+    def runpytest_subprocess(self, *args, timeout=None):
+        # Upstream subprocess runs do NOT inherit the outer warning filters.
+        return self._runpytest(args, timeout=timeout, forward_filters=False)
+
     runpytest_inprocess = runpytest
 
     def inline_run(self, *args):
@@ -621,7 +649,16 @@ def _make_runner_dir(request, tmp_path_factory, cls):
     old_cwd = os.getcwd()
     os.chdir(path)
     runner = cls(path, name, request)
+    # Upstream: nested runs root their tmp dirs under a per-pytester
+    # directory (tests inspect it via pytester._test_tmproot).
+    runner._test_tmproot = tmp_path_factory.mktemp(f"tmp-{name}", numbered=True)
+    old_temproot = os.environ.get("PYTEST_DEBUG_TEMPROOT")
+    os.environ["PYTEST_DEBUG_TEMPROOT"] = str(runner._test_tmproot)
     yield runner
+    if old_temproot is None:
+        os.environ.pop("PYTEST_DEBUG_TEMPROOT", None)
+    else:
+        os.environ["PYTEST_DEBUG_TEMPROOT"] = old_temproot
     for entry in runner._syspaths:
         if entry in sys.path:
             sys.path.remove(entry)

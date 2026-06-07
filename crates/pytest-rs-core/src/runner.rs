@@ -755,6 +755,22 @@ fn run_one_body(
             return reports;
         }
     };
+    // Unraisable exceptions surfaced during setup (upstream's trylast
+    // pytest_runtest_setup hookimpl): an error filter fails the setup.
+    if let Err(err) = python::unraisable_collect(py) {
+        reports.push(report_from_err(
+            py,
+            config,
+            item,
+            Phase::Setup,
+            setup_started,
+            &err,
+        ));
+        teardown_one(py, plugins, session, config, item, xfail, &mut reports);
+        close_item_filters(py);
+        python::end_item_context(py);
+        return reports;
+    }
     reports.push(TestReport {
         nodeid: item.nodeid.clone(),
         phase: Phase::Setup,
@@ -1008,6 +1024,17 @@ fn run_one_body(
     } else {
         report
     };
+    // Unraisable exceptions surfaced during a passed call (upstream's
+    // trylast pytest_runtest_call hookimpl, which pluggy skips when the
+    // test itself raised): an error filter fails the call.
+    let report = if report.outcome == Outcome::Passed {
+        match python::unraisable_collect(py) {
+            Ok(()) => report,
+            Err(err) => report_from_err(py, config, item, Phase::Call, call_started, &err),
+        }
+    } else {
+        report
+    };
     reports.push(report);
 
     // Finalizers added via the test's own `request` run at function teardown.
@@ -1036,6 +1063,14 @@ fn teardown_one(
     xfail: bool,
     reports: &mut Vec<TestReport>,
 ) {
+    // tmp_path retention: the fixture teardown (a function finalizer below)
+    // reads this item's call outcome; None means no call phase ran.
+    let call_passed = reports
+        .iter()
+        .rev()
+        .find(|r| r.phase == Phase::Call && r.subtest_desc.is_none())
+        .map(|r| matches!(r.outcome, Outcome::Passed | Outcome::XPassed));
+    python::tmp_path_record_call(py, &item.nodeid, call_passed);
     // log_cli: the call outcome prints before teardown records appear —
     // with the item capture paused, so the words reach the real terminal.
     if session.live_logging {
@@ -1099,6 +1134,15 @@ fn teardown_one(
     })();
     if let Err(err) = hook_result {
         errors.push(python::format_exception(py, &err));
+    }
+    // Unraisable exceptions surfaced during teardown (upstream's trylast
+    // pytest_runtest_teardown hookimpl): an error filter errors the item.
+    if let Err(err) = python::unraisable_collect(py) {
+        errors.push(python::format_test_failure(
+            py,
+            &err,
+            config.get_value("tb").unwrap_or("long"),
+        ));
     }
 
     if errors.is_empty() {
@@ -1624,15 +1668,17 @@ fn resolve_fixture_def(
     }
 
     // Finalizers registered through request.addfinalizer run at this
-    // fixture's scope teardown, LIFO.
-    if let Some(request) = &request {
-        for finalizer in request.borrow(py).take_finalizers() {
-            session.finalizers.push(PendingFinalizer {
-                scope: def.scope,
-                instance: instance.clone(),
-                finalizer: Finalizer::Callable(finalizer),
-            });
-        }
+    // fixture's scope teardown, LIFO — drained at teardown time, so
+    // late additions (factory fixtures calling addfinalizer during the
+    // test, e.g. anyio's sock_or_fd_factory) are included.
+    if let Some(request) = &request
+        && let Ok(drainer) = request.bind(py).as_any().getattr("_drain_finalizers")
+    {
+        session.finalizers.push(PendingFinalizer {
+            scope: def.scope,
+            instance: instance.clone(),
+            finalizer: Finalizer::Callable(drainer.unbind()),
+        });
     }
     if let Some(finalizer) = finalizer {
         session.finalizers.push(PendingFinalizer {

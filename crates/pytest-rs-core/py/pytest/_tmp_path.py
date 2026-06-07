@@ -1,51 +1,64 @@
-"""tmp_path / tmp_path_factory builtin fixtures."""
+"""tmp_path / tmp_path_factory builtin fixtures (upstream _pytest/tmpdir.py
+port: pytest-of-{user} numbered basetemps with lock-driven retention)."""
 
+import os
 import pathlib
+import stat
 import tempfile
 
 from pytest._fixtures import fixture
 
 _BASETEMP_PREFIX = "pytest-rs-basetemp-"
-# A SIGKILLed session (timeouts, ^C -9) never reaches the factory teardown;
-# sweep leftovers this much older than now before creating a new basetemp.
-# Generous so concurrently live sessions are never touched.
+# Pre-numbered-dir releases used unique mkdtemp basetemps; killed sessions
+# leaked them unboundedly. Keep sweeping those legacy leftovers for a while.
 _STALE_SECONDS = 3 * 60 * 60
 
-# --basetemp value, set by the engine at startup (None → mkdtemp per run).
+LOCK_TIMEOUT = 60 * 60 * 24
+
+# --basetemp / retention ini values, set by the engine at startup.
 _given_basetemp = None
+_retention_count = 3
+_retention_policy = "all"
+
+# Call-phase outcomes per nodeid (engine-fed; upstream stores rep.passed in
+# the item stash) and whether anything failed (upstream checks exitstatus).
+_call_results: dict = {}
+_any_failed = False
 
 
-def configure(basetemp):
-    global _given_basetemp
+def configure(basetemp, retention_count=None, retention_policy=None):
+    global _given_basetemp, _retention_count, _retention_policy
     _given_basetemp = basetemp
+    if retention_count is not None:
+        _retention_count = int(retention_count)
+    if retention_policy is not None:
+        _retention_policy = retention_policy
+
+
+def record_call(nodeid, passed):
+    """The engine reports each item's call outcome (None: no call ran)
+    before function-scope finalizers — the tmp_path retention teardown
+    reads it (upstream's tmppath_result_key stash)."""
+    global _any_failed
+    if passed is not None:
+        _call_results[nodeid] = passed
+        if not passed:
+            _any_failed = True
 
 
 def rm_rf(path):
-    """shutil.rmtree clearing read-only bits on the way (pytest's rm_rf):
-    plain rmtree silently leaves e.g. chmod-0 dirs made by tests behind."""
-    import os
-    import shutil
-    import stat
-
-    def onexc(func, failed, exc):
-        for target in (os.path.dirname(failed), failed):
-            try:
-                os.chmod(target, os.stat(target).st_mode | stat.S_IRWXU)
-            except OSError:
-                pass
-        try:
-            func(failed)
-        except OSError:
-            pass
+    """Best-effort _pytest.pathlib.rm_rf (engine teardown callers must not
+    raise on a half-removed tree)."""
+    from _pytest.pathlib import rm_rf as _rm_rf
 
     try:
-        shutil.rmtree(path, onexc=onexc)
+        _rm_rf(path)
     except OSError:
         pass
 
 
 def _sweep_stale_basetemps():
-    """Best-effort removal of basetemps left behind by killed sessions."""
+    """Best-effort removal of legacy mkdtemp basetemps left by old builds."""
     import time
 
     cutoff = time.time() - _STALE_SECONDS
@@ -63,54 +76,183 @@ def _sweep_stale_basetemps():
             continue
 
 
+def get_user():
+    """Return the current user name, or None if getuser() does not work
+    in the current environment (see #1010)."""
+    try:
+        # In some exotic environments, getpass may not be importable.
+        import getpass
+
+        return getpass.getuser()
+    except (ImportError, OSError, KeyError):
+        return None
+
+
+def _check_ispytest(ispytest):
+    from _pytest.deprecated import check_ispytest
+
+    check_ispytest(ispytest)
+
+
 class TempPathFactory:
-    """Factory for session-scoped temporary directories."""
+    """Factory for temporary directories under the common base temp
+    directory (upstream TempPathFactory)."""
 
-    def __init__(self, basetemp=None):
-        basetemp = basetemp if basetemp is not None else _given_basetemp
-        self._given = basetemp is not None
-        self._basetemp = None
-        if self._given:
-            # pytest semantics for an explicit --basetemp: cleared at session
-            # start, kept after the run.
-            path = pathlib.Path(basetemp)
-            if path.exists():
-                rm_rf(path)
-            path.mkdir(parents=True, exist_ok=True)
-            self._basetemp = path.resolve()
+    def __init__(
+        self,
+        given_basetemp,
+        retention_count,
+        retention_policy,
+        trace,
+        basetemp=None,
+        *,
+        _ispytest=False,
+    ):
+        _check_ispytest(_ispytest)
+        if given_basetemp is None:
+            self._given_basetemp = None
+        else:
+            # Use os.path.abspath() to get absolute path instead of resolve()
+            # as it does not work the same in all platforms (see #4427).
+            self._given_basetemp = pathlib.Path(os.path.abspath(str(given_basetemp)))
+        self._trace = trace
+        self._retention_count = retention_count
+        self._retention_policy = retention_policy
+        self._basetemp = basetemp
 
-    def getbasetemp(self):
-        if self._basetemp is None:
-            _sweep_stale_basetemps()
-            # resolve() so chdir(tmp_path) round-trips through os.getcwd()
-            # (macOS /tmp is a symlink to /private/tmp).
-            self._basetemp = pathlib.Path(tempfile.mkdtemp(prefix=_BASETEMP_PREFIX)).resolve()
-        return self._basetemp
+    @classmethod
+    def from_config(cls, config, *, _ispytest=False):
+        """Create a factory according to pytest configuration."""
+        _check_ispytest(_ispytest)
+        count = int(config.getini("tmp_path_retention_count"))
+        if count < 0:
+            raise ValueError(f"tmp_path_retention_count must be >= 0. Current input: {count}.")
+
+        policy = config.getini("tmp_path_retention_policy")
+        if policy not in ("all", "failed", "none"):
+            raise ValueError(
+                f"tmp_path_retention_policy must be either all, failed, none. "
+                f"Current input: {policy}."
+            )
+
+        return cls(
+            given_basetemp=config.option.basetemp,
+            trace=config.trace.get("tmpdir"),
+            retention_count=count,
+            retention_policy=policy,
+            _ispytest=True,
+        )
+
+    def _ensure_relative_to_basetemp(self, basename):
+        basename = os.path.normpath(basename)
+        if (self.getbasetemp() / basename).resolve().parent != self.getbasetemp():
+            raise ValueError(f"{basename} is not a normalized and relative path")
+        return basename
 
     def mktemp(self, basename, numbered=True):
-        base = self.getbasetemp()
-        basename = str(basename)
+        """Create a new temporary directory managed by the factory."""
+        from _pytest.pathlib import make_numbered_dir
+
+        basename = self._ensure_relative_to_basetemp(str(basename))
         if not numbered:
-            path = base / basename
-            path.mkdir()
-            return path
-        maximum = -1
-        for existing in base.iterdir():
-            name = existing.name
-            if name.startswith(basename) and name[len(basename) :].isdigit():
-                maximum = max(maximum, int(name[len(basename) :]))
-        path = base / f"{basename}{maximum + 1}"
-        path.mkdir()
-        return path
+            p = self.getbasetemp().joinpath(basename)
+            p.mkdir(mode=0o700)
+        else:
+            p = make_numbered_dir(root=self.getbasetemp(), prefix=basename, mode=0o700)
+            self._trace("mktemp", p)
+        return p
+
+    def getbasetemp(self):
+        """Return the base temporary directory, creating it if needed."""
+        from _pytest.compat import get_user_id
+        from _pytest.pathlib import make_numbered_dir_with_cleanup, rm_rf
+
+        if self._basetemp is not None:
+            return self._basetemp
+
+        if self._given_basetemp is not None:
+            basetemp = self._given_basetemp
+            if basetemp.exists():
+                rm_rf(basetemp)
+            basetemp.mkdir(mode=0o700, parents=True, exist_ok=True)
+            basetemp = basetemp.resolve()
+        else:
+            _sweep_stale_basetemps()
+            from_env = os.environ.get("PYTEST_DEBUG_TEMPROOT")
+            temproot = pathlib.Path(from_env or tempfile.gettempdir()).resolve()
+            user = get_user() or "unknown"
+            # use a sub-directory in the temproot to speed-up
+            # make_numbered_dir() call
+            rootdir = temproot.joinpath(f"pytest-of-{user}")
+            try:
+                rootdir.mkdir(mode=0o700, exist_ok=True)
+            except OSError:
+                # getuser() likely returned illegal characters for the
+                # platform, use unknown back off mechanism
+                rootdir = temproot.joinpath("pytest-of-unknown")
+                rootdir.mkdir(mode=0o700, exist_ok=True)
+            # Because we use exist_ok=True with a predictable name, make sure
+            # we are the owners, to prevent any funny business (on unix, where
+            # temproot is usually shared). Also fixup any world-readable temp
+            # rootdir's permissions, and reject symlinked rootdirs
+            # (CVE-2025-71176).
+            uid = get_user_id()
+            if uid is not None:
+                stat_follow_symlinks = False if os.stat in os.supports_follow_symlinks else True
+                rootdir_stat = rootdir.stat(follow_symlinks=stat_follow_symlinks)
+                if stat.S_ISLNK(rootdir_stat.st_mode):
+                    raise OSError(
+                        f"The temporary directory {rootdir} is a symbolic link. "
+                        "Fix this and try again."
+                    )
+                if rootdir_stat.st_uid != uid:
+                    raise OSError(
+                        f"The temporary directory {rootdir} is not owned by the current user. "
+                        "Fix this and try again."
+                    )
+                if (rootdir_stat.st_mode & 0o077) != 0:
+                    chmod_follow_symlinks = (
+                        False if os.chmod in os.supports_follow_symlinks else True
+                    )
+                    rootdir.chmod(
+                        rootdir_stat.st_mode & ~0o077,
+                        follow_symlinks=chmod_follow_symlinks,
+                    )
+            keep = self._retention_count
+            if self._retention_policy == "none":
+                keep = 0
+            basetemp = make_numbered_dir_with_cleanup(
+                prefix="pytest-",
+                root=rootdir,
+                keep=keep,
+                lock_timeout=LOCK_TIMEOUT,
+                mode=0o700,
+            )
+        assert basetemp is not None, basetemp
+        self._basetemp = basetemp
+        self._trace("new basetemp", basetemp)
+        return basetemp
 
 
 @fixture(scope="session")
 def tmp_path_factory():
-    factory = TempPathFactory()
+    factory = TempPathFactory(
+        given_basetemp=_given_basetemp,
+        retention_count=_retention_count,
+        retention_policy=_retention_policy,
+        trace=lambda *args: None,
+        _ispytest=True,
+    )
     yield factory
-    # Auto-created basetemps are removed with the session; an explicit
-    # --basetemp survives the run (pytest semantics).
-    if factory._basetemp is not None and not factory._given:
+    # Upstream pytest_sessionfinish: a fully-passed run under the "failed"
+    # policy removes the whole basetemp. ("all" keeps it; the numbered-dir
+    # retention prunes old ones at the next session's creation.)
+    if (
+        factory._basetemp is not None
+        and factory._given_basetemp is None
+        and factory._retention_policy == "failed"
+        and not _any_failed
+    ):
         rm_rf(factory._basetemp)
 
 
@@ -119,7 +261,14 @@ def tmp_path(tmp_path_factory, request):
     import re
 
     name = re.sub(r"\W", "_", request.node.name)[:30]
-    return tmp_path_factory.mktemp(name, numbered=True)
+    path = tmp_path_factory.mktemp(name, numbered=True)
+    yield path
+    # Upstream: the "failed" policy removes the dir when the call passed
+    # (or never ran — a setup skip counts as passed, issue #10502).
+    if tmp_path_factory._retention_policy == "failed" and _call_results.pop(
+        request.node.nodeid, True
+    ):
+        rm_rf(path)
 
 
 class LocalPath:

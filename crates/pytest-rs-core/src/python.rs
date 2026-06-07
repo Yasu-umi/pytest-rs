@@ -2747,11 +2747,48 @@ pub fn invalid_theme_message(py: Python<'_>) -> Option<String> {
 }
 
 /// Tell the tmp_path factory the explicit --basetemp directory (cleared at
-/// session start, kept after the run, like pytest).
-pub fn configure_basetemp(py: Python<'_>, path: &str) {
+/// session start, kept after the run, like pytest) and the retention inis.
+pub fn configure_tmp_path(
+    py: Python<'_>,
+    basetemp: Option<&str>,
+    retention_count: Option<&str>,
+    retention_policy: Option<&str>,
+) {
     let _ = py
         .import("pytest._tmp_path")
-        .and_then(|m| m.call_method1("configure", (path,)));
+        .and_then(|m| m.call_method1("configure", (basetemp, retention_count, retention_policy)));
+}
+
+/// Report an item's call outcome (None: no call phase ran) to the tmp_path
+/// retention machinery, before function-scope finalizers run.
+pub fn tmp_path_record_call(py: Python<'_>, nodeid: &str, passed: Option<bool>) {
+    let _ = py
+        .import("pytest._tmp_path")
+        .and_then(|m| m.call_method1("record_call", (nodeid, passed)));
+}
+
+/// Install the sys.unraisablehook capture (upstream unraisableexception
+/// plugin's pytest_configure).
+pub fn unraisable_configure(py: Python<'_>) {
+    let _ = py
+        .import("pytest._unraisable")
+        .and_then(|m| m.call_method0("configure"));
+}
+
+/// Drain unraisable exceptions collected since the last phase. Err when the
+/// warning filter turns them into errors (-W error).
+pub fn unraisable_collect(py: Python<'_>) -> PyResult<()> {
+    py.import("pytest._unraisable")?
+        .call_method0("collect_unraisable")?;
+    Ok(())
+}
+
+/// Session-end unraisable cleanup: force gc, drain leftovers, restore the
+/// previous hook (upstream's config cleanup).
+pub fn unraisable_session_cleanup(py: Python<'_>) -> PyResult<()> {
+    py.import("pytest._unraisable")?
+        .call_method0("session_cleanup")?;
+    Ok(())
 }
 
 /// Tell the assert-rewrite explainer the -v level (full iterable diffs

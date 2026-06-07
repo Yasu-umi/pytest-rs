@@ -232,6 +232,24 @@ impl PyRequest {
 
 #[pymethods]
 impl PyRequest {
+    /// Engine use: run (and clear) the addfinalizer callbacks, LIFO. Called
+    /// at the owning fixture's teardown so finalizers added late (factory
+    /// fixtures calling addfinalizer during the test) are included.
+    fn _drain_finalizers(&self, py: Python<'_>) -> PyResult<()> {
+        let mut first_err: Option<PyErr> = None;
+        for finalizer in self.take_finalizers().into_iter().rev() {
+            if let Err(err) = finalizer.bind(py).call0()
+                && first_err.is_none()
+            {
+                first_err = Some(err);
+            }
+        }
+        match first_err {
+            Some(err) => Err(err),
+            None => Ok(()),
+        }
+    }
+
     /// The current parameter for parametrized fixtures. AttributeError when
     /// the fixture is not parametrized, matching pytest.
     #[getter]

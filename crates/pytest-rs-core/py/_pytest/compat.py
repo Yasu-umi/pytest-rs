@@ -36,6 +36,32 @@ class NotSetType(enum.Enum):
 
 
 NOTSET = NotSetType.token
-LEGACY_PATH = None  # py.path.local is not supported
+
+
+def legacy_path(path):
+    """A py.path.local-alike for the given path (the LocalPath shim)."""
+    from pytest._tmp_path import LocalPath
+
+    return LocalPath(path)
+
+
+LEGACY_PATH = None  # py.path.local itself is not bundled
+
+
+def get_user_id():
+    """Return the current process's real user id or None if it could not be
+    determined (upstream get_user_id)."""
+    import sys
+
+    if sys.platform == "win32" or sys.platform == "emscripten":
+        # win32 does not have a getuid() function;
+        # Emscripten has a return 0 stub.
+        return None
+    # On other platforms, a return value of -1 is assumed to indicate that
+    # the current process's real user id could not be determined.
+    erruid = -1
+    uid = os.getuid()
+    return uid if uid != erruid else None
+
 
 from _pytest._stub import __getattr__  # noqa: E402, F401

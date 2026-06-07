@@ -31,8 +31,7 @@ class Config:
             raise ValueError(f"no option named {name!r}") from None
 
 
-class PytestPluginManager:
-    """Stub plugin manager (pluggy is not used by pytest-rs)."""
+from pytest._pluginmanager import PluginManager as PytestPluginManager  # noqa: E402, F401
 
 
 def main(args=None, plugins=None):

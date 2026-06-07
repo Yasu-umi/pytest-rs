@@ -32,10 +32,14 @@ def _showwarning(message, category, filename, lineno, file=None, line=None):
     )
 
 
+_original_showwarning = None
+
+
 def install():
     # Mirror _pytest.warnings.catch_warnings_for_item's session filters on
     # top of the interpreter defaults (no reset, so -W/PYTHONWARNINGS from
     # the outside keep working).
+    global _original_showwarning
     if not sys.warnoptions:
         # If the user is not explicitly configuring warning filters, show
         # deprecation warnings by default (#2908).
@@ -44,7 +48,17 @@ def install():
     from pytest._warning_types import PytestRemovedIn9Warning
 
     warnings.filterwarnings("error", category=PytestRemovedIn9Warning)
+    _original_showwarning = warnings.showwarning
     warnings.showwarning = _showwarning
+
+
+def uninstall():
+    """Stop capturing: warnings emitted after the summary (e.g. the
+    unraisable session cleanup) print through the original showwarning."""
+    global _original_showwarning
+    if _original_showwarning is not None:
+        warnings.showwarning = _original_showwarning
+        _original_showwarning = None
 
 
 def _resolve_category(category):
@@ -134,9 +148,26 @@ def _apply_filter(spec, escape):
         warnings.warn(f"Failed to import filter module '{e.name}': {spec}", PytestConfigWarning)
 
 
+# The session's filter specs (ini then -W), kept for pytester: upstream's
+# in-process nested runs inherit the outer session's warning filters.
+session_specs: list = []
+
+
 def apply_session_filters(ini_specs, w_specs):
     """Apply the `filterwarnings` ini lines (unescaped regexes), then -W
-    specs (escaped, python -W semantics) so the command line wins."""
+    specs (escaped, python -W semantics) so the command line wins. A parent
+    pytester's forwarded filterwarnings marks apply first — lowest priority,
+    like upstream's in-process nesting."""
+    import os
+
+    forwarded = [
+        spec
+        for spec in os.environ.get("PYTEST_RS_FORWARDED_FILTERS", "").split("\n")
+        if spec.strip()
+    ]
+    session_specs[:] = [*forwarded, *ini_specs, *w_specs]
+    for spec in forwarded:
+        _apply_filter(spec, escape=False)
     for spec in ini_specs:
         _apply_filter(spec, escape=False)
     for spec in w_specs:

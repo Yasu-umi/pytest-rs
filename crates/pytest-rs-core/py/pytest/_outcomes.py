@@ -8,11 +8,11 @@ class OutcomeException(BaseException):
 
 
 class Skipped(OutcomeException):
-    pass
+    __module__ = "builtins"
 
 
 class Failed(OutcomeException):
-    pass
+    __module__ = "builtins"
 
 
 class XFailed(Failed):

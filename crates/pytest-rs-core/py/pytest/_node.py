@@ -54,6 +54,14 @@ class DoctestNode:
         self.lineno = lineno
 
     @property
+    def ihook(self):
+        """The shim pluginmanager's hook relay (upstream: the node's
+        fspath-sensitive HookProxy)."""
+        from pytest._pluginmanager import pluginmanager
+
+        return pluginmanager.hook
+
+    @property
     def keywords(self):
         """Mark names (plus the node name) as a mapping — pytest's
         node.keywords, for the common `"xfail" in item.keywords` probes."""
@@ -169,6 +177,14 @@ class Node(Item):
         """item.session shim: enough for plugins reaching
         item.session.config (e.g. pytest-timeout's session deadline)."""
         return _NodeSession(getattr(self, "config", None))
+
+    @property
+    def ihook(self):
+        """The shim pluginmanager's hook relay (upstream: the node's
+        fspath-sensitive HookProxy)."""
+        from pytest._pluginmanager import pluginmanager
+
+        return pluginmanager.hook
 
     def warn(self, warning):
         """Issue a warning attributed to this item's definition site

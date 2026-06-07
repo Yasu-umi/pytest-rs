@@ -93,7 +93,10 @@ def _relpath(path):
 
 
 def _exception_lines(exc):
-    text = f"{type(exc).__name__}: {exc}" if str(exc) else type(exc).__name__
+    # pytest's exconly: traceback.format_exception_only, which qualifies
+    # non-builtin exception types with their module (upstream classes pin
+    # __module__, e.g. "pytest.PytestUnraisableExceptionWarning").
+    text = "".join(traceback.format_exception_only(type(exc), exc)).rstrip("\n")
     if (
         isinstance(exc, AssertionError)
         and str(exc).startswith("assert")
@@ -110,8 +113,12 @@ def _exception_lines(exc):
 
 
 def _source_block(frame, lineno):
-    """The frame's source from its definition to the failing line, the
-    whole block pygments-highlighted, '>' marking the failing line."""
+    """The frame's source from its definition to the failing line, dedented
+    to the definition's indentation (pytest), the whole block
+    pygments-highlighted, '>' marking the failing line.
+
+    Returns (lines, fail_indent): fail_indent is the displayed indentation
+    of the failing line — pytest aligns the E lines under it."""
     code = frame.f_code
     try:
         source, start = inspect.getsourcelines(code)
@@ -119,20 +126,36 @@ def _source_block(frame, lineno):
         source, start = [], None
     prefixes = []
     contents = []
-    if start is not None:
+    fail_indent = 4
+    if start is not None and source:
+        first = source[0]
+        dedent = len(first) - len(first.lstrip())
+
+        def strip_indent(raw):
+            i = 0
+            while i < dedent and i < len(raw) and raw[i] == " ":
+                i += 1
+            return raw[i:]
+
         for offset, raw in enumerate(source):
             current = start + offset
             if current > lineno:
                 break
-            prefixes.append(">   " if current == lineno else "    ")
-            contents.append(raw.rstrip())
+            content = strip_indent(raw.rstrip())
+            if current == lineno:
+                prefixes.append(">   ")
+                fail_indent = len(content) - len(content.lstrip())
+            else:
+                prefixes.append("    ")
+            contents.append(content)
     else:
         stripped = linecache.getline(code.co_filename, lineno).rstrip()
         if stripped:
             prefixes.append(">   ")
-            contents.append(stripped)
+            contents.append(stripped.lstrip())
     highlighted = _highlight("\n".join(contents)).split("\n")
-    return [f"{prefix}{line}" for prefix, line in zip(prefixes, highlighted)]
+    lines = [f"{prefix}{line}" for prefix, line in zip(prefixes, highlighted)]
+    return lines, fail_indent
 
 
 def _location_line(code, lineno, suffix):
@@ -210,13 +233,16 @@ def format_exception(exc, style="long"):
 
     # long (default): every frame shows its full source block with the
     # failing line marked, frames separated by the "_ _ _" rule; the last
-    # frame carries the E lines and the exception name.
+    # frame carries the E lines (aligned under the failing line's indent,
+    # like pytest) and the exception name.
     for index, (frame, lineno) in enumerate(frames):
         last = index == len(frames) - 1
-        lines.extend(_source_block(frame, lineno))
+        block, fail_indent = _source_block(frame, lineno)
+        lines.extend(block)
         if last:
+            e_prefix = "E" + " " * (3 + fail_indent)
             for entry in _exception_lines(exc):
-                lines.append(_markup(f"E       {entry}", 1, 31))
+                lines.append(_markup(f"{e_prefix}{entry}", 1, 31))
         lines.append("")
         suffix = type(exc).__name__ if last else ""
         lines.append(_location_line(frame.f_code, lineno, suffix))

@@ -19,6 +19,7 @@ from pytest._capture import capteesys as capteesys
 from pytest._fixtures import FixtureFunctionMarker as FixtureFunctionMarker
 from pytest._fixtures import FixtureLookupError as FixtureLookupError
 from pytest._fixtures import fixture as fixture
+from pytest._fixtures import yield_fixture as yield_fixture
 from pytest._junitxml import record_property as record_property
 from pytest._junitxml import record_testsuite_property as record_testsuite_property
 from pytest._junitxml import record_xml_attribute as record_xml_attribute
@@ -47,6 +48,7 @@ from pytest._outcomes import fail as fail
 from pytest._outcomes import importorskip as importorskip
 from pytest._outcomes import skip as skip
 from pytest._outcomes import xfail as xfail
+from pytest._pluginmanager import PluginManager as PluginManager
 from pytest._pytester import LineMatcher as LineMatcher
 from pytest._pytester import Pytester as Pytester
 from pytest._pytester import RunResult as RunResult
@@ -134,3 +136,7 @@ def hookspec(function=None, **kwargs):
     if function is not None:
         return decorator(function)
     return decorator
+
+
+# Upstream name for the plugin manager (config.pluginmanager's type).
+PytestPluginManager = PluginManager

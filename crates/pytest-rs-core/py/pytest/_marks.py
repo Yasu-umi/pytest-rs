@@ -70,6 +70,13 @@ class MarkDecorator:
     def __call__(self, *args, **kwargs):
         if len(args) == 1 and not kwargs and (callable(args[0]) or isinstance(args[0], type)):
             func = args[0]
+            if hasattr(func, "_pytestfixturefunction"):
+                # Marks applied to a fixture are inert (#3364).
+                import warnings
+
+                from _pytest.deprecated import MARKED_FIXTURE
+
+                warnings.warn(MARKED_FIXTURE, stacklevel=2)
             existing = list(getattr(func, "pytestmark", []))
             existing.append(self.mark)
             func.pytestmark = existing

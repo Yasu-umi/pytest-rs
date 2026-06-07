@@ -1,48 +1,50 @@
 class PytestWarning(UserWarning):
-    pass
+    __module__ = "pytest"
 
 
 class PytestDeprecationWarning(PytestWarning, DeprecationWarning):
-    pass
+    __module__ = "pytest"
 
 
 class PytestRemovedIn9Warning(PytestDeprecationWarning):
-    pass
+    __module__ = "pytest"
 
 
 class PytestRemovedIn10Warning(PytestDeprecationWarning):
-    pass
+    __module__ = "pytest"
 
 
 class PytestCollectionWarning(PytestWarning):
-    pass
+    __module__ = "pytest"
 
 
 class PytestConfigWarning(PytestWarning):
-    pass
+    __module__ = "pytest"
 
 
 class PytestUnknownMarkWarning(PytestWarning):
-    pass
+    __module__ = "pytest"
 
 
 class PytestUnraisableExceptionWarning(PytestWarning):
-    pass
+    __module__ = "pytest"
 
 
 class PytestAssertRewriteWarning(PytestWarning):
-    pass
+    __module__ = "pytest"
 
 
 class PytestCacheWarning(PytestWarning):
-    pass
+    __module__ = "pytest"
 
 
 class PytestReturnNotNoneWarning(PytestWarning):
-    pass
+    __module__ = "pytest"
 
 
 class PytestExperimentalApiWarning(PytestWarning, FutureWarning):
+    __module__ = "pytest"
+
     @classmethod
     def simple(cls, apiname):
         return cls(f"{apiname} is an experimental api that may change over time")
@@ -50,3 +52,18 @@ class PytestExperimentalApiWarning(PytestWarning, FutureWarning):
 
 class PytestFDWarning(PytestWarning):
     """When the lsof plugin finds leaked fds."""
+
+    __module__ = "pytest"
+
+
+class UnformattedWarning:
+    """A warning category meant to be formatted before use (upstream
+    _pytest.warning_types.UnformattedWarning)."""
+
+    def __init__(self, category, template):
+        self.category = category
+        self.template = template
+
+    def format(self, **kwargs):
+        """Return an instance of the warning category, formatted with kwargs."""
+        return self.category(self.template.format(**kwargs))

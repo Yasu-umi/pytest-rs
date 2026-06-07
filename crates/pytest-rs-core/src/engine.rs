@@ -129,8 +129,14 @@ impl Engine {
             return exit_code::USAGE_ERROR;
         }
         python::configure_capture(py, capture_mode);
-        if let Some(basetemp) = self.config.get_value("basetemp") {
-            python::configure_basetemp(py, basetemp);
+        python::configure_tmp_path(
+            py,
+            self.config.get_value("basetemp"),
+            self.config.get_ini("tmp_path_retention_count"),
+            self.config.get_ini("tmp_path_retention_policy"),
+        );
+        if !self.config.plugin_disabled("unraisableexception") {
+            python::unraisable_configure(py);
         }
         python::set_assertion_verbosity(py, self.config.verbose);
         python::set_assertion_truncation(
@@ -552,6 +558,20 @@ impl Engine {
                 started.elapsed(),
             )
         );
+        // Unraisable leftovers (e.g. refcycles with broken __del__, only
+        // collectable after a forced gc) drain after the terminal reporter
+        // has finished, like upstream's config cleanup; an error filter
+        // propagates them to the top (exit 1, traceback on stderr). Stop
+        // the warnings capture first so they print for real.
+        let _ = py
+            .import("pytest._wcapture")
+            .and_then(|m| m.call_method0("uninstall"));
+        if let Err(err) = python::unraisable_session_cleanup(py) {
+            eprintln!("{}", python::format_exception(py, &err));
+            if code == 0 {
+                code = crate::report::exit_code::TESTS_FAILED;
+            }
+        }
         code
     }
 
