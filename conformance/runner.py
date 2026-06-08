@@ -197,7 +197,9 @@ class Suite:
             failed=counts.get("failed", 0),
             skipped=counts.get("skipped", 0),
             errors=counts.get("errors", 0),
-            stdout=out if is_unexpected else "",
+            # Keep output for diagnosing pin regressions (failed) and crashes
+            # (unexpected exit codes); passing files are dropped to save memory.
+            stdout=out if (is_unexpected or status == "failed") else "",
             stderr=proc.stderr if is_unexpected else "",
         )
 
@@ -516,11 +518,23 @@ def update_readme_table(suites: list[Suite]) -> None:
 def check_suite(suite: Suite, results: list[FileResult]) -> list[str]:
     expected = load_expected(suite)
     violations = []
-    actual = {result.file: result.status for result in results}
+    by_file = {result.file: result for result in results}
     for file, want in expected.items():
-        got = actual.get(file, "missing")
+        result = by_file.get(file)
+        got = result.status if result is not None else "missing"
         if got != want:
-            violations.append(f"{suite.name}: {file}: expected {want}, got {got}")
+            line = f"{suite.name}: {file}: expected {want}, got {got}"
+            # Surface the offending tests so a CI-only regression is
+            # actionable without re-running the file by hand (the captured
+            # output is kept for "failed" files in run_one).
+            failing = [
+                row
+                for row in (result.stdout if result else "").splitlines()
+                if row.startswith("FAILED ") or row.startswith("ERROR ")
+            ]
+            if failing:
+                line += "\n      " + "\n      ".join(failing[:20])
+            violations.append(line)
     return violations
 
 
