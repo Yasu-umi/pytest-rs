@@ -14,6 +14,22 @@ class Config:
     VERBOSITY_ASSERTIONS = "assertions"
     VERBOSITY_TEST_CASES = "test_cases"
     VERBOSITY_SUBTESTS = "subtests"
+    _VERBOSITY_INI_DEFAULT = "auto"
+
+    @staticmethod
+    def _verbosity_ini_name(verbosity_type):
+        return f"verbosity_{verbosity_type}"
+
+    @staticmethod
+    def _add_verbosity_ini(parser, verbosity_type, help):
+        """Register a fine-grained verbosity ini (pytest's helper). Plugins
+        call this from pytest_addoption; config.get_verbosity reads it back."""
+        parser.addini(
+            Config._verbosity_ini_name(verbosity_type),
+            help=help,
+            type="string",
+            default=Config._VERBOSITY_INI_DEFAULT,
+        )
 
     class ArgsSource(enum.Enum):
         """Indicates the source of the test arguments (pytest's enum;
