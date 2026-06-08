@@ -1,6 +1,8 @@
 import argparse
+import collections.abc
 import enum
 import os
+import types
 
 from pytest import ExitCode, UsageError  # noqa: F401
 
@@ -97,6 +99,41 @@ def filename_arg(path, optname):
     if os.path.isdir(path):
         raise UsageError(f"{optname} must be a filename, given: {path}")
     return path
+
+
+def _strtobool(val):
+    """Convert a string representation of truth to True or False.
+
+    True values are 'y', 'yes', 't', 'true', 'on', and '1'; false values
+    are 'n', 'no', 'f', 'false', 'off', and '0'. Raises ValueError if
+    'val' is anything else (copied from distutils.util)."""
+    val = val.lower()
+    if val in ("y", "yes", "t", "true", "on", "1"):
+        return True
+    elif val in ("n", "no", "f", "false", "off", "0"):
+        return False
+    else:
+        raise ValueError(f"invalid truth value {val!r}")
+
+
+def _get_plugin_specs_as_list(specs):
+    """Parse a plugins specification into a list of plugin names."""
+    # None means empty.
+    if specs is None:
+        return []
+    # Workaround for #3899 - a submodule called "pytest_plugins".
+    if isinstance(specs, types.ModuleType):
+        return []
+    # Comma-separated list.
+    if isinstance(specs, str):
+        return specs.split(",") if specs else []
+    # Direct specification.
+    if isinstance(specs, collections.abc.Sequence):
+        return list(specs)
+    raise UsageError(
+        "Plugins may be specified as a sequence or a ','-separated string of "
+        f"plugin names. Got: {specs!r}"
+    )
 
 
 def _iter_rewritable_modules(package_files):
