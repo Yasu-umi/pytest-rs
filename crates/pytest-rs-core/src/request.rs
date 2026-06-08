@@ -86,17 +86,19 @@ impl PyConfig {
     }
 
     fn getini(&self, py: Python<'_>, name: &str) -> PyResult<Py<PyAny>> {
-        let raw = self
-            .ini
-            .lock()
-            .expect("config lock poisoned")
-            .get(name)
-            .cloned();
-        // Plugin-registered ini specs (parser.addini) supply type
-        // conversion and defaults for values the Rust config doesn't know.
+        // Pass the full ini snapshot so the resolver can apply alias lookups
+        // and type coercion (parser.addini specs supply both); paths/pathlist
+        // types resolve relative to rootdir.
+        let inicfg = pyo3::types::PyDict::new(py);
+        {
+            let ini = self.ini.lock().expect("config lock poisoned");
+            for (key, value) in ini.iter() {
+                inicfg.set_item(key, value)?;
+            }
+        }
         Ok(py
             .import("pytest._parser")?
-            .call_method1("ini_lookup", (name, raw))?
+            .call_method1("getini", (name, inicfg, self.rootdir.as_str()))?
             .unbind())
     }
 

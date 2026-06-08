@@ -8,8 +8,14 @@ from __future__ import annotations
 
 from typing import Any
 
-# name -> {"type": str | None, "default": Any}
+# Sentinel for "no default passed to addini" — distinct from an explicit
+# default=None (which makes getini return None regardless of type).
+_UNSET = object()
+
+# name -> {"type": str | None, "default": Any, "aliases": list[str]}
 ini_specs: dict[str, dict[str, Any]] = {}
+# alias -> canonical ini name
+ini_aliases: dict[str, str] = {}
 # dest -> {"default": Any, "type": callable | None, "action": str | None}
 option_specs: dict[str, dict[str, Any]] = {}
 # "--flag" -> dest, for deferred CLI token resolution
@@ -59,11 +65,14 @@ class Parser:
         name: str,
         help: str | None = None,
         type: str | None = None,
-        default: Any = None,
+        default: Any = _UNSET,
+        *,
+        aliases: Any = (),
     ) -> None:
-        if type == "bool" and default is None:
-            default = False
-        ini_specs[name] = {"type": type, "default": default}
+        aliases = list(aliases)
+        ini_specs[name] = {"type": type, "default": default, "aliases": aliases}
+        for alias in aliases:
+            ini_aliases[alias] = name
 
 
 parser = Parser()
@@ -93,19 +102,78 @@ _LINELIST_INIS = {
 }
 
 
-def ini_lookup(name: str, raw: str | None) -> Any:
-    """Resolve one ini value: the configured string converted per the
-    registered spec's type, or the spec default when unset."""
-    spec = ini_specs.get(name)
-    if raw is None:
-        if spec is not None:
-            return spec["default"]
-        return [] if name in _LINELIST_INIS else None
-    if spec is not None and spec["type"] == "bool":
-        return _strtobool(raw)
-    if spec is None and name in _LINELIST_INIS:
-        return [line.strip() for line in raw.splitlines() if line.strip()]
-    return raw
+def _empty_for_type(type_: str | None) -> Any:
+    """The default getini value for a registered ini with no value and no
+    explicit default (pytest's per-type empty)."""
+    if type_ == "bool":
+        return False
+    if type_ in ("args", "linelist", "paths", "pathlist"):
+        return []
+    # string / int / float / None
+    return ""
+
+
+def _coerce_ini(type_: str | None, value: Any, rootpath: str | None) -> Any:
+    """Coerce a raw ini value to its registered type (pytest INI-mode
+    coercion). Values are strings from .ini files; toml linelists may already
+    be lists."""
+    import shlex
+    from pathlib import Path
+
+    if type_ == "paths":
+        base = Path(rootpath) if rootpath else Path.cwd()
+        parts = shlex.split(value) if isinstance(value, str) else list(value)
+        return [base / p for p in parts]
+    if type_ == "pathlist":
+        from pytest._tmp_path import LocalPath
+
+        base = Path(rootpath) if rootpath else Path.cwd()
+        parts = shlex.split(value) if isinstance(value, str) else list(value)
+        return [LocalPath(str(base / p)) for p in parts]
+    if type_ == "args":
+        return shlex.split(value) if isinstance(value, str) else list(value)
+    if type_ == "linelist":
+        if isinstance(value, list):
+            return value
+        return [line.strip() for line in value.splitlines() if line.strip()]
+    if type_ == "bool":
+        return _strtobool(value.strip()) if isinstance(value, str) else bool(value)
+    if type_ == "int":
+        return int(value)
+    if type_ == "float":
+        return float(value)
+    # string / None
+    return value
+
+
+def getini(name: str, inicfg: dict[str, str], rootpath: str | None) -> Any:
+    """config.getini(name): the typed, alias-resolved ini value. Registered
+    options (parser.addini) supply type conversion and defaults; unregistered
+    names fall back to the lenient core behavior (a linelist for known core
+    inis, else the raw string or None)."""
+    canonical = ini_aliases.get(name, name)
+    spec = ini_specs.get(canonical)
+    if spec is None:
+        # Unregistered: lenient fallback (strict ValueError is upstream's
+        # behavior but would regress core inis the engine never registers).
+        raw = inicfg.get(name)
+        if raw is None:
+            return [] if name in _LINELIST_INIS else None
+        if name in _LINELIST_INIS:
+            return [line.strip() for line in raw.splitlines() if line.strip()]
+        return raw
+    type_ = spec["type"]
+    # Value precedence: canonical name first, then any alias.
+    value = inicfg.get(canonical)
+    if value is None:
+        for alias in spec.get("aliases", ()):
+            if inicfg.get(alias) is not None:
+                value = inicfg[alias]
+                break
+    if value is None:
+        default = spec["default"]
+        return _empty_for_type(type_) if default is _UNSET else default
+    return _coerce_ini(type_, value, rootpath)
 
 
 def option_lookup(dest: str) -> tuple[bool, Any]:

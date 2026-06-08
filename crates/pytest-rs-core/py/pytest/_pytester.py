@@ -334,9 +334,64 @@ class Pytester:
 
         new_args = [str(arg) for arg in args]
         config = _native_prepareconfig(new_args)
+        self._fire_addoption(config, new_args)
         if self._request is not None:
             self._request.addfinalizer(config._ensure_unconfigure)
         return config
+
+    def _fire_addoption(self, config, args):
+        """Fire pytest_addoption from the rootdir conftest and any
+        ``pytester.plugins`` so custom addini/addoption declarations resolve
+        through config.getini/getoption. The shared parser registries are
+        snapshot/restored around this config's lifetime to avoid leaking the
+        test's custom options into the outer session."""
+        from pytest import _parser
+        from pytest._pluginmanager import _accepted_kwargs, pluginmanager
+
+        snapshots = {
+            reg: dict(getattr(_parser, reg))
+            for reg in ("ini_specs", "ini_aliases", "option_specs", "flag_dests")
+        }
+
+        def restore():
+            for reg, snap in snapshots.items():
+                live = getattr(_parser, reg)
+                live.clear()
+                live.update(snap)
+
+        if self._request is not None:
+            self._request.addfinalizer(restore)
+
+        plugins = []
+        conftest = self.path / "conftest.py"
+        if conftest.is_file():
+            mod = self._import_parseconfig_conftest(conftest)
+            if mod is not None:
+                plugins.append(mod)
+        for plugin in getattr(self, "plugins", []):
+            if not isinstance(plugin, str):
+                plugins.append(plugin)
+
+        for plugin in plugins:
+            add = getattr(plugin, "pytest_addoption", None)
+            if callable(add):
+                add(**_accepted_kwargs(add, {"parser": _parser.parser, "pluginmanager": pluginmanager}))
+
+        # Apply the parseconfig CLI flags (e.g. "--hello=this") now that their
+        # options are registered, so config.getoption sees the parsed values.
+        _parser.apply_cli_args(config.option, list(args))
+
+    @staticmethod
+    def _import_parseconfig_conftest(path):
+        import importlib.util
+
+        try:
+            spec = importlib.util.spec_from_file_location("_pytester_parseconfig_conftest", path)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            return mod
+        except Exception:
+            return None
 
     def parseconfigure(self, *args):
         """Like parseconfig, but also runs the pytest_configure step."""
