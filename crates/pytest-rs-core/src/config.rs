@@ -595,6 +595,14 @@ impl Config {
                 .action(clap::ArgAction::SetTrue)
                 .hide(true),
         );
+        // --fulltrace: don't cut any tracebacks (accepted; read as the
+        // `fulltrace` option by the config proxy).
+        cmd = cmd.arg(
+            clap::Arg::new("full-trace")
+                .long("fulltrace")
+                .action(clap::ArgAction::SetTrue)
+                .hide(true),
+        );
         // cacheprovider selection flags (each with its long-form alias).
         for (name, alias) in [
             ("lf", "last-failed"),
@@ -817,9 +825,14 @@ impl Config {
         let mut ini_overrides = HashMap::new();
         if let Some(overrides) = matches.get_many::<String>("override-ini") {
             for entry in overrides {
-                if let Some((name, value)) = entry.split_once('=') {
-                    ini_overrides.insert(name.to_string(), value.to_string());
-                }
+                // pytest rejects bare names: -o/--override-ini wants
+                // option=value, not a lone option.
+                let Some((name, value)) = entry.split_once('=') else {
+                    return Err(format!(
+                        "ERROR: -o/--override-ini expects option=value style (got: '{entry}')."
+                    ));
+                };
+                ini_overrides.insert(name.to_string(), value.to_string());
             }
         }
 
