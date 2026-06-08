@@ -389,6 +389,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pytest-benchmark | v5.1.0 | 91 | 31 | 0 | 1 | 123 | 74.0% | 4 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 41 | 97.6% | 1 | 1 | 0 |
 | anyio | 4.13.0 | 2860 | 0 | 0 | 302 | 3162 | 90.4% | 26 | 26 | 0 |
+| pytest-repeat | v0.9.4 | 11 | 5 | 0 | 0 | 16 | 68.8% | 0 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 45 | 18 | 0 | 0 | 63 | 71.4% | 0 | 1 | 0 |
 | pytest-env | 1.6.0 | 66 | 9 | 0 | 0 | 75 | 88.0% | 2 | 3 | 0 |
 | pytest-rerunfailures | 9.1.1 | 32 | 15 | 0 | 1 | 48 | 66.7% | 0 | 1 | 0 |
@@ -589,6 +590,16 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_to_process.py | passed | 36 | 0 | 0 | 0 |
 | tests/test_to_thread.py | passed | 64 | 0 | 0 | 0 |
 | tests/test_typedattr.py | passed | 1 | 0 | 0 | 0 |
+
+</details>
+
+### pytest-repeat @ v0.9.4
+
+<details><summary>per-file detail (1 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| test_repeat.py | failed | 11 | 5 | 0 | 0 |
 
 </details>
 

@@ -104,6 +104,14 @@ deps = [
 ]
 enabled = true
 
+[pytest-repeat]
+repo = "https://github.com/pytest-dev/pytest-repeat"
+tag = "v0.9.4"
+testpaths = ["test_repeat.py"]
+deps = ["pytest-repeat==0.9.4"]
+pythonpath = ["."]
+enabled = true
+
 [pytest-instafail]
 repo = "https://github.com/pytest-dev/pytest-instafail"
 tag = "v0.5.0"

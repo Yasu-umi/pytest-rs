@@ -1,0 +1,17 @@
+# Upstream pytest-repeat tests that must keep passing under pytest-rs.
+#
+# test_repeat.py (~11/16): pytest-rs now runs plugin/conftest
+# pytest_generate_tests impls (not just module-level), gives metafunc its
+# config + definition markers, and honors metafunc.parametrize(indirect=...)
+# — so --count / @pytest.mark.repeat duplicate tests via the indirect step
+# fixture.
+
+[files]
+
+[excluded]
+# (single file; partial — tracked by the scoreboard, pinned once green)
+
+# Known remaining gaps:
+#   test_scope[*] (3) — --repeat-scope reordering (parametrize scope= grouping).
+#   test_invalid_scope — addoption choices= validation (invalid value usage error).
+#   test_mark_repeat_decorator_is_registered — repeat marker registration check.

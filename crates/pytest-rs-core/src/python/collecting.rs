@@ -120,6 +120,13 @@ pub fn collect_module(
     let nodeid_base = file_nodeid(rootdir, path);
 
     register_pytest_plugins(py, &module, registry, hooks)?;
+    // Plugin/conftest pytest_generate_tests impls (e.g. pytest-repeat) run on
+    // the metafunc alongside any module-level one.
+    let extra_generate_hooks: Vec<Py<PyAny>> = hooks
+        .iter()
+        .filter(|hook| hook.name == "pytest_generate_tests")
+        .map(|hook| hook.func.clone_ref(py))
+        .collect();
     introspect_namespace(
         py,
         &module,
@@ -128,6 +135,7 @@ pub fn collect_module(
         path,
         items,
         registry,
+        &extra_generate_hooks,
     )
 }
 
@@ -235,18 +243,36 @@ pub(crate) fn introspect_namespace(
     path: &Path,
     items: &mut Vec<TestItem>,
     registry: &mut FixtureRegistry,
+    extra_generate_hooks: &[Py<PyAny>],
 ) -> PyResult<()> {
     register_fixtures_from(py, module, &format!("{nodeid_base}::"), registry)?;
 
     // Module-level `pytestmark` applies to every item in the module.
     let module_marks = read_marks(py, module.as_any())?;
 
-    // A module-level pytest_generate_tests hook parametrizes via metafunc.
-    // (conftest-level hooks are not threaded through here yet.)
-    let generate_hook: Option<Bound<'_, PyAny>> = module
+    // pytest_generate_tests impls parametrize via metafunc: the module-level
+    // one plus every plugin/conftest impl (pytest-repeat registers one). They
+    // run in order on a single combined callable.
+    let gen_list = pyo3::types::PyList::empty(py);
+    if let Some(mod_hook) = module
         .dict()
         .get_item("pytest_generate_tests")?
-        .filter(|hook| hook.is_callable());
+        .filter(|hook| hook.is_callable())
+    {
+        gen_list.append(mod_hook)?;
+    }
+    for hook in extra_generate_hooks {
+        gen_list.append(hook.bind(py))?;
+    }
+    let generate_hook: Option<Bound<'_, PyAny>> = if gen_list.is_empty() {
+        None
+    } else {
+        Some(
+            py.import("pytest._metafunc")?
+                .getattr("combine_generate_hooks")?
+                .call1((gen_list,))?,
+        )
+    };
 
     let inspect = py.import("inspect")?;
     let isclass = inspect.getattr("isclass")?;
@@ -576,12 +602,29 @@ pub(crate) fn push_test_items(
     // pytest_generate_tests: metafunc.parametrize calls become parametrize
     // marks, merged after the decorator-applied ones.
     let mut marks = marks;
+    let fixture_names = fixture_names;
+    // Fixtures a generate hook appended (pytest-repeat's indirect step
+    // fixture): set up so their request.param is consumed, but not injected
+    // into the test signature.
+    let mut extra_generated_fixtures: Vec<String> = Vec::new();
     if let Some(hook) = generate_hook {
+        // metafunc.config (option.count etc.) and definition markers
+        // (get_closest_marker) let plugin impls like pytest-repeat decide.
+        let config = crate::python::proxies::CONFIG_PROXY
+            .get()
+            .map(|c| c.clone_ref(py).into_bound(py))
+            .map(|c| c.into_any());
+        let mark_objs = pyo3::types::PyList::empty(py);
+        for m in &marks {
+            mark_objs.append(m.obj.bind(py))?;
+        }
         let metafunc = py.import("pytest._metafunc")?.getattr("Metafunc")?.call1((
             func,
             fixture_names.clone(),
             module,
             cls.map(|c| c.clone().unbind()),
+            config,
+            mark_objs,
         ))?;
         hook.call1((&metafunc,))?;
         for mark in metafunc.getattr("_parametrize_marks")?.try_iter()? {
@@ -590,6 +633,14 @@ pub(crate) fn push_test_items(
                 name: "parametrize".to_string(),
                 obj: mark.unbind(),
             });
+        }
+        // A hook may append fixturenames (pytest-repeat adds its indirect
+        // step fixture so its request.param is set up per repeat).
+        let updated: Vec<String> = metafunc.getattr("fixturenames")?.extract()?;
+        for name in updated {
+            if !fixture_names.contains(&name) && !extra_generated_fixtures.contains(&name) {
+                extra_generated_fixtures.push(name);
+            }
         }
     }
 
@@ -617,7 +668,7 @@ pub(crate) fn push_test_items(
             is_coroutine: flags.is_coroutine,
             is_doctest: false,
             fixture_names: fixture_names.clone(),
-            extra_fixture_names: Vec::new(),
+            extra_fixture_names: extra_generated_fixtures.clone(),
             marks: item_marks,
             callspec: variant.params,
             fixture_params: variant.indirect_params,
