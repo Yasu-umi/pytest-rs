@@ -296,12 +296,21 @@ impl Engine {
                         self.print_dist_banner(workers);
                     }
                     if dist_workers.is_none() && !self.config.quiet {
+                        // pytest still applies -k/-m selection before aborting,
+                        // so the count line shows deselected/selected too.
+                        let _ = self.apply_selection(py);
+                        let deselected = self.session.deselected_items.len();
                         let n_items = self.session.items.len();
-                        println!(
-                            "collected {n_items} item{} / {n_collect_errors} error{}",
-                            if n_items == 1 { "" } else { "s" },
+                        let collected = n_items + deselected;
+                        let mut line = format!(
+                            "collected {collected} item{} / {n_collect_errors} error{}",
+                            if collected == 1 { "" } else { "s" },
                             if n_collect_errors == 1 { "" } else { "s" }
                         );
+                        if deselected > 0 {
+                            line += &format!(" / {deselected} deselected / {n_items} selected");
+                        }
+                        println!("{line}");
                     }
                     self.print_collect_errors();
                 }
@@ -416,22 +425,23 @@ impl Engine {
             } else {
                 ""
             };
-            if deselected > 0 {
-                println!(
-                    "{prefix}collected {collected} items / {deselected} deselected / {n_items} selected"
-                );
-            } else if n_collect_errors > 0 {
-                println!(
-                    "{prefix}collected {n_items} item{} / {n_collect_errors} error{}",
-                    if n_items == 1 { "" } else { "s" },
+            // pytest's report_collect builds the line incrementally so error,
+            // deselected and selected counts can all appear together.
+            let mut line = format!(
+                "{prefix}collected {collected} item{}",
+                if collected == 1 { "" } else { "s" }
+            );
+            if n_collect_errors > 0 {
+                line += &format!(
+                    " / {n_collect_errors} error{}",
                     if n_collect_errors == 1 { "" } else { "s" }
                 );
-            } else {
-                println!(
-                    "{prefix}collected {n_items} item{}",
-                    if n_items == 1 { "" } else { "s" }
-                );
             }
+            if deselected > 0 {
+                line += &format!(" / {deselected} deselected");
+                line += &format!(" / {n_items} selected");
+            }
+            println!("{line}");
             if let Some(line) = self
                 .cache
                 .as_ref()
