@@ -14,6 +14,35 @@ pub const GREEN: u8 = 32;
 pub const YELLOW: u8 = 33;
 pub const CYAN: u8 = 36;
 
+/// The SGR code for a TerminalWriter markup name (`_esctable` in
+/// pytest's `_io.terminalwriter`), used when a `pytest_report_teststatus`
+/// hook supplies its own `(word, {name: True})` markup.
+pub fn markup_code(name: &str) -> Option<u8> {
+    Some(match name {
+        "black" => 30,
+        "red" => 31,
+        "green" => 32,
+        "yellow" => 33,
+        "blue" => 34,
+        "purple" => 35,
+        "cyan" => 36,
+        "white" => 37,
+        "Black" => 40,
+        "Red" => 41,
+        "Green" => 42,
+        "Yellow" => 43,
+        "Blue" => 44,
+        "Purple" => 45,
+        "Cyan" => 46,
+        "White" => 47,
+        "bold" => 1,
+        "light" => 2,
+        "blink" => 5,
+        "invert" => 7,
+        _ => return None,
+    })
+}
+
 pub fn set_enabled(on: bool) {
     ENABLED.store(on, Ordering::Relaxed);
 }

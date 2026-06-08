@@ -49,6 +49,87 @@ pub(crate) fn fire_logreport_hooks(
     }
 }
 
+/// A `pytest_report_teststatus` hook result: the verbose word and any
+/// explicit markup codes the hook attached to it (a `(word, {name: True})`
+/// tuple, upstream). The category/letter members of the triple are parsed
+/// for shape but not yet consumed (stats stay outcome-driven here).
+pub(crate) struct TestStatus {
+    pub word: String,
+    pub markup: Option<Vec<u8>>,
+}
+
+/// Resolve a report through the registered `pytest_report_teststatus`
+/// conftest/plugin hooks (firstresult: first non-None wins, pluggy order).
+/// Returns None when no hook claims the report, so the caller falls back
+/// to the built-in outcome word/color.
+pub(crate) fn report_teststatus(
+    py: Python<'_>,
+    session: &Session,
+    report: &TestReport,
+    lineno: Option<u32>,
+) -> Option<TestStatus> {
+    let funcs: Vec<Py<PyAny>> = session
+        .py_hooks
+        .iter()
+        .filter(|hook| {
+            hook.name == "pytest_report_teststatus"
+                && report.nodeid.starts_with(hook.baseid.as_str())
+        })
+        .map(|hook| hook.func.clone_ref(py))
+        .collect();
+    if funcs.is_empty() {
+        return None;
+    }
+    let proxy = python::make_report_proxy(py, report, lineno).ok()?;
+    for func in funcs {
+        let result = match python::call_py_hook(
+            py,
+            &func,
+            &[("report", proxy.clone_ref(py))],
+        ) {
+            Ok(result) => result,
+            Err(err) => {
+                eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+                continue;
+            }
+        };
+        let bound = result.bind(py);
+        if bound.is_none() {
+            continue;
+        }
+        if let Some(status) = TestStatus::from_py(bound) {
+            return Some(status);
+        }
+    }
+    None
+}
+
+impl TestStatus {
+    /// Parse a `(category, letter, word)` triple, where `word` may itself
+    /// be a `(word, markup_dict)` tuple carrying explicit color markup.
+    fn from_py(value: &Bound<'_, PyAny>) -> Option<TestStatus> {
+        let _category: String = value.get_item(0).ok()?.extract().ok()?;
+        let _letter: String = value.get_item(1).ok()?.extract().ok()?;
+        let word_item = value.get_item(2).ok()?;
+        let (word, markup) = if let Ok((word, markup)) =
+            word_item.extract::<(String, Bound<'_, pyo3::types::PyDict>)>()
+        {
+            let codes: Vec<u8> = markup
+                .iter()
+                .filter_map(|(k, v)| {
+                    let name: String = k.extract().ok()?;
+                    let on: bool = v.extract().unwrap_or(false);
+                    on.then(|| crate::tw::markup_code(&name)).flatten()
+                })
+                .collect();
+            (word, Some(codes))
+        } else {
+            (word_item.extract::<String>().ok()?, None)
+        };
+        Some(TestStatus { word, markup })
+    }
+}
+
 pub(crate) fn fire_runtest_py_hooks(
     py: Python<'_>,
     session: &Session,

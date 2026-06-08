@@ -186,12 +186,24 @@ impl Engine {
                     // -p no:terminal: no progress output at all.
                 } else if tc >= 1 {
                     if report.phase == Phase::Call || report.outcome != Outcome::Passed {
-                        let word = outcome_word(&report);
+                        // A pytest_report_teststatus hook may override the
+                        // verbose word and its markup; otherwise use the
+                        // built-in outcome word/color.
+                        let status =
+                            report_teststatus(py, session, &report, Some(item.lineno));
+                        let word = status
+                            .as_ref()
+                            .map(|s| s.word.clone())
+                            .unwrap_or_else(|| outcome_word(&report));
+                        let codes = status
+                            .as_ref()
+                            .and_then(|s| s.markup.clone())
+                            .unwrap_or_else(|| outcome_codes(&report).to_vec());
                         let plain = format!("{} {}", item.nodeid, word);
                         let rendered = format!(
                             "{} {}",
                             item.nodeid,
-                            crate::tw::markup(&word, outcome_codes(&report))
+                            crate::tw::markup(&word, &codes)
                         );
                         // "times" in verbose mode reports each test's own
                         // duration (pytest's per-item showlongtestinfo).
