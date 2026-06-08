@@ -268,11 +268,22 @@ def unknown_ini_keys(inicfg_keys: Any) -> list[str]:
     return sorted(key for key in inicfg_keys if key not in known)
 
 
+# Core pytest options that pytest-rs does not implement but plugins read
+# defensively off config.option (e.g. pytest-rerunfailures checks
+# config.option.usepdb to refuse reruns under the debugger).
+CORE_OPTION_DEFAULTS: dict[str, Any] = {
+    "usepdb": False,
+    "usepdb_cls": None,
+}
+
+
 def option_lookup(dest: str) -> tuple[bool, Any]:
     """(registered, default) for one option dest — registered defaults win
     over the getoption(default=) argument, like pytest's parsed namespace."""
     spec = option_specs.get(dest)
     if spec is None:
+        if dest in CORE_OPTION_DEFAULTS:
+            return (True, CORE_OPTION_DEFAULTS[dest])
         return (False, None)
     return (True, spec["default"])
 

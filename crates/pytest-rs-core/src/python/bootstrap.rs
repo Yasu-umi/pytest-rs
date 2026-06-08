@@ -104,6 +104,38 @@ if not hasattr(_main, '__file__'):
     py.import("_pytest.config")?
         .setattr("_native_prepareconfig", prepareconfig)?;
 
+    // runtestprotocol delegation (pytest-rerunfailures): the re-entrant phase
+    // runner and the logreport capture sink that records what a delegated
+    // protocol logs. Both are no-ops outside a delegated run.
+    let run_phases = pyo3::types::PyCFunction::new_closure(
+        py,
+        Some(c"_native_run_item_phases"),
+        None,
+        |args: &Bound<'_, pyo3::types::PyTuple>,
+         _kwargs: Option<&Bound<'_, pyo3::types::PyDict>>|
+         -> PyResult<Py<PyAny>> { crate::runner::run_item_phases(args.py()) },
+    )?;
+    let capture = pyo3::types::PyCFunction::new_closure(
+        py,
+        Some(c"_native_capture_logreport"),
+        None,
+        |args: &Bound<'_, pyo3::types::PyTuple>,
+         _kwargs: Option<&Bound<'_, pyo3::types::PyDict>>|
+         -> PyResult<Py<PyAny>> {
+            let report = args.get_item(0)?;
+            crate::runner::capture_logreport(args.py(), &report)?;
+            Ok(args.py().None())
+        },
+    )?;
+    let runner_mod = py.import("_pytest.runner")?;
+    runner_mod.setattr("_native_run_item_phases", run_phases)?;
+    runner_mod.setattr("_native_capture_logreport", capture)?;
+    // Register the capture sink so ihook.pytest_runtest_logreport reaches it.
+    let sink = runner_mod.getattr("_LogreportSink")?.call0()?;
+    py.import("pytest._pluginmanager")?
+        .getattr("pluginmanager")?
+        .call_method1("register", (sink,))?;
+
     // Assertion rewriting: rewrite `assert` in test modules at import time.
     py.import("pytest._rewrite")?.call_method0("install")?;
 

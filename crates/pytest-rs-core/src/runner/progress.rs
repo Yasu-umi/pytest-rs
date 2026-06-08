@@ -36,6 +36,9 @@ pub(crate) fn live_flush(session: &mut Session, config: &Config, reports: &[Test
 /// SGR codes for a report's outcome (progress letters, verbose words).
 pub(crate) fn outcome_codes(report: &TestReport) -> &'static [u8] {
     use crate::tw;
+    if report.rerun {
+        return &[tw::YELLOW];
+    }
     match report.outcome {
         Outcome::Passed => &[tw::GREEN],
         Outcome::Failed => &[tw::RED],
@@ -84,6 +87,8 @@ pub(crate) fn outcome_word(report: &TestReport) -> String {
             Outcome::XFailed => reasoned(&format!("SUBXFAIL{desc}")),
             _ => format!("SUBPASSED{desc}"),
         }
+    } else if report.rerun {
+        "RERUN".to_string()
     } else {
         match report.outcome {
             Outcome::Passed => "PASSED".to_string(),
@@ -207,6 +212,7 @@ pub(crate) fn report_from_err(
             location: None,
             subtest_desc: None,
             sections: Vec::new(),
+            rerun: false,
         }
     } else if python::is_skipped(py, err) {
         // Imperative skips report where pytest.skip was raised; skips out
@@ -230,6 +236,7 @@ pub(crate) fn report_from_err(
             location,
             subtest_desc: None,
             sections: Vec::new(),
+            rerun: false,
         }
     } else {
         TestReport {
@@ -247,6 +254,7 @@ pub(crate) fn report_from_err(
             // "Captured stdout/log {when}" report sections; the terminal
             // appends them to the longrepr at render time.
             sections: python::log_failure_sections(py),
+            rerun: false,
         }
     }
 }
@@ -269,7 +277,14 @@ pub fn summary_line(
     let mut xfailed = 0usize;
     let mut xpassed = 0usize;
     let mut subtests_passed = 0usize;
+    let mut rerun = 0usize;
     for report in reports {
+        // A retried attempt (pytest-rerunfailures): its own "rerun" category,
+        // never counted as failed/error.
+        if report.rerun {
+            rerun += 1;
+            continue;
+        }
         // Passed subtests count their own category; other subtest outcomes
         // fold into the regular buckets (upstream report_teststatus).
         if report.subtest_desc.is_some() && report.outcome == Outcome::Passed {
@@ -308,6 +323,9 @@ pub fn summary_line(
     }
     if xpassed > 0 {
         parts.push((format!("{xpassed} xpassed"), tw::YELLOW));
+    }
+    if rerun > 0 {
+        parts.push((format!("{rerun} rerun"), tw::YELLOW));
     }
     if warning_count > 0 {
         parts.push((

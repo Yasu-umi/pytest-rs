@@ -16,11 +16,13 @@ mod fixtures;
 mod hooks;
 mod marks;
 mod progress;
+mod protocol;
 
 pub(crate) use fixtures::*;
 pub(crate) use hooks::*;
 pub(crate) use marks::*;
 pub use progress::*;
+pub(crate) use protocol::{capture_logreport, run_item_phases};
 
 impl Engine {
     pub(crate) fn run_items(&mut self, py: Python<'_>) {
@@ -93,7 +95,8 @@ impl Engine {
             };
         }
 
-        for item in &items {
+        for idx in 0..items.len() {
+            let item = &items[idx];
             if let Some(m) = maxfail
                 && failed >= m
             {
@@ -163,14 +166,21 @@ impl Engine {
             python::set_subtest_fail_budget(py, maxfail.map(|m| m.saturating_sub(failed)));
             session.live_printed = 0;
             session.streamed_chars = 0;
-            let reports = run_one(py, plugins, session, config, item);
-            live_flush(session, config, &reports);
+            let reports = run_one(py, plugins, session, config, item, items.get(idx + 1));
+            // A delegated pytest_runtest_protocol drove the shim TerminalReporter
+            // (via ihook), which already rendered; here we only count.
+            let delegated = session.delegated_render;
+            if !delegated {
+                live_flush(session, config, &reports);
+            }
             done += 1;
             last_nodeid = Some(item.nodeid.clone());
             let mut item_failed = false;
             for (i, report) in reports.into_iter().enumerate() {
                 fire_logreport_hooks(py, session, &report, Some(item.lineno));
-                if report.outcome == Outcome::Failed {
+                // A "rerun" report is a retried attempt: shown as 'R', never
+                // counted as a failure or charged against --maxfail.
+                if report.outcome == Outcome::Failed && !report.rerun {
                     failed += 1;
                     item_failed = true;
                 }
@@ -182,8 +192,9 @@ impl Engine {
                 if report.progress_char().is_some() {
                     any_char = true;
                 }
-                if config.no_terminal() {
-                    // -p no:terminal: no progress output at all.
+                if config.no_terminal() || delegated {
+                    // -p no:terminal, or a delegated protocol whose shim
+                    // TerminalReporter already rendered: no native output.
                 } else if tc >= 1 {
                     if report.phase == Phase::Call || report.outcome != Outcome::Passed {
                         // A pytest_report_teststatus hook may override the
@@ -304,7 +315,9 @@ pub(crate) fn run_one(
     session: &mut Session,
     config: &Config,
     item: &TestItem,
+    nextitem: Option<&TestItem>,
 ) -> Vec<TestReport> {
+    session.delegated_render = false;
     // pytest_runtest_protocol hookwrappers (e.g. pytest-timeout's timer)
     // surround the whole setup/call/teardown protocol: their pre-yield part
     // runs now, the rest after the item finishes.
@@ -322,7 +335,16 @@ pub(crate) fn run_one(
                 )];
             }
         };
-    let reports = run_one_body(py, plugins, session, config, item);
+    // A plain pytest_runtest_protocol impl (pytest-rerunfailures) may replace
+    // the protocol; if one handles the item, use the reports it logged.
+    let reports = match protocol::delegate_protocol(py, plugins, session, config, item, nextitem) {
+        Ok(Some(reports)) => reports,
+        Ok(None) => run_one_body(py, plugins, session, config, item),
+        Err(err) => {
+            let _ = finish_runtest_py_wrappers(py, &wrappers);
+            return vec![report_from_err(py, config, item, Phase::Setup, Instant::now(), &err)];
+        }
+    };
     if let Err(err) = finish_runtest_py_wrappers(py, &wrappers) {
         eprintln!(
             "pytest_runtest_protocol wrapper teardown failed for {}: {}",
@@ -333,7 +355,7 @@ pub(crate) fn run_one(
     reports
 }
 
-fn run_one_body(
+pub(crate) fn run_one_body(
     py: Python<'_>,
     plugins: &[Box<dyn Plugin>],
     session: &mut Session,
@@ -363,6 +385,7 @@ fn run_one_body(
                 location: Some(location),
                 subtest_desc: None,
                 sections: Vec::new(),
+                rerun: false,
             });
             return reports;
         }
@@ -414,6 +437,7 @@ fn run_one_body(
             location: None,
             subtest_desc: None,
             sections: Vec::new(),
+            rerun: false,
         });
         return reports;
     }
@@ -712,6 +736,7 @@ fn run_one_body(
         location: None,
         subtest_desc: None,
         sections: Vec::new(),
+        rerun: false,
     });
 
     if setup_show_active(config) {
@@ -770,6 +795,7 @@ fn run_one_body(
                     location: None,
                     subtest_desc: None,
                     sections: Vec::new(),
+                    rerun: false,
                 });
                 teardown_one(py, plugins, session, config, item, true, &mut reports);
                 close_item_filters(py);
@@ -846,6 +872,7 @@ fn run_one_body(
             location: None,
             subtest_desc: None,
             sections: python::log_failure_sections(py),
+            rerun: false,
         },
         Ok(false) => {
             if item.is_coroutine {
@@ -866,6 +893,7 @@ fn run_one_body(
                     location: None,
                     subtest_desc: None,
                     sections: Vec::new(),
+                    rerun: false,
                 }
             } else {
                 match python::call_with_kwargs(py, &callable, &kwargs) {
@@ -878,6 +906,7 @@ fn run_one_body(
                         location: None,
                         subtest_desc: None,
                         sections: python::log_failure_sections(py),
+                        rerun: false,
                     },
                     Err(err) => {
                         if let Some(code) = python::session_abort_code(py, &err) {
@@ -1106,6 +1135,7 @@ fn teardown_one(
             // The teardown report carries the item's full captured output
             // (pytest writes junit system-out from it).
             sections: python::log_failure_sections(py),
+            rerun: false,
         });
     } else {
         reports.push(TestReport {
@@ -1125,6 +1155,7 @@ fn teardown_one(
             // "Captured stdout/log {when}" report sections; the terminal
             // appends them to the longrepr at render time.
             sections: python::log_failure_sections(py),
+            rerun: false,
         });
     }
     python::log_finish_item(py);
@@ -1176,6 +1207,7 @@ pub(crate) fn teardown_scope_reported(
         location: None,
         subtest_desc: None,
         sections,
+        rerun: false,
     })
 }
 

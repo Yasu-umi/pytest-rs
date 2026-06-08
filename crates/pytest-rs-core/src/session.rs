@@ -105,6 +105,10 @@ pub struct Session {
     /// entry points), for the session header's "plugins:" line. Empty when
     /// no dist-backed plugins loaded, in which case the line is omitted.
     pub plugin_distinfo: Vec<String>,
+    /// Set for the current item when a plain pytest_runtest_protocol plugin
+    /// handled it: the shim TerminalReporter already rendered its reports, so
+    /// run_items counts them without re-rendering.
+    pub delegated_render: bool,
 }
 
 impl Session {
@@ -136,6 +140,7 @@ impl Session {
             shouldfail: None,
             custom_reporter: None,
             plugin_distinfo: Vec::new(),
+            delegated_render: false,
         }
     }
 

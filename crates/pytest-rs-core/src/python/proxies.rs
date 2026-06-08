@@ -218,6 +218,15 @@ pub fn make_node(py: Python<'_>, item: &TestItem) -> PyResult<Py<PyAny>> {
     if let Some(cls) = cls {
         node.setattr("cls", cls)?;
     }
+    // node.location = (relpath, 0-based lineno, domain) — pytest-rerunfailures
+    // passes it to pytest_runtest_logstart/logfinish.
+    let file = item.nodeid.split("::").next().unwrap_or("");
+    let domain = item
+        .nodeid
+        .split_once("::")
+        .map(|(_, rest)| rest.replace("::", "."))
+        .unwrap_or_default();
+    node.setattr("location", (file, item.lineno.saturating_sub(1), domain))?;
     Ok(node.unbind())
 }
 

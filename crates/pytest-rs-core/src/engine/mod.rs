@@ -274,6 +274,7 @@ impl Engine {
                     location: None,
                     subtest_desc: None,
                     sections: Vec::new(),
+                    rerun: false,
                 });
             }
             // --maxfail aborting collection exits TESTS_FAILED with a
@@ -1000,6 +1001,7 @@ impl Engine {
                                 location: Some(location),
                                 subtest_desc: None,
                                 sections: Vec::new(),
+                                rerun: false,
                             });
                         }
                         Some(Err(message)) => errors.push((file.clone(), with_sections(message))),
@@ -1052,6 +1054,7 @@ impl Engine {
                                     location: Some(format!("{nodeid}:1")),
                                     subtest_desc: None,
                                     sections: Vec::new(),
+                                    rerun: false,
                                 });
                             }
                         }
@@ -1119,6 +1122,7 @@ impl Engine {
                                 location: Some(format!("{nodeid}:1")),
                                 subtest_desc: None,
                                 sections: Vec::new(),
+                                rerun: false,
                             });
                         } else {
                             errors.push((extra_file.clone(), python::format_exception(py, &err)));

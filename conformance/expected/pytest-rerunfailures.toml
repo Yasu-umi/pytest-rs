@@ -1,0 +1,23 @@
+# Upstream pytest-rerunfailures tests that must keep passing under pytest-rs.
+#
+# test_pytest_rerunfailures.py (~32/48 passing): pytest-rs now delegates a
+# plain pytest_runtest_protocol impl that replaces the protocol — the plugin
+# calls _pytest.runner.runtestprotocol() to re-run the engine phases, marks
+# reports "rerun", and drives the terminal via item.ihook. The rerun outcome
+# is rendered ('R'/RERUN) and counted in the summary.
+
+[files]
+
+[excluded]
+# (single file; partial — tracked by the scoreboard, pinned once green)
+
+# Known per-test gaps in test_pytest_rerunfailures.py:
+#   test_reruns_with_delay[*] / test_reruns_with_delay_marker[*] — assert a
+#     parent-process mock.MagicMock() on time.sleep was called; this needs
+#     in-process pytester (pytest-rs runs nested sessions as subprocesses, so
+#     the parent's monkeypatch is not shared).
+#   test_error_when_run_with_pdb — --pdb is not implemented.
+#   test_only_rerun_flag[*-False] — only_rerun regex matched against
+#     report.longrepr.reprcrash.message (message granularity differs).
+#   test_rerun_on_setup_class_with_error_with_reruns — class-scope setup-error
+#     rerun bookkeeping.

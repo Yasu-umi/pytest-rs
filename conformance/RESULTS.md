@@ -384,11 +384,12 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 85 | 0 | 0 | 5 | 90 | 94.4% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 182 | 23 | 0 | 4 | 209 | 87.1% | 0 | 1 | 0 |
-| pytest-xdist | v3.8.0 | 89 | 8 | 0 | 0 | 97 | 91.8% | 0 | 1 | 6 |
+| pytest-xdist | v3.8.0 | 90 | 7 | 0 | 0 | 97 | 92.8% | 0 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 91 | 31 | 0 | 1 | 123 | 74.0% | 4 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 41 | 97.6% | 1 | 1 | 0 |
 | anyio | 4.13.0 | 2860 | 0 | 0 | 302 | 3162 | 90.4% | 26 | 26 | 0 |
+| pytest-rerunfailures | 9.1.1 | 32 | 15 | 0 | 1 | 48 | 66.7% | 0 | 1 | 0 |
 | pytest-randomly | 4.1.0 | 30 | 7 | 0 | 0 | 37 | 81.1% | 0 | 1 | 0 |
 | click | 8.3.1 | 1313 | 0 | 0 | 22 | 1335 | 98.4% | 20 | 20 | 0 |
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
@@ -514,7 +515,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| testing/acceptance_test.py | failed | 89 | 8 | 0 | 0 |
+| testing/acceptance_test.py | failed | 90 | 7 | 0 | 0 |
 
 </details>
 
@@ -586,6 +587,16 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_to_process.py | passed | 36 | 0 | 0 | 0 |
 | tests/test_to_thread.py | passed | 64 | 0 | 0 | 0 |
 | tests/test_typedattr.py | passed | 1 | 0 | 0 | 0 |
+
+</details>
+
+### pytest-rerunfailures @ 9.1.1
+
+<details><summary>per-file detail (1 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| test_pytest_rerunfailures.py | failed | 32 | 15 | 0 | 1 |
 
 </details>
 

@@ -104,6 +104,19 @@ deps = [
 ]
 enabled = true
 
+[pytest-rerunfailures]
+repo = "https://github.com/pytest-dev/pytest-rerunfailures"
+tag = "9.1.1"
+testpaths = ["test_pytest_rerunfailures.py"]
+# Flat layout: the checkout root is the import path; the dist is installed
+# so its pytest11 entry point autoloads (the checkout shadows the import).
+# setuptools<81 still ships pkg_resources, which the test module imports
+# (removed in setuptools 81+). The `py` package backs the tests'
+# py.path.local temp-file flakiness toggles.
+deps = ["pytest-rerunfailures==9.1.1", "setuptools<81", "py"]
+pythonpath = ["."]
+enabled = true
+
 [pytest-randomly]
 repo = "https://github.com/pytest-dev/pytest-randomly"
 tag = "4.1.0"

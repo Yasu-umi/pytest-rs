@@ -169,11 +169,23 @@ def session_obj_overrides():
     ]
 
 
+class _SetupState:
+    """Stand-in for pytest's SetupState (item.session._setupstate): a mutable
+    stack of collectors. pytest-rs runs each item afresh, so it stays empty."""
+
+    def __init__(self):
+        self.stack = []
+
+
 class _NodeSession:
     """Minimal stand-in for pytest's Session as seen from item.session."""
 
     def __init__(self, config):
         self.config = config
+        # pytest-rerunfailures clears _setupstate.stack between reruns; each
+        # pytest-rs attempt is a fresh run_one_body, so the stack is always
+        # empty (an object exposing a mutable .stack is enough).
+        self._setupstate = _SetupState()
 
     @property
     def shouldfail(self):

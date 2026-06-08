@@ -126,6 +126,7 @@ pub fn pop_subtest_reports(
                 location,
                 subtest_desc: Some(desc),
                 sections: Vec::new(),
+                rerun: false,
             });
         }
         Ok((reports, failed_fixture_subs))

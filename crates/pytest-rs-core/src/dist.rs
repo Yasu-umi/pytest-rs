@@ -841,6 +841,7 @@ impl WorkerOwner {
                     location: None,
                     subtest_desc: None,
                     sections: Vec::new(),
+                    rerun: false,
                 },
                 worker: self.index,
             });

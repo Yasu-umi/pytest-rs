@@ -35,6 +35,7 @@ fn send_collect_error(nodeid: &str, message: String) {
             location: None,
             subtest_desc: None,
             sections: Vec::new(),
+            rerun: false,
         },
     });
     send(&WorkerMsg::Report {
@@ -47,6 +48,7 @@ fn send_collect_error(nodeid: &str, message: String) {
             location: None,
             subtest_desc: None,
             sections: Vec::new(),
+            rerun: false,
         },
     });
 }
@@ -376,8 +378,14 @@ impl Engine {
                 item,
                 "pytest_runtest_logstart",
             );
-            let reports =
-                crate::runner::run_one(py, &self.plugins, &mut self.session, &self.config, item);
+            let reports = crate::runner::run_one(
+                py,
+                &self.plugins,
+                &mut self.session,
+                &self.config,
+                item,
+                None,
+            );
             collection.last_nodeid = Some(item.nodeid.clone());
             for report in reports {
                 crate::runner::fire_logreport_hooks(py, &self.session, &report, Some(lineno));

@@ -7,7 +7,7 @@ from pytest._fixtures import fixture
 from pytest._outcomes import fail
 
 _OUTCOME_RE = _re.compile(
-    r"(\d+) (passed|failed|skipped|xfailed|xpassed|errors?|warnings?|deselected)"
+    r"(\d+) (passed|failed|skipped|xfailed|xpassed|errors?|warnings?|deselected|rerun)"
 )
 _ANSI_RE = _re.compile(r"\x1b\[[0-9;]*m")
 

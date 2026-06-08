@@ -39,11 +39,19 @@ pub struct TestReport {
     /// (failures embed them in longrepr); shown by -rA/-rP's PASSES block.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub sections: Vec<(String, String)>,
+    /// A retried attempt that a `pytest_runtest_protocol` plugin reported as
+    /// "rerun" (pytest-rerunfailures): shown as 'R'/RERUN and counted under
+    /// "rerun", not "failed". Always false on natively produced reports.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub rerun: bool,
 }
 
 impl TestReport {
     /// The single-char progress marker for this report, if it should print one.
     pub fn progress_char(&self) -> Option<char> {
+        if self.rerun {
+            return Some('R');
+        }
         if self.subtest_desc.is_some() {
             // Upstream subtests short letters: u (failed/passed), - (skipped),
             // y (xfail). Quiet subtest verbosity drops non-failed subtest
