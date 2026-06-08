@@ -1,0 +1,17 @@
+{
+  "suite": "pytest-instafail",
+  "tag": "v0.5.0",
+  "category": "ecosystem",
+  "excluded_files": 0,
+  "files": [
+    {
+      "file": "test_instafail.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 45,
+      "failed": 18,
+      "skipped": 0,
+      "errors": 0
+    }
+  ]
+}

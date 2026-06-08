@@ -104,6 +104,15 @@ deps = [
 ]
 enabled = true
 
+[pytest-instafail]
+repo = "https://github.com/pytest-dev/pytest-instafail"
+tag = "v0.5.0"
+testpaths = ["test_instafail.py"]
+# Flat layout; installed for the pytest11 entry point, checkout shadows.
+deps = ["pytest-instafail==0.5.0"]
+pythonpath = ["."]
+enabled = true
+
 [pytest-env]
 repo = "https://github.com/pytest-dev/pytest-env"
 tag = "1.6.0"

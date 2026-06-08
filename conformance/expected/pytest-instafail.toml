@@ -1,0 +1,17 @@
+# Upstream pytest-instafail tests that must keep passing under pytest-rs.
+#
+# test_instafail.py (~45/63): instafail subclasses TerminalReporter and
+# replaces the 'terminalreporter' plugin, which pytest-rs already drives
+# through its custom-reporter delegation — no code changes were needed.
+
+[files]
+
+[excluded]
+# (single file; partial — tracked by the scoreboard, pinned once green)
+
+# Known remaining gaps:
+#   test_print_stacktrace_once_with_pdb[*] (9) — pytester.spawn_pytest
+#     (pexpect-driven interactive run), a deliberate pytester gap.
+#   test_collect_error[*] (9) — collection-error traceback uses the
+#     "file:line: in <module>" entry style upstream renders; pytest-rs emits
+#     the reprcrash short style.
