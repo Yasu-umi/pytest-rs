@@ -108,6 +108,22 @@ impl PyConfig {
             .unbind())
     }
 
+    /// `config._get_unknown_ini_keys()`: ini-file keys that aren't a
+    /// registered or core option (pytest's unknown-config-option set).
+    fn _get_unknown_ini_keys(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let keys: Vec<String> = self
+            .ini
+            .lock()
+            .expect("config lock poisoned")
+            .keys()
+            .cloned()
+            .collect();
+        Ok(py
+            .import("pytest._parser")?
+            .call_method1("unknown_ini_keys", (keys,))?
+            .unbind())
+    }
+
     /// Append one line to a line-list ini option (e.g. "markers").
     fn addinivalue_line(&self, name: &str, line: &str) {
         let mut ini = self.ini.lock().expect("config lock poisoned");

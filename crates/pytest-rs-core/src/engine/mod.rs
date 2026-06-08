@@ -783,6 +783,42 @@ impl Engine {
         if let Err(err) = self.apply_plugin_cli_args(py) {
             return Err(python::format_exception(py, &err));
         }
+        // Unknown config-option validation (pytest's _validate_config_options):
+        // [pytest]-section keys that are neither a registered (plugin/conftest)
+        // nor a core ini. Under --strict-config / the strict_config / strict
+        // ini, the first is a fatal UsageError; otherwise each warns (and is
+        // silenceable via filterwarnings).
+        if !self.config.is_worker() {
+            let ini_keys = self.config.ini_file_keys();
+            let unknown = python::unknown_ini_keys(py, &ini_keys)
+                .map_err(|err| python::format_exception(py, &err))?;
+            if !unknown.is_empty() {
+                let strict_config = self.config.ini_bool("strict_config");
+                let strict = self.config.get_flag("strict-config")
+                    || strict_config == Some(true)
+                    || (strict_config.is_none()
+                        && (self.config.get_flag("strict")
+                            || self.config.ini_bool("strict") == Some(true)));
+                if strict {
+                    return Err(format!("Unknown config option: {}", unknown[0]));
+                }
+                let inipath = self
+                    .config
+                    .config_file_name
+                    .as_ref()
+                    .map(|name| rootdir.join(name).to_string_lossy().to_string())
+                    .unwrap_or_else(|| rootdir.to_string_lossy().to_string());
+                for key in &unknown {
+                    let _ = python::warn_explicit_at(
+                        py,
+                        "PytestConfigWarning",
+                        &format!("Unknown config option: {key}"),
+                        &inipath,
+                        0,
+                    );
+                }
+            }
+        }
         // The default 'terminalreporter' plugin registers before configure
         // so reporter-replacing plugins (pytest-sugar/pretty) find it.
         if let Err(err) = python::reporter_setup(py, &self.config) {

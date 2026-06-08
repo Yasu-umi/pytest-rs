@@ -536,6 +536,14 @@ pub fn unraisable_session_cleanup(py: Python<'_>) -> PyResult<()> {
     Ok(())
 }
 
+/// The config-file ini keys that are neither a registered (plugin/conftest
+/// addini) option nor a core one — pytest's unknown-config-option set, sorted.
+pub fn unknown_ini_keys(py: Python<'_>, keys: &[String]) -> PyResult<Vec<String>> {
+    py.import("pytest._parser")?
+        .call_method1("unknown_ini_keys", (keys.to_vec(),))?
+        .extract()
+}
+
 /// Install the threading.excepthook capture (upstream threadexception
 /// plugin's pytest_configure).
 pub fn threadexception_configure(py: Python<'_>) {

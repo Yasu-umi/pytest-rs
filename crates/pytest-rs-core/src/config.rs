@@ -825,6 +825,23 @@ impl Config {
             .map(String::as_str)
     }
 
+    /// The `[pytest]`-section keys read from the config file (excludes -o
+    /// overrides), for unknown-config-option validation.
+    pub fn ini_file_keys(&self) -> Vec<String> {
+        self.ini_file.keys().cloned().collect()
+    }
+
+    /// A config-file boolean ini (pytest's _strtobool truthiness), or None
+    /// when unset. Reads -o overrides then the file.
+    pub fn ini_bool(&self, name: &str) -> Option<bool> {
+        self.get_ini(name).map(|value| {
+            matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on" | "t" | "y"
+            )
+        })
+    }
+
     /// All effective ini values (file merged with -o overrides).
     pub fn ini_snapshot(&self) -> HashMap<String, String> {
         let mut merged = self.ini_file.clone();

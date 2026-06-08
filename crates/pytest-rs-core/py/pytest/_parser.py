@@ -245,6 +245,29 @@ def getini(name: str, inicfg: dict[str, str], rootpath: str | None, strict: bool
     return _coerce_ini(type_, value, rootpath)
 
 
+#: Inis the bundled native plugins read (registered in Rust via the plugin's
+#: OptionParser, not the Python parser, so they don't appear in ini_specs).
+#: Treated as known so unknown-config-option validation doesn't flag them.
+_PLUGIN_INIS = {
+    "anyio_backend",
+    "anyio_mode",
+    "asyncio_debug",
+    "asyncio_default_fixture_loop_scope",
+    "asyncio_default_test_loop_scope",
+    "asyncio_mode",
+    "mock_traceback_monkeypatch",
+    "mock_use_standalone_module",
+}
+
+
+def unknown_ini_keys(inicfg_keys: Any) -> list[str]:
+    """The config-file keys that are neither a registered (plugin/conftest
+    addini) option nor a core/builtin one — pytest's unknown-config-option
+    set (sorted)."""
+    known = set(_CORE_INI_TYPES) | set(_PLUGIN_INIS) | set(ini_specs) | set(ini_aliases)
+    return sorted(key for key in inicfg_keys if key not in known)
+
+
 def option_lookup(dest: str) -> tuple[bool, Any]:
     """(registered, default) for one option dest — registered defaults win
     over the getoption(default=) argument, like pytest's parsed namespace."""
