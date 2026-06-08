@@ -292,4 +292,4 @@ testpaths = ["tests"]
 deps = ["pytest-django==4.9.0", "Django"]
 pythonpath = ["."]
 use_src = false
-enabled = false
+enabled = true

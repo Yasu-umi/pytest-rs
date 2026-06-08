@@ -61,6 +61,19 @@ class Parser:
     def addoption(self, *opts: str, **attrs: Any) -> None:
         OptionGroup(self).addoption(*opts, **attrs)
 
+    def parse_known_args(self, args, namespace=None):
+        """argparse-style early parse: a namespace carrying the registered
+        option defaults with the CLI `args` applied (pytest-django reads
+        options.ds/.dc/.itv/.version/.help here). Unknown tokens are ignored."""
+        ns = namespace if namespace is not None else OptionNamespace()
+        apply_cli_args(ns, [str(a) for a in args])
+        return ns
+
+    def parse_known_and_unknown_args(self, args, namespace=None):
+        ns = namespace if namespace is not None else OptionNamespace()
+        unknown = apply_cli_args(ns, [str(a) for a in args])
+        return ns, unknown
+
     def addini(
         self,
         name: str,
@@ -278,6 +291,9 @@ CORE_OPTION_DEFAULTS: dict[str, Any] = {
     # assertion rewriting is pytest-rs's default; pytest-snapshot's test
     # helper reads config.option.assertmode to pick runpytest vs subprocess.
     "assertmode": "rewrite",
+    # core flags plugins read off a parse_known_args namespace (pytest-django).
+    "version": 0,
+    "help": False,
 }
 
 

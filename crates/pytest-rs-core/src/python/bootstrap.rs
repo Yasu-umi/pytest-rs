@@ -84,6 +84,8 @@ if not hasattr(_main, '__file__'):
     // Expose the Rust-backed request type for `_pytest.fixtures` imports.
     let pytest_module = py.import("pytest")?;
     pytest_module.setattr("FixtureRequest", py.get_type::<crate::request::PyRequest>())?;
+    // pytest.Config: the config type, for annotations/isinstance (pytest-django).
+    pytest_module.setattr("Config", py.get_type::<crate::request::PyConfig>())?;
 
     // Native config builder backing `pytester.parseconfig(*args)`: builds a
     // fresh in-process Config from command-line args (rootdir discovery, ini

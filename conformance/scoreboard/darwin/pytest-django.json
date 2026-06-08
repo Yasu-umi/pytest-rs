@@ -6,120 +6,120 @@
   "files": [
     {
       "file": "tests/test_asserts.py",
-      "status": "error",
-      "exit_code": 2,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "errors": 2
+      "errors": 0
     },
     {
       "file": "tests/test_database.py",
-      "status": "error",
-      "exit_code": 2,
-      "passed": 0,
-      "failed": 0,
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 55,
+      "failed": 5,
       "skipped": 0,
-      "errors": 3
+      "errors": 1
     },
     {
       "file": "tests/test_db_access_in_repr.py",
-      "status": "error",
-      "exit_code": 2,
+      "status": "failed",
+      "exit_code": 1,
       "passed": 0,
-      "failed": 0,
+      "failed": 1,
       "skipped": 0,
-      "errors": 2
+      "errors": 0
     },
     {
       "file": "tests/test_db_setup.py",
-      "status": "error",
-      "exit_code": 2,
+      "status": "failed",
+      "exit_code": 1,
       "passed": 0,
-      "failed": 0,
+      "failed": 14,
       "skipped": 0,
-      "errors": 3
+      "errors": 0
     },
     {
       "file": "tests/test_django_configurations.py",
-      "status": "error",
-      "exit_code": 2,
+      "status": "no-tests",
+      "exit_code": 5,
       "passed": 0,
       "failed": 0,
       "skipped": 1,
-      "errors": 2
+      "errors": 0
     },
     {
       "file": "tests/test_django_settings_module.py",
-      "status": "error",
-      "exit_code": 2,
-      "passed": 0,
-      "failed": 0,
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 9,
+      "failed": 10,
       "skipped": 0,
-      "errors": 2
+      "errors": 0
     },
     {
       "file": "tests/test_environment.py",
-      "status": "error",
-      "exit_code": 2,
-      "passed": 0,
-      "failed": 0,
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 12,
+      "failed": 5,
       "skipped": 0,
-      "errors": 3
+      "errors": 5
     },
     {
       "file": "tests/test_fixtures.py",
-      "status": "error",
-      "exit_code": 2,
-      "passed": 0,
-      "failed": 0,
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 43,
+      "failed": 9,
       "skipped": 0,
-      "errors": 3
+      "errors": 0
     },
     {
       "file": "tests/test_initialization.py",
-      "status": "error",
-      "exit_code": 2,
+      "status": "failed",
+      "exit_code": 1,
       "passed": 0,
-      "failed": 0,
+      "failed": 1,
       "skipped": 0,
-      "errors": 2
+      "errors": 0
     },
     {
       "file": "tests/test_manage_py_scan.py",
-      "status": "error",
-      "exit_code": 2,
-      "passed": 0,
-      "failed": 0,
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 5,
+      "failed": 4,
       "skipped": 0,
-      "errors": 2
+      "errors": 0
     },
     {
       "file": "tests/test_unittest.py",
-      "status": "error",
-      "exit_code": 2,
-      "passed": 0,
-      "failed": 0,
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 7,
+      "failed": 16,
       "skipped": 0,
-      "errors": 3
+      "errors": 0
     },
     {
       "file": "tests/test_urls.py",
-      "status": "error",
-      "exit_code": 2,
-      "passed": 0,
-      "failed": 0,
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 2,
+      "failed": 2,
       "skipped": 0,
-      "errors": 3
+      "errors": 0
     },
     {
       "file": "tests/test_without_django_loaded.py",
-      "status": "error",
-      "exit_code": 2,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 7,
       "failed": 0,
       "skipped": 0,
-      "errors": 2
+      "errors": 0
     }
   ]
 }

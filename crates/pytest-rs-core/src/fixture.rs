@@ -142,10 +142,14 @@ impl FixtureRegistry {
                     .cloned()
             })
             .collect();
+        // Higher-scoped autouse first (pytest sets up session/module autouse
+        // before function ones — pytest-django's session django_test_environment
+        // must run before the function _dj_autoclear_mailbox), then
+        // most-general baseid, then name for stability.
         found.sort_by(|a, b| {
-            a.baseid
-                .len()
-                .cmp(&b.baseid.len())
+            std::cmp::Reverse(a.scope)
+                .cmp(&std::cmp::Reverse(b.scope))
+                .then(a.baseid.len().cmp(&b.baseid.len()))
                 .then(a.name.cmp(&b.name))
         });
         found
