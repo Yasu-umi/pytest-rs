@@ -136,7 +136,7 @@ pub(crate) fn resolve_fixture(
     name: &str,
     item: &TestItem,
     class_instance: Option<&Py<PyAny>>,
-    stack: &mut Vec<(String, String)>,
+    stack: &mut Vec<std::sync::Arc<crate::fixture::FixtureDef>>,
 ) -> PyResult<Py<PyAny>> {
     // Direct (non-indirect) parametrize of a fixture name: the callspec
     // value replaces the fixture outright, its function never runs
@@ -144,7 +144,16 @@ pub(crate) fn resolve_fixture(
     if let Some((_, value)) = item.callspec.iter().find(|(param, _)| param == name) {
         return Ok(value.clone_ref(py));
     }
-    let Some(def) = session.registry.lookup(name, &item.nodeid) else {
+    // Override chain through an intermediate fixture: if a fixture of this
+    // name is already resolving up the stack (e.g. a class-level `pytester`
+    // depends on `django_pytester`, which depends on `pytester`), resolve to
+    // the next definition below it instead of re-selecting the same override.
+    let looked_up = if let Some(stacked) = stack.iter().rev().find(|d| d.name == name) {
+        session.registry.lookup_overridden(name, &item.nodeid, stacked)
+    } else {
+        session.registry.lookup(name, &item.nodeid)
+    };
+    let Some(def) = looked_up else {
         // `pytestconfig` is a builtin backed by the Rust config, not a
         // shim-defined fixture (overridable like any other fixture).
         if name == "pytestconfig" {
@@ -177,16 +186,12 @@ pub(crate) fn resolve_fixture_def(
     def: std::sync::Arc<crate::fixture::FixtureDef>,
     item: &TestItem,
     class_instance: Option<&Py<PyAny>>,
-    stack: &mut Vec<(String, String)>,
+    stack: &mut Vec<std::sync::Arc<crate::fixture::FixtureDef>>,
 ) -> PyResult<Py<PyAny>> {
-    // Identify the def by its Arc pointer, not (name, baseid): a fixture
-    // override and the builtin it overrides share (name, "") but are distinct
-    // defs — only a def appearing twice in the same chain is a real cycle.
-    let def_id = (
-        def.name.clone(),
-        format!("{:p}", std::sync::Arc::as_ptr(&def)),
-    );
-    if stack.contains(&def_id) {
+    // A def appearing twice in the same chain is a real cycle (identity by Arc
+    // pointer: an override and the builtin it overrides are distinct defs that
+    // share (name, "")).
+    if stack.iter().any(|d| std::sync::Arc::ptr_eq(d, &def)) {
         return Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
             "recursive fixture dependency involving '{}'",
             def.name
@@ -235,7 +240,7 @@ pub(crate) fn resolve_fixture_def(
         return Ok(cached.clone_ref(py));
     }
 
-    stack.push(def_id);
+    stack.push(def.clone());
     let mut request: Option<Py<crate::request::PyRequest>> = None;
     let deps_result = (|| -> PyResult<Vec<(String, Py<PyAny>)>> {
         let mut kwargs = Vec::new();

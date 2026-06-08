@@ -63,9 +63,9 @@
       "status": "failed",
       "exit_code": 1,
       "passed": 12,
-      "failed": 5,
+      "failed": 10,
       "skipped": 0,
-      "errors": 5
+      "errors": 0
     },
     {
       "file": "tests/test_fixtures.py",
