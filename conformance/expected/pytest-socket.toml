@@ -1,0 +1,19 @@
+# Upstream pytest-socket tests that must keep passing under pytest-rs.
+#
+# tests (~59/65): pytest-socket disables socket via pytest_runtest_setup +
+# markers/fixtures, which pytest-rs runs as-is — no code changes (deps add
+# pytest-httpbin/starlette/httpx for the network fixtures). The subprocess
+# pytester suits the process-global socket guard.
+
+[files]
+"tests/test_doctest.py" = "passed"
+"tests/test_precedence.py" = "passed"
+
+[excluded]
+# (partial — tracked by the scoreboard)
+
+# Known remaining gaps:
+#   test_help_message (2) — --help does not render plugin addoption groups.
+#   test_urllib_succeeds_by_default / test_enabled_urllib_succeeds — real
+#     outbound network (environment-dependent).
+#   test_parametrize_with_socket_enabled_and_allow_hosts, test_httpx_fails.

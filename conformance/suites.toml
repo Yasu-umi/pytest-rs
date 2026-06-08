@@ -104,6 +104,22 @@ deps = [
 ]
 enabled = true
 
+[pytest-socket]
+repo = "https://github.com/miketheman/pytest-socket"
+tag = "0.7.0"
+testpaths = ["tests"]
+# pytest-httpbin provides the local-server `httpbin` fixture the restrict-hosts
+# tests connect to; starlette/httpx/anyio back the async tests.
+deps = [
+    "pytest-socket==0.7.0",
+    "pytest-httpbin",
+    "starlette",
+    "httpx",
+    "anyio",
+]
+pythonpath = ["."]
+enabled = true
+
 [pytest-order]
 repo = "https://github.com/pytest-dev/pytest-order"
 tag = "v1.4.0"
