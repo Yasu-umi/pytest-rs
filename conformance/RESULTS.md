@@ -389,6 +389,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pytest-benchmark | v5.1.0 | 91 | 31 | 0 | 1 | 123 | 74.0% | 4 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 41 | 97.6% | 1 | 1 | 0 |
 | anyio | 4.13.0 | 2860 | 0 | 0 | 302 | 3162 | 90.4% | 26 | 26 | 0 |
+| pytest-order | v1.4.0 | 80 | 54 | 0 | 0 | 134 | 59.7% | 2 | 16 | 0 |
 | pytest-repeat | v0.9.4 | 11 | 5 | 0 | 0 | 16 | 68.8% | 0 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 45 | 18 | 0 | 0 | 63 | 71.4% | 0 | 1 | 0 |
 | pytest-env | 1.6.0 | 66 | 9 | 0 | 0 | 75 | 88.0% | 2 | 3 | 0 |
@@ -590,6 +591,31 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_to_process.py | passed | 36 | 0 | 0 | 0 |
 | tests/test_to_thread.py | passed | 64 | 0 | 0 | 0 |
 | tests/test_typedattr.py | passed | 1 | 0 | 0 | 0 |
+
+</details>
+
+### pytest-order @ v1.4.0
+
+<details><summary>per-file detail (16 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_class_marks.py | failed | 5 | 4 | 0 | 0 |
+| tests/test_dependency.py | failed | 18 | 5 | 0 | 0 |
+| tests/test_marker_prefix.py | failed | 3 | 4 | 0 | 0 |
+| tests/test_misc.py | failed | 2 | 2 | 0 | 0 |
+| tests/test_multiple_ordering.py | failed | 0 | 4 | 0 | 0 |
+| tests/test_order_group_scope.py | failed | 0 | 6 | 0 | 0 |
+| tests/test_order_group_scope_dep.py | failed | 0 | 4 | 0 | 0 |
+| tests/test_order_group_scope_named_dep.py | failed | 0 | 4 | 0 | 0 |
+| tests/test_order_group_scope_relative.py | failed | 0 | 5 | 0 | 0 |
+| tests/test_order_scope.py | failed | 0 | 4 | 0 | 0 |
+| tests/test_order_scope_level.py | failed | 0 | 5 | 0 | 0 |
+| tests/test_ordering.py | passed | 19 | 0 | 0 | 0 |
+| tests/test_ordering_options.py | failed | 0 | 2 | 0 | 0 |
+| tests/test_relative_ordering.py | failed | 17 | 4 | 0 | 0 |
+| tests/test_sparse_ordinals.py | passed | 16 | 0 | 0 | 0 |
+| tests/test_xdist_handling.py | failed | 0 | 1 | 0 | 0 |
 
 </details>
 

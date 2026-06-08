@@ -502,12 +502,15 @@ class Pytester:
         collection: module import + test functions/Test-class methods with
         merged marks — enough for the mark-evaluation tests; no fixtures)."""
         import importlib.util
+        import pathlib
         import sys
 
         from pytest._marks import get_unpacked_marks
         from pytest._node import Function
 
-        path = self.makepyfile(source)
+        # makepyfile returns a py.path.local under the legacy testdir fixture;
+        # normalize to pathlib.Path for .stem/.name.
+        path = pathlib.Path(str(self.makepyfile(source)))
         module_name = path.stem
         spec = importlib.util.spec_from_file_location(module_name, path)
         assert spec is not None and spec.loader is not None
@@ -518,7 +521,7 @@ class Pytester:
         config = self._request.config if self._request is not None else None
         module_marks = get_unpacked_marks(module)
 
-        def make_item(func, nodeid_name, extra_marks):
+        def make_item(func, nodeid_name, extra_marks, cls=None):
             marks = [*get_unpacked_marks(func), *extra_marks, *module_marks]
             lineno = getattr(getattr(func, "__code__", None), "co_firstlineno", 0)
             node = Function(
@@ -531,6 +534,7 @@ class Pytester:
                 lineno,
             )
             node.module = module
+            node.cls = cls
             node.parent = None
             if config is not None:
                 node.config = config
@@ -545,7 +549,7 @@ class Pytester:
                 for mname, mobj in vars(obj).items():
                     mobj = getattr(mobj, "__func__", mobj)
                     if mname.startswith("test") and callable(mobj):
-                        items.append(make_item(mobj, f"{name}::{mname}", class_marks))
+                        items.append(make_item(mobj, f"{name}::{mname}", class_marks, cls=obj))
         return items
 
     def getitem(self, source, funcname="test_func"):

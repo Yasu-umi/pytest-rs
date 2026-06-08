@@ -1,0 +1,17 @@
+# Upstream pytest-order tests that must keep passing under pytest-rs.
+#
+# tests (~80/134): the suite drives ordering in-process via
+# testdir.getitems(...) + config.hook.pytest_collection_modifyitems(...).
+# getitems now normalizes the py.path.local to pathlib and sets node.cls, so
+# the order plugin's sorter (keyed on item.nodeid / item.cls) runs.
+
+[files]
+
+[excluded]
+# (partial — tracked by the scoreboard)
+
+# Known remaining gaps:
+#   before/after-by-class-name ordering, group/scope ordering, relative and
+#   dependency ordering — pytest-order sorter name-resolution edge cases.
+#   test_markers_registered — pytest.main(["--markers"]) (no in-process main).
+#   Unknown-scope UserWarning text.

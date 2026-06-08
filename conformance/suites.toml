@@ -104,6 +104,13 @@ deps = [
 ]
 enabled = true
 
+[pytest-order]
+repo = "https://github.com/pytest-dev/pytest-order"
+tag = "v1.4.0"
+testpaths = ["tests"]
+deps = ["pytest-order==1.4.0"]
+enabled = true
+
 [pytest-repeat]
 repo = "https://github.com/pytest-dev/pytest-repeat"
 tag = "v0.9.4"
