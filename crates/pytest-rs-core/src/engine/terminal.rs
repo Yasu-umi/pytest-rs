@@ -147,6 +147,11 @@ impl Engine {
             "{}",
             crate::tw::markup(&center_banner("test session starts"), &[crate::tw::BOLD])
         );
+        // --no-header keeps only the "test session starts" banner; the
+        // platform/rootdir/testpaths/plugins block below is suppressed.
+        if self.config.get_flag("no-header") {
+            return;
+        }
         // Upstream's "platform darwin -- Python 3.13.2, pytest-9.0.3, ..."
         // shape (sys.platform naming), with pytest-rs as the tool.
         let platform = match std::env::consts::OS {
@@ -177,6 +182,15 @@ impl Engine {
         println!("rootdir: {}", self.config.rootdir.display());
         if let Some(name) = &self.config.config_file_name {
             println!("configfile: {name}");
+        }
+        // testpaths: shown only when collection ran from the testpaths ini
+        // (no paths on the command line), like pytest's args_source check.
+        if self.config.paths.is_empty()
+            && let Some(testpaths) = self.config.get_ini("testpaths")
+            && !testpaths.trim().is_empty()
+        {
+            let joined = testpaths.split_whitespace().collect::<Vec<_>>().join(", ");
+            println!("testpaths: {joined}");
         }
     }
 

@@ -256,7 +256,12 @@ pub fn summary_line(
     deselected: usize,
     warning_count: usize,
     elapsed: Duration,
+    verbosity: i32,
 ) -> String {
+    // -qq (verbosity < -1) suppresses the stats line entirely.
+    if verbosity < -1 {
+        return String::new();
+    }
     let mut passed = 0usize;
     let mut failed = 0usize;
     let mut errors = 0usize;
@@ -336,10 +341,36 @@ pub fn summary_line(
         plain_parts.join(", "),
         elapsed.as_secs_f64()
     );
-    let banner = crate::engine::center_banner(&plain_body);
+    // -q (verbosity < 0) drops the "=" separators around the stats line
+    // (pytest's display_sep = verbosity >= 0).
+    let sep = verbosity >= 0;
     if !tw::enabled() {
-        return banner;
+        return if sep {
+            crate::engine::center_banner(&plain_body)
+        } else {
+            plain_body
+        };
     }
+    if !sep {
+        let mut out = String::new();
+        for (i, (text, color)) in parts.iter().enumerate() {
+            if i > 0 {
+                out.push_str(", ");
+            }
+            let codes: &[u8] = if *color == main {
+                &[*color, tw::BOLD]
+            } else {
+                &[*color]
+            };
+            out.push_str(&tw::markup(text, codes));
+        }
+        out.push_str(&tw::markup(
+            &format!(" in {:.2}s", elapsed.as_secs_f64()),
+            &[main],
+        ));
+        return out;
+    }
+    let banner = crate::engine::center_banner(&plain_body);
     // pytest's nesting: the left banner segment opens the main color
     // without a reset, each count carries its own color (bold when it
     // matches the main color), the tail segments re-open the main color.

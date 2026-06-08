@@ -223,6 +223,12 @@ class PluginManager:
 
     get_plugin = getplugin
 
+    def list_plugin_distinfo(self):
+        """(plugin, dist) pairs for registered plugins backed by a
+        distribution. The native engine tracks plugins out-of-band, so this
+        is empty here (the session header's "plugins:" line is omitted)."""
+        return []
+
     def hasplugin(self, name: str) -> bool:
         return self.getplugin(name) is not None
 

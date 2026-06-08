@@ -318,15 +318,16 @@ impl Engine {
                         };
                         println!("{}", center_with(&banner, '!'));
                     }
-                    println!(
-                        "{}",
-                        crate::runner::summary_line(
-                            &self.session.reports,
-                            self.session.deselected,
-                            python::warning_count(py),
-                            started.elapsed()
-                        )
+                    let summary = crate::runner::summary_line(
+                        &self.session.reports,
+                        self.session.deselected,
+                        python::warning_count(py),
+                        started.elapsed(),
+                        self.config.global_verbosity(),
                     );
+                    if !summary.is_empty() {
+                        println!("{summary}");
+                    }
                 }
                 let code = if maxfail_hit || dist_workers.is_some() {
                     exit_code::TESTS_FAILED
@@ -514,15 +515,16 @@ impl Engine {
                 self.print_warnings_summary(py);
                 self.write_junit_xml(py);
                 self.print_short_summary();
-                println!(
-                    "{}",
-                    crate::runner::summary_line(
-                        &self.session.reports,
-                        self.session.deselected,
-                        python::warning_count(py),
-                        started.elapsed()
-                    )
+                let summary = crate::runner::summary_line(
+                    &self.session.reports,
+                    self.session.deselected,
+                    python::warning_count(py),
+                    started.elapsed(),
+                    self.config.global_verbosity(),
                 );
+                if !summary.is_empty() {
+                    println!("{summary}");
+                }
             }
             return code;
         }
@@ -583,20 +585,28 @@ impl Engine {
         if let Some(banner) = &self.session.abort_banner {
             println!("{}", center_with(banner, '!'));
         }
-        // --continue-on-collection-errors: the ERRORS section was deferred
-        // until after the run, like pytest's terminal reporter.
-        self.print_collect_errors();
-        self.print_failures();
-        if let Err(err) = self.print_plugin_summaries(py, code) {
-            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+        // --no-summary suppresses pytest's whole terminal-summary block
+        // (FAILURES/ERRORS/PASSES/warnings/short summary + the conftest
+        // pytest_terminal_summary hooks); the final stats line still shows.
+        let no_summary = self.config.get_flag("no-summary");
+        if !no_summary {
+            // --continue-on-collection-errors: the ERRORS section was deferred
+            // until after the run, like pytest's terminal reporter.
+            self.print_collect_errors();
+            self.print_failures();
+            if let Err(err) = self.print_plugin_summaries(py, code) {
+                eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+            }
+            self.print_warnings_summary(py);
+            self.print_passes();
         }
-        self.print_warnings_summary(py);
-        self.print_passes();
         self.write_junit_xml(py);
         if let Some(banner) = &self.session.dist_banner {
             println!("{}", center_banner(banner));
         }
-        self.print_short_summary();
+        if !no_summary {
+            self.print_short_summary();
+        }
         if let Some(n) = self.session.stopped_after {
             println!(
                 "{}",
@@ -617,15 +627,16 @@ impl Engine {
             println!("{}", center_with(&reason, '!'));
         }
         let warning_count = python::warning_count(py) + self.session.worker_warning_count;
-        println!(
-            "\n{}",
-            crate::runner::summary_line(
-                &self.session.reports,
-                self.session.deselected,
-                warning_count,
-                started.elapsed(),
-            )
+        let summary = crate::runner::summary_line(
+            &self.session.reports,
+            self.session.deselected,
+            warning_count,
+            started.elapsed(),
+            self.config.global_verbosity(),
         );
+        if !summary.is_empty() {
+            println!("\n{summary}");
+        }
         // Unraisable leftovers (e.g. refcycles with broken __del__, only
         // collectable after a forced gc) drain after the terminal reporter
         // has finished, like upstream's config cleanup; an error filter
