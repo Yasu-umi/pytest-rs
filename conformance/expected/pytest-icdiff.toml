@@ -1,0 +1,19 @@
+# Upstream pytest-icdiff tests that must keep passing under pytest-rs.
+#
+# tests (~7/12): pytest-rs now fires pytest_assertrepr_compare plugin/conftest
+# hooks from the assertion-rewrite explanation path (first non-None wins,
+# falling back to the built-in comparison), so icdiff's side-by-side diff
+# renders. config.get_terminal_writer().hasmarkup tracks the color setting.
+
+[files]
+
+[excluded]
+# (single file; partial — tracked by the scoreboard)
+
+# Known remaining gaps:
+#   test_short_dict_with_colorization / test_columns_are_calculated_outside_hook
+#     — monkeypatch pytest_icdiff.COLS in the parent and expect the nested run
+#     to see it (in-process pytester; pytest-rs runs nested as a subprocess).
+#   test_long_dict — icdiff column wrapping tied to the same width monkeypatch.
+#   test_small_numbers_are_specialcased / int drilldown — native int-comparison
+#     diff format.

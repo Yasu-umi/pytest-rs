@@ -104,6 +104,14 @@ deps = [
 ]
 enabled = true
 
+[pytest-icdiff]
+repo = "https://github.com/hjwp/pytest-icdiff"
+tag = "0.5"
+testpaths = ["tests"]
+deps = ["pytest-icdiff==0.5", "icdiff", "pprintpp", "py"]
+pythonpath = ["."]
+enabled = true
+
 [pytest-socket]
 repo = "https://github.com/miketheman/pytest-socket"
 tag = "0.7.0"

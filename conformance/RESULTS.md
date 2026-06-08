@@ -380,7 +380,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | pass % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 1612 | 532 | 25 | 24 | 2193 | 73.5% | 6 | 45 | 63 |
+| pytest | 9.0.3 | 1613 | 531 | 25 | 24 | 2193 | 73.6% | 6 | 45 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 85 | 0 | 0 | 5 | 90 | 94.4% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 182 | 23 | 0 | 4 | 209 | 87.1% | 0 | 1 | 0 |
@@ -389,6 +389,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pytest-benchmark | v5.1.0 | 91 | 31 | 0 | 1 | 123 | 74.0% | 4 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 41 | 97.6% | 1 | 1 | 0 |
 | anyio | 4.13.0 | 2860 | 0 | 0 | 302 | 3162 | 90.4% | 26 | 26 | 0 |
+| pytest-icdiff | 0.5 | 7 | 5 | 0 | 0 | 12 | 58.3% | 0 | 1 | 0 |
 | pytest-socket | 0.7.0 | 59 | 6 | 0 | 0 | 65 | 90.8% | 2 | 6 | 0 |
 | pytest-order | v1.4.0 | 80 | 54 | 0 | 0 | 134 | 59.7% | 2 | 16 | 0 |
 | pytest-repeat | v0.9.4 | 11 | 5 | 0 | 0 | 16 | 68.8% | 0 | 1 | 0 |
@@ -412,7 +413,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/logging/test_fixture.py | failed | 26 | 1 | 0 | 0 |
 | testing/logging/test_formatter.py | failed | 0 | 4 | 0 | 0 |
 | testing/logging/test_reporting.py | failed | 44 | 8 | 0 | 0 |
-| testing/test_assertion.py | failed | 117 | 43 | 0 | 0 |
+| testing/test_assertion.py | failed | 118 | 42 | 0 | 0 |
 | testing/test_cacheprovider.py | failed | 56 | 1 | 0 | 0 |
 | testing/test_capture.py | failed | 106 | 1 | 0 | 1 |
 | testing/test_collect_imported_tests.py | failed | 2 | 1 | 0 | 0 |
@@ -592,6 +593,16 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_to_process.py | passed | 36 | 0 | 0 | 0 |
 | tests/test_to_thread.py | passed | 64 | 0 | 0 | 0 |
 | tests/test_typedattr.py | passed | 1 | 0 | 0 | 0 |
+
+</details>
+
+### pytest-icdiff @ 0.5
+
+<details><summary>per-file detail (1 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_pytest_icdiff.py | failed | 7 | 5 | 0 | 0 |
 
 </details>
 

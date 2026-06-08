@@ -71,13 +71,21 @@ def set_truncation_limits(lines, chars):
 
 
 class _RewriteConfig:
-    """Just enough of pytest's Config for util.assertrepr_compare."""
+    """Just enough of pytest's Config for util.assertrepr_compare and
+    pytest_assertrepr_compare plugins (e.g. pytest-icdiff reads
+    config.get_terminal_writer().hasmarkup)."""
 
     def get_verbosity(self, verbosity_type=None):
         return _verbosity
 
     def get_terminal_writer(self):
         return self
+
+    @property
+    def hasmarkup(self):
+        from pytest import _tb
+
+        return _tb._color
 
     def _highlight(self, source, lexer="python"):
         return source
@@ -96,7 +104,24 @@ def _format_assert(op, left, right):
     except Exception:
         return fallback
     try:
-        expl = util.assertrepr_compare(_RewriteConfig(), op, left, right)
+        cfg = _RewriteConfig()
+        # pytest_assertrepr_compare plugins (pytest-icdiff, pytest-clarity)
+        # win over the built-in comparison; first non-None explanation is used.
+        expl = None
+        try:
+            from pytest._pluginmanager import pluginmanager
+
+            hooked = pluginmanager.hook.pytest_assertrepr_compare(
+                config=cfg, op=op, left=left, right=right
+            )
+            for result in hooked or []:
+                if result:
+                    expl = list(result)
+                    break
+        except Exception:
+            expl = None
+        if not expl:
+            expl = util.assertrepr_compare(cfg, op, left, right)
         if not expl:
             return fallback
         max_lines = int(
