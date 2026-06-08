@@ -11,6 +11,15 @@ use pyo3::prelude::*;
 #[pyclass(name = "Config", dict)]
 pub struct PyConfig {
     rootdir: String,
+    /// Full path to the discovered config file (pytest.ini / pyproject.toml
+    /// / tox.ini / setup.cfg), or None when no config file was found.
+    inipath: Option<String>,
+    /// The resolved collection arguments (`config.args`): the path-like CLI
+    /// tokens, or the testpaths/invocation-dir fallback.
+    args: Vec<String>,
+    /// `config.args_source`: "args" (explicit CLI paths), "testpaths" (from
+    /// the testpaths ini), or "invocation_dir" (the default).
+    args_source: String,
     ini: Mutex<HashMap<String, String>>,
     /// The argparse-namespace equivalent (`config.option`), mutable from
     /// Python so conftest hooks can stash flags on it.
@@ -23,9 +32,19 @@ pub struct PyConfig {
 }
 
 impl PyConfig {
-    pub fn new(rootdir: String, ini: HashMap<String, String>, option: Py<PyAny>) -> Self {
+    pub fn new(
+        rootdir: String,
+        inipath: Option<String>,
+        args: Vec<String>,
+        args_source: String,
+        ini: HashMap<String, String>,
+        option: Py<PyAny>,
+    ) -> Self {
         Self {
             rootdir,
+            inipath,
+            args,
+            args_source,
             ini: Mutex::new(ini),
             option,
             stash: pyo3::sync::PyOnceLock::new(),
@@ -175,6 +194,58 @@ impl PyConfig {
     fn rootdir<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         self.rootpath(py)
     }
+
+    /// `config.inipath`: a Path to the discovered config file, or None.
+    #[getter]
+    fn inipath<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        match &self.inipath {
+            Some(path) => py.import("pathlib")?.getattr("Path")?.call1((path.as_str(),)),
+            None => Ok(py.None().into_bound(py)),
+        }
+    }
+
+    /// `config.inifile`: legacy py.path alias for inipath (deprecated form).
+    #[getter]
+    fn inifile<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        match &self.inipath {
+            Some(path) => py
+                .import("pytest._tmp_path")?
+                .getattr("LocalPath")?
+                .call1((path.as_str(),)),
+            None => Ok(py.None().into_bound(py)),
+        }
+    }
+
+    #[getter]
+    fn args(&self, py: Python<'_>) -> Py<PyAny> {
+        pyo3::types::PyList::new(py, &self.args)
+            .map(|list| list.into_any().unbind())
+            .unwrap_or_else(|_| py.None())
+    }
+
+    /// `config.args_source`: the upstream `Config.ArgsSource` enum member
+    /// (ARGS / TESTPATHS / INVOCATION_DIR) matching how `args` was derived.
+    #[getter]
+    fn args_source<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let member = match self.args_source.as_str() {
+            "args" => "ARGS",
+            "testpaths" => "TESTPATHS",
+            _ => "INVOCATION_DIR",
+        };
+        py.import("_pytest.config")?
+            .getattr("Config")?
+            .getattr("ArgsSource")?
+            .getattr(member)
+    }
+
+    /// pytest's parseconfigure step: fire pytest_configure. Kept minimal —
+    /// the cache/getini/getoption surface parseconfig tests exercise needs
+    /// no plugin configuration, and re-firing the shared pluginmanager's
+    /// hooks would reconfigure the outer session's plugins.
+    fn _do_configure(&self) {}
+
+    /// pytest's config teardown (registered as a parseconfig finalizer).
+    fn _ensure_unconfigure(&self) {}
 
     /// Minimal pluginmanager (getplugin("logging-plugin") etc.).
     #[getter]

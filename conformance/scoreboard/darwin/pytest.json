@@ -62,8 +62,8 @@
       "file": "testing/test_cacheprovider.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 36,
-      "failed": 21,
+      "passed": 54,
+      "failed": 3,
       "skipped": 0,
       "errors": 0
     },
@@ -107,8 +107,8 @@
       "file": "testing/test_config.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 69,
-      "failed": 139,
+      "passed": 87,
+      "failed": 121,
       "skipped": 1,
       "errors": 0
     },
@@ -180,16 +180,16 @@
       "status": "failed",
       "exit_code": 1,
       "passed": 1,
-      "failed": 12,
+      "failed": 23,
       "skipped": 0,
-      "errors": 11
+      "errors": 0
     },
     {
       "file": "testing/test_mark.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 76,
-      "failed": 30,
+      "passed": 80,
+      "failed": 26,
       "skipped": 0,
       "errors": 0
     },
@@ -224,8 +224,8 @@
       "file": "testing/test_pytester.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 15,
-      "failed": 38,
+      "passed": 16,
+      "failed": 37,
       "skipped": 0,
       "errors": 0
     },
@@ -332,8 +332,8 @@
       "file": "testing/test_terminal.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 102,
-      "failed": 113,
+      "passed": 107,
+      "failed": 108,
       "skipped": 2,
       "errors": 10
     },

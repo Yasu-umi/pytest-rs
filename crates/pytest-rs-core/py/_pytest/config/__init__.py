@@ -1,4 +1,5 @@
 import argparse
+import enum
 import os
 
 from pytest import ExitCode, UsageError  # noqa: F401
@@ -13,6 +14,16 @@ class Config:
     VERBOSITY_ASSERTIONS = "assertions"
     VERBOSITY_TEST_CASES = "test_cases"
     VERBOSITY_SUBTESTS = "subtests"
+
+    class ArgsSource(enum.Enum):
+        """Indicates the source of the test arguments (pytest's enum;
+        the Rust-built Config proxy returns these members from
+        ``config.args_source``)."""
+
+        ARGS = enum.auto()
+        INVOCATION_DIR = enum.auto()
+        INCOVATION_DIR = INVOCATION_DIR  # backwards compatibility alias
+        TESTPATHS = enum.auto()
 
     def __init__(self, option=None):
         self.option = option if option is not None else argparse.Namespace()

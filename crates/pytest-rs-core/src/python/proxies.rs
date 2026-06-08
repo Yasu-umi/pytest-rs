@@ -19,6 +19,33 @@ pub fn make_py_config(py: Python<'_>, config: &crate::config::Config) -> PyResul
     if let Some(proxy) = CONFIG_PROXY.get() {
         return Ok(proxy.clone_ref(py));
     }
+    let proxy = build_py_config(py, config)?;
+    Ok(CONFIG_PROXY.get_or_init(|| proxy).clone_ref(py))
+}
+
+/// `config.args`/`config.args_source`: where the collection arguments came
+/// from. `config.paths` holds the raw CLI path tokens; an empty set falls
+/// back to the `testpaths` ini, else to the invocation directory.
+fn decide_args(config: &crate::config::Config) -> (Vec<String>, String) {
+    if !config.paths.is_empty() {
+        return (config.paths.clone(), "args".to_string());
+    }
+    if let Some(testpaths) = config.get_ini("testpaths")
+        && !testpaths.trim().is_empty()
+    {
+        let args = testpaths.split_whitespace().map(str::to_string).collect();
+        return (args, "testpaths".to_string());
+    }
+    (
+        vec![config.invocation_dir.to_string_lossy().to_string()],
+        "invocation_dir".to_string(),
+    )
+}
+
+/// Build a fresh `Config` proxy (no singleton caching). Shared by the
+/// session-global proxy and by `pytester.parseconfig`, which needs an
+/// independent config built from its own args.
+fn build_py_config(py: Python<'_>, config: &crate::config::Config) -> PyResult<Py<PyAny>> {
     // `config.option` is the argparse namespace in pytest; expose a mutable
     // namespace so conftests can stash flags on it. Unset names fall back
     // to plugin-registered option defaults (pytest._parser.OptionNamespace).
@@ -81,16 +108,41 @@ pub fn make_py_config(py: Python<'_>, config: &crate::config::Config) -> PyResul
     }
     option_ns.setattr("doctest_glob", glob_list)?;
     let option = option_ns.unbind();
+    let inipath = config
+        .config_file_name
+        .as_ref()
+        .map(|name| config.rootdir.join(name).to_string_lossy().to_string());
+    let (args, args_source) = decide_args(config);
     let proxy = Py::new(
         py,
         crate::request::PyConfig::new(
             config.rootdir.to_string_lossy().to_string(),
+            inipath,
+            args,
+            args_source,
             config.ini_snapshot(),
             option,
         ),
     )?
     .into_any();
-    Ok(CONFIG_PROXY.get_or_init(|| proxy).clone_ref(py))
+    Ok(proxy)
+}
+
+/// `pytester.parseconfig(*args)`: build a fresh in-process Config from the
+/// given command-line args (rootdir discovery, ini reading, option parsing),
+/// without running a session. Raises `pytest.UsageError` on bad args,
+/// matching upstream's `_prepareconfig`.
+pub fn prepare_config(py: Python<'_>, args: Vec<String>) -> PyResult<Py<PyAny>> {
+    let mut argv = vec!["pytest-rs".to_string()];
+    argv.extend(args);
+    let parser = crate::config::OptionParser::default();
+    match crate::config::Config::from_args(parser, argv) {
+        Ok(config) => build_py_config(py, &config),
+        Err(message) => {
+            let exc = py.import("pytest")?.getattr("UsageError")?.call1((message,))?;
+            Err(PyErr::from_value(exc))
+        }
+    }
 }
 
 /// Build a `pytest._node.Node` for an item (used as `request.node`).

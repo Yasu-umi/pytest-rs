@@ -318,6 +318,34 @@ class Pytester:
 
     runpytest_inprocess = runpytest
 
+    def chdir(self):
+        """Cd into the pytester temporary directory. The pytester fixture
+        already chdir's here at setup; this restores it after a test that
+        wandered elsewhere (upstream API parity)."""
+        import os
+
+        os.chdir(self.path)
+
+    def parseconfig(self, *args):
+        """Return an in-process pytest Config built from the given
+        command-line args (rootdir discovery, ini reading, option parsing),
+        without running a session — upstream's _prepareconfig."""
+        from _pytest.config import _native_prepareconfig
+
+        new_args = [str(arg) for arg in args]
+        config = _native_prepareconfig(new_args)
+        if self._request is not None:
+            self._request.addfinalizer(config._ensure_unconfigure)
+        return config
+
+    def parseconfigure(self, *args):
+        """Like parseconfig, but also runs the pytest_configure step."""
+        config = self.parseconfig(*args)
+        config._do_configure()
+        if self._request is not None:
+            self._request.addfinalizer(config._ensure_unconfigure)
+        return config
+
     def inline_run(self, *args):
         # No in-process runner: a subprocess -v run parsed into a
         # HookRecorder-shaped result (ret / assertoutcome / listoutcomes).

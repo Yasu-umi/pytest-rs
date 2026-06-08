@@ -85,6 +85,25 @@ if not hasattr(_main, '__file__'):
     let pytest_module = py.import("pytest")?;
     pytest_module.setattr("FixtureRequest", py.get_type::<crate::request::PyRequest>())?;
 
+    // Native config builder backing `pytester.parseconfig(*args)`: builds a
+    // fresh in-process Config from command-line args (rootdir discovery, ini
+    // reading, option parsing). Injected as a closure since the engine
+    // exposes no Python extension module.
+    let prepareconfig = pyo3::types::PyCFunction::new_closure(
+        py,
+        Some(c"_native_prepareconfig"),
+        None,
+        |args: &Bound<'_, pyo3::types::PyTuple>,
+         _kwargs: Option<&Bound<'_, pyo3::types::PyDict>>|
+         -> PyResult<Py<PyAny>> {
+            let py = args.py();
+            let arglist: Vec<String> = args.get_item(0)?.extract()?;
+            super::prepare_config(py, arglist)
+        },
+    )?;
+    py.import("_pytest.config")?
+        .setattr("_native_prepareconfig", prepareconfig)?;
+
     // Assertion rewriting: rewrite `assert` in test modules at import time.
     py.import("pytest._rewrite")?.call_method0("install")?;
 

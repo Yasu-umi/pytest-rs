@@ -18,7 +18,7 @@ which provides the `--lf` and `--ff` options, as well as the `cache` fixture.
 See [the docs](https://docs.pytest.org/en/stable/how-to/cache.html) for more information.
 """
 
-CACHEDIR_TAG_CONTENT = """\
+CACHEDIR_TAG_CONTENT = b"""\
 Signature: 8a477f597d28d172789f06886806bc55
 # This file is a cache directory tag created by pytest.
 # For information about cache directory tags, see:
@@ -33,7 +33,7 @@ class Cache:
     # Sub-directory under cache-dir for values created by `set()`.
     _CACHE_PREFIX_VALUES = "v"
 
-    def __init__(self, cachedir):
+    def __init__(self, cachedir, _ispytest=False):
         self._cachedir = Path(cachedir)
 
     @staticmethod
@@ -53,7 +53,7 @@ class Cache:
         return str(Path(rootdir) / value)
 
     @classmethod
-    def for_config(cls, config):
+    def for_config(cls, config, *, _ispytest=False):
         return cls(cls.cache_dir_from(str(config.rootpath), config.getini("cache_dir")))
 
     def clear_cache(self):
@@ -130,7 +130,7 @@ class Cache:
             with open(path.joinpath(".gitignore"), "x", encoding="UTF-8") as f:
                 f.write("# Created by pytest automatically.\n*\n")
             with open(path.joinpath("CACHEDIR.TAG"), "xb") as f:
-                f.write(CACHEDIR_TAG_CONTENT.encode())
+                f.write(CACHEDIR_TAG_CONTENT)
             try:
                 path.rename(self._cachedir)
             except OSError as e:
