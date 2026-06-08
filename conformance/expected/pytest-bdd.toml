@@ -1,0 +1,13 @@
+# Upstream pytest-bdd tests that must keep passing under pytest-rs.
+#
+# tests (~36/139): pytest-bdd is decorator-based (@scenario generates test
+# functions collected normally), so it runs partially with no code changes —
+# pytest_addhooks registers its pytest_bdd_* hooks and the step fixtures
+# resolve. Remaining failures need fuller gherkin step-binding (scenario
+# outlines/examples parametrization, datatables, the pytest_bdd_* hook
+# sequence, and generation/`--generate-missing`).
+
+[files]
+
+[excluded]
+# (partial — tracked by the scoreboard)

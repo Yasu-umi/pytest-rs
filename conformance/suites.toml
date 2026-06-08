@@ -272,3 +272,24 @@ deps = ["markdown-it-py", "pygments", "attrs"]
 pythonpath = ["."]
 category = "real-world"
 enabled = true
+
+[pytest-bdd]
+repo = "https://github.com/pytest-dev/pytest-bdd"
+tag = "8.1.0"
+testpaths = ["tests"]
+deps = ["pytest-bdd==8.1.0", "Mako", "parse", "parse-type", "gherkin-official"]
+use_src = false
+enabled = true
+
+# pytest-django: deferred. Needs Parser.parse_known_args plus full Django
+# framework integration (DJANGO_SETTINGS_MODULE handling, db/transactional_db
+# fixtures, the django_db marker, transaction/schema management) — a distinct
+# framework subsystem, not the custom-collector work.
+[pytest-django]
+repo = "https://github.com/pytest-dev/pytest-django"
+tag = "v4.9.0"
+testpaths = ["tests"]
+deps = ["pytest-django==4.9.0", "Django"]
+pythonpath = ["."]
+use_src = false
+enabled = false

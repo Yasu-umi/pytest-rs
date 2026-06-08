@@ -1,0 +1,125 @@
+{
+  "suite": "pytest-django",
+  "tag": "v4.9.0",
+  "category": "ecosystem",
+  "excluded_files": 0,
+  "files": [
+    {
+      "file": "tests/test_asserts.py",
+      "status": "error",
+      "exit_code": 2,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 2
+    },
+    {
+      "file": "tests/test_database.py",
+      "status": "error",
+      "exit_code": 2,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 3
+    },
+    {
+      "file": "tests/test_db_access_in_repr.py",
+      "status": "error",
+      "exit_code": 2,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 2
+    },
+    {
+      "file": "tests/test_db_setup.py",
+      "status": "error",
+      "exit_code": 2,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 3
+    },
+    {
+      "file": "tests/test_django_configurations.py",
+      "status": "error",
+      "exit_code": 2,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 1,
+      "errors": 2
+    },
+    {
+      "file": "tests/test_django_settings_module.py",
+      "status": "error",
+      "exit_code": 2,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 2
+    },
+    {
+      "file": "tests/test_environment.py",
+      "status": "error",
+      "exit_code": 2,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 3
+    },
+    {
+      "file": "tests/test_fixtures.py",
+      "status": "error",
+      "exit_code": 2,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 3
+    },
+    {
+      "file": "tests/test_initialization.py",
+      "status": "error",
+      "exit_code": 2,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 2
+    },
+    {
+      "file": "tests/test_manage_py_scan.py",
+      "status": "error",
+      "exit_code": 2,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 2
+    },
+    {
+      "file": "tests/test_unittest.py",
+      "status": "error",
+      "exit_code": 2,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 3
+    },
+    {
+      "file": "tests/test_urls.py",
+      "status": "error",
+      "exit_code": 2,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 3
+    },
+    {
+      "file": "tests/test_without_django_loaded.py",
+      "status": "error",
+      "exit_code": 2,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 2
+    }
+  ]
+}
