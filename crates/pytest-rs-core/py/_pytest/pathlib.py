@@ -19,6 +19,22 @@ from pytest import skip
 
 from _pytest.warning_types import PytestWarning
 
+
+def absolutepath(path):
+    """Convert a path to an absolute path, without resolving symlinks
+    (pytest's absolutepath)."""
+    return Path(os.path.abspath(path))
+
+
+def safe_exists(p):
+    """exists() that swallows the ValueError Windows raises for over-long
+    paths (pytest's safe_exists)."""
+    try:
+        return Path(p).exists()
+    except (ValueError, OSError):
+        return False
+
+
 # The following constants are taken from CPython's shutil (upstream).
 _IGNORED_ERRORS = (ENOENT, ENOTDIR, EBADF, ELOOP)
 _IGNORED_WINERRORS = (

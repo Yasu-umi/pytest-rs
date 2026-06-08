@@ -179,8 +179,8 @@
       "file": "testing/test_main.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 1,
-      "failed": 23,
+      "passed": 16,
+      "failed": 8,
       "skipped": 0,
       "errors": 0
     },
