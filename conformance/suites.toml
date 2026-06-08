@@ -81,6 +81,7 @@ deselect = [
     "test_pytest_timeout.py::test_suppresses_timeout_when_debugger_is_entered[pdb-set_trace()]",
     "test_pytest_timeout.py::test_disable_debugger_detection_flag[pdb-set_trace()]",
 ]
+category = "third-party"
 enabled = true
 
 [anyio]
@@ -112,6 +113,7 @@ testpaths = ["tests"]
 # back the checker and its cross-worker lock.
 deps = ["pytest-mypy==1.0.1", "mypy", "filelock"]
 use_src = false
+category = "third-party"
 enabled = true
 
 [pytest-ruff]
@@ -122,6 +124,7 @@ testpaths = ["tests"]
 # the binary, py backs node.fspath.mtime().
 deps = ["pytest-ruff==0.5", "ruff", "py"]
 pythonpath = ["."]
+category = "third-party"
 enabled = true
 
 [pytest-subtests]
@@ -130,6 +133,7 @@ tag = "v0.14.2"
 testpaths = ["tests"]
 deps = ["pytest-subtests==0.14.2"]
 use_src = false
+category = "third-party"
 enabled = true
 
 [pytest-metadata]
@@ -138,6 +142,7 @@ tag = "v2.0.4"
 testpaths = ["tests"]
 deps = ["pytest-metadata==2.0.4"]
 use_src = false
+category = "third-party"
 enabled = true
 
 [pytest-snapshot]
@@ -147,6 +152,7 @@ testpaths = ["tests"]
 # `py` backs the plugin's node.fspath.dirpath() snapshot-dir resolution.
 deps = ["pytest-snapshot==0.9.0", "py"]
 pythonpath = ["."]
+category = "third-party"
 enabled = true
 
 [pytest-icdiff]
@@ -155,6 +161,7 @@ tag = "0.5"
 testpaths = ["tests"]
 deps = ["pytest-icdiff==0.5", "icdiff", "pprintpp", "py"]
 pythonpath = ["."]
+category = "third-party"
 enabled = true
 
 [pytest-socket]
@@ -171,6 +178,7 @@ deps = [
     "anyio",
 ]
 pythonpath = ["."]
+category = "third-party"
 enabled = true
 
 [pytest-order]
@@ -178,6 +186,7 @@ repo = "https://github.com/pytest-dev/pytest-order"
 tag = "v1.4.0"
 testpaths = ["tests"]
 deps = ["pytest-order==1.4.0"]
+category = "third-party"
 enabled = true
 
 [pytest-repeat]
@@ -186,6 +195,7 @@ tag = "v0.9.4"
 testpaths = ["test_repeat.py"]
 deps = ["pytest-repeat==0.9.4"]
 pythonpath = ["."]
+category = "third-party"
 enabled = true
 
 [pytest-instafail]
@@ -195,6 +205,7 @@ testpaths = ["test_instafail.py"]
 # Flat layout; installed for the pytest11 entry point, checkout shadows.
 deps = ["pytest-instafail==0.5.0"]
 pythonpath = ["."]
+category = "third-party"
 enabled = true
 
 [pytest-env]
@@ -206,6 +217,7 @@ testpaths = ["tests"]
 # git checkout's src/.
 deps = ["pytest-env==1.6.0"]
 use_src = false
+category = "third-party"
 enabled = true
 
 [pytest-rerunfailures]
@@ -219,6 +231,7 @@ testpaths = ["test_pytest_rerunfailures.py"]
 # py.path.local temp-file flakiness toggles.
 deps = ["pytest-rerunfailures==9.1.1", "setuptools<81", "py"]
 pythonpath = ["."]
+category = "third-party"
 enabled = true
 
 [pytest-randomly]
@@ -235,6 +248,7 @@ deps = [
     "numpy",
     "model-bakery",
 ]
+category = "third-party"
 enabled = true
 
 # --- Real-world projects: famous suites that must pass wholesale, as
@@ -279,6 +293,7 @@ tag = "8.1.0"
 testpaths = ["tests"]
 deps = ["pytest-bdd==8.1.0", "Mako", "parse", "parse-type", "gherkin-official"]
 use_src = false
+category = "third-party"
 enabled = true
 
 # pytest-django: deferred. Needs Parser.parse_known_args plus full Django
@@ -292,4 +307,5 @@ testpaths = ["tests"]
 deps = ["pytest-django==4.9.0", "Django"]
 pythonpath = ["."]
 use_src = false
+category = "third-party"
 enabled = true

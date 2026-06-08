@@ -394,12 +394,22 @@ def scoreboard_platforms() -> list[str]:
 
 def cross_suite_tables(boards: list[dict]) -> list[str]:
     """Category-split cross-suite tables (shared by RESULTS.md / README.md):
-    the pytest ecosystem (reimplementation targets), then real-world suites
-    run wholesale as drop-in evidence."""
+    the pytest ecosystem (reimplementation targets), then third-party plugins
+    loaded as-is through the entry-point shim, then real-world suites run
+    wholesale as drop-in evidence."""
     ecosystem = [b for b in boards if b.get("category", "ecosystem") == "ecosystem"]
+    third_party = [b for b in boards if b.get("category") == "third-party"]
     real_world = [b for b in boards if b.get("category") == "real-world"]
     lines = ["**pytest & plugin ecosystem** (the APIs pytest-rs reimplements):", ""]
     lines.extend(cross_suite_table(ecosystem))
+    if third_party:
+        lines.append("")
+        lines.append(
+            "**Third-party plugins** (not reimplemented — their own upstream test "
+            "suites run under pytest-rs, loaded via the `pytest11` entry-point shim):"
+        )
+        lines.append("")
+        lines.extend(cross_suite_table(third_party))
     if real_world:
         lines.append("")
         lines.append("**Real-world projects** (their suites run unchanged, as drop-in evidence):")
