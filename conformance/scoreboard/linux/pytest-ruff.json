@@ -1,16 +1,16 @@
 {
-  "suite": "pytest-timeout",
-  "tag": "2.4.0",
+  "suite": "pytest-ruff",
+  "tag": "v0.5",
   "category": "third-party",
   "excluded_files": 0,
   "files": [
     {
-      "file": "test_pytest_timeout.py",
+      "file": "tests/test_plugin.py",
       "status": "passed",
       "exit_code": 0,
-      "passed": 40,
+      "passed": 10,
       "failed": 0,
-      "skipped": 1,
+      "skipped": 0,
       "errors": 0
     }
   ]

@@ -1,0 +1,17 @@
+{
+  "suite": "pytest-repeat",
+  "tag": "v0.9.4",
+  "category": "third-party",
+  "excluded_files": 0,
+  "files": [
+    {
+      "file": "test_repeat.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 11,
+      "failed": 5,
+      "skipped": 0,
+      "errors": 0
+    }
+  ]
+}

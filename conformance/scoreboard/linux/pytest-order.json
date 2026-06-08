@@ -1,0 +1,152 @@
+{
+  "suite": "pytest-order",
+  "tag": "v1.4.0",
+  "category": "third-party",
+  "excluded_files": 0,
+  "files": [
+    {
+      "file": "tests/test_class_marks.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 5,
+      "failed": 4,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_dependency.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 18,
+      "failed": 5,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_marker_prefix.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 3,
+      "failed": 4,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_misc.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 2,
+      "failed": 2,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_multiple_ordering.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 0,
+      "failed": 4,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_order_group_scope.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 0,
+      "failed": 6,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_order_group_scope_dep.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 0,
+      "failed": 4,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_order_group_scope_named_dep.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 0,
+      "failed": 4,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_order_group_scope_relative.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 0,
+      "failed": 5,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_order_scope.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 0,
+      "failed": 4,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_order_scope_level.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 0,
+      "failed": 5,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_ordering.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 19,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_ordering_options.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 0,
+      "failed": 2,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_relative_ordering.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 17,
+      "failed": 4,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_sparse_ordinals.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 16,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_xdist_handling.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 0,
+      "failed": 1,
+      "skipped": 0,
+      "errors": 0
+    }
+  ]
+}

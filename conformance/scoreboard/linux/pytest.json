@@ -53,8 +53,8 @@
       "file": "testing/test_assertion.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 117,
-      "failed": 43,
+      "passed": 118,
+      "failed": 42,
       "skipped": 0,
       "errors": 0
     },
@@ -62,8 +62,8 @@
       "file": "testing/test_cacheprovider.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 36,
-      "failed": 21,
+      "passed": 56,
+      "failed": 1,
       "skipped": 0,
       "errors": 0
     },
@@ -89,8 +89,8 @@
       "file": "testing/test_collection.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 59,
-      "failed": 54,
+      "passed": 60,
+      "failed": 53,
       "skipped": 3,
       "errors": 0
     },
@@ -107,8 +107,8 @@
       "file": "testing/test_config.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 69,
-      "failed": 139,
+      "passed": 138,
+      "failed": 70,
       "skipped": 1,
       "errors": 0
     },
@@ -161,8 +161,8 @@
       "file": "testing/test_junitxml.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 128,
-      "failed": 8,
+      "passed": 129,
+      "failed": 7,
       "skipped": 0,
       "errors": 1
     },
@@ -179,17 +179,17 @@
       "file": "testing/test_main.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 1,
-      "failed": 12,
+      "passed": 16,
+      "failed": 8,
       "skipped": 0,
-      "errors": 11
+      "errors": 0
     },
     {
       "file": "testing/test_mark.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 76,
-      "failed": 30,
+      "passed": 80,
+      "failed": 26,
       "skipped": 0,
       "errors": 0
     },
@@ -224,8 +224,8 @@
       "file": "testing/test_pytester.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 15,
-      "failed": 38,
+      "passed": 16,
+      "failed": 37,
       "skipped": 0,
       "errors": 0
     },
@@ -314,8 +314,8 @@
       "file": "testing/test_stepwise.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 6,
-      "failed": 12,
+      "passed": 7,
+      "failed": 11,
       "skipped": 0,
       "errors": 0
     },
@@ -332,8 +332,8 @@
       "file": "testing/test_terminal.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 102,
-      "failed": 113,
+      "passed": 176,
+      "failed": 39,
       "skipped": 2,
       "errors": 10
     },
@@ -341,10 +341,10 @@
       "file": "testing/test_threadexception.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 0,
-      "failed": 2,
+      "passed": 7,
+      "failed": 1,
       "skipped": 0,
-      "errors": 6
+      "errors": 0
     },
     {
       "file": "testing/test_tmpdir.py",
@@ -359,8 +359,8 @@
       "file": "testing/test_unittest.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 57,
-      "failed": 13,
+      "passed": 58,
+      "failed": 12,
       "skipped": 9,
       "errors": 0
     },
@@ -386,8 +386,8 @@
       "file": "testing/acceptance_test.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 22,
-      "failed": 58,
+      "passed": 24,
+      "failed": 56,
       "skipped": 2,
       "errors": 0
     },

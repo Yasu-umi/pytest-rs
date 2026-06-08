@@ -1,0 +1,17 @@
+{
+  "suite": "pytest-randomly",
+  "tag": "4.1.0",
+  "category": "third-party",
+  "excluded_files": 0,
+  "files": [
+    {
+      "file": "tests/test_pytest_randomly.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 31,
+      "failed": 6,
+      "skipped": 0,
+      "errors": 0
+    }
+  ]
+}

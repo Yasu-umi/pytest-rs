@@ -1,0 +1,17 @@
+{
+  "suite": "pytest-metadata",
+  "tag": "v2.0.4",
+  "category": "third-party",
+  "excluded_files": 0,
+  "files": [
+    {
+      "file": "tests/test_metadata.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 6,
+      "failed": 4,
+      "skipped": 0,
+      "errors": 0
+    }
+  ]
+}

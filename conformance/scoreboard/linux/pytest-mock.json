@@ -8,9 +8,9 @@
       "file": "tests/test_pytest_mock.py",
       "status": "passed",
       "exit_code": 0,
-      "passed": 85,
+      "passed": 87,
       "failed": 0,
-      "skipped": 5,
+      "skipped": 1,
       "errors": 0
     }
   ]
