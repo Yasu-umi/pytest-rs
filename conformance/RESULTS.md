@@ -380,7 +380,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | pass % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 1617 | 527 | 25 | 24 | 2193 | 73.7% | 6 | 45 | 63 |
+| pytest | 9.0.3 | 1618 | 526 | 25 | 24 | 2193 | 73.8% | 6 | 45 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 89 | 0 | 0 | 1 | 90 | 98.9% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 182 | 23 | 0 | 4 | 209 | 87.1% | 0 | 1 | 0 |
@@ -407,7 +407,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
 | rich | v14.2.0 | 855 | 0 | 0 | 25 | 880 | 97.2% | 60 | 62 | 0 |
 | pytest-bdd | 8.1.0 | 36 | 102 | 0 | 1 | 139 | 25.9% | 5 | 35 | 0 |
-| pytest-django | v4.9.0 | 143 | 66 | 6 | 1 | 216 | 66.2% | 2 | 13 | 0 |
+| pytest-django | v4.9.0 | 145 | 64 | 6 | 1 | 216 | 67.1% | 2 | 13 | 0 |
 
 ### pytest @ 9.0.3
 
@@ -454,7 +454,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_terminal.py | failed | 176 | 39 | 10 | 2 |
 | testing/test_threadexception.py | failed | 7 | 1 | 0 | 0 |
 | testing/test_tmpdir.py | passed | 39 | 0 | 0 | 1 |
-| testing/test_unittest.py | failed | 57 | 13 | 0 | 9 |
+| testing/test_unittest.py | failed | 58 | 12 | 0 | 9 |
 | testing/test_unraisableexception.py | failed | 10 | 1 | 0 | 0 |
 | testing/test_warnings.py | failed | 35 | 8 | 0 | 1 |
 | testing/acceptance_test.py | failed | 24 | 56 | 0 | 2 |
@@ -969,7 +969,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_fixtures.py | failed | 43 | 9 | 0 | 0 |
 | tests/test_initialization.py | failed | 0 | 1 | 0 | 0 |
 | tests/test_manage_py_scan.py | failed | 5 | 4 | 0 | 0 |
-| tests/test_unittest.py | failed | 8 | 15 | 0 | 0 |
+| tests/test_unittest.py | failed | 10 | 13 | 0 | 0 |
 | tests/test_urls.py | failed | 2 | 2 | 0 | 0 |
 | tests/test_without_django_loaded.py | passed | 7 | 0 | 0 | 0 |
 

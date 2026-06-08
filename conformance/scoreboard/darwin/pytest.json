@@ -359,8 +359,8 @@
       "file": "testing/test_unittest.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 57,
-      "failed": 13,
+      "passed": 58,
+      "failed": 12,
       "skipped": 9,
       "errors": 0
     },

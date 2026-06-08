@@ -231,7 +231,15 @@ def make_runner(cls, method_name):
         outcome.expecting_failure = expecting_failure
         case._outcome = outcome
         primary = None
+        # Django's SimpleTestCase/TestCase wrap each test in _pre_setup
+        # (transaction begin + fixture load) / _post_teardown (rollback);
+        # upstream runs these via TestCase.__call__, which our manual
+        # setUp/method/tearDown loop bypasses. Call them when present.
+        pre_setup = getattr(case, "_pre_setup", None)
+        post_teardown = getattr(case, "_post_teardown", None)
         try:
+            if pre_setup is not None:
+                pre_setup()
             try:
                 case.setUp()
             except unittest.SkipTest as e:
@@ -266,6 +274,12 @@ def make_runner(cls, method_name):
         except BaseException as exc:
             primary = exc
         finally:
+            if post_teardown is not None:
+                try:
+                    post_teardown()
+                except BaseException as texc:  # noqa: BLE001
+                    if primary is None:
+                        primary = texc
             case._outcome = None
         # addCleanup functions run LIFO even when setUp/call/tearDown failed
         # (unittest's doCleanups); the primary exception wins, else the
