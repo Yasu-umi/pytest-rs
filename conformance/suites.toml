@@ -104,6 +104,14 @@ deps = [
 ]
 enabled = true
 
+[pytest-subtests]
+repo = "https://github.com/pytest-dev/pytest-subtests"
+tag = "v0.14.2"
+testpaths = ["tests"]
+deps = ["pytest-subtests==0.14.2"]
+use_src = false
+enabled = true
+
 [pytest-metadata]
 repo = "https://github.com/pytest-dev/pytest-metadata"
 tag = "v2.0.4"

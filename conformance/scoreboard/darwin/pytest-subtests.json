@@ -1,0 +1,17 @@
+{
+  "suite": "pytest-subtests",
+  "tag": "v0.14.2",
+  "category": "ecosystem",
+  "excluded_files": 0,
+  "files": [
+    {
+      "file": "tests/test_subtests.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 8,
+      "failed": 24,
+      "skipped": 0,
+      "errors": 0
+    }
+  ]
+}
