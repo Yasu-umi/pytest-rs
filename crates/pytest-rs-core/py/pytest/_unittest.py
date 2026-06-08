@@ -296,6 +296,10 @@ def make_runner(cls, method_name):
     run.__name__ = method_name
     run.__qualname__ = f"{cls.__qualname__}.{method_name}"
     run.make_case = make_case
+    # The collected TestCase class, for node.cls introspection (reordering
+    # plugins shuffle by item.cls.__qualname__). Kept off TestItem.cls so the
+    # engine does not instantiate/rebind around the shim runner.
+    run.cls = cls
     return run
 
 

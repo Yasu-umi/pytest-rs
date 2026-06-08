@@ -380,7 +380,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | pass % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 1600 | 544 | 25 | 24 | 2193 | 73.0% | 6 | 45 | 63 |
+| pytest | 9.0.3 | 1611 | 533 | 25 | 24 | 2193 | 73.5% | 6 | 45 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 85 | 0 | 0 | 5 | 90 | 94.4% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 182 | 23 | 0 | 4 | 209 | 87.1% | 0 | 1 | 0 |
@@ -389,6 +389,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pytest-benchmark | v5.1.0 | 91 | 31 | 0 | 1 | 123 | 74.0% | 4 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 41 | 97.6% | 1 | 1 | 0 |
 | anyio | 4.13.0 | 2860 | 0 | 0 | 302 | 3162 | 90.4% | 26 | 26 | 0 |
+| pytest-randomly | 4.1.0 | 30 | 7 | 0 | 0 | 37 | 81.1% | 0 | 1 | 0 |
 | click | 8.3.1 | 1313 | 0 | 0 | 22 | 1335 | 98.4% | 20 | 20 | 0 |
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
@@ -406,12 +407,12 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/logging/test_formatter.py | failed | 0 | 4 | 0 | 0 |
 | testing/logging/test_reporting.py | failed | 44 | 8 | 0 | 0 |
 | testing/test_assertion.py | failed | 117 | 43 | 0 | 0 |
-| testing/test_cacheprovider.py | failed | 54 | 3 | 0 | 0 |
+| testing/test_cacheprovider.py | failed | 56 | 1 | 0 | 0 |
 | testing/test_capture.py | failed | 106 | 1 | 0 | 1 |
 | testing/test_collect_imported_tests.py | failed | 2 | 1 | 0 | 0 |
 | testing/test_collection.py | failed | 61 | 52 | 0 | 3 |
 | testing/test_compat.py | failed | 6 | 4 | 0 | 0 |
-| testing/test_config.py | failed | 132 | 76 | 0 | 1 |
+| testing/test_config.py | failed | 137 | 71 | 0 | 1 |
 | testing/test_conftest.py | failed | 20 | 22 | 11 | 1 |
 | testing/test_doctest.py | passed | 139 | 0 | 0 | 1 |
 | testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 |
@@ -436,7 +437,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_skipping.py | failed | 90 | 2 | 0 | 0 |
 | testing/test_stepwise.py | failed | 6 | 12 | 0 | 0 |
 | testing/test_subtests.py | failed | 29 | 5 | 0 | 0 |
-| testing/test_terminal.py | failed | 171 | 44 | 10 | 2 |
+| testing/test_terminal.py | failed | 175 | 40 | 10 | 2 |
 | testing/test_threadexception.py | failed | 7 | 1 | 0 | 0 |
 | testing/test_tmpdir.py | passed | 39 | 0 | 0 | 1 |
 | testing/test_unittest.py | failed | 57 | 13 | 0 | 9 |
@@ -585,6 +586,16 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_to_process.py | passed | 36 | 0 | 0 | 0 |
 | tests/test_to_thread.py | passed | 64 | 0 | 0 | 0 |
 | tests/test_typedattr.py | passed | 1 | 0 | 0 | 0 |
+
+</details>
+
+### pytest-randomly @ 4.1.0
+
+<details><summary>per-file detail (1 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_pytest_randomly.py | failed | 30 | 7 | 0 | 0 |
 
 </details>
 

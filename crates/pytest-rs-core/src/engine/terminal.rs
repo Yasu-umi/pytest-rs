@@ -192,6 +192,12 @@ impl Engine {
             let joined = testpaths.split_whitespace().collect::<Vec<_>>().join(", ");
             println!("testpaths: {joined}");
         }
+        // plugins: dist-backed third-party plugins that autoloaded (pytest's
+        // _plugin_nameversions). Omitted when none loaded — the natively
+        // replaced plugins (pytest-cov, etc.) never appear.
+        if !self.session.plugin_distinfo.is_empty() {
+            println!("plugins: {}", self.session.plugin_distinfo.join(", "));
+        }
     }
 
     /// The ERRORS section: "ERROR collecting <file>" banners per collection

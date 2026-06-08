@@ -1,0 +1,28 @@
+# Upstream pytest-randomly test files that must keep passing under pytest-rs.
+#
+# tests/test_pytest_randomly.py is the single behavioral target (~30/37
+# passing); it is tracked by the scoreboard and pinned once fully green.
+# The reordering core works: pytest-rs now exposes item.module / item.cls,
+# so randomly's shuffle (crc32 of module.__name__ / cls.__qualname__ /
+# nodeid) reproduces upstream's order, and the "plugins:" header line lands
+# so the verbose output offsets line up.
+
+[files]
+
+[excluded]
+# (whole-file exclusions; none — the suite is one file)
+
+# Known per-test gaps in test_pytest_randomly.py (architectural or
+# environment, not randomly-specific), kept here for the record:
+#   test_it_works_with_the_simplest_test_items — custom collector via
+#     pytest_collect_file + Node.from_parent (Python node-tree API).
+#   test_failing_import — Testdir.getmodulecol (pytester introspection gap).
+#   test_entrypoint_injection — runpytest_inprocess + monkeypatched
+#     entry_points (in-process pytester run).
+#   test_passing_nonsense_for_randomly_seed — argparse custom type=
+#     validator: CLI parsing is Rust-side, so the Python ArgumentTypeError
+#     message is not produced.
+#   test_doctests_in_txt_files_reordered — .txt doctest item nodeid display.
+#   test_it_runs_before_stepwise — assertion passes; the test's own teardown
+#     rmtrees __pycache__, which pytest-rs does not write on import.
+#   test_faker_fixture — exact Faker-seeded names (faker_seed fixture chain).

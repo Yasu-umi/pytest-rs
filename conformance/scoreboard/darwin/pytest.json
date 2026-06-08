@@ -62,8 +62,8 @@
       "file": "testing/test_cacheprovider.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 54,
-      "failed": 3,
+      "passed": 56,
+      "failed": 1,
       "skipped": 0,
       "errors": 0
     },
@@ -107,8 +107,8 @@
       "file": "testing/test_config.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 132,
-      "failed": 76,
+      "passed": 137,
+      "failed": 71,
       "skipped": 1,
       "errors": 0
     },
@@ -332,8 +332,8 @@
       "file": "testing/test_terminal.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 171,
-      "failed": 44,
+      "passed": 175,
+      "failed": 40,
       "skipped": 2,
       "errors": 10
     },

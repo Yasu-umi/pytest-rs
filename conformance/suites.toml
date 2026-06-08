@@ -104,6 +104,22 @@ deps = [
 ]
 enabled = true
 
+[pytest-randomly]
+repo = "https://github.com/pytest-dev/pytest-randomly"
+tag = "4.1.0"
+testpaths = ["tests"]
+# Installed as a dep so its pytest11 entry point autoloads; the src/
+# checkout shadows the import at the same version. factory-boy/faker/numpy/
+# model-bakery drive the optional reseed-integration tests.
+deps = [
+    "pytest-randomly==4.1.0",
+    "factory-boy",
+    "faker",
+    "numpy",
+    "model-bakery",
+]
+enabled = true
+
 # --- Real-world projects: famous suites that must pass wholesale, as
 # --- drop-in evidence (no pytest-rs-specific relationship).
 

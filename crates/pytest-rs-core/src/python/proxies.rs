@@ -193,6 +193,31 @@ pub fn make_node(py: Python<'_>, item: &TestItem) -> PyResult<Py<PyAny>> {
     if let Some(proxy) = CONFIG_PROXY.get() {
         node.setattr("config", proxy.bind(py))?;
     }
+    // node.module / node.cls: reordering plugins (pytest-randomly,
+    // pytest-order) shuffle by item.module.__name__ and item.cls. The module
+    // was imported into sys.modules during collection; the class is carried
+    // on the TestItem for methods of a Test* class.
+    let module = py
+        .import("sys")?
+        .getattr("modules")?
+        .call_method1("get", (item.module_name.as_str(),))?;
+    node.setattr("module", module)?;
+    // For pytest-style classes the class is on TestItem.cls; unittest items
+    // keep cls None (see collect_testcase) and expose it on the shim runner.
+    let cls = match &item.cls {
+        Some(cls) => Some(cls.bind(py).clone()),
+        None => {
+            let func = item.func.bind(py);
+            if func.hasattr("make_case").unwrap_or(false) {
+                func.getattr("cls").ok()
+            } else {
+                None
+            }
+        }
+    };
+    if let Some(cls) = cls {
+        node.setattr("cls", cls)?;
+    }
     Ok(node.unbind())
 }
 

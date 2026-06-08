@@ -101,6 +101,10 @@ pub struct Session {
     /// plugin (pytest-sugar/pytest-pretty); the engine drives it through
     /// reporter hook calls instead of rendering natively.
     pub custom_reporter: Option<Py<PyAny>>,
+    /// "name-version" strings for autoloaded third-party plugins (pytest11
+    /// entry points), for the session header's "plugins:" line. Empty when
+    /// no dist-backed plugins loaded, in which case the line is omitted.
+    pub plugin_distinfo: Vec<String>,
 }
 
 impl Session {
@@ -131,6 +135,7 @@ impl Session {
             stopped_after: None,
             shouldfail: None,
             custom_reporter: None,
+            plugin_distinfo: Vec::new(),
         }
     }
 

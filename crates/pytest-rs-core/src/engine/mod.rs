@@ -756,6 +756,7 @@ impl Engine {
             &blocked,
             &mut self.session.registry,
             &mut self.session.py_hooks,
+            &mut self.session.plugin_distinfo,
         ) {
             return Err(python::format_exception(py, &err));
         }

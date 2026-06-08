@@ -63,6 +63,12 @@ class DoctestNode:
         self.obj = function
         self.path = path
         self.lineno = lineno
+        # The Python module/class this item was collected from. Reordering
+        # plugins (pytest-randomly, pytest-order) shuffle by
+        # item.module.__name__ and item.cls; the engine fills these in
+        # make_node from the already-imported module and the collected class.
+        self.module = None
+        self.cls = None
 
     @property
     def ihook(self):
@@ -231,6 +237,12 @@ class Node(Item):
         self.obj = function
         self.path = path
         self.lineno = lineno
+        # The Python module/class this item was collected from. Reordering
+        # plugins (pytest-randomly, pytest-order) shuffle by
+        # item.module.__name__ and item.cls; the engine fills these in
+        # make_node from the already-imported module and the collected class.
+        self.module = None
+        self.cls = None
 
     @property
     def keywords(self):

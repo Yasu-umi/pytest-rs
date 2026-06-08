@@ -125,6 +125,7 @@ impl Engine {
             &blocked,
             &mut self.session.registry,
             &mut self.session.py_hooks,
+            &mut self.session.plugin_distinfo,
         ) {
             eprintln!(
                 "INTERNAL ERROR: worker entry-point plugin loading failed: {}",

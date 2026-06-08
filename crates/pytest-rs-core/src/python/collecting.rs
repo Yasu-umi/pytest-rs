@@ -444,6 +444,10 @@ pub(crate) fn collect_testcase(
             module_name: module_name.to_string(),
             func_name: name,
             func: runner.unbind(),
+            // cls stays None: the runner drives the unittest instance via
+            // make_case (item.cls Some would make the engine instantiate and
+            // rebind, bypassing setUp/tearDown). The class is still exposed
+            // for node.cls introspection via the runner's `cls` attribute.
             cls: None,
             is_coroutine: false,
             is_doctest: false,

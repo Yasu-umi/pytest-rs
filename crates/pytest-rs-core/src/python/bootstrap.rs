@@ -241,26 +241,29 @@ pub fn load_entrypoint_plugins(
     blocked: &[String],
     registry: &mut FixtureRegistry,
     hooks: &mut Vec<crate::session::PyHook>,
+    distinfo: &mut Vec<String>,
 ) -> PyResult<()> {
     if std::env::var_os("PYTEST_DISABLE_PLUGIN_AUTOLOAD").is_some() {
         return Ok(());
     }
     let globals = pyo3::types::PyDict::new(py);
     globals.set_item("bundled", SKIPPED_DISTS.to_vec())?;
+    // (entry-point name, plugin module, dist Name, dist version): the dist
+    // metadata feeds the "plugins:" header line (pytest's _plugin_nameversions).
     py.run(
         c"from importlib.metadata import distributions\n\
 bundled = {name.lower() for name in bundled}\n\
-result = sorted({(ep.name, ep.value.split(':')[0].strip()) for dist in distributions() if ((dist.metadata.get('Name') if dist.metadata else None) or '').lower() not in bundled for ep in dist.entry_points if ep.group == 'pytest11'})\n",
+result = sorted({(ep.name, ep.value.split(':')[0].strip(), (dist.metadata.get('Name') if dist.metadata else None) or '', dist.version or '') for dist in distributions() if ((dist.metadata.get('Name') if dist.metadata else None) or '').lower() not in bundled for ep in dist.entry_points if ep.group == 'pytest11'})\n",
         Some(&globals),
         None,
     )?;
-    let entrypoints: Vec<(String, String)> = globals
+    let entrypoints: Vec<(String, String, String, String)> = globals
         .get_item("result")?
         .map(|result| result.extract())
         .transpose()?
         .unwrap_or_default();
 
-    for (ep_name, module_name) in entrypoints {
+    for (ep_name, module_name, dist_name, dist_version) in entrypoints {
         if blocked.contains(&ep_name) || blocked.contains(&module_name) {
             continue;
         }
@@ -296,6 +299,16 @@ result = sorted({(ep.name, ep.value.split(':')[0].strip()) for dist in distribut
         py.import("pytest._pluginmanager")?
             .getattr("pluginmanager")?
             .call_method1("register", (&plugin,))?;
+        // The "plugins:" header label: pytest strips a leading "pytest-"
+        // from the dist name and appends the version (_plugin_nameversions),
+        // deduped.
+        if !dist_name.is_empty() {
+            let label = dist_name.strip_prefix("pytest-").unwrap_or(&dist_name);
+            let entry = format!("{label}-{dist_version}");
+            if !distinfo.contains(&entry) {
+                distinfo.push(entry);
+            }
+        }
     }
     Ok(())
 }
