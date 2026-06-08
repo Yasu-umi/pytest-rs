@@ -3,6 +3,73 @@
 Notable changes per release. The release workflow uses the matching section
 as the GitHub release notes (auto-generated notes are the fallback).
 
+## v0.0.3 (unreleased)
+
+### Added
+
+- **Terminal-reporter replacement** — `pytest-sugar` and `pytest-pretty`
+  take over the output as-is (the engine suppresses its native rendering
+  and drives the registered replacement through the same hooks pluggy
+  would); their output is byte-diffed against real pytest in CI.
+- **More third-party plugins work through the `pytest` shim**, gated by a
+  functional smoke test: `pytest-timeout`, `inline-snapshot`,
+  `pytest-run-parallel` (`--parallel-threads` really runs each test on N
+  threads), plus `anyio`'s own plugin. The pluggy-lite hook relay now
+  implements wrapper/hookwrapper semantics, and `pytest_addoption` hooks
+  receive the `pluginmanager` argument.
+- **`anyio`** runs through a native runner plugin (per-backend
+  parametrization, async fixtures over asyncio/trio); its upstream suite
+  is part of conformance.
+- **pytest-xdist data exchange**: `pytest_configure_node` /
+  `config.workerinput` / `config.workeroutput` / `pytest_testnodedown`,
+  `--dist=loadgroup` (xdist_group batching), and `-x`/`--maxfail` under
+  `-n`. Distributed conformance 67% → 92%.
+- **`--ignore` / `--ignore-glob`** prune paths during collection
+  (fnmatch with character classes), and `--rootdir` is validated.
+- `PYTEST_ADDOPTS` is honored (between ini `addopts` and the command line).
+
+### Fixed
+
+- **`--stepwise` was entirely inert** — the flag never reached the runner,
+  so it never stopped after the first failure. `--stepwise`,
+  `--stepwise-skip`, and `--stepwise-reset` now work.
+- **`--keep-duplicates`** doubles a directory passed twice, not just a
+  file passed twice.
+- `@pytest.mark.parametrize(ids=callable)` runs the idfn per value
+  (matching pytest's `_idval`), no longer raising spurious duplicate-ID
+  collection errors under strict id checking.
+- `session.shouldfail` / `session.shouldstop` are sticky — once set they
+  cannot be unset (pytest issue #11706).
+- `_pytest.assertion.rewrite.AssertionRewritingHook` is importable and
+  usable as an explicit loader; a module docstring containing
+  `PYTEST_DONT_REWRITE` opts out of rewriting.
+- Rewritten asserts no longer keep their compared values alive in the
+  frame — leak tests using `weakref` + `gc.collect()` pass, and
+  GC-retry-loop suites run dramatically faster.
+- `-k` / `-m` expressions use a faithful port of pytest's expression
+  parser (kwargs syntax, exact error messages); `pytest.raises`
+  `ExceptionInfo` gains the upstream `repr` and `match()` honors
+  PEP-678 `__notes__`.
+- Inside a virtualenv, `sys.executable` points at the venv interpreter, so
+  tests spawning subprocesses through it see the venv's packages.
+
+### Coverage
+
+- pytest-cov's upstream suite: 105 → 182 of 209 graded tests. `--cov-append`
+  with branch coverage round-trips internal arcs through a sidecar file,
+  `--cov-precision` / `[report]` precision/show_missing/skip_covered are
+  honored, and `--cov`'s subprocess hook installs into the active
+  virtualenv's site-packages too.
+
+### Conformance
+
+- pytest's own suite: ~1180 → 1421 of 2193 graded tests, across
+  `unittest` lifecycle, `tmpdir`/`unraisable`/`deprecated`, marks,
+  skipping, sessions, and terminal output.
+- **Real-world drop-in**: `pydantic`'s full 11,545-test suite passes
+  (byte-identical collection), and `click` / `jinja` / `marshmallow` /
+  `rich` run unchanged as conformance gallery suites.
+
 ## v0.0.2 (2026-06-06)
 
 ### Fixed
