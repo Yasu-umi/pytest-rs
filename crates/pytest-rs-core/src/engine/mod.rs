@@ -316,7 +316,7 @@ impl Engine {
                 }
                 // A file that fails collection is a "last failed" entry.
                 if let Some(cache) = &self.cache {
-                    cache.sessionfinish(py, &self.config, &self.session.reports);
+                    cache.sessionfinish(py, &self.config, &self.session.reports, &self.session.items);
                 }
                 self.write_junit_xml(py);
                 if !self.config.no_terminal() {
@@ -522,7 +522,7 @@ impl Engine {
             // Stop the session-wide capture (errors surface on stderr).
             python::capture_session_end(py);
             if let Some(cache) = &self.cache {
-                cache.sessionfinish(py, &self.config, &self.session.reports);
+                cache.sessionfinish(py, &self.config, &self.session.reports, &self.session.items);
             }
             if self.config.no_terminal() {
                 self.write_junit_xml(py);
@@ -572,7 +572,7 @@ impl Engine {
         // Stop the session-wide capture (errors surface on stderr).
         python::capture_session_end(py);
         if let Some(cache) = &self.cache {
-            cache.sessionfinish(py, &self.config, &self.session.reports);
+            cache.sessionfinish(py, &self.config, &self.session.reports, &self.session.items);
         }
         if let Some(forced) = self.session.exit_code_override {
             code = forced;

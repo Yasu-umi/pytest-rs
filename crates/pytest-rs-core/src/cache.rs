@@ -252,12 +252,34 @@ impl CacheState {
 
     /// LFPlugin/NFPlugin pytest_sessionfinish: replay the run's reports into
     /// cache/lastfailed and persist cache/nodeids.
-    pub fn sessionfinish(&self, py: Python<'_>, config: &Config, reports: &[TestReport]) {
+    pub fn sessionfinish(
+        &self,
+        py: Python<'_>,
+        config: &Config,
+        reports: &[TestReport],
+        items: &[TestItem],
+    ) {
         if !self.enabled || config.is_worker() || config.get_value("cache-show").is_some() {
             return;
         }
         let mut failed: Vec<String> = self.lastfailed.clone();
         let mut in_failed: HashSet<String> = failed.iter().cloned().collect();
+        // A file that previously failed collection but now collects fine no
+        // longer belongs in lastfailed under its bare file nodeid; its items
+        // are tracked individually via the runtest reports below (upstream's
+        // LFPlugin.pytest_collectreport pops the file, keeps the items).
+        let collected_files: HashSet<&str> = items
+            .iter()
+            .map(|item| item.nodeid.split("::").next().unwrap_or(""))
+            .collect();
+        failed.retain(|nodeid| {
+            let stale_collection_key =
+                !nodeid.contains("::") && collected_files.contains(nodeid.as_str());
+            if stale_collection_key {
+                in_failed.remove(nodeid);
+            }
+            !stale_collection_key
+        });
         for report in reports {
             let pop = (report.phase == Phase::Call && report.outcome == Outcome::Passed)
                 || matches!(report.outcome, Outcome::Skipped | Outcome::XFailed);
