@@ -82,11 +82,7 @@ pub(crate) fn report_teststatus(
     }
     let proxy = python::make_report_proxy(py, report, lineno).ok()?;
     for func in funcs {
-        let result = match python::call_py_hook(
-            py,
-            &func,
-            &[("report", proxy.clone_ref(py))],
-        ) {
+        let result = match python::call_py_hook(py, &func, &[("report", proxy.clone_ref(py))]) {
             Ok(result) => result,
             Err(err) => {
                 eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));

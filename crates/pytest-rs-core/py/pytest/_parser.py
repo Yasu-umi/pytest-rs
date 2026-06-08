@@ -347,8 +347,9 @@ def apply_cli_args(namespace: Any, tokens: list[str]) -> list[str]:
             setattr(namespace, dest, spec["action"] == "store_true")
             continue
         convert = spec["type"]
-        cast = (lambda v: convert(v)) if callable(convert) else (lambda v: v)
         nargs = spec.get("nargs")
+        # nargs=N collects a list; the single-value branch a scalar.
+        converted: object
         # nargs=N consumes N value tokens (pytest-metadata's `--metadata k v`).
         if isinstance(nargs, int) and nargs > 1:
             collected = []
@@ -360,7 +361,7 @@ def apply_cli_args(namespace: Any, tokens: list[str]) -> list[str]:
             if len(collected) < nargs:
                 unknown.append(token)
                 continue
-            converted = [cast(v) for v in collected]
+            converted = [convert(v) if callable(convert) else v for v in collected]
         else:
             if not eq:
                 if index < len(tokens) and not tokens[index].startswith("--"):
@@ -369,7 +370,7 @@ def apply_cli_args(namespace: Any, tokens: list[str]) -> list[str]:
                 else:
                     unknown.append(token)
                     continue
-            converted = cast(value)
+            converted = convert(value) if callable(convert) else value
         # action="append" accumulates into a list (default []).
         if spec["action"] == "append":
             existing = getattr(namespace, dest, None)

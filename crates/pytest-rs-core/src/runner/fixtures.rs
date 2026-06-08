@@ -149,7 +149,9 @@ pub(crate) fn resolve_fixture(
     // depends on `django_pytester`, which depends on `pytester`), resolve to
     // the next definition below it instead of re-selecting the same override.
     let looked_up = if let Some(stacked) = stack.iter().rev().find(|d| d.name == name) {
-        session.registry.lookup_overridden(name, &item.nodeid, stacked)
+        session
+            .registry
+            .lookup_overridden(name, &item.nodeid, stacked)
     } else {
         session.registry.lookup(name, &item.nodeid)
     };

@@ -70,8 +70,10 @@ class Collector:
             root = getattr(self.config, "rootpath", None) or getattr(self.config, "rootdir", None)
             if root is not None:
                 try:
-                    rel = pathlib.Path(self.path).resolve().relative_to(
-                        pathlib.Path(str(root)).resolve()
+                    rel = (
+                        pathlib.Path(self.path)
+                        .resolve()
+                        .relative_to(pathlib.Path(str(root)).resolve())
                     )
                     return str(rel).replace("\\", "/")
                 except ValueError:

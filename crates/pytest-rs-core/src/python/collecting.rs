@@ -137,7 +137,10 @@ pub fn collect_custom_files(
     _hooks: &[crate::session::PyHook],
     items: &mut Vec<TestItem>,
 ) -> PyResult<()> {
-    let Some(config) = crate::python::proxies::CONFIG_PROXY.get().map(|c| c.bind(py)) else {
+    let Some(config) = crate::python::proxies::CONFIG_PROXY
+        .get()
+        .map(|c| c.bind(py))
+    else {
         return Ok(());
     };
     // pytest_collect_file impls live on the shim pluginmanager (autoloaded
@@ -159,9 +162,12 @@ pub fn collect_custom_files(
             (),
             Some(&{
                 let kw = pyo3::types::PyDict::new(py);
-                kw.set_item("config", &config)?;
+                kw.set_item("config", config)?;
                 kw.set_item("session", &session)?;
-                kw.set_item("path", pathlib.call1((rootdir.to_string_lossy().as_ref(),))?)?;
+                kw.set_item(
+                    "path",
+                    pathlib.call1((rootdir.to_string_lossy().as_ref(),))?,
+                )?;
                 kw.set_item("nodeid", "")?;
                 kw.set_item("name", "")?;
                 kw
@@ -346,6 +352,7 @@ pub fn is_doctest_textfile(py: Python<'_>, path: &Path, py_config: &Py<PyAny>) -
     result.extract()
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn introspect_namespace(
     py: Python<'_>,
     module: &Bound<'_, PyModule>,

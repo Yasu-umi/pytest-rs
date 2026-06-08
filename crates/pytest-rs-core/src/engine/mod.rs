@@ -317,7 +317,12 @@ impl Engine {
                 }
                 // A file that fails collection is a "last failed" entry.
                 if let Some(cache) = &self.cache {
-                    cache.sessionfinish(py, &self.config, &self.session.reports, &self.session.items);
+                    cache.sessionfinish(
+                        py,
+                        &self.config,
+                        &self.session.reports,
+                        &self.session.items,
+                    );
                 }
                 self.write_junit_xml(py);
                 if !self.config.no_terminal() {
@@ -734,7 +739,11 @@ impl Engine {
             .cloned()
             .collect();
         if let Ok(env_plugins) = std::env::var("PYTEST_PLUGINS") {
-            for name in env_plugins.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+            for name in env_plugins
+                .split(',')
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+            {
                 if !named_plugins.iter().any(|n| n == name) {
                     named_plugins.push(name.to_string());
                 }

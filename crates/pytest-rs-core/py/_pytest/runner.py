@@ -37,7 +37,9 @@ class _LogreportSink:
     can render and count it. A no-op outside a delegated run."""
 
     def pytest_runtest_logreport(self, report):
-        _native_capture_logreport(report)
+        capture = globals().get("_native_capture_logreport")
+        if capture is not None:
+            capture(report)
 
 
 def runtestprotocol(item, log=True, nextitem=None):

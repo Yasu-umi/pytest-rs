@@ -417,7 +417,11 @@ class Pytester:
         for plugin in plugins:
             add = getattr(plugin, "pytest_addoption", None)
             if callable(add):
-                add(**_accepted_kwargs(add, {"parser": _parser.parser, "pluginmanager": pluginmanager}))
+                add(
+                    **_accepted_kwargs(
+                        add, {"parser": _parser.parser, "pluginmanager": pluginmanager}
+                    )
+                )
 
         # Apply the parseconfig CLI flags (e.g. "--hello=this") now that their
         # options are registered, so config.getoption sees the parsed values.

@@ -200,8 +200,7 @@ impl Engine {
                         // A pytest_report_teststatus hook may override the
                         // verbose word and its markup; otherwise use the
                         // built-in outcome word/color.
-                        let status =
-                            report_teststatus(py, session, &report, Some(item.lineno));
+                        let status = report_teststatus(py, session, &report, Some(item.lineno));
                         let word = status
                             .as_ref()
                             .map(|s| s.word.clone())
@@ -211,11 +210,8 @@ impl Engine {
                             .and_then(|s| s.markup.clone())
                             .unwrap_or_else(|| outcome_codes(&report).to_vec());
                         let plain = format!("{} {}", item.nodeid, word);
-                        let rendered = format!(
-                            "{} {}",
-                            item.nodeid,
-                            crate::tw::markup(&word, &codes)
-                        );
+                        let rendered =
+                            format!("{} {}", item.nodeid, crate::tw::markup(&word, &codes));
                         // "times" in verbose mode reports each test's own
                         // duration (pytest's per-item showlongtestinfo).
                         let msg = progress_message(pkind, done, total, report.duration);
@@ -342,7 +338,14 @@ pub(crate) fn run_one(
         Ok(None) => run_one_body(py, plugins, session, config, item),
         Err(err) => {
             let _ = finish_runtest_py_wrappers(py, &wrappers);
-            return vec![report_from_err(py, config, item, Phase::Setup, Instant::now(), &err)];
+            return vec![report_from_err(
+                py,
+                config,
+                item,
+                Phase::Setup,
+                Instant::now(),
+                &err,
+            )];
         }
     };
     if let Err(err) = finish_runtest_py_wrappers(py, &wrappers) {
@@ -366,21 +369,36 @@ fn run_custom_item(py: Python<'_>, config: &Config, item: &TestItem) -> Vec<Test
     let triples = match result {
         Ok(r) => r,
         Err(err) => {
-            return vec![report_from_err(py, config, item, Phase::Setup, started, &err)];
+            return vec![report_from_err(
+                py,
+                config,
+                item,
+                Phase::Setup,
+                started,
+                &err,
+            )];
         }
     };
     let mut reports = Vec::new();
     let iter = match triples.try_iter() {
         Ok(it) => it,
-        Err(err) => return vec![report_from_err(py, config, item, Phase::Setup, started, &err)],
+        Err(err) => {
+            return vec![report_from_err(
+                py,
+                config,
+                item,
+                Phase::Setup,
+                started,
+                &err,
+            )];
+        }
     };
     for entry in iter {
         let Ok(entry) = entry else { continue };
-        let (when, outcome, longrepr): (String, String, Option<String>) =
-            match entry.extract() {
-                Ok(t) => t,
-                Err(_) => continue,
-            };
+        let (when, outcome, longrepr): (String, String, Option<String>) = match entry.extract() {
+            Ok(t) => t,
+            Err(_) => continue,
+        };
         let phase = match when.as_str() {
             "setup" => Phase::Setup,
             "teardown" => Phase::Teardown,

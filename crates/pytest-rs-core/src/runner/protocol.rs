@@ -206,7 +206,9 @@ pub(crate) fn delegate_protocol(
     PROTOCOL_CTX.with(|stack| {
         stack.borrow_mut().pop();
     });
-    let captured = CAPTURE.with(|stack| stack.borrow_mut().pop()).unwrap_or_default();
+    let captured = CAPTURE
+        .with(|stack| stack.borrow_mut().pop())
+        .unwrap_or_default();
 
     if let Some(err) = error {
         return Err(err);

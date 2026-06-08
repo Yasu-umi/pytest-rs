@@ -85,7 +85,8 @@ impl Engine {
         let hook_funcs = hook_for("pytest_collection_modifyitems");
         let itemcollected_funcs = hook_for("pytest_itemcollected");
         let collectstart_funcs = hook_for("pytest_collectstart");
-        if hook_funcs.is_empty() && itemcollected_funcs.is_empty() && collectstart_funcs.is_empty() {
+        if hook_funcs.is_empty() && itemcollected_funcs.is_empty() && collectstart_funcs.is_empty()
+        {
             return Ok(());
         }
 
@@ -304,7 +305,10 @@ impl Engine {
             // Match argparse/pytest's MyOptionParser.error: a
             // "<prog>: error: <message>" line followed by the sorted
             // extra_info (inifile, rootdir) pytest attaches to the parser.
-            let mut msg = format!("pytest: error: unrecognized arguments: {}", unknown.join(" "));
+            let mut msg = format!(
+                "pytest: error: unrecognized arguments: {}",
+                unknown.join(" ")
+            );
             if let Some(name) = &self.config.config_file_name {
                 let inifile = self.config.rootdir.join(name);
                 msg += &format!("\n  inifile: {}", inifile.display());
