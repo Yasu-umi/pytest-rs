@@ -16,7 +16,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | pass % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 1409 | 718 | 42 | 24 | 2193 | 64.2% | 6 | 45 | 63 |
+| pytest | 9.0.3 | 1419 | 708 | 42 | 24 | 2193 | 64.7% | 6 | 45 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 85 | 0 | 0 | 5 | 90 | 94.4% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 182 | 24 | 0 | 3 | 209 | 87.1% | 0 | 1 | 0 |
@@ -45,7 +45,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_cacheprovider.py | failed | 36 | 21 | 0 | 0 |
 | testing/test_capture.py | failed | 106 | 1 | 0 | 1 |
 | testing/test_collect_imported_tests.py | failed | 2 | 1 | 0 | 0 |
-| testing/test_collection.py | failed | 58 | 55 | 0 | 3 |
+| testing/test_collection.py | failed | 59 | 54 | 0 | 3 |
 | testing/test_compat.py | failed | 6 | 4 | 0 | 0 |
 | testing/test_config.py | failed | 69 | 139 | 0 | 1 |
 | testing/test_conftest.py | failed | 20 | 22 | 11 | 1 |
@@ -63,14 +63,14 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_pytester.py | failed | 15 | 38 | 0 | 0 |
 | testing/test_python_path.py | failed | 2 | 4 | 0 | 0 |
 | testing/test_recwarn.py | passed | 63 | 0 | 0 | 0 |
-| testing/test_runner.py | failed | 16 | 36 | 0 | 0 |
+| testing/test_runner.py | failed | 17 | 35 | 0 | 0 |
 | testing/test_runner_xunit.py | failed | 8 | 5 | 0 | 0 |
 | testing/test_scope.py | failed | 0 | 4 | 0 | 0 |
-| testing/test_session.py | failed | 4 | 13 | 0 | 0 |
+| testing/test_session.py | failed | 9 | 8 | 0 | 0 |
 | testing/test_setuponly.py | failed | 21 | 5 | 0 | 0 |
 | testing/test_setupplan.py | failed | 1 | 2 | 0 | 0 |
 | testing/test_skipping.py | failed | 90 | 2 | 0 | 0 |
-| testing/test_stepwise.py | failed | 3 | 15 | 0 | 0 |
+| testing/test_stepwise.py | failed | 6 | 12 | 0 | 0 |
 | testing/test_subtests.py | failed | 29 | 5 | 0 | 0 |
 | testing/test_terminal.py | failed | 102 | 113 | 10 | 2 |
 | testing/test_threadexception.py | failed | 0 | 2 | 6 | 0 |
