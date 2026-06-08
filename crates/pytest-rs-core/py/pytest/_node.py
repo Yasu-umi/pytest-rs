@@ -123,13 +123,29 @@ class DoctestNode:
         record_added_mark(marker)
 
 
-# Session.shouldfail set by plugins (pytest-timeout's session deadline):
-# the runner polls this between items and aborts with the message banner.
-_session_state: dict = {"shouldfail": None, "items": []}
+# Session.shouldfail / shouldstop set by plugins (pytest-timeout's session
+# deadline) or the engine (--maxfail / --stepwise): the runner polls these
+# between items and aborts with the message banner.
+_session_state: dict = {"shouldfail": None, "shouldstop": None, "items": []}
 
 
 def session_shouldfail():
     return _session_state["shouldfail"]
+
+
+def session_shouldstop():
+    return _session_state["shouldstop"]
+
+
+def set_session_shouldfail(value):
+    """Engine-side set (--maxfail): bypasses the sticky setter so the
+    conftest's pytest_sessionfinish sees the truthy value."""
+    _session_state["shouldfail"] = value
+
+
+def set_session_shouldstop(value):
+    """Engine-side set (--stepwise)."""
+    _session_state["shouldstop"] = value
 
 
 def set_session_items(items):
@@ -159,7 +175,40 @@ class _NodeSession:
 
     @shouldfail.setter
     def shouldfail(self, value):
+        # Upstream issue #11706: once set, shouldfail cannot be unset.
+        if value is False and _session_state["shouldfail"]:
+            import warnings
+
+            from pytest._warning_types import PytestWarning
+
+            warnings.warn(
+                PytestWarning(
+                    "session.shouldfail cannot be unset after it has been set; ignoring."
+                ),
+                stacklevel=2,
+            )
+            return
         _session_state["shouldfail"] = value
+
+    @property
+    def shouldstop(self):
+        return _session_state["shouldstop"]
+
+    @shouldstop.setter
+    def shouldstop(self, value):
+        if value is False and _session_state["shouldstop"]:
+            import warnings
+
+            from pytest._warning_types import PytestWarning
+
+            warnings.warn(
+                PytestWarning(
+                    "session.shouldstop cannot be unset after it has been set; ignoring."
+                ),
+                stacklevel=2,
+            )
+            return
+        _session_state["shouldstop"] = value
 
     @property
     def items(self):

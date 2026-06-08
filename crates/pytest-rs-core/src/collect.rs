@@ -150,6 +150,7 @@ pub fn collect_test_files(
                 python_files,
                 norecursedirs,
                 ignores,
+                keep_duplicates,
             )?;
         } else if keep_duplicates || !files.contains(&path) {
             // --keep-duplicates: a file given twice collects twice (pytest
@@ -173,6 +174,7 @@ fn collect_dir(
     python_files: &[String],
     norecursedirs: &[String],
     ignores: &CollectIgnores,
+    keep_duplicates: bool,
 ) -> Result<(), String> {
     let mut entries: Vec<_> = std::fs::read_dir(dir)
         .map_err(|e| format!("{}: {e}", dir.display()))?
@@ -199,9 +201,13 @@ fn collect_dir(
                     python_files,
                     norecursedirs,
                     ignores,
+                    keep_duplicates,
                 )?;
             }
-        } else if is_test_file(&path, python_files) && path.is_file() && !files.contains(&path) {
+        } else if is_test_file(&path, python_files)
+            && path.is_file()
+            && (keep_duplicates || !files.contains(&path))
+        {
             // Overlapping arguments ("pytest a a/b") collect each file
             // once; is_file also drops broken symlinks.
             files.push(path);
@@ -248,8 +254,11 @@ fn wildcard_match(pattern: &str, name: &str) -> bool {
     let (mut p, mut n) = (0usize, 0usize);
     let mut star: Option<(usize, usize)> = None;
     while n < name.len() {
-        if p < pattern.len() && (pattern[p] == '?' || pattern[p] == name[n]) {
-            p += 1;
+        if p < pattern.len()
+            && pattern[p] != '*'
+            && let Some(next_p) = match_token(&pattern, p, name[n])
+        {
+            p = next_p;
             n += 1;
         } else if p < pattern.len() && pattern[p] == '*' {
             star = Some((p, n));
@@ -266,6 +275,53 @@ fn wildcard_match(pattern: &str, name: &str) -> bool {
         p += 1;
     }
     p == pattern.len()
+}
+
+/// Match one fnmatch token (`?`, a `[seq]` / `[!seq]` character class, or a
+/// literal) against `ch`. Returns the pattern index just past the token on
+/// a match, or None. A class with no closing `]` is a literal `[`.
+fn match_token(pattern: &[char], p: usize, ch: char) -> Option<usize> {
+    match pattern[p] {
+        '?' => Some(p + 1),
+        '[' => {
+            // A ']' immediately after '[' or '[!' is a literal member.
+            let mut end = p + 1;
+            let negated = pattern.get(end) == Some(&'!');
+            if negated {
+                end += 1;
+            }
+            let class_start = end;
+            if pattern.get(end) == Some(&']') {
+                end += 1;
+            }
+            while end < pattern.len() && pattern[end] != ']' {
+                end += 1;
+            }
+            if end >= pattern.len() {
+                // No closing bracket: treat '[' as a literal.
+                return (pattern[p] == ch).then_some(p + 1);
+            }
+            let class = &pattern[class_start..end];
+            let mut matched = false;
+            let mut idx = 0;
+            while idx < class.len() {
+                if idx + 2 < class.len() && class[idx + 1] == '-' {
+                    // A range like a-z (the '-' is literal at the edges).
+                    if class[idx] <= ch && ch <= class[idx + 2] {
+                        matched = true;
+                    }
+                    idx += 3;
+                } else {
+                    if class[idx] == ch {
+                        matched = true;
+                    }
+                    idx += 1;
+                }
+            }
+            (matched != negated).then_some(end + 1)
+        }
+        literal => (literal == ch).then_some(p + 1),
+    }
 }
 
 /// pytest "prepend" import mode: walk up while __init__.py exists; the first

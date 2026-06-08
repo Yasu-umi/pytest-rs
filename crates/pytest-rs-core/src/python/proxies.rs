@@ -146,6 +146,22 @@ pub fn session_shouldfail(py: Python<'_>) -> Option<String> {
         .ok()?
 }
 
+/// Publish a truthy session.shouldfail to the Python session state so the
+/// conftest's pytest_sessionfinish sees it (--maxfail). Engine-side set
+/// bypasses the sticky setter.
+pub fn set_session_shouldfail(py: Python<'_>, message: &str) {
+    let _ = py
+        .import("pytest._node")
+        .and_then(|m| m.call_method1("set_session_shouldfail", (message,)));
+}
+
+/// Publish a truthy session.shouldstop (--stepwise).
+pub fn set_session_shouldstop(py: Python<'_>, message: &str) {
+    let _ = py
+        .import("pytest._node")
+        .and_then(|m| m.call_method1("set_session_shouldstop", (message,)));
+}
+
 /// Evaluate a (skipif) condition string in a test module's namespace.
 pub fn eval_in_module(py: Python<'_>, module_name: &str, expr: &str) -> PyResult<bool> {
     let module = py.import(module_name)?;

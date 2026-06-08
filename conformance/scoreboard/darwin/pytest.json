@@ -89,8 +89,8 @@
       "file": "testing/test_collection.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 59,
-      "failed": 54,
+      "passed": 60,
+      "failed": 53,
       "skipped": 3,
       "errors": 0
     },
@@ -251,8 +251,8 @@
       "file": "testing/test_runner.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 17,
-      "failed": 35,
+      "passed": 18,
+      "failed": 34,
       "skipped": 0,
       "errors": 0
     },
@@ -278,8 +278,8 @@
       "file": "testing/test_session.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 4,
-      "failed": 13,
+      "passed": 9,
+      "failed": 8,
       "skipped": 0,
       "errors": 0
     },
@@ -314,8 +314,8 @@
       "file": "testing/test_stepwise.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 3,
-      "failed": 15,
+      "passed": 6,
+      "failed": 12,
       "skipped": 0,
       "errors": 0
     },

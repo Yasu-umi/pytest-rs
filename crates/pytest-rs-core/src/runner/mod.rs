@@ -226,6 +226,9 @@ impl Engine {
             if stepwise && item_failed {
                 sw_failed_items += 1;
                 if !(sw_skip && sw_failed_items == 1) {
+                    // Publish a truthy session.shouldstop so a conftest
+                    // pytest_sessionfinish sees it (and cannot unset it).
+                    python::set_session_shouldstop(py, "stepwise: stopping after first failure");
                     break;
                 }
             }
@@ -270,6 +273,9 @@ impl Engine {
             && failed >= m
         {
             session.stopped_after = Some(failed);
+            // Publish a truthy session.shouldfail for conftest
+            // pytest_sessionfinish (upstream sets the stop message here).
+            python::set_session_shouldfail(py, &format!("stopping after {failed} failures"));
         }
 
         session.items = items;

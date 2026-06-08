@@ -321,6 +321,30 @@ impl Config {
         let ancestor = common_ancestor(&dirs_from_args(&cwd, &argv));
         let (rootdir, config_file_name, ini_file) = find_ini(&ancestor);
 
+        // --rootdir=DIR must point at an existing directory (upstream
+        // determine_setup raises a UsageError otherwise).
+        let rootdir_arg = {
+            let mut value = None;
+            let mut iter = argv.iter();
+            while let Some(arg) = iter.next() {
+                if let Some(rest) = arg.strip_prefix("--rootdir=") {
+                    value = Some(rest.to_string());
+                } else if arg == "--rootdir" {
+                    value = iter.next().cloned();
+                }
+            }
+            value
+        };
+        if let Some(arg) = &rootdir_arg {
+            let path = cwd.join(arg);
+            if !path.is_dir() {
+                return Err(format!(
+                    "Directory '{}' not found. Check your '--rootdir' option.",
+                    path.display()
+                ));
+            }
+        }
+
         // addopts from the config file are prepended to the CLI args.
         // `-o addopts=...` wins over the file: it must apply here, before
         // clap parsing, or the override could never disable addopts.
@@ -664,10 +688,15 @@ impl Config {
                 flags.insert(opt.name.clone());
             }
         }
-        for flag in CORE_FLAGS
-            .into_iter()
-            .chain(["capture-disable", "lf", "ff", "nf"])
-        {
+        for flag in CORE_FLAGS.into_iter().chain([
+            "capture-disable",
+            "lf",
+            "ff",
+            "nf",
+            "sw",
+            "sw-skip",
+            "sw-reset",
+        ]) {
             if !has_xdist && xdist_only(flag) {
                 continue;
             }
