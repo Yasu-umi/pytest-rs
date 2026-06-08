@@ -1172,6 +1172,30 @@ impl Engine {
             }
         }
 
+        // Custom collectors: plugins like pytest-ruff / pytest-mypy collect
+        // non-test files via pytest_collect_file -> pytest.File.collect().
+        // Only walk the (broader) candidate file set when such a hook exists.
+        if self.session.py_hooks.iter().any(|h| h.name == "pytest_collect_file") {
+            let candidate = crate::collect::collect_all_python_files(
+                &self.config.invocation_dir,
+                &paths,
+                self.config.get_flag("collect-in-virtualenv"),
+                &[],
+            );
+            let hooks = std::mem::take(&mut self.session.py_hooks);
+            let result = python::collect_custom_files(
+                py,
+                &rootdir,
+                &candidate,
+                &hooks,
+                &mut self.session.items,
+            );
+            self.session.py_hooks = hooks;
+            if let Err(err) = result {
+                errors.push((rootdir.clone(), python::format_exception(py, &err)));
+            }
+        }
+
         // Collection over: close its catching_logs phase.
         python::log_end_phase(py);
 

@@ -22,10 +22,186 @@ def clear_added_marks():
 
 
 class Collector:
-    """Stub collector base (annotations/isinstance upstream)."""
+    """Base for custom collectors (pytest.File subclasses returned from
+    pytest_collect_file) and items. Enough of pytest's Node API for plugins
+    like pytest-ruff / pytest-mypy: from_parent, config/path/nodeid, markers."""
 
     class CollectError(Exception):
         """An error during collection, shown without a traceback."""
+
+    def __init__(
+        self,
+        *,
+        name=None,
+        parent=None,
+        config=None,
+        path=None,
+        fspath=None,
+        nodeid=None,
+        session=None,
+        **kwargs,
+    ):
+        import pathlib
+
+        self.parent = parent
+        self.config = config if config is not None else getattr(parent, "config", None)
+        self.session = session if session is not None else getattr(parent, "session", None)
+        if path is None and fspath is not None:
+            path = pathlib.Path(str(fspath))
+        if path is None and parent is not None:
+            path = getattr(parent, "path", None)
+        self.path = pathlib.Path(str(path)) if path is not None else None
+        self.name = name if name is not None else (self.path.name if self.path is not None else "")
+        self.own_markers = []
+        self._nodeid = nodeid if nodeid is not None else self._compute_nodeid()
+
+    @classmethod
+    def from_parent(cls, parent, **kwargs):
+        """Construct a child node under `parent` (pytest's Node.from_parent)."""
+        return cls(parent=parent, **kwargs)
+
+    def _compute_nodeid(self):
+        parent_id = getattr(self.parent, "nodeid", None)
+        if isinstance(self, Item) and parent_id:
+            return f"{parent_id}::{self.name}"
+        if self.path is not None and self.config is not None:
+            import pathlib
+
+            root = getattr(self.config, "rootpath", None) or getattr(self.config, "rootdir", None)
+            if root is not None:
+                try:
+                    rel = pathlib.Path(self.path).resolve().relative_to(
+                        pathlib.Path(str(root)).resolve()
+                    )
+                    return str(rel).replace("\\", "/")
+                except ValueError:
+                    pass
+        return self.name
+
+    @property
+    def nodeid(self):
+        return self._nodeid
+
+    @nodeid.setter
+    def nodeid(self, value):
+        # Node/Function (engine nodes) subclass this and assign self.nodeid.
+        self._nodeid = value
+
+    @property
+    def fspath(self):
+        """Legacy py.path.local (node.fspath.mtime() etc.)."""
+        import py
+
+        return py.path.local(str(self.path))
+
+    @property
+    def ihook(self):
+        from pytest._pluginmanager import pluginmanager
+
+        return pluginmanager.hook
+
+    def add_marker(self, marker, append=True):
+        from pytest._marks import Mark, MarkDecorator
+
+        if isinstance(marker, str):
+            marker = Mark(marker)
+        elif isinstance(marker, MarkDecorator):
+            marker = marker.mark
+        if append:
+            self.own_markers.append(marker)
+        else:
+            self.own_markers.insert(0, marker)
+
+    def get_closest_marker(self, name, default=None):
+        for marker in self.own_markers:
+            if marker.name == name:
+                return marker
+        return default
+
+    def iter_markers(self, name=None):
+        for marker in self.own_markers:
+            if name is None or marker.name == name:
+                yield marker
+
+
+def run_custom_item(item):
+    """Run a custom collector Item (setup/runtest/teardown) and return a list
+    of (when, outcome, longrepr) tuples for the engine. Failures get their
+    longrepr from Item.repr_failure plus any pytest_exception_interact hook
+    (pytest-ruff sets the ruff error message there)."""
+    import traceback
+
+    from pytest._outcomes import Skipped
+
+    def _excinfo(exc):
+        class _ExcInfo:
+            def __init__(self):
+                self.value = exc
+                self.type = type(exc)
+                self.typename = type(exc).__name__
+
+            def exconly(self, tryshort=False):
+                return f"{type(exc).__name__}: {exc}"
+
+        return _ExcInfo()
+
+    def _failrepr(when, exc):
+        excinfo = _excinfo(exc)
+        try:
+            longrepr = item.repr_failure(excinfo)
+        except Exception:
+            longrepr = None
+        if not longrepr:
+            longrepr = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+        # pytest_exception_interact may replace report.longrepr.
+        report = type("_Report", (), {})()
+        report.when = when
+        report.nodeid = item.nodeid
+        report.outcome = "failed"
+        report.longrepr = longrepr
+        report.failed = True
+
+        class _Call:
+            def __init__(self):
+                self.when = when
+                self.excinfo = excinfo
+
+        try:
+            item.ihook.pytest_exception_interact(node=item, call=_Call(), report=report)
+        except Exception:
+            pass
+        return str(report.longrepr)
+
+    reports = []
+    try:
+        item.setup()
+    except Skipped as exc:
+        reports.append(("setup", "skipped", str(getattr(exc, "msg", exc) or exc)))
+        reports.append(("teardown", "passed", None))
+        return reports
+    except BaseException as exc:  # noqa: BLE001 - protocol boundary
+        reports.append(("setup", "failed", _failrepr("setup", exc)))
+        try:
+            item.teardown()
+            reports.append(("teardown", "passed", None))
+        except BaseException as texc:  # noqa: BLE001
+            reports.append(("teardown", "failed", _failrepr("teardown", texc)))
+        return reports
+
+    try:
+        item.runtest()
+        reports.append(("call", "passed", None))
+    except Skipped as exc:
+        reports.append(("call", "skipped", str(getattr(exc, "msg", exc) or exc)))
+    except BaseException as exc:  # noqa: BLE001
+        reports.append(("call", "failed", _failrepr("call", exc)))
+
+    try:
+        item.teardown()
+        reports.append(("teardown", "passed", None))
+    except BaseException as texc:  # noqa: BLE001
+        reports.append(("teardown", "failed", _failrepr("teardown", texc)))
+    return reports
 
 
 class Session(Collector):
@@ -39,12 +215,32 @@ class Session(Collector):
         """Signals an interrupted test run (upstream)."""
 
 
-class Item:
-    """Stub item base (annotations/isinstance upstream)."""
+class Item(Collector):
+    """Base test item for custom collectors. Subclasses override runtest()
+    (and optionally setup()/teardown()/repr_failure()/reportinfo())."""
+
+    def setup(self):
+        pass
+
+    def runtest(self):
+        raise NotImplementedError("custom Item must implement runtest()")
+
+    def teardown(self):
+        pass
+
+    def reportinfo(self):
+        return (self.path, None, "")
+
+    def repr_failure(self, excinfo, style=None):
+        """Failure text (subclasses may override); default is the exception."""
+        return str(getattr(excinfo, "value", excinfo))
 
 
-class File:
-    """Stub file collector base."""
+class File(Collector):
+    """Base file collector. Subclasses override collect() to yield Items."""
+
+    def collect(self):
+        return []
 
 
 class DoctestNode:

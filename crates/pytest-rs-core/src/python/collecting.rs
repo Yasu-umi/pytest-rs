@@ -106,6 +106,93 @@ pub fn async_flags(py: Python<'_>, func: &Bound<'_, PyAny>) -> PyResult<AsyncFla
 
 /// Import one test module and introspect it: append discovered test items
 /// and fixture definitions (objects carrying recorded shim metadata).
+/// Custom collectors: fire `pytest_collect_file(file_path, parent)` for each
+/// candidate file; a plugin (pytest-ruff/pytest-mypy) may return a
+/// `pytest.File` whose `.collect()` yields `pytest.Item`s. Each item becomes a
+/// TestItem whose `func` is the item object itself (run via item.runtest()).
+pub fn collect_custom_files(
+    py: Python<'_>,
+    rootdir: &Path,
+    files: &[PathBuf],
+    hooks: &[crate::session::PyHook],
+    items: &mut Vec<TestItem>,
+) -> PyResult<()> {
+    let hook_funcs: Vec<Py<PyAny>> = hooks
+        .iter()
+        .filter(|hook| hook.name == "pytest_collect_file")
+        .map(|hook| hook.func.clone_ref(py))
+        .collect();
+    if hook_funcs.is_empty() {
+        return Ok(());
+    }
+    let Some(config) = crate::python::proxies::CONFIG_PROXY.get().map(|c| c.bind(py)) else {
+        return Ok(());
+    };
+    let pathlib = py.import("pathlib")?.getattr("Path")?;
+    let collector_cls = py.import("pytest._node")?.getattr("Collector")?;
+    for file in files {
+        let file_path = pathlib.call1((file.to_string_lossy().as_ref(),))?;
+        let parent = collector_cls.call(
+            (),
+            Some(&{
+                let kw = pyo3::types::PyDict::new(py);
+                kw.set_item("config", &config)?;
+                kw.set_item("path", pathlib.call1((rootdir.to_string_lossy().as_ref(),))?)?;
+                kw.set_item("nodeid", "")?;
+                kw.set_item("name", "")?;
+                kw
+            }),
+        )?;
+        for func in &hook_funcs {
+            let collector = crate::python::call_py_hook(
+                py,
+                func,
+                &[
+                    ("file_path", file_path.clone().unbind().into_any()),
+                    ("path", file_path.clone().unbind().into_any()),
+                    ("parent", parent.clone().unbind().into_any()),
+                ],
+            )?;
+            let collector = collector.bind(py);
+            if collector.is_none() {
+                continue;
+            }
+            for item_obj in collector.call_method0("collect")?.try_iter()? {
+                let item_obj = item_obj?;
+                let nodeid: String = item_obj.getattr("nodeid")?.extract()?;
+                let name: String = item_obj.getattr("name")?.extract()?;
+                let mut marks = Vec::new();
+                if let Ok(own) = item_obj.getattr("own_markers") {
+                    for mark in own.try_iter()? {
+                        let mark = mark?;
+                        marks.push(MarkData {
+                            name: mark.getattr("name")?.extract()?,
+                            obj: mark.unbind(),
+                        });
+                    }
+                }
+                items.push(TestItem {
+                    nodeid,
+                    path: file.clone(),
+                    module_name: String::new(),
+                    func_name: name,
+                    func: item_obj.unbind(),
+                    cls: None,
+                    is_coroutine: false,
+                    is_doctest: false,
+                    fixture_names: Vec::new(),
+                    extra_fixture_names: Vec::new(),
+                    marks,
+                    callspec: Vec::new(),
+                    fixture_params: Vec::new(),
+                    lineno: 0,
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn collect_module(
     py: Python<'_>,
     rootdir: &Path,

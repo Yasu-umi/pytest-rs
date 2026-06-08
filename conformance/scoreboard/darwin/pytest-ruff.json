@@ -1,0 +1,17 @@
+{
+  "suite": "pytest-ruff",
+  "tag": "v0.5",
+  "category": "ecosystem",
+  "excluded_files": 0,
+  "files": [
+    {
+      "file": "tests/test_plugin.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    }
+  ]
+}

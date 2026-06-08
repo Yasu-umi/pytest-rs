@@ -161,8 +161,8 @@
       "file": "testing/test_junitxml.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 128,
-      "failed": 8,
+      "passed": 129,
+      "failed": 7,
       "skipped": 0,
       "errors": 1
     },
@@ -386,8 +386,8 @@
       "file": "testing/acceptance_test.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 23,
-      "failed": 57,
+      "passed": 24,
+      "failed": 56,
       "skipped": 2,
       "errors": 0
     },

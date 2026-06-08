@@ -6,10 +6,10 @@
   "files": [
     {
       "file": "tests/test_pytest_randomly.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 30,
-      "failed": 7,
+      "status": "error",
+      "exit_code": 3,
+      "passed": 0,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     }

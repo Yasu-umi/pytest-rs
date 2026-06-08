@@ -104,6 +104,16 @@ deps = [
 ]
 enabled = true
 
+[pytest-ruff]
+repo = "https://github.com/businho/pytest-ruff"
+tag = "v0.5"
+testpaths = ["tests"]
+# Custom collector (pytest_collect_file -> RuffFile/RuffItem). ruff provides
+# the binary, py backs node.fspath.mtime().
+deps = ["pytest-ruff==0.5", "ruff", "py"]
+pythonpath = ["."]
+enabled = true
+
 [pytest-subtests]
 repo = "https://github.com/pytest-dev/pytest-subtests"
 tag = "v0.14.2"

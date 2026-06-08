@@ -355,6 +355,58 @@ pub(crate) fn run_one(
     reports
 }
 
+/// Run a custom collector item (pytest.Item subclass) via the shim's
+/// run_custom_item, mapping its (when, outcome, longrepr) tuples to reports.
+fn run_custom_item(py: Python<'_>, config: &Config, item: &TestItem) -> Vec<TestReport> {
+    let started = Instant::now();
+    let result = py
+        .import("pytest._node")
+        .and_then(|m| m.getattr("run_custom_item"))
+        .and_then(|f| f.call1((item.func.bind(py),)));
+    let triples = match result {
+        Ok(r) => r,
+        Err(err) => {
+            return vec![report_from_err(py, config, item, Phase::Setup, started, &err)];
+        }
+    };
+    let mut reports = Vec::new();
+    let iter = match triples.try_iter() {
+        Ok(it) => it,
+        Err(err) => return vec![report_from_err(py, config, item, Phase::Setup, started, &err)],
+    };
+    for entry in iter {
+        let Ok(entry) = entry else { continue };
+        let (when, outcome, longrepr): (String, String, Option<String>) =
+            match entry.extract() {
+                Ok(t) => t,
+                Err(_) => continue,
+            };
+        let phase = match when.as_str() {
+            "setup" => Phase::Setup,
+            "teardown" => Phase::Teardown,
+            _ => Phase::Call,
+        };
+        let oc = match outcome.as_str() {
+            "passed" => Outcome::Passed,
+            "skipped" => Outcome::Skipped,
+            _ => Outcome::Failed,
+        };
+        let location = (oc == Outcome::Skipped).then(|| item.nodeid.clone());
+        reports.push(TestReport {
+            nodeid: item.nodeid.clone(),
+            phase,
+            outcome: oc,
+            duration: started.elapsed(),
+            longrepr,
+            location,
+            subtest_desc: None,
+            sections: Vec::new(),
+            rerun: false,
+        });
+    }
+    reports
+}
+
 pub(crate) fn run_one_body(
     py: Python<'_>,
     plugins: &[Box<dyn Plugin>],
@@ -362,6 +414,20 @@ pub(crate) fn run_one_body(
     config: &Config,
     item: &TestItem,
 ) -> Vec<TestReport> {
+    // Custom collector items (pytest-ruff/pytest-mypy): the func IS a
+    // pytest.Item with setup()/runtest()/teardown(); run that protocol with
+    // no fixtures instead of calling it as a test function. Detect precisely
+    // via isinstance(pytest.Item) — a hasattr("runtest") probe would also
+    // match Mocks and other auto-attr objects used as test funcs.
+    let is_custom_item = py
+        .import("pytest._node")
+        .and_then(|m| m.getattr("Item"))
+        .and_then(|cls| item.func.bind(py).is_instance(&cls))
+        .unwrap_or(false);
+    if is_custom_item {
+        return run_custom_item(py, config, item);
+    }
+
     let mut reports = Vec::new();
 
     // @pytest.mark.skip / @pytest.mark.skipif (mark-usage and condition
