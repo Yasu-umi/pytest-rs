@@ -207,11 +207,19 @@ def _crash_message(rep):
 
 def _get_raw_skip_reason(rep):
     """The reason suffix for verbose SKIPPED/XFAIL/XPASS words (upstream's
-    _get_raw_skip_reason, recovered from the shim's data)."""
-    wasxfail = getattr(rep, "wasxfail", None)
-    if wasxfail is not None and wasxfail:
-        return str(wasxfail)
-    reason = _crash_message(rep) or ""
+    _get_raw_skip_reason). xfail reports carry it on ``wasxfail`` (with a
+    "reason: " prefix); skipped reports carry it as the message third of the
+    longrepr tuple (with a "Skipped: " prefix)."""
+    if getattr(rep, "wasxfail", None) is not None:
+        reason = rep.wasxfail
+        if reason.startswith("reason: "):
+            reason = reason[len("reason: ") :]
+        return reason
+    longrepr = getattr(rep, "longrepr", None)
+    if isinstance(longrepr, tuple) and len(longrepr) == 3:
+        reason = longrepr[2]
+    else:
+        reason = _crash_message(rep) or ""
     if reason.startswith("Skipped: "):
         reason = reason[len("Skipped: ") :]
     elif reason == "Skipped":
@@ -1036,6 +1044,141 @@ class TerminalReporter:
             parts += [("%d %s" % pluralize(errors, "error"), {main_color: True})]  # noqa: UP031
 
         return parts, main_color
+
+
+_REPORTCHARS_DEFAULT = "fE"
+
+
+def getreportopt(config) -> str:
+    """The effective -r report chars, with aliases expanded (pytest's
+    getreportopt): a/A expand groups, N clears, F/S are old lowercase
+    aliases, and 'w' (warnings) is forced on unless --disable-warnings."""
+    reportchars: str = config.option.reportchars
+
+    old_aliases = {"F", "S"}
+    reportopts = ""
+    for char in reportchars:
+        if char in old_aliases:
+            char = char.lower()
+        if char == "a":
+            reportopts = "sxXEf"
+        elif char == "A":
+            reportopts = "PpsxXEf"
+        elif char == "N":
+            reportopts = ""
+        elif char not in reportopts:
+            reportopts += char
+
+    disable_warnings = getattr(config.option, "disable_warnings", False)
+    if not disable_warnings and "w" not in reportopts:
+        reportopts = "w" + reportopts
+    elif disable_warnings and "w" in reportopts:
+        reportopts = reportopts.replace("w", "")
+
+    return reportopts
+
+
+def _format_trimmed(format: str, msg: str, available_width: int):
+    """Format msg into format, ellipsizing it if it doesn't fit in
+    available_width (pytest's helper). Returns None if even the ellipsis
+    can't fit."""
+    from _pytest._io.wcwidth import wcswidth
+
+    # Only use the first line.
+    i = msg.find("\n")
+    if i != -1:
+        msg = msg[:i]
+
+    ellipsis = "..."
+    format_width = wcswidth(format.format(""))
+    if format_width + len(ellipsis) > available_width:
+        return None
+
+    if format_width + wcswidth(msg) > available_width:
+        available_width -= len(ellipsis)
+        msg = msg[:available_width]
+        while format_width + wcswidth(msg) > available_width:
+            msg = msg[:-1]
+        msg += ellipsis
+
+    return format.format(msg)
+
+
+def _get_node_id_with_markup(tw, config, rep):
+    nodeid = config.cwd_relative_nodeid(rep.nodeid)
+    path, *parts = nodeid.split("::")
+    if parts:
+        parts_markup = tw.markup("::".join(parts), bold=True)
+        return path + "::" + parts_markup
+    else:
+        return path
+
+
+def _get_line_with_reprcrash_message(config, rep, tw, word_markup):
+    """Summary line for a report, trying to append the reprcrash message
+    (trimmed to the terminal width unless on CI / -vv)."""
+    from _pytest._io.wcwidth import wcswidth
+    from _pytest.compat import running_on_ci
+
+    verbose_word, verbose_markup = rep._get_verbose_word_with_markup(config, word_markup)
+    word = tw.markup(verbose_word, **verbose_markup)
+    node = _get_node_id_with_markup(tw, config, rep)
+
+    line = f"{word} {node}"
+    line_width = wcswidth(line)
+
+    try:
+        if isinstance(rep.longrepr, str):
+            msg = rep.longrepr
+        else:
+            msg = rep.longrepr.reprcrash.message
+    except AttributeError:
+        pass
+    else:
+        if (running_on_ci() or getattr(config.option, "verbose", 0) >= 2) and not getattr(
+            config.option, "force_short_summary", False
+        ):
+            msg = f" - {msg}"
+        else:
+            available_width = tw.fullwidth - line_width
+            msg = _format_trimmed(" - {}", msg, available_width)
+        if msg is not None:
+            line += msg
+
+    return line
+
+
+def _bestrelpath(directory, dest):
+    """A relative path from directory to dest, or str(dest) when none exists
+    (mixed absolute/relative or different drives) — pytest's bestrelpath."""
+    if dest == directory:
+        return os.curdir
+    try:
+        return os.path.relpath(dest, directory)
+    except ValueError:
+        return str(dest)
+
+
+def _folded_skips(startpath, skipped):
+    """Group skip reports by (fspath, lineno, reason) so the short summary
+    can fold duplicates into "SKIPPED [N] fspath:lineno: reason"."""
+    d: dict = {}
+    for event in skipped:
+        assert event.longrepr is not None
+        assert isinstance(event.longrepr, tuple), (event, event.longrepr)
+        assert len(event.longrepr) == 3, (event, event.longrepr)
+        fspath, lineno, reason = event.longrepr
+        fspath = _bestrelpath(startpath, Path(fspath))
+        keywords = getattr(event, "keywords", {})
+        if event.when == "setup" and "skip" in keywords and "pytestmark" not in keywords:
+            key = (fspath, None, reason)
+        else:
+            key = (fspath, lineno, reason)
+        d.setdefault(key, []).append(event)
+    values = []
+    for key, events in d.items():
+        values.append((len(events), *key))
+    return values
 
 
 from _pytest._stub import __getattr__  # noqa: E402, F401
