@@ -184,6 +184,11 @@ impl Engine {
     /// error, plus "ERROR at setup/teardown of <test>" banners for
     /// fixture/teardown failures (pytest groups all of these together).
     pub(crate) fn print_collect_errors(&self) {
+        // --tb=no suppresses the traceback sections entirely (pytest's
+        // summary_errors guards on tbstyle != "no").
+        if self.config.get_value("tb") == Some("no") {
+            return;
+        }
         let phase_errors: Vec<_> = self
             .session
             .reports
@@ -228,7 +233,13 @@ impl Engine {
                 center_with(&format!("ERROR at {when} of {name}"), '_')
             );
             if report.longrepr.is_some() {
-                println!("{}", Self::render_longrepr(report));
+                println!(
+                    "{}",
+                    Self::render_longrepr(
+                        report,
+                        self.config.get_value("show-capture").unwrap_or("all")
+                    )
+                );
             }
         }
     }
@@ -257,9 +268,25 @@ impl Engine {
     /// A failing report's terminal text: the longrepr followed by its
     /// "Captured stdout/stderr/log {when}" sections (kept separate on the
     /// report so junitxml can read them structured).
-    pub(crate) fn render_longrepr(report: &crate::report::TestReport) -> String {
+    pub(crate) fn render_longrepr(
+        report: &crate::report::TestReport,
+        show_capture: &str,
+    ) -> String {
         let mut text = report.longrepr.clone().unwrap_or_default();
         for (title, body) in &report.sections {
+            // --show-capture filters which "Captured <stream> <when>" sections
+            // appear on a failure (no/stdout/stderr/log/all); other sections
+            // (e.g. -rA PASSES output) are always shown.
+            if let Some(stream) = title.strip_prefix("Captured ") {
+                let shown = match show_capture {
+                    "no" => false,
+                    "all" => true,
+                    want => stream.starts_with(want),
+                };
+                if !shown {
+                    continue;
+                }
+            }
             text.push_str(&format!(
                 "\n{:-^80}\n{}",
                 format!(" {title} "),
@@ -288,6 +315,11 @@ impl Engine {
     }
 
     pub(crate) fn print_failures(&self) {
+        // --tb=no suppresses the FAILURES section (pytest's summary_failures
+        // guards on tbstyle != "no").
+        if self.config.get_value("tb") == Some("no") {
+            return;
+        }
         let failures: Vec<_> = self
             .session
             .reports
@@ -317,7 +349,13 @@ impl Engine {
                 println!("[gw{worker}] {suffix}");
             }
             if report.longrepr.is_some() {
-                println!("{}", Self::render_longrepr(report));
+                println!(
+                    "{}",
+                    Self::render_longrepr(
+                        report,
+                        self.config.get_value("show-capture").unwrap_or("all")
+                    )
+                );
             }
         }
     }
@@ -562,8 +600,22 @@ impl Engine {
             return Ok(());
         }
         let config_proxy = python::make_py_config(py, &self.config)?;
+        // pytest passes start_path (the rootdir) to report-header hooks that
+        // declare it (kwarg-filtered by the callable's signature).
+        let start_path = py
+            .import("pathlib")?
+            .getattr("Path")?
+            .call1((self.config.rootdir.to_string_lossy().as_ref(),))?
+            .unbind();
         for func in &hook_funcs {
-            let result = python::call_py_hook(py, func, &[("config", config_proxy.clone_ref(py))])?;
+            let result = python::call_py_hook(
+                py,
+                func,
+                &[
+                    ("config", config_proxy.clone_ref(py)),
+                    ("start_path", start_path.clone_ref(py)),
+                ],
+            )?;
             let result = result.bind(py);
             if result.is_none() {
                 continue;

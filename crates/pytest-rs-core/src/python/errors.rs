@@ -25,6 +25,12 @@ pub fn map_skiptest(py: Python<'_>, err: PyErr) -> PyErr {
     }
 }
 
+/// Whether the error is an ImportError (ModuleNotFoundError included): a
+/// test module that fails to import gets pytest's wrapped CollectError.
+pub fn is_import_error(py: Python<'_>, err: &PyErr) -> bool {
+    err.is_instance_of::<pyo3::exceptions::PyImportError>(py)
+}
+
 /// Format a PyErr as a native-style traceback string.
 pub fn format_exception(py: Python<'_>, err: &PyErr) -> String {
     let result: PyResult<String> = (|| {

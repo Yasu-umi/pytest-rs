@@ -606,6 +606,16 @@ impl Engine {
         if let Some(msg) = &self.session.shouldfail {
             println!("{}", center_with(msg, '!'));
         }
+        // A test/plugin set session.shouldstop with a reason: pytest banners
+        // it after the failure summary (the INTERRUPTED-exit case shows it via
+        // the interrupt report instead; --stepwise drives its own banner).
+        if !self.config.get_flag("sw")
+            && !self.config.get_flag("sw-skip")
+            && self.session.abort_banner.is_none()
+            && let Some(reason) = python::session_shouldstop(py)
+        {
+            println!("{}", center_with(&reason, '!'));
+        }
         let warning_count = python::warning_count(py) + self.session.worker_warning_count;
         println!(
             "\n{}",
@@ -843,6 +853,13 @@ impl Engine {
             self.session.custom_reporter = Some(reporter);
             self.config.set_reporter_delegated();
         }
+        // pytest_sessionstart python hooks fire before the header, like
+        // upstream (the terminal's own sessionstart, which prints the header,
+        // runs last under pluggy LIFO). A conftest sessionstart may stash
+        // state the pytest_report_header hooks read back (e.g. config._x).
+        if let Err(err) = self.fire_py_sessionstart(py) {
+            errors.push((rootdir.clone(), python::format_exception(py, &err)));
+        }
         // The session header: the replacement reporter's pytest_sessionstart
         // owns it in delegated mode (upstream prints it from that hook);
         // otherwise the native header plus pytest_report_header lines
@@ -854,11 +871,6 @@ impl Engine {
             if let Err(err) = self.print_py_report_header(py) {
                 errors.push((rootdir.clone(), python::format_exception(py, &err)));
             }
-        }
-        // pytest_sessionstart python hooks fire before collection, like
-        // upstream (the native-plugin pass fired before the header).
-        if let Err(err) = self.fire_py_sessionstart(py) {
-            errors.push((rootdir.clone(), python::format_exception(py, &err)));
         }
         // --markers: list registered markers (configure hooks above already
         // ran their addinivalue_line("markers", ...)) and skip collection.
@@ -961,6 +973,20 @@ impl Engine {
                             match python::collect_error_message(py, &err) {
                                 Some(message) => {
                                     errors.push((file.clone(), with_sections(message)))
+                                }
+                                None if python::is_import_error(py, &err) => {
+                                    // A test module that fails to import gets
+                                    // pytest's wrapped CollectError header
+                                    // (importtestmodule), with a short-style
+                                    // traceback.
+                                    let tb = python::format_test_failure(py, &err, "short");
+                                    let message = format!(
+                                        "ImportError while importing test module '{}'.\n\
+                                         Hint: make sure your test modules/packages have valid Python names.\n\
+                                         Traceback:\n{tb}",
+                                        file.display()
+                                    );
+                                    errors.push((file.clone(), with_sections(message)));
                                 }
                                 None => errors.push((
                                     file.clone(),

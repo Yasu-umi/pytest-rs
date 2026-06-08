@@ -506,7 +506,7 @@ impl Config {
             "traceconfig",     // accepted-but-inert: plugin trace header not implemented
             "keep-duplicates", // collect the same file once per duplicated arg
         ];
-        const CORE_VALUES: [(&str, Option<char>); 41] = [
+        const CORE_VALUES: [(&str, Option<char>); 42] = [
             ("confcutdir", None),
             ("deselect", None),
             ("log-level", None),
@@ -537,6 +537,7 @@ impl Config {
             ("basetemp", None),
             ("import-mode", None),
             ("capture", None),
+            ("show-capture", None), // which captured sections to show on failure
             ("doctest-glob", None),
             ("doctest-report", None),
             ("ignore", None),             // paths pruned from collection

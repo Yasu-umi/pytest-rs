@@ -518,4 +518,18 @@ impl PyRequest {
         crate::python::existing_py_config(py)
             .ok_or_else(|| pyo3::exceptions::PyAttributeError::new_err("config"))
     }
+
+    /// The test session proxy (pytest's `request.session`), exposing the
+    /// `shouldstop`/`shouldfail` setters and `config` (a test setting
+    /// `request.session.shouldstop = "..."` aborts and banners the reason).
+    #[getter]
+    fn session(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let config = crate::python::existing_py_config(py)
+            .ok_or_else(|| pyo3::exceptions::PyAttributeError::new_err("session"))?;
+        Ok(py
+            .import("pytest._node")?
+            .getattr("_NodeSession")?
+            .call1((config,))?
+            .unbind())
+    }
 }

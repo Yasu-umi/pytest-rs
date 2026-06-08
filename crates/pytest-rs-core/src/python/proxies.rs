@@ -215,6 +215,16 @@ pub fn set_session_shouldfail(py: Python<'_>, message: &str) {
         .and_then(|m| m.call_method1("set_session_shouldfail", (message,)));
 }
 
+/// A reason a test/plugin set on `session.shouldstop` (pytest banners it at
+/// the end of the run with `! <reason> !`).
+pub fn session_shouldstop(py: Python<'_>) -> Option<String> {
+    py.import("pytest._node")
+        .and_then(|m| m.call_method0("session_shouldstop"))
+        .ok()?
+        .extract()
+        .ok()?
+}
+
 /// Publish a truthy session.shouldstop (--stepwise).
 pub fn set_session_shouldstop(py: Python<'_>, message: &str) {
     let _ = py

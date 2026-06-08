@@ -185,8 +185,10 @@ def format_exception(exc, style="long"):
     if style == "no":
         return ""
     # pytest.fail(..., pytrace=False): no traceback, message only (with the
-    # original exception's text when raised from an except block).
-    if not getattr(exc, "pytrace", True):
+    # original exception's text when raised from an except block). --tb=line
+    # still renders the one-line "path:lineno: Type: msg" form, so it falls
+    # through to the line logic below.
+    if not getattr(exc, "pytrace", True) and style != "line":
         parts = []
         context = exc.__context__
         if context is not None and not exc.__suppress_context__:

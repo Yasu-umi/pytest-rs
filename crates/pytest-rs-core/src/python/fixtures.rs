@@ -233,7 +233,8 @@ pub(crate) fn register_fixture_def(
     };
     let scope_str: String = scope_str;
     let scope = Scope::parse(&scope_str).unwrap_or(Scope::Function);
-    let autouse: bool = marker.getattr("autouse")?.extract()?;
+    // autouse is used for its truthiness (pytest accepts e.g. autouse="True").
+    let autouse: bool = marker.getattr("autouse")?.is_truthy()?;
     let explicit_name: Option<String> = marker.getattr("name")?.extract()?;
     let name = explicit_name.unwrap_or_else(|| attr_name.to_string());
     let flags = async_flags(py, value)?;
