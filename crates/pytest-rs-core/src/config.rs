@@ -7,13 +7,27 @@ use std::path::{Path, PathBuf};
 /// directory becomes the rootdir.
 fn find_ini(start: &Path) -> (PathBuf, Option<String>, HashMap<String, String>) {
     for dir in start.ancestors() {
-        let pytest_ini = dir.join("pytest.ini");
-        if pytest_ini.exists()
-            && let Ok(content) = std::fs::read_to_string(&pytest_ini)
-        {
-            // pytest.ini counts as config even with an empty/missing section.
-            let values = parse_ini_section(&content, "pytest").unwrap_or_default();
-            return (dir.to_path_buf(), Some("pytest.ini".to_string()), values);
+        // pytest.toml / .pytest.toml use a top-level [pytest] table and are
+        // always the source of configuration, even if empty (pytest 9).
+        for name in ["pytest.toml", ".pytest.toml"] {
+            let p = dir.join(name);
+            if p.exists()
+                && let Ok(content) = std::fs::read_to_string(&p)
+            {
+                let values = parse_toml_pytest(&content).unwrap_or_default();
+                return (dir.to_path_buf(), Some(name.to_string()), values);
+            }
+        }
+        // pytest.ini / .pytest.ini count as config even with an empty or
+        // missing [pytest] section.
+        for name in ["pytest.ini", ".pytest.ini"] {
+            let p = dir.join(name);
+            if p.exists()
+                && let Ok(content) = std::fs::read_to_string(&p)
+            {
+                let values = parse_ini_section(&content, "pytest").unwrap_or_default();
+                return (dir.to_path_buf(), Some(name.to_string()), values);
+            }
         }
         let pyproject = dir.join("pyproject.toml");
         if pyproject.exists()
@@ -100,6 +114,21 @@ fn parse_pyproject(content: &str) -> Option<HashMap<String, String>> {
     } else {
         tool_pytest.get("ini_options")?.as_table()?.iter().collect()
     };
+    Some(render_toml_entries(entries))
+}
+
+/// pytest config from a standalone pytest.toml / .pytest.toml: a top-level
+/// `[pytest]` table (pytest 9 toml mode). Returns None when no `[pytest]`
+/// table is present (the caller still treats the file as config, just empty).
+fn parse_toml_pytest(content: &str) -> Option<HashMap<String, String>> {
+    let document: toml::Table = content.parse().ok()?;
+    let pytest = document.get("pytest")?.as_table()?;
+    Some(render_toml_entries(pytest.iter().collect()))
+}
+
+/// Render TOML pytest entries into the engine's stringified ini form: scalar
+/// values become their string, arrays become newline-joined linelists.
+fn render_toml_entries(entries: Vec<(&String, &toml::Value)>) -> HashMap<String, String> {
     let mut values = HashMap::new();
     for (key, value) in entries {
         let rendered = match value {
@@ -116,7 +145,7 @@ fn parse_pyproject(content: &str) -> Option<HashMap<String, String>> {
         };
         values.insert(key.clone(), rendered);
     }
-    Some(values)
+    values
 }
 
 /// A CLI option contributed by the core or a plugin.

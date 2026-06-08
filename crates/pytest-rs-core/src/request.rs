@@ -146,6 +146,61 @@ impl PyConfig {
         self.getoption(py, name, default)
     }
 
+    /// `config.getvalueorskip(name)`: the option's value, or skip the test if
+    /// it is unset/None (pytest's getoption(..., skip=True)).
+    fn getvalueorskip(&self, py: Python<'_>, name: &str) -> PyResult<Py<PyAny>> {
+        let attr = name.trim_start_matches('-').replace('-', "_");
+        if let Ok(v) = self.option.bind(py).getattr(attr.as_str())
+            && !v.is_none()
+        {
+            return Ok(v.unbind());
+        }
+        let (registered, value): (bool, Py<PyAny>) = py
+            .import("pytest._parser")?
+            .call_method1("option_lookup", (attr.as_str(),))?
+            .extract()?;
+        if registered && !value.bind(py).is_none() {
+            return Ok(value);
+        }
+        py.import("pytest")?
+            .getattr("skip")?
+            .call1((format!("no {attr:?} option found"),))?;
+        Ok(py.None())
+    }
+
+    /// `config.get_verbosity(type)`: the level for a fine-grained verbosity
+    /// type, or the global verbose level when the type is unknown/unset.
+    #[pyo3(signature = (verbosity_type = None))]
+    fn get_verbosity(
+        &self,
+        py: Python<'_>,
+        verbosity_type: Option<String>,
+    ) -> PyResult<Py<PyAny>> {
+        let global_level = self.option.bind(py).getattr("verbose")?.unbind();
+        let Some(vt) = verbosity_type else {
+            return Ok(global_level);
+        };
+        let ini_name = format!("verbosity_{vt}");
+        // The verbosity ini must be registered (a plugin's addini); otherwise
+        // fall back to the global level (upstream's `_parser._inidict` check).
+        let registered = py
+            .import("pytest._parser")?
+            .getattr("ini_specs")?
+            .contains(ini_name.as_str())?;
+        if !registered {
+            return Ok(global_level);
+        }
+        let level = self.getini(py, &ini_name)?;
+        if level.bind(py).extract::<String>().ok().as_deref() == Some("auto") {
+            return Ok(global_level);
+        }
+        Ok(py
+            .import("builtins")?
+            .getattr("int")?
+            .call1((level.bind(py),))?
+            .unbind())
+    }
+
     /// xdist parity: present (with the worker id) only in -n workers, so
     /// `hasattr(config, "workerinput")` detects worker processes. Custom
     /// entries set by controller-side pytest_configure_node hooks arrive
