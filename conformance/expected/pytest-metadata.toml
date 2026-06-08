@@ -1,0 +1,15 @@
+# Upstream pytest-metadata tests that must keep passing under pytest-rs.
+#
+# tests (~6/10): pytest-metadata's pytest_addhooks/pytest_metadata hook,
+# session metadata fixture and report header run under pytest-rs. The
+# apply_cli_args parser now handles action="append" and nargs=N options.
+
+[files]
+
+[excluded]
+# (partial — tracked by the scoreboard)
+
+# Known remaining gaps (all use `--metadata key value`):
+#   nargs=2 plugin options can't be parsed — pytest-rs parses the CLI in Rust
+#   before plugins register their option arities, so the second value token is
+#   taken as a positional test path. Architectural (CLI parse split).

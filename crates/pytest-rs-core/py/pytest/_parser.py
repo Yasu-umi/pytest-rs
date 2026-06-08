@@ -42,6 +42,7 @@ class OptionGroup:
             "default": default,
             "type": attrs.get("type"),
             "action": attrs.get("action"),
+            "nargs": attrs.get("nargs"),
         }
         for opt in opts:
             if opt.startswith("--"):
@@ -329,13 +330,37 @@ def apply_cli_args(namespace: Any, tokens: list[str]) -> list[str]:
         if spec["action"] in ("store_true", "store_false"):
             setattr(namespace, dest, spec["action"] == "store_true")
             continue
-        if not eq:
-            if index < len(tokens) and not tokens[index].startswith("--"):
-                value = tokens[index]
+        convert = spec["type"]
+        cast = (lambda v: convert(v)) if callable(convert) else (lambda v: v)
+        nargs = spec.get("nargs")
+        # nargs=N consumes N value tokens (pytest-metadata's `--metadata k v`).
+        if isinstance(nargs, int) and nargs > 1:
+            collected = []
+            if eq:
+                collected.append(value)
+            while len(collected) < nargs and index < len(tokens):
+                collected.append(tokens[index])
                 index += 1
-            else:
+            if len(collected) < nargs:
                 unknown.append(token)
                 continue
-        convert = spec["type"]
-        setattr(namespace, dest, convert(value) if callable(convert) else value)
+            converted = [cast(v) for v in collected]
+        else:
+            if not eq:
+                if index < len(tokens) and not tokens[index].startswith("--"):
+                    value = tokens[index]
+                    index += 1
+                else:
+                    unknown.append(token)
+                    continue
+            converted = cast(value)
+        # action="append" accumulates into a list (default []).
+        if spec["action"] == "append":
+            existing = getattr(namespace, dest, None)
+            if not isinstance(existing, list):
+                existing = list(spec["default"] or [])
+            existing.append(converted)
+            setattr(namespace, dest, existing)
+        else:
+            setattr(namespace, dest, converted)
     return unknown
