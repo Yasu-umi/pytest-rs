@@ -33,6 +33,10 @@ impl Engine {
 
         let items = std::mem::take(&mut session.items);
         let total = items.len().max(1);
+        // Per-test progress display level (pytest's VERBOSITY_TEST_CASES):
+        // >=1 → a line per test, ==0 → chars grouped under a file header,
+        // <0 → bare chars with no file header.
+        let tc = config.test_case_verbosity();
         let mut done = 0usize;
         let mut prev_module: Option<String> = None;
         let mut prev_class: Option<String> = None;
@@ -74,11 +78,7 @@ impl Engine {
                 ) {
                     fire_logreport_hooks(py, session, &report, None);
                     failed += 1;
-                    if !config.no_terminal()
-                        && !config.quiet
-                        && config.verbose == 0
-                        && !session.live_logging
-                        && !current_file.is_empty()
+                    if !config.no_terminal() && tc <= 0 && !session.live_logging && !line.is_empty()
                     {
                         print!("E");
                         let _ = std::io::stdout().flush();
@@ -123,12 +123,7 @@ impl Engine {
                 .split_once("::")
                 .map(|(f, _)| f.to_string())
                 .unwrap_or_else(|| item.nodeid.clone());
-            if config.verbose == 0
-                && !config.quiet
-                && !config.no_terminal()
-                && !session.live_logging
-                && file != current_file
-            {
+            if tc == 0 && !config.no_terminal() && !session.live_logging && file != current_file {
                 if !current_file.is_empty() {
                     println!(
                         "{}",
@@ -178,7 +173,7 @@ impl Engine {
                 }
                 if config.no_terminal() {
                     // -p no:terminal: no progress output at all.
-                } else if config.verbose > 0 {
+                } else if tc >= 1 {
                     if report.phase == Phase::Call || report.outcome != Outcome::Passed {
                         let word = outcome_word(&report);
                         let plain = format!("{} {}", item.nodeid, word);
@@ -204,7 +199,7 @@ impl Engine {
                 } else if i < session.streamed_chars {
                     // --setup-show already streamed this report's char
                     // (between the item line and the TEARDOWN narration).
-                } else if !config.quiet
+                } else if tc <= 0
                     && let Some(c) = report.progress_char()
                 {
                     print!(
@@ -255,11 +250,10 @@ impl Engine {
         if let Some(last) = items.last() {
             report_scope_teardown!(Scope::Session, "", last);
         }
-        if config.verbose == 0
-            && !config.quiet
+        if tc <= 0
             && !config.no_terminal()
             && !session.live_logging
-            && !current_file.is_empty()
+            && !line.is_empty()
             && (!setup_show_active(config) || any_char)
         {
             println!(

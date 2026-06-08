@@ -106,10 +106,17 @@ pub(crate) fn term_width() -> usize {
 /// line of `body`'s width (the body itself streamed char by char).
 pub(crate) fn progress_suffix(body: &str, done: usize, total: usize, color: u8) -> String {
     let pct = format!("[{:>3}%]", done * 100 / total);
-    let pad = term_width().saturating_sub(body.chars().count() + pct.len());
+    // pytest right-justifies the percentage to fullwidth - 1, leaving one
+    // trailing column, so the whole progress line is one char short of the
+    // terminal width.
+    let pad = term_width()
+        .saturating_sub(1)
+        .saturating_sub(body.chars().count() + pct.len());
     let suffix = if pad > 0 {
         format!("{}{pct}", " ".repeat(pad))
     } else {
+        // pytest's progress message keeps its single leading space when it
+        // overflows the line (the space is part of " [ 33%]", not padding).
         format!(" {pct}")
     };
     crate::tw::markup(&suffix, &[color])
@@ -118,7 +125,9 @@ pub(crate) fn progress_suffix(body: &str, done: usize, total: usize, color: u8) 
 /// "body        [ 33%]" — the percentage right-aligned at the terminal edge.
 pub(crate) fn with_progress(body: &str, done: usize, total: usize) -> String {
     let pct = format!("[{:>3}%]", done * 100 / total);
-    let pad = term_width().saturating_sub(body.chars().count() + pct.len());
+    let pad = term_width()
+        .saturating_sub(1)
+        .saturating_sub(body.chars().count() + pct.len());
     if pad > 0 {
         format!("{body}{}{pct}", " ".repeat(pad))
     } else {

@@ -433,7 +433,12 @@ impl Engine {
             {
                 println!("{line}");
             }
-            println!();
+            // The blank line separating collection from the run is omitted
+            // at negative test-case verbosity (the progress chars group
+            // directly under "collected N items"); --collect-only keeps it.
+            if self.config.collect_only || self.config.test_case_verbosity() >= 0 {
+                println!();
+            }
         }
 
         if self.config.collect_only {
@@ -441,8 +446,12 @@ impl Engine {
             // mode: upstream reporter plugins inherit it from the base
             // class rather than reimplementing it.
             if !self.config.no_terminal_explicit() {
-                if self.config.quiet_level >= 2 {
-                    // -qq: per-file counts ("test_x.py: 3").
+                // pytest's _printcollecteditems keys the layout on the
+                // test-case verbosity: < -1 → per-file counts, == -1 →
+                // bare nodeids, >= 0 → the node tree (docstrings at >= 1).
+                let tc = self.config.test_case_verbosity();
+                if tc < -1 {
+                    // -qq / verbosity_test_cases<-1: per-file counts.
                     let mut counts: Vec<(String, usize)> = Vec::new();
                     for item in &self.session.items {
                         let file = item.nodeid.split("::").next().unwrap_or("").to_string();
@@ -454,12 +463,12 @@ impl Engine {
                     for (file, count) in counts {
                         println!("{file}: {count}");
                     }
-                } else if self.config.quiet {
+                } else if tc == -1 {
                     for item in &self.session.items {
                         println!("{}", item.nodeid);
                     }
                 } else {
-                    self.print_collect_tree();
+                    self.print_collect_tree(py, tc >= 1);
                 }
                 if self.session.custom_reporter.is_some() {
                     // The closing stats line is the replacement reporter's

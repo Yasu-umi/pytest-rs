@@ -9,7 +9,17 @@ use crate::report::{Outcome, Phase};
 impl Engine {
     /// The --collect-only hierarchy: <Dir>/<Package>/<Module>/<Class>/
     /// <Function> nodes, two-space indent per level.
-    pub(crate) fn print_collect_tree(&self) {
+    /// `inspect.getdoc(obj)` split into lines (cleaned/dedented), or empty.
+    fn obj_doc_lines(py: Python<'_>, obj: &Py<PyAny>) -> Vec<String> {
+        py.import("inspect")
+            .and_then(|inspect| inspect.call_method1("getdoc", (obj.bind(py),)))
+            .ok()
+            .and_then(|doc| doc.extract::<String>().ok())
+            .map(|doc| doc.lines().map(str::to_string).collect())
+            .unwrap_or_default()
+    }
+
+    pub(crate) fn print_collect_tree(&self, py: Python<'_>, show_docstrings: bool) {
         if self.session.items.is_empty() {
             return;
         }
@@ -55,8 +65,27 @@ impl Engine {
                 .zip(labels.iter())
                 .take_while(|(open_label, label)| open_label == label)
                 .count();
+            let last = labels.len() - 1;
             for (depth, label) in labels.iter().enumerate().skip(shared) {
-                println!("{}{label}", "  ".repeat(depth + 1));
+                let indent = "  ".repeat(depth + 1);
+                println!("{indent}{label}");
+                // pytest prints each node's docstring (verbosity >= 1) on
+                // the following lines, indented one level deeper. We have
+                // the obj for the function (last label) and its class.
+                if show_docstrings {
+                    let obj = if depth == last {
+                        Some(&item.func)
+                    } else if label.starts_with("<Class ") {
+                        item.cls.as_ref()
+                    } else {
+                        None
+                    };
+                    if let Some(obj) = obj {
+                        for doc_line in Self::obj_doc_lines(py, obj) {
+                            println!("{indent}  {doc_line}");
+                        }
+                    }
+                }
             }
             open = labels;
         }

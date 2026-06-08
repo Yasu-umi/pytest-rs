@@ -144,7 +144,10 @@ pub fn prepare_config(py: Python<'_>, args: Vec<String>) -> PyResult<Py<PyAny>> 
     match crate::config::Config::from_args(parser, argv) {
         Ok(config) => build_py_config(py, &config, true),
         Err(message) => {
-            let exc = py.import("pytest")?.getattr("UsageError")?.call1((message,))?;
+            let exc = py
+                .import("pytest")?
+                .getattr("UsageError")?
+                .call1((message,))?;
             Err(PyErr::from_value(exc))
         }
     }

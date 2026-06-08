@@ -431,6 +431,15 @@ impl Config {
                     .action(clap::ArgAction::Count),
             )
             .arg(
+                // pytest's --verbosity=N sets the global verbose level
+                // directly (may be negative, so allow a leading hyphen).
+                clap::Arg::new("verbosity")
+                    .long("verbosity")
+                    .value_name("VERBOSE")
+                    .allow_hyphen_values(true)
+                    .num_args(1),
+            )
+            .arg(
                 clap::Arg::new("exitfirst")
                     .short('x')
                     .long("exitfirst")
@@ -789,14 +798,26 @@ impl Config {
             }
         }
 
+        // pytest's -v/-q and --verbosity=N all write the same signed
+        // `option.verbose`. We keep verbose (level up) and quiet_level
+        // (level down) split; --verbosity=N sets the level directly.
+        let (verbose, quiet_level) = match matches
+            .get_one::<String>("verbosity")
+            .and_then(|v| v.trim().parse::<i32>().ok())
+        {
+            Some(level) if level >= 0 => (level as u8, 0),
+            Some(level) => (0, (-level) as u8),
+            None => (matches.get_count("verbose"), matches.get_count("quiet")),
+        };
+
         Ok(Self {
             paths: matches
                 .get_many::<String>("paths")
                 .map(|vals| vals.cloned().collect())
                 .unwrap_or_default(),
-            verbose: matches.get_count("verbose"),
-            quiet: matches.get_count("quiet") > 0,
-            quiet_level: matches.get_count("quiet"),
+            verbose,
+            quiet: quiet_level > 0,
+            quiet_level,
             exitfirst: matches.get_flag("exitfirst"),
             collect_only: matches.get_flag("collect-only"),
             rootdir,
@@ -815,6 +836,32 @@ impl Config {
             plugin_args,
             reporter_delegated: std::sync::atomic::AtomicBool::new(false),
         })
+    }
+
+    /// The signed global verbosity level (pytest's `option.verbose`): -v
+    /// raises it, -q lowers it, --verbosity=N sets it directly.
+    pub fn global_verbosity(&self) -> i32 {
+        self.verbose as i32 - self.quiet_level as i32
+    }
+
+    /// The verbosity for a fine-grained type (pytest's `get_verbosity`):
+    /// the `verbosity_<type>` ini if set to an int, else the global level.
+    /// The ini's "auto" default defers to the global level.
+    fn verbosity_for(&self, ini_name: &str) -> i32 {
+        match self.get_ini(ini_name) {
+            Some(value) if value.trim() != "auto" => value
+                .trim()
+                .parse()
+                .unwrap_or_else(|_| self.global_verbosity()),
+            _ => self.global_verbosity(),
+        }
+    }
+
+    /// Verbosity governing per-test progress display (pytest's
+    /// VERBOSITY_TEST_CASES): >=1 shows a line per test, 0 groups chars by
+    /// file, <0 shows bare chars.
+    pub fn test_case_verbosity(&self) -> i32 {
+        self.verbosity_for("verbosity_test_cases")
     }
 
     /// An ini-style option: -o overrides win over config file values.

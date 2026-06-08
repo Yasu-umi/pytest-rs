@@ -195,11 +195,7 @@ impl PyConfig {
     /// `config.get_verbosity(type)`: the level for a fine-grained verbosity
     /// type, or the global verbose level when the type is unknown/unset.
     #[pyo3(signature = (verbosity_type = None))]
-    fn get_verbosity(
-        &self,
-        py: Python<'_>,
-        verbosity_type: Option<String>,
-    ) -> PyResult<Py<PyAny>> {
+    fn get_verbosity(&self, py: Python<'_>, verbosity_type: Option<String>) -> PyResult<Py<PyAny>> {
         let global_level = self.option.bind(py).getattr("verbose")?.unbind();
         let Some(vt) = verbosity_type else {
             return Ok(global_level);
@@ -278,7 +274,10 @@ impl PyConfig {
     #[getter]
     fn inipath<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         match &self.inipath {
-            Some(path) => py.import("pathlib")?.getattr("Path")?.call1((path.as_str(),)),
+            Some(path) => py
+                .import("pathlib")?
+                .getattr("Path")?
+                .call1((path.as_str(),)),
             None => Ok(py.None().into_bound(py)),
         }
     }

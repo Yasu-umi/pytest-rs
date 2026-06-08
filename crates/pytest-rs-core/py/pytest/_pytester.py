@@ -76,19 +76,40 @@ class LineMatcher:
             if line == pattern or fnmatch.fnmatch(line, pattern):
                 fail(f"no_fnmatch_line: unexpectedly matched {pattern!r}: {line!r}")
 
-    def re_match_lines(self, patterns):
+    def re_match_lines(self, patterns, *, consecutive=False):
         __tracebackhide__ = True
         import re
 
         patterns = self._pattern_lines(patterns)
+
+        def matches(line, pattern):
+            return re.match(pattern, line) is not None
+
+        if consecutive:
+            for start in range(len(self.lines)):
+                window = self.lines[start : start + len(patterns)]
+                if len(window) == len(patterns) and all(
+                    matches(line, pattern) for line, pattern in zip(window, patterns)
+                ):
+                    return
+            fail(f"re_match_lines: no consecutive match for {patterns!r} in:\n{self}")
         remaining = list(self.lines)
         for pattern in patterns:
             for index, line in enumerate(remaining):
-                if re.match(pattern, line):
+                if matches(line, pattern):
                     remaining = remaining[index + 1 :]
                     break
             else:
                 fail(f"re_match_lines: no line matches {pattern!r} in:\n{self}")
+
+    def re_match_lines_random(self, patterns):
+        __tracebackhide__ = True
+        import re
+
+        patterns = self._pattern_lines(patterns)
+        for pattern in patterns:
+            if not any(re.match(pattern, line) for line in self.lines):
+                fail(f"re_match_lines_random: no line matches {pattern!r} in:\n{self}")
 
     def no_re_match_line(self, pattern):
         __tracebackhide__ = True
