@@ -481,6 +481,13 @@ pub fn set_tb_color(py: Python<'_>, on: bool) {
         .and_then(|m| m.call_method1("set_color", (on,)));
 }
 
+/// -l / --showlocals: render frame locals in tracebacks.
+pub fn set_showlocals(py: Python<'_>, on: bool) {
+    let _ = py
+        .import("pytest._tb")
+        .and_then(|m| m.call_method1("set_showlocals", (on,)));
+}
+
 /// PYTEST_THEME / PYTEST_THEME_MODE validation (color mode only): the
 /// pytest startup error message, or None.
 pub fn invalid_theme_message(py: Python<'_>) -> Option<String> {

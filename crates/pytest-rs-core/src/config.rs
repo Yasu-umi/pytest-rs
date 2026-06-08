@@ -483,8 +483,9 @@ impl Config {
         // Core pytest options parsed into flags/values (queried via
         // get_flag/get_value); some are still inert and gain behavior as
         // features land.
-        const CORE_FLAGS: [&str; 21] = [
-            "markers", // list registered markers (ini + plugin-registered) and exit
+        const CORE_FLAGS: [&str; 22] = [
+            "no-showlocals", // overrides an addopts --showlocals / -l
+            "markers",       // list registered markers (ini + plugin-registered) and exit
             "strict-config",
             "strict-markers",
             "strict",
@@ -583,6 +584,14 @@ impl Config {
         cmd = cmd.arg(
             clap::Arg::new("capture-disable")
                 .short('s')
+                .action(clap::ArgAction::SetTrue)
+                .hide(true),
+        );
+        // -l / --showlocals: show local variables in tracebacks.
+        cmd = cmd.arg(
+            clap::Arg::new("showlocals")
+                .short('l')
+                .long("showlocals")
                 .action(clap::ArgAction::SetTrue)
                 .hide(true),
         );
@@ -743,6 +752,7 @@ impl Config {
         }
         for flag in CORE_FLAGS.into_iter().chain([
             "capture-disable",
+            "showlocals",
             "lf",
             "ff",
             "nf",

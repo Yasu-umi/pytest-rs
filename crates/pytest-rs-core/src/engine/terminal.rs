@@ -646,4 +646,59 @@ impl Engine {
         }
         Ok(())
     }
+
+    /// pytest_report_collectionfinish py hooks: each returns a str or list
+    /// of str, printed right after the "collected N items" line (the hook
+    /// receives config, start_path and the collected item nodes).
+    pub(crate) fn print_py_report_collectionfinish(&self, py: Python<'_>) -> PyResult<()> {
+        if self.config.quiet || self.config.no_terminal() {
+            return Ok(());
+        }
+        let hook_funcs: Vec<Py<pyo3::PyAny>> = self
+            .session
+            .py_hooks
+            .iter()
+            .filter(|hook| hook.name == "pytest_report_collectionfinish")
+            .map(|hook| hook.func.clone_ref(py))
+            .collect();
+        if hook_funcs.is_empty() {
+            return Ok(());
+        }
+        let config_proxy = python::make_py_config(py, &self.config)?;
+        let start_path = py
+            .import("pathlib")?
+            .getattr("Path")?
+            .call1((self.config.rootdir.to_string_lossy().as_ref(),))?
+            .unbind();
+        let items = pyo3::types::PyList::empty(py);
+        for item in &self.session.items {
+            items.append(python::make_node(py, item)?)?;
+        }
+        let items: Py<pyo3::PyAny> = items.into_any().unbind();
+        for func in &hook_funcs {
+            let result = python::call_py_hook(
+                py,
+                func,
+                &[
+                    ("config", config_proxy.clone_ref(py)),
+                    ("start_path", start_path.clone_ref(py)),
+                    ("items", items.clone_ref(py)),
+                ],
+            )?;
+            let result = result.bind(py);
+            if result.is_none() {
+                continue;
+            }
+            let lines: Vec<String> = match result.extract::<String>() {
+                Ok(line) => vec![line],
+                Err(_) => result.extract().unwrap_or_default(),
+            };
+            for block in lines {
+                for line in block.split('\n') {
+                    println!("{line}");
+                }
+            }
+        }
+        Ok(())
+    }
 }

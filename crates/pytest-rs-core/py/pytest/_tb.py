@@ -19,6 +19,31 @@ def set_color(on):
     _color = on
 
 
+# Set by the engine for -l / --showlocals: render each frame's locals.
+_showlocals = False
+
+
+def set_showlocals(on):
+    global _showlocals
+    _showlocals = on
+
+
+def _format_locals(frame, indent):
+    """pytest's repr_locals: "<name:<10> = <saferepr>" per local, sorted,
+    skipping assertion-rewrite temporaries (names starting with "@")."""
+    if not _showlocals:
+        return []
+    from _pytest._io.saferepr import saferepr
+
+    lines = []
+    for name in sorted(k for k in frame.f_locals if not k.startswith("@")):
+        if name == "__builtins__":
+            lines.append(f"{indent}__builtins__ = <builtins>")
+            continue
+        lines.append(f"{indent}{name:<10} = {saferepr(frame.f_locals[name])}")
+    return lines
+
+
 def _markup(text, *codes):
     if not _color:
         return text
@@ -227,10 +252,14 @@ def format_exception(exc, style="long"):
 
     lines = []
     if style == "short":
-        for frame, lineno in frames:
+        for index, (frame, lineno) in enumerate(frames):
             lines.extend(_format_short_frame(frame, lineno))
-        for entry in _exception_lines(exc):
-            lines.append(_markup(f"E   {entry}", 1, 31))
+            # The last frame carries the E lines; locals (-l) follow each
+            # frame, indented under it.
+            if index == len(frames) - 1:
+                for entry in _exception_lines(exc):
+                    lines.append(_markup(f"E   {entry}", 1, 31))
+            lines.extend(_format_locals(frame, " " * 8))
         return "\n".join(lines)
 
     # long (default): every frame shows its full source block with the
@@ -245,6 +274,12 @@ def format_exception(exc, style="long"):
             e_prefix = "E" + " " * (3 + fail_indent)
             for entry in _exception_lines(exc):
                 lines.append(_markup(f"{e_prefix}{entry}", 1, 31))
+        # -l / --showlocals: the frame's locals between the source/E block
+        # and the "file:line:" location, each on its own line at column 0.
+        local_lines = _format_locals(frame, "")
+        if local_lines:
+            lines.append("")
+            lines.extend(local_lines)
         lines.append("")
         suffix = type(exc).__name__ if last else ""
         lines.append(_location_line(frame.f_code, lineno, suffix))

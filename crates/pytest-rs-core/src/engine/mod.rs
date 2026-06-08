@@ -128,6 +128,11 @@ impl Engine {
         }
         crate::tw::set_enabled(crate::tw::should_colorize(color_option));
         python::set_tb_color(py, crate::tw::enabled());
+        // -l / --showlocals, unless a later --no-showlocals overrides it.
+        python::set_showlocals(
+            py,
+            self.config.get_flag("showlocals") && !self.config.get_flag("no-showlocals"),
+        );
         if let Some(message) = python::invalid_theme_message(py) {
             eprintln!("ERROR: {message}");
             return exit_code::USAGE_ERROR;
@@ -433,6 +438,9 @@ impl Engine {
                 .and_then(|cache| cache.status_line(&self.config))
             {
                 println!("{line}");
+            }
+            if let Err(err) = self.print_py_report_collectionfinish(py) {
+                eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
             }
             // The blank line separating collection from the run is omitted
             // at negative test-case verbosity (the progress chars group
