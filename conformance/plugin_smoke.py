@@ -115,7 +115,20 @@ def check_reporter_diff(
 ) -> list[str]:
     """pytest-rs vs real pytest on the mixed-outcome demo: normalized
     output and exit code must match exactly."""
-    args = ["test_outcomes.py", "-p", "no:randomly", *extra_args]
+    # This gate isolates the reporter under test (sugar/pretty); other
+    # autoloaded plugins add environment-dependent output (e.g.
+    # inline-snapshot prints a "CI run detected" banner when $CI is set,
+    # and run-parallel a collection line), so disable them on both sides.
+    args = [
+        "test_outcomes.py",
+        "-p",
+        "no:randomly",
+        "-p",
+        "no:inline_snapshot",
+        "-p",
+        "no:run_parallel",
+        *extra_args,
+    ]
     rs_code, rs_out = run([str(BINARY), *args], workdir, env)
     py_code, py_out = run([sys.executable, "-m", "pytest", *args], workdir, env)
     errors = []
