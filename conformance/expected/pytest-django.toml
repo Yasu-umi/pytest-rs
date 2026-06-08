@@ -1,6 +1,6 @@
 # Upstream pytest-django tests that must keep passing under pytest-rs.
 #
-# tests (~143/216): pytest-django sets Django up in pytest_load_initial_conftests
+# tests (~146/216): pytest-django sets Django up in pytest_load_initial_conftests
 # (Parser.parse_known_args + pytest.Config now exist) and its fixtures run once
 # session-scoped autouse fixtures are ordered before function ones (so
 # django_test_environment installs mail.outbox before _dj_autoclear_mailbox).

@@ -17,10 +17,10 @@
       "file": "tests/test_database.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 55,
+      "passed": 56,
       "failed": 5,
       "skipped": 0,
-      "errors": 1
+      "errors": 0
     },
     {
       "file": "tests/test_db_access_in_repr.py",

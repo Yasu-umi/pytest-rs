@@ -401,13 +401,13 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pytest-instafail | v0.5.0 | 45 | 18 | 0 | 0 | 63 | 71.4% | 0 | 1 | 0 |
 | pytest-env | 1.6.0 | 66 | 9 | 0 | 0 | 75 | 88.0% | 2 | 3 | 0 |
 | pytest-rerunfailures | 9.1.1 | 35 | 12 | 0 | 1 | 48 | 72.9% | 0 | 1 | 0 |
-| pytest-randomly | 4.1.0 | 30 | 7 | 0 | 0 | 37 | 81.1% | 0 | 1 | 0 |
+| pytest-randomly | 4.1.0 | 31 | 6 | 0 | 0 | 37 | 83.8% | 0 | 1 | 0 |
 | click | 8.3.1 | 1313 | 0 | 0 | 22 | 1335 | 98.4% | 20 | 20 | 0 |
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
 | rich | v14.2.0 | 855 | 0 | 0 | 25 | 880 | 97.2% | 60 | 62 | 0 |
 | pytest-bdd | 8.1.0 | 36 | 102 | 0 | 1 | 139 | 25.9% | 5 | 35 | 0 |
-| pytest-django | v4.9.0 | 145 | 64 | 6 | 1 | 216 | 67.1% | 2 | 13 | 0 |
+| pytest-django | v4.9.0 | 146 | 64 | 5 | 1 | 216 | 67.6% | 2 | 13 | 0 |
 
 ### pytest @ 9.0.3
 
@@ -753,7 +753,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| tests/test_pytest_randomly.py | failed | 30 | 7 | 0 | 0 |
+| tests/test_pytest_randomly.py | failed | 31 | 6 | 0 | 0 |
 
 </details>
 
@@ -960,7 +960,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
 | tests/test_asserts.py | passed | 2 | 0 | 0 | 0 |
-| tests/test_database.py | failed | 55 | 5 | 1 | 0 |
+| tests/test_database.py | failed | 56 | 5 | 0 | 0 |
 | tests/test_db_access_in_repr.py | failed | 0 | 1 | 0 | 0 |
 | tests/test_db_setup.py | failed | 0 | 14 | 0 | 0 |
 | tests/test_django_configurations.py | no-tests | 0 | 0 | 0 | 1 |

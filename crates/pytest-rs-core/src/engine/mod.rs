@@ -1220,6 +1220,25 @@ impl Engine {
             Err(err) => return Err(python::format_exception(py, &err)),
         }
 
+        // request.fixturenames must list the item's whole fixture closure
+        // (transitive deps + autouse), not just its direct params — plugins
+        // probe it (pytest-django: "transactional_db" in request.fixturenames,
+        // pulled in transitively by django_db_reset_sequences). Record the
+        // closure-only names as extra fixturenames (display only; the fixtures
+        // themselves resolve through the dependency chain).
+        for item in &mut self.session.items {
+            let mut direct: Vec<String> = item.fixture_names.clone();
+            direct.extend(item.extra_fixture_names.iter().cloned());
+            let closure = self.session.registry.closure_for(&item.nodeid, &direct);
+            for def in closure {
+                if !item.fixture_names.contains(&def.name)
+                    && !item.extra_fixture_names.contains(&def.name)
+                {
+                    item.extra_fixture_names.push(def.name.clone());
+                }
+            }
+        }
+
         // Node-id args ("file.py::TestCls::test_a") restrict collection to
         // matching items; unlike -k/-m this is not a deselection.
         enum ArgSel {
