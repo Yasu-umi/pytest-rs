@@ -104,6 +104,15 @@ deps = [
 ]
 enabled = true
 
+[pytest-snapshot]
+repo = "https://github.com/joseph-roitman/pytest-snapshot"
+tag = "v0.9.0"
+testpaths = ["tests"]
+# `py` backs the plugin's node.fspath.dirpath() snapshot-dir resolution.
+deps = ["pytest-snapshot==0.9.0", "py"]
+pythonpath = ["."]
+enabled = true
+
 [pytest-icdiff]
 repo = "https://github.com/hjwp/pytest-icdiff"
 tag = "0.5"

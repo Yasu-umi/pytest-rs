@@ -92,6 +92,9 @@ pub(crate) fn outcome_word(report: &TestReport) -> String {
     } else {
         match report.outcome {
             Outcome::Passed => "PASSED".to_string(),
+            // setup/teardown failures are "ERROR", not "FAILED" (pytest's
+            // report_teststatus: errors are non-call-phase failures).
+            Outcome::Failed if report.phase != Phase::Call => "ERROR".to_string(),
             Outcome::Failed => "FAILED".to_string(),
             Outcome::Skipped => reasoned("SKIPPED"),
             Outcome::XFailed => reasoned("XFAIL"),

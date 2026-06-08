@@ -314,8 +314,8 @@
       "file": "testing/test_stepwise.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 6,
-      "failed": 12,
+      "passed": 7,
+      "failed": 11,
       "skipped": 0,
       "errors": 0
     },
@@ -332,8 +332,8 @@
       "file": "testing/test_terminal.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 175,
-      "failed": 40,
+      "passed": 176,
+      "failed": 39,
       "skipped": 2,
       "errors": 10
     },

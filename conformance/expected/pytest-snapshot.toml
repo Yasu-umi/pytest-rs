@@ -1,0 +1,16 @@
+# Upstream pytest-snapshot tests that must keep passing under pytest-rs.
+#
+# tests (~100/107): the snapshot fixture works once node.fspath (legacy
+# py.path.local) is exposed and setup/teardown failures render as "ERROR"
+# (not "FAILED") in verbose output, matching pytest's report_teststatus.
+# config.option.assertmode is also provided for the suite's runpytest helper.
+
+[files]
+
+[excluded]
+# (partial — tracked by the scoreboard)
+
+# Known remaining gaps:
+#   assert-match failure/unsupported-value diff message formatting,
+#   dir-comparison failure format, --help plugin-group rendering, and the
+#   parametrize id in a nested run's verbose line.

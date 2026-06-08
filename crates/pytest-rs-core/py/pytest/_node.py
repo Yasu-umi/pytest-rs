@@ -71,6 +71,14 @@ class DoctestNode:
         self.cls = None
 
     @property
+    def fspath(self):
+        """Legacy py.path.local of this node's file (upstream Node.fspath);
+        some plugins still use node.fspath.dirpath()."""
+        import py
+
+        return py.path.local(self.path)
+
+    @property
     def ihook(self):
         """The shim pluginmanager's hook relay (upstream: the node's
         fspath-sensitive HookProxy)."""
@@ -279,6 +287,14 @@ class Node(Item):
         """item.session shim: enough for plugins reaching
         item.session.config (e.g. pytest-timeout's session deadline)."""
         return _NodeSession(getattr(self, "config", None))
+
+    @property
+    def fspath(self):
+        """Legacy py.path.local of this node's file (upstream Node.fspath);
+        some plugins still use node.fspath.dirpath()."""
+        import py
+
+        return py.path.local(self.path)
 
     @property
     def ihook(self):
