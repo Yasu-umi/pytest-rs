@@ -369,7 +369,11 @@ impl Engine {
         let mut extras: Vec<(String, String)> = Vec::new();
         let show_progress =
             !self.config.quiet && !self.config.no_terminal() && self.config.verbose == 0;
+        // The console_output_style progress field (percent/count/times/none)
+        // shown after the chars and on each -v line.
+        let pkind = self.config.progress_kind();
         let mut printed = 0usize;
+        let mut total_dur = std::time::Duration::ZERO;
         // Outcome lines printed so far (the -v progress percentage).
         let mut verbose_done = 0usize;
         // -x/--maxfail across all workers: stop dispatching once reached
@@ -400,13 +404,26 @@ impl Engine {
                             // (loadgroup nodeids display as "nodeid@group").
                             verbose_done += 1;
                             let total = self.session.items.len().max(1);
-                            let pct = (verbose_done * 100 / total).min(100);
+                            let msg = crate::runner::progress_message(
+                                pkind,
+                                verbose_done.min(total),
+                                total,
+                                report.duration,
+                            );
                             let display = match nodeid_groups.get(&report.nodeid) {
                                 Some(group) => format!("{}@{group}", report.nodeid),
                                 None => report.nodeid.clone(),
                             };
                             println!("{display} ");
-                            println!("[gw{worker}] [{pct:>3}%] {word} {display}");
+                            // xdist verbose: "[gwN] <progress> WORD nodeid "
+                            // (pytest writes the progress message + a space,
+                            // then the word and the locationline, which itself
+                            // ends with a trailing space).
+                            if msg.is_empty() {
+                                println!("[gw{worker}] {word} {display} ");
+                            } else {
+                                println!("[gw{worker}] {msg} {word} {display} ");
+                            }
                         }
                     } else if show_progress && let Some(c) = report.progress_char() {
                         print!("{c}");
@@ -417,6 +434,9 @@ impl Engine {
                             line_open = false;
                         }
                         let _ = std::io::stdout().flush();
+                    }
+                    if report.phase == Phase::Call {
+                        total_dur += report.duration;
                     }
                     if report.outcome == Outcome::Failed {
                         // The failure repr's "[gw0] darwin -- Python ..." line.
@@ -470,7 +490,17 @@ impl Engine {
             }
         }
         if line_open {
-            println!();
+            // Close the progress char line with the right-aligned progress
+            // field (pytest's end-of-loop "[100%]" / "[20/20]" / duration).
+            let total = self.session.items.len().max(1);
+            let msg = crate::runner::progress_message(pkind, total, total, total_dur);
+            let color = if failed > 0 {
+                crate::tw::RED
+            } else {
+                crate::tw::GREEN
+            };
+            let body = " ".repeat(printed % 80);
+            println!("{}", crate::runner::progress_suffix(&body, &msg, color));
         }
         for handle in handles {
             let _ = handle.join();

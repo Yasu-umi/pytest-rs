@@ -332,8 +332,8 @@
       "file": "testing/test_terminal.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 148,
-      "failed": 67,
+      "passed": 153,
+      "failed": 62,
       "skipped": 2,
       "errors": 10
     },
