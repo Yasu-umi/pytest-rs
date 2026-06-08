@@ -102,6 +102,68 @@ _LINELIST_INIS = {
 }
 
 
+#: The ini options pytest's core and builtin plugins register (name -> type).
+#: Consulted only in strict mode (parseconfig-built configs) so getini can
+#: tell a genuinely-unknown key from a core one the Rust engine owns.
+_CORE_INI_TYPES: dict[str, str | None] = {
+    "addopts": "args",
+    "cache_dir": None,
+    "collect_imported_tests": "bool",
+    "consider_namespace_packages": "bool",
+    "console_output_style": None,
+    "disable_test_id_escaping_and_forfeit_all_rights_to_community_support": "bool",
+    "doctest_encoding": None,
+    "doctest_optionflags": "args",
+    "empty_parameter_set_mark": None,
+    "enable_assertion_pass_hook": "bool",
+    "faulthandler_exit_on_timeout": "bool",
+    "faulthandler_timeout": None,
+    "filterwarnings": "linelist",
+    "junit_duration_report": None,
+    "junit_family": None,
+    "junit_log_passing_tests": "bool",
+    "junit_logging": None,
+    "junit_suite_name": None,
+    "log_auto_indent": None,
+    "log_cli": "bool",
+    "log_cli_date_format": None,
+    "log_cli_format": None,
+    "log_cli_level": None,
+    "log_date_format": None,
+    "log_file": None,
+    "log_file_date_format": None,
+    "log_file_format": None,
+    "log_file_level": None,
+    "log_file_mode": None,
+    "log_format": None,
+    "log_level": None,
+    "markers": "linelist",
+    "minversion": None,
+    "norecursedirs": "args",
+    "python_classes": "args",
+    "python_files": "args",
+    "python_functions": "args",
+    "pythonpath": "paths",
+    "pytester_example_dir": None,
+    "required_plugins": "args",
+    "strict": "bool",
+    "strict_config": "bool",
+    "strict_markers": "bool",
+    "strict_parametrization_ids": "bool",
+    "strict_xfail": "bool",
+    "testpaths": "args",
+    "tmp_path_retention_count": "string",
+    "tmp_path_retention_policy": "string",
+    "truncation_limit_chars": None,
+    "truncation_limit_lines": None,
+    "usefixtures": "args",
+    "verbosity_assertions": "string",
+    "verbosity_subtests": "string",
+    "verbosity_test_cases": "string",
+    "xfail_strict": "bool",
+}
+
+
 def _empty_for_type(type_: str | None) -> Any:
     """The default getini value for a registered ini with no value and no
     explicit default (pytest's per-type empty)."""
@@ -146,22 +208,29 @@ def _coerce_ini(type_: str | None, value: Any, rootpath: str | None) -> Any:
     return value
 
 
-def getini(name: str, inicfg: dict[str, str], rootpath: str | None) -> Any:
+def getini(name: str, inicfg: dict[str, str], rootpath: str | None, strict: bool = False) -> Any:
     """config.getini(name): the typed, alias-resolved ini value. Registered
-    options (parser.addini) supply type conversion and defaults; unregistered
-    names fall back to the lenient core behavior (a linelist for known core
-    inis, else the raw string or None)."""
+    options (parser.addini) supply type conversion and defaults.
+
+    In strict mode (parseconfig-built configs) an unregistered, non-core key
+    raises ValueError, matching upstream. The session config stays lenient —
+    the Rust engine owns the core inis and never registers them here, so
+    raising would regress its own getini calls."""
     canonical = ini_aliases.get(name, name)
     spec = ini_specs.get(canonical)
     if spec is None:
-        # Unregistered: lenient fallback (strict ValueError is upstream's
-        # behavior but would regress core inis the engine never registers).
-        raw = inicfg.get(name)
-        if raw is None:
-            return [] if name in _LINELIST_INIS else None
-        if name in _LINELIST_INIS:
-            return [line.strip() for line in raw.splitlines() if line.strip()]
-        return raw
+        if strict:
+            if canonical not in _CORE_INI_TYPES:
+                raise ValueError(f"unknown configuration value: {name!r}")
+            spec = {"type": _CORE_INI_TYPES[canonical], "default": _UNSET, "aliases": ()}
+        else:
+            # Unregistered: lenient fallback.
+            raw = inicfg.get(name)
+            if raw is None:
+                return [] if name in _LINELIST_INIS else None
+            if name in _LINELIST_INIS:
+                return [line.strip() for line in raw.splitlines() if line.strip()]
+            return raw
     type_ = spec["type"]
     # Value precedence: canonical name first, then any alias.
     value = inicfg.get(canonical)

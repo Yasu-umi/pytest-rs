@@ -21,6 +21,10 @@ pub struct PyConfig {
     /// the testpaths ini), or "invocation_dir" (the default).
     args_source: String,
     ini: Mutex<HashMap<String, String>>,
+    /// Strict getini: an unregistered, non-core ini key raises ValueError
+    /// (upstream behavior). Only parseconfig-built configs are strict; the
+    /// session config stays lenient since the engine owns the core inis.
+    strict: bool,
     /// The argparse-namespace equivalent (`config.option`), mutable from
     /// Python so conftest hooks can stash flags on it.
     #[pyo3(get)]
@@ -39,6 +43,7 @@ impl PyConfig {
         args_source: String,
         ini: HashMap<String, String>,
         option: Py<PyAny>,
+        strict: bool,
     ) -> Self {
         Self {
             rootdir,
@@ -46,6 +51,7 @@ impl PyConfig {
             args,
             args_source,
             ini: Mutex::new(ini),
+            strict,
             option,
             stash: pyo3::sync::PyOnceLock::new(),
         }
@@ -98,7 +104,7 @@ impl PyConfig {
         }
         Ok(py
             .import("pytest._parser")?
-            .call_method1("getini", (name, inicfg, self.rootdir.as_str()))?
+            .call_method1("getini", (name, inicfg, self.rootdir.as_str(), self.strict))?
             .unbind())
     }
 
