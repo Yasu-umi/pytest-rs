@@ -130,6 +130,11 @@ fn build_py_config(
         ),
     )?
     .into_any();
+    // config.known_args_namespace: pytest's parsed argparse namespace, an
+    // alias of config.option (pytest-env reads it for its verbose flag).
+    let bound = proxy.bind(py);
+    let opt = bound.getattr("option")?;
+    bound.setattr("known_args_namespace", opt)?;
     Ok(proxy)
 }
 
@@ -227,6 +232,24 @@ pub fn make_node(py: Python<'_>, item: &TestItem) -> PyResult<Py<PyAny>> {
         .map(|(_, rest)| rest.replace("::", "."))
         .unwrap_or_default();
     node.setattr("location", (file, item.lineno.saturating_sub(1), domain))?;
+    // node.callspec for parametrized items: params dict + the "[a-1]" id from
+    // the nodeid (pytest-env's tests read request.node.callspec.id).
+    if !item.callspec.is_empty() {
+        let params = pyo3::types::PyDict::new(py);
+        for (name, value) in &item.callspec {
+            params.set_item(name, value.bind(py))?;
+        }
+        let id = item
+            .nodeid
+            .rsplit_once('[')
+            .map(|(_, rest)| rest.trim_end_matches(']'))
+            .unwrap_or_default();
+        let callspec = py
+            .import("pytest._node")?
+            .getattr("_CallSpec")?
+            .call1((params, id))?;
+        node.setattr("callspec", callspec)?;
+    }
     Ok(node.unbind())
 }
 

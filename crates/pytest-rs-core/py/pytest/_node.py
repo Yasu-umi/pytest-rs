@@ -169,6 +169,15 @@ def session_obj_overrides():
     ]
 
 
+class _CallSpec:
+    """item.callspec for parametrized items: the param values and the id (the
+    "[a-1]" bracket of the nodeid). pytest's CallSpec2 subset plugins read."""
+
+    def __init__(self, params, id):
+        self.params = params
+        self.id = id
+
+
 class _SetupState:
     """Stand-in for pytest's SetupState (item.session._setupstate): a mutable
     stack of collectors. pytest-rs runs each item afresh, so it stays empty."""

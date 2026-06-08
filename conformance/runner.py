@@ -61,6 +61,10 @@ class Suite:
         self.testpaths = config["testpaths"]
         self.enabled = config.get("enabled", False)
         self.local = config.get("local")
+        # Some src-layout packages generate their version module at build time
+        # (absent from a git checkout); use_src = false skips the checkout's
+        # src/ shadow so the installed dist (with the generated file) is used.
+        self.use_src = config.get("use_src", True)
         self.deps: list[str] = config.get("deps", [])
         self.exclude: list[str] = config.get("exclude", [])
         # Node ids never run (flaky under load; they would destabilize the
@@ -125,6 +129,8 @@ class Suite:
 
     def _detect_src(self) -> None:
         """src-layout checkouts import the package from src/."""
+        if not self.use_src:
+            return
         src = self.checkout / "src"
         if src.is_dir():
             self.src_dir = src

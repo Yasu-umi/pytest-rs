@@ -723,14 +723,23 @@ impl Engine {
         )?;
 
         // -p NAME (non-"no:") plugins import before conftests, like
-        // pytest's cmdline plugin loading.
-        let named_plugins: Vec<String> = self
+        // pytest's cmdline plugin loading. PYTEST_PLUGINS (comma-separated
+        // module names) loads the same way — pytest's env-driven early
+        // plugins, used when PYTEST_DISABLE_PLUGIN_AUTOLOAD is set.
+        let mut named_plugins: Vec<String> = self
             .config
             .plugin_opts
             .iter()
             .filter(|spec| !spec.starts_with("no:"))
             .cloned()
             .collect();
+        if let Ok(env_plugins) = std::env::var("PYTEST_PLUGINS") {
+            for name in env_plugins.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+                if !named_plugins.iter().any(|n| n == name) {
+                    named_plugins.push(name.to_string());
+                }
+            }
+        }
         if !named_plugins.is_empty()
             && let Err(err) = python::load_named_plugins(
                 py,
@@ -873,6 +882,11 @@ impl Engine {
                     );
                 }
             }
+        }
+        // pytest_load_initial_conftests (pytest-env sets os.environ here),
+        // after option specs are registered so getini resolves, before configure.
+        if let Err(err) = self.fire_py_load_initial_conftests(py) {
+            errors.push((rootdir.clone(), python::format_exception(py, &err)));
         }
         // The default 'terminalreporter' plugin registers before configure
         // so reporter-replacing plugins (pytest-sugar/pretty) find it.

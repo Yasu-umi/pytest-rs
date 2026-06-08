@@ -1,10 +1,19 @@
 """pytester: run pytest-rs as a child process so upstream test suites can
 exercise the runner itself."""
 
+import os as _os
 import re as _re
 
 from pytest._fixtures import fixture
 from pytest._outcomes import fail
+
+# Captured before any test mutates os.environ: tests sometimes
+# mock.patch.dict(os.environ, ..., clear=True) around runpytest(), which would
+# otherwise strip the runner path and the import path the subprocess pytester
+# needs (in-process pytester upstream shares sys.modules/sys.path, so a cleared
+# env still finds installed plugins; we approximate that by remembering both).
+_RUNNER_EXE = _os.environ.get("PYTEST_RS_EXE")
+_RUNNER_PYTHONPATH = _os.environ.get("PYTHONPATH")
 
 _OUTCOME_RE = _re.compile(
     r"(\d+) (passed|failed|skipped|xfailed|xpassed|errors?|warnings?|deselected|rerun)"
@@ -185,6 +194,15 @@ class Pytester:
         self._name = request_name
         self._request = request
         self._syspaths = []
+        # Capture the runner path now (fixture setup, before a test body can
+        # mock.patch.dict(os.environ, clear=True) around runpytest). The
+        # module-level import runs too early — pytest imports this before the
+        # engine sets PYTEST_RS_EXE.
+        global _RUNNER_EXE, _RUNNER_PYTHONPATH
+        if _RUNNER_EXE is None:
+            _RUNNER_EXE = _os.environ.get("PYTEST_RS_EXE")
+        if _RUNNER_PYTHONPATH is None:
+            _RUNNER_PYTHONPATH = _os.environ.get("PYTHONPATH")
 
     def _makefile(self, ext, args, kwargs):
         items = list(kwargs.items())
@@ -266,12 +284,15 @@ class Pytester:
             ]
             forwarded_filters = list(reversed(marks))  # farthest first
 
-        exe = os.environ.get("PYTEST_RS_EXE")
+        exe = os.environ.get("PYTEST_RS_EXE") or _RUNNER_EXE
         if exe is None:
             fail("PYTEST_RS_EXE is not set; pytester cannot run the runner")
         env = os.environ.copy()
-        if self._syspaths:
-            existing = env.get("PYTHONPATH")
+        # Keep installed plugins importable even when the test cleared the
+        # environment (upstream's in-process pytester shares the parent's
+        # sys.path); fall back to the PYTHONPATH captured at fixture setup.
+        existing = env.get("PYTHONPATH") or _RUNNER_PYTHONPATH
+        if self._syspaths or existing:
             entries = [*self._syspaths, *([existing] if existing else [])]
             env["PYTHONPATH"] = os.pathsep.join(entries)
         # Upstream pytester parity: nested runs get a numbered --basetemp

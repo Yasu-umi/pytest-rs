@@ -202,6 +202,39 @@ impl Engine {
         Ok(())
     }
 
+    /// pytest_load_initial_conftests(early_config, parser, args): pytest's
+    /// early hook, after option specs are registered (so getini works) and
+    /// before configure. pytest-env reads getini("env") here to set os.environ.
+    pub(crate) fn fire_py_load_initial_conftests(&mut self, py: Python<'_>) -> PyResult<()> {
+        let hook_funcs: Vec<Py<pyo3::PyAny>> = self
+            .session
+            .py_hooks
+            .iter()
+            .filter(|hook| hook.name == "pytest_load_initial_conftests")
+            .map(|hook| hook.func.clone_ref(py))
+            .collect();
+        if hook_funcs.is_empty() {
+            return Ok(());
+        }
+        let early_config = python::make_py_config(py, &self.config)?;
+        let parser = py.import("pytest._parser")?.getattr("parser")?.unbind();
+        let args = pyo3::types::PyList::new(py, &self.config.paths)?
+            .into_any()
+            .unbind();
+        for func in &hook_funcs {
+            python::call_py_hook(
+                py,
+                func,
+                &[
+                    ("early_config", early_config.clone_ref(py)),
+                    ("parser", parser.clone_ref(py)),
+                    ("args", args.clone_ref(py)),
+                ],
+            )?;
+        }
+        Ok(())
+    }
+
     /// Deferred `--flag[=value]` tokens (unknown to clap) resolve against
     /// the python-plugin option specs onto config.option; unregistered
     /// leftovers usage-error like pytest's "unrecognized arguments".

@@ -1,0 +1,23 @@
+# Upstream pytest-env tests that must keep passing under pytest-rs.
+#
+# tests (~66/75): pytest-env's pytest_load_initial_conftests hook now fires
+# (after option specs register, before configure) so it reads getini("env")
+# and sets os.environ. Required supporting pieces: PYTEST_PLUGINS env loading,
+# config.known_args_namespace (alias of config.option), node.callspec.id, and
+# the subprocess pytester keeping PYTEST_RS_EXE / PYTHONPATH across a test's
+# mock.patch.dict(os.environ, clear=True).
+
+[files]
+"tests/test_verbose.py" = "passed"
+"tests/test_version.py" = "passed"
+
+[excluded]
+# (partial — tracked by the scoreboard, pinned once green)
+
+# Known remaining gaps:
+#   test_conftest_import_uses_env[*] — env must be set before conftest import
+#     ordering (toml/ini sources).
+#   test_env_via_toml[subdir ...] / test_env_via_pyproject_toml_bad[*] — toml
+#     config precedence and malformed-toml error counts.
+#   test_envfile_cli_missing_file[*] — exact "Environment file not found"
+#     errline text.

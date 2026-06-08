@@ -104,6 +104,17 @@ deps = [
 ]
 enabled = true
 
+[pytest-env]
+repo = "https://github.com/pytest-dev/pytest-env"
+tag = "1.6.0"
+testpaths = ["tests"]
+# Installed for the pytest11 entry point; use_src=false so the dist (with its
+# build-generated pytest_env/version.py) is imported, not the version-less
+# git checkout's src/.
+deps = ["pytest-env==1.6.0"]
+use_src = false
+enabled = true
+
 [pytest-rerunfailures]
 repo = "https://github.com/pytest-dev/pytest-rerunfailures"
 tag = "9.1.1"
