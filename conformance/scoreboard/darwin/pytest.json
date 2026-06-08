@@ -341,10 +341,10 @@
       "file": "testing/test_threadexception.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 0,
-      "failed": 2,
+      "passed": 7,
+      "failed": 1,
       "skipped": 0,
-      "errors": 6
+      "errors": 0
     },
     {
       "file": "testing/test_tmpdir.py",

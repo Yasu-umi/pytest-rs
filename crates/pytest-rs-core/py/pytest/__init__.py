@@ -80,6 +80,9 @@ from pytest._warning_types import PytestFDWarning as PytestFDWarning
 from pytest._warning_types import PytestRemovedIn9Warning as PytestRemovedIn9Warning
 from pytest._warning_types import PytestRemovedIn10Warning as PytestRemovedIn10Warning
 from pytest._warning_types import PytestReturnNotNoneWarning as PytestReturnNotNoneWarning
+from pytest._warning_types import (
+    PytestUnhandledThreadExceptionWarning as PytestUnhandledThreadExceptionWarning,
+)
 from pytest._warning_types import PytestUnknownMarkWarning as PytestUnknownMarkWarning
 from pytest._warning_types import (
     PytestUnraisableExceptionWarning as PytestUnraisableExceptionWarning,

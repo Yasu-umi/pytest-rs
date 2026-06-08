@@ -536,6 +536,30 @@ pub fn unraisable_session_cleanup(py: Python<'_>) -> PyResult<()> {
     Ok(())
 }
 
+/// Install the threading.excepthook capture (upstream threadexception
+/// plugin's pytest_configure).
+pub fn threadexception_configure(py: Python<'_>) {
+    let _ = py
+        .import("pytest._threadexception")
+        .and_then(|m| m.call_method0("configure"));
+}
+
+/// Drain unhandled thread exceptions collected since the last phase. Err when
+/// the warning filter turns them into errors (-W error).
+pub fn threadexception_collect(py: Python<'_>) -> PyResult<()> {
+    py.import("pytest._threadexception")?
+        .call_method0("collect_thread_exception")?;
+    Ok(())
+}
+
+/// Session-end thread-exception cleanup: drain leftovers, restore the
+/// previous hook (upstream's config cleanup).
+pub fn threadexception_session_cleanup(py: Python<'_>) -> PyResult<()> {
+    py.import("pytest._threadexception")?
+        .call_method0("session_cleanup")?;
+    Ok(())
+}
+
 /// Tell the assert-rewrite explainer the -v level (full iterable diffs
 /// need -v, identical dict items unfold at -vv, like pytest).
 pub fn set_assertion_verbosity(py: Python<'_>, level: u8) {

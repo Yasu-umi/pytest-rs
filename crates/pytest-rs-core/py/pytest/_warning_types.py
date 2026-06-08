@@ -30,6 +30,10 @@ class PytestUnraisableExceptionWarning(PytestWarning):
     __module__ = "pytest"
 
 
+class PytestUnhandledThreadExceptionWarning(PytestWarning):
+    __module__ = "pytest"
+
+
 class PytestAssertRewriteWarning(PytestWarning):
     __module__ = "pytest"
 

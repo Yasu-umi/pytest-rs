@@ -380,7 +380,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | pass % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 1495 | 643 | 31 | 24 | 2193 | 68.2% | 6 | 45 | 63 |
+| pytest | 9.0.3 | 1502 | 642 | 25 | 24 | 2193 | 68.5% | 6 | 45 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 85 | 0 | 0 | 5 | 90 | 94.4% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 182 | 23 | 0 | 4 | 209 | 87.1% | 0 | 1 | 0 |
@@ -437,7 +437,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_stepwise.py | failed | 6 | 12 | 0 | 0 |
 | testing/test_subtests.py | failed | 29 | 5 | 0 | 0 |
 | testing/test_terminal.py | failed | 107 | 108 | 10 | 2 |
-| testing/test_threadexception.py | failed | 0 | 2 | 6 | 0 |
+| testing/test_threadexception.py | failed | 7 | 1 | 0 | 0 |
 | testing/test_tmpdir.py | passed | 39 | 0 | 0 | 1 |
 | testing/test_unittest.py | failed | 57 | 13 | 0 | 9 |
 | testing/test_unraisableexception.py | failed | 10 | 1 | 0 | 0 |

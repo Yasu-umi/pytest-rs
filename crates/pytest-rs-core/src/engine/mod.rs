@@ -156,6 +156,9 @@ impl Engine {
         if !self.config.plugin_disabled("unraisableexception") {
             python::unraisable_configure(py);
         }
+        if !self.config.plugin_disabled("threadexception") {
+            python::threadexception_configure(py);
+        }
         python::set_assertion_verbosity(py, self.config.verbose);
         python::set_assertion_truncation(
             py,
@@ -613,6 +616,12 @@ impl Engine {
             .import("pytest._wcapture")
             .and_then(|m| m.call_method0("uninstall"));
         if let Err(err) = python::unraisable_session_cleanup(py) {
+            eprintln!("{}", python::format_exception(py, &err));
+            if code == 0 {
+                code = crate::report::exit_code::TESTS_FAILED;
+            }
+        }
+        if let Err(err) = python::threadexception_session_cleanup(py) {
             eprintln!("{}", python::format_exception(py, &err));
             if code == 0 {
                 code = crate::report::exit_code::TESTS_FAILED;

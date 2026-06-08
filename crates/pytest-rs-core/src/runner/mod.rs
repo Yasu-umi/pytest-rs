@@ -671,6 +671,22 @@ fn run_one_body(
         python::end_item_context(py);
         return reports;
     }
+    // Unhandled thread exceptions surfaced during setup (upstream's trylast
+    // pytest_runtest_setup hookimpl): an error filter fails the setup.
+    if let Err(err) = python::threadexception_collect(py) {
+        reports.push(report_from_err(
+            py,
+            config,
+            item,
+            Phase::Setup,
+            setup_started,
+            &err,
+        ));
+        teardown_one(py, plugins, session, config, item, xfail, &mut reports);
+        close_item_filters(py);
+        python::end_item_context(py);
+        return reports;
+    }
     reports.push(TestReport {
         nodeid: item.nodeid.clone(),
         phase: Phase::Setup,
@@ -935,6 +951,14 @@ fn run_one_body(
     } else {
         report
     };
+    let report = if report.outcome == Outcome::Passed {
+        match python::threadexception_collect(py) {
+            Ok(()) => report,
+            Err(err) => report_from_err(py, config, item, Phase::Call, call_started, &err),
+        }
+    } else {
+        report
+    };
     reports.push(report);
 
     // Finalizers added via the test's own `request` run at function teardown.
@@ -1038,6 +1062,15 @@ fn teardown_one(
     // Unraisable exceptions surfaced during teardown (upstream's trylast
     // pytest_runtest_teardown hookimpl): an error filter errors the item.
     if let Err(err) = python::unraisable_collect(py) {
+        errors.push(python::format_test_failure(
+            py,
+            &err,
+            config.get_value("tb").unwrap_or("long"),
+        ));
+    }
+    // Unhandled thread exceptions surfaced during teardown (upstream's trylast
+    // pytest_runtest_teardown hookimpl): an error filter errors the item.
+    if let Err(err) = python::threadexception_collect(py) {
         errors.push(python::format_test_failure(
             py,
             &err,
