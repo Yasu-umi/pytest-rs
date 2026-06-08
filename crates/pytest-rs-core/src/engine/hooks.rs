@@ -74,14 +74,18 @@ impl Engine {
         py: Python<'_>,
         items: &mut Vec<crate::collect::TestItem>,
     ) -> PyResult<()> {
-        let hook_funcs: Vec<Py<pyo3::PyAny>> = self
-            .session
-            .py_hooks
-            .iter()
-            .filter(|hook| hook.name == "pytest_collection_modifyitems")
-            .map(|hook| hook.func.clone_ref(py))
-            .collect();
-        if hook_funcs.is_empty() {
+        let hook_for = |name: &str| -> Vec<Py<pyo3::PyAny>> {
+            self.session
+                .py_hooks
+                .iter()
+                .filter(|hook| hook.name == name)
+                .map(|hook| hook.func.clone_ref(py))
+                .collect()
+        };
+        let hook_funcs = hook_for("pytest_collection_modifyitems");
+        let itemcollected_funcs = hook_for("pytest_itemcollected");
+        let collectstart_funcs = hook_for("pytest_collectstart");
+        if hook_funcs.is_empty() && itemcollected_funcs.is_empty() && collectstart_funcs.is_empty() {
             return Ok(());
         }
 
@@ -91,6 +95,54 @@ impl Engine {
             .map(|item| python::make_node(py, item))
             .collect::<PyResult<_>>()?;
         let node_list = pyo3::types::PyList::new(py, nodes.iter().map(|n| n.bind(py)))?;
+
+        // pytest_collectstart per distinct test class: build a pytest.Class
+        // collector (.obj = the class), fire the hooks, and propagate any
+        // markers it added to the class's item nodes (Django tags -> marks).
+        if !collectstart_funcs.is_empty() {
+            let class_cls = py.import("pytest._node")?.getattr("Class")?;
+            let mut seen_cls: Vec<Py<pyo3::PyAny>> = Vec::new();
+            for node in node_list.iter() {
+                let cls = node.getattr("cls").ok().filter(|c| !c.is_none());
+                let Some(cls) = cls else { continue };
+                if seen_cls.iter().any(|c| c.bind(py).is(&cls)) {
+                    continue;
+                }
+                seen_cls.push(cls.clone().unbind());
+                let kw = pyo3::types::PyDict::new(py);
+                kw.set_item("obj", &cls)?;
+                kw.set_item("config", config_proxy.clone_ref(py))?;
+                kw.set_item("name", cls.getattr("__name__").ok())?;
+                let collector = class_cls.call((), Some(&kw))?;
+                for func in &collectstart_funcs {
+                    python::call_py_hook(py, func, &[("collector", collector.clone().unbind())])?;
+                }
+                // Propagate the collector's markers to this class's items.
+                let class_marks: Vec<Py<pyo3::PyAny>> = collector
+                    .getattr("own_markers")?
+                    .try_iter()?
+                    .filter_map(|m| m.ok().map(|m| m.unbind()))
+                    .collect();
+                if !class_marks.is_empty() {
+                    for item_node in node_list.iter() {
+                        let item_cls = item_node.getattr("cls").ok().filter(|c| !c.is_none());
+                        if item_cls.is_some_and(|c| c.is(&cls)) {
+                            let own = item_node.getattr("own_markers")?;
+                            for mark in &class_marks {
+                                own.call_method1("append", (mark.bind(py),))?;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // pytest_itemcollected per item (Django method tags -> marks).
+        for func in &itemcollected_funcs {
+            for node in node_list.iter() {
+                python::call_py_hook(py, func, &[("item", node.clone().unbind())])?;
+            }
+        }
 
         for func in &hook_funcs {
             python::call_py_hook(

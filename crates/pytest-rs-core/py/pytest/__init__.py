@@ -34,6 +34,7 @@ from pytest._marks import mark as mark
 from pytest._marks import param as param
 from pytest._monkeypatch import MonkeyPatch as MonkeyPatch
 from pytest._monkeypatch import monkeypatch as monkeypatch
+from pytest._node import Class as Class
 from pytest._node import Collector as Collector
 from pytest._node import File as File
 from pytest._node import Function as Function

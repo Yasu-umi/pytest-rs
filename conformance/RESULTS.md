@@ -407,7 +407,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
 | rich | v14.2.0 | 855 | 0 | 0 | 25 | 880 | 97.2% | 60 | 62 | 0 |
 | pytest-bdd | 8.1.0 | 36 | 102 | 0 | 1 | 139 | 25.9% | 5 | 35 | 0 |
-| pytest-django | v4.9.0 | 142 | 67 | 6 | 1 | 216 | 65.7% | 2 | 13 | 0 |
+| pytest-django | v4.9.0 | 143 | 66 | 6 | 1 | 216 | 66.2% | 2 | 13 | 0 |
 
 ### pytest @ 9.0.3
 
@@ -969,7 +969,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_fixtures.py | failed | 43 | 9 | 0 | 0 |
 | tests/test_initialization.py | failed | 0 | 1 | 0 | 0 |
 | tests/test_manage_py_scan.py | failed | 5 | 4 | 0 | 0 |
-| tests/test_unittest.py | failed | 7 | 16 | 0 | 0 |
+| tests/test_unittest.py | failed | 8 | 15 | 0 | 0 |
 | tests/test_urls.py | failed | 2 | 2 | 0 | 0 |
 | tests/test_without_django_loaded.py | passed | 7 | 0 | 0 | 0 |
 

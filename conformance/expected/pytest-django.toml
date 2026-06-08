@@ -1,10 +1,12 @@
 # Upstream pytest-django tests that must keep passing under pytest-rs.
 #
-# tests (~142/216): pytest-django sets Django up in pytest_load_initial_conftests
+# tests (~143/216): pytest-django sets Django up in pytest_load_initial_conftests
 # (Parser.parse_known_args + pytest.Config now exist) and its fixtures run once
 # session-scoped autouse fixtures are ordered before function ones (so
 # django_test_environment installs mail.outbox before _dj_autoclear_mailbox).
-# Most non-DB tests and many DB tests (sqlite) pass.
+# pytest_collectstart/pytest_itemcollected fire (Django class tags -> marks) and
+# fixture-override cycle detection keys on the def identity (the `pytester`
+# override resolves to the builtin). Most non-DB tests and many sqlite DB pass.
 
 [files]
 "tests/test_asserts.py" = "passed"

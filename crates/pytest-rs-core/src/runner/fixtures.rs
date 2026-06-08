@@ -179,7 +179,13 @@ pub(crate) fn resolve_fixture_def(
     class_instance: Option<&Py<PyAny>>,
     stack: &mut Vec<(String, String)>,
 ) -> PyResult<Py<PyAny>> {
-    let def_id = (def.name.clone(), def.baseid.clone());
+    // Identify the def by its Arc pointer, not (name, baseid): a fixture
+    // override and the builtin it overrides share (name, "") but are distinct
+    // defs — only a def appearing twice in the same chain is a real cycle.
+    let def_id = (
+        def.name.clone(),
+        format!("{:p}", std::sync::Arc::as_ptr(&def)),
+    );
     if stack.contains(&def_id) {
         return Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
             "recursive fixture dependency involving '{}'",

@@ -215,6 +215,15 @@ class Session(Collector):
         """Signals an interrupted test run (upstream)."""
 
 
+class Class(Collector):
+    """A class collector stand-in for pytest_collectstart: carries .obj (the
+    test class) and collects markers via add_marker, propagated to its items."""
+
+    def __init__(self, *, obj=None, **kwargs):
+        super().__init__(**kwargs)
+        self.obj = obj
+
+
 class Item(Collector):
     """Base test item for custom collectors. Subclasses override runtest()
     (and optionally setup()/teardown()/repr_failure()/reportinfo())."""
