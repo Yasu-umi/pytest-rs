@@ -37,6 +37,10 @@ impl Engine {
         // >=1 → a line per test, ==0 → chars grouped under a file header,
         // <0 → bare chars with no file header.
         let tc = config.test_case_verbosity();
+        // console_output_style progress field, and the per-file call-duration
+        // accumulator that feeds it under the "times" style.
+        let pkind = config.progress_kind();
+        let mut file_dur = std::time::Duration::ZERO;
         let mut done = 0usize;
         let mut prev_module: Option<String> = None;
         let mut prev_class: Option<String> = None;
@@ -125,11 +129,13 @@ impl Engine {
                 .unwrap_or_else(|| item.nodeid.clone());
             if tc == 0 && !config.no_terminal() && !session.live_logging && file != current_file {
                 if !current_file.is_empty() {
+                    let msg = progress_message(pkind, done, total, file_dur);
                     println!(
                         "{}",
-                        progress_suffix(&line, done, total, fill_color(py, session, false))
+                        progress_suffix(&line, &msg, fill_color(py, session, false))
                     );
                 }
+                file_dur = std::time::Duration::ZERO;
                 line = format!("{file} ");
                 print!("{line}");
                 let _ = std::io::stdout().flush();
@@ -168,6 +174,11 @@ impl Engine {
                     failed += 1;
                     item_failed = true;
                 }
+                // Accumulate call-phase time for the current file's "times"
+                // progress field.
+                if report.phase == Phase::Call {
+                    file_dur += report.duration;
+                }
                 if report.progress_char().is_some() {
                     any_char = true;
                 }
@@ -182,14 +193,12 @@ impl Engine {
                             item.nodeid,
                             crate::tw::markup(&word, outcome_codes(&report))
                         );
+                        // "times" in verbose mode reports each test's own
+                        // duration (pytest's per-item showlongtestinfo).
+                        let msg = progress_message(pkind, done, total, report.duration);
                         println!(
                             "{rendered}{}",
-                            progress_suffix(
-                                &plain,
-                                done,
-                                total,
-                                fill_color(py, session, done == total)
-                            )
+                            progress_suffix(&plain, &msg, fill_color(py, session, done == total))
                         );
                         let _ = std::io::stdout().flush();
                     }
@@ -256,9 +265,10 @@ impl Engine {
             && !line.is_empty()
             && (!setup_show_active(config) || any_char)
         {
+            let msg = progress_message(pkind, done, total, file_dur);
             println!(
                 "{}",
-                progress_suffix(&line, done, total, fill_color(py, session, true))
+                progress_suffix(&line, &msg, fill_color(py, session, true))
             );
         }
         // pytest prints the banner even when the budget was spent on the

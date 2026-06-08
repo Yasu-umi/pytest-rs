@@ -89,8 +89,8 @@
       "file": "testing/test_collection.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 60,
-      "failed": 53,
+      "passed": 61,
+      "failed": 52,
       "skipped": 3,
       "errors": 0
     },
@@ -332,8 +332,8 @@
       "file": "testing/test_terminal.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 125,
-      "failed": 90,
+      "passed": 133,
+      "failed": 82,
       "skipped": 2,
       "errors": 10
     },

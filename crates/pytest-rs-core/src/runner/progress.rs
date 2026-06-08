@@ -3,7 +3,7 @@
 #[allow(unused_imports)]
 use super::*;
 use crate::collect::TestItem;
-use crate::config::Config;
+use crate::config::{Config, ProgressKind};
 use crate::fixture::Scope;
 use crate::python;
 use crate::report::{Outcome, Phase, TestReport};
@@ -21,11 +21,13 @@ pub(crate) fn live_flush(session: &mut Session, config: &Config, reports: &[Test
         session.live_printed = reports.len();
         return;
     };
+    let kind = config.progress_kind();
     while session.live_printed < reports.len() {
         let report = &reports[session.live_printed];
         session.live_printed += 1;
         if report.phase == Phase::Call || report.outcome != Outcome::Passed {
-            println!("{}", with_progress(&outcome_word(report), done, total));
+            let msg = progress_message(kind, done, total, report.duration);
+            println!("{}", with_progress(&outcome_word(report), &msg));
             let _ = std::io::stdout().flush();
         }
     }
@@ -102,36 +104,84 @@ pub(crate) fn term_width() -> usize {
         .unwrap_or(80)
 }
 
-/// The padding + percentage that completes an already-printed progress
-/// line of `body`'s width (the body itself streamed char by char).
-pub(crate) fn progress_suffix(body: &str, done: usize, total: usize, color: u8) -> String {
-    let pct = format!("[{:>3}%]", done * 100 / total);
-    // pytest right-justifies the percentage to fullwidth - 1, leaving one
-    // trailing column, so the whole progress line is one char short of the
-    // terminal width.
+/// The console_output_style progress field for `done`/`total` (and, for the
+/// "times" style, the elapsed `dur`): "[ 50%]", "[10/20]", " 0.123s", or "".
+pub(crate) fn progress_message(
+    kind: ProgressKind,
+    done: usize,
+    total: usize,
+    dur: Duration,
+) -> String {
+    match kind {
+        ProgressKind::Percent => format!("[{:>3}%]", done * 100 / total),
+        ProgressKind::Count => {
+            let width = total.to_string().len();
+            format!("[{done:>width$}/{total}]")
+        }
+        ProgressKind::Times => node_duration(dur),
+        ProgressKind::Hidden => String::new(),
+    }
+}
+
+/// pytest's format_node_duration, sans the leading space: a compact, human
+/// readable duration (us/ms/s/m/h) for the "times" progress style.
+fn node_duration(d: Duration) -> String {
+    let s = d.as_secs_f64();
+    if s < 0.00001 {
+        format!("{:.3}us", s * 1_000_000.0)
+    } else if s < 0.0001 {
+        format!("{:.2}us", s * 1_000_000.0)
+    } else if s < 0.001 {
+        format!("{:.1}us", s * 1_000_000.0)
+    } else if s < 0.01 {
+        format!("{:.3}ms", s * 1000.0)
+    } else if s < 0.1 {
+        format!("{:.2}ms", s * 1000.0)
+    } else if s < 1.0 {
+        format!("{:.1}ms", s * 1000.0)
+    } else if s < 60.0 {
+        format!("{s:.3}s")
+    } else if s < 3600.0 {
+        format!("{:.0}m {:.0}s", s / 60.0, s % 60.0)
+    } else {
+        format!("{:.0}h {:.0}m", s / 3600.0, (s % 3600.0) / 60.0)
+    }
+}
+
+/// The padding + progress field that completes an already-printed progress
+/// line of `body`'s width (the body itself streamed char by char). Empty
+/// when the field is hidden (classic / capture-off styles).
+pub(crate) fn progress_suffix(body: &str, msg: &str, color: u8) -> String {
+    if msg.is_empty() {
+        return String::new();
+    }
+    // pytest right-justifies the field to fullwidth - 1, leaving one trailing
+    // column, so the whole progress line is one char short of the terminal.
     let pad = term_width()
         .saturating_sub(1)
-        .saturating_sub(body.chars().count() + pct.len());
+        .saturating_sub(body.chars().count() + msg.len());
     let suffix = if pad > 0 {
-        format!("{}{pct}", " ".repeat(pad))
+        format!("{}{msg}", " ".repeat(pad))
     } else {
-        // pytest's progress message keeps its single leading space when it
-        // overflows the line (the space is part of " [ 33%]", not padding).
-        format!(" {pct}")
+        // The field keeps its single leading space when it overflows the
+        // line (the space is part of " [ 33%]", not the padding).
+        format!(" {msg}")
     };
     crate::tw::markup(&suffix, &[color])
 }
 
-/// "body        [ 33%]" — the percentage right-aligned at the terminal edge.
-pub(crate) fn with_progress(body: &str, done: usize, total: usize) -> String {
-    let pct = format!("[{:>3}%]", done * 100 / total);
+/// "body        [ 33%]" — the progress field right-aligned at the line edge.
+pub(crate) fn with_progress(body: &str, msg: &str) -> String {
+    if msg.is_empty() {
+        return body.to_string();
+    }
     let pad = term_width()
         .saturating_sub(1)
-        .saturating_sub(body.chars().count() + pct.len());
+        .saturating_sub(body.chars().count() + msg.len());
     if pad > 0 {
-        format!("{body}{}{pct}", " ".repeat(pad))
+        format!("{body}{}{msg}", " ".repeat(pad))
     } else {
-        format!("{body} {pct}")
+        format!("{body} {msg}")
     }
 }
 

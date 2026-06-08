@@ -205,6 +205,20 @@ impl OptionParser {
     }
 }
 
+/// The console_output_style progress field rendered at the right edge of a
+/// progress line (pytest's `_show_progress_info`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProgressKind {
+    /// "[ 50%]" (the "progress" style, default).
+    Percent,
+    /// "[10/20]" (the "count" style).
+    Count,
+    /// A per-file node duration (the "times" style).
+    Times,
+    /// No field at all ("classic", capture-off, or unknown styles).
+    Hidden,
+}
+
 /// Frozen CLI + ini configuration, immutable after parsing.
 #[derive(Debug)]
 pub struct Config {
@@ -842,6 +856,29 @@ impl Config {
     /// raises it, -q lowers it, --verbosity=N sets it directly.
     pub fn global_verbosity(&self) -> i32 {
         self.verbose as i32 - self.quiet_level as i32
+    }
+
+    /// `-s` / `--capture=no`: output capturing is off.
+    pub fn capture_disabled(&self) -> bool {
+        self.get_flag("capture-disable") || self.get_value("capture") == Some("no")
+    }
+
+    /// The per-test progress field shown at the line edge (pytest's
+    /// `_determine_show_progress_info` × console_output_style): a percentage,
+    /// a count, a node duration, or hidden. Capturing-off hides it unless
+    /// the style explicitly keeps it (#3038).
+    pub fn progress_kind(&self) -> ProgressKind {
+        let style = self.get_ini("console_output_style").unwrap_or("progress");
+        if self.capture_disabled() && style != "progress-even-when-capture-no" {
+            return ProgressKind::Hidden;
+        }
+        match style {
+            "progress" | "progress-even-when-capture-no" => ProgressKind::Percent,
+            "count" => ProgressKind::Count,
+            "times" => ProgressKind::Times,
+            // "classic" (and any unknown value) shows no progress field.
+            _ => ProgressKind::Hidden,
+        }
     }
 
     /// The verbosity for a fine-grained type (pytest's `get_verbosity`):
