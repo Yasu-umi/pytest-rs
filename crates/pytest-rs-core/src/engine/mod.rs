@@ -829,6 +829,11 @@ impl Engine {
         // CLI tokens clap didn't know resolve against the specs registered
         // above; anything still unknown is a usage error (pytest parity).
         if let Err(err) = self.apply_plugin_cli_args(py) {
+            // Usage errors print their bare message ("ERROR: <message>"),
+            // not a class-prefixed traceback line.
+            if python::is_usage_error(py, &err) {
+                return Err(err.value(py).to_string());
+            }
             return Err(python::format_exception(py, &err));
         }
         // Unknown config-option validation (pytest's _validate_config_options):

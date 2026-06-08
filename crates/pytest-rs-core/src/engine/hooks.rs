@@ -216,10 +216,16 @@ impl Engine {
             .call_method1("apply_cli_args", (option, self.config.plugin_args.clone()))?
             .extract()?;
         if !unknown.is_empty() {
-            return Err(python::usage_error(
-                py,
-                &format!("unrecognized arguments: {}", unknown.join(" ")),
-            ));
+            // Match argparse/pytest's MyOptionParser.error: a
+            // "<prog>: error: <message>" line followed by the sorted
+            // extra_info (inifile, rootdir) pytest attaches to the parser.
+            let mut msg = format!("pytest: error: unrecognized arguments: {}", unknown.join(" "));
+            if let Some(name) = &self.config.config_file_name {
+                let inifile = self.config.rootdir.join(name);
+                msg += &format!("\n  inifile: {}", inifile.display());
+            }
+            msg += &format!("\n  rootdir: {}", self.config.rootdir.display());
+            return Err(python::usage_error(py, &msg));
         }
         Ok(())
     }
