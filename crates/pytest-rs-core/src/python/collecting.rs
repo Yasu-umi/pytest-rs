@@ -110,26 +110,49 @@ pub fn async_flags(py: Python<'_>, func: &Bound<'_, PyAny>) -> PyResult<AsyncFla
 /// candidate file; a plugin (pytest-ruff/pytest-mypy) may return a
 /// `pytest.File` whose `.collect()` yields `pytest.Item`s. Each item becomes a
 /// TestItem whose `func` is the item object itself (run via item.runtest()).
+/// True when a pytest_collect_file hook exists (module-level in py_hooks, or
+/// on a pluginmanager-registered plugin like pytest-mypy's MypyCollectionPlugin).
+pub fn has_collect_file_hook(py: Python<'_>, hooks: &[crate::session::PyHook]) -> bool {
+    if hooks.iter().any(|h| h.name == "pytest_collect_file") {
+        return true;
+    }
+    py.import("pytest._pluginmanager")
+        .and_then(|m| m.getattr("pluginmanager"))
+        .and_then(|pm| {
+            let plugins = pm.getattr("_plugins")?;
+            for plugin in plugins.try_iter()? {
+                if plugin?.hasattr("pytest_collect_file")? {
+                    return Ok(true);
+                }
+            }
+            Ok(false)
+        })
+        .unwrap_or(false)
+}
+
 pub fn collect_custom_files(
     py: Python<'_>,
     rootdir: &Path,
     files: &[PathBuf],
-    hooks: &[crate::session::PyHook],
+    _hooks: &[crate::session::PyHook],
     items: &mut Vec<TestItem>,
 ) -> PyResult<()> {
-    let hook_funcs: Vec<Py<PyAny>> = hooks
-        .iter()
-        .filter(|hook| hook.name == "pytest_collect_file")
-        .map(|hook| hook.func.clone_ref(py))
-        .collect();
-    if hook_funcs.is_empty() {
-        return Ok(());
-    }
     let Some(config) = crate::python::proxies::CONFIG_PROXY.get().map(|c| c.bind(py)) else {
         return Ok(());
     };
+    // pytest_collect_file impls live on the shim pluginmanager (autoloaded
+    // plugin modules + objects registered at configure, e.g. pytest-mypy);
+    // the hook relay reaches them all.
+    let collect_file = py
+        .import("pytest._pluginmanager")?
+        .getattr("pluginmanager")?
+        .getattr("hook")?
+        .getattr("pytest_collect_file")?;
     let pathlib = py.import("pathlib")?.getattr("Path")?;
-    let collector_cls = py.import("pytest._node")?.getattr("Collector")?;
+    let node_mod = py.import("pytest._node")?;
+    let collector_cls = node_mod.getattr("Collector")?;
+    // A session stand-in with .config (plugins read parent.session.config).
+    let session = node_mod.getattr("_NodeSession")?.call1((&config,))?;
     for file in files {
         let file_path = pathlib.call1((file.to_string_lossy().as_ref(),))?;
         let parent = collector_cls.call(
@@ -137,23 +160,24 @@ pub fn collect_custom_files(
             Some(&{
                 let kw = pyo3::types::PyDict::new(py);
                 kw.set_item("config", &config)?;
+                kw.set_item("session", &session)?;
                 kw.set_item("path", pathlib.call1((rootdir.to_string_lossy().as_ref(),))?)?;
                 kw.set_item("nodeid", "")?;
                 kw.set_item("name", "")?;
                 kw
             }),
         )?;
-        for func in &hook_funcs {
-            let collector = crate::python::call_py_hook(
-                py,
-                func,
-                &[
-                    ("file_path", file_path.clone().unbind().into_any()),
-                    ("path", file_path.clone().unbind().into_any()),
-                    ("parent", parent.clone().unbind().into_any()),
-                ],
-            )?;
-            let collector = collector.bind(py);
+        // The relay returns a list of every plugin's result (collector|None).
+        let kwargs = pyo3::types::PyDict::new(py);
+        kwargs.set_item("file_path", &file_path)?;
+        kwargs.set_item("parent", &parent)?;
+        let results = collect_file.call((), Some(&kwargs))?;
+        let results_list: Vec<Bound<'_, PyAny>> = if results.is_none() {
+            Vec::new()
+        } else {
+            results.try_iter()?.collect::<PyResult<_>>()?
+        };
+        for collector in results_list {
             if collector.is_none() {
                 continue;
             }

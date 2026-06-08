@@ -389,6 +389,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pytest-benchmark | v5.1.0 | 91 | 31 | 0 | 1 | 123 | 74.0% | 4 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 41 | 97.6% | 1 | 1 | 0 |
 | anyio | 4.13.0 | 2860 | 0 | 0 | 302 | 3162 | 90.4% | 26 | 26 | 0 |
+| pytest-mypy | v1.0.1 | 27 | 51 | 0 | 0 | 78 | 34.6% | 0 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-subtests | v0.14.2 | 8 | 24 | 0 | 0 | 32 | 25.0% | 0 | 1 | 0 |
 | pytest-metadata | v2.0.4 | 6 | 4 | 0 | 0 | 10 | 60.0% | 0 | 1 | 0 |
@@ -399,8 +400,8 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pytest-repeat | v0.9.4 | 11 | 5 | 0 | 0 | 16 | 68.8% | 0 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 45 | 18 | 0 | 0 | 63 | 71.4% | 0 | 1 | 0 |
 | pytest-env | 1.6.0 | 66 | 9 | 0 | 0 | 75 | 88.0% | 2 | 3 | 0 |
-| pytest-rerunfailures | 9.1.1 | 32 | 15 | 0 | 1 | 48 | 66.7% | 0 | 1 | 0 |
-| pytest-randomly | 4.1.0 | 0 | 0 | 0 | 0 | 0 | - | 0 | 1 | 0 |
+| pytest-rerunfailures | 9.1.1 | 35 | 12 | 0 | 1 | 48 | 72.9% | 0 | 1 | 0 |
+| pytest-randomly | 4.1.0 | 30 | 7 | 0 | 0 | 37 | 81.1% | 0 | 1 | 0 |
 | click | 8.3.1 | 1313 | 0 | 0 | 22 | 1335 | 98.4% | 20 | 20 | 0 |
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
@@ -600,6 +601,16 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 </details>
 
+### pytest-mypy @ v1.0.1
+
+<details><summary>per-file detail (1 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_pytest_mypy.py | failed | 27 | 51 | 0 | 0 |
+
+</details>
+
 ### pytest-ruff @ v0.5
 
 <details><summary>per-file detail (1 files)</summary>
@@ -730,7 +741,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| test_pytest_rerunfailures.py | failed | 32 | 15 | 0 | 1 |
+| test_pytest_rerunfailures.py | failed | 35 | 12 | 0 | 1 |
 
 </details>
 
@@ -740,7 +751,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| tests/test_pytest_randomly.py | error | 0 | 0 | 0 | 0 |
+| tests/test_pytest_randomly.py | failed | 30 | 7 | 0 | 0 |
 
 </details>
 

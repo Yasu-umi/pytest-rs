@@ -160,6 +160,17 @@ pub fn prepare_config(py: Python<'_>, args: Vec<String>) -> PyResult<Py<PyAny>> 
 
 /// Build a `pytest._node.Node` for an item (used as `request.node`).
 pub fn make_node(py: Python<'_>, item: &TestItem) -> PyResult<Py<PyAny>> {
+    // Custom collector items: the func IS the pytest.Item node (with its own
+    // nodeid/markers/config); expose it directly so isinstance checks and
+    // session.items aggregation (pytest-mypy) see the real object.
+    if py
+        .import("pytest._node")
+        .and_then(|m| m.getattr("Item"))
+        .and_then(|cls| item.func.bind(py).is_instance(&cls))
+        .unwrap_or(false)
+    {
+        return Ok(item.func.clone_ref(py));
+    }
     let marks = pyo3::types::PyList::empty(py);
     for mark in &item.marks {
         marks.append(mark.obj.bind(py))?;

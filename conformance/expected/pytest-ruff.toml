@@ -1,0 +1,9 @@
+# Upstream pytest-ruff tests that must keep passing under pytest-rs.
+#
+# tests (10/10): the custom-collector subsystem (pytest_collect_file ->
+# RuffFile.collect() -> RuffItem.runtest()) runs ruff per .py file.
+
+[files]
+"tests/test_plugin.py" = "passed"
+
+[excluded]

@@ -1,15 +1,15 @@
 {
-  "suite": "pytest-randomly",
-  "tag": "4.1.0",
+  "suite": "pytest-mypy",
+  "tag": "v1.0.1",
   "category": "ecosystem",
   "excluded_files": 0,
   "files": [
     {
-      "file": "tests/test_pytest_randomly.py",
+      "file": "tests/test_pytest_mypy.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 30,
-      "failed": 7,
+      "passed": 27,
+      "failed": 51,
       "skipped": 0,
       "errors": 0
     }

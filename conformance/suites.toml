@@ -104,6 +104,16 @@ deps = [
 ]
 enabled = true
 
+[pytest-mypy]
+repo = "https://github.com/realpython/pytest-mypy"
+tag = "v1.0.1"
+testpaths = ["tests"]
+# Custom collector (pytest_collect_file -> MypyFile/MypyItem). mypy/filelock
+# back the checker and its cross-worker lock.
+deps = ["pytest-mypy==1.0.1", "mypy", "filelock"]
+use_src = false
+enabled = true
+
 [pytest-ruff]
 repo = "https://github.com/businho/pytest-ruff"
 tag = "v0.5"

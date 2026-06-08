@@ -1175,7 +1175,7 @@ impl Engine {
         // Custom collectors: plugins like pytest-ruff / pytest-mypy collect
         // non-test files via pytest_collect_file -> pytest.File.collect().
         // Only walk the (broader) candidate file set when such a hook exists.
-        if self.session.py_hooks.iter().any(|h| h.name == "pytest_collect_file") {
+        if python::has_collect_file_hook(py, &self.session.py_hooks) {
             let candidate = crate::collect::collect_all_python_files(
                 &self.config.invocation_dir,
                 &paths,

@@ -1,0 +1,16 @@
+# Upstream pytest-mypy tests that must keep passing under pytest-rs.
+#
+# tests (~27/78): the custom-collector subsystem runs pytest-mypy's
+# MypyFile/MypyFileItem/MypyStatusItem (registered via pluginmanager at
+# configure). session.items exposes the collected items so MypyResults
+# aggregates the file paths and runs mypy once.
+
+[files]
+
+[excluded]
+# (partial — tracked by the scoreboard)
+
+# Known remaining gaps:
+#   mypy-config-driven strict checks (error-line fnmatch), the custom
+#   reportinfo test-name in verbose nodeids (UnmistakableTestName/NodeIDName),
+#   --mypy-xfail item markers, and a few testdir.move/py.path helpers.
