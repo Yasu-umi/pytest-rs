@@ -14,6 +14,12 @@ from pytest._outcomes import fail
 # env still finds installed plugins; we approximate that by remembering both).
 _RUNNER_EXE = _os.environ.get("PYTEST_RS_EXE")
 _RUNNER_PYTHONPATH = _os.environ.get("PYTHONPATH")
+# The engine binary is dynamically linked against libpython; the loader path
+# that lets it resolve libpython at runtime (LD_LIBRARY_PATH on linux, the
+# DYLD_* vars on macOS) must also survive a clear=True so the nested run can
+# even start — on linux a cleared LD_LIBRARY_PATH makes it fail to load.
+_LIBPATH_VARS = ("LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH", "DYLD_FALLBACK_LIBRARY_PATH")
+_RUNNER_LIBPATH = {v: _os.environ[v] for v in _LIBPATH_VARS if v in _os.environ}
 
 _OUTCOME_RE = _re.compile(
     r"(\d+) (passed|failed|skipped|xfailed|xpassed|errors?|warnings?|deselected|rerun)"
@@ -203,6 +209,9 @@ class Pytester:
             _RUNNER_EXE = _os.environ.get("PYTEST_RS_EXE")
         if _RUNNER_PYTHONPATH is None:
             _RUNNER_PYTHONPATH = _os.environ.get("PYTHONPATH")
+        for _var in _LIBPATH_VARS:
+            if _var not in _RUNNER_LIBPATH and _var in _os.environ:
+                _RUNNER_LIBPATH[_var] = _os.environ[_var]
 
     def _makefile(self, ext, args, kwargs):
         items = list(kwargs.items())
@@ -288,6 +297,10 @@ class Pytester:
         if exe is None:
             fail("PYTEST_RS_EXE is not set; pytester cannot run the runner")
         env = os.environ.copy()
+        # The engine binary needs its loader path to find libpython; restore it
+        # if the test cleared the environment (setdefault keeps a test's own).
+        for _var, _value in _RUNNER_LIBPATH.items():
+            env.setdefault(_var, _value)
         # Keep installed plugins importable even when the test cleared the
         # environment (upstream's in-process pytester shares the parent's
         # sys.path); fall back to the PYTHONPATH captured at fixture setup.

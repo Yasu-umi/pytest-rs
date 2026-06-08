@@ -28,6 +28,14 @@ repo = "https://github.com/pytest-dev/pytest-mock"
 tag = "v3.15.1"
 testpaths = ["tests"]
 local = "conformance/suites/pytest-mock"
+# These assert the low-verbosity "Use -v to get more diff" hint, which pytest
+# (faithfully) suppresses when running_on_ci() is true (CI/BUILD_NUMBER set) so
+# CI logs get the full diff. Real pytest+pytest-mock fail these under CI too, so
+# they only pass in a non-CI dev run; deselect so the rest of the file gates.
+deselect = [
+    "tests/test_pytest_mock.py::test_detailed_introspection",
+    "tests/test_pytest_mock.py::test_detailed_introspection_async",
+]
 enabled = true
 
 [pytest-cov]
