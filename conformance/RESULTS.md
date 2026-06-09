@@ -615,10 +615,10 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | pass % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 1630 | 514 | 25 | 24 | 2193 | 74.3% | 6 | 45 | 63 |
+| pytest | 9.0.3 | 1638 | 506 | 25 | 24 | 2193 | 74.7% | 6 | 45 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 98.9% | 1 | 1 | 0 |
-| pytest-cov | v7.1.0 | 182 | 23 | 0 | 4 | 209 | 87.1% | 0 | 1 | 0 |
+| pytest-cov | v7.1.0 | 186 | 19 | 0 | 4 | 209 | 89.0% | 0 | 1 | 0 |
 | pytest-xdist | v3.8.0 | 90 | 7 | 0 | 0 | 97 | 92.8% | 0 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 91 | 31 | 0 | 1 | 123 | 74.0% | 4 | 7 | 6 |
@@ -686,7 +686,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_skipping.py | failed | 90 | 2 | 0 | 0 |
 | testing/test_stepwise.py | failed | 7 | 11 | 0 | 0 |
 | testing/test_subtests.py | failed | 29 | 5 | 0 | 0 |
-| testing/test_terminal.py | failed | 183 | 32 | 10 | 2 |
+| testing/test_terminal.py | failed | 191 | 24 | 10 | 2 |
 | testing/test_threadexception.py | failed | 7 | 1 | 0 | 0 |
 | testing/test_tmpdir.py | passed | 39 | 0 | 0 | 1 |
 | testing/test_unittest.py | failed | 58 | 12 | 0 | 9 |
@@ -753,7 +753,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| tests/test_pytest_cov.py | failed | 182 | 23 | 0 | 4 |
+| tests/test_pytest_cov.py | failed | 186 | 19 | 0 | 4 |
 
 </details>
 
