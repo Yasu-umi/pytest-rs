@@ -4,6 +4,39 @@ skip/xfail mark semantics; no fixtures."""
 
 import traceback
 
+from _pytest.reports import CollectReport as CollectReport
+from _pytest.reports import TestReport as TestReport
+
+
+class CallInfo:
+    """Result/exception of a single phase call (upstream runner.CallInfo):
+    `result` is set only on success, `excinfo` only on failure."""
+
+    def __init__(self, when, result, excinfo):
+        self.when = when
+        self.excinfo = excinfo
+        if excinfo is None:
+            self.result = result
+
+    @classmethod
+    def from_call(cls, func, when, reraise=None):
+        from pytest._raises import ExceptionInfo
+
+        excinfo = None
+        result = None
+        try:
+            result = func()
+        except BaseException:
+            excinfo = ExceptionInfo.from_current()
+            if reraise is not None and isinstance(excinfo.value, reraise):
+                raise
+        return cls(when, result, excinfo)
+
+    def __repr__(self):
+        if self.excinfo is None:
+            return f"<CallInfo when={self.when!r} result: {self.result!r}>"
+        return f"<CallInfo when={self.when!r} excinfo={self.excinfo!r}>"
+
 
 class _ProtocolReport:
     """The TestReport subset the mark-evaluation tests inspect."""

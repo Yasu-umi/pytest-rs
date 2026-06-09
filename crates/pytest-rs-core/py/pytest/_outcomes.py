@@ -3,6 +3,11 @@
 
 class OutcomeException(BaseException):
     def __init__(self, msg=None):
+        if msg is not None and not isinstance(msg, str):
+            raise TypeError(
+                f"{type(self).__name__} expected string as 'msg' parameter, got "
+                f"'{type(msg).__name__}' instead.\nPerhaps you meant to use a mark?"
+            )
         super().__init__(msg)
         self.msg = msg
 
@@ -53,6 +58,7 @@ def exit(reason="", returncode=None):
 
 
 def importorskip(modname, minversion=None, reason=None):
+    __tracebackhide__ = True
     import importlib
 
     try:

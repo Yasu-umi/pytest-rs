@@ -74,6 +74,9 @@ class BaseReport:
     # sections list.
     sections: list = []
 
+    def __init__(self, **kwargs):
+        _set_report_attrs(self, kwargs)
+
     def _join_sections(self, prefix):
         return "\n".join(
             content for (header, content) in self.sections if header.startswith(prefix)

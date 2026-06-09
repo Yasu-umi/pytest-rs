@@ -21,6 +21,22 @@ class ExceptionInfo[E: BaseException]:
         """An unfilled ExceptionInfo (upstream API, used by RaisesGroup)."""
         return cls()
 
+    @classmethod
+    def from_current(cls):
+        """An ExceptionInfo for the exception currently being handled."""
+        import sys
+
+        self = cls()
+        self._set(*sys.exc_info())
+        return self
+
+    @classmethod
+    def from_exception(cls, exception):
+        """An ExceptionInfo wrapping an already-captured exception."""
+        self = cls()
+        self._set(type(exception), exception, exception.__traceback__)
+        return self
+
     def fill_unfilled(self, exc_info):
         """Fill from a (type, value, traceback) triple."""
         self._set(*exc_info)
@@ -28,6 +44,26 @@ class ExceptionInfo[E: BaseException]:
     @property
     def typename(self):
         return self.type.__name__ if self.type else None
+
+    def errisinstance(self, exc):
+        """Whether the captured exception is an instance of exc (or any in a
+        tuple) — upstream ExceptionInfo.errisinstance."""
+        return self.value is not None and isinstance(self.value, exc)
+
+    def exconly(self, tryshort=False):
+        """The exception's `type: message` line(s), like pytest's exconly.
+        With tryshort, the rewritten-assert "AssertionError: " noise is
+        stripped (upstream strips a leading striptext)."""
+        import traceback
+
+        text = "".join(
+            traceback.format_exception_only(self.type, self.value)
+        ).strip()
+        if tryshort:
+            prefix = "AssertionError: "
+            if text.startswith(prefix):
+                text = text[len(prefix) :]
+        return text
 
     def __repr__(self):
         # Upstream shape: "<ExceptionInfo ValueError('boom') tblen=2>" —
@@ -58,7 +94,24 @@ class ExceptionInfo[E: BaseException]:
         text = "".join(
             traceback.format_exception(self.type, self.value, self.tb)
         ).rstrip("\n")
-        return _ExceptionRepr(text)
+        # reprcrash points at the deepest non-__tracebackhide__ frame, like
+        # pytest (so e.g. importorskip's skip() reports the caller, not the
+        # internal helper). Falls back to the deepest frame if all are hidden.
+        path, lineno = "", 0
+        tb = self.tb
+        while tb is not None:
+            frame = tb.tb_frame
+            hidden = frame.f_locals.get("__tracebackhide__") or frame.f_globals.get(
+                "__tracebackhide__"
+            )
+            if not hidden or not path:
+                path = frame.f_code.co_filename
+                lineno = tb.tb_lineno
+            tb = tb.tb_next
+        message = "".join(
+            traceback.format_exception_only(self.type, self.value)
+        ).strip()
+        return _ExceptionRepr(text, path=path, lineno=lineno, message=message)
 
     def match(self, regexp):
         # Upstream stringify_exception: PEP-678 __notes__ join the message.
@@ -75,19 +128,22 @@ class ExceptionInfo[E: BaseException]:
 
 
 class _ReprCrash:
-    def __init__(self, message):
+    def __init__(self, message, path="", lineno=0):
         self.message = message
+        self.path = path
+        self.lineno = lineno
 
 
 class _ExceptionRepr:
     """Minimal TerminalRepr stand-in returned by ExceptionInfo.getrepr():
-    str() and toterminal() render the traceback text, reprcrash.message is
-    its last line."""
+    str() and toterminal() render the traceback text; reprcrash carries the
+    crash message and the deepest frame's path/lineno."""
 
-    def __init__(self, text):
+    def __init__(self, text, path="", lineno=0, message=None):
         self.text = text
-        last = text.rstrip("\n").rsplit("\n", 1)[-1] if text else ""
-        self.reprcrash = _ReprCrash(last)
+        if message is None:
+            message = text.rstrip("\n").rsplit("\n", 1)[-1] if text else ""
+        self.reprcrash = _ReprCrash(message, path=path, lineno=lineno)
 
     def __str__(self):
         return self.text
