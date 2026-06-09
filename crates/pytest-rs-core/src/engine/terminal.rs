@@ -377,6 +377,34 @@ impl Engine {
                     )
                 );
             }
+            self.print_teardown_sections(&report.nodeid);
+        }
+    }
+
+    /// pytest's _handle_teardown_sections: the "Captured ... teardown" capture
+    /// sections live on the item's separate teardown report, so the terminal
+    /// appends them after the call report's failure/passes repr (honoring
+    /// --show-capture). Setup/call sections already rendered on the call report
+    /// are skipped here by the "teardown" filter.
+    fn print_teardown_sections(&self, nodeid: &str) {
+        let show_capture = self.config.get_value("show-capture").unwrap_or("all");
+        if show_capture == "no" {
+            return;
+        }
+        for report in &self.session.reports {
+            if report.phase != Phase::Teardown || report.nodeid != nodeid {
+                continue;
+            }
+            for (title, body) in &report.sections {
+                if !title.contains("teardown") {
+                    continue;
+                }
+                if show_capture != "all" && !title.contains(show_capture) {
+                    continue;
+                }
+                println!("{:-^80}", format!(" {title} "));
+                println!("{}", body.trim_end_matches('\n'));
+            }
         }
     }
 
@@ -426,6 +454,7 @@ impl Engine {
                 println!("{:-^80}", format!(" {title} "));
                 println!("{}", text.trim_end_matches('\n'));
             }
+            self.print_teardown_sections(&report.nodeid);
         }
     }
 
@@ -483,6 +512,7 @@ impl Engine {
                 println!("{:-^80}", format!(" {title} "));
                 println!("{}", body.trim_end_matches('\n'));
             }
+            self.print_teardown_sections(&report.nodeid);
         }
     }
 
@@ -518,6 +548,7 @@ impl Engine {
                 println!("{:-^80}", format!(" {title} "));
                 println!("{}", text.trim_end_matches('\n'));
             }
+            self.print_teardown_sections(&report.nodeid);
         }
     }
 

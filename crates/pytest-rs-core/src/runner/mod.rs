@@ -82,15 +82,33 @@ impl Engine {
                     $item,
                     last_nodeid.as_deref(),
                 ) {
-                    fire_logreport_hooks(py, session, &report, None);
-                    failed += 1;
-                    if !config.no_terminal() && tc <= 0 && !session.live_logging && !line.is_empty()
+                    if report.outcome == Outcome::Failed {
+                        fire_logreport_hooks(py, session, &report, None);
+                        failed += 1;
+                        if !config.no_terminal()
+                            && tc <= 0
+                            && !session.live_logging
+                            && !line.is_empty()
+                        {
+                            print!("E");
+                            let _ = std::io::stdout().flush();
+                            line.push('E');
+                        }
+                        session.reports.push(report);
+                    } else if let Some(existing) = session
+                        .reports
+                        .iter_mut()
+                        .rev()
+                        .find(|r| r.phase == Phase::Teardown && r.nodeid == report.nodeid)
                     {
-                        print!("E");
-                        let _ = std::io::stdout().flush();
-                        line.push('E');
+                        // A passing scope teardown's captured output belongs on
+                        // the item's existing teardown report (pytest runs these
+                        // finalizers inside that teardown); merge to avoid a
+                        // duplicate report skewing junit/counts.
+                        existing.sections.extend(report.sections);
+                    } else {
+                        session.reports.push(report);
                     }
-                    session.reports.push(report);
                 }
             };
         }
@@ -1289,10 +1307,33 @@ pub(crate) fn teardown_scope_reported(
     let started = Instant::now();
     let errors = teardown_scope(py, plugins, session, config, scope, instance, item);
     if errors.is_empty() {
+        // A passing scope teardown that printed (e.g. teardown_module): its
+        // captured output is labelled "Captured stdout teardown". Surface it
+        // as a passing teardown report so the caller can merge it into the
+        // item's teardown sections (an empty one yields None).
+        let sections = if has_finalizers {
+            python::log_failure_sections(py)
+        } else {
+            Vec::new()
+        };
         if has_finalizers {
             python::log_finish_item(py);
         }
-        return None;
+        if sections.is_empty() {
+            return None;
+        }
+        return Some(TestReport {
+            nodeid: report_nodeid.unwrap_or(&item.nodeid).to_string(),
+            phase: Phase::Teardown,
+            outcome: Outcome::Passed,
+            duration: started.elapsed(),
+            longrepr: None,
+            location: None,
+            subtest_desc: None,
+            sections,
+            rerun: false,
+            xfail_longrepr: None,
+        });
     }
     let sections = python::log_failure_sections(py);
     python::log_finish_item(py);
