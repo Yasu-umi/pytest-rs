@@ -251,8 +251,8 @@
       "file": "testing/test_runner.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 17,
-      "failed": 35,
+      "passed": 22,
+      "failed": 30,
       "skipped": 0,
       "errors": 0
     },
