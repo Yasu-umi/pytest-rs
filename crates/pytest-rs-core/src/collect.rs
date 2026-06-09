@@ -129,12 +129,14 @@ pub fn collect_test_files(
     for arg in &args {
         // Node-id args select within a file; only the path part is
         // collected here (the engine filters items afterwards).
-        let arg = arg.split("::").next().unwrap_or(arg);
+        let path_arg = arg.split("::").next().unwrap_or(arg);
         // Canonicalize so symlinked paths (e.g. /tmp on macOS) match the
         // canonical rootdir when computing node ids.
-        let path = invocation_dir.join(arg);
+        let path = invocation_dir.join(path_arg);
         let path = std::fs::canonicalize(&path).unwrap_or(path);
-        let meta = std::fs::metadata(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+        // Upstream UsageError wording, with the argument as the user gave it.
+        let meta =
+            std::fs::metadata(&path).map_err(|_| format!("file or directory not found: {arg}"))?;
         // --ignore applies to explicit args too (upstream
         // pytest_ignore_collect covers the whole collection tree).
         if ignores.is_ignored(&path) {

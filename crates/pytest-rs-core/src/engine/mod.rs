@@ -282,7 +282,12 @@ impl Engine {
             // --maxfail aborting collection exits TESTS_FAILED with a
             // "stopping after N failures" banner; otherwise INTERRUPTED.
             let maxfail_hit = self.config.maxfail().is_some_and(|m| n_collect_errors >= m);
-            if !self.config.get_flag("continue-on-collection-errors") || maxfail_hit {
+            // --collect-only still lists the items it did collect plus an
+            // error count (pytest's "3 tests collected, 1 error"), so it falls
+            // through to the collect-only branch like continue-on-errors.
+            if (!self.config.get_flag("continue-on-collection-errors") && !self.config.collect_only)
+                || maxfail_hit
+            {
                 // Under -n, xdist reports collection errors as plain errors
                 // (exit 1, no Interrupted banner) below the worker banner.
                 #[cfg(feature = "xdist")]
@@ -519,10 +524,17 @@ impl Engine {
                     }
                     python::reporter_finish(py, &self.config, code, None);
                 } else {
-                    self.print_collect_only_summary(started.elapsed());
+                    // Collection errors still surface their traceback (the
+                    // ERRORS section) above the collected-count summary.
+                    if n_collect_errors > 0 {
+                        self.print_collect_errors();
+                    }
+                    self.print_collect_only_summary(started.elapsed(), n_collect_errors);
                 }
             }
-            return if n_items == 0 {
+            return if n_collect_errors > 0 {
+                exit_code::INTERRUPTED
+            } else if n_items == 0 {
                 exit_code::NO_TESTS_COLLECTED
             } else {
                 exit_code::OK

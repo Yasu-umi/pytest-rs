@@ -91,26 +91,47 @@ impl Engine {
         }
     }
 
-    /// The --collect-only closing banner ("N/M tests collected ...").
-    pub(crate) fn print_collect_only_summary(&self, elapsed: std::time::Duration) {
+    /// The --collect-only closing banner ("N/M tests collected ...", with a
+    /// trailing ", K error(s)" when collection hit errors).
+    pub(crate) fn print_collect_only_summary(&self, elapsed: std::time::Duration, errors: usize) {
         let selected = self.session.items.len();
         let deselected = self.session.deselected;
-        let body = if selected == 0 && deselected == 0 {
-            format!("no tests collected in {:.2}s", elapsed.as_secs_f64())
-        } else if deselected > 0 {
-            format!(
-                "{selected}/{} tests collected ({deselected} deselected) in {:.2}s",
-                selected + deselected,
-                elapsed.as_secs_f64()
+        let total = selected + deselected;
+        let secs = elapsed.as_secs_f64();
+        // pytest's collected_status: all-deselected (or nothing collected)
+        // reads "no tests collected" in yellow; a partial selection shows
+        // "M/T tests collected (N deselected)" in green.
+        let (status, all_deselected) = if total == 0 {
+            ("no tests collected".to_string(), true)
+        } else if deselected == 0 {
+            (
+                format!(
+                    "{total} test{} collected",
+                    if total == 1 { "" } else { "s" }
+                ),
+                false,
+            )
+        } else if selected == 0 {
+            (
+                format!("no tests collected ({deselected} deselected)"),
+                true,
             )
         } else {
-            format!(
-                "{selected} test{} collected in {:.2}s",
-                if selected == 1 { "" } else { "s" },
-                elapsed.as_secs_f64()
+            (
+                format!("{selected}/{total} tests collected ({deselected} deselected)"),
+                false,
             )
         };
-        let color = if selected == 0 && deselected == 0 {
+        let error_suffix = if errors > 0 {
+            format!(", {errors} error{}", if errors == 1 { "" } else { "s" })
+        } else {
+            String::new()
+        };
+        let body = format!("{status}{error_suffix} in {secs:.2}s");
+        // Errors dominate the banner color (pytest's _color_for_type["error"]).
+        let color = if errors > 0 {
+            crate::tw::RED
+        } else if all_deselected {
             crate::tw::YELLOW
         } else {
             crate::tw::GREEN
@@ -685,7 +706,22 @@ impl Engine {
                 if !is_collect_error
                     && let Some(message) = report.longrepr.as_deref().and_then(short_message)
                 {
-                    line.push_str(&format!(" - {message}"));
+                    // pytest's _get_line_with_reprcrash_message: failure/error
+                    // lines show the full crash message on CI or at -vv, but
+                    // otherwise (and always under --force-short-summary) trim it
+                    // to the terminal width. xfail/xpass reasons are untrimmed.
+                    let trimmable = matches!(c, 'f' | 'E' | 'p');
+                    let full = (running_on_ci() || self.config.verbose >= 2)
+                        && !self.config.get_flag("force-short-summary");
+                    if !trimmable || full {
+                        line.push_str(&format!(" - {message}"));
+                    } else {
+                        let available =
+                            crate::runner::term_width().saturating_sub(line.chars().count());
+                        if let Some(trimmed) = format_trimmed(" - ", &message, available) {
+                            line.push_str(&trimmed);
+                        }
+                    }
                 }
                 lines.push(line);
             }
@@ -896,4 +932,27 @@ impl Engine {
         }
         Ok(())
     }
+}
+
+/// pytest's running_on_ci(): the CI / BUILD_NUMBER env vars suppress
+/// short-summary message trimming so CI logs keep the full crash text.
+fn running_on_ci() -> bool {
+    std::env::var_os("CI").is_some() || std::env::var_os("BUILD_NUMBER").is_some()
+}
+
+/// pytest's _format_trimmed for the " - {}" short-summary form: ellipsize
+/// `msg` to fit `available` columns after the prefix, or None when even the
+/// ellipsis would not fit (so the caller drops the message entirely).
+fn format_trimmed(prefix: &str, msg: &str, available: usize) -> Option<String> {
+    const ELLIPSIS: &str = "...";
+    let format_width = prefix.chars().count();
+    if format_width + ELLIPSIS.len() > available {
+        return None;
+    }
+    if format_width + msg.chars().count() <= available {
+        return Some(format!("{prefix}{msg}"));
+    }
+    let budget = available - format_width - ELLIPSIS.len();
+    let trimmed: String = msg.chars().take(budget).collect();
+    Some(format!("{prefix}{trimmed}{ELLIPSIS}"))
 }
