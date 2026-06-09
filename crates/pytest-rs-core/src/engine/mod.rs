@@ -165,6 +165,7 @@ impl Engine {
             python::threadexception_configure(py);
         }
         python::set_assertion_verbosity(py, self.config.verbose);
+        python::set_assertion_rewrite(py, self.config.get_value("assert"));
         python::set_assertion_truncation(
             py,
             self.config.get_ini("truncation_limit_lines"),

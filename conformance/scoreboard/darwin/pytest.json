@@ -53,8 +53,8 @@
       "file": "testing/test_assertion.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 120,
-      "failed": 40,
+      "passed": 123,
+      "failed": 37,
       "skipped": 0,
       "errors": 0
     },

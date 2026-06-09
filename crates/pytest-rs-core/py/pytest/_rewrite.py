@@ -58,10 +58,19 @@ _verbosity = 0
 _truncation_lines = None
 _truncation_chars = None
 
+# --assert=plain disables rewriting entirely (failed asserts surface as bare
+# AssertionError); the engine flips this from config before collection.
+_rewrite_enabled = True
+
 
 def set_verbosity(level):
     global _verbosity
     _verbosity = level
+
+
+def set_enabled(flag):
+    global _rewrite_enabled
+    _rewrite_enabled = bool(flag)
 
 
 def set_truncation_limits(lines, chars):
@@ -322,6 +331,8 @@ class _RewriteLoader(importlib.machinery.SourceFileLoader):
 
 class _RewriteFinder:
     def find_spec(self, name, path=None, target=None):
+        if not _rewrite_enabled:
+            return None
         spec = importlib.machinery.PathFinder.find_spec(name, path, target)
         if (
             spec is not None

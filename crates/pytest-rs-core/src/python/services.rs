@@ -584,6 +584,16 @@ pub fn set_assertion_verbosity(py: Python<'_>, level: u8) {
         .and_then(|m| m.call_method1("set_verbosity", (level,)));
 }
 
+/// --assert=plain disables assertion rewriting entirely (failed asserts
+/// surface as a bare AssertionError, like pytest). Any other value (or the
+/// default "rewrite") keeps the rewriter installed.
+pub fn set_assertion_rewrite(py: Python<'_>, mode: Option<&str>) {
+    let enabled = mode != Some("plain");
+    let _ = py
+        .import("pytest._rewrite")
+        .and_then(|m| m.call_method1("set_enabled", (enabled,)));
+}
+
 /// Pass the truncation_limit_lines / truncation_limit_chars ini values to
 /// the assert-rewrite explainer (None keeps pytest's defaults: 8 lines,
 /// 640 chars).
