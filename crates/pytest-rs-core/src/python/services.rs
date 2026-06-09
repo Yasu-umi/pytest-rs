@@ -490,6 +490,17 @@ pub fn set_showlocals(py: Python<'_>, on: bool) {
         .and_then(|m| m.call_method1("set_showlocals", (on,)));
 }
 
+/// Toggle the cyclic garbage collector. Collection imports thousands of test
+/// modules and their app dependencies, and those allocations trigger gc runs
+/// that scan the ever-growing set of just-imported objects for cycles —
+/// wasted work, since none of it is freed mid-collection. We disable gc for
+/// the collection phase and re-enable it before any test runs (tests and the
+/// unraisable/threadexception plugins rely on gc to surface finalizers).
+pub fn set_gc_enabled(py: Python<'_>, enabled: bool) {
+    let method = if enabled { "enable" } else { "disable" };
+    let _ = py.import("gc").and_then(|m| m.call_method0(method));
+}
+
 /// PYTEST_THEME / PYTEST_THEME_MODE validation (color mode only): the
 /// pytest startup error message, or None.
 pub fn invalid_theme_message(py: Python<'_>) -> Option<String> {

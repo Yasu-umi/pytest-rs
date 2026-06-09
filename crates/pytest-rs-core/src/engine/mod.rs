@@ -51,6 +51,13 @@ impl Engine {
     /// Run the whole test session; returns the process exit code.
     pub fn run(&mut self, py: Python<'_>) -> i32 {
         let started = Instant::now();
+        // Startup + collection (shim/conftest/plugin/module imports) is
+        // allocation-heavy; gc cycle scans during it just rescan the growing
+        // set of just-imported objects for nothing. Disable for the whole
+        // import phase, re-enabled before any test runs (after collect, and
+        // before the worker loop). Every path in between either runs no user
+        // tests or exits the process, so leaving it off until then is safe.
+        python::set_gc_enabled(py, false);
         if let Err(err) = python::activate_virtualenv(py) {
             eprintln!("INTERNAL ERROR: failed to activate virtualenv: {err}");
             return exit_code::INTERNAL_ERROR;
@@ -223,6 +230,9 @@ impl Engine {
         // never collects or reports on its own.
         #[cfg(feature = "xdist")]
         if self.config.is_worker() {
+            // Workers collect and run inside run_worker; restore gc so their
+            // test execution is unaffected by the bootstrap-phase disable.
+            python::set_gc_enabled(py, true);
             return self.run_worker(py);
         }
 
@@ -253,6 +263,8 @@ impl Engine {
                 return exit_code::USAGE_ERROR;
             }
         };
+        // Collection done: tests (and gc-dependent plugins) run from here on.
+        python::set_gc_enabled(py, true);
         let n_collect_errors = collect_errors.len();
         if n_collect_errors > 0 {
             // Collection errors still report as errors in the summary.
