@@ -1,7 +1,7 @@
 {
   "suite": "pytest-mypy",
   "tag": "v1.0.1",
-  "category": "ecosystem",
+  "category": "third-party",
   "excluded_files": 0,
   "files": [
     {

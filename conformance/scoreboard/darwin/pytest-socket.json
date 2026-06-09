@@ -1,7 +1,7 @@
 {
   "suite": "pytest-socket",
   "tag": "0.7.0",
-  "category": "ecosystem",
+  "category": "third-party",
   "excluded_files": 0,
   "files": [
     {

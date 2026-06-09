@@ -186,7 +186,13 @@ class _AssertRewriter(ast.NodeTransformer):
         """Pieces for the AssertionError message ahead of the explanation."""
         if node.msg is None:
             return []
-        return [node.msg, ast.Constant("\n")]
+        # The msg can be any expression (int, tuple, custom object); a raw node
+        # in a JoinedStr would TypeError at join, so format it like an f-string
+        # interpolation (str()-equivalent), matching `assert x, msg` semantics.
+        return [
+            ast.FormattedValue(value=node.msg, conversion=-1, format_spec=None),
+            ast.Constant("\n"),
+        ]
 
     def _rewrite_compare(self, node):
         test = node.test

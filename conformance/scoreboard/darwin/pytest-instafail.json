@@ -1,7 +1,7 @@
 {
   "suite": "pytest-instafail",
   "tag": "v0.5.0",
-  "category": "ecosystem",
+  "category": "third-party",
   "excluded_files": 0,
   "files": [
     {

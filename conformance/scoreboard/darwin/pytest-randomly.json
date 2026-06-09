@@ -1,7 +1,7 @@
 {
   "suite": "pytest-randomly",
   "tag": "4.1.0",
-  "category": "ecosystem",
+  "category": "third-party",
   "excluded_files": 0,
   "files": [
     {

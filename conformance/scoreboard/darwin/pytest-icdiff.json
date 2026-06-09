@@ -1,7 +1,7 @@
 {
   "suite": "pytest-icdiff",
   "tag": "0.5",
-  "category": "ecosystem",
+  "category": "third-party",
   "excluded_files": 0,
   "files": [
     {

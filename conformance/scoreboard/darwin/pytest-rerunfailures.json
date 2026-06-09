@@ -1,7 +1,7 @@
 {
   "suite": "pytest-rerunfailures",
   "tag": "9.1.1",
-  "category": "ecosystem",
+  "category": "third-party",
   "excluded_files": 0,
   "files": [
     {

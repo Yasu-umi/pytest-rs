@@ -1,7 +1,7 @@
 {
   "suite": "pytest-repeat",
   "tag": "v0.9.4",
-  "category": "ecosystem",
+  "category": "third-party",
   "excluded_files": 0,
   "files": [
     {
