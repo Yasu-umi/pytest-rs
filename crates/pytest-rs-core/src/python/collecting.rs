@@ -707,6 +707,23 @@ pub(crate) fn collect_class(
             generate_hook,
         )?;
     }
+    // Fire pytest_pycollect_makeitem hooks so plugins can set extra_keyword_matches.
+    // Store the result on the class object for keyword_match_names to read.
+    let _ = (|| -> PyResult<()> {
+        let kw_set = py
+            .import("pytest._node")?
+            .call_method1("fire_makeitem_for_class", (cls_name,))?;
+        let mut extra: Vec<String> = Vec::new();
+        for item in kw_set.try_iter()? {
+            if let Ok(s) = item?.extract::<String>() {
+                extra.push(s);
+            }
+        }
+        if !extra.is_empty() {
+            cls.setattr("_pytest_extra_keyword_matches", extra)?;
+        }
+        Ok(())
+    })();
     Ok(())
 }
 
@@ -1437,6 +1454,16 @@ pub fn keyword_match_names(py: Python<'_>, item: &TestItem) -> Vec<String> {
     }
     for mark in &item.marks {
         names.push(mark.name.clone());
+    }
+    // extra_keyword_matches set by pytest_pycollect_makeitem hooks on the class.
+    if let Some(cls) = &item.cls {
+        if let Ok(extras) = cls
+            .bind(py)
+            .getattr("_pytest_extra_keyword_matches")
+            .and_then(|v| v.extract::<Vec<String>>())
+        {
+            names.extend(extras);
+        }
     }
     names
 }

@@ -711,3 +711,79 @@ class Function(Node):
             fn = getattr(self.module, "teardown_function", None)
             if fn is not None:
                 _call_optional_arg(fn, self.function)
+
+
+# ---------------------------------------------------------------------------
+# pytest_pycollect_makeitem hookwrapper support
+# ---------------------------------------------------------------------------
+
+class _CollectedClass:
+    """Minimal class-node shim passed as the 'item' result to
+    pytest_pycollect_makeitem hookwrappers (e.g. for extra_keyword_matches)."""
+    def __init__(self, name):
+        self.name = name
+        self.extra_keyword_matches = set()
+
+
+_pycollect_makeitem_hooks: list = []
+
+
+def set_pycollect_hooks(hooks: list) -> None:
+    global _pycollect_makeitem_hooks
+    _pycollect_makeitem_hooks = list(hooks)
+
+
+def fire_makeitem_for_class(name: str) -> set:
+    """Fire pytest_pycollect_makeitem hookwrappers for a class, returning
+    extra_keyword_matches set that plugins may have populated."""
+    import inspect
+    node = _CollectedClass(name)
+    if not _pycollect_makeitem_hooks:
+        return node.extra_keyword_matches
+
+    kwargs = {"name": name, "obj": None, "collector": None}
+    started = []
+    for func in _pycollect_makeitem_hooks:
+        opts = getattr(func, "pytest_impl", None) or {}
+        old_style = bool(opts.get("hookwrapper"))
+        try:
+            sig_params = set(inspect.signature(func).parameters)
+            call_kw = {k: v for k, v in kwargs.items() if k in sig_params}
+            gen = func(**call_kw)
+        except Exception:
+            continue
+        if not inspect.isgenerator(gen):
+            continue
+        try:
+            next(gen)
+        except StopIteration:
+            continue
+        started.append((gen, old_style))
+
+    result = node
+    for gen, old_style in reversed(started):
+        try:
+            if old_style:
+                from pytest._pluginmanager import _Result
+                outcome = _Result(result)
+                try:
+                    gen.send(outcome)
+                except StopIteration:
+                    pass
+                finally:
+                    gen.close()
+                result = outcome.get_result()
+            else:
+                try:
+                    gen.send(result)
+                except StopIteration as stop:
+                    if stop.value is not None:
+                        result = stop.value
+                finally:
+                    gen.close()
+        except Exception:
+            pass
+
+    if hasattr(result, "extra_keyword_matches"):
+        return result.extra_keyword_matches
+    return set()

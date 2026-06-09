@@ -989,6 +989,20 @@ impl Engine {
             .map(str::to_string)
             .or_else(|| self.config.get_ini("log_level").map(str::to_string));
         python::log_start_phase(py, "collection", log_level_cfg.as_deref());
+        // Expose pytest_pycollect_makeitem hooks to Python for collect_class.
+        {
+            use pyo3::types::PyAnyMethods;
+            let makeitem_hooks: Vec<Py<PyAny>> = self
+                .session
+                .py_hooks
+                .iter()
+                .filter(|h| h.name == "pytest_pycollect_makeitem")
+                .map(|h| h.func.clone_ref(py))
+                .collect();
+            let _ = py
+                .import("pytest._node")
+                .and_then(|m| m.call_method1("set_pycollect_hooks", (makeitem_hooks,)));
+        }
         for file in &files {
             // --maxfail aborts collection once the budget is spent on
             // collection errors, ignoring further files.
