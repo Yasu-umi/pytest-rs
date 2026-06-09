@@ -83,7 +83,7 @@ impl Engine {
                     last_nodeid.as_deref(),
                 ) {
                     if report.outcome == Outcome::Failed {
-                        fire_logreport_hooks(py, session, &report, None);
+                        fire_logreport_hooks(py, session, &report, None, None);
                         failed += 1;
                         if !config.no_terminal()
                             && tc <= 0
@@ -195,7 +195,7 @@ impl Engine {
             last_nodeid = Some(item.nodeid.clone());
             let mut item_failed = false;
             for (i, report) in reports.into_iter().enumerate() {
-                fire_logreport_hooks(py, session, &report, Some(item.lineno));
+                fire_logreport_hooks(py, session, &report, Some(item.lineno), Some(item));
                 // A "rerun" report is a retried attempt: shown as 'R', never
                 // counted as a failure or charged against --maxfail.
                 if report.outcome == Outcome::Failed && !report.rerun {

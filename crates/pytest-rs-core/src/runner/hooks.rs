@@ -16,6 +16,7 @@ pub(crate) fn fire_logreport_hooks(
     session: &Session,
     report: &TestReport,
     lineno: Option<u32>,
+    item: Option<&TestItem>,
 ) {
     let funcs: Vec<Py<PyAny>> = session
         .py_hooks
@@ -27,9 +28,6 @@ pub(crate) fn fire_logreport_hooks(
         .map(|hook| hook.func.clone_ref(py))
         .collect();
     let delegated = session.custom_reporter.is_some();
-    if funcs.is_empty() && !delegated {
-        return;
-    }
     let proxy = match python::make_report_proxy(py, report, lineno) {
         Ok(proxy) => proxy,
         Err(err) => {
@@ -37,8 +35,24 @@ pub(crate) fn fire_logreport_hooks(
             return;
         }
     };
-    for func in funcs {
-        if let Err(err) = python::call_py_hook(py, &func, &[("report", proxy.clone_ref(py))]) {
+    // Populate keywords from the item's marks so conftest pytest_terminal_summary
+    // hooks (which receive this report via terminalreporter.stats) can inspect marks.
+    if let Some(item) = item {
+        let _ = (|| -> PyResult<()> {
+            use pyo3::types::{PyAnyMethods, PyDict, PyDictMethods};
+            let kw = PyDict::new(py);
+            for mark in &item.marks {
+                kw.set_item(&mark.name, mark.obj.bind(py))?;
+            }
+            for (name, obj) in super::marks::added_marks(py) {
+                kw.set_item(&name, obj.bind(py))?;
+            }
+            proxy.bind(py).setattr("keywords", kw)?;
+            Ok(())
+        })();
+    }
+    for func in &funcs {
+        if let Err(err) = python::call_py_hook(py, func, &[("report", proxy.clone_ref(py))]) {
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
         }
     }
@@ -46,6 +60,10 @@ pub(crate) fn fire_logreport_hooks(
     // conftest impls (pluggy LIFO: the reporter registered first).
     if delegated {
         python::reporter_logreport(py, proxy.bind(py));
+    } else {
+        // Native mode: feed stats so conftest pytest_terminal_summary hooks
+        // can access terminalreporter.stats['passed'] etc.
+        python::reporter_feed_default(py, proxy.bind(py));
     }
 }
 

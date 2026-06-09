@@ -110,7 +110,13 @@ def get_unpacked_marks(obj, *, consider_mro=True):
             mark_list = mark_attribute
         else:
             mark_list = [mark_attribute]
-    return [getattr(mark, "mark", mark) for mark in mark_list]
+    result = []
+    for m in mark_list:
+        m = getattr(m, "mark", m)
+        if not isinstance(m, Mark):
+            raise TypeError(f"got {m!r} instead of Mark")
+        result.append(m)
+    return result
 
 
 def store_mark(obj, mark, *, stacklevel=3):

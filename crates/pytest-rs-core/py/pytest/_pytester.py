@@ -681,63 +681,59 @@ class Pytester:
         except (OSError, Exception):
             pass
         reprec = InlineRunResult(result, hook_events)
+        # Collect items in-process so they carry full mark data
+        # (keywords, get_closest_marker) — needed by mark-evaluation tests.
+        # Fall back to nodeid-only stubs for doctest/text files.
         items = []
-        parents: dict = {}
-        for line in result.outlines:
-            line = line.strip()
-            if (
-                not line
-                or line.startswith("=")
-                or line.startswith("<")
-                or line.startswith("no tests")
-            ):
-                continue
-            if "::" in line or line.endswith((".txt", ".rst", ".md")):
-                # Deduce type from nodeid
-                nodeid = line.split()[0] if line.split() else line
-                from _pytest.doctest import DoctestItem, DoctestModule, DoctestTextfile
+        for arg in args:
+            path_str = str(arg)
+            if "::" in path_str:
+                # nodeid selector: extract the file part
+                file_part = path_str.split("::")[0]
+                if file_part.endswith(".py"):
+                    items.extend(self._collect_items_from_path(file_part))
+                    continue
+            if path_str.endswith(".py"):
+                items.extend(self._collect_items_from_path(path_str))
+            elif path_str.endswith((".txt", ".rst", ".md")):
+                from _pytest.doctest import DoctestItem, DoctestTextfile
 
-                filename = nodeid.split("::")[0]
-                if filename not in parents:
-                    if filename.endswith((".txt", ".rst", ".md")):
-                        parents[filename] = DoctestTextfile(filename, None)
-                    else:
-                        parents[filename] = DoctestModule(filename, None)
-                item = DoctestItem(nodeid, None)
-                item.parent = parents[filename]
-                item.nodeid = nodeid
-                item._pytester_path = self.path
+                parent = DoctestTextfile(path_str, None)
+                item = DoctestItem(path_str, None)
+                item.parent = parent
+                item.nodeid = path_str
                 items.append(item)
         return items, reprec
 
-    def getitems(self, source):
-        """Collect Function item nodes from the source in-process (a light
-        collection: module import + test functions/Test-class methods with
-        merged marks — enough for the mark-evaluation tests; no fixtures)."""
+    def _collect_items_from_path(self, path):
+        """In-process collection of Function items from an existing .py file.
+
+        Returns items with full mark data (own_markers, get_closest_marker,
+        keywords) — the same objects getitems() returns, but without needing
+        source text."""
         import importlib.util
         import pathlib
         import sys
 
         from pytest._marks import get_unpacked_marks
-        from pytest._node import Function
+        from pytest._node import Function, _ModuleCollector, _NodeSession
 
-        # makepyfile returns a py.path.local under the legacy testdir fixture;
-        # normalize to pathlib.Path for .stem/.name.
-        path = pathlib.Path(str(self.makepyfile(source)))
+        path = pathlib.Path(str(path))
+        if not path.is_absolute():
+            path = self.path / path
         module_name = path.stem
         spec = importlib.util.spec_from_file_location(module_name, path)
-        assert spec is not None and spec.loader is not None
+        if spec is None or spec.loader is None:
+            return []
         module = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = module
-        spec.loader.exec_module(module)
+        try:
+            spec.loader.exec_module(module)
+        except Exception:
+            return []
 
         config = self._request.config if self._request is not None else None
         module_marks = get_unpacked_marks(module)
-
-        # A per-call session + module collector so item.session._setupstate
-        # and item.listchain() work for the in-process SetupState tests.
-        from pytest._node import _ModuleCollector, _NodeSession
-
         session = _NodeSession(config)
         module_collector = _ModuleCollector(module, session, path)
 
@@ -756,9 +752,6 @@ class Pytester:
             node.module = module
             node.cls = cls
             node.parent = None
-            # node.session is a property returning a fresh _NodeSession (whose
-            # _setupstate is a full SetupState); only the module collector for
-            # listchain needs attaching.
             node._module_collector = module_collector
             if config is not None:
                 node.config = config
@@ -770,11 +763,33 @@ class Pytester:
                 items.append(make_item(obj, name, []))
             elif name.startswith("Test") and isinstance(obj, type):
                 class_marks = get_unpacked_marks(obj)
-                for mname, mobj in vars(obj).items():
-                    mobj = getattr(mobj, "__func__", mobj)
-                    if mname.startswith("test") and callable(mobj):
-                        items.append(make_item(mobj, f"{name}::{mname}", class_marks, cls=obj))
+                # Collect test methods including inherited ones (dir()), then
+                # sort by source line so the order matches definition order.
+                methods = []
+                seen = set()
+                for mname in dir(obj):
+                    if not mname.startswith("test") or mname in seen:
+                        continue
+                    seen.add(mname)
+                    mobj = getattr(obj, mname, None)
+                    if mobj is None or not callable(mobj):
+                        continue
+                    func = getattr(mobj, "__func__", mobj)
+                    if callable(func):
+                        lineno = getattr(getattr(func, "__code__", None), "co_firstlineno", 0)
+                        methods.append((lineno, mname, func))
+                for _ln, mname, func in sorted(methods):
+                    items.append(make_item(func, f"{name}::{mname}", class_marks, cls=obj))
         return items
+
+    def getitems(self, source):
+        """Collect Function item nodes from the source in-process (a light
+        collection: module import + test functions/Test-class methods with
+        merged marks — enough for the mark-evaluation tests; no fixtures)."""
+        import pathlib
+
+        path = pathlib.Path(str(self.makepyfile(source)))
+        return self._collect_items_from_path(path)
 
     def getitem(self, source, funcname="test_func"):
         """The single collected item named funcname (upstream getitem)."""
@@ -957,6 +972,18 @@ class _RelaySession:
         self.items = items
 
 
+class _RelayCollectReport:
+    """Lightweight CollectReport reconstructed from relay JSON."""
+
+    def __init__(self, nodeid, outcome, longrepr):
+        self.nodeid = nodeid
+        self.outcome = outcome
+        self.longrepr = longrepr
+        self.failed = outcome == "failed"
+        self.passed = outcome == "passed"
+        self.skipped = outcome == "skipped"
+
+
 class _RelayHookCall:
     """Reconstructed hook call record; named attributes come from relay JSON."""
 
@@ -977,6 +1004,13 @@ class _RelayHookCall:
         if hook == "pytest_collection_finish":
             items = [_RelayItem(i["name"], i["nodeid"]) for i in event.get("session_items", [])]
             return cls(hook, {"session": _RelaySession(items)})
+        if hook == "pytest_collectreport":
+            report = _RelayCollectReport(
+                event.get("nodeid", ""),
+                event.get("outcome", ""),
+                event.get("longrepr", ""),
+            )
+            return cls(hook, {"report": report})
         return cls(hook, {k: v for k, v in event.items() if k != "hook"})
 
 

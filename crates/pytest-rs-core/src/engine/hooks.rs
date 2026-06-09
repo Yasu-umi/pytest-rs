@@ -157,6 +157,23 @@ impl Engine {
             )?;
         }
 
+        // session.add_marker() calls store in _session_state["session_markers"]; append
+        // them to every node's own_markers so -m and request.keywords both see them.
+        let session_markers: Vec<Bound<'_, PyAny>> = py
+            .import("pytest._node")?
+            .call_method0("get_session_markers")?
+            .try_iter()?
+            .filter_map(|m| m.ok())
+            .collect();
+        if !session_markers.is_empty() {
+            for node in node_list.iter() {
+                let own = node.getattr("own_markers")?;
+                for marker in &session_markers {
+                    own.call_method1("append", (marker,))?;
+                }
+            }
+        }
+
         // Read back order/membership (by nodeid) and any added markers.
         let mut by_nodeid: std::collections::HashMap<String, crate::collect::TestItem> =
             std::mem::take(items)

@@ -630,23 +630,48 @@ pub(crate) fn collect_class(
     let mut class_marks = read_marks(py, cls)?;
     class_marks.extend(clone_marks(py, module_marks));
 
-    for pair in cls_dict.call_method0("items")?.try_iter()? {
-        let (name, value): (String, Bound<'_, PyAny>) = pair?.extract()?;
-        // cls.__dict__ stores staticmethods/classmethods as descriptors;
-        // unwrap so mark reading and async introspection see the underlying
-        // function (#12863). The runner re-binds via the instance, so the
-        // descriptor semantics are preserved at call time.
-        let builtins = py.import("builtins")?;
-        let is_static = value.is_instance(&builtins.getattr("staticmethod")?)?;
-        let is_classmethod = value.is_instance(&builtins.getattr("classmethod")?)?;
+    let builtins = py.import("builtins")?;
+    let staticmethod_type = builtins.getattr("staticmethod")?;
+    let classmethod_type = builtins.getattr("classmethod")?;
+
+    // Use dir(cls) instead of cls.__dict__ so inherited test methods are collected.
+    // Walk the MRO to find the raw descriptor for each name (detects staticmethod/classmethod).
+    let dir_list: Vec<String> = builtins.getattr("dir")?.call1((cls,))?.extract()?;
+    let mro: Vec<Bound<'_, PyAny>> = cls.getattr("__mro__")?.extract()?;
+
+    let mut method_entries: Vec<(u32, String, Bound<'_, PyAny>, bool)> = Vec::new();
+
+    for name in &dir_list {
+        let mut raw_opt: Option<Bound<'_, PyAny>> = None;
+        for base in &mro {
+            let base_dict = base.getattr("__dict__")?;
+            if base_dict.contains(name.as_str())? {
+                raw_opt = Some(base_dict.get_item(name.as_str())?);
+                break;
+            }
+        }
+        let Some(raw) = raw_opt else { continue };
+
+        let is_static = raw.is_instance(&staticmethod_type)?;
+        let is_classmethod = raw.is_instance(&classmethod_type)?;
         let value = if is_static || is_classmethod {
-            value.getattr("__func__")?
+            raw.getattr("__func__")?
         } else {
-            value
+            raw
         };
+
         if !value.is_callable() {
             continue;
         }
+
+        let lineno = first_lineno(py, &value);
+        method_entries.push((lineno, name.clone(), value, is_static));
+    }
+
+    // Sort by source line for deterministic definition-order traversal.
+    method_entries.sort_by_key(|(ln, name, ..)| (*ln, name.clone()));
+
+    for (_, name, value, is_static) in method_entries {
         if value.hasattr("_pytestfixturefunction")? {
             register_fixture_def(
                 py,
@@ -1336,13 +1361,16 @@ pub(crate) fn read_marks(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<Vec
     // get_unpacked_marks (upstream): classes merge their whole MRO's own
     // pytestmark lists, base classes first; MarkDecorators unwrap to Marks.
     let mut marks = Vec::new();
-    let Ok(entries) = py
+    let get_unpacked = match py
         .import("pytest._marks")
         .and_then(|m| m.getattr("get_unpacked_marks"))
-        .and_then(|f| f.call1((obj,)))
-    else {
-        return Ok(marks);
+    {
+        Ok(f) => f,
+        Err(_) => return Ok(marks),
     };
+    // Propagate TypeError (invalid pytestmark) so the caller can report it
+    // as a collection error; swallow only import/getattr failures above.
+    let entries = get_unpacked.call1((obj,))?;
     let Ok(iter) = entries.try_iter() else {
         return Ok(marks);
     };

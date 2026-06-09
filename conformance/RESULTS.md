@@ -615,16 +615,16 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | pass % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 1735 | 418 | 15 | 24 | 2192 | 79.2% | 6 | 45 | 63 |
+| pytest | 9.0.3 | 1775 | 425 | 15 | 24 | 2239 | 79.3% | 5 | 45 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 98.9% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 19 | 0 | 4 | 209 | 89.0% | 0 | 1 | 0 |
-| pytest-xdist | v3.8.0 | 90 | 7 | 0 | 0 | 97 | 92.8% | 0 | 1 | 6 |
+| pytest-xdist | v3.8.0 | 27 | 4 | 0 | 0 | 31 | 87.1% | 0 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 91 | 31 | 0 | 1 | 123 | 74.0% | 4 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 41 | 97.6% | 1 | 1 | 0 |
 | anyio | 4.13.0 | 2860 | 0 | 0 | 302 | 3162 | 90.4% | 26 | 26 | 0 |
-| pytest-mypy | v1.0.1 | 28 | 50 | 0 | 0 | 78 | 35.9% | 0 | 1 | 0 |
+| pytest-mypy | v1.0.1 | 0 | 0 | 0 | 0 | 0 | - | 0 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-subtests | v0.14.2 | 10 | 22 | 0 | 0 | 32 | 31.2% | 0 | 1 | 0 |
 | pytest-metadata | v2.0.4 | 6 | 4 | 0 | 0 | 10 | 60.0% | 0 | 1 | 0 |
@@ -657,30 +657,30 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/logging/test_reporting.py | failed | 44 | 8 | 0 | 0 |
 | testing/test_assertion.py | failed | 145 | 15 | 0 | 0 |
 | testing/test_cacheprovider.py | failed | 56 | 1 | 0 | 0 |
-| testing/test_capture.py | failed | 106 | 1 | 0 | 1 |
+| testing/test_capture.py | failed | 130 | 1 | 0 | 1 |
 | testing/test_collect_imported_tests.py | failed | 2 | 1 | 0 | 0 |
-| testing/test_collection.py | failed | 61 | 52 | 0 | 3 |
+| testing/test_collection.py | failed | 59 | 54 | 0 | 3 |
 | testing/test_compat.py | failed | 6 | 4 | 0 | 0 |
 | testing/test_config.py | failed | 138 | 70 | 0 | 1 |
 | testing/test_conftest.py | failed | 20 | 22 | 11 | 1 |
-| testing/test_doctest.py | passed | 139 | 0 | 0 | 1 |
+| testing/test_doctest.py | failed | 133 | 6 | 0 | 1 |
 | testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 |
 | testing/test_faulthandler.py | failed | 5 | 7 | 0 | 0 |
 | testing/test_helpconfig.py | failed | 2 | 10 | 0 | 0 |
 | testing/test_junitxml.py | failed | 129 | 7 | 1 | 0 |
 | testing/test_link_resolve.py | failed | 0 | 1 | 0 | 0 |
 | testing/test_main.py | failed | 16 | 8 | 0 | 0 |
-| testing/test_mark.py | failed | 88 | 18 | 0 | 0 |
+| testing/test_mark.py | failed | 100 | 6 | 0 | 0 |
 | testing/test_monkeypatch.py | passed | 33 | 0 | 0 | 2 |
 | testing/test_nodes.py | failed | 3 | 5 | 0 | 0 |
 | testing/test_pastebin.py | failed | 0 | 5 | 3 | 0 |
 | testing/test_pytester.py | failed | 44 | 8 | 0 | 0 |
 | testing/test_python_path.py | failed | 2 | 4 | 0 | 0 |
 | testing/test_recwarn.py | passed | 63 | 0 | 0 | 0 |
-| testing/test_runner.py | failed | 33 | 19 | 0 | 0 |
-| testing/test_runner_xunit.py | failed | 8 | 5 | 0 | 0 |
+| testing/test_runner.py | failed | 39 | 27 | 0 | 0 |
+| testing/test_runner_xunit.py | failed | 9 | 4 | 0 | 0 |
 | testing/test_scope.py | failed | 0 | 4 | 0 | 0 |
-| testing/test_session.py | failed | 9 | 8 | 0 | 0 |
+| testing/test_session.py | failed | 14 | 12 | 0 | 0 |
 | testing/test_setuponly.py | failed | 22 | 4 | 0 | 0 |
 | testing/test_setupplan.py | failed | 1 | 2 | 0 | 0 |
 | testing/test_skipping.py | failed | 90 | 2 | 0 | 0 |
@@ -763,7 +763,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| testing/acceptance_test.py | failed | 90 | 7 | 0 | 0 |
+| testing/acceptance_test.py | failed | 27 | 4 | 0 | 0 |
 
 </details>
 
@@ -844,7 +844,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| tests/test_pytest_mypy.py | failed | 28 | 50 | 0 | 0 |
+| tests/test_pytest_mypy.py | timeout | 0 | 0 | 0 | 0 |
 
 </details>
 

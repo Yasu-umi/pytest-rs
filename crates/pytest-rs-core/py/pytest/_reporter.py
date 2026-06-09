@@ -155,9 +155,15 @@ def logfinish(nodeid: str, location: tuple) -> None:
 
 def collectreport(report: Any) -> None:
     reporter = replacement()
-    if reporter is None:
-        return
-    _call(reporter, "pytest_collectreport", report=report)
+    if reporter is not None:
+        _call(reporter, "pytest_collectreport", report=report)
+    # Also dispatch to instance-registered plugins (e.g., relay plugin).
+    from pytest._pluginmanager import instance_hook_impls
+    for impl in instance_hook_impls("pytest_collectreport"):
+        try:
+            impl(report=report)
+        except Exception:
+            pass
 
 
 def _feed_warnings(reporter: Any) -> None:
@@ -190,6 +196,19 @@ def _feed_warnings(reporter: Any) -> None:
             )
         if entries:
             stats["warnings"] = entries
+    except Exception:
+        pass
+
+
+def feed_default(report: Any) -> None:
+    """Feed a report to the default reporter's stats without printing terminal
+    output. Used in native mode so conftest pytest_terminal_summary hooks can
+    access terminalreporter.stats['passed'] etc."""
+    if _default is None:
+        return
+    try:
+        category, _, _ = _default._gettestkindstatus(report)
+        _default._add_stats(category, [report])
     except Exception:
         pass
 

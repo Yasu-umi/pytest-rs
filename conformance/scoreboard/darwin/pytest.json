@@ -71,7 +71,7 @@
       "file": "testing/test_capture.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 106,
+      "passed": 130,
       "failed": 1,
       "skipped": 1,
       "errors": 0
@@ -89,8 +89,8 @@
       "file": "testing/test_collection.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 61,
-      "failed": 52,
+      "passed": 59,
+      "failed": 54,
       "skipped": 3,
       "errors": 0
     },
@@ -123,10 +123,10 @@
     },
     {
       "file": "testing/test_doctest.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 139,
-      "failed": 0,
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 133,
+      "failed": 6,
       "skipped": 1,
       "errors": 0
     },
@@ -188,8 +188,8 @@
       "file": "testing/test_mark.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 88,
-      "failed": 18,
+      "passed": 100,
+      "failed": 6,
       "skipped": 0,
       "errors": 0
     },
@@ -251,8 +251,8 @@
       "file": "testing/test_runner.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 33,
-      "failed": 19,
+      "passed": 39,
+      "failed": 27,
       "skipped": 0,
       "errors": 0
     },
@@ -260,8 +260,8 @@
       "file": "testing/test_runner_xunit.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 8,
-      "failed": 5,
+      "passed": 9,
+      "failed": 4,
       "skipped": 0,
       "errors": 0
     },
@@ -278,8 +278,8 @@
       "file": "testing/test_session.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 9,
-      "failed": 8,
+      "passed": 14,
+      "failed": 12,
       "skipped": 0,
       "errors": 0
     },

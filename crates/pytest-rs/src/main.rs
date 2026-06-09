@@ -1,3 +1,4 @@
+use pytest_rs_core::pyo3::types::PyAnyMethods;
 use pytest_rs_core::pyo3::Python;
 use pytest_rs_core::{Config, Engine, OptionParser, Plugin};
 
@@ -79,5 +80,12 @@ fn main() {
 
     let mut engine = Engine::new(plugins, config);
     let code = Python::attach(|py| engine.run(py));
+    // Run Python atexit handlers before std::process::exit, because
+    // std::process::exit bypasses Python's own cleanup (including atexit).
+    Python::attach(|py| {
+        if let Ok(m) = py.import("atexit") {
+            let _ = m.call_method0("_run_exitfuncs");
+        }
+    });
     std::process::exit(code);
 }

@@ -25,8 +25,11 @@ def get_empty_parameterset_mark(config, argnames, func):
     if requested_mark == "fail_at_collect":
         lineno = getattr(getattr(func, "__code__", None), "co_firstlineno", 0)
         fname = getattr(func, "__name__", "?")
-        raise Collector.CollectError(f"Empty parameter set in '{fname}' at line {lineno + 1}")
-    raise LookupError(requested_mark)
+        raise Collector.CollectError(f"Empty parameter set in '{fname}' at line {lineno}")
+    import pytest
+    raise pytest.UsageError(
+        f"{EMPTY_PARAMETERSET_OPTION!r} has unknown value {requested_mark!r}",
+    )
 
 
 def pytest_configure(config):

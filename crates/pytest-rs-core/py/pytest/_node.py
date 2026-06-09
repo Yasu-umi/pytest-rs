@@ -109,6 +109,10 @@ class Collector:
             marker = Mark(marker)
         elif isinstance(marker, MarkDecorator):
             marker = marker.mark
+        else:
+            raise ValueError(
+                f"is not a string or pytest.mark.* Marker object: {marker!r}"
+            )
         if append:
             self.own_markers.append(marker)
         else:
@@ -347,7 +351,7 @@ class DoctestNode:
 # Session.shouldfail / shouldstop set by plugins (pytest-timeout's session
 # deadline) or the engine (--maxfail / --stepwise): the runner polls these
 # between items and aborts with the message banner.
-_session_state: dict = {"shouldfail": None, "shouldstop": None, "items": []}
+_session_state: dict = {"shouldfail": None, "shouldstop": None, "items": [], "session_markers": []}
 
 
 def session_shouldfail():
@@ -552,14 +556,51 @@ class _NodeSession:
     def testscollected(self):
         return len(_session_state["items"])
 
+    def add_marker(self, marker, append=True):
+        from pytest._marks import Mark, MarkDecorator
+
+        if isinstance(marker, str):
+            marker = Mark(marker)
+        elif isinstance(marker, MarkDecorator):
+            marker = marker.mark
+        else:
+            raise ValueError(
+                f"is not a string or pytest.mark.* Marker object: {marker!r}"
+            )
+        _session_state["session_markers"].append(marker)
+
+
+def get_session_markers():
+    return _session_state["session_markers"]
+
 
 class Node(Item):
     def __init__(
-        self, nodeid, name, marks, fixturenames=None, function=None, path=None, lineno=None
+        self,
+        nodeid=None,
+        name=None,
+        marks=None,
+        fixturenames=None,
+        function=None,
+        path=None,
+        lineno=None,
+        parent=None,
+        **_,
     ):
+        if marks is None and nodeid is None:
+            # Generic node created via Node.from_parent(parent, name=...).
+            # Set attributes directly (avoids Collector.__init__'s self.session
+            # assignment, which would conflict with our read-only property).
+            self.name = name or ""
+            self.parent = parent
+            self.config = getattr(parent, "config", None)
+            self.path = path or getattr(parent, "path", None)
+            self.own_markers = list(getattr(parent, "own_markers", []))
+            self._nodeid = None
+            return
         self.nodeid = nodeid
         self.name = name
-        self.own_markers = list(marks)
+        self.own_markers = list(marks or [])
         self.fixturenames = list(fixturenames or [])
         self.function = function
         self.obj = function
@@ -638,6 +679,10 @@ class Node(Item):
             marker = Mark(marker)
         elif isinstance(marker, MarkDecorator):
             marker = marker.mark
+        else:
+            raise ValueError(
+                f"is not a string or pytest.mark.* Marker object: {marker!r}"
+            )
         if append:
             self.own_markers.append(marker)
         else:

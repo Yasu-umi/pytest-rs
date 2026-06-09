@@ -119,6 +119,21 @@ pub fn reporter_logreport(py: Python<'_>, report: &Bound<'_, PyAny>) {
     }
 }
 
+/// Feed a report to the default reporter's stats (native mode only).
+/// Populates terminalreporter.stats so conftest pytest_terminal_summary hooks
+/// can access stats['passed'] etc. without the default reporter printing.
+pub fn reporter_feed_default(py: Python<'_>, report: &Bound<'_, PyAny>) {
+    let result = (|| -> PyResult<()> {
+        py.import("pytest._reporter")?
+            .getattr("feed_default")?
+            .call1((report,))?;
+        Ok(())
+    })();
+    if let Err(err) = result {
+        eprintln!("INTERNAL ERROR: {}", format_exception(py, &err));
+    }
+}
+
 /// Drive the replacement reporter's pytest_runtest_logfinish.
 pub fn reporter_logfinish(py: Python<'_>, item: &TestItem) {
     let result = (|| -> PyResult<()> {

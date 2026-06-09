@@ -390,7 +390,7 @@ impl Engine {
             );
             collection.last_nodeid = Some(item.nodeid.clone());
             for report in reports {
-                crate::runner::fire_logreport_hooks(py, &self.session, &report, Some(lineno));
+                crate::runner::fire_logreport_hooks(py, &self.session, &report, Some(lineno), Some(item));
                 send(&WorkerMsg::Report { report });
             }
             let item = &collection.items[index];

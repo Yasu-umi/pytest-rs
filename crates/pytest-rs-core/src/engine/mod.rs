@@ -273,11 +273,10 @@ impl Engine {
                 self.session
                     .collect_errors
                     .push((nodeid.clone(), err.clone()));
-                // Delegated mode: the replacement reporter sees a failed
-                // CollectReport (sugar prints these instantly).
-                if self.session.custom_reporter.is_some() {
-                    python::reporter_collect_error(py, &nodeid, &err);
-                }
+                // Delegated mode: replacement reporter sees a failed CollectReport
+                // (sugar prints them instantly). Native mode: instance plugins
+                // (e.g., relay plugin) still need to observe collect errors.
+                python::reporter_collect_error(py, &nodeid, &err);
                 self.session.reports.push(crate::report::TestReport {
                     nodeid,
                     phase: Phase::Setup,
