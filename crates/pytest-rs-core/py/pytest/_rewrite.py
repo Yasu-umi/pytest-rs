@@ -8,8 +8,17 @@ CPython ast (locations copied node-by-node, so tracebacks stay exact).
 import ast
 import importlib.machinery
 import importlib.util
+import marshal
 import os
 import sys
+import types
+
+# Rewritten bytecode is cached in __pycache__ under a pytest-rs-specific pyc
+# tag, so it can never be confused with CPython's own (non-rewritten) bytecode
+# for the same file. Bump _CACHE_VERSION whenever _AssertRewriter's output
+# changes, to invalidate any stale rewritten pyc left on disk.
+_CACHE_VERSION = 1
+_PYC_TAIL = f".{sys.implementation.cache_tag}-pytestrs{_CACHE_VERSION}.pyc"
 
 _OPS = {
     ast.Eq: "==",
@@ -309,11 +318,66 @@ class _AssertRewriter(ast.NodeTransformer):
 
 class _RewriteLoader(importlib.machinery.SourceFileLoader):
     def get_code(self, fullname):
-        # Always compile from source, bypassing the bytecode cache:
-        # CPython's pyc validation (mtime seconds + size) misses the
-        # same-second same-size rewrites pytester does constantly.
+        # Cache rewritten bytecode in __pycache__ keyed on a *content hash*
+        # (PEP 552 checked-hash pyc), not mtime+size. The hash is what lets us
+        # cache where upstream's mtime-second granularity can't: it stays
+        # correct under pytester's same-second, same-size in-place rewrites
+        # (different content -> different hash -> recompile) while giving warm
+        # runs the rewritten-bytecode reuse that uncached compilation forgoes.
         path = self.get_filename(fullname)
-        return self.source_to_code(self.get_data(path), path)
+        source = self.get_data(path)
+        cache_path = self._cache_path(path)
+        code = self._read_pyc(source, cache_path)
+        if code is not None:
+            return code
+        code = self.source_to_code(source, path)
+        if not sys.dont_write_bytecode:
+            self._write_pyc(code, source, cache_path)
+        return code
+
+    @staticmethod
+    def _cache_path(source_path):
+        head, tail = os.path.split(source_path)
+        return os.path.join(head, "__pycache__", tail[:-len(".py")] + _PYC_TAIL)
+
+    @staticmethod
+    def _read_pyc(source, cache_path):
+        """Return the cached code object iff the pyc's embedded source hash
+        matches `source`; otherwise None. The pytest-rs tag + CPython magic
+        guard means a stale interpreter or non-rewritten pyc is never reused."""
+        try:
+            with open(cache_path, "rb") as fp:
+                data = fp.read()
+        except OSError:
+            return None
+        if len(data) < 16 or data[:4] != importlib.util.MAGIC_NUMBER:
+            return None
+        if int.from_bytes(data[4:8], "little") != 0b11:  # hash-based, checked
+            return None
+        if data[8:16] != importlib.util.source_hash(source):
+            return None
+        try:
+            code = marshal.loads(data[16:])
+        except Exception:
+            return None
+        return code if isinstance(code, types.CodeType) else None
+
+    @staticmethod
+    def _write_pyc(code, source, cache_path):
+        header = bytearray(importlib.util.MAGIC_NUMBER)
+        header += (0b11).to_bytes(4, "little")  # hash-based + check_source flags
+        header += importlib.util.source_hash(source)  # 8 bytes
+        try:
+            os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+            # Write to a process-unique temp then atomically rename, so parallel
+            # workers sharing a __pycache__ never observe a half-written pyc.
+            tmp = f"{cache_path}.{os.getpid()}"
+            with open(tmp, "wb") as fp:
+                fp.write(header)
+                fp.write(marshal.dumps(code))
+            os.replace(tmp, cache_path)
+        except OSError:
+            pass  # read-only dir etc.: skip caching, like upstream
 
     def source_to_code(self, data, path, *, _optimize=-1):
         tree = ast.parse(data, filename=path)
