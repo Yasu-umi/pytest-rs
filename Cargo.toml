@@ -45,3 +45,16 @@ ruff_text_size = { git = "https://github.com/astral-sh/ruff", tag = "0.15.16" }
 [profile.release]
 strip = true
 lto = "thin"
+
+# Profiling builds: release speed, but keep debug symbols and frame pointers
+# so py-spy/samply/cargo-flamegraph can symbolize the native (Rust) frames.
+# Build into a separate target dir to avoid clobbering release/debug artifacts:
+#   CARGO_TARGET_DIR=target-prof PYO3_PYTHON=... cargo build --profile profiling
+[profile.profiling]
+inherits = "release"
+strip = false
+debug = true
+lto = "thin"
+
+[profile.profiling.build-override]
+debug = true
