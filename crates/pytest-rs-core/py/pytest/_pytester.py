@@ -357,7 +357,7 @@ class Pytester:
         # the child as -W options (farthest first, so the closest wins).
         return self._runpytest(args, timeout=timeout, forward_filters=True)
 
-    def _runpytest(self, args, *, timeout=None, forward_filters=False):
+    def _runpytest(self, args, *, timeout=None, forward_filters=False, hook_relay=None):
         import os
         import subprocess
         import time
@@ -407,12 +407,21 @@ class Pytester:
             env["PYTEST_RS_FORWARDED_FILTERS"] = "\n".join(forwarded_filters)
         else:
             env.pop("PYTEST_RS_FORWARDED_FILTERS", None)
+        # Hook relay: when set, the child records selected hook events to a
+        # JSON file so InlineRunResult.getcalls() can reconstruct them.
+        extra_args = []
+        if hook_relay is not None:
+            hook_relay.unlink(missing_ok=True)
+            env["PYTEST_RS_HOOK_RELAY"] = str(hook_relay)
+            extra_args = ["-p", "pytest._hook_relay_plugin"]
+        else:
+            env.pop("PYTEST_RS_HOOK_RELAY", None)
         start = time.perf_counter()
         # cwd inherits like upstream's subprocess runs: the pytester fixture
         # chdir'd to self.path at setup, and a test that os.chdir()s deeper
         # means the nested run to resolve relative args from there.
         proc = subprocess.run(
-            [exe, f"--basetemp={basetemp}", *[str(arg) for arg in args]],
+            [exe, f"--basetemp={basetemp}", *extra_args, *[str(arg) for arg in args]],
             capture_output=True,
             text=True,
             timeout=timeout if timeout is not None else 120,
@@ -621,19 +630,34 @@ class Pytester:
             self._request.addfinalizer(config._ensure_unconfigure)
         return config
 
+    def _hook_relay_path(self, prefix):
+        n = sum(1 for p in self.path.glob(f".{prefix}-*"))
+        return self.path / f".{prefix}-{n}"
+
     def inline_run(self, *args):
         # No in-process runner: a subprocess -v run parsed into a
         # HookRecorder-shaped result (ret / assertoutcome / listoutcomes).
         # The child's output is echoed so capsys sees what an in-process
         # run would have printed.
+        import json
         import sys
 
-        result = self.runpytest("-v", *[str(arg) for arg in args])
+        hook_relay = self._hook_relay_path("hookrelay")
+        result = self._runpytest(
+            ("-v", *[str(arg) for arg in args]),
+            forward_filters=True,
+            hook_relay=hook_relay,
+        )
         if result.outlines:
             sys.stdout.write("\n".join(result.outlines) + "\n")
         if result.errlines:
             sys.stderr.write("\n".join(result.errlines) + "\n")
-        return InlineRunResult(result)
+        hook_events = []
+        try:
+            hook_events = json.loads(hook_relay.read_text(encoding="utf-8"))
+        except (OSError, Exception):
+            pass
+        return InlineRunResult(result, hook_events)
 
     def inline_runsource(self, source, *args):
         path = self.makepyfile(source)
@@ -644,8 +668,19 @@ class Pytester:
 
         Items are lightweight objects with .nodeid, .name, and .parent attributes.
         """
-        result = self.runpytest("--collect-only", "-q", *[str(arg) for arg in args])
-        reprec = InlineRunResult(result)
+        import json
+
+        hook_relay = self._hook_relay_path("hookrelay")
+        result = self._runpytest(
+            ("--collect-only", "-q", *[str(arg) for arg in args]),
+            hook_relay=hook_relay,
+        )
+        hook_events = []
+        try:
+            hook_events = json.loads(hook_relay.read_text(encoding="utf-8"))
+        except (OSError, Exception):
+            pass
+        reprec = InlineRunResult(result, hook_events)
         items = []
         parents: dict = {}
         for line in result.outlines:
@@ -904,6 +939,47 @@ class _OutcomeReport:
         return f"<OutcomeReport {self.nodeid!r} {self.when} {self.outcome}>"
 
 
+class _RelayItem:
+    """Lightweight reconstruction of a pytest node from relay JSON data."""
+
+    def __init__(self, name, nodeid):
+        self.name = name
+        self.nodeid = nodeid
+
+    def __repr__(self):
+        return f"<_RelayItem {self.nodeid!r}>"
+
+
+class _RelaySession:
+    """Lightweight reconstruction of session with .items from relay JSON data."""
+
+    def __init__(self, items):
+        self.items = items
+
+
+class _RelayHookCall:
+    """Reconstructed hook call record; named attributes come from relay JSON."""
+
+    def __init__(self, hook_name, kwargs):
+        self.__dict__.update(kwargs)
+        self._name = hook_name
+
+    def __repr__(self):
+        d = {k: v for k, v in self.__dict__.items() if k != "_name"}
+        return f"<_RelayHookCall {self._name!r}(**{d!r})>"
+
+    @classmethod
+    def _from_event(cls, event):
+        hook = event["hook"]
+        if hook == "pytest_deselected":
+            items = [_RelayItem(i["name"], i["nodeid"]) for i in event.get("items", [])]
+            return cls(hook, {"items": items})
+        if hook == "pytest_collection_finish":
+            items = [_RelayItem(i["name"], i["nodeid"]) for i in event.get("session_items", [])]
+            return cls(hook, {"session": _RelaySession(items)})
+        return cls(hook, {k: v for k, v in event.items() if k != "hook"})
+
+
 class InlineRunResult:
     """The subset of pytester's HookRecorder API used by upstream suites."""
 
@@ -916,9 +992,44 @@ class InlineRunResult:
         "ERROR": "failed",
     }
 
-    def __init__(self, run_result):
+    def __init__(self, run_result, hook_events=None):
         self._result = run_result
         self.ret = run_result.ret
+        self._hook_calls = [_RelayHookCall._from_event(e) for e in (hook_events or [])]
+
+    def getcalls(self, names):
+        """Return recorded hook calls matching the given name(s) (space-sep string or list)."""
+        if isinstance(names, str):
+            names = names.split()
+        return [c for c in self._hook_calls if c._name in names]
+
+    def getfailedcollections(self):
+        return [rep for rep in self.getreports("pytest_collectreport") if rep.failed]
+
+    def getreports(self, names=("pytest_collectreport", "pytest_runtest_logreport")):
+        return [c.report for c in self.getcalls(names) if hasattr(c, "report")]
+
+    def assert_contains(self, entries):
+        """Assert that recorded hook calls contain the given (name, expr) pairs in order."""
+        import sys
+
+        __tracebackhide__ = True
+        i = 0
+        entries = list(entries)
+        backlocals = dict(sys._getframe(1).f_locals)
+        while entries:
+            name, check = entries.pop(0)
+            for ind, call in enumerate(self._hook_calls[i:]):
+                if call._name == name:
+                    if eval(check, backlocals, call.__dict__):  # noqa: S307
+                        pass
+                    else:
+                        continue
+                    i += ind + 1
+                    break
+            else:
+                from pytest._outcomes import fail
+                fail(f"could not find {name!r} check {check!r}")
 
     def listoutcomes(self):
         outcomes = {"passed": [], "skipped": [], "failed": []}

@@ -187,13 +187,14 @@ impl Engine {
         if self.session.deselected_items.is_empty() {
             return Ok(());
         }
-        let hook_funcs: Vec<Py<pyo3::PyAny>> = self
-            .session
-            .py_hooks
-            .iter()
-            .filter(|hook| hook.name == "pytest_deselected")
-            .map(|hook| hook.func.clone_ref(py))
-            .collect();
+        let mut hook_funcs = python::instance_hook_funcs(py, "pytest_deselected");
+        hook_funcs.extend(
+            self.session
+                .py_hooks
+                .iter()
+                .filter(|hook| hook.name == "pytest_deselected")
+                .map(|hook| hook.func.clone_ref(py)),
+        );
         let delegated = self.session.custom_reporter.is_some();
         if hook_funcs.is_empty() && !delegated {
             return Ok(());
@@ -401,13 +402,14 @@ impl Engine {
     /// pytest_sessionfinish conftest/plugin hooks (session is not modeled;
     /// hooks asking for it receive None).
     pub(crate) fn fire_py_sessionfinish(&mut self, py: Python<'_>, code: i32) -> PyResult<()> {
-        let hook_funcs: Vec<Py<pyo3::PyAny>> = self
-            .session
-            .py_hooks
-            .iter()
-            .filter(|hook| hook.name == "pytest_sessionfinish")
-            .map(|hook| hook.func.clone_ref(py))
-            .collect();
+        let mut hook_funcs = python::instance_hook_funcs(py, "pytest_sessionfinish");
+        hook_funcs.extend(
+            self.session
+                .py_hooks
+                .iter()
+                .filter(|hook| hook.name == "pytest_sessionfinish")
+                .map(|hook| hook.func.clone_ref(py)),
+        );
         if hook_funcs.is_empty() {
             return Ok(());
         }
