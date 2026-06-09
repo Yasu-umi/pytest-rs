@@ -128,6 +128,7 @@ fn report_from_proxy(py: Python<'_>, report: &Bound<'_, PyAny>) -> PyResult<Test
         subtest_desc: None,
         sections: Vec::new(),
         rerun,
+        xfail_longrepr: None,
     })
 }
 

@@ -483,7 +483,8 @@ impl Config {
         // Core pytest options parsed into flags/values (queried via
         // get_flag/get_value); some are still inert and gain behavior as
         // features land.
-        const CORE_FLAGS: [&str; 22] = [
+        const CORE_FLAGS: [&str; 23] = [
+            "xfail-tb",      // show tracebacks for xfailed tests in XFAILURES
             "no-showlocals", // overrides an addopts --showlocals / -l
             "markers",       // list registered markers (ini + plugin-registered) and exit
             "strict-config",

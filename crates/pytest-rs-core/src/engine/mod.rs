@@ -276,6 +276,7 @@ impl Engine {
                     subtest_desc: None,
                     sections: Vec::new(),
                     rerun: false,
+                    xfail_longrepr: None,
                 });
             }
             // --maxfail aborting collection exits TESTS_FAILED with a
@@ -292,6 +293,10 @@ impl Engine {
                 };
                 #[cfg(not(feature = "xdist"))]
                 let dist_workers: Option<usize> = None;
+                // --no-summary suppresses the ERRORS section and short summary,
+                // like pytest's terminal-summary block (the count line and the
+                // Interrupted banner still show).
+                let no_summary = self.config.get_flag("no-summary");
                 if !self.config.no_terminal() {
                     #[cfg(feature = "xdist")]
                     if let Some(workers) = dist_workers {
@@ -314,7 +319,9 @@ impl Engine {
                         }
                         println!("{line}");
                     }
-                    self.print_collect_errors();
+                    if !no_summary {
+                        self.print_collect_errors();
+                    }
                 }
                 // A file that fails collection is a "last failed" entry.
                 if let Some(cache) = &self.cache {
@@ -327,7 +334,9 @@ impl Engine {
                 }
                 self.write_junit_xml(py);
                 if !self.config.no_terminal() {
-                    self.print_short_summary();
+                    if !no_summary {
+                        self.print_short_summary();
+                    }
                     if dist_workers.is_none() {
                         let banner = if maxfail_hit {
                             format!("stopping after {n_collect_errors} failures")
@@ -619,11 +628,13 @@ impl Engine {
             // until after the run, like pytest's terminal reporter.
             self.print_collect_errors();
             self.print_failures();
+            self.print_xfailures();
             if let Err(err) = self.print_plugin_summaries(py, code) {
                 eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
             }
             self.print_warnings_summary(py);
             self.print_passes();
+            self.print_xpasses();
         }
         self.write_junit_xml(py);
         if let Some(banner) = &self.session.dist_banner {
@@ -1026,6 +1037,7 @@ impl Engine {
                                 subtest_desc: None,
                                 sections: Vec::new(),
                                 rerun: false,
+                                xfail_longrepr: None,
                             });
                         }
                         Some(Err(message)) => errors.push((file.clone(), with_sections(message))),
@@ -1079,6 +1091,7 @@ impl Engine {
                                     subtest_desc: None,
                                     sections: Vec::new(),
                                     rerun: false,
+                                    xfail_longrepr: None,
                                 });
                             }
                         }
@@ -1147,6 +1160,7 @@ impl Engine {
                                 subtest_desc: None,
                                 sections: Vec::new(),
                                 rerun: false,
+                                xfail_longrepr: None,
                             });
                         } else {
                             errors.push((extra_file.clone(), python::format_exception(py, &err)));

@@ -127,6 +127,7 @@ pub fn pop_subtest_reports(
                 subtest_desc: Some(desc),
                 sections: Vec::new(),
                 rerun: false,
+                xfail_longrepr: None,
             });
         }
         Ok((reports, failed_fixture_subs))

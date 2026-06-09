@@ -216,6 +216,7 @@ pub(crate) fn report_from_err(
             subtest_desc: None,
             sections: Vec::new(),
             rerun: false,
+            xfail_longrepr: None,
         }
     } else if python::is_skipped(py, err) {
         // Imperative skips report where pytest.skip was raised; skips out
@@ -240,6 +241,7 @@ pub(crate) fn report_from_err(
             subtest_desc: None,
             sections: Vec::new(),
             rerun: false,
+            xfail_longrepr: None,
         }
     } else {
         TestReport {
@@ -258,6 +260,7 @@ pub(crate) fn report_from_err(
             // appends them to the longrepr at render time.
             sections: python::log_failure_sections(py),
             rerun: false,
+            xfail_longrepr: None,
         }
     }
 }

@@ -44,6 +44,11 @@ pub struct TestReport {
     /// "rerun", not "failed". Always false on natively produced reports.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub rerun: bool,
+    /// For an xfailed report, the original failure traceback. longrepr holds
+    /// the xfail reason (for the short summary); this retains the real
+    /// traceback so the XFAILURES section (--xfail-tb) can render it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub xfail_longrepr: Option<String>,
 }
 
 impl TestReport {

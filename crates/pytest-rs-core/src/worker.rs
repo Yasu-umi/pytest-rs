@@ -36,6 +36,7 @@ fn send_collect_error(nodeid: &str, message: String) {
             subtest_desc: None,
             sections: Vec::new(),
             rerun: false,
+            xfail_longrepr: None,
         },
     });
     send(&WorkerMsg::Report {
@@ -49,6 +50,7 @@ fn send_collect_error(nodeid: &str, message: String) {
             subtest_desc: None,
             sections: Vec::new(),
             rerun: false,
+            xfail_longrepr: None,
         },
     });
 }

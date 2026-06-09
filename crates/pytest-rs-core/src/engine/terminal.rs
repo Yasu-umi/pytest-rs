@@ -429,6 +429,98 @@ impl Engine {
         }
     }
 
+    /// --xfail-tb: the XFAILURES section, showing the retained traceback of
+    /// each xfailed test (pytest's summary_xfailures; off unless --xfail-tb,
+    /// suppressed by --tb=no).
+    pub(crate) fn print_xfailures(&self) {
+        if !self.config.get_flag("xfail-tb") {
+            return;
+        }
+        let style = self.config.get_value("tb").unwrap_or("auto");
+        if style == "no" {
+            return;
+        }
+        let xfailures: Vec<_> = self
+            .session
+            .reports
+            .iter()
+            .filter(|r| {
+                r.outcome == Outcome::XFailed
+                    && r.phase == Phase::Call
+                    && r.xfail_longrepr.is_some()
+            })
+            .collect();
+        if xfailures.is_empty() {
+            return;
+        }
+        println!("\n{}", center_banner("XFAILURES"));
+        let show_capture = self.config.get_value("show-capture").unwrap_or("all");
+        for report in &xfailures {
+            let tb = report.xfail_longrepr.as_deref().unwrap_or_default();
+            // --tb=line: the crashline only, no per-test heading (parity with
+            // summary_failures_combined's line branch).
+            if style == "line" {
+                println!("{tb}");
+                continue;
+            }
+            let name = Self::failure_title(&report.nodeid);
+            println!(
+                "{}",
+                crate::tw::markup(&center_named(&name), &[crate::tw::RED, crate::tw::BOLD])
+            );
+            println!("{tb}");
+            for (title, body) in &report.sections {
+                if let Some(stream) = title.strip_prefix("Captured ") {
+                    let shown = match show_capture {
+                        "no" => false,
+                        "all" => true,
+                        want => stream.starts_with(want),
+                    };
+                    if !shown {
+                        continue;
+                    }
+                }
+                println!("{:-^80}", format!(" {title} "));
+                println!("{}", body.trim_end_matches('\n'));
+            }
+        }
+    }
+
+    /// -rX: the XPASSES section, xpassed tests' captured output (pytest's
+    /// summary_xpasses; suppressed by --tb=no, only tests with captured
+    /// sections get a heading).
+    pub(crate) fn print_xpasses(&self) {
+        if !self.report_chars().contains('X') || self.config.get_value("tb") == Some("no") {
+            return;
+        }
+        let xpassed: Vec<_> = self
+            .session
+            .reports
+            .iter()
+            .filter(|r| r.outcome == Outcome::XPassed && r.phase == Phase::Call)
+            .collect();
+        if xpassed.is_empty() {
+            return;
+        }
+        println!("{}", center_banner("XPASSES"));
+        for report in xpassed {
+            if report.sections.is_empty() {
+                continue;
+            }
+            println!(
+                "{}",
+                crate::tw::markup(
+                    &center_named(&Self::failure_title(&report.nodeid)),
+                    &[crate::tw::GREEN, crate::tw::BOLD]
+                )
+            );
+            for (title, text) in &report.sections {
+                println!("{:-^80}", format!(" {title} "));
+                println!("{}", text.trim_end_matches('\n'));
+            }
+        }
+    }
+
     /// The "short test summary info" section, controlled by -r chars.
     /// Groups print in the order the chars were given, matching pytest.
     pub(crate) fn print_short_summary(&self) {

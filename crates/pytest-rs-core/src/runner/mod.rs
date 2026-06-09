@@ -420,6 +420,7 @@ fn run_custom_item(py: Python<'_>, config: &Config, item: &TestItem) -> Vec<Test
             subtest_desc: None,
             sections: Vec::new(),
             rerun: false,
+            xfail_longrepr: None,
         });
     }
     reports
@@ -470,6 +471,7 @@ pub(crate) fn run_one_body(
                 subtest_desc: None,
                 sections: Vec::new(),
                 rerun: false,
+                xfail_longrepr: None,
             });
             return reports;
         }
@@ -522,6 +524,7 @@ pub(crate) fn run_one_body(
             subtest_desc: None,
             sections: Vec::new(),
             rerun: false,
+            xfail_longrepr: None,
         });
         return reports;
     }
@@ -821,6 +824,7 @@ pub(crate) fn run_one_body(
         subtest_desc: None,
         sections: Vec::new(),
         rerun: false,
+        xfail_longrepr: None,
     });
 
     if setup_show_active(config) {
@@ -880,6 +884,7 @@ pub(crate) fn run_one_body(
                     subtest_desc: None,
                     sections: Vec::new(),
                     rerun: false,
+                    xfail_longrepr: None,
                 });
                 teardown_one(py, plugins, session, config, item, true, &mut reports);
                 close_item_filters(py);
@@ -957,6 +962,7 @@ pub(crate) fn run_one_body(
             subtest_desc: None,
             sections: python::log_failure_sections(py),
             rerun: false,
+            xfail_longrepr: None,
         },
         Ok(false) => {
             if item.is_coroutine {
@@ -978,6 +984,7 @@ pub(crate) fn run_one_body(
                     subtest_desc: None,
                     sections: Vec::new(),
                     rerun: false,
+                    xfail_longrepr: None,
                 }
             } else {
                 match python::call_with_kwargs(py, &callable, &kwargs) {
@@ -991,6 +998,7 @@ pub(crate) fn run_one_body(
                         subtest_desc: None,
                         sections: python::log_failure_sections(py),
                         rerun: false,
+                        xfail_longrepr: None,
                     },
                     Err(err) => {
                         if let Some(code) = python::session_abort_code(py, &err) {
@@ -1029,6 +1037,10 @@ pub(crate) fn run_one_body(
         match report.outcome {
             Outcome::Failed if raises_ok => TestReport {
                 outcome: Outcome::XFailed,
+                // Keep the failure traceback so --xfail-tb can render it in the
+                // XFAILURES section; longrepr becomes the xfail reason (the
+                // short summary's "XFAIL nodeid - reason").
+                xfail_longrepr: report.longrepr.clone(),
                 longrepr: Some(xf.reason.clone()),
                 ..report
             },
@@ -1220,6 +1232,7 @@ fn teardown_one(
             // (pytest writes junit system-out from it).
             sections: python::log_failure_sections(py),
             rerun: false,
+            xfail_longrepr: None,
         });
     } else {
         reports.push(TestReport {
@@ -1240,6 +1253,7 @@ fn teardown_one(
             // appends them to the longrepr at render time.
             sections: python::log_failure_sections(py),
             rerun: false,
+            xfail_longrepr: None,
         });
     }
     python::log_finish_item(py);
@@ -1292,6 +1306,7 @@ pub(crate) fn teardown_scope_reported(
         subtest_desc: None,
         sections,
         rerun: false,
+        xfail_longrepr: None,
     })
 }
 
