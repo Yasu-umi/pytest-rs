@@ -224,8 +224,8 @@
       "file": "testing/test_pytester.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 42,
-      "failed": 11,
+      "passed": 44,
+      "failed": 8,
       "skipped": 0,
       "errors": 0
     },
