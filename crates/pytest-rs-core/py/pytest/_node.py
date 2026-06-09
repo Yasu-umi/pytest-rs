@@ -393,12 +393,104 @@ class _CallSpec:
         self.id = id
 
 
+def _call_optional_arg(func, arg):
+    """Call an xunit function with the node arg if it accepts one, else
+    with no arguments (pytest's _call_with_optional_argument)."""
+    import inspect
+
+    try:
+        nparams = len(inspect.signature(func).parameters)
+    except (TypeError, ValueError):
+        nparams = 1
+    if nparams:
+        func(arg)
+    else:
+        func()
+
+
 class _SetupState:
-    """Stand-in for pytest's SetupState (item.session._setupstate): a mutable
-    stack of collectors. pytest-rs runs each item afresh, so it stays empty."""
+    """pytest's SetupState (item.session._setupstate): a stack of collectors
+    set up along the path to an item, with per-node finalizers. The engine
+    runs items natively and never drives this, but in-process tests
+    (test_runner's TestSetupState) construct items and exercise it directly."""
 
     def __init__(self):
-        self.stack = []
+        # Insertion-ordered: node -> (finalizers, cached setup exception).
+        self.stack = {}
+
+    def setup(self, item):
+        from pytest._outcomes import OutcomeException
+
+        needed = item.listchain()
+        for col, (_fin, exc) in self.stack.items():
+            assert col in needed, "previous item was not torn down properly"
+            if exc:
+                raise exc[0].with_traceback(exc[1])
+        for col in needed[len(self.stack) :]:
+            self.stack[col] = ([col.teardown], None)
+            try:
+                col.setup()
+            except (Exception, OutcomeException) as exc:
+                self.stack[col] = (self.stack[col][0], (exc, exc.__traceback__))
+                raise
+
+    def addfinalizer(self, finalizer, node):
+        assert node and not isinstance(node, tuple)
+        assert callable(finalizer)
+        assert node in self.stack, (node, self.stack)
+        self.stack[node][0].append(finalizer)
+
+    def teardown_exact(self, nextitem):
+        from pytest._outcomes import OutcomeException
+
+        needed = (nextitem and nextitem.listchain()) or []
+        exceptions = []
+        while self.stack:
+            if list(self.stack.keys()) == needed[: len(self.stack)]:
+                break
+            node, (finalizers, _exc) = self.stack.popitem()
+            node_exceptions = []
+            while finalizers:
+                fin = finalizers.pop()
+                try:
+                    fin()
+                except (Exception, OutcomeException) as e:
+                    node_exceptions.append(e)
+            if len(node_exceptions) == 1:
+                exceptions.extend(node_exceptions)
+            elif node_exceptions:
+                exceptions.append(
+                    BaseExceptionGroup(
+                        f"errors while tearing down {node!r}", node_exceptions[::-1]
+                    )
+                )
+        if len(exceptions) == 1:
+            raise exceptions[0]
+        elif exceptions:
+            raise BaseExceptionGroup("errors during test teardown", exceptions[::-1])
+
+
+class _ModuleCollector:
+    """A minimal Module collector node for in-process SetupState tests: its
+    setup()/teardown() run the module's xunit setup_module/teardown_module."""
+
+    def __init__(self, module, session, path):
+        self.module = module
+        self.session = session
+        self.path = path
+        self.name = getattr(path, "name", str(path))
+        self.nodeid = self.name
+        self.own_markers = []
+
+    def setup(self):
+        fn = getattr(self.module, "setup_module", None)
+        if fn is not None:
+            _call_optional_arg(fn, self.module)
+
+    def teardown(self):
+        fn = getattr(self.module, "teardown_module", None)
+        if fn is not None:
+            _call_optional_arg(fn, self.module)
 
 
 class _NodeSession:
@@ -556,3 +648,21 @@ class Node(Item):
 class Function(Node):
     """Test-function node; the engine builds these for collected test items
     (conftest hooks isinstance-check pytest.Function)."""
+
+    def listchain(self):
+        """The collector chain to this item ([module, item]); pytester.getitems
+        attaches `_module_collector` so SetupState can set up module scope."""
+        mod = getattr(self, "_module_collector", None)
+        return [mod, self] if mod is not None else [self]
+
+    def setup(self):
+        if self.module is not None:
+            fn = getattr(self.module, "setup_function", None)
+            if fn is not None:
+                _call_optional_arg(fn, self.function)
+
+    def teardown(self):
+        if self.module is not None:
+            fn = getattr(self.module, "teardown_function", None)
+            if fn is not None:
+                _call_optional_arg(fn, self.function)

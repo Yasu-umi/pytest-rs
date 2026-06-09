@@ -538,6 +538,13 @@ class Pytester:
         config = self._request.config if self._request is not None else None
         module_marks = get_unpacked_marks(module)
 
+        # A per-call session + module collector so item.session._setupstate
+        # and item.listchain() work for the in-process SetupState tests.
+        from pytest._node import _ModuleCollector, _NodeSession
+
+        session = _NodeSession(config)
+        module_collector = _ModuleCollector(module, session, path)
+
         def make_item(func, nodeid_name, extra_marks, cls=None):
             marks = [*get_unpacked_marks(func), *extra_marks, *module_marks]
             lineno = getattr(getattr(func, "__code__", None), "co_firstlineno", 0)
@@ -553,6 +560,10 @@ class Pytester:
             node.module = module
             node.cls = cls
             node.parent = None
+            # node.session is a property returning a fresh _NodeSession (whose
+            # _setupstate is a full SetupState); only the module collector for
+            # listchain needs attaching.
+            node._module_collector = module_collector
             if config is not None:
                 node.config = config
             return node
