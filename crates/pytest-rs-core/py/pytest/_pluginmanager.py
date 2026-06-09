@@ -84,6 +84,32 @@ class HookCaller:
             func = getattr(plugin, self._name, None)
             if callable(func):
                 impls.append(func)
+        monitors = self._pm._call_monitors
+        if monitors:
+            return self._call_monitored(monitors, impls, firstresult, kwargs)
+        return self._call_impls(impls, firstresult, kwargs)
+
+    def _call_monitored(self, monitors, impls, firstresult, kwargs):
+        # before/after wrap the call so HookRecorder sees every hook (even
+        # ones with no registered impl, e.g. a freshly-specced hook).
+        for before, _after in monitors:
+            before(self._name, impls, kwargs)
+        outcome_exc = None
+        result = None
+        try:
+            result = self._call_impls(impls, firstresult, kwargs)
+        except BaseException as exc:  # noqa: BLE001 - reraised after after()
+            outcome_exc = exc
+        outcome = _Result(result)
+        if outcome_exc is not None:
+            outcome.force_exception(outcome_exc)
+        for _before, after in monitors:
+            after(outcome, self._name, impls, kwargs)
+        if outcome_exc is not None:
+            raise outcome_exc
+        return result
+
+    def _call_impls(self, impls, firstresult, kwargs):
         # pluggy wrapper semantics: wrapper/hookwrapper impls surround the
         # plain impls (run-parallel wraps pytest_report_teststatus this way).
         wrappers = []
@@ -206,7 +232,25 @@ class PluginManager:
         self._specs: dict[str, dict[str, Any]] = {
             "pytest_report_teststatus": {"firstresult": True},
         }
+        # (before, after) callbacks fired around every hook call (HookRecorder
+        # registers itself here to record calls; see add_hookcall_monitoring).
+        self._call_monitors: list[tuple[Any, Any]] = []
         self.hook = HookRelay(self)
+
+    def add_hookcall_monitoring(self, before, after):
+        """Register before(name, hook_impls, kwargs) / after(outcome, name,
+        hook_impls, kwargs) callbacks fired around every hook call. Returns an
+        undo callable that removes them (pluggy API used by HookRecorder)."""
+        entry = (before, after)
+        self._call_monitors.append(entry)
+
+        def undo():
+            try:
+                self._call_monitors.remove(entry)
+            except ValueError:
+                pass
+
+        return undo
 
     def getplugin(self, name: str) -> Any:
         if name in self._names:

@@ -457,6 +457,16 @@ class Pytester:
 
     runpytest_inprocess = runpytest
 
+    def make_hook_recorder(self, pluginmanager):
+        """Attach a HookRecorder to ``pluginmanager`` and finish recording at
+        the end of the test (upstream API)."""
+        from _pytest.pytester import HookRecorder
+
+        pluginmanager.reprec = reprec = HookRecorder(pluginmanager, _ispytest=True)
+        if self._request is not None:
+            self._request.addfinalizer(reprec.finish_recording)
+        return reprec
+
     def _subprocess_env(self):
         """Child env that keeps libpython + installed plugins reachable even
         after a test clears os.environ (shared by popen/run)."""

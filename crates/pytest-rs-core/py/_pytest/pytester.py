@@ -31,11 +31,145 @@ class SysPathsSnapshot:
         sys.path[:], sys.meta_path[:] = self.__saved
 
 
-class HookRecorder:
-    """Stub: hook recording is not supported yet."""
+from pytest._outcomes import fail
 
-    def __init__(self, *args, **kwargs):
-        raise NotImplementedError("HookRecorder is not supported by pytest-rs yet")
+
+class RecordedHookCall:
+    """A recorded hook call; the hook's kwargs are set as attributes."""
+
+    def __init__(self, name, kwargs):
+        self.__dict__.update(kwargs)
+        self._name = name
+
+    def __repr__(self):
+        d = self.__dict__.copy()
+        del d["_name"]
+        return f"<RecordedHookCall {self._name!r}(**{d!r})>"
+
+
+# Upstream exposes the recorded call under this name in some versions.
+ParsedCall = RecordedHookCall
+
+
+class HookRecorder:
+    """Record every hook called through a plugin manager (port of upstream
+    pytester.HookRecorder), so tests can introspect what fired."""
+
+    def __init__(self, pluginmanager, *, _ispytest=False):
+        self._pluginmanager = pluginmanager
+        self.calls = []
+        self.ret = None
+
+        def before(hook_name, hook_impls, kwargs):
+            self.calls.append(RecordedHookCall(hook_name, kwargs))
+
+        def after(outcome, hook_name, hook_impls, kwargs):
+            pass
+
+        self._undo_wrapping = pluginmanager.add_hookcall_monitoring(before, after)
+
+    def finish_recording(self):
+        self._undo_wrapping()
+
+    def getcalls(self, names):
+        if isinstance(names, str):
+            names = names.split()
+        return [call for call in self.calls if call._name in names]
+
+    def assert_contains(self, entries):
+        __tracebackhide__ = True
+        i = 0
+        entries = list(entries)
+        backlocals = dict(sys._getframe(1).f_locals)
+        while entries:
+            name, check = entries.pop(0)
+            for ind, call in enumerate(self.calls[i:]):
+                if call._name == name:
+                    if eval(check, backlocals, call.__dict__):
+                        pass
+                    else:
+                        continue
+                    i += ind + 1
+                    break
+            else:
+                fail(f"could not find {name!r} check {check!r}")
+
+    def popcall(self, name):
+        __tracebackhide__ = True
+        for i, call in enumerate(self.calls):
+            if call._name == name:
+                del self.calls[i]
+                return call
+        lines = [f"could not find call {name!r}, in:"]
+        lines.extend([f"  {x}" for x in self.calls])
+        fail("\n".join(lines))
+
+    def getcall(self, name):
+        values = self.getcalls(name)
+        assert len(values) == 1, (name, values)
+        return values[0]
+
+    def getreports(self, names=("pytest_collectreport", "pytest_runtest_logreport")):
+        return [x.report for x in self.getcalls(names)]
+
+    def matchreport(
+        self,
+        inamepart="",
+        names=("pytest_runtest_logreport", "pytest_collectreport"),
+        when=None,
+    ):
+        values = []
+        for rep in self.getreports(names=names):
+            if not when and rep.when != "call" and rep.passed:
+                continue
+            if when and rep.when != when:
+                continue
+            if not inamepart or inamepart in rep.nodeid.split("::"):
+                values.append(rep)
+        if not values:
+            raise ValueError(
+                f"could not find test report matching {inamepart!r}: "
+                "no test reports at all!"
+            )
+        if len(values) > 1:
+            raise ValueError(f"found 2 or more testreports matching {inamepart!r}: {values}")
+        return values[0]
+
+    def getfailures(self, names=("pytest_collectreport", "pytest_runtest_logreport")):
+        return [rep for rep in self.getreports(names) if rep.failed]
+
+    def getfailedcollections(self):
+        return self.getfailures("pytest_collectreport")
+
+    def listoutcomes(self):
+        passed = []
+        skipped = []
+        failed = []
+        for rep in self.getreports(("pytest_collectreport", "pytest_runtest_logreport")):
+            if rep.passed:
+                if rep.when == "call":
+                    passed.append(rep)
+            elif rep.skipped:
+                skipped.append(rep)
+            else:
+                assert rep.failed, f"Unexpected outcome: {rep!r}"
+                failed.append(rep)
+        return passed, skipped, failed
+
+    def countoutcomes(self):
+        return [len(x) for x in self.listoutcomes()]
+
+    def assertoutcome(self, passed=0, skipped=0, failed=0):
+        __tracebackhide__ = True
+        outcomes = self.listoutcomes()
+        got = tuple(len(x) for x in outcomes)
+        assert got == (passed, skipped, failed), (
+            f"assertoutcome: expected (passed={passed}, skipped={skipped}, "
+            f"failed={failed}), got {got}"
+        )
+
+    def clear(self):
+        self.calls[:] = []
 
 
 from _pytest._stub import __getattr__  # noqa: E402, F401
