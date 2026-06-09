@@ -13,6 +13,9 @@ testpaths = ["testing"]
 exclude = ["example_scripts"]
 local = "conformance/suites/pytest"
 deps = ["packaging", "iniconfig", "pluggy", "xmlschema", "setuptools", "pygments", "attrs"]
+# Large file (~215 tests) that intermittently times out under full-parallel
+# load; give it the 3x slow-file timeout so the scoreboard/CI stay stable.
+slow_files = ["testing/test_terminal.py"]
 enabled = true
 
 [pytest-asyncio]
