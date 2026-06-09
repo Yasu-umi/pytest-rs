@@ -59,6 +59,22 @@ class _ProtocolReport:
     def skipped(self):
         return self.outcome == "skipped"
 
+    @property
+    def longreprtext(self):
+        """The longrepr rendered as text (upstream TestReport.longreprtext):
+        a skip's 3-tuple yields its reason, a string is returned as-is."""
+        longrepr = self.longrepr
+        if longrepr is None:
+            return ""
+        if isinstance(longrepr, tuple):
+            return longrepr[2]
+        return str(longrepr)
+
+    # The lightweight protocol shim does not capture output.
+    capstdout = ""
+    capstderr = ""
+    caplog = ""
+
     def __repr__(self):
         return f"<ProtocolReport {self.when!r} outcome={self.outcome!r}>"
 
@@ -107,11 +123,29 @@ def runtestprotocol(item, log=True, nextitem=None):
         call = _ProtocolReport("call", "skipped", keywords, "[NOTRUN] " + xfailed.reason)
         call.wasxfail = xfailed.reason
     else:
+        from pytest._outcomes import Skipped
+
         error = None
         try:
             item.obj()
         except BaseException as exc:  # noqa: BLE001 - protocol boundary
             error = exc
+        if isinstance(error, Skipped):
+            # pytest.skip() inside the body: a skipped call report whose
+            # longrepr is the (path, lineno, "Skipped: reason") tuple.
+            tb = error.__traceback__
+            path, lineno = str(getattr(item, "path", "")), 0
+            while tb is not None:
+                path = tb.tb_frame.f_code.co_filename
+                lineno = tb.tb_lineno
+                tb = tb.tb_next
+            reason = error.msg or ""
+            call = _ProtocolReport(
+                "call", "skipped", keywords, (path, lineno, f"Skipped: {reason}")
+            )
+            reports.append(call)
+            reports.append(_ProtocolReport("teardown", "passed", keywords))
+            return reports
         if error is not None:
             if xfailed:
                 call = _ProtocolReport("call", "skipped", keywords, xfailed.reason)

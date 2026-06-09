@@ -587,6 +587,13 @@ class Pytester:
                 return item
         fail(f"{funcname!r} item not found in module:\n{source}")
 
+    def runitem(self, source, funcname="test_func"):
+        """Run the single item named funcname in-process and return its
+        [setup, call, teardown] reports (upstream Pytester.runitem)."""
+        from _pytest.runner import runtestprotocol
+
+        return runtestprotocol(self.getitem(source, funcname), log=False)
+
     def getmodulecol(self, source, *, configargs=(), withinit=False):
         """A lightweight Module collector for the source (upstream
         getmodulecol). Carries .config/.path/.nodeid/.name — enough for the
