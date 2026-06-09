@@ -546,7 +546,7 @@ impl Engine {
                     python::reporter_finish(py, &self.config, code, None);
                 }
             } else {
-                self.print_warnings_summary(py);
+                self.print_warnings_summary(py, 0, false);
                 self.write_junit_xml(py);
                 self.print_short_summary();
                 let summary = crate::runner::summary_line(
@@ -623,18 +623,23 @@ impl Engine {
         // (FAILURES/ERRORS/PASSES/warnings/short summary + the conftest
         // pytest_terminal_summary hooks); the final stats line still shows.
         let no_summary = self.config.get_flag("no-summary");
+        // Warnings shown in the first summary; the "(final)" pass after the
+        // short summary reports any emitted during pytest_terminal_summary.
+        let mut warnings_shown = 0usize;
         if !no_summary {
-            // --continue-on-collection-errors: the ERRORS section was deferred
-            // until after the run, like pytest's terminal reporter.
+            // pytest's pytest_terminal_summary order: errors/failures/xfailures,
+            // warnings (first), passes/xpasses, then the conftest & plugin
+            // pytest_terminal_summary hooks (which may emit more warnings),
+            // then the short summary and the final warnings pass.
             self.print_collect_errors();
             self.print_failures();
             self.print_xfailures();
+            warnings_shown = self.print_warnings_summary(py, 0, false);
+            self.print_passes();
+            self.print_xpasses();
             if let Err(err) = self.print_plugin_summaries(py, code) {
                 eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
             }
-            self.print_warnings_summary(py);
-            self.print_passes();
-            self.print_xpasses();
         }
         self.write_junit_xml(py);
         if let Some(banner) = &self.session.dist_banner {
@@ -642,6 +647,7 @@ impl Engine {
         }
         if !no_summary {
             self.print_short_summary();
+            self.print_warnings_summary(py, warnings_shown, true);
         }
         if let Some(n) = self.session.stopped_after {
             println!(

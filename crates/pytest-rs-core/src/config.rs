@@ -5,57 +5,59 @@ use std::path::{Path, PathBuf};
 /// pytest.ini ([pytest]), pyproject.toml ([tool.pytest.ini_options]),
 /// tox.ini ([pytest]) or setup.cfg ([tool:pytest]) — first hit wins and its
 /// directory becomes the rootdir.
-fn find_ini(start: &Path) -> (PathBuf, Option<String>, HashMap<String, String>) {
+/// pytest config file candidates, in pytest's locate_config priority order.
+const CONFIG_NAMES: [&str; 7] = [
+    "pytest.toml",
+    ".pytest.toml",
+    "pytest.ini",
+    ".pytest.ini",
+    "pyproject.toml",
+    "tox.ini",
+    "setup.cfg",
+];
+
+/// The pytest config dict from one candidate file, or None if the file is
+/// absent or carries no pytest config (load_config_dict_from_file). The
+/// pytest.toml/.pytest.toml and pytest.ini/.pytest.ini variants always count
+/// as config when present, even when empty.
+fn load_config(dir: &Path, name: &str) -> Option<HashMap<String, String>> {
+    let content = std::fs::read_to_string(dir.join(name)).ok()?;
+    match name {
+        "pytest.toml" | ".pytest.toml" => Some(parse_toml_pytest(&content).unwrap_or_default()),
+        "pytest.ini" | ".pytest.ini" => {
+            Some(parse_ini_section(&content, "pytest").unwrap_or_default())
+        }
+        "pyproject.toml" => parse_pyproject(&content),
+        "tox.ini" => parse_ini_section(&content, "pytest"),
+        "setup.cfg" => parse_ini_section(&content, "tool:pytest"),
+        _ => None,
+    }
+}
+
+/// Locate the winning config file. Returns (rootdir, basename, values,
+/// ignored), where `ignored` lists lower-priority config files in the same
+/// directory that also hold pytest config — pytest warns about these.
+fn find_ini(
+    start: &Path,
+) -> (
+    PathBuf,
+    Option<String>,
+    HashMap<String, String>,
+    Vec<String>,
+) {
     for dir in start.ancestors() {
-        // pytest.toml / .pytest.toml use a top-level [pytest] table and are
-        // always the source of configuration, even if empty (pytest 9).
-        for name in ["pytest.toml", ".pytest.toml"] {
-            let p = dir.join(name);
-            if p.exists()
-                && let Ok(content) = std::fs::read_to_string(&p)
-            {
-                let values = parse_toml_pytest(&content).unwrap_or_default();
-                return (dir.to_path_buf(), Some(name.to_string()), values);
+        for (i, name) in CONFIG_NAMES.iter().enumerate() {
+            if let Some(values) = load_config(dir, name) {
+                let ignored = CONFIG_NAMES[i + 1..]
+                    .iter()
+                    .filter(|other| load_config(dir, other).is_some())
+                    .map(|other| other.to_string())
+                    .collect();
+                return (dir.to_path_buf(), Some(name.to_string()), values, ignored);
             }
-        }
-        // pytest.ini / .pytest.ini count as config even with an empty or
-        // missing [pytest] section.
-        for name in ["pytest.ini", ".pytest.ini"] {
-            let p = dir.join(name);
-            if p.exists()
-                && let Ok(content) = std::fs::read_to_string(&p)
-            {
-                let values = parse_ini_section(&content, "pytest").unwrap_or_default();
-                return (dir.to_path_buf(), Some(name.to_string()), values);
-            }
-        }
-        let pyproject = dir.join("pyproject.toml");
-        if pyproject.exists()
-            && let Ok(content) = std::fs::read_to_string(&pyproject)
-            && let Some(values) = parse_pyproject(&content)
-        {
-            return (
-                dir.to_path_buf(),
-                Some("pyproject.toml".to_string()),
-                values,
-            );
-        }
-        let tox_ini = dir.join("tox.ini");
-        if tox_ini.exists()
-            && let Ok(content) = std::fs::read_to_string(&tox_ini)
-            && let Some(values) = parse_ini_section(&content, "pytest")
-        {
-            return (dir.to_path_buf(), Some("tox.ini".to_string()), values);
-        }
-        let setup_cfg = dir.join("setup.cfg");
-        if setup_cfg.exists()
-            && let Ok(content) = std::fs::read_to_string(&setup_cfg)
-            && let Some(values) = parse_ini_section(&content, "tool:pytest")
-        {
-            return (dir.to_path_buf(), Some("setup.cfg".to_string()), values);
         }
     }
-    (start.to_path_buf(), None, HashMap::new())
+    (start.to_path_buf(), None, HashMap::new(), Vec::new())
 }
 
 /// Minimal INI parser: one named section, `key = value` pairs, indented
@@ -245,6 +247,9 @@ pub struct Config {
     ini_file: HashMap<String, String>,
     /// The config file's basename, for the "configfile:" header line.
     pub config_file_name: Option<String>,
+    /// Lower-priority config files in the rootdir that also hold pytest config
+    /// but were ignored — pytest appends a "(WARNING: ignoring ...)" note.
+    pub ignored_config_files: Vec<String>,
     /// The full argument list after addopts splicing — for plugins with
     /// position-sensitive options (pytest-cov's --cov-reset / --no-cov).
     pub effective_args: Vec<String>,
@@ -362,7 +367,7 @@ impl Config {
         // path-like args (pytest's rootdir algorithm); with no config file
         // anywhere, the ancestor itself is the rootdir.
         let ancestor = common_ancestor(&dirs_from_args(&cwd, &argv));
-        let (rootdir, config_file_name, ini_file) = find_ini(&ancestor);
+        let (rootdir, config_file_name, ini_file, ignored_config_files) = find_ini(&ancestor);
 
         // --rootdir=DIR must point at an existing directory (upstream
         // determine_setup raises a UsageError otherwise).
@@ -483,10 +488,11 @@ impl Config {
         // Core pytest options parsed into flags/values (queried via
         // get_flag/get_value); some are still inert and gain behavior as
         // features land.
-        const CORE_FLAGS: [&str; 23] = [
-            "xfail-tb",      // show tracebacks for xfailed tests in XFAILURES
-            "no-showlocals", // overrides an addopts --showlocals / -l
-            "markers",       // list registered markers (ini + plugin-registered) and exit
+        const CORE_FLAGS: [&str; 24] = [
+            "no-fold-skipped", // list each skipped test in the short summary
+            "xfail-tb",        // show tracebacks for xfailed tests in XFAILURES
+            "no-showlocals",   // overrides an addopts --showlocals / -l
+            "markers",         // list registered markers (ini + plugin-registered) and exit
             "strict-config",
             "strict-markers",
             "strict",
@@ -871,6 +877,7 @@ impl Config {
             ini_overrides,
             ini_file,
             config_file_name,
+            ignored_config_files,
             effective_args,
             plugin_args,
             reporter_delegated: std::sync::atomic::AtomicBool::new(false),

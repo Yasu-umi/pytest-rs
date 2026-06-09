@@ -219,23 +219,63 @@ impl Engine {
                         // verbose word and its markup; otherwise use the
                         // built-in outcome word/color.
                         let status = report_teststatus(py, session, &report, Some(item.lineno));
-                        let word = status
-                            .as_ref()
-                            .map(|s| s.word.clone())
-                            .unwrap_or_else(|| outcome_word(&report));
+                        // Skip/xfail/xpass reasons are appended separately so
+                        // they can be trimmed (-v) or wrapped (-vv) to width; a
+                        // teststatus hook word is used verbatim with no reason.
+                        let (word, reason) = match &status {
+                            Some(s) => (s.word.clone(), None),
+                            None => verbose_outcome(&report),
+                        };
                         let codes = status
                             .as_ref()
                             .and_then(|s| s.markup.clone())
                             .unwrap_or_else(|| outcome_codes(&report).to_vec());
-                        let plain = format!("{} {}", item.nodeid, word);
-                        let rendered =
-                            format!("{} {}", item.nodeid, crate::tw::markup(&word, &codes));
+                        // pytest's _locationline appends " <- <src>" when the
+                        // test's code has no real source file — an exec'd def
+                        // reports co_filename "<string>". Real files (including
+                        // wrapper shims like _unittest.py, whose co_filename is
+                        // not the test module) are not flagged.
+                        let loc_suffix = item
+                            .func
+                            .bind(py)
+                            .getattr("__code__")
+                            .and_then(|c| c.getattr("co_filename"))
+                            .and_then(|f| f.extract::<String>())
+                            .ok()
+                            .filter(|co| !std::path::Path::new(co).is_file())
+                            .map(|co| format!(" <- {co}"))
+                            .unwrap_or_default();
+                        let prefix = format!("{}{} {}", item.nodeid, loc_suffix, word);
+                        let reason_suffix = match &reason {
+                            Some(r) => python::format_verbose_reason(
+                                py,
+                                prefix.chars().count(),
+                                r,
+                                tc,
+                                term_width(),
+                            ),
+                            None => String::new(),
+                        };
+                        let plain = format!("{prefix}{reason_suffix}");
+                        let rendered = format!(
+                            "{}{} {}{reason_suffix}",
+                            item.nodeid,
+                            loc_suffix,
+                            crate::tw::markup(&word, &codes)
+                        );
+                        // The progress field right-aligns against the last line
+                        // (a -vv reason may wrap across several).
+                        let last_line = plain.rsplit('\n').next().unwrap_or(&plain);
                         // "times" in verbose mode reports each test's own
                         // duration (pytest's per-item showlongtestinfo).
                         let msg = progress_message(pkind, done, total, report.duration);
                         println!(
                             "{rendered}{}",
-                            progress_suffix(&plain, &msg, fill_color(py, session, done == total))
+                            progress_suffix(
+                                last_line,
+                                &msg,
+                                fill_color(py, session, done == total)
+                            )
                         );
                         let _ = std::io::stdout().flush();
                     }

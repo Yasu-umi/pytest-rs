@@ -214,11 +214,13 @@ def _location(warning):
     return f"{filename}:{warning['lineno']}"
 
 
-def summary_lines():
+def summary_lines(start=0):
     """Warnings grouped by formatted message with their locations above,
-    the way pytest's summary_warnings renders them."""
+    the way pytest's summary_warnings renders them. `start` skips warnings
+    already shown, for the "(final)" summary of pytest_terminal_summary
+    warnings."""
     grouped: dict[str, list[str]] = {}
-    for warning in captured:
+    for warning in captured[start:]:
         message = warnings.formatwarning(
             warning["message"],
             warning["category"],

@@ -1104,6 +1104,30 @@ def _format_trimmed(format: str, msg: str, available_width: int):
     return format.format(msg)
 
 
+def format_verbose_reason(prefix_width, reason, verbosity, fullwidth):
+    """The reason suffix for a verbose skip/xfail/xpass line: truncated to fit
+    (verbosity < 2) or wrapped across lines (verbosity >= 2). An empty reason
+    returns ''. Mirrors TerminalReporter.pytest_runtest_logreport's skip/xfail
+    reason handling (wrap_write uses screen_width - margin, margin=8)."""
+    if not reason:
+        return ""
+    if verbosity < 2:
+        available = fullwidth - prefix_width - len(" [100%]") - 1
+        return _format_trimmed(" ({})", reason, available) or ""
+    import textwrap
+
+    content = f" ({reason})"
+    wrapped = "\n".join(
+        textwrap.wrap(
+            " " * prefix_width + content,
+            width=fullwidth - 8,
+            drop_whitespace=True,
+            replace_whitespace=False,
+        )
+    )
+    return wrapped[prefix_width:]
+
+
 def _get_node_id_with_markup(tw, config, rep):
     nodeid = config.cwd_relative_nodeid(rep.nodeid)
     path, *parts = nodeid.split("::")

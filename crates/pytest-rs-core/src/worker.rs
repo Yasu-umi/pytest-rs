@@ -303,7 +303,7 @@ impl Engine {
         let warning_count = python::warning_count(py);
         if warning_count > 0 {
             send(&WorkerMsg::Warnings {
-                lines: python::warning_summary_lines(py),
+                lines: python::warning_summary_lines(py, 0),
                 count: warning_count,
             });
         }

@@ -103,6 +103,26 @@ pub(crate) fn outcome_word(report: &TestReport) -> String {
     }
 }
 
+/// The bare verbose word and (for skip/xfail/xpass) the raw reason, kept
+/// separate so the caller can truncate/wrap the reason to the terminal width.
+/// Other outcomes (and subtests/reruns, whose words already embed any reason)
+/// carry no separate reason.
+pub(crate) fn verbose_outcome(report: &TestReport) -> (String, Option<String>) {
+    if report.subtest_desc.is_some() || report.rerun {
+        return (outcome_word(report), None);
+    }
+    let reason = report
+        .longrepr
+        .clone()
+        .filter(|r| !r.is_empty() && !r.contains('\n'));
+    match report.outcome {
+        Outcome::Skipped => ("SKIPPED".to_string(), reason),
+        Outcome::XFailed => ("XFAIL".to_string(), reason),
+        Outcome::XPassed => ("XPASS".to_string(), reason),
+        _ => (outcome_word(report), None),
+    }
+}
+
 /// Terminal width for right-aligning the progress percentage, like
 /// pytest's TerminalWriter (COLUMNS env, else 80).
 pub(crate) fn term_width() -> usize {

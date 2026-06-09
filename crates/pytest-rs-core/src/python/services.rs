@@ -651,6 +651,27 @@ pub fn log_failure_sections(py: Python<'_>) -> Vec<(String, String)> {
     sections
 }
 
+/// The verbose per-test reason suffix for a skip/xfail/xpass line: " (reason)"
+/// truncated to fit (verbosity < 2) or wrapped across lines (>= 2). Empty when
+/// there is no reason or it cannot fit.
+pub fn format_verbose_reason(
+    py: Python<'_>,
+    prefix_width: usize,
+    reason: &str,
+    verbosity: i32,
+    fullwidth: usize,
+) -> String {
+    py.import("_pytest.terminal")
+        .and_then(|m| {
+            m.call_method1(
+                "format_verbose_reason",
+                (prefix_width, reason, verbosity, fullwidth),
+            )
+        })
+        .and_then(|s| s.extract())
+        .unwrap_or_default()
+}
+
 pub fn warning_count(py: Python<'_>) -> usize {
     py.import("pytest._wcapture")
         .and_then(|m| m.call_method0("count"))
@@ -658,10 +679,11 @@ pub fn warning_count(py: Python<'_>) -> usize {
         .unwrap_or(0)
 }
 
-/// Formatted lines for the warnings summary section.
-pub fn warning_summary_lines(py: Python<'_>) -> Vec<String> {
+/// Formatted lines for the warnings summary section, skipping the first
+/// `start` warnings (already shown — for the "(final)" summary).
+pub fn warning_summary_lines(py: Python<'_>, start: usize) -> Vec<String> {
     py.import("pytest._wcapture")
-        .and_then(|m| m.call_method0("summary_lines"))
+        .and_then(|m| m.call_method1("summary_lines", (start,)))
         .and_then(|lines| lines.extract())
         .unwrap_or_default()
 }

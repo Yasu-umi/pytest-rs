@@ -124,19 +124,48 @@ impl Engine {
         }
     }
 
-    pub(crate) fn print_warnings_summary(&self, py: Python<'_>) {
-        let warning_count = python::warning_count(py) + self.session.worker_warning_count;
-        if warning_count == 0 || self.config.quiet {
-            return;
+    /// The warnings summary. `start` skips warnings already shown (for the
+    /// "(final)" pass after the short summary, which reports warnings emitted
+    /// during the pytest_terminal_summary hooks). Returns the number of
+    /// in-process warnings now shown, so the caller can pass it as the next
+    /// `start`.
+    pub(crate) fn print_warnings_summary(
+        &self,
+        py: Python<'_>,
+        start: usize,
+        final_: bool,
+    ) -> usize {
+        let in_process = python::warning_count(py);
+        let total = in_process + self.session.worker_warning_count;
+        if self.config.quiet {
+            return in_process;
         }
-        println!("{}", center_banner("warnings summary"));
-        for line in python::warning_summary_lines(py) {
+        let lines = python::warning_summary_lines(py, start);
+        // The "(final)" pass only prints when new warnings appeared; the first
+        // pass also accounts for xdist worker warnings.
+        if final_ {
+            if lines.is_empty() {
+                return in_process;
+            }
+        } else if total == 0 {
+            return in_process;
+        }
+        let title = if final_ {
+            "warnings summary (final)"
+        } else {
+            "warnings summary"
+        };
+        println!("{}", center_banner(title));
+        for line in lines {
             println!("{line}");
         }
-        for line in &self.session.worker_warnings {
-            println!("{line}");
+        if !final_ {
+            for line in &self.session.worker_warnings {
+                println!("{line}");
+            }
         }
         println!("-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html");
+        in_process
     }
 
     pub(crate) fn print_header(&self, py: Python<'_>) {
@@ -181,7 +210,17 @@ impl Engine {
         }
         println!("rootdir: {}", self.config.rootdir.display());
         if let Some(name) = &self.config.config_file_name {
-            println!("configfile: {name}");
+            // pytest appends a warning when other config files in the rootdir
+            // also held pytest config but lost to this one.
+            let warning = if self.config.ignored_config_files.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    " (WARNING: ignoring pytest config in {}!)",
+                    self.config.ignored_config_files.join(", ")
+                )
+            };
+            println!("configfile: {name}{warning}");
         }
         // testpaths: shown only when collection ran from the testpaths ini
         // (no paths on the command line), like pytest's args_source check.
@@ -560,6 +599,33 @@ impl Engine {
         let mut lines = Vec::new();
         for c in chars.chars() {
             if c == 's' {
+                // --no-fold-skipped lists each skip on its own line, like the
+                // FAILED lines: "SKIPPED nodeid - Skipped: reason" (upstream
+                // show_skipped_unfolded uses the full longrepr reason, which we
+                // store stripped of its "Skipped: " prefix — re-add it).
+                if self.config.get_flag("no-fold-skipped") {
+                    for report in &self.session.reports {
+                        if report.outcome != Outcome::Skipped {
+                            continue;
+                        }
+                        let word = match &report.subtest_desc {
+                            Some(desc) => format!("SUBSKIPPED{desc}"),
+                            None => "SKIPPED".to_string(),
+                        };
+                        let mut line = format!("{word} {}", report.nodeid);
+                        let reason = report.longrepr.clone().unwrap_or_default();
+                        if !reason.is_empty() {
+                            let reason = if reason.starts_with("Skipped") {
+                                reason
+                            } else {
+                                format!("Skipped: {reason}")
+                            };
+                            line.push_str(&format!(" - {reason}"));
+                        }
+                        lines.push(line);
+                    }
+                    continue;
+                }
                 // Skips fold by (location, reason): "SKIPPED [2] file.py:3: x".
                 // The section label comes from the first skipped report, so a
                 // leading subtest skip relabels the whole group SUBSKIPPED[..]
