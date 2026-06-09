@@ -6,10 +6,10 @@
   "files": [
     {
       "file": "tests/test_pytest_mypy.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
-      "failed": 0,
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 27,
+      "failed": 51,
       "skipped": 0,
       "errors": 0
     }

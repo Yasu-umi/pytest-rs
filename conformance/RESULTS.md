@@ -25,7 +25,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pytest-benchmark | v5.1.0 | 91 | 31 | 0 | 1 | 123 | 74.0% | 4 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 41 | 97.6% | 1 | 1 | 0 |
 | anyio | 4.13.0 | 3120 | 0 | 0 | 42 | 3162 | 98.7% | 26 | 26 | 0 |
-| pytest-mypy | v1.0.1 | 0 | 0 | 0 | 0 | 0 | - | 0 | 1 | 0 |
+| pytest-mypy | v1.0.1 | 27 | 51 | 0 | 0 | 78 | 34.6% | 0 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-subtests | v0.14.2 | 8 | 24 | 0 | 0 | 32 | 25.0% | 0 | 1 | 0 |
 | pytest-metadata | v2.0.4 | 6 | 4 | 0 | 0 | 10 | 60.0% | 0 | 1 | 0 |
@@ -245,7 +245,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| tests/test_pytest_mypy.py | timeout | 0 | 0 | 0 | 0 |
+| tests/test_pytest_mypy.py | failed | 27 | 51 | 0 | 0 |
 
 </details>
 

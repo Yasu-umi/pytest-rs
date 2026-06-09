@@ -108,7 +108,7 @@ _linux (CI-verified)_
 | suite | tag | passed | failed | errors | skipped | total | pass % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 41 | 97.6% | 1 | 1 | 0 |
-| pytest-mypy | v1.0.1 | 0 | 0 | 0 | 0 | 0 | - | 0 | 1 | 0 |
+| pytest-mypy | v1.0.1 | 27 | 51 | 0 | 0 | 78 | 34.6% | 0 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-subtests | v0.14.2 | 8 | 24 | 0 | 0 | 32 | 25.0% | 0 | 1 | 0 |
 | pytest-metadata | v2.0.4 | 6 | 4 | 0 | 0 | 10 | 60.0% | 0 | 1 | 0 |
