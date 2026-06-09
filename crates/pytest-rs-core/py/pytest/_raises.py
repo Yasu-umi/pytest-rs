@@ -47,6 +47,19 @@ class ExceptionInfo[E: BaseException]:
             tb = tb.tb_next
         return f"<{type(self).__name__} {shown} tblen={tblen}>"
 
+    def getrepr(self, showlocals=False, style="long", **kwargs):
+        """A printable traceback representation (str() yields the formatted
+        exception). Enough for pytest_internalerror and report longrepr; the
+        style/showlocals knobs are accepted but not honored."""
+        import traceback
+
+        if self.value is None:
+            return _ExceptionRepr("")
+        text = "".join(
+            traceback.format_exception(self.type, self.value, self.tb)
+        ).rstrip("\n")
+        return _ExceptionRepr(text)
+
     def match(self, regexp):
         # Upstream stringify_exception: PEP-678 __notes__ join the message.
         value = str(self.value)
@@ -59,6 +72,29 @@ class ExceptionInfo[E: BaseException]:
         if not _re.search(regexp, value):
             fail(f"Regex pattern did not match.\n Regex: {regexp!r}\n Input: {value!r}")
         return True
+
+
+class _ReprCrash:
+    def __init__(self, message):
+        self.message = message
+
+
+class _ExceptionRepr:
+    """Minimal TerminalRepr stand-in returned by ExceptionInfo.getrepr():
+    str() and toterminal() render the traceback text, reprcrash.message is
+    its last line."""
+
+    def __init__(self, text):
+        self.text = text
+        last = text.rstrip("\n").rsplit("\n", 1)[-1] if text else ""
+        self.reprcrash = _ReprCrash(last)
+
+    def __str__(self):
+        return self.text
+
+    def toterminal(self, tw):
+        for line in self.text.split("\n"):
+            tw.line(line)
 
 
 class RaisesContext:

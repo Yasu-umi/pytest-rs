@@ -576,6 +576,20 @@ class Pytester:
                 return item
         fail(f"{funcname!r} item not found in module:\n{source}")
 
+    def getmodulecol(self, source, *, configargs=(), withinit=False):
+        """A lightweight Module collector for the source (upstream
+        getmodulecol). Carries .config/.path/.nodeid/.name — enough for the
+        TerminalReporter unit tests; collection is not run."""
+        import pathlib
+
+        from pytest._node import File
+
+        if withinit:
+            (self.path / "__init__.py").touch()
+        path = pathlib.Path(str(self.makepyfile(source)))
+        config = self._request.config if self._request is not None else None
+        return File(name=path.name, config=config, path=path, nodeid=path.name)
+
     def mkpydir(self, name):
         path = self.path / name
         path.mkdir(parents=True)
@@ -872,6 +886,28 @@ def _make_runner_dir(request, tmp_path_factory, cls):
         if entry in sys.path:
             sys.path.remove(entry)
     os.chdir(old_cwd)
+
+
+class LineComp:
+    """A StringIO plus assert_contains_lines, for driving an in-process
+    TerminalReporter in tests (upstream's `linecomp` fixture)."""
+
+    def __init__(self):
+        from io import StringIO
+
+        self.stringio = StringIO()
+
+    def assert_contains_lines(self, lines2):
+        __tracebackhide__ = True
+        val = self.stringio.getvalue()
+        self.stringio.truncate(0)
+        self.stringio.seek(0)
+        LineMatcher(val.split("\n")).fnmatch_lines(lines2)
+
+
+@fixture
+def linecomp():
+    return LineComp()
 
 
 @fixture

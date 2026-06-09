@@ -51,10 +51,12 @@ from pytest._outcomes import importorskip as importorskip
 from pytest._outcomes import skip as skip
 from pytest._outcomes import xfail as xfail
 from pytest._pluginmanager import PluginManager as PluginManager
+from pytest._pytester import LineComp as LineComp
 from pytest._pytester import LineMatcher as LineMatcher
 from pytest._pytester import Pytester as Pytester
 from pytest._pytester import RunResult as RunResult
 from pytest._pytester import Testdir as Testdir
+from pytest._pytester import linecomp as linecomp
 from pytest._pytester import pytester as pytester
 from pytest._pytester import testdir as testdir
 from pytest._raises import ExceptionInfo as ExceptionInfo
@@ -145,6 +147,13 @@ def hookspec(function=None, **kwargs):
 
 # Upstream name for the plugin manager (config.pluginmanager's type).
 PytestPluginManager = PluginManager
+
+# Report/terminal classes live in the _pytest shadow package; import them last
+# to avoid a circular import while pytest's own package is initializing.
+from _pytest.reports import CollectReport as CollectReport  # noqa: E402
+from _pytest.reports import TestReport as TestReport  # noqa: E402
+from _pytest.terminal import TerminalProgressPlugin as TerminalProgressPlugin  # noqa: E402
+from _pytest.terminal import TerminalReporter as TerminalReporter  # noqa: E402
 
 #: Public names (upstream curates this list; the public surface here is
 #: exactly the non-underscore module globals).

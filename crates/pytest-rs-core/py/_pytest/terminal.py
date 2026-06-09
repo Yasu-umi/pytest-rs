@@ -1205,4 +1205,56 @@ def _folded_skips(startpath, skipped):
     return values
 
 
+class TerminalProgressPlugin:
+    """Terminal progress reporting via OSC 9;4 ANSI sequences (upstream port).
+    Emits sequences indicating test progress to supporting terminal tabs."""
+
+    def __init__(self, tr):
+        self._tr = tr
+        self._session = None
+        self._has_failures = False
+
+    def _emit_progress(self, state, progress=None):
+        """Emit the OSC 9;4 sequence for a progress state (0-100)."""
+        assert progress is None or 0 <= progress <= 100
+        if state == "remove":
+            sequence = "\x1b]9;4;0;\x1b\\"
+        elif state == "normal":
+            assert progress is not None
+            sequence = f"\x1b]9;4;1;{progress}\x1b\\"
+        elif state == "error":
+            sequence = f"\x1b]9;4;2;{progress}\x1b\\" if progress is not None else "\x1b]9;4;2;\x1b\\"
+        elif state == "indeterminate":
+            sequence = "\x1b]9;4;3;\x1b\\"
+        elif state == "paused":
+            sequence = f"\x1b]9;4;4;{progress}\x1b\\" if progress is not None else "\x1b]9;4;4;\x1b\\"
+        else:
+            return
+        self._tr.write_raw(sequence, flush=True)
+
+    def pytest_sessionstart(self, session):
+        self._session = session
+        self._emit_progress("indeterminate")
+
+    def pytest_collection_finish(self):
+        assert self._session is not None
+        if self._session.testscollected > 0:
+            self._emit_progress("normal", 0)
+
+    def pytest_runtest_logreport(self, report):
+        if report.failed:
+            self._has_failures = True
+        if report.when != "call":
+            return
+        assert self._session is not None
+        collected = self._session.testscollected
+        if collected > 0:
+            reported = self._tr.reported_progress
+            progress = min(reported * 100 // collected, 100)
+            self._emit_progress("error" if self._has_failures else "normal", progress)
+
+    def pytest_sessionfinish(self):
+        self._emit_progress("remove")
+
+
 from _pytest._stub import __getattr__  # noqa: E402, F401
