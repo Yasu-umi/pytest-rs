@@ -13,5 +13,12 @@ class Source:
     def __str__(self):
         return "\n".join(self.lines)
 
+    def strip(self):
+        """Return a Source with leading/trailing blank lines removed. Our
+        constructor already strips string input, so the lines are clean;
+        this exists so callers can write ``Source(x).strip().lines`` (the
+        shape LineMatcher._getlines relies on)."""
+        return self
+
 
 from _pytest._stub import __getattr__  # noqa: E402, F401

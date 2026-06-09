@@ -3,6 +3,7 @@ exercise the runner itself."""
 
 import os as _os
 import re as _re
+import subprocess as _subprocess
 
 from pytest._fixtures import fixture
 from pytest._outcomes import fail
@@ -28,8 +29,16 @@ _ANSI_RE = _re.compile(r"\x1b\[[0-9;]*m")
 
 
 class LineMatcher:
+    """Flexible matching of text (port of upstream pytester.LineMatcher).
+
+    Built from a list of lines without trailing newlines; the various
+    matchers log their match/no-match trail so failures show exactly which
+    pattern stopped matching and against which lines.
+    """
+
     def __init__(self, lines):
         self.lines = lines
+        self._log_output = []
 
     def __str__(self):
         return "\n".join(self.lines)
@@ -37,111 +46,151 @@ class LineMatcher:
     def str(self):
         return str(self)
 
-    @staticmethod
-    def _pattern_lines(patterns):
-        """A multi-line string becomes a dedented pattern list (pytest's
-        Source semantics); a plain one-line string is a single pattern."""
-        if not isinstance(patterns, str):
-            return patterns
-        if "\n" not in patterns:
-            return [patterns]
-        import textwrap
+    def _getlines(self, lines2):
+        from _pytest._code import Source
 
-        lines = textwrap.dedent(patterns).splitlines()
-        while lines and not lines[0].strip():
-            lines.pop(0)
-        while lines and not lines[-1].strip():
-            lines.pop()
-        return lines
+        if isinstance(lines2, str):
+            lines2 = Source(lines2)
+        if isinstance(lines2, Source):
+            lines2 = lines2.strip().lines
+        return lines2
 
-    def fnmatch_lines(self, patterns, *, consecutive=False):
+    def fnmatch_lines_random(self, lines2):
         __tracebackhide__ = True
         import fnmatch
 
-        patterns = self._pattern_lines(patterns)
+        self._match_lines_random(lines2, fnmatch.fnmatch)
 
-        # Upstream checks equality before globbing, so a literal "[1, 2, 3]"
-        # pattern matches itself despite being a valid character class.
-        def matches(line, pattern):
-            return line == pattern or fnmatch.fnmatch(line, pattern)
+    def re_match_lines_random(self, lines2):
+        __tracebackhide__ = True
+        import re
 
-        if consecutive:
-            # The whole pattern block must match a consecutive run of lines.
-            for start in range(len(self.lines)):
-                window = self.lines[start : start + len(patterns)]
-                if len(window) == len(patterns) and all(
-                    matches(line, pattern) for line, pattern in zip(window, patterns)
-                ):
-                    return
-            fail(f"fnmatch_lines: no consecutive match for {patterns!r} in:\n{self}")
-        remaining = list(self.lines)
-        for pattern in patterns:
-            for index, line in enumerate(remaining):
-                if matches(line, pattern):
-                    remaining = remaining[index + 1 :]
+        self._match_lines_random(lines2, lambda name, pat: bool(re.match(pat, name)))
+
+    def _match_lines_random(self, lines2, match_func):
+        __tracebackhide__ = True
+        lines2 = self._getlines(lines2)
+        for line in lines2:
+            for x in self.lines:
+                if line == x or match_func(x, line):
+                    self._log("matched: ", repr(line))
                     break
             else:
-                fail(f"fnmatch_lines: no line matches {pattern!r} in:\n{self}")
+                msg = f"line {line!r} not found in output"
+                self._log(msg)
+                self._fail(msg)
 
-    def no_fnmatch_line(self, pattern):
+    def get_lines_after(self, fnline):
+        import fnmatch
+
+        for i, line in enumerate(self.lines):
+            if fnline == line or fnmatch.fnmatch(line, fnline):
+                return self.lines[i + 1 :]
+        raise ValueError(f"line {fnline!r} not found in output")
+
+    def _log(self, *args):
+        self._log_output.append(" ".join(str(x) for x in args))
+
+    @property
+    def _log_text(self):
+        return "\n".join(self._log_output)
+
+    def fnmatch_lines(self, lines2, *, consecutive=False):
         __tracebackhide__ = True
         import fnmatch
 
-        for line in self.lines:
-            if line == pattern or fnmatch.fnmatch(line, pattern):
-                fail(f"no_fnmatch_line: unexpectedly matched {pattern!r}: {line!r}")
+        self._match_lines(lines2, fnmatch.fnmatch, "fnmatch", consecutive=consecutive)
 
-    def re_match_lines(self, patterns, *, consecutive=False):
+    def re_match_lines(self, lines2, *, consecutive=False):
         __tracebackhide__ = True
         import re
 
-        patterns = self._pattern_lines(patterns)
+        self._match_lines(
+            lines2,
+            lambda name, pat: bool(re.match(pat, name)),
+            "re.match",
+            consecutive=consecutive,
+        )
 
-        def matches(line, pattern):
-            return re.match(pattern, line) is not None
+    def _match_lines(self, lines2, match_func, match_nickname, *, consecutive=False):
+        import collections.abc
 
-        if consecutive:
-            for start in range(len(self.lines)):
-                window = self.lines[start : start + len(patterns)]
-                if len(window) == len(patterns) and all(
-                    matches(line, pattern) for line, pattern in zip(window, patterns)
-                ):
-                    return
-            fail(f"re_match_lines: no consecutive match for {patterns!r} in:\n{self}")
-        remaining = list(self.lines)
-        for pattern in patterns:
-            for index, line in enumerate(remaining):
-                if matches(line, pattern):
-                    remaining = remaining[index + 1 :]
+        if not isinstance(lines2, collections.abc.Sequence):
+            raise TypeError(f"invalid type for lines2: {type(lines2).__name__}")
+        lines2 = self._getlines(lines2)
+        lines1 = self.lines[:]
+        extralines = []
+        __tracebackhide__ = True
+        wnick = len(match_nickname) + 1
+        started = False
+        for line in lines2:
+            nomatchprinted = False
+            while lines1:
+                nextline = lines1.pop(0)
+                if line == nextline:
+                    self._log("exact match:", repr(line))
+                    started = True
                     break
+                elif match_func(nextline, line):
+                    self._log(f"{match_nickname}:", repr(line))
+                    self._log("{:>{width}}".format("with:", width=wnick), repr(nextline))
+                    started = True
+                    break
+                else:
+                    if consecutive and started:
+                        msg = f"no consecutive match: {line!r}"
+                        self._log(msg)
+                        self._log(
+                            "{:>{width}}".format("with:", width=wnick), repr(nextline)
+                        )
+                        self._fail(msg)
+                    if not nomatchprinted:
+                        self._log(
+                            "{:>{width}}".format("nomatch:", width=wnick), repr(line)
+                        )
+                        nomatchprinted = True
+                    self._log("{:>{width}}".format("and:", width=wnick), repr(nextline))
+                extralines.append(nextline)
             else:
-                fail(f"re_match_lines: no line matches {pattern!r} in:\n{self}")
+                msg = f"remains unmatched: {line!r}"
+                self._log(msg)
+                self._fail(msg)
+        self._log_output = []
 
-    def re_match_lines_random(self, patterns):
-        __tracebackhide__ = True
-        import re
-
-        patterns = self._pattern_lines(patterns)
-        for pattern in patterns:
-            if not any(re.match(pattern, line) for line in self.lines):
-                fail(f"re_match_lines_random: no line matches {pattern!r} in:\n{self}")
-
-    def no_re_match_line(self, pattern):
-        __tracebackhide__ = True
-        import re
-
-        for line in self.lines:
-            if re.match(pattern, line):
-                fail(f"no_re_match_line: unexpectedly matched {pattern!r}: {line!r}")
-
-    def fnmatch_lines_random(self, patterns):
+    def no_fnmatch_line(self, pat):
         __tracebackhide__ = True
         import fnmatch
 
-        patterns = self._pattern_lines(patterns)
-        for pattern in patterns:
-            if not any(line == pattern or fnmatch.fnmatch(line, pattern) for line in self.lines):
-                fail(f"fnmatch_lines_random: no line matches {pattern!r} in:\n{self}")
+        self._no_match_line(pat, fnmatch.fnmatch, "fnmatch")
+
+    def no_re_match_line(self, pat):
+        __tracebackhide__ = True
+        import re
+
+        self._no_match_line(pat, lambda name, pat: bool(re.match(pat, name)), "re.match")
+
+    def _no_match_line(self, pat, match_func, match_nickname):
+        __tracebackhide__ = True
+        nomatch_printed = False
+        wnick = len(match_nickname) + 1
+        for line in self.lines:
+            if match_func(line, pat):
+                msg = f"{match_nickname}: {pat!r}"
+                self._log(msg)
+                self._log("{:>{width}}".format("with:", width=wnick), repr(line))
+                self._fail(msg)
+            else:
+                if not nomatch_printed:
+                    self._log("{:>{width}}".format("nomatch:", width=wnick), repr(pat))
+                    nomatch_printed = True
+                self._log("{:>{width}}".format("and:", width=wnick), repr(line))
+        self._log_output = []
+
+    def _fail(self, msg):
+        __tracebackhide__ = True
+        log_text = self._log_text
+        self._log_output = []
+        fail(log_text)
 
 
 class RunResult:
@@ -153,15 +202,34 @@ class RunResult:
         self.stdout = LineMatcher(outlines)
         self.stderr = LineMatcher(errlines)
 
-    def parseoutcomes(self):
-        for line in reversed(self.outlines):
+    def __repr__(self):
+        from pytest import ExitCode
+
+        try:
+            ret = str(ExitCode(self.ret))
+        except ValueError:
+            ret = str(self.ret)
+        return (
+            f"<RunResult ret={ret} len(stdout.lines)={len(self.stdout.lines)}"
+            f" len(stderr.lines)={len(self.stderr.lines)} duration={self.duration:.2f}s>"
+        )
+
+    @classmethod
+    def parse_summary_nouns(cls, lines):
+        """Parse the summary line, normalising to the plural noun pytest
+        reports regardless of count (#6505): 1 error -> {"errors": 1}."""
+        plural = {"error": "errors", "warning": "warnings"}
+        for line in reversed(lines):
             clean = _ANSI_RE.sub("", line)
             if clean.startswith("====") and " in " in clean:
                 found = {}
-                for count, key in _OUTCOME_RE.findall(clean):
-                    found[key.rstrip("s") if key in ("errors", "warnings") else key] = int(count)
+                for count, noun in _OUTCOME_RE.findall(clean):
+                    found[plural.get(noun, noun)] = int(count)
                 return found
         return {}
+
+    def parseoutcomes(self):
+        return self.parse_summary_nouns(self.outlines)
 
     def assert_outcomes(
         self,
@@ -180,19 +248,26 @@ class RunResult:
             "passed": passed,
             "skipped": skipped,
             "failed": failed,
-            "error": errors,
+            "errors": errors,
             "xpassed": xpassed,
             "xfailed": xfailed,
         }
         got = {key: actual.get(key, 0) for key in expected}
         assert got == expected, f"assert_outcomes: expected {expected}, got {actual}"
         if warnings is not None:
-            assert actual.get("warning", 0) == warnings
+            assert actual.get("warnings", 0) == warnings
         if deselected is not None:
             assert actual.get("deselected", 0) == deselected
 
 
 class Pytester:
+    # Raised by run()/runpytest_subprocess() when a child overruns its timeout
+    # (the same class subprocess raises, so callers can catch either).
+    TimeoutExpired = _subprocess.TimeoutExpired
+    # Sentinel for popen()/run()'s stdin: close the child's stdin pipe. None is
+    # a distinct, valid value (leave stdin inherited) per upstream.
+    CLOSE_STDIN = object()
+
     def __init__(self, path, request_name, request=None):
         import pathlib
 
@@ -213,10 +288,15 @@ class Pytester:
             if _var not in _RUNNER_LIBPATH and _var in _os.environ:
                 _RUNNER_LIBPATH[_var] = _os.environ[_var]
 
+    @staticmethod
+    def _source_text(source):
+        # makepyfile accepts utf-8 bytes as well as str/Source (#2738).
+        return source.decode("utf-8") if isinstance(source, bytes) else str(source)
+
     def _makefile(self, ext, args, kwargs):
         items = list(kwargs.items())
         if args:
-            source = "\n".join(str(arg) for arg in args)
+            source = "\n".join(self._source_text(arg) for arg in args)
             items.insert(0, (self._name, source))
         paths = []
         for basename, source in items:
@@ -226,7 +306,7 @@ class Pytester:
             # itself), matching upstream pytester.
             path = (self.path / basename).with_suffix(ext)
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(textwrap.dedent(str(source)).lstrip("\n"))
+            path.write_text(textwrap.dedent(self._source_text(source)).lstrip("\n"))
             paths.append(path)
         # pytest returns the first file's path even for multiple files.
         return paths[0]
@@ -251,6 +331,10 @@ class Pytester:
         return self._makefile(".toml", [], {"pytest": source})
 
     def makefile(self, ext, *args, **kwargs):
+        if ext and not ext.startswith("."):
+            raise ValueError(
+                f"pytester.makefile expects a file extension, try .{ext} instead of {ext}"
+            )
         return self._makefile(ext, args, kwargs)
 
     def mkdir(self, name):
@@ -372,6 +456,73 @@ class Pytester:
         return self._runpytest(args, timeout=timeout, forward_filters=False)
 
     runpytest_inprocess = runpytest
+
+    def _subprocess_env(self):
+        """Child env that keeps libpython + installed plugins reachable even
+        after a test clears os.environ (shared by popen/run)."""
+        import os
+
+        env = os.environ.copy()
+        for _var, _value in _RUNNER_LIBPATH.items():
+            env.setdefault(_var, _value)
+        existing = env.get("PYTHONPATH") or _RUNNER_PYTHONPATH
+        if self._syspaths or existing:
+            env["PYTHONPATH"] = os.pathsep.join(
+                [*self._syspaths, *([existing] if existing else [])]
+            )
+        return env
+
+    def popen(self, cmdargs, stdout=_subprocess.PIPE, stderr=_subprocess.PIPE, stdin=CLOSE_STDIN, **kw):
+        """Spawn a subprocess. ``stdin`` may be CLOSE_STDIN (close the pipe),
+        bytes (written then left open for communicate()), or any value passed
+        straight to Popen (e.g. PIPE, None)."""
+        import subprocess
+
+        cmdargs = [str(arg) for arg in cmdargs]
+        kw["env"] = self._subprocess_env()
+        if stdin is self.CLOSE_STDIN or isinstance(stdin, bytes):
+            kw["stdin"] = subprocess.PIPE
+        else:
+            kw["stdin"] = stdin
+        popen = subprocess.Popen(cmdargs, stdout=stdout, stderr=stderr, **kw)
+        if stdin is self.CLOSE_STDIN:
+            assert popen.stdin is not None
+            popen.stdin.close()
+        elif isinstance(stdin, bytes):
+            assert popen.stdin is not None
+            popen.stdin.write(stdin)
+        return popen
+
+    def run(self, *cmdargs, timeout=None, stdin=CLOSE_STDIN):
+        """Run a command, capturing stdout/stderr to RunResult. Raises
+        ``Pytester.TimeoutExpired`` (== subprocess.TimeoutExpired) on overrun."""
+        __tracebackhide__ = True
+        import subprocess
+        import time
+
+        cmdargs = [str(arg) for arg in cmdargs]
+        p1 = self.path / "stdout"
+        p2 = self.path / "stderr"
+        start = time.perf_counter()
+        with open(p1, "w", encoding="utf8") as f1, open(p2, "w", encoding="utf8") as f2:
+            popen = self.popen(cmdargs, stdout=f1, stderr=f2, stdin=stdin)
+            if isinstance(stdin, bytes):
+                popen.stdin.close()
+            try:
+                ret = popen.wait(timeout)
+            except subprocess.TimeoutExpired:
+                popen.kill()
+                popen.wait()
+                raise
+            finally:
+                # Close any stdin pipe we left open (e.g. stdin=PIPE) so it
+                # doesn't surface later as an unraisable ResourceWarning.
+                if popen.stdin is not None and not popen.stdin.closed:
+                    popen.stdin.close()
+        duration = time.perf_counter() - start
+        out = p1.read_text(encoding="utf8").splitlines()
+        err = p2.read_text(encoding="utf8").splitlines()
+        return RunResult(ret, out, err, duration)
 
     def chdir(self):
         """Cd into the pytester temporary directory. The pytester fixture
@@ -795,7 +946,7 @@ class InlineRunResult:
         expected = {
             "passed": totals.get("passed", 0) + totals.get("xpassed", 0),
             "skipped": totals.get("skipped", 0) + totals.get("xfailed", 0),
-            "failed": totals.get("failed", 0) + totals.get("error", 0),
+            "failed": totals.get("failed", 0) + totals.get("errors", 0),
         }
         for bucket, want in expected.items():
             while len(outcomes[bucket]) < want:
