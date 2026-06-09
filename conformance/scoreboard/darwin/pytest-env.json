@@ -1,7 +1,7 @@
 {
   "suite": "pytest-env",
   "tag": "1.6.0",
-  "category": "ecosystem",
+  "category": "third-party",
   "excluded_files": 0,
   "files": [
     {
