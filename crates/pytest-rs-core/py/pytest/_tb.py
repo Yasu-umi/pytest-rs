@@ -122,15 +122,21 @@ def _exception_lines(exc):
     # non-builtin exception types with their module (upstream classes pin
     # __module__, e.g. "pytest.PytestUnraisableExceptionWarning").
     text = "".join(traceback.format_exception_only(type(exc), exc)).rstrip("\n")
-    if (
-        isinstance(exc, AssertionError)
-        and str(exc).startswith("assert")
+    try:
         # pytest's exconly(tryshort=True) quirk: the prefix is stripped only
         # when saferepr(exc) starts with "AssertionError('assert " — a quote
         # anywhere in the message flips repr to double quotes and the
-        # "AssertionError: " stays.
-        and repr(exc).startswith("AssertionError('assert ")
-    ):
+        # "AssertionError: " stays. str()/repr() can themselves raise (a
+        # failing __repr__), so guard them and keep format_exception_only's
+        # safe "<exception str() failed>" text in that case.
+        tryshort = (
+            isinstance(exc, AssertionError)
+            and str(exc).startswith("assert")
+            and repr(exc).startswith("AssertionError('assert ")
+        )
+    except Exception:
+        tryshort = False
+    if tryshort:
         # pytest's exconly(tryshort=True): only rewritten-assert explanations
         # drop the type name; raised AssertionErrors keep it.
         text = str(exc)
