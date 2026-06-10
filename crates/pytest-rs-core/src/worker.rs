@@ -37,6 +37,7 @@ fn send_collect_error(nodeid: &str, message: String) {
             sections: Vec::new(),
             rerun: false,
             xfail_longrepr: None,
+            reprcrash_message: None,
         },
     });
     send(&WorkerMsg::Report {
@@ -51,6 +52,7 @@ fn send_collect_error(nodeid: &str, message: String) {
             sections: Vec::new(),
             rerun: false,
             xfail_longrepr: None,
+            reprcrash_message: None,
         },
     });
 }

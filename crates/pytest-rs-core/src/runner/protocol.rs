@@ -106,10 +106,18 @@ fn report_from_proxy(py: Python<'_>, report: &Bound<'_, PyAny>) -> PyResult<Test
         "passed" if wasxfail.is_some() => (Outcome::XPassed, false),
         _ => (Outcome::Passed, false),
     };
-    let longrepr = report
+    let longrepr_obj = report
         .getattr("longrepr")
         .ok()
+        .filter(|v| !v.is_none());
+    let reprcrash_message = longrepr_obj
+        .as_ref()
+        .and_then(|lr| lr.getattr("reprcrash").ok())
         .filter(|v| !v.is_none())
+        .and_then(|rc| rc.getattr("message").ok())
+        .filter(|v| !v.is_none())
+        .and_then(|m| m.extract::<String>().ok());
+    let longrepr = longrepr_obj
         .map(|v| v.str().map(|s| s.to_string()))
         .transpose()?;
     let duration = report
@@ -129,6 +137,7 @@ fn report_from_proxy(py: Python<'_>, report: &Bound<'_, PyAny>) -> PyResult<Test
         sections: Vec::new(),
         rerun,
         xfail_longrepr: None,
+        reprcrash_message,
     })
 }
 

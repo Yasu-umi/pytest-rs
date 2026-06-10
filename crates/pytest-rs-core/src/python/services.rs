@@ -128,6 +128,7 @@ pub fn pop_subtest_reports(
                 sections: Vec::new(),
                 rerun: false,
                 xfail_longrepr: None,
+            reprcrash_message: None,
             });
         }
         Ok((reports, failed_fixture_subs))
@@ -193,14 +194,27 @@ pub fn cache_write_session(
     Ok(())
 }
 
-/// The nodeid --stepwise stopped at last run (cache/stepwise), if any.
-pub fn cache_stepwise(py: Python<'_>, config: &crate::config::Config) -> Option<String> {
-    let read = || -> PyResult<Option<String>> {
+/// The stepwise cache info: (cache_hit, error_msg).
+/// cache_hit is Some((nodeid, test_count, age_str)) when a valid prior failure
+/// is cached; error_msg is Some("error reading cache, ...") when the cache
+/// exists but is corrupt/invalid.
+pub fn cache_stepwise(
+    py: Python<'_>,
+    config: &crate::config::Config,
+) -> (Option<(String, Option<usize>, Option<String>)>, Option<String>) {
+    let read = || -> PyResult<(Option<(String, Option<usize>, Option<String>)>, Option<String>)> {
         let cache = cache_object(py, config)?;
-        let value = cache.call_method1("get", ("cache/stepwise", py.None()))?;
-        value.extract()
+        let result = py
+            .import("pytest._cache")?
+            .call_method1("stepwise_info", (cache,))?;
+        let last_failed: Option<String> = result.get_item(0)?.extract()?;
+        let test_count: Option<usize> = result.get_item(1)?.extract()?;
+        let age_str: Option<String> = result.get_item(2)?.extract()?;
+        let error_msg: Option<String> = result.get_item(3)?.extract()?;
+        let hit = last_failed.map(|n| (n, test_count, age_str));
+        Ok((hit, error_msg))
     };
-    read().ok().flatten()
+    read().unwrap_or((None, None))
 }
 
 /// Persist (or clear, with None) the --stepwise resume point.
@@ -208,11 +222,16 @@ pub fn cache_write_stepwise(
     py: Python<'_>,
     config: &crate::config::Config,
     nodeid: Option<&str>,
+    test_count: Option<usize>,
 ) -> PyResult<()> {
     let cache = cache_object(py, config)?;
     match nodeid {
-        Some(nodeid) => cache.call_method1("set", ("cache/stepwise", nodeid))?,
-        None => cache.call_method1("set", ("cache/stepwise", py.None()))?,
+        Some(nodeid) => py
+            .import("pytest._cache")?
+            .call_method1("stepwise_write", (cache, nodeid, test_count))?,
+        None => py
+            .import("pytest._cache")?
+            .call_method1("stepwise_write", (cache, py.None(), py.None()))?,
     };
     Ok(())
 }
@@ -240,6 +259,18 @@ pub fn cache_show(py: Python<'_>, config: &crate::config::Config, glob: &str) ->
 pub fn cache_clear(py: Python<'_>, config: &crate::config::Config) -> PyResult<()> {
     cache_object(py, config)?.call_method0("clear_cache")?;
     Ok(())
+}
+
+/// Return true if the Python config proxy has `workerinput` set (simulated or
+/// real xdist worker). Used to skip cache writes from workers.
+pub fn config_has_workerinput(py: Python<'_>, config: &crate::config::Config) -> bool {
+    let Ok(proxy) = make_py_config(py, config) else {
+        return false;
+    };
+    proxy
+        .bind(py)
+        .hasattr("workerinput")
+        .unwrap_or(false)
 }
 
 /// Arm the shim's MarkGenerator: unknown marks (not builtin, not in the

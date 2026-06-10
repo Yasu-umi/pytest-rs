@@ -212,6 +212,12 @@ def raise_location(exc):
     return f"{_relpath(frame.f_code.co_filename)}:{lineno}"
 
 
+def crash_message(exc):
+    """Return the short crash message for an exception (reprcrash.message
+    equivalent), used for the short test summary regardless of --tb style."""
+    return _exception_lines(exc)[0]
+
+
 def format_exception(exc, style="long"):
     if style == "no":
         return ""

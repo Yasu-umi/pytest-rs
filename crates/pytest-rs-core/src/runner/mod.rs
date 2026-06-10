@@ -54,7 +54,7 @@ impl Engine {
         let maxfail = config.maxfail();
         // --stepwise stops after the first failing item (--stepwise-skip
         // ignores the first one); the resume point persists via the cache.
-        let stepwise = (config.get_flag("sw") || config.get_flag("sw-skip")) && maxfail.is_none();
+        let stepwise = (config.get_flag("sw") || config.get_flag("sw-skip") || config.get_flag("sw-reset")) && maxfail.is_none();
         let sw_skip = config.get_flag("sw-skip");
         let mut sw_failed_items = 0usize;
         // Collection errors (--continue-on-collection-errors) already count
@@ -309,7 +309,10 @@ impl Engine {
                 if !(sw_skip && sw_failed_items == 1) {
                     // Publish a truthy session.shouldstop so a conftest
                     // pytest_sessionfinish sees it (and cannot unset it).
-                    python::set_session_shouldstop(py, "stepwise: stopping after first failure");
+                    python::set_session_shouldstop(
+                        py,
+                        "Test failed, continuing from this test next run.",
+                    );
                     break;
                 }
             }
@@ -479,6 +482,7 @@ fn run_custom_item(py: Python<'_>, config: &Config, item: &TestItem) -> Vec<Test
             sections: Vec::new(),
             rerun: false,
             xfail_longrepr: None,
+            reprcrash_message: None,
         });
     }
     reports
@@ -530,6 +534,7 @@ pub(crate) fn run_one_body(
                 sections: Vec::new(),
                 rerun: false,
                 xfail_longrepr: None,
+            reprcrash_message: None,
             });
             return reports;
         }
@@ -583,6 +588,7 @@ pub(crate) fn run_one_body(
             sections: Vec::new(),
             rerun: false,
             xfail_longrepr: None,
+            reprcrash_message: None,
         });
         return reports;
     }
@@ -883,6 +889,7 @@ pub(crate) fn run_one_body(
         sections: Vec::new(),
         rerun: false,
         xfail_longrepr: None,
+            reprcrash_message: None,
     });
 
     if setup_show_active(config) {
@@ -943,6 +950,7 @@ pub(crate) fn run_one_body(
                     sections: Vec::new(),
                     rerun: false,
                     xfail_longrepr: None,
+            reprcrash_message: None,
                 });
                 teardown_one(py, plugins, session, config, item, true, &mut reports);
                 close_item_filters(py);
@@ -1021,6 +1029,7 @@ pub(crate) fn run_one_body(
             sections: python::log_failure_sections(py),
             rerun: false,
             xfail_longrepr: None,
+            reprcrash_message: None,
         },
         Ok(false) => {
             if item.is_coroutine {
@@ -1043,6 +1052,7 @@ pub(crate) fn run_one_body(
                     sections: Vec::new(),
                     rerun: false,
                     xfail_longrepr: None,
+            reprcrash_message: None,
                 }
             } else {
                 match python::call_with_kwargs(py, &callable, &kwargs) {
@@ -1057,6 +1067,7 @@ pub(crate) fn run_one_body(
                         sections: python::log_failure_sections(py),
                         rerun: false,
                         xfail_longrepr: None,
+            reprcrash_message: None,
                     },
                     Err(err) => {
                         if let Some(code) = python::session_abort_code(py, &err) {
@@ -1291,6 +1302,7 @@ fn teardown_one(
             sections: python::log_failure_sections(py),
             rerun: false,
             xfail_longrepr: None,
+            reprcrash_message: None,
         });
     } else {
         reports.push(TestReport {
@@ -1312,6 +1324,7 @@ fn teardown_one(
             sections: python::log_failure_sections(py),
             rerun: false,
             xfail_longrepr: None,
+            reprcrash_message: None,
         });
     }
     python::log_finish_item(py);
@@ -1373,6 +1386,7 @@ pub(crate) fn teardown_scope_reported(
             sections,
             rerun: false,
             xfail_longrepr: None,
+            reprcrash_message: None,
         });
     }
     let sections = python::log_failure_sections(py);
@@ -1388,6 +1402,7 @@ pub(crate) fn teardown_scope_reported(
         sections,
         rerun: false,
         xfail_longrepr: None,
+            reprcrash_message: None,
     })
 }
 

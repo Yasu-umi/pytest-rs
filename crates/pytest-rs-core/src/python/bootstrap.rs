@@ -213,22 +213,28 @@ pub fn load_named_plugins(
     hooks: &mut Vec<crate::session::PyHook>,
 ) -> PyResult<()> {
     for name in names {
-        // Built-in plugin names ("pytester", ...) aren't importable modules;
-        // they're provided natively, so only importable plugins register.
+        // Try the name directly, then as `_pytest.{name}` (for built-in
+        // pytest plugin short-names like "pytester"), then via the search_dir.
         let plugin = match py.import(name.as_str()) {
             Ok(plugin) => plugin,
-            // Under `python -m pytest` the invocation dir is sys.path[0],
-            // so -p resolves local plugin modules; emulate that for the
-            // import only, then drop the path entry again.
             Err(_) => {
-                let Some(dir) = search_dir else { continue };
-                let dir = dir.to_string_lossy();
-                let sys_path = py.import("sys")?.getattr("path")?;
-                sys_path.call_method1("insert", (0, dir.as_ref()))?;
-                let result = py.import(name.as_str());
-                let _ = sys_path.call_method1("remove", (dir.as_ref(),));
-                let Ok(plugin) = result else { continue };
-                plugin
+                let scoped = format!("_pytest.{name}");
+                match py.import(scoped.as_str()) {
+                    Ok(plugin) => plugin,
+                    Err(_) => {
+                        // Under `python -m pytest` the invocation dir is
+                        // sys.path[0], so -p resolves local plugin modules;
+                        // emulate that for the import only.
+                        let Some(dir) = search_dir else { continue };
+                        let dir = dir.to_string_lossy();
+                        let sys_path = py.import("sys")?.getattr("path")?;
+                        sys_path.call_method1("insert", (0, dir.as_ref()))?;
+                        let result = py.import(name.as_str());
+                        let _ = sys_path.call_method1("remove", (dir.as_ref(),));
+                        let Ok(plugin) = result else { continue };
+                        plugin
+                    }
+                }
             }
         };
         // Re-registering an already-seen plugin would duplicate its hooks.

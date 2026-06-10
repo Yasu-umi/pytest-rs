@@ -188,6 +188,58 @@ def cacheshow(cachedir, glob):
     return 0
 
 
+def stepwise_info(cache_obj):
+    """Return (last_failed, test_count, age_str, error_msg) from the stepwise cache entry.
+
+    error_msg is non-None when the cache exists but is invalid (e.g. corrupted);
+    in that case last_failed/test_count/age_str are all None.
+    """
+    from datetime import datetime, timedelta
+
+    info = cache_obj.get("cache/stepwise", None)
+    if info is None:
+        return None, None, None, None
+    if isinstance(info, str):
+        # Legacy format: bare nodeid string.
+        return info, None, None, None
+    if isinstance(info, dict):
+        try:
+            last_failed = info["last_failed"]
+            test_count = info["last_test_count"]
+            cache_date_str = info["last_cache_date_str"]
+        except (KeyError, TypeError) as e:
+            error = f"{type(e).__name__}: {e}"
+            return None, None, None, f"error reading cache, discarding ({error})"
+        age_str = None
+        if cache_date_str:
+            try:
+                cache_date = datetime.fromisoformat(cache_date_str)
+                age = datetime.now() - cache_date
+                age = timedelta(seconds=int(age.total_seconds()))
+                age_str = str(age)
+            except (ValueError, TypeError):
+                pass
+        return last_failed, test_count, age_str, None
+    return None, None, None, None
+
+
+def stepwise_write(cache_obj, nodeid, test_count=None):
+    """Persist the stepwise resume point (or clear it with nodeid=None)."""
+    from datetime import datetime
+
+    if nodeid is None:
+        cache_obj.set("cache/stepwise", None)
+    else:
+        cache_obj.set(
+            "cache/stepwise",
+            {
+                "last_failed": nodeid,
+                "last_test_count": test_count,
+                "last_cache_date_str": datetime.now().isoformat(),
+            },
+        )
+
+
 @fixture
 def cache(request):
     return request.config.cache

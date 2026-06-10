@@ -49,6 +49,10 @@ pub struct TestReport {
     /// traceback so the XFAILURES section (--xfail-tb) can render it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub xfail_longrepr: Option<String>,
+    /// report.longrepr.reprcrash.message: the crash message without traceback,
+    /// used for short test summary lines regardless of --tb style.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reprcrash_message: Option<String>,
 }
 
 impl TestReport {

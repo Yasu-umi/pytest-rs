@@ -17,8 +17,12 @@ pub struct CacheState {
     nf: bool,
     /// --stepwise: resume from the cached failure, stop at the next one.
     sw: bool,
-    /// The nodeid the previous --stepwise run stopped at.
-    sw_resume: Option<String>,
+    /// True when --sw-reset was used.
+    sw_reset: bool,
+    /// The nodeid the previous --stepwise run stopped at, plus cache metadata.
+    sw_resume: Option<(String, Option<usize>, Option<String>)>,
+    /// Error message when the cache existed but was invalid (e.g. corrupted).
+    sw_cache_error: Option<String>,
     /// Failed nodeids from the previous run, in recorded order.
     lastfailed: Vec<String>,
     /// Nodeids seen in previous runs (--nf sorts unseen ones first).
@@ -27,6 +31,10 @@ pub struct CacheState {
     skipped_files: usize,
     /// The "run-last-failure: ..." collection status line.
     report_status: Option<String>,
+    /// The "stepwise: ..." collection status lines (may include error + normal).
+    sw_statuses: Vec<String>,
+    /// Number of items seen in the current collection (for writing cache).
+    total_items: usize,
 }
 
 impl CacheState {
@@ -38,11 +46,12 @@ impl CacheState {
         let lf = enabled && config.get_flag("lf");
         let ff = enabled && config.get_flag("ff");
         let nf = enabled && config.get_flag("nf");
-        let sw = enabled && (config.get_flag("sw") || config.get_flag("sw-skip"));
-        let sw_resume = if sw && !config.get_flag("sw-reset") {
+        let sw_reset = enabled && config.get_flag("sw-reset");
+        let sw = enabled && (config.get_flag("sw") || config.get_flag("sw-skip") || sw_reset);
+        let (sw_resume, sw_cache_error) = if sw && !sw_reset {
             crate::python::cache_stepwise(py, config)
         } else {
-            None
+            (None, None)
         };
         let lastfailed = if enabled {
             crate::python::cache_lastfailed(py, config)
@@ -60,11 +69,15 @@ impl CacheState {
             ff,
             nf,
             sw,
+            sw_reset,
             sw_resume,
+            sw_cache_error,
             lastfailed,
             cached_nodeids,
             skipped_files: 0,
             report_status: None,
+            sw_statuses: Vec::new(),
+            total_items: 0,
         }
     }
 
@@ -202,13 +215,38 @@ impl CacheState {
                 }
             }
         }
-        // --stepwise: drop items before the cached resume point (they
-        // already passed last run); unknown resume points run everything.
-        if self.sw
-            && let Some(resume) = &self.sw_resume
-            && let Some(index) = items.iter().position(|item| &item.nodeid == resume)
-        {
-            removed.extend(items.drain(..index));
+        // --stepwise status and item filtering.
+        if self.sw {
+            self.total_items = items.len();
+            if let Some(err) = self.sw_cache_error.take() {
+                self.sw_statuses.push(err);
+            }
+            if self.sw_reset {
+                self.sw_statuses
+                    .push("resetting state, not skipping.".to_string());
+            } else if let Some((nodeid, last_count, age_str)) = &self.sw_resume {
+                // Invalidate if test count changed since last run.
+                let count_changed = last_count.map(|c| c != items.len()).unwrap_or(false);
+                if count_changed {
+                    self.sw_statuses.push(format!(
+                        "test count changed, not skipping (now {} tests, previously {}).",
+                        items.len(),
+                        last_count.unwrap()
+                    ));
+                } else if let Some(index) = items.iter().position(|item| &item.nodeid == nodeid) {
+                    let age = age_str.as_deref().unwrap_or("unknown");
+                    self.sw_statuses.push(format!(
+                        "skipping {index} already passed items (cache from {age} ago, use --sw-reset to discard)."
+                    ));
+                    removed.extend(items.drain(..index));
+                } else {
+                    self.sw_statuses
+                        .push("previously failed test not found, not skipping.".to_string());
+                }
+            } else {
+                self.sw_statuses
+                    .push("no previously failed tests, not skipping.".to_string());
+            }
         }
         if self.nf {
             let seen: HashSet<&str> = self.cached_nodeids.iter().map(String::as_str).collect();
@@ -250,6 +288,17 @@ impl CacheState {
             .map(|status| format!("run-last-failure: {status}"))
     }
 
+    /// The "stepwise: ..." lines shown after the collected count (may be >1 on error).
+    pub fn stepwise_lines(&self, config: &Config) -> Vec<String> {
+        if !self.sw || config.quiet || self.sw_statuses.is_empty() {
+            return Vec::new();
+        }
+        self.sw_statuses
+            .iter()
+            .map(|status| format!("stepwise: {status}"))
+            .collect()
+    }
+
     /// LFPlugin/NFPlugin pytest_sessionfinish: replay the run's reports into
     /// cache/lastfailed and persist cache/nodeids.
     pub fn sessionfinish(
@@ -259,7 +308,11 @@ impl CacheState {
         reports: &[TestReport],
         items: &[TestItem],
     ) {
-        if !self.enabled || config.is_worker() || config.get_value("cache-show").is_some() {
+        if !self.enabled
+            || config.is_worker()
+            || crate::python::config_has_workerinput(py, config)
+            || config.get_value("cache-show").is_some()
+        {
             return;
         }
         let mut failed: Vec<String> = self.lastfailed.clone();
@@ -300,7 +353,12 @@ impl CacheState {
                 .iter()
                 .find(|r| r.outcome == Outcome::Failed)
                 .map(|r| r.nodeid.as_str());
-            let _ = crate::python::cache_write_stepwise(py, config, first_failed);
+            let count = if first_failed.is_some() {
+                Some(self.total_items)
+            } else {
+                None
+            };
+            let _ = crate::python::cache_write_stepwise(py, config, first_failed, count);
         }
     }
 }

@@ -435,6 +435,15 @@ fn common_ancestor(dirs: &[PathBuf]) -> PathBuf {
 
 /// Python shlex.split (posix): whitespace-separated tokens with '...'
 /// (literal) and "..." (backslash escapes \\ and \") quoting.
+/// A token is a positional test-path arg if it looks like a filesystem path
+/// (contains `/`, `\`, or a Python-file extension). Used to avoid greedily
+/// consuming test-path positionals as values for deferred plugin flags.
+fn looks_like_path(s: &str) -> bool {
+    s.contains('/') || s.contains('\\') || s.ends_with(".py") || s.ends_with(".txt")
+        || s.ends_with(".toml") || s.ends_with(".cfg") || s.ends_with(".ini")
+        || s.starts_with('.') // ./relative or ../up
+}
+
 fn shlex_split(input: &str) -> Vec<String> {
     let mut parts = Vec::new();
     let mut current = String::new();
@@ -787,7 +796,6 @@ impl Config {
             ("ff", "failed-first"),
             ("nf", "new-first"),
             ("sw", "stepwise"),
-            ("sw-skip", "stepwise-skip"),
             ("sw-reset", "stepwise-reset"),
         ] {
             cmd = cmd.arg(
@@ -798,6 +806,13 @@ impl Config {
                     .hide(true),
             );
         }
+        cmd = cmd.arg(
+            clap::Arg::new("sw-skip")
+                .long("sw-skip")
+                .alias("stepwise-skip")
+                .action(clap::ArgAction::SetTrue)
+                .help("Ignore the first failing test but stop on the next failing test. Implicitly enables --stepwise."),
+        );
         cmd = cmd.arg(
             clap::Arg::new("cache-show")
                 .long("cache-show")
@@ -888,11 +903,14 @@ impl Config {
             }
             // A separate value token (`--flag value`) is deferred with the
             // flag; whether the spec consumes it is decided at apply time.
+            // Skip the peek for path-like tokens (test file args): they're
+            // positional args for clap, not values for the deferred flag.
             let space_value = !token.contains('=');
             plugin_args.push(token);
             if space_value
                 && let Some((_, next)) = tokens.peek()
                 && !next.starts_with('-')
+                && !looks_like_path(next)
             {
                 plugin_args.push(tokens.next().expect("peeked").1);
             }

@@ -42,6 +42,9 @@ pub struct PyConfig {
     /// (`strict = true`). Parseconfig tests register plugins here; the
     /// session config uses the global shared PM instead.
     local_pm: pyo3::sync::PyOnceLock<Py<PyAny>>,
+    /// Optional override for `workerinput`, set by conftest hooks in tests
+    /// that simulate xdist worker processes (`config.workerinput = True`).
+    workerinput_override: std::sync::Mutex<Option<Py<PyAny>>>,
 }
 
 impl PyConfig {
@@ -68,6 +71,7 @@ impl PyConfig {
             option,
             stash: pyo3::sync::PyOnceLock::new(),
             local_pm: pyo3::sync::PyOnceLock::new(),
+            workerinput_override: std::sync::Mutex::new(None),
         }
     }
 
@@ -285,9 +289,17 @@ impl PyConfig {
     /// xdist parity: present (with the worker id) only in -n workers, so
     /// `hasattr(config, "workerinput")` detects worker processes. Custom
     /// entries set by controller-side pytest_configure_node hooks arrive
-    /// as JSON via PYTEST_RS_WORKERINPUT.
+    /// as JSON via PYTEST_RS_WORKERINPUT. Also settable by conftest hooks
+    /// (e.g. test_stepwise sets `config.workerinput = True` to simulate a
+    /// worker without actually running xdist).
     #[getter]
     fn workerinput<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        // Check for an explicit override set via the setter.
+        if let Ok(guard) = self.workerinput_override.lock() {
+            if let Some(ref v) = *guard {
+                return Ok(v.bind(py).clone());
+            }
+        }
         match std::env::var("PYTEST_XDIST_WORKER") {
             Ok(worker_id) => {
                 let dict = pyo3::types::PyDict::new(py);
@@ -307,6 +319,14 @@ impl PyConfig {
             }
             Err(_) => Err(pyo3::exceptions::PyAttributeError::new_err("workerinput")),
         }
+    }
+
+    #[setter]
+    fn set_workerinput(&self, py: Python<'_>, value: Py<PyAny>) -> PyResult<()> {
+        if let Ok(mut guard) = self.workerinput_override.lock() {
+            *guard = Some(value.clone_ref(py));
+        }
+        Ok(())
     }
 
     /// xdist parity: a worker-only dict the controller receives back in

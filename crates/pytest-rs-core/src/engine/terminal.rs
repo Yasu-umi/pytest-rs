@@ -703,8 +703,15 @@ impl Engine {
                     .collect_errors
                     .iter()
                     .any(|(nodeid, _)| nodeid == &report.nodeid);
+                // Prefer reprcrash.message (always set, tb-style-independent)
+                // over parsing longrepr lines (unavailable with --tb=no).
+                let crash_msg = report
+                    .reprcrash_message
+                    .as_deref()
+                    .map(str::to_string)
+                    .or_else(|| report.longrepr.as_deref().and_then(short_message));
                 if !is_collect_error
-                    && let Some(message) = report.longrepr.as_deref().and_then(short_message)
+                    && let Some(message) = crash_msg
                 {
                     // pytest's _get_line_with_reprcrash_message: failure/error
                     // lines show the full crash message on CI or at -vv, but

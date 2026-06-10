@@ -317,7 +317,7 @@ class RunResult:
                 for count, noun in _OUTCOME_RE.findall(clean):
                     found[plural.get(noun, noun)] = int(count)
                 return found
-        return {}
+        raise ValueError("Pytest terminal summary report not found")
 
     def parseoutcomes(self):
         return self.parse_summary_nouns(self.outlines)
@@ -366,6 +366,7 @@ class Pytester:
         self._name = request_name
         self._request = request
         self._syspaths = []
+        self.plugins = []
         # Capture the runner path now (fixture setup, before a test body can
         # mock.patch.dict(os.environ, clear=True) around runpytest). The
         # module-level import runs too early — pytest imports this before the
@@ -509,11 +510,12 @@ class Pytester:
         else:
             env.pop("PYTEST_RS_HOOK_RELAY", None)
         start = time.perf_counter()
-        # cwd inherits like upstream's subprocess runs: the pytester fixture
-        # chdir'd to self.path at setup, and a test that os.chdir()s deeper
-        # means the nested run to resolve relative args from there.
+        # cwd: use self.path explicitly so the inner run's rootdir discovery
+        # starts from the pytester temp dir, not from the outer binary's CWD.
+        # A test that os.chdir()s deeper can still pass an explicit path arg.
         proc = subprocess.run(
             [exe, f"--basetemp={basetemp}", *extra_args, *[str(arg) for arg in args]],
+            cwd=str(self.path),
             capture_output=True,
             text=True,
             timeout=timeout if timeout is not None else 120,
@@ -554,6 +556,13 @@ class Pytester:
 
     def runpytest_subprocess(self, *args, timeout=None):
         # Upstream subprocess runs do NOT inherit the outer warning filters.
+        __tracebackhide__ = True
+        for plugin in self.plugins:
+            if not isinstance(plugin, str):
+                raise ValueError(
+                    f"plugins as objects is not supported in pytester subprocess mode; "
+                    f"specify by name instead: {plugin}"
+                )
         return self._runpytest(args, timeout=timeout, forward_filters=False)
 
     runpytest_inprocess = runpytest
@@ -1270,7 +1279,7 @@ class Testdir(Pytester):
         return LocalPath(super().mkdir(name))
 
 
-def _make_runner_dir(request, tmp_path_factory, cls):
+def _make_runner_dir(request, tmp_path_factory, cls, monkeypatch=None):
     # Numbered dirs named after the test, under the session basetemp shared
     # with tmp_path/tmpdir — upstream pytester layout (relative nodeids of
     # nested runs can include this dir name when rootdir lands on basetemp).
@@ -1284,6 +1293,7 @@ def _make_runner_dir(request, tmp_path_factory, cls):
     old_cwd = os.getcwd()
     os.chdir(path)
     runner = cls(path, name, request)
+    runner._monkeypatch = monkeypatch
     # Upstream: nested runs root their tmp dirs under a per-pytester
     # directory (tests inspect it via pytester._test_tmproot).
     runner._test_tmproot = tmp_path_factory.mktemp(f"tmp-{name}", numbered=True)
@@ -1292,6 +1302,13 @@ def _make_runner_dir(request, tmp_path_factory, cls):
     # Upstream pytester sanitizes the outer PYTEST_ADDOPTS at setup; a test
     # monkeypatch.setenv afterwards still reaches the nested run.
     old_addopts = os.environ.pop("PYTEST_ADDOPTS", None)
+    # Upstream pytester sets HOME to the pytester temp directory so nested
+    # runs don't pick up the real user's home config.
+    tmphome = str(path)
+    old_home = os.environ.get("HOME")
+    old_userprofile = os.environ.get("USERPROFILE")
+    os.environ["HOME"] = tmphome
+    os.environ["USERPROFILE"] = tmphome
     yield runner
     if old_temproot is None:
         os.environ.pop("PYTEST_DEBUG_TEMPROOT", None)
@@ -1299,6 +1316,14 @@ def _make_runner_dir(request, tmp_path_factory, cls):
         os.environ["PYTEST_DEBUG_TEMPROOT"] = old_temproot
     if old_addopts is not None:
         os.environ["PYTEST_ADDOPTS"] = old_addopts
+    if old_home is None:
+        os.environ.pop("HOME", None)
+    else:
+        os.environ["HOME"] = old_home
+    if old_userprofile is None:
+        os.environ.pop("USERPROFILE", None)
+    else:
+        os.environ["USERPROFILE"] = old_userprofile
     for entry in runner._syspaths:
         if entry in sys.path:
             sys.path.remove(entry)
@@ -1328,13 +1353,13 @@ def linecomp():
 
 
 @fixture
-def pytester(request, tmp_path_factory):
-    yield from _make_runner_dir(request, tmp_path_factory, Pytester)
+def pytester(request, tmp_path_factory, monkeypatch):
+    yield from _make_runner_dir(request, tmp_path_factory, Pytester, monkeypatch)
 
 
 @fixture
-def testdir(request, tmp_path_factory):
-    yield from _make_runner_dir(request, tmp_path_factory, Testdir)
+def testdir(request, tmp_path_factory, monkeypatch):
+    yield from _make_runner_dir(request, tmp_path_factory, Testdir, monkeypatch)
 
 
 @fixture

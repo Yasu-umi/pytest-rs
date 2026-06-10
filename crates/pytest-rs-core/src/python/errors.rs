@@ -44,6 +44,14 @@ pub fn format_exception(py: Python<'_>, err: &PyErr) -> String {
 
 /// Format a test failure pytest-style (per --tb), falling back to the
 /// native traceback.
+/// Extract the short crash message from an exception (reprcrash.message equivalent).
+pub fn crash_message(py: Python<'_>, err: &PyErr) -> Option<String> {
+    py.import("pytest._tb")
+        .and_then(|m| m.call_method1("crash_message", (err.value(py),)))
+        .and_then(|v| v.extract())
+        .ok()
+}
+
 pub fn format_test_failure(py: Python<'_>, err: &PyErr, style: &str) -> String {
     let result: PyResult<String> = (|| {
         py.import("pytest._tb")?

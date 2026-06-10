@@ -306,6 +306,7 @@ impl Engine {
                     sections: Vec::new(),
                     rerun: false,
                     xfail_longrepr: None,
+            reprcrash_message: None,
                 });
             }
             // --maxfail aborting collection exits TESTS_FAILED with a
@@ -498,6 +499,11 @@ impl Engine {
                 .and_then(|cache| cache.status_line(&self.config))
             {
                 println!("{line}");
+            }
+            if let Some(cache) = self.cache.as_ref() {
+                for line in cache.stepwise_lines(&self.config) {
+                    println!("{line}");
+                }
             }
             if let Err(err) = self.print_py_report_collectionfinish(py) {
                 eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
@@ -701,13 +707,14 @@ impl Engine {
         }
         // A test/plugin set session.shouldstop with a reason: pytest banners
         // it after the failure summary (the INTERRUPTED-exit case shows it via
-        // the interrupt report instead; --stepwise drives its own banner).
-        if !self.config.get_flag("sw")
-            && !self.config.get_flag("sw-skip")
-            && self.session.abort_banner.is_none()
+        // the interrupt report instead). Exit code is INTERRUPTED regardless
+        // of whether any tests also failed (e.g. --stepwise stops after the
+        // first failure).
+        if self.session.abort_banner.is_none()
             && let Some(reason) = python::session_shouldstop(py)
         {
-            println!("{}", center_with(&reason, '!'));
+            println!("{}", center_with(&format!("Interrupted: {reason}"), '!'));
+            code = exit_code::INTERRUPTED;
         }
         let warning_count = python::warning_count(py) + self.session.worker_warning_count;
         let summary = crate::runner::summary_line(
@@ -1130,6 +1137,7 @@ impl Engine {
                                 sections: Vec::new(),
                                 rerun: false,
                                 xfail_longrepr: None,
+            reprcrash_message: None,
                             });
                         }
                         Some(Err(message)) => errors.push((file.clone(), with_sections(message))),
@@ -1184,6 +1192,7 @@ impl Engine {
                                     sections: Vec::new(),
                                     rerun: false,
                                     xfail_longrepr: None,
+            reprcrash_message: None,
                                 });
                             }
                         }
@@ -1253,6 +1262,7 @@ impl Engine {
                                 sections: Vec::new(),
                                 rerun: false,
                                 xfail_longrepr: None,
+            reprcrash_message: None,
                             });
                         } else {
                             errors.push((extra_file.clone(), python::format_exception(py, &err)));

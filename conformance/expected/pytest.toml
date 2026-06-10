@@ -6,6 +6,7 @@
 "testing/test_doctest.py" = "passed"
 "testing/test_monkeypatch.py" = "passed"
 "testing/test_recwarn.py" = "passed"
+"testing/test_stepwise.py" = "passed"
 "testing/test_tmpdir.py" = "passed"
 
 # Files intentionally not run: they test pytest's internal implementation,

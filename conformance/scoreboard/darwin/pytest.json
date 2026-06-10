@@ -87,11 +87,11 @@
     },
     {
       "file": "testing/test_collection.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 49,
-      "failed": 64,
-      "skipped": 3,
+      "status": "timeout",
+      "exit_code": null,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
       "errors": 0
     },
     {
@@ -114,11 +114,11 @@
     },
     {
       "file": "testing/test_conftest.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 22,
-      "failed": 31,
-      "skipped": 1,
+      "status": "timeout",
+      "exit_code": null,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
       "errors": 0
     },
     {
@@ -186,10 +186,10 @@
     },
     {
       "file": "testing/test_mark.py",
-      "status": "failed",
-      "exit_code": 1,
+      "status": "passed",
+      "exit_code": 0,
       "passed": 105,
-      "failed": 1,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },
@@ -224,8 +224,8 @@
       "file": "testing/test_pytester.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 44,
-      "failed": 8,
+      "passed": 47,
+      "failed": 5,
       "skipped": 0,
       "errors": 0
     },
@@ -305,17 +305,17 @@
       "file": "testing/test_skipping.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 88,
-      "failed": 4,
+      "passed": 85,
+      "failed": 7,
       "skipped": 0,
       "errors": 0
     },
     {
       "file": "testing/test_stepwise.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 7,
-      "failed": 11,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 18,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },
@@ -332,8 +332,8 @@
       "file": "testing/test_terminal.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 202,
-      "failed": 23,
+      "passed": 200,
+      "failed": 25,
       "skipped": 2,
       "errors": 0
     },

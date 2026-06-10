@@ -172,4 +172,22 @@ class HookRecorder:
         self.calls[:] = []
 
 
+def pytest_addoption(parser):
+    """Register pytester CLI options so -p pytester + --runpytest work."""
+    parser.addoption(
+        "--lsof",
+        action="store_true",
+        dest="lsof",
+        default=False,
+        help="Run FD checks if lsof is available",
+    )
+    parser.addoption(
+        "--runpytest",
+        default="inprocess",
+        dest="runpytest",
+        choices=("inprocess", "subprocess"),
+        help="Run pytest sub runs via 'inprocess' or 'subprocess'",
+    )
+
+
 from _pytest._stub import __getattr__  # noqa: E402, F401
