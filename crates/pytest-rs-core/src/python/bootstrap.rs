@@ -604,26 +604,32 @@ pub fn extract_collect_ignores(
 /// Call pytest_ignore_collect for a path; returns true if the path should be
 /// ignored. Only calls hooks whose baseid is a prefix of the path (conftests
 /// only ignore paths within their subtree).
+/// Check whether a path should be ignored by pytest_ignore_collect hooks.
+///
+/// Returns:
+/// - `None` = do not ignore
+/// - `Some(None)` = ignore silently (hook returned truthy)
+/// - `Some(Some(reason))` = ignore and emit a skip report (hook raised Skipped)
 pub fn call_ignore_collect_hooks(
     py: Python<'_>,
     hooks: &[crate::session::PyHook],
     path: &Path,
     rootdir: &Path,
-) -> bool {
+) -> Option<Option<String>> {
     let ignore_hooks: Vec<&crate::session::PyHook> = hooks
         .iter()
         .filter(|h| h.name == "pytest_ignore_collect")
         .collect();
     if ignore_hooks.is_empty() {
-        return false;
+        return None;
     }
     let pathlib = match py.import("pathlib").and_then(|m| m.getattr("Path")) {
         Ok(p) => p,
-        Err(_) => return false,
+        Err(_) => return None,
     };
     let py_path = match pathlib.call1((path.to_string_lossy().as_ref(),)) {
         Ok(p) => p,
-        Err(_) => return false,
+        Err(_) => return None,
     };
     // Build a minimal config proxy for the hook parameter
     let config = crate::python::proxies::CONFIG_PROXY
@@ -655,15 +661,29 @@ pub fn call_ignore_collect_hooks(
                 ("path", py_path.clone().unbind()),
             ],
         );
-        if let Ok(result) = result {
-            if result
-                .bind(py)
-                .is_truthy()
-                .unwrap_or(false)
-            {
-                return true;
+        match result {
+            Ok(result) => {
+                if result.bind(py).is_truthy().unwrap_or(false) {
+                    return Some(None);
+                }
             }
+            // pytest.skip() in pytest_ignore_collect: ignore the path and emit a skip report
+            Err(ref err)
+                if err
+                    .get_type(py)
+                    .name()
+                    .map(|n| n == "Skipped")
+                    .unwrap_or(false) =>
+            {
+                let reason = err
+                    .value(py)
+                    .getattr("msg")
+                    .and_then(|m| m.extract::<String>())
+                    .unwrap_or_else(|_| "Skipped".to_string());
+                return Some(Some(reason));
+            }
+            Err(_) => {}
         }
     }
-    false
+    None
 }

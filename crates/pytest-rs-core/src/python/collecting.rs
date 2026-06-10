@@ -130,18 +130,21 @@ pub fn has_collect_file_hook(py: Python<'_>, hooks: &[crate::session::PyHook]) -
         .unwrap_or(false)
 }
 
+/// Collect items via pytest_collect_file hooks.
+/// Returns `(file, skip_reason)` pairs for files that were skipped via pytest.skip().
 pub fn collect_custom_files(
     py: Python<'_>,
     rootdir: &Path,
     files: &[PathBuf],
     _hooks: &[crate::session::PyHook],
     items: &mut Vec<TestItem>,
-) -> PyResult<()> {
+) -> PyResult<Vec<(PathBuf, String)>> {
+    let mut skipped: Vec<(PathBuf, String)> = Vec::new();
     let Some(config) = crate::python::proxies::CONFIG_PROXY
         .get()
         .map(|c| c.bind(py))
     else {
-        return Ok(());
+        return Ok(skipped);
     };
     // pytest_collect_file impls live on the shim pluginmanager (autoloaded
     // plugin modules + objects registered at configure, e.g. pytest-mypy);
@@ -177,7 +180,26 @@ pub fn collect_custom_files(
         let kwargs = pyo3::types::PyDict::new(py);
         kwargs.set_item("file_path", &file_path)?;
         kwargs.set_item("parent", &parent)?;
-        let results = collect_file.call((), Some(&kwargs))?;
+        let results = match collect_file.call((), Some(&kwargs)) {
+            Ok(r) => r,
+            // pytest.skip() in pytest_collect_file means "skip this file".
+            Err(ref err)
+                if err
+                    .get_type(py)
+                    .name()
+                    .map(|n| n == "Skipped")
+                    .unwrap_or(false) =>
+            {
+                let reason = err
+                    .value(py)
+                    .getattr("msg")
+                    .and_then(|m| m.extract::<String>())
+                    .unwrap_or_else(|_| "Skipped".to_string());
+                skipped.push((file.clone(), reason));
+                continue;
+            }
+            Err(e) => return Err(e),
+        };
         let results_list: Vec<Bound<'_, PyAny>> = if results.is_none() {
             Vec::new()
         } else {
@@ -243,7 +265,7 @@ pub fn collect_custom_files(
             }
         }
     }
-    Ok(())
+    Ok(skipped)
 }
 
 pub fn collect_module(

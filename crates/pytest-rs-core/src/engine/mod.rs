@@ -1107,14 +1107,36 @@ impl Engine {
             }
             // pytest_ignore_collect: only applied when no explicit file args
             if no_explicit_file_args {
-                files.retain(|f| {
-                    !python::call_ignore_collect_hooks(
+                let mut kept = Vec::with_capacity(files.len());
+                for f in files.drain(..) {
+                    match python::call_ignore_collect_hooks(
                         py,
                         &self.session.py_hooks,
-                        f,
+                        &f,
                         &rootdir,
-                    )
-                });
+                    ) {
+                        None => kept.push(f),
+                        Some(None) => {} // ignored silently
+                        Some(Some(reason)) => {
+                            // pytest.skip() in the hook: emit a skip report for this file
+                            let nodeid = crate::collect::file_nodeid(&rootdir, &f);
+                            self.session.reports.push(crate::report::TestReport {
+                                nodeid,
+                                phase: crate::report::Phase::Setup,
+                                outcome: crate::report::Outcome::Skipped,
+                                duration: std::time::Duration::ZERO,
+                                longrepr: Some(reason),
+                                location: None,
+                                subtest_desc: None,
+                                sections: Vec::new(),
+                                rerun: false,
+                                xfail_longrepr: None,
+                                reprcrash_message: None,
+                            });
+                        }
+                    }
+                }
+                files = kept;
             }
         }
 
@@ -1260,11 +1282,12 @@ impl Engine {
                                 None => errors.push((
                                     file.clone(),
                                     // pytest-style frames + E lines (upstream
-                                    // collect errors honor --tb).
+                                    // collect errors honor --tb; default "short"
+                                    // matches pytest's auto style for collection).
                                     with_sections(python::format_test_failure(
                                         py,
                                         &err,
-                                        self.config.get_value("tb").unwrap_or("long"),
+                                        self.config.get_value("tb").unwrap_or("short"),
                                     )),
                                 )),
                             }
@@ -1413,8 +1436,28 @@ impl Engine {
                 &mut self.session.items,
             );
             self.session.py_hooks = hooks;
-            if let Err(err) = result {
-                errors.push((rootdir.clone(), python::format_exception(py, &err)));
+            match result {
+                Ok(skipped_files) => {
+                    for (file, reason) in skipped_files {
+                        let nodeid = crate::collect::file_nodeid(&rootdir, &file);
+                        self.session.reports.push(crate::report::TestReport {
+                            nodeid,
+                            phase: crate::report::Phase::Setup,
+                            outcome: crate::report::Outcome::Skipped,
+                            duration: std::time::Duration::ZERO,
+                            longrepr: Some(reason),
+                            location: None,
+                            subtest_desc: None,
+                            sections: Vec::new(),
+                            rerun: false,
+                            xfail_longrepr: None,
+                            reprcrash_message: None,
+                        });
+                    }
+                }
+                Err(err) => {
+                    errors.push((rootdir.clone(), python::format_exception(py, &err)));
+                }
             }
         }
 
