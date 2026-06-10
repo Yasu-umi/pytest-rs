@@ -792,7 +792,7 @@ pub(crate) fn run_one_body(
             }
             if name == "request" {
                 let node = python::make_node(py, item)?;
-                let req = Py::new(py, crate::request::PyRequest::new(None, node, None))?;
+                let req = Py::new(py, crate::request::PyRequest::new(None, node, None, crate::fixture::Scope::Function))?;
                 kwargs.push((name.clone(), req.clone_ref(py).into_any()));
                 test_request = Some(req);
                 continue;

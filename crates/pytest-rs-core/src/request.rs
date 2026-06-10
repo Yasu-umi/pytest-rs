@@ -383,15 +383,22 @@ pub struct PyRequest {
     param: Option<Py<PyAny>>,
     node: Py<PyAny>,
     fixturename: Option<String>,
+    scope: crate::fixture::Scope,
     finalizers: Mutex<Vec<Py<PyAny>>>,
 }
 
 impl PyRequest {
-    pub fn new(param: Option<Py<PyAny>>, node: Py<PyAny>, fixturename: Option<String>) -> Self {
+    pub fn new(
+        param: Option<Py<PyAny>>,
+        node: Py<PyAny>,
+        fixturename: Option<String>,
+        scope: crate::fixture::Scope,
+    ) -> Self {
         Self {
             param,
             node,
             fixturename,
+            scope,
             finalizers: Mutex::new(Vec::new()),
         }
     }
@@ -450,9 +457,23 @@ impl PyRequest {
     }
 
     /// The item's keywords mapping (pytest's request.keywords == node.keywords).
+    ///
+    /// Scope-aware: session-scoped fixtures see only session-level keywords
+    /// (mutations persist in _session_state); function-scoped fixtures see
+    /// the item keywords merged with session-level keywords.
     #[getter]
     fn keywords(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        Ok(self.node.bind(py).getattr("keywords")?.unbind())
+        let session_kw = py
+            .import("pytest._node")?
+            .call_method0("get_session_keywords")?;
+        if self.scope == crate::fixture::Scope::Session {
+            return Ok(session_kw.unbind());
+        }
+        // For function/class/module/package scope: item keywords + session keywords.
+        let item_kw = self.node.bind(py).getattr("keywords")?;
+        // Start with item keywords and overlay session keywords (session wins on conflict).
+        let merged = item_kw.call_method1("__or__", (session_kw,))?;
+        Ok(merged.unbind())
     }
 
     /// The underlying test function object.

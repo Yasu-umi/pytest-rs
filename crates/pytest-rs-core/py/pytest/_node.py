@@ -351,7 +351,13 @@ class DoctestNode:
 # Session.shouldfail / shouldstop set by plugins (pytest-timeout's session
 # deadline) or the engine (--maxfail / --stepwise): the runner polls these
 # between items and aborts with the message banner.
-_session_state: dict = {"shouldfail": None, "shouldstop": None, "items": [], "session_markers": []}
+_session_state: dict = {
+    "shouldfail": None,
+    "shouldstop": None,
+    "items": [],
+    "session_markers": [],
+    "session_keywords": {},
+}
 
 
 def session_shouldfail():
@@ -377,6 +383,12 @@ def set_session_items(items):
     """Collected item proxies, published once collection finishes (the
     engine fires pytest_collection_finish with them on the session)."""
     _session_state["items"] = list(items)
+
+
+def get_session_keywords() -> dict:
+    """Return the session-level keywords dict (mutable, persists across items).
+    Used by session-scoped fixtures' request.keywords."""
+    return _session_state["session_keywords"]
 
 
 def session_obj_overrides():

@@ -255,6 +255,7 @@ pub(crate) fn resolve_fixture_def(
                         fixture_param.as_ref().map(|(_, value)| value.clone_ref(py)),
                         node,
                         Some(def.name.clone()),
+                        def.scope,
                     ),
                 )?;
                 kwargs.push((dep.clone(), req.clone_ref(py).into_any()));

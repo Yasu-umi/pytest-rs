@@ -156,6 +156,7 @@ impl AsyncioPlugin {
                     Some(param_value.clone_ref(py)),
                     node,
                     Some("event_loop_policy".to_string()),
+                    pytest_rs_core::fixture::Scope::Session,
                 ),
             )
             .ok()?;
