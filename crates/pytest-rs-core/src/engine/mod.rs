@@ -1181,6 +1181,8 @@ impl Engine {
                 .import("pytest._node")
                 .and_then(|m| m.call_method1("set_pycollect_hooks", (makeitem_hooks,)));
         }
+        // Explicit non-Python, non-text-doctest file args that no collector handles.
+        let mut not_found_files: Vec<PathBuf> = Vec::new();
         for file in &files {
             // --maxfail aborts collection once the budget is spent on
             // collection errors, ignoring further files.
@@ -1196,17 +1198,21 @@ impl Engine {
                 // For scanned files, the glob loop below handles them.
                 let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
                 let is_text_doctest = matches!(ext, "txt" | "rst" | "md");
-                if is_text_doctest
-                    && let Ok(py_config) = python::make_py_config(py, &self.config)
-                    && let Err(err) = python::collect_doctests_from_textfile(
-                        py,
-                        &rootdir,
-                        file,
-                        &py_config,
-                        &mut self.session.items,
-                    )
-                {
-                    errors.push((file.clone(), python::format_exception(py, &err)));
+                if is_text_doctest {
+                    if let Ok(py_config) = python::make_py_config(py, &self.config)
+                        && let Err(err) = python::collect_doctests_from_textfile(
+                            py,
+                            &rootdir,
+                            file,
+                            &py_config,
+                            &mut self.session.items,
+                        )
+                    {
+                        errors.push((file.clone(), python::format_exception(py, &err)));
+                    }
+                } else {
+                    // No collector can handle this file type (e.g. .pyc).
+                    not_found_files.push(file.clone());
                 }
                 continue;
             }
@@ -1362,6 +1368,16 @@ impl Engine {
                     }
                 }
             }
+        }
+
+        // Explicit file args with no matching collector → USAGE_ERROR.
+        if !not_found_files.is_empty() {
+            for file in &not_found_files {
+                eprintln!("ERROR: not found: {}", file.display());
+                eprintln!("(no match in any of [<Session ''>])");
+                eprintln!();
+            }
+            return Err("\x00USAGE_ERROR\x00".to_string());
         }
 
         // --doctest-modules: also scan ALL .py files (not just test files) for doctests.
@@ -1559,6 +1575,21 @@ impl Engine {
                     }
                 })
             });
+            // Emit "not found" error to stderr for NodeId args that matched nothing.
+            for sel in &arg_sels {
+                if let ArgSel::NodeId(nodeid) = sel {
+                    let matched = self.session.items.iter().any(|item| {
+                        item.nodeid == *nodeid
+                            || item
+                                .nodeid
+                                .strip_prefix(nodeid.as_str())
+                                .is_some_and(|r| r.starts_with('[') || r.starts_with("::"))
+                    });
+                    if !matched {
+                        eprintln!("ERROR: not found: {nodeid}");
+                    }
+                }
+            }
         }
 
         // --lf drops failure-free files (and non-failed top-level functions

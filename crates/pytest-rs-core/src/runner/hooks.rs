@@ -56,11 +56,11 @@ pub(crate) fn fire_logreport_hooks(
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
         }
     }
-    // The replacement reporter's pytest_runtest_logreport runs after the
-    // conftest impls (pluggy LIFO: the reporter registered first).
-    if delegated {
-        python::reporter_logreport(py, proxy.bind(py));
-    } else {
+    // Drive both the replacement reporter (if any) and instance-registered
+    // plugins (e.g. relay plugin). In native mode also feed the default
+    // reporter's stats for conftest pytest_terminal_summary hooks.
+    python::reporter_logreport(py, proxy.bind(py));
+    if !delegated {
         // Native mode: feed stats so conftest pytest_terminal_summary hooks
         // can access terminalreporter.stats['passed'] etc.
         python::reporter_feed_default(py, proxy.bind(py));

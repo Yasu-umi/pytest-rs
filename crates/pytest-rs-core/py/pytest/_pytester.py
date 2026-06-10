@@ -1441,6 +1441,28 @@ class _RelayCollectReport:
         self.result = result or []
 
 
+class _RelayTestReport:
+    """Lightweight TestReport reconstructed from relay JSON."""
+
+    def __init__(self, nodeid, when, outcome, longrepr=None):
+        self.nodeid = nodeid
+        self.when = when
+        self.outcome = outcome
+        self.longrepr = longrepr
+
+    @property
+    def passed(self):
+        return self.outcome == "passed"
+
+    @property
+    def failed(self):
+        return self.outcome == "failed"
+
+    @property
+    def skipped(self):
+        return self.outcome == "skipped"
+
+
 class _RelayHookCall:
     """Reconstructed hook call record; named attributes come from relay JSON."""
 
@@ -1490,6 +1512,33 @@ class _RelayHookCall:
                     event.get("collector_path", ""), "collector", ""
                 ),
             })
+        if hook in ("pytest_runtest_logstart", "pytest_runtest_logfinish"):
+            location = event.get("location")
+            if isinstance(location, list) and len(location) == 3:
+                location = tuple(location)
+            return cls(hook, {"nodeid": event.get("nodeid", ""), "location": location})
+        if hook == "pytest_runtest_logreport":
+            longrepr = None
+            crash_data = event.get("longrepr_crash")
+            if event.get("longrepr_type") == "ExceptionChainRepr" and crash_data:
+                try:
+                    from _pytest._code.code import ExceptionChainRepr, ReprTraceback, ReprFileLocation
+                    crash = ReprFileLocation(
+                        path=crash_data.get("path", ""),
+                        lineno=crash_data.get("lineno", 0),
+                        message=crash_data.get("message", ""),
+                    )
+                    tb = ReprTraceback(reprentries=[], extraline=None, style="long")
+                    longrepr = ExceptionChainRepr([(tb, crash, None)])
+                except Exception:
+                    longrepr = crash_data.get("message", "")
+            report = _RelayTestReport(
+                nodeid=event.get("nodeid", ""),
+                when=event.get("when", ""),
+                outcome=event.get("outcome", ""),
+                longrepr=longrepr,
+            )
+            return cls(hook, {"report": report})
         return cls(hook, {k: v for k, v in event.items() if k != "hook"})
 
 

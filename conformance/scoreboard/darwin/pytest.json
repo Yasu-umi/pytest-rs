@@ -122,15 +122,6 @@
       "errors": 0
     },
     {
-      "file": "testing/test_debug_session.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 1,
-      "failed": 0,
-      "skipped": 0,
-      "errors": 0
-    },
-    {
       "file": "testing/test_doctest.py",
       "status": "failed",
       "exit_code": 1,
@@ -260,8 +251,8 @@
       "file": "testing/test_runner.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 39,
-      "failed": 27,
+      "passed": 46,
+      "failed": 20,
       "skipped": 0,
       "errors": 0
     },
@@ -395,8 +386,8 @@
       "file": "testing/acceptance_test.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 28,
-      "failed": 53,
+      "passed": 33,
+      "failed": 48,
       "skipped": 2,
       "errors": 0
     },

@@ -17,13 +17,12 @@ class _HookRelayPlugin:
         atexit.register(self._flush)
 
     def _flush(self):
-        if not self._written:
+        try:
+            with open(self._relay_path, "w", encoding="utf-8") as f:
+                json.dump(self._events, f)
             self._written = True
-            try:
-                with open(self._relay_path, "w", encoding="utf-8") as f:
-                    json.dump(self._events, f)
-            except Exception:
-                pass
+        except Exception:
+            pass
 
     def pytest_deselected(self, items):
         self._events.append({
@@ -75,6 +74,40 @@ class _HookRelayPlugin:
             "result": result,
         })
 
+    def pytest_runtest_logstart(self, nodeid, location):
+        self._events.append({
+            "hook": "pytest_runtest_logstart",
+            "nodeid": nodeid,
+            "location": list(location),
+        })
+
+    def pytest_runtest_logfinish(self, nodeid, location):
+        self._events.append({
+            "hook": "pytest_runtest_logfinish",
+            "nodeid": nodeid,
+            "location": list(location),
+        })
+
+    def pytest_runtest_logreport(self, report):
+        longrepr = getattr(report, "longrepr", None)
+        longrepr_type = type(longrepr).__name__ if longrepr is not None else ""
+        longrepr_crash = None
+        if hasattr(longrepr, "reprcrash") and longrepr.reprcrash is not None:
+            crash = longrepr.reprcrash
+            longrepr_crash = {
+                "path": str(getattr(crash, "path", "")),
+                "lineno": int(getattr(crash, "lineno", 0) or 0),
+                "message": str(getattr(crash, "message", "")),
+            }
+        self._events.append({
+            "hook": "pytest_runtest_logreport",
+            "nodeid": getattr(report, "nodeid", ""),
+            "when": getattr(report, "when", ""),
+            "outcome": getattr(report, "outcome", ""),
+            "longrepr_type": longrepr_type,
+            "longrepr_crash": longrepr_crash,
+        })
+
     def pytest_collection_finish(self, session):
         self._events.append({
             "hook": "pytest_collection_finish",
@@ -93,6 +126,10 @@ class _HookRelayPlugin:
                 for i in session.items
             ],
         })
+        # Don't flush here — run-phase events (logstart/logreport/logfinish)
+        # come after collection. Final flush is in pytest_sessionfinish.
+
+    def pytest_sessionfinish(self, session, exitstatus):
         self._flush()
 
 

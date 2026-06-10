@@ -108,6 +108,7 @@ def runtestprotocol(item, log=True, nextitem=None):
             return reports
 
     from _pytest.skipping import evaluate_skip_marks, evaluate_xfail_marks
+    from pytest._outcomes import Exit, Skipped
 
     keywords = dict(getattr(item, "keywords", None) or {})
     reports = []
@@ -116,6 +117,31 @@ def runtestprotocol(item, log=True, nextitem=None):
         reports.append(_ProtocolReport("setup", "skipped", keywords, skipped.reason))
         reports.append(_ProtocolReport("teardown", "passed", keywords))
         return reports
+
+    # Call setup_function from the test module if present.
+    setup_fn = getattr(getattr(item, "module", None), "setup_function", None)
+    if setup_fn is not None:
+        try:
+            setup_fn(item.obj)
+        except BaseException as setup_exc:
+            if isinstance(setup_exc, Skipped):
+                tb = setup_exc.__traceback__
+                path, lineno = str(getattr(item, "path", "")), 0
+                while tb is not None:
+                    path = tb.tb_frame.f_code.co_filename
+                    lineno = tb.tb_lineno
+                    tb = tb.tb_next
+                reason = setup_exc.msg or ""
+                reports.append(
+                    _ProtocolReport("setup", "skipped", keywords, (path, lineno, f"Skipped: {reason}"))
+                )
+            else:
+                reports.append(
+                    _ProtocolReport("setup", "failed", keywords, "".join(traceback.format_exception(setup_exc)))
+                )
+            reports.append(_ProtocolReport("teardown", "passed", keywords))
+            return reports
+
     reports.append(_ProtocolReport("setup", "passed", keywords))
 
     xfailed = evaluate_xfail_marks(item)
@@ -123,11 +149,11 @@ def runtestprotocol(item, log=True, nextitem=None):
         call = _ProtocolReport("call", "skipped", keywords, "[NOTRUN] " + xfailed.reason)
         call.wasxfail = xfailed.reason
     else:
-        from pytest._outcomes import Skipped
-
         error = None
         try:
             item.obj()
+        except (Exit, KeyboardInterrupt):
+            raise
         except BaseException as exc:  # noqa: BLE001 - protocol boundary
             error = exc
         if isinstance(error, Skipped):
@@ -168,6 +194,17 @@ def runtestprotocol(item, log=True, nextitem=None):
         else:
             call = _ProtocolReport("call", "passed", keywords)
     reports.append(call)
+
+    # Call teardown_function from the test module if present.
+    teardown_fn = getattr(getattr(item, "module", None), "teardown_function", None)
+    if teardown_fn is not None:
+        try:
+            teardown_fn(item.obj)
+        except BaseException as teardown_exc:
+            reports.append(
+                _ProtocolReport("teardown", "failed", keywords, "".join(traceback.format_exception(teardown_exc)))
+            )
+            return reports
     reports.append(_ProtocolReport("teardown", "passed", keywords))
     return reports
 

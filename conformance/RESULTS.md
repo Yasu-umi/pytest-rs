@@ -615,7 +615,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | pass % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 1873 | 345 | 4 | 24 | 2246 | 83.4% | 8 | 46 | 63 |
+| pytest | 9.0.3 | 1884 | 333 | 4 | 24 | 2245 | 83.9% | 7 | 45 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 98.9% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 19 | 0 | 4 | 209 | 89.0% | 0 | 1 | 0 |
@@ -646,7 +646,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 ### pytest @ 9.0.3
 
-<details><summary>per-file detail (46 files)</summary>
+<details><summary>per-file detail (45 files)</summary>
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
@@ -663,7 +663,6 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_compat.py | failed | 6 | 4 | 0 | 0 |
 | testing/test_config.py | failed | 183 | 31 | 0 | 1 |
 | testing/test_conftest.py | failed | 22 | 31 | 0 | 1 |
-| testing/test_debug_session.py | passed | 1 | 0 | 0 | 0 |
 | testing/test_doctest.py | failed | 133 | 6 | 0 | 1 |
 | testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 |
 | testing/test_faulthandler.py | failed | 5 | 7 | 0 | 0 |
@@ -678,7 +677,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_pytester.py | failed | 47 | 5 | 0 | 0 |
 | testing/test_python_path.py | failed | 3 | 3 | 0 | 0 |
 | testing/test_recwarn.py | passed | 63 | 0 | 0 | 0 |
-| testing/test_runner.py | failed | 39 | 27 | 0 | 0 |
+| testing/test_runner.py | failed | 46 | 20 | 0 | 0 |
 | testing/test_runner_xunit.py | failed | 9 | 4 | 0 | 0 |
 | testing/test_scope.py | failed | 0 | 4 | 0 | 0 |
 | testing/test_session.py | failed | 14 | 12 | 0 | 0 |
@@ -693,7 +692,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_unittest.py | failed | 58 | 12 | 0 | 9 |
 | testing/test_unraisableexception.py | failed | 10 | 1 | 0 | 0 |
 | testing/test_warnings.py | failed | 36 | 7 | 0 | 1 |
-| testing/acceptance_test.py | failed | 28 | 53 | 0 | 2 |
+| testing/acceptance_test.py | failed | 33 | 48 | 0 | 2 |
 | testing/deprecated_test.py | failed | 10 | 5 | 0 | 0 |
 | testing/python/show_fixtures_per_test.py | failed | 0 | 8 | 0 | 0 |
 

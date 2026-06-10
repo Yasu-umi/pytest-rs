@@ -175,7 +175,7 @@ impl Engine {
                 python::log_set_live_when(py, "start");
             }
             let _ = fire_runtest_py_hooks(py, session, item, "pytest_runtest_logstart");
-            if session.custom_reporter.is_some() && !config.is_worker() {
+            if !config.is_worker() {
                 python::reporter_logstart(py, item);
             }
 
@@ -301,7 +301,7 @@ impl Engine {
                 python::log_set_live_when(py, "finish");
             }
             let _ = fire_runtest_py_hooks(py, session, item, "pytest_runtest_logfinish");
-            if session.custom_reporter.is_some() && !config.is_worker() {
+            if !config.is_worker() {
                 python::reporter_logfinish(py, item);
             }
             if stepwise && item_failed {
