@@ -61,9 +61,6 @@ tag = "v3.8.0"
 testpaths = ["testing"]
 local = "conformance/suites/pytest-xdist"
 deps = ["execnet", "filelock", "py"]
-# Asserts real workers' scheduling order; flips under machine load (it
-# would otherwise randomly trip the results-drift release gate).
-deselect = ["testing/acceptance_test.py::TestLoadScope::test_workqueue_ordered_by_size"]
 enabled = true
 
 [pytest-split]

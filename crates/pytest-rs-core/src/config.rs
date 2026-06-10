@@ -677,7 +677,9 @@ impl Config {
         // Core pytest options parsed into flags/values (queried via
         // get_flag/get_value); some are still inert and gain behavior as
         // features land.
-        const CORE_FLAGS: [&str; 25] = [
+        const CORE_FLAGS: [&str; 27] = [
+            "loadscope-reorder", // xdist: reorder loadscope work units by size (default on)
+            "no-loadscope-reorder", // xdist: keep collection order for loadscope work units
             "force-short-summary", // truncate short-summary messages even at -vv
             "no-fold-skipped",     // list each skipped test in the short summary
             "xfail-tb",            // show tracebacks for xfailed tests in XFAILURES
@@ -754,7 +756,14 @@ impl Config {
         let xdist_only = |name: &str| {
             matches!(
                 name,
-                "numprocesses" | "dist" | "maxprocesses" | "worker" | "tx" | "rsyncdir"
+                "numprocesses"
+                    | "dist"
+                    | "maxprocesses"
+                    | "worker"
+                    | "tx"
+                    | "rsyncdir"
+                    | "loadscope-reorder"
+                    | "no-loadscope-reorder"
             )
         };
         let has_xdist = cfg!(feature = "xdist");

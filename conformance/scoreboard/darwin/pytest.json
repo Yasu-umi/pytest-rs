@@ -122,6 +122,15 @@
       "errors": 0
     },
     {
+      "file": "testing/test_debug_session.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
       "file": "testing/test_doctest.py",
       "status": "failed",
       "exit_code": 1,

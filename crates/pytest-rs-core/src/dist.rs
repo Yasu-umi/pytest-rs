@@ -242,6 +242,18 @@ impl Engine {
                 batches.push_back(vec![item.nodeid.clone()]);
             }
         }
+        // loadscope/loadfile/loadgroup reorder the work queue by descending
+        // unit size by default (xdist LoadScopeScheduling.schedule, gated on
+        // --loadscope-reorder / --no-loadscope-reorder; default on). The sort
+        // is stable, so equal-size units keep collection order. This is what
+        // sends the largest scope to the first available worker.
+        let reorder = per_module && !self.config.get_flag("no-loadscope-reorder");
+        if reorder {
+            let mut ordered: Vec<Vec<String>> = batches.into_iter().collect();
+            ordered.sort_by_key(|batch| std::cmp::Reverse(batch.len()));
+            batches = ordered.into();
+        }
+
         if dist_mode == "each" {
             // every test runs on every worker
             let base: Vec<Vec<String>> = batches.iter().cloned().collect();
