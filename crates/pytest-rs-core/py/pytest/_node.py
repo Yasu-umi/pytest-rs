@@ -6,6 +6,87 @@
 _added_marks: list = []
 
 
+class _NodeKeywords:
+    """Mutable dict-like keyword map for a node (pytest's NodeKeywords).
+
+    Priority (highest wins): own function attributes > own marks/extra > ancestor chain.
+    """
+
+    def __init__(self, node):
+        self._node = node
+        self._extra = {}
+
+    def _own_items(self):
+        result = {self._node.name: True}
+        for m in getattr(self._node, "own_markers", []):
+            result[m.name] = m
+        result.update(self._extra)
+        func = getattr(self._node, "function", None)
+        if func is not None:
+            for k, v in vars(func).items() if hasattr(func, "__dict__") else []:
+                if not k.startswith("_") and k != "pytestmark":
+                    result[k] = v
+        return result
+
+    def _all_items(self):
+        chain = []
+        node = self._node
+        while node is not None:
+            chain.append(node)
+            node = getattr(node, "parent", None)
+        chain.reverse()
+        result = {}
+        for n in chain:
+            kw = getattr(n, "_keywords", None)
+            if kw is not None:
+                result.update(kw._own_items())
+            else:
+                result[n.name] = True
+                for m in getattr(n, "own_markers", []):
+                    result[m.name] = m
+        return result
+
+    def __getitem__(self, key):
+        return self._all_items()[key]
+
+    def __setitem__(self, key, value):
+        self._extra[key] = value
+
+    def __contains__(self, key):
+        return key in self._all_items()
+
+    def __iter__(self):
+        return iter(self._all_items())
+
+    def __len__(self):
+        return len(self._all_items())
+
+    def keys(self):
+        return self._all_items().keys()
+
+    def values(self):
+        return self._all_items().values()
+
+    def items(self):
+        return self._all_items().items()
+
+    def get(self, key, default=None):
+        return self._all_items().get(key, default)
+
+    def __or__(self, other):
+        result = dict(self._all_items())
+        result.update(other._all_items() if isinstance(other, _NodeKeywords) else other)
+        return result
+
+    def __ror__(self, other):
+        result = dict(other._all_items() if isinstance(other, _NodeKeywords) else other)
+        result.update(self._all_items())
+        return result
+
+    def __repr__(self):
+        return repr(self._all_items())
+
+
 def record_added_mark(marker):
     mark = getattr(marker, "mark", marker)
     name = getattr(mark, "name", None)
@@ -166,6 +247,12 @@ class Collector:
     def __repr__(self):
         return f"<{type(self).__name__} {self.nodeid!r}>"
 
+    @property
+    def keywords(self):
+        if not hasattr(self, "_keywords"):
+            self._keywords = _NodeKeywords(self)
+        return self._keywords
+
 
 def run_custom_item(item):
     """Run a custom collector Item (setup/runtest/teardown) and return a list
@@ -316,7 +403,11 @@ class Class(Collector):
     """A class collector stand-in for pytest_collectstart: carries .obj (the
     test class) and collects markers via add_marker, propagated to its items."""
 
-    def __init__(self, *, obj=None, **kwargs):
+    def __init__(self, name=None, parent=None, *, obj=None, **kwargs):
+        if name is not None:
+            kwargs.setdefault("name", name)
+        if parent is not None:
+            kwargs.setdefault("parent", parent)
         super().__init__(**kwargs)
         self.obj = obj
 
@@ -400,12 +491,9 @@ class DoctestNode:
 
     @property
     def keywords(self):
-        """Mark names (plus the node name) as a mapping — pytest's
-        node.keywords, for the common `"xfail" in item.keywords` probes."""
-        keywords = {self.name: True}
-        for marker in self.own_markers:
-            keywords[marker.name] = marker
-        return keywords
+        if not hasattr(self, "_keywords"):
+            self._keywords = _NodeKeywords(self)
+        return self._keywords
 
     def warn(self, warning):
         """Issue a warning attributed to this item's definition site
@@ -729,12 +817,9 @@ class Node(Item):
 
     @property
     def keywords(self):
-        """Mark names (plus the node name) as a mapping — pytest's
-        node.keywords, for the common `"xfail" in item.keywords` probes."""
-        keywords = {self.name: True}
-        for marker in self.own_markers:
-            keywords[marker.name] = marker
-        return keywords
+        if not hasattr(self, "_keywords"):
+            self._keywords = _NodeKeywords(self)
+        return self._keywords
 
     @property
     def session(self):

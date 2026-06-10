@@ -835,7 +835,7 @@ class Pytester:
         import sys
 
         from pytest._marks import get_unpacked_marks
-        from pytest._node import Function, _ModuleCollector, _NodeSession
+        from pytest._node import Class, Collector, File, Function, _ModuleCollector, _NodeSession
 
         path = pathlib.Path(str(path))
         if not path.is_absolute():
@@ -962,12 +962,20 @@ class Pytester:
                 items.append(make_item(func, param_name, all_marks, cls, parent))
             return items
 
+        # Module-level node for parent chain (getparent/keywords); use File so
+        # getparent(pytest.Module) finds it (Module is aliased to File).
+        mod_node = File(name=path.name, path=path, config=config, parent=parent_collector)
+        mod_node.own_markers = list(module_marks)
+
         items = []
         for name, obj in vars(module).items():
             if _is_test_func(name) and callable(obj) and not isinstance(obj, type):
-                items.extend(expand_parametrize(obj, name, [], parent=parent_collector))
+                sub = expand_parametrize(obj, name, [], parent=mod_node)
+                items.extend(sub)
             elif _is_test_class(name) and isinstance(obj, type):
                 class_marks = get_unpacked_marks(obj)
+                cls_node = Class(name=name, parent=mod_node, obj=obj)
+                cls_node.own_markers = list(class_marks)
                 methods = []
                 seen = set()
                 for mname in dir(obj):
@@ -982,10 +990,7 @@ class Pytester:
                         lineno = getattr(getattr(func, "__code__", None), "co_firstlineno", 0)
                         methods.append((lineno, mname, func))
                 for _ln, mname, func in sorted(methods):
-                    sub = expand_parametrize(
-                        func, f"{name}::{mname}", class_marks, cls=obj,
-                        parent=parent_collector,
-                    )
+                    sub = expand_parametrize(func, f"{name}::{mname}", class_marks, cls=obj, parent=cls_node)
                     for item in sub:
                         item.instance = obj
                     items.extend(sub)
