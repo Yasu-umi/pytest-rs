@@ -89,8 +89,8 @@
       "file": "testing/test_collection.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 82,
-      "failed": 31,
+      "passed": 88,
+      "failed": 25,
       "skipped": 3,
       "errors": 0
     },
@@ -116,9 +116,18 @@
       "file": "testing/test_conftest.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 21,
-      "failed": 32,
+      "passed": 22,
+      "failed": 31,
       "skipped": 1,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_debug_session.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
       "errors": 0
     },
     {

@@ -277,6 +277,20 @@ impl Engine {
         let collect_errors = match self.collect(py) {
             Ok(errors) => errors,
             Err(message) => {
+                // Sentinel "\x00INTERNAL\x00" means an unexpected hook exception
+                // (e.g. conftest pytest_sessionstart raised) — print as INTERNALERROR.
+                if let Some(inner) = message.strip_prefix("\x00INTERNAL\x00") {
+                    for line in inner.lines() {
+                        println!("INTERNALERROR> {line}");
+                    }
+                    return exit_code::INTERNAL_ERROR;
+                }
+                // Sentinel "\x00KEYBOARD_INTERRUPT\x00": KeyboardInterrupt during
+                // collection — print the special "!!! KeyboardInterrupt !!!" banner.
+                if message == "\x00KEYBOARD_INTERRUPT\x00" {
+                    println!("!!! KeyboardInterrupt !!!");
+                    return exit_code::INTERRUPTED;
+                }
                 eprintln!("ERROR: {message}");
                 return exit_code::USAGE_ERROR;
             }
@@ -758,7 +772,11 @@ impl Engine {
         // recursive search from the invocation dir, like pytest.
         let mut paths = self.config.paths.clone();
         let testpaths_lines = self.config.get_ini_lines("testpaths");
-        if paths.is_empty() && !testpaths_lines.is_empty() {
+        // testpaths only applies when invocation_dir == rootdir (like pytest):
+        // if you cd into a subdirectory, pytest ignores testpaths and collects
+        // from the current directory instead.
+        let invocation_is_root = self.config.invocation_dir == rootdir;
+        if paths.is_empty() && !testpaths_lines.is_empty() && invocation_is_root {
             let entries: Vec<String> = testpaths_lines
                 .into_iter()
                 .flat_map(|v| v.split_whitespace().map(str::to_string))
@@ -1014,7 +1032,11 @@ impl Engine {
         // runs last under pluggy LIFO). A conftest sessionstart may stash
         // state the pytest_report_header hooks read back (e.g. config._x).
         if let Err(err) = self.fire_py_sessionstart(py) {
-            errors.push((rootdir.clone(), python::format_exception(py, &err)));
+            // An unexpected exception in pytest_sessionstart is an INTERNALERROR
+            // (exit 3), not a collection error (exit 2). Signal the caller with
+            // a sentinel prefix so it can print the INTERNALERROR banner.
+            let msg = python::format_exception(py, &err);
+            return Err(format!("\x00INTERNAL\x00{msg}"));
         }
         // The session header: the replacement reporter's pytest_sessionstart
         // owns it in delegated mode (upstream prints it from that hook);
@@ -1176,6 +1198,20 @@ impl Engine {
             };
             let module_ok = match collect_result {
                 Ok(()) => true,
+                Err(ref err)
+                    if err.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py) =>
+                {
+                    // KeyboardInterrupt during collection stops immediately with
+                    // the "!!! KeyboardInterrupt !!!" banner (exit 2).
+                    return Err(format!("\x00KEYBOARD_INTERRUPT\x00"));
+                }
+                Err(ref err)
+                    if err.is_instance_of::<pyo3::exceptions::PySystemExit>(py) =>
+                {
+                    // SystemExit during collection is an INTERNALERROR.
+                    let msg = python::format_exception(py, err);
+                    return Err(format!("\x00INTERNAL\x00{msg}"));
+                }
                 Err(err) => {
                     // pytest.skip(..., allow_module_level=True) or
                     // unittest.SkipTest at module import skip the whole module;

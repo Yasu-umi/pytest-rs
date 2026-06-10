@@ -478,6 +478,20 @@ pub(crate) fn introspect_namespace(
         {
             continue;
         }
+        // Generator test functions fail collection (#12960).
+        if inspect
+            .getattr("isgeneratorfunction")?
+            .call1((&value,))?
+            .extract::<bool>()
+            .unwrap_or(false)
+        {
+            return Err(collect_error(
+                py,
+                &format!(
+                    "'yield' keyword is allowed in fixtures, but not in tests ({name})"
+                ),
+            ));
+        }
         let mut marks = read_marks(py, &value)?;
         marks.extend(clone_marks(py, &module_marks));
         push_test_items(
