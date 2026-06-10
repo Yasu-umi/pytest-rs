@@ -16,8 +16,7 @@ from _pytest._stub import __getattr__  # noqa: E402, F401
 from _pytest.pathlib import absolutepath, safe_exists
 
 
-class Session:
-    """Stub session type (mostly used for annotations upstream)."""
+from pytest._node import Session as Session  # noqa: E402, F401
 
 
 def _in_venv(path) -> bool:

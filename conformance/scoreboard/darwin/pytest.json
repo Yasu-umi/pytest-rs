@@ -89,8 +89,8 @@
       "file": "testing/test_collection.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 66,
-      "failed": 47,
+      "passed": 69,
+      "failed": 44,
       "skipped": 3,
       "errors": 0
     },

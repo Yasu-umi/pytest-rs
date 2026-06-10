@@ -257,6 +257,60 @@ class Session(Collector):
     class Interrupted(KeyboardInterrupt):
         """Signals an interrupted test run (upstream)."""
 
+    @classmethod
+    def from_config(cls, config):
+        import pathlib
+
+        rootdir = getattr(config, "rootpath", None) or getattr(config, "rootdir", None)
+        rootdir = pathlib.Path(str(rootdir)) if rootdir is not None else pathlib.Path.cwd()
+        session = cls(name=rootdir.name or ".", config=config, path=rootdir, nodeid="")
+        session.parent = None
+        return session
+
+    def perform_collect(self, args=None, genitems=False):
+        import pathlib
+
+        if not args or args == [self.nodeid] or args == [""]:
+            return [self]
+        results = []
+        for arg in args:
+            arg_str = str(arg)
+            file_part_str = arg_str.split("::")[0] if "::" in arg_str else arg_str
+            file_part = pathlib.Path(file_part_str)
+            if not file_part.is_absolute():
+                file_part = self.path / file_part
+            if not file_part.exists():
+                continue
+            if file_part.is_dir():
+                try:
+                    rel = str(file_part.resolve().relative_to(self.path.resolve())).replace("\\", "/")
+                except ValueError:
+                    rel = file_part.name
+                dir_node = Dir(name=file_part.name, config=self.config, path=file_part, nodeid=rel)
+                dir_node.parent = self
+                results.append(dir_node)
+            elif file_part.is_file():
+                parent_dir = file_part.parent
+                is_pkg = (parent_dir / "__init__.py").is_file()
+                try:
+                    parent_rel = str(parent_dir.resolve().relative_to(self.path.resolve())).replace("\\", "/")
+                except ValueError:
+                    parent_rel = parent_dir.name
+                if is_pkg:
+                    mid_node = Package(name=parent_dir.name, config=self.config, path=parent_dir, nodeid=parent_rel)
+                    mid_node.parent = self
+                else:
+                    mid_node = Dir(name=parent_dir.name, config=self.config, path=parent_dir, nodeid=parent_rel)
+                    mid_node.parent = self
+                try:
+                    file_rel = str(file_part.resolve().relative_to(self.path.resolve())).replace("\\", "/")
+                except ValueError:
+                    file_rel = file_part.name
+                mod_node = File(name=file_part.name, config=self.config, path=file_part, nodeid=file_rel)
+                mod_node.parent = mid_node
+                results.append(mod_node)
+        return results
+
 
 class Class(Collector):
     """A class collector stand-in for pytest_collectstart: carries .obj (the
@@ -298,6 +352,10 @@ class File(Collector):
 class Package(File):
     """Directory-level collector for Python packages (has __init__.py).
     Alias used by upstream isinstance checks (e.g. pytest.Package in test_collection)."""
+
+
+class Dir(Collector):
+    """Directory-level collector for plain directories (no __init__.py)."""
 
 
 class DoctestNode:

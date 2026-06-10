@@ -1149,6 +1149,18 @@ class Pytester:
                 return colitem
         return None
 
+    def getnode(self, config, arg):
+        """Return the collector/item for `arg` under a fresh Session built from `config`."""
+        import os
+        import pathlib
+
+        from pytest._node import Session
+
+        session = Session.from_config(config)
+        p = pathlib.Path(os.path.abspath(str(arg)))
+        results = session.perform_collect([str(p)], genitems=False)
+        return results[0] if results else None
+
     def mkpydir(self, name):
         path = self.path / name
         path.mkdir(parents=True)
