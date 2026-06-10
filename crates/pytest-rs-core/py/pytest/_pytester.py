@@ -790,26 +790,60 @@ class Pytester:
         # Fall back to nodeid-only stubs for doctest/text files.
         import pathlib as _pathlib
 
+        # When called with no path args (or only CLI flags), the subprocess knows
+        # the right collection (respects testpaths, cwd, etc.) — use relay items directly.
+        def _is_path_arg(a):
+            s = str(a)
+            return not s.startswith("-") and (
+                s.endswith(".py") or "::" in s or _pathlib.Path(s).exists()
+            )
+
+        path_args = [a for a in args if _is_path_arg(a)]
+        if not path_args:
+            # Use relay items as the authoritative source
+            items = []
+            for event in hook_events:
+                if event.get("hook") == "pytest_collection_finish":
+                    items = [
+                        _RelayItemResult(it["name"], it["nodeid"], it.get("path", ""))
+                        for it in event.get("session_items", [])
+                    ]
+                    break
+            return items, reprec
+
+        collect_args = path_args
+
         items = []
-        for arg in args:
+        for arg in collect_args:
             path_str = str(arg)
+            # Handle "file.py::Class::method" — collect file then filter by nodeid suffix
+            nodeid_filter = None
             if "::" in path_str:
-                file_part = path_str.split("::")[0]
+                file_part, _, nodeid_filter = path_str.partition("::")
                 if file_part.endswith(".py"):
-                    items.extend(self._collect_items_from_path(file_part))
+                    all_items = self._collect_items_from_path(file_part)
+                    # Filter to items whose nodeid ends with the requested suffix
+                    filter_suffix = "::" + nodeid_filter
+                    matched = [i for i in all_items if i.nodeid.endswith(filter_suffix)]
+                    items.extend(matched if matched else all_items)
                     continue
             p = _pathlib.Path(path_str)
             if not p.is_absolute():
                 p = self.path / p
             if p.is_dir():
                 config = self._request.config if self._request is not None else None
-                python_files = "test_*.py *.py" if config is None else (
+                python_files = "test_*.py" if config is None else (
                     config.getini("python_files") if hasattr(config, "getini") else "test_*.py"
                 )
                 patterns = python_files.split() if isinstance(python_files, str) else list(python_files)
+                seen_files = set()
                 for pat in patterns:
-                    for py_file in sorted(p.glob(pat)):
-                        if py_file.is_file():
+                    for py_file in sorted(p.rglob(pat)):
+                        if py_file.is_file() and py_file not in seen_files:
+                            # Skip __pycache__ and hidden dirs
+                            if any(part.startswith((".", "__pycache__")) for part in py_file.parts):
+                                continue
+                            seen_files.add(py_file)
                             items.extend(self._collect_items_from_path(py_file))
             elif path_str.endswith(".py"):
                 items.extend(self._collect_items_from_path(path_str))
@@ -835,11 +869,12 @@ class Pytester:
         import sys
 
         from pytest._marks import get_unpacked_marks
-        from pytest._node import Class, Collector, File, Function, _ModuleCollector, _NodeSession
+        from pytest._node import Class, File, Function, _ModuleCollector, _NodeSession
 
         path = pathlib.Path(str(path))
         if not path.is_absolute():
             path = self.path / path
+        path = path.resolve()
         module_name = path.stem
         spec = importlib.util.spec_from_file_location(module_name, path)
         if spec is None or spec.loader is None:
@@ -919,7 +954,7 @@ class Pytester:
                 all_marks,
                 [],
                 func,
-                str(path),
+                path,
                 lineno,
             )
             node.module = module
@@ -1166,6 +1201,11 @@ class Pytester:
         results = session.perform_collect([str(p)], genitems=False)
         return results[0] if results else None
 
+    def getpathnode(self, path):
+        """Return the collector/item for `path` (parses config from path)."""
+        config = self.parseconfigure(path)
+        return self.getnode(config, path)
+
     def mkpydir(self, name):
         path = self.path / name
         path.mkdir(parents=True)
@@ -1304,12 +1344,58 @@ class _OutcomeReport:
 class _RelayItem:
     """Lightweight reconstruction of a pytest node from relay JSON data."""
 
-    def __init__(self, name, nodeid):
+    def __init__(self, name, nodeid, path=None):
+        import pathlib
+
         self.name = name
         self.nodeid = nodeid
+        self.path = pathlib.Path(path) if path else None
 
     def __repr__(self):
         return f"<_RelayItem {self.nodeid!r}>"
+
+
+from pytest._node import Item as _Item
+
+
+class _RelayItemResult(_Item):
+    """Relay item rebuilt from hook relay JSON; passes isinstance(x, pytest.Item)."""
+
+    def __init__(self, name, nodeid, path=None):
+        import pathlib
+
+        object.__setattr__(self, "name", name)
+        object.__setattr__(self, "_nodeid", nodeid)
+        _p = pathlib.Path(path).resolve() if path else None
+        object.__setattr__(self, "path", _p)
+        object.__setattr__(self, "own_markers", [])
+        object.__setattr__(self, "parent", None)
+        object.__setattr__(self, "config", None)
+
+    @property
+    def nodeid(self):
+        return self._nodeid
+
+    def __repr__(self):
+        return f"<_RelayItemResult {self._nodeid!r}>"
+
+
+class _RelayCollector:
+    """Fake collector reconstructed from relay JSON (for assert_contains checks)."""
+
+    def __init__(self, path, class_name, session_path):
+        import pathlib
+
+        self.path = pathlib.Path(path) if path else None
+        self._session_path = pathlib.Path(session_path) if session_path else None
+        # Create a named subclass so __class__.__name__ == class_name
+        self.__class__ = type(class_name, (_RelayCollector,), {})
+
+    @property
+    def session(self):
+        s = object.__new__(object)
+        object.__setattr__(s, "path", self._session_path)
+        return type("_S", (), {"path": self._session_path})()
 
 
 class _RelaySession:
@@ -1322,13 +1408,14 @@ class _RelaySession:
 class _RelayCollectReport:
     """Lightweight CollectReport reconstructed from relay JSON."""
 
-    def __init__(self, nodeid, outcome, longrepr):
+    def __init__(self, nodeid, outcome, longrepr, result=None):
         self.nodeid = nodeid
         self.outcome = outcome
         self.longrepr = longrepr
         self.failed = outcome == "failed"
         self.passed = outcome == "passed"
         self.skipped = outcome == "skipped"
+        self.result = result or []
 
 
 class _RelayHookCall:
@@ -1352,12 +1439,34 @@ class _RelayHookCall:
             items = [_RelayItem(i["name"], i["nodeid"]) for i in event.get("session_items", [])]
             return cls(hook, {"session": _RelaySession(items)})
         if hook == "pytest_collectreport":
+            raw_result = event.get("result", []) or []
+            result = [
+                _RelayItemResult(r["name"], r["nodeid"], r.get("path"))
+                if r.get("is_item", True)
+                else _RelayItem(r["name"], r["nodeid"], r.get("path"))
+                for r in raw_result
+            ]
             report = _RelayCollectReport(
                 event.get("nodeid", ""),
                 event.get("outcome", ""),
                 event.get("longrepr", ""),
+                result,
             )
             return cls(hook, {"report": report})
+        if hook in ("pytest_collectstart", "pytest_make_collect_report"):
+            collector = _RelayCollector(
+                event.get("collector_path", ""),
+                event.get("collector_class", "collector"),
+                event.get("session_path", ""),
+            )
+            return cls(hook, {"collector": collector})
+        if hook == "pytest_pycollect_makeitem":
+            return cls(hook, {
+                "name": event.get("name", ""),
+                "collector": _RelayCollector(
+                    event.get("collector_path", ""), "collector", ""
+                ),
+            })
         return cls(hook, {k: v for k, v in event.items() if k != "hook"})
 
 
@@ -1376,7 +1485,104 @@ class InlineRunResult:
     def __init__(self, run_result, hook_events=None):
         self._result = run_result
         self.ret = run_result.ret
-        self._hook_calls = [_RelayHookCall._from_event(e) for e in (hook_events or [])]
+        self._hook_calls = self._build_calls(hook_events or [])
+
+    @staticmethod
+    def _build_calls(hook_events):
+        """Convert relay events to _RelayHookCall list, synthesizing collection hooks."""
+        import pathlib
+
+        calls = []
+        for event in hook_events:
+            if event.get("hook") != "pytest_collection_finish":
+                calls.append(_RelayHookCall._from_event(event))
+                continue
+            # Synthesize collection hooks from pytest_collection_finish data
+            session_path_str = event.get("session_path", "")
+            session_path = pathlib.Path(session_path_str) if session_path_str else None
+            raw_items = event.get("session_items", [])
+            # Infer session_path from the first item's path + nodeid if not provided
+            if session_path is None and raw_items:
+                first = raw_items[0]
+                item_path_str = first.get("path", "")
+                nodeid = first.get("nodeid", "")
+                if item_path_str and nodeid:
+                    item_path = pathlib.Path(item_path_str)
+                    file_part = nodeid.split("::")[0]
+                    file_parts = pathlib.PurePosixPath(file_part).parts
+                    # session_path = item_path parent raised by number of path components
+                    if len(file_parts) >= 1:
+                        session_path = item_path.parents[len(file_parts) - 1]
+            # Group items by file (the path part of the nodeid, resolved via session_path)
+            from collections import OrderedDict
+            files_to_items = OrderedDict()
+            for it in raw_items:
+                nodeid = it.get("nodeid", "")
+                item_path_str = it.get("path", "")
+                if item_path_str:
+                    file_path = pathlib.Path(item_path_str)
+                elif session_path and nodeid:
+                    file_part = nodeid.split("::")[0]
+                    file_path = session_path / file_part
+                else:
+                    file_path = None
+                key = str(file_path) if file_path else ""
+                if key not in files_to_items:
+                    files_to_items[key] = (file_path, [])
+                files_to_items[key][1].append(it)
+
+            if session_path is not None:
+                # Session-level collectstart
+                calls.append(_RelayHookCall(
+                    "pytest_collectstart",
+                    {"collector": _RelayCollector(
+                        str(session_path), "Session", str(session_path)
+                    )},
+                ))
+                # Session-level make_collect_report
+                calls.append(_RelayHookCall(
+                    "pytest_make_collect_report",
+                    {"collector": _RelayCollector(
+                        str(session_path), "Session", str(session_path)
+                    )},
+                ))
+            for key, (file_path, file_items) in files_to_items.items():
+                file_path_str = str(file_path) if file_path else ""
+                session_path_str2 = str(session_path) if session_path else ""
+                # Use relative nodeid for collectreport (e.g. "aaa/test_aaa.py")
+                file_nodeid = file_items[0].get("nodeid", "").split("::")[0] if file_items else file_path_str
+                # Module-level collectstart
+                calls.append(_RelayHookCall(
+                    "pytest_collectstart",
+                    {"collector": _RelayCollector(file_path_str, "Module", session_path_str2)},
+                ))
+                # Module-level make_collect_report
+                calls.append(_RelayHookCall(
+                    "pytest_make_collect_report",
+                    {"collector": _RelayCollector(file_path_str, "Module", session_path_str2)},
+                ))
+                # pycollect_makeitem for each item in this file
+                for it in file_items:
+                    item_name = it.get("name", "")
+                    calls.append(_RelayHookCall(
+                        "pytest_pycollect_makeitem",
+                        {
+                            "name": item_name,
+                            "collector": _RelayCollector(file_path_str, "Module", session_path_str2),
+                        },
+                    ))
+                # collectreport for this module (nodeid is relative, matching pytest behaviour)
+                result = [
+                    _RelayItemResult(it.get("name", ""), it.get("nodeid", ""), it.get("path", ""))
+                    for it in file_items
+                ]
+                report = _RelayCollectReport(file_nodeid, "passed", "", result)
+                calls.append(_RelayHookCall("pytest_collectreport", {"report": report}))
+
+            # Append the original collection_finish
+            calls.append(_RelayHookCall._from_event(event))
+
+        return calls
 
     @property
     def calls(self):

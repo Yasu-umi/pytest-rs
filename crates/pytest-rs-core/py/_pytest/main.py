@@ -20,9 +20,13 @@ from pytest._node import Session as Session  # noqa: E402, F401
 
 
 def _in_venv(path) -> bool:
-    """Is this path the root of a virtual environment? (pyvenv.cfg check)"""
+    """Is this path the root of a virtual environment? (pyvenv.cfg or conda-meta check)"""
     try:
-        return os.path.isfile(os.path.join(str(path), "pyvenv.cfg"))
+        p = str(path)
+        return (
+            os.path.isfile(os.path.join(p, "pyvenv.cfg"))
+            or os.path.isfile(os.path.join(p, "conda-meta", "history"))
+        )
     except OSError:
         return False
 

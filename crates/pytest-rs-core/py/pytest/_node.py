@@ -102,13 +102,8 @@ def clear_added_marks():
     _added_marks.clear()
 
 
-class Collector:
-    """Base for custom collectors (pytest.File subclasses returned from
-    pytest_collect_file) and items. Enough of pytest's Node API for plugins
-    like pytest-ruff / pytest-mypy: from_parent, config/path/nodeid, markers."""
-
-    class CollectError(Exception):
-        """An error during collection, shown without a traceback."""
+class _NodeBase:
+    """Shared Node implementation. Use Collector or Item, not this directly."""
 
     def __init__(
         self,
@@ -231,7 +226,7 @@ class Collector:
         return chain
 
     def __eq__(self, other):
-        if not isinstance(other, Collector):
+        if not isinstance(other, _NodeBase):
             return NotImplemented
         return self.nodeid == other.nodeid
 
@@ -252,6 +247,13 @@ class Collector:
         if not hasattr(self, "_keywords"):
             self._keywords = _NodeKeywords(self)
         return self._keywords
+
+
+class Collector(_NodeBase):
+    """Base for collection nodes (pytest.File, pytest.Class, etc.)."""
+
+    class CollectError(Exception):
+        """An error during collection, shown without a traceback."""
 
 
 def run_custom_item(item):
@@ -373,7 +375,7 @@ class Session(Collector):
                     rel = str(file_part.resolve().relative_to(self.path.resolve())).replace("\\", "/")
                 except ValueError:
                     rel = file_part.name
-                dir_node = Dir(name=file_part.name, config=self.config, path=file_part, nodeid=rel)
+                dir_node = Dir(name=file_part.name, config=self.config, path=file_part, nodeid=rel, session=self)
                 dir_node.parent = self
                 results.append(dir_node)
             elif file_part.is_file():
@@ -384,16 +386,16 @@ class Session(Collector):
                 except ValueError:
                     parent_rel = parent_dir.name
                 if is_pkg:
-                    mid_node = Package(name=parent_dir.name, config=self.config, path=parent_dir, nodeid=parent_rel)
+                    mid_node = Package(name=parent_dir.name, config=self.config, path=parent_dir, nodeid=parent_rel, session=self)
                     mid_node.parent = self
                 else:
-                    mid_node = Dir(name=parent_dir.name, config=self.config, path=parent_dir, nodeid=parent_rel)
+                    mid_node = Dir(name=parent_dir.name, config=self.config, path=parent_dir, nodeid=parent_rel, session=self)
                     mid_node.parent = self
                 try:
                     file_rel = str(file_part.resolve().relative_to(self.path.resolve())).replace("\\", "/")
                 except ValueError:
                     file_rel = file_part.name
-                mod_node = File(name=file_part.name, config=self.config, path=file_part, nodeid=file_rel)
+                mod_node = File(name=file_part.name, config=self.config, path=file_part, nodeid=file_rel, session=self)
                 mod_node.parent = mid_node
                 results.append(mod_node)
         return results
@@ -412,7 +414,7 @@ class Class(Collector):
         self.obj = obj
 
 
-class Item(Collector):
+class Item(_NodeBase):
     """Base test item for custom collectors. Subclasses override runtest()
     (and optionally setup()/teardown()/repr_failure()/reportinfo())."""
 
@@ -503,7 +505,7 @@ class DoctestNode:
         warnings.warn_explicit(
             warning,
             category=None,
-            filename=self.path or "<unknown>",
+            filename=str(self.path) if self.path else "<unknown>",
             lineno=self.lineno or 0,
         )
 
@@ -851,7 +853,7 @@ class Node(Item):
         warnings.warn_explicit(
             warning,
             category=None,
-            filename=self.path or "<unknown>",
+            filename=str(self.path) if self.path else "<unknown>",
             lineno=self.lineno or 0,
         )
 

@@ -31,18 +31,62 @@ class _HookRelayPlugin:
             "items": [{"name": i.name, "nodeid": i.nodeid} for i in items],
         })
 
+    def pytest_collectstart(self, collector):
+        self._events.append({
+            "hook": "pytest_collectstart",
+            "collector_path": str(getattr(collector, "path", "") or ""),
+            "collector_class": type(collector).__name__,
+            "session_path": str(
+                getattr(getattr(collector, "session", None), "path", "") or ""
+            ),
+        })
+
+    def pytest_make_collect_report(self, collector):
+        self._events.append({
+            "hook": "pytest_make_collect_report",
+            "collector_path": str(getattr(collector, "path", "") or ""),
+            "collector_class": type(collector).__name__,
+        })
+
+    def pytest_pycollect_makeitem(self, collector, name, obj):
+        self._events.append({
+            "hook": "pytest_pycollect_makeitem",
+            "name": name,
+            "collector_path": str(getattr(collector, "path", "") or ""),
+        })
+
     def pytest_collectreport(self, report):
+        result_items = getattr(report, "result", []) or []
+        result = [
+            {
+                "name": getattr(i, "name", ""),
+                "nodeid": getattr(i, "nodeid", ""),
+                "path": str(getattr(i, "path", "") or ""),
+                "is_item": not hasattr(i, "collect"),
+            }
+            for i in result_items
+            if hasattr(i, "name")
+        ]
         self._events.append({
             "hook": "pytest_collectreport",
             "nodeid": getattr(report, "nodeid", ""),
             "outcome": getattr(report, "outcome", ""),
             "longrepr": str(getattr(report, "longrepr", "") or ""),
+            "result": result,
         })
 
     def pytest_collection_finish(self, session):
         self._events.append({
             "hook": "pytest_collection_finish",
-            "session_items": [{"name": i.name, "nodeid": i.nodeid} for i in session.items],
+            "session_path": str(getattr(session, "path", "") or ""),
+            "session_items": [
+                {
+                    "name": i.name,
+                    "nodeid": i.nodeid,
+                    "path": str(getattr(i, "path", "") or ""),
+                }
+                for i in session.items
+            ],
         })
         self._flush()
 
