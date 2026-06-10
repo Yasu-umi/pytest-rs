@@ -291,6 +291,12 @@ impl Engine {
                     println!("!!! KeyboardInterrupt !!!");
                     return exit_code::INTERRUPTED;
                 }
+                // Sentinel "\x00USAGE_ERROR\x00": UsageError in configure —
+                // message already printed; run unconfigure and exit 4.
+                if message == "\x00USAGE_ERROR\x00" {
+                    let _ = self.fire_py_hooks_simple(py, "pytest_unconfigure");
+                    return exit_code::USAGE_ERROR;
+                }
                 eprintln!("ERROR: {message}");
                 return exit_code::USAGE_ERROR;
             }
@@ -1019,6 +1025,18 @@ impl Engine {
         }
         // conftest pytest_configure hooks run once conftests are loaded.
         if let Err(err) = self.fire_py_hooks_simple(py, "pytest_configure") {
+            if python::is_usage_error(py, &err) {
+                // UsageError in configure → eprintln ERROR: msg, then exit 4.
+                let msg = python::format_exception(py, &err);
+                // Extract just the exception message (drop "pytest.UsageError: " prefix).
+                let usage_msg = msg
+                    .lines()
+                    .last()
+                    .and_then(|l| l.strip_prefix("pytest.UsageError: "))
+                    .unwrap_or(msg.trim());
+                eprintln!("ERROR: {usage_msg}");
+                return Err(format!("\x00USAGE_ERROR\x00"));
+            }
             errors.push((rootdir.clone(), python::format_exception(py, &err)));
         }
         // A plugin swapped in its own terminal reporter: suppress native
