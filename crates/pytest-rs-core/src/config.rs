@@ -1209,6 +1209,11 @@ impl Config {
         self.ini_overrides.clone()
     }
 
+    /// The raw ini file values without -o overrides (for config._inicfg).
+    pub fn ini_file_clone(&self) -> HashMap<String, String> {
+        self.ini_file.clone()
+    }
+
     /// Plugin-contributed boolean option.
     pub fn get_flag(&self, name: &str) -> bool {
         self.flags.contains(name.trim_start_matches("--"))

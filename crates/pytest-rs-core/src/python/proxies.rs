@@ -129,6 +129,7 @@ fn build_py_config(
             args,
             args_source,
             config.ini_snapshot(),
+            config.ini_file_clone(),
             config.ini_overrides_clone(),
             option,
             strict,

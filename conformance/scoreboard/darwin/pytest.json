@@ -107,8 +107,8 @@
       "file": "testing/test_config.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 180,
-      "failed": 34,
+      "passed": 183,
+      "failed": 31,
       "skipped": 1,
       "errors": 0
     },

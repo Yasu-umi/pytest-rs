@@ -21,6 +21,8 @@ pub struct PyConfig {
     /// the testpaths ini), or "invocation_dir" (the default).
     args_source: String,
     ini: Mutex<HashMap<String, String>>,
+    /// Raw ini file values (without -o overrides), for `config._inicfg`.
+    ini_file: HashMap<String, String>,
     /// Raw -o override values, kept separately so Python's `getini` can
     /// perform alias-aware override resolution (alias in `-o` should win).
     ini_overrides: HashMap<String, String>,
@@ -49,6 +51,7 @@ impl PyConfig {
         args: Vec<String>,
         args_source: String,
         ini: HashMap<String, String>,
+        ini_file: HashMap<String, String>,
         ini_overrides: HashMap<String, String>,
         option: Py<PyAny>,
         strict: bool,
@@ -59,6 +62,7 @@ impl PyConfig {
             args,
             args_source,
             ini: Mutex::new(ini),
+            ini_file,
             ini_overrides,
             strict,
             option,
@@ -84,6 +88,35 @@ impl PyConfig {
 
 #[pymethods]
 impl PyConfig {
+    /// `config._inicfg`: raw ini file values (without -o overrides) wrapped in
+    /// ConfigValue objects. Keys from overrides appear with `origin="override"`.
+    #[getter]
+    fn _inicfg(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let config_value_cls = py
+            .import("_pytest.config.findpaths")?
+            .getattr("ConfigValue")?;
+        let is_toml = self
+            .inipath
+            .as_deref()
+            .map(|p| p.ends_with(".toml"))
+            .unwrap_or(false);
+        let mode = if is_toml { "toml" } else { "ini" };
+        let dict = pyo3::types::PyDict::new(py);
+        for (k, v) in &self.ini_file {
+            let kw = pyo3::types::PyDict::new(py);
+            kw.set_item("origin", "file")?;
+            kw.set_item("mode", mode)?;
+            dict.set_item(k, config_value_cls.call((v,), Some(&kw))?)?;
+        }
+        for (k, v) in &self.ini_overrides {
+            let kw = pyo3::types::PyDict::new(py);
+            kw.set_item("origin", "override")?;
+            kw.set_item("mode", "ini")?;
+            dict.set_item(k, config_value_cls.call((v,), Some(&kw))?)?;
+        }
+        Ok(dict.unbind().into_any())
+    }
+
     #[getter]
     fn stash(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         Ok(self

@@ -117,10 +117,13 @@ impl Engine {
             .into_iter()
             .map(str::to_string)
             .collect();
-        if let Err(err) = python::install_warning_capture(py, &ini_filters, &self.config.w_options)
-        {
-            eprintln!("ERROR: {}", err.value(py));
-            return exit_code::USAGE_ERROR;
+        if !self.config.plugin_disabled("warnings") {
+            if let Err(err) =
+                python::install_warning_capture(py, &ini_filters, &self.config.w_options)
+            {
+                eprintln!("ERROR: {}", err.value(py));
+                return exit_code::USAGE_ERROR;
+            }
         }
         if let Some(mode) = self
             .config
