@@ -289,8 +289,10 @@ Harness (`conformance/runner.py`):
   of pytest/pluggy internals, packaging tests). The release gate additionally requires
   ci-green and a drift-free scoreboard.
 - `pytester` is supported (nested sessions run the pytest-rs binary as the sub-runner),
-  which is what unlocked the bulk of upstream behavioral tests; the remaining pytester gaps
-  are its in-process APIs (`inline_genitems`, `parseconfig(ure)`, `spawn_pytest`, `run`).
+  which is what unlocked the bulk of upstream behavioral tests. Its in-process APIs largely
+  landed too (`parseconfig(ure)`, `runitem`, `getnode`/`getitems`/`collect_by_name`, a real
+  `HookRecorder`); the main remaining gap is `spawn_pytest` (pexpect-driven interactive
+  sessions, e.g. `--pdb` debugger tests).
 
 ## Risks
 
