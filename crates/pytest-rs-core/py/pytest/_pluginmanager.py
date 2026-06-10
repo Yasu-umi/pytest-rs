@@ -68,6 +68,21 @@ def _accepted_kwargs(func: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
     return {name: value for name, value in kwargs.items() if name in params}
 
 
+class _HookImpl:
+    """pluggy HookImpl shim: function + wrapper/hookwrapper/tryfirst/trylast."""
+
+    def __init__(self, func: Any, opts: dict) -> None:
+        self.function = func
+        self.wrapper = bool(opts.get("wrapper"))
+        self.hookwrapper = bool(opts.get("hookwrapper"))
+        self.tryfirst = bool(opts.get("tryfirst"))
+        self.trylast = bool(opts.get("trylast"))
+        self.specname = opts.get("specname")
+
+    def __repr__(self) -> str:
+        return f"<HookImpl {self.function!r}>"
+
+
 class HookCaller:
     """One named hook: calls every registered plugin's same-named function
     (LIFO), honoring firstresult from the registered hookspec."""
@@ -75,6 +90,16 @@ class HookCaller:
     def __init__(self, name: str, pm: PluginManager) -> None:
         self._name = name
         self._pm = pm
+
+    def get_hookimpls(self) -> list[_HookImpl]:
+        """Return HookImpl objects for all registered implementations (pluggy API)."""
+        impls = []
+        for plugin in reversed(self._pm._plugins):
+            func = getattr(plugin, self._name, None)
+            if callable(func):
+                opts = getattr(func, "pytest_impl", None) or {}
+                impls.append(_HookImpl(func, opts))
+        return impls
 
     def __call__(self, **kwargs: Any) -> Any:
         kwargs = self._fix_path_args(kwargs)
@@ -387,6 +412,19 @@ class PluginManager:
 
     def is_registered(self, plugin: Any) -> bool:
         return plugin in self._plugins
+
+    def parse_hookimpl_opts(self, plugin: Any, name: str) -> dict | None:
+        """Return hookimpl opts dict if name is a hook implementation, else None (pluggy API)."""
+        method = getattr(plugin, name, None)
+        if not callable(method):
+            return None
+        opts = getattr(method, "pytest_impl", None)
+        if isinstance(opts, dict):
+            return opts
+        for attr in self._LEGACY_HOOK_ATTRS:
+            if hasattr(method, attr):
+                return {attr: getattr(method, attr)}
+        return None
 
 
 pluginmanager = PluginManager()

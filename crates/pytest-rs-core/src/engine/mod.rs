@@ -66,6 +66,14 @@ impl Engine {
             eprintln!("INTERNAL ERROR: failed to install pytest shim: {err}");
             return exit_code::INTERNAL_ERROR;
         }
+        // pythonpath ini: add paths relative to rootdir to sys.path early,
+        // before conftest/plugin imports (mirrors _pytest/python_path.py).
+        for rel in self.config.get_ini_lines("pythonpath") {
+            let abs = self.config.rootdir.join(rel);
+            if let Err(err) = python::sys_path_prepend(py, &abs) {
+                eprintln!("INTERNAL ERROR: failed to add pythonpath entry {rel}: {err}");
+            }
+        }
         // --debug: pytest's debug trace file (minimal: create the file and
         // announce it on stderr like upstream). The "wrote" message fires on
         // drop so every exit path (early returns, NO_TESTS_COLLECTED, etc.)
@@ -948,6 +956,24 @@ impl Engine {
                         "PytestConfigWarning",
                         &format!("Unknown config option: {key}"),
                         &inipath,
+                        0,
+                    );
+                }
+            }
+        }
+        // --override-ini keys that aren't registered/core get the same warning
+        // as unknown ini file keys (upstream issues this via config.getoption).
+        if !self.config.is_worker() {
+            let override_keys: Vec<String> = self.config.ini_overrides.keys().cloned().collect();
+            if !override_keys.is_empty() {
+                let unknown_overrides = python::unknown_ini_keys(py, &override_keys)
+                    .map_err(|err| python::format_exception(py, &err))?;
+                for key in &unknown_overrides {
+                    let _ = python::warn_explicit_at(
+                        py,
+                        "PytestConfigWarning",
+                        &format!("Unknown config option: {key}"),
+                        "<cmdline>",
                         0,
                     );
                 }

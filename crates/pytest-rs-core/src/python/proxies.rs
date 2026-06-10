@@ -111,6 +111,10 @@ fn build_py_config(
         }
     }
     option_ns.setattr("doctest_glob", glob_list)?;
+    // confcutdir is a CLI option plugins read via getoption("confcutdir").
+    if let Some(confcutdir) = config.get_value("confcutdir") {
+        option_ns.setattr("confcutdir", confcutdir.to_owned())?;
+    }
     let option = option_ns.unbind();
     let inipath = config
         .config_file_name
@@ -125,6 +129,7 @@ fn build_py_config(
             args,
             args_source,
             config.ini_snapshot(),
+            config.ini_overrides_clone(),
             option,
             strict,
         ),
@@ -135,6 +140,16 @@ fn build_py_config(
     let bound = proxy.bind(py);
     let opt = bound.getattr("option")?;
     bound.setattr("known_args_namespace", opt)?;
+    // config.pluginmanager._confcutdir: the directory below which conftest.py
+    // files are not considered (--confcutdir if given, else rootdir).
+    let confcutdir_str = config
+        .get_value("confcutdir")
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| config.rootdir.to_string_lossy().to_string());
+    let pathlib = py.import("pathlib")?;
+    let confcutdir_path = pathlib.getattr("Path")?.call1((confcutdir_str,))?;
+    let pm = bound.getattr("pluginmanager")?;
+    pm.setattr("_confcutdir", confcutdir_path)?;
     Ok(proxy)
 }
 

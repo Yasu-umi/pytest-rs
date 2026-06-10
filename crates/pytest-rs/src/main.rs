@@ -59,7 +59,7 @@ fn main() {
     let config = match Config::from_args(parser, argv) {
         Ok(config) => config,
         Err(message) => {
-            eprintln!("{message}");
+            eprintln!("ERROR: {message}");
             std::process::exit(pytest_rs_core::report::exit_code::USAGE_ERROR);
         }
     };

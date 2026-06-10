@@ -21,6 +21,9 @@ pub struct PyConfig {
     /// the testpaths ini), or "invocation_dir" (the default).
     args_source: String,
     ini: Mutex<HashMap<String, String>>,
+    /// Raw -o override values, kept separately so Python's `getini` can
+    /// perform alias-aware override resolution (alias in `-o` should win).
+    ini_overrides: HashMap<String, String>,
     /// Strict getini: an unregistered, non-core ini key raises ValueError
     /// (upstream behavior). Only parseconfig-built configs are strict; the
     /// session config stays lenient since the engine owns the core inis.
@@ -46,6 +49,7 @@ impl PyConfig {
         args: Vec<String>,
         args_source: String,
         ini: HashMap<String, String>,
+        ini_overrides: HashMap<String, String>,
         option: Py<PyAny>,
         strict: bool,
     ) -> Self {
@@ -55,6 +59,7 @@ impl PyConfig {
             args,
             args_source,
             ini: Mutex::new(ini),
+            ini_overrides,
             strict,
             option,
             stash: pyo3::sync::PyOnceLock::new(),
@@ -113,7 +118,9 @@ impl PyConfig {
     fn getini(&self, py: Python<'_>, name: &str) -> PyResult<Py<PyAny>> {
         // Pass the full ini snapshot so the resolver can apply alias lookups
         // and type coercion (parser.addini specs supply both); paths/pathlist
-        // types resolve relative to rootdir.
+        // types resolve relative to rootdir. Overrides are passed separately
+        // so the Python layer can give them precedence over file values even
+        // when the override key is an alias of the canonical name.
         let inicfg = pyo3::types::PyDict::new(py);
         {
             let ini = self.ini.lock().expect("config lock poisoned");
@@ -121,9 +128,15 @@ impl PyConfig {
                 inicfg.set_item(key, value)?;
             }
         }
+        let overrides = pyo3::types::PyDict::new(py);
+        for (key, value) in &self.ini_overrides {
+            overrides.set_item(key, value)?;
+        }
+        let kwargs = pyo3::types::PyDict::new(py);
+        kwargs.set_item("overrides", &overrides)?;
         Ok(py
             .import("pytest._parser")?
-            .call_method1("getini", (name, inicfg, self.rootdir.as_str(), self.strict))?
+            .call_method("getini", (name, inicfg, self.rootdir.as_str(), self.strict), Some(&kwargs))?
             .unbind())
     }
 

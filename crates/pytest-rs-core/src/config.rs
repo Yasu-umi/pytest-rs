@@ -20,7 +20,8 @@ const CONFIG_NAMES: [&str; 7] = [
 /// absent or carries no pytest config (load_config_dict_from_file). The
 /// pytest.toml/.pytest.toml and pytest.ini/.pytest.ini variants always count
 /// as config when present, even when empty.
-/// Returns Err for pyproject.toml conflicts (UsageError), Ok(None) when absent.
+/// Returns Err for parse errors or pyproject.toml conflicts (UsageError),
+/// Ok(None) when absent.
 fn load_config(
     dir: &Path,
     name: &str,
@@ -28,18 +29,42 @@ fn load_config(
     let Ok(content) = std::fs::read_to_string(dir.join(name)) else {
         return Ok(None);
     };
+    let path = dir.join(name).to_string_lossy().into_owned();
     match name {
         "pytest.toml" | ".pytest.toml" => {
-            Ok(Some(parse_toml_pytest(&content).unwrap_or_default()))
+            let values = parse_toml_pytest(&content, Some(&path))?;
+            Ok(Some(values.unwrap_or_default()))
         }
-        "pytest.ini" | ".pytest.ini" => Ok(Some(
-            parse_ini_section(&content, "pytest").unwrap_or_default(),
-        )),
-        "pyproject.toml" => parse_pyproject(&content),
+        "pytest.ini" | ".pytest.ini" => {
+            if let Some(line) = detect_missing_section_header(&content) {
+                return Err(format!("{}:{}: no section header defined", path, line));
+            }
+            Ok(Some(parse_ini_section(&content, "pytest").unwrap_or_default()))
+        }
+        "pyproject.toml" => parse_pyproject(&content, Some(&path)),
         "tox.ini" => Ok(parse_ini_section(&content, "pytest")),
         "setup.cfg" => Ok(parse_ini_section(&content, "tool:pytest")),
         _ => Ok(None),
     }
+}
+
+/// Detect a missing section header: the first non-blank, non-comment line
+/// before any `[section]` that looks like a key=value pair. Returns the
+/// 1-based line number on detection, None if the content is well-formed.
+fn detect_missing_section_header(content: &str) -> Option<usize> {
+    for (i, line) in content.lines().enumerate() {
+        let t = line.trim();
+        if t.is_empty() || t.starts_with('#') || t.starts_with(';') {
+            continue;
+        }
+        if t.starts_with('[') {
+            return None;
+        }
+        if t.contains('=') {
+            return Some(i + 1);
+        }
+    }
+    None
 }
 
 /// Locate the winning config file. Returns (rootdir, basename, values,
@@ -105,12 +130,13 @@ fn load_config_from_path(path: &Path) -> Result<HashMap<String, String>, String>
         return Ok(HashMap::new());
     };
     let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+    let path_str = path.to_string_lossy().into_owned();
     match path.extension().and_then(|e| e.to_str()) {
         Some("toml") => {
             if matches!(name, "pytest.toml" | ".pytest.toml") {
-                Ok(parse_toml_pytest(&content).unwrap_or_default())
+                Ok(parse_toml_pytest(&content, Some(&path_str))?.unwrap_or_default())
             } else {
-                Ok(parse_pyproject(&content)?.unwrap_or_default())
+                Ok(parse_pyproject(&content, Some(&path_str))?.unwrap_or_default())
             }
         }
         Some("cfg") => Ok(parse_ini_section(&content, "tool:pytest").unwrap_or_default()),
@@ -157,14 +183,32 @@ fn parse_ini_section(content: &str, section: &str) -> Option<HashMap<String, Str
     found.then_some(values)
 }
 
+/// Compare two dotted version strings (e.g. "1.2.3") by major.minor.patch.
+/// Returns true when `current` >= `required`.
+fn semver_ge(current: &str, required: &str) -> bool {
+    let parse = |v: &str| -> (u64, u64, u64) {
+        let mut parts = v.split('.');
+        let major = parts.next().and_then(|s| s.trim().parse().ok()).unwrap_or(0);
+        let minor = parts.next().and_then(|s| s.trim().parse().ok()).unwrap_or(0);
+        let patch = parts.next().and_then(|s| s.trim().parse().ok()).unwrap_or(0);
+        (major, minor, patch)
+    };
+    parse(current) >= parse(required)
+}
+
 /// pytest config from pyproject.toml: [tool.pytest] (pytest 9 toml mode,
 /// keys other than ini_options) or [tool.pytest.ini_options] (ini mode).
 /// Returns Err when both styles are present simultaneously (upstream
 /// UsageError), Ok(None) when no pytest config is found.
-fn parse_pyproject(content: &str) -> Result<Option<HashMap<String, String>>, String> {
+fn parse_pyproject(content: &str, path: Option<&str>) -> Result<Option<HashMap<String, String>>, String> {
     let document: toml::Table = match content.parse() {
         Ok(t) => t,
-        Err(_) => return Ok(None),
+        Err(e) => {
+            return match path {
+                Some(p) => Err(format!("{p}: Invalid statement ({e})")),
+                None => Ok(None),
+            };
+        }
     };
     let Some(tool) = document.get("tool") else {
         return Ok(None);
@@ -195,10 +239,20 @@ fn parse_pyproject(content: &str) -> Result<Option<HashMap<String, String>>, Str
 /// pytest config from a standalone pytest.toml / .pytest.toml: a top-level
 /// `[pytest]` table (pytest 9 toml mode). Returns None when no `[pytest]`
 /// table is present (the caller still treats the file as config, just empty).
-fn parse_toml_pytest(content: &str) -> Option<HashMap<String, String>> {
-    let document: toml::Table = content.parse().ok()?;
-    let pytest = document.get("pytest")?.as_table()?;
-    Some(render_toml_entries(pytest.iter().collect()))
+fn parse_toml_pytest(content: &str, path: Option<&str>) -> Result<Option<HashMap<String, String>>, String> {
+    let document: toml::Table = match content.parse() {
+        Ok(t) => t,
+        Err(e) => {
+            return match path {
+                Some(p) => Err(format!("{p}: Invalid statement ({e})")),
+                None => Ok(None),
+            };
+        }
+    };
+    let Some(pytest) = document.get("pytest").and_then(|v| v.as_table()) else {
+        return Ok(None);
+    };
+    Ok(Some(render_toml_entries(pytest.iter().collect())))
 }
 
 /// Render TOML pytest entries into the engine's stringified ini form: scalar
@@ -318,7 +372,7 @@ pub struct Config {
     flags: HashSet<String>,
     values: HashMap<String, String>,
     /// -o name=value overrides; take precedence over file values.
-    ini_overrides: HashMap<String, String>,
+    pub(crate) ini_overrides: HashMap<String, String>,
     /// Values from pytest.ini / pyproject.toml / tox.ini / setup.cfg.
     ini_file: HashMap<String, String>,
     /// The config file's basename, for the "configfile:" header line.
@@ -859,7 +913,20 @@ impl Config {
                 let _ = err.print();
                 std::process::exit(0);
             }
-            Err(err) => return Err(err.to_string()),
+            Err(err) => {
+                let msg = err.to_string();
+                // Rewrite clap's verbose error for --override-ini missing value
+                // to match pytest's argparse-style: "*: error: argument -o/--override-ini: ..."
+                if msg.contains("override-ini")
+                    && (msg.contains("required") || msg.contains("value"))
+                {
+                    return Err(
+                        "pytest: error: argument -o/--override-ini: expected one argument"
+                            .to_string(),
+                    );
+                }
+                return Err(msg);
+            }
         };
 
         let mut flags = HashSet::new();
@@ -953,10 +1020,46 @@ impl Config {
                 // option=value, not a lone option.
                 let Some((name, value)) = entry.split_once('=') else {
                     return Err(format!(
-                        "ERROR: -o/--override-ini expects option=value style (got: '{entry}')."
+                        "-o/--override-ini expects option=value style (got: '{entry}')."
                     ));
                 };
                 ini_overrides.insert(name.to_string(), value.to_string());
+            }
+        }
+
+        // --confcutdir must point at an existing directory (upstream raises UsageError).
+        if let Some(dir_val) = values.get("confcutdir") {
+            let dir_path = if std::path::Path::new(dir_val).is_absolute() {
+                std::path::PathBuf::from(dir_val)
+            } else {
+                cwd.join(dir_val)
+            };
+            if !dir_path.is_dir() {
+                return Err(format!(
+                    "--confcutdir must be a directory, given: {dir_val}"
+                ));
+            }
+        }
+
+        // minversion check: if the config requires a newer pytest than ours.
+        // Compare against the pytest API version we track (9.0.3), not the
+        // pytest-rs package version (0.0.3), since minversion targets pytest.
+        {
+            let required = ini_overrides.get("minversion")
+                .or_else(|| ini_file.get("minversion"));
+            if let Some(required) = required {
+                // pytest API compatibility version (kept in sync with the
+                // embedded pytest.__version__ shim).
+                const PYTEST_COMPAT_VERSION: &str = "9.0.3";
+                if !semver_ge(PYTEST_COMPAT_VERSION, required.trim()) {
+                    let path = config_file_name.as_ref()
+                        .map(|n| rootdir.join(n).display().to_string())
+                        .unwrap_or_default();
+                    return Err(format!(
+                        "{}: 'minversion' requires pytest-{}, actual pytest-{}",
+                        path, required.trim(), PYTEST_COMPAT_VERSION
+                    ));
+                }
             }
         }
 
@@ -1099,6 +1202,11 @@ impl Config {
                 .map(|(key, value)| (key.clone(), value.clone())),
         );
         merged
+    }
+
+    /// The raw -o override values (for alias-aware getini in the Python layer).
+    pub fn ini_overrides_clone(&self) -> HashMap<String, String> {
+        self.ini_overrides.clone()
     }
 
     /// Plugin-contributed boolean option.

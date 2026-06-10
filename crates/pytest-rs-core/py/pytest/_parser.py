@@ -265,14 +265,18 @@ def _coerce_ini(type_: str | None, value: Any, rootpath: str | None, name: str =
     return value
 
 
-def getini(name: str, inicfg: dict[str, str], rootpath: str | None, strict: bool = False) -> Any:
+def getini(name: str, inicfg: dict[str, str], rootpath: str | None, strict: bool = False, overrides: dict[str, str] | None = None) -> Any:
     """config.getini(name): the typed, alias-resolved ini value. Registered
     options (parser.addini) supply type conversion and defaults.
 
     In strict mode (parseconfig-built configs) an unregistered, non-core key
     raises ValueError, matching upstream. The session config stays lenient —
     the Rust engine owns the core inis and never registers them here, so
-    raising would regress its own getini calls."""
+    raising would regress its own getini calls.
+
+    ``overrides`` (the raw -o/--override-ini values) is checked before
+    ``inicfg`` with full alias resolution so ``-o old_name=val`` wins over
+    ``new_name = from_file`` when old_name is registered as an alias."""
     canonical = ini_aliases.get(name, name)
     spec = ini_specs.get(canonical)
     if spec is None:
@@ -289,6 +293,16 @@ def getini(name: str, inicfg: dict[str, str], rootpath: str | None, strict: bool
                 return _split_str(raw, False)
             return raw
     type_ = spec["type"]
+    # Override precedence: -o canonical first, then any alias.
+    if overrides is not None:
+        override_val = overrides.get(canonical)
+        if override_val is None:
+            for alias in spec.get("aliases", ()):
+                if alias in overrides:
+                    override_val = overrides[alias]
+                    break
+        if override_val is not None:
+            return _coerce_ini(type_, override_val, rootpath, canonical)
     # Value precedence: canonical name first, then any alias.
     value = inicfg.get(canonical)
     if value is None:
