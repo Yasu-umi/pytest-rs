@@ -36,6 +36,9 @@ pub struct TestItem {
     pub fixture_params: Vec<(String, usize, Py<PyAny>)>,
     /// 1-based line of the test definition (0 if unknown).
     pub lineno: u32,
+    /// Python collector class name for custom file collectors (e.g. "MyModule").
+    /// Empty string means standard Module collection.
+    pub collector_class: String,
 }
 
 impl TestItem {
@@ -250,7 +253,7 @@ pub fn is_test_file(path: &Path, python_files: &[String]) -> bool {
 }
 
 /// fnmatch-style match supporting * and ? (iterative, no allocation).
-fn wildcard_match(pattern: &str, name: &str) -> bool {
+pub(crate) fn wildcard_match(pattern: &str, name: &str) -> bool {
     let pattern: Vec<char> = pattern.chars().collect();
     let name: Vec<char> = name.chars().collect();
     let (mut p, mut n) = (0usize, 0usize);

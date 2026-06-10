@@ -645,6 +645,7 @@ impl Plugin for AsyncioPlugin {
                         .collect(),
                     fixture_params,
                     lineno: item.lineno,
+                    collector_class: item.collector_class.clone(),
                 });
             }
         }
@@ -810,6 +811,7 @@ impl Plugin for AsyncioPlugin {
                         .map(|(name, index, value)| (name.clone(), *index, value.clone_ref(py)))
                         .collect(),
                     lineno: item.lineno,
+                    collector_class: item.collector_class.clone(),
                 });
             }
         }

@@ -846,7 +846,32 @@ class Pytester:
                             seen_files.add(py_file)
                             items.extend(self._collect_items_from_path(py_file))
             elif path_str.endswith(".py"):
-                items.extend(self._collect_items_from_path(path_str))
+                in_proc = self._collect_items_from_path(path_str)
+                # Supplement with relay items for custom collectors (e.g. pytest_collect_file
+                # hooks that return non-standard File subclasses alongside the normal Module).
+                in_proc_nodeids = {i.nodeid for i in in_proc}
+                for event in hook_events:
+                    if event.get("hook") == "pytest_collection_finish":
+                        for it in event.get("session_items", []):
+                            it_path_str = it.get("path", "")
+                            it_nodeid = it.get("nodeid", "")
+                            if it_nodeid in in_proc_nodeids:
+                                continue
+                            if it_path_str:
+                                it_abs = _pathlib.Path(it_path_str).resolve()
+                                src_abs = (
+                                    _pathlib.Path(path_str)
+                                    if _pathlib.Path(path_str).is_absolute()
+                                    else self.path / path_str
+                                ).resolve()
+                                if it_abs == src_abs:
+                                    in_proc.append(
+                                        _RelayItemResult(
+                                            it["name"], it_nodeid, it_path_str
+                                        )
+                                    )
+                        break
+                items.extend(in_proc)
             elif path_str.endswith((".txt", ".rst", ".md")):
                 from _pytest.doctest import DoctestItem, DoctestTextfile
 
@@ -1393,8 +1418,6 @@ class _RelayCollector:
 
     @property
     def session(self):
-        s = object.__new__(object)
-        object.__setattr__(s, "path", self._session_path)
         return type("_S", (), {"path": self._session_path})()
 
 
@@ -1546,11 +1569,38 @@ class InlineRunResult:
                         str(session_path), "Session", str(session_path)
                     )},
                 ))
+            _MODULE_CLASSES = {"", "NoneType", "Function", "Node", "Module"}
             for key, (file_path, file_items) in files_to_items.items():
                 file_path_str = str(file_path) if file_path else ""
                 session_path_str2 = str(session_path) if session_path else ""
-                # Use relative nodeid for collectreport (e.g. "aaa/test_aaa.py")
                 file_nodeid = file_items[0].get("nodeid", "").split("::")[0] if file_items else file_path_str
+                # Separate custom-collector items (parent_class != Module) from Module items
+                from collections import OrderedDict as _OD
+                custom_groups = _OD()
+                module_items = []
+                for it in file_items:
+                    pc = it.get("parent_class", "")
+                    if pc and pc not in _MODULE_CLASSES:
+                        custom_groups.setdefault(pc, []).append(it)
+                    else:
+                        module_items.append(it)
+                # Custom collectors: collectstart + make_collect_report + collectreport
+                for parent_cls, custom_items in custom_groups.items():
+                    calls.append(_RelayHookCall(
+                        "pytest_collectstart",
+                        {"collector": _RelayCollector(file_path_str, parent_cls, session_path_str2)},
+                    ))
+                    calls.append(_RelayHookCall(
+                        "pytest_make_collect_report",
+                        {"collector": _RelayCollector(file_path_str, parent_cls, session_path_str2)},
+                    ))
+                    custom_nodeid = custom_items[0].get("nodeid", "").split("::")[0]
+                    custom_result = [
+                        _RelayItemResult(it.get("name", ""), it.get("nodeid", ""), it.get("path", ""))
+                        for it in custom_items
+                    ]
+                    calls.append(_RelayHookCall("pytest_collectreport",
+                        {"report": _RelayCollectReport(custom_nodeid, "passed", "", custom_result)}))
                 # Module-level collectstart
                 calls.append(_RelayHookCall(
                     "pytest_collectstart",
@@ -1561,8 +1611,8 @@ class InlineRunResult:
                     "pytest_make_collect_report",
                     {"collector": _RelayCollector(file_path_str, "Module", session_path_str2)},
                 ))
-                # pycollect_makeitem for each item in this file
-                for it in file_items:
+                # pycollect_makeitem only for Module-collected items
+                for it in module_items:
                     item_name = it.get("name", "")
                     calls.append(_RelayHookCall(
                         "pytest_pycollect_makeitem",
@@ -1571,12 +1621,13 @@ class InlineRunResult:
                             "collector": _RelayCollector(file_path_str, "Module", session_path_str2),
                         },
                     ))
-                # collectreport for this module (nodeid is relative, matching pytest behaviour)
-                result = [
+                # collectreport for module items
+                module_nodeid = module_items[0].get("nodeid", "").split("::")[0] if module_items else file_nodeid
+                module_result = [
                     _RelayItemResult(it.get("name", ""), it.get("nodeid", ""), it.get("path", ""))
-                    for it in file_items
+                    for it in module_items
                 ]
-                report = _RelayCollectReport(file_nodeid, "passed", "", result)
+                report = _RelayCollectReport(module_nodeid, "passed", "", module_result)
                 calls.append(_RelayHookCall("pytest_collectreport", {"report": report}))
 
             # Append the original collection_finish

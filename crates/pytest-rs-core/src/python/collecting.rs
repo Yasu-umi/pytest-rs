@@ -187,9 +187,31 @@ pub fn collect_custom_files(
             if collector.is_none() {
                 continue;
             }
+            let collector_class: String = collector
+                .getattr("__class__")
+                .and_then(|c| c.getattr("__name__"))
+                .and_then(|n| n.extract())
+                .unwrap_or_else(|_| "Module".to_string());
+            // Update already-collected items for this file to use the custom
+            // collector class (e.g. MyModule replacing the default Module).
+            let pre_existing: std::collections::HashSet<String> = items
+                .iter_mut()
+                .filter_map(|it| {
+                    if it.path == *file {
+                        it.collector_class = collector_class.clone();
+                        Some(it.nodeid.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            // Call collect() for new items not already found by standard collection.
             for item_obj in collector.call_method0("collect")?.try_iter()? {
                 let item_obj = item_obj?;
                 let nodeid: String = item_obj.getattr("nodeid")?.extract()?;
+                if pre_existing.contains(&nodeid) {
+                    continue;
+                }
                 let name: String = item_obj.getattr("name")?.extract()?;
                 let mut marks = Vec::new();
                 if let Ok(own) = item_obj.getattr("own_markers") {
@@ -216,6 +238,7 @@ pub fn collect_custom_files(
                     callspec: Vec::new(),
                     fixture_params: Vec::new(),
                     lineno: 0,
+                    collector_class: collector_class.clone(),
                 });
             }
         }
@@ -297,6 +320,7 @@ pub fn collect_doctests_from_module(
             callspec: vec![],
             fixture_params: vec![],
             lineno,
+            collector_class: String::new(),
         });
     }
     Ok(())
@@ -338,6 +362,7 @@ pub fn collect_doctests_from_textfile(
             callspec: vec![],
             fixture_params: vec![],
             lineno,
+            collector_class: String::new(),
         });
     }
     Ok(())
@@ -400,7 +425,13 @@ pub(crate) fn introspect_namespace(
         let Ok(name) = key.extract::<String>() else {
             continue;
         };
-        if isclass.call1((&value,))?.extract::<bool>()? {
+        // Wrap isclass in try-catch: objects with __class__ = property(raises)
+        // cause inspect.isclass → isinstance(obj, type) to raise (#4266).
+        let is_class = isclass
+            .call1((&value,))
+            .and_then(|r| r.extract::<bool>())
+            .unwrap_or(false);
+        if is_class {
             let is_testcase: bool = py
                 .import("pytest._unittest")?
                 .getattr("is_testcase_class")?
@@ -443,7 +474,7 @@ pub(crate) fn introspect_namespace(
         // pytest default python_functions = "test*"
         if !name.starts_with("test")
             || !value.is_callable()
-            || value.hasattr("_pytestfixturefunction")?
+            || value.hasattr("_pytestfixturefunction").unwrap_or(false)
         {
             continue;
         }
@@ -601,6 +632,7 @@ pub(crate) fn collect_testcase(
             callspec: Vec::new(),
             fixture_params: Vec::new(),
             lineno: first_lineno(py, &method),
+            collector_class: String::new(),
         });
     }
     Ok(())
@@ -833,6 +865,7 @@ pub(crate) fn push_test_items(
             callspec: variant.params,
             fixture_params: variant.indirect_params,
             lineno: first_lineno(py, func),
+            collector_class: String::new(),
         });
     }
     Ok(())

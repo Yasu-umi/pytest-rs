@@ -50,7 +50,12 @@ impl Engine {
                 labels.push(format!("<{kind} {dir}>"));
             }
             if let Some(module) = segments.last() {
-                labels.push(format!("<Module {module}>"));
+                let module_class = if item.collector_class.is_empty() {
+                    "Module"
+                } else {
+                    &item.collector_class
+                };
+                labels.push(format!("<{module_class} {module}>"));
             }
             let parts: Vec<&str> = rest.split("::").collect();
             for class in &parts[..parts.len().saturating_sub(1)] {

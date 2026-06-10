@@ -463,6 +463,7 @@ impl Plugin for AnyioPlugin {
                             .collect(),
                         fixture_params,
                         lineno: item.lineno,
+                        collector_class: item.collector_class.clone(),
                     });
                 }
             }

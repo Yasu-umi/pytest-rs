@@ -523,3 +523,147 @@ pub fn call_py_hook(
         Err(err) => Err(err),
     }
 }
+
+/// Extract collect_ignore and collect_ignore_glob entries from a conftest module.
+/// conftest_path is the absolute path to the conftest.py file; we look it up
+/// in sys.modules by matching __file__. conftest_dir is the directory of that
+/// conftest; relative paths in collect_ignore are resolved relative to it.
+/// Returns (paths, globs).
+pub fn extract_collect_ignores(
+    py: Python<'_>,
+    conftest_dir: &Path,
+    conftest_path: &Path,
+) -> (Vec<PathBuf>, Vec<String>) {
+    let conftest_str = conftest_path.to_string_lossy();
+    let conftest_canonical = std::fs::canonicalize(conftest_path)
+        .unwrap_or_else(|_| conftest_path.to_path_buf());
+
+    let Ok(sys_modules) = py.import("sys").and_then(|s| s.getattr("modules")) else {
+        return (Vec::new(), Vec::new());
+    };
+    // Find the conftest module by matching __file__
+    let module = {
+        let mut found = None;
+        if let Ok(values) = sys_modules.call_method0("values") {
+            for m in values.try_iter().into_iter().flatten().flatten() {
+                if let Ok(file_attr) = m.getattr("__file__") {
+                    if let Ok(file_str) = file_attr.extract::<String>() {
+                        let canon = std::fs::canonicalize(&file_str)
+                            .unwrap_or_else(|_| std::path::PathBuf::from(&file_str));
+                        if canon == conftest_canonical || file_str == conftest_str.as_ref() {
+                            found = Some(m);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        match found {
+            Some(m) => m,
+            None => return (Vec::new(), Vec::new()),
+        }
+    };
+
+    let mut paths = Vec::new();
+    let mut globs = Vec::new();
+
+    // collect_ignore: list of path-like objects, resolved relative to conftest_dir
+    if let Ok(ignore_list) = module.getattr("collect_ignore") {
+        if let Ok(iter) = ignore_list.try_iter() {
+            for item in iter.flatten() {
+                // os.fspath converts PathLike → str/bytes; fallback to str()
+                let path_str: Option<String> = py
+                    .import("os")
+                    .and_then(|os| os.getattr("fspath"))
+                    .and_then(|fsp| fsp.call1((&item,)))
+                    .and_then(|s| s.extract::<String>())
+                    .or_else(|_| item.str().and_then(|s| s.extract::<String>()))
+                    .ok();
+                if let Some(s) = path_str {
+                    let abs = conftest_dir.join(&s);
+                    paths.push(abs);
+                }
+            }
+        }
+    }
+
+    // collect_ignore_glob: list of glob pattern strings
+    if let Ok(glob_list) = module.getattr("collect_ignore_glob") {
+        if let Ok(iter) = glob_list.try_iter() {
+            for item in iter.flatten() {
+                if let Ok(s) = item.str().and_then(|s| s.extract::<String>()) {
+                    globs.push(s);
+                }
+            }
+        }
+    }
+
+    (paths, globs)
+}
+
+/// Call pytest_ignore_collect for a path; returns true if the path should be
+/// ignored. Only calls hooks whose baseid is a prefix of the path (conftests
+/// only ignore paths within their subtree).
+pub fn call_ignore_collect_hooks(
+    py: Python<'_>,
+    hooks: &[crate::session::PyHook],
+    path: &Path,
+    rootdir: &Path,
+) -> bool {
+    let ignore_hooks: Vec<&crate::session::PyHook> = hooks
+        .iter()
+        .filter(|h| h.name == "pytest_ignore_collect")
+        .collect();
+    if ignore_hooks.is_empty() {
+        return false;
+    }
+    let pathlib = match py.import("pathlib").and_then(|m| m.getattr("Path")) {
+        Ok(p) => p,
+        Err(_) => return false,
+    };
+    let py_path = match pathlib.call1((path.to_string_lossy().as_ref(),)) {
+        Ok(p) => p,
+        Err(_) => return false,
+    };
+    // Build a minimal config proxy for the hook parameter
+    let config = crate::python::proxies::CONFIG_PROXY
+        .get()
+        .map(|c| c.bind(py).clone());
+    for hook in &ignore_hooks {
+        // Only apply hooks from conftests whose baseid is relevant to this path
+        // (baseid is "" for root conftest, "subdir" for subdir conftest).
+        let hook_dir = if hook.baseid.is_empty() {
+            rootdir.to_path_buf()
+        } else {
+            rootdir.join(&hook.baseid)
+        };
+        if !path.starts_with(&hook_dir) {
+            continue;
+        }
+        let result = call_py_hook_raw(
+            py,
+            &hook.func,
+            &[
+                ("collection_path", py_path.clone().unbind()),
+                (
+                    "config",
+                    config
+                        .as_ref()
+                        .map(|c| c.clone().unbind())
+                        .unwrap_or_else(|| py.None()),
+                ),
+                ("path", py_path.clone().unbind()),
+            ],
+        );
+        if let Ok(result) = result {
+            if result
+                .bind(py)
+                .is_truthy()
+                .unwrap_or(false)
+            {
+                return true;
+            }
+        }
+    }
+    false
+}

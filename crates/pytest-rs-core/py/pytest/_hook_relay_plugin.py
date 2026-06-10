@@ -84,6 +84,11 @@ class _HookRelayPlugin:
                     "name": i.name,
                     "nodeid": i.nodeid,
                     "path": str(getattr(i, "path", "") or ""),
+                    "parent_class": (
+                        type(i.parent).__name__
+                        if getattr(i, "parent", None) is not None
+                        else ""
+                    ),
                 }
                 for i in session.items
             ],

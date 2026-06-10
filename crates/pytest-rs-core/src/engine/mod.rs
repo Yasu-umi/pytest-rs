@@ -785,7 +785,7 @@ impl Engine {
         // invocation dir; rootdir only anchors node ids.
         let python_files = self.config.python_files_patterns();
         let norecursedirs = self.config.norecursedirs_patterns();
-        let files = crate::collect::collect_test_files(
+        let mut files = crate::collect::collect_test_files(
             &self.config.invocation_dir,
             &paths,
             self.config.get_flag("collect-in-virtualenv"),
@@ -1036,6 +1036,66 @@ impl Engine {
             }
             return Ok(errors);
         }
+        // Apply collect_ignore / collect_ignore_glob / pytest_ignore_collect from
+        // loaded conftests. This is a post-filter after collect_test_files so that
+        // conftest hooks can prune files from the collection set.
+        // Note: for explicit path args, pytest_ignore_collect is NOT called (upstream
+        // "not called on argument" behaviour). collect_ignore is always applied.
+        let no_explicit_file_args = paths.is_empty();
+        {
+            // Gather ignore paths/globs from all loaded conftest modules.
+            let mut extra_ignore_paths: Vec<std::path::PathBuf> = Vec::new();
+            let mut extra_ignore_globs: Vec<String> = Vec::new();
+            for conftest_path in &conftests {
+                if let Some(conftest_dir) = conftest_path.parent() {
+                    let (mut paths_from, mut globs_from) =
+                        python::extract_collect_ignores(py, conftest_dir, conftest_path);
+                    extra_ignore_paths.append(&mut paths_from);
+                    extra_ignore_globs.append(&mut globs_from);
+                }
+            }
+            if !extra_ignore_paths.is_empty() || !extra_ignore_globs.is_empty() {
+                files.retain(|f| {
+                    let f_canonical = std::fs::canonicalize(f).unwrap_or_else(|_| f.clone());
+                    // collect_ignore: check if file or any ancestor is in the ignore list
+                    for ip in &extra_ignore_paths {
+                        let ip_canonical = std::fs::canonicalize(ip)
+                            .unwrap_or_else(|_| ip.clone());
+                        if f_canonical.starts_with(&ip_canonical) || f_canonical == ip_canonical {
+                            return false;
+                        }
+                    }
+                    // collect_ignore_glob: check against full path
+                    if !extra_ignore_globs.is_empty() {
+                        let f_str = f_canonical.to_string_lossy();
+                        let f_name = f_canonical
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("");
+                        for glob in &extra_ignore_globs {
+                            if crate::collect::wildcard_match(glob, f_name)
+                                || crate::collect::wildcard_match(glob, &f_str)
+                            {
+                                return false;
+                            }
+                        }
+                    }
+                    true
+                });
+            }
+            // pytest_ignore_collect: only applied when no explicit file args
+            if no_explicit_file_args {
+                files.retain(|f| {
+                    !python::call_ignore_collect_hooks(
+                        py,
+                        &self.session.py_hooks,
+                        f,
+                        &rootdir,
+                    )
+                });
+            }
+        }
+
         // pytest's catching_logs around pytest_collection: a root handler
         // during import keeps module-level logging calls from triggering
         // logging.basicConfig (issue #6240).

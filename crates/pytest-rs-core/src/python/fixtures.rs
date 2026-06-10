@@ -497,6 +497,7 @@ pub fn expand_fixture_params(
                         .iter()
                         .map(|(n, i, v)| (n.clone(), *i, v.clone_ref(py)))
                         .collect(),
+                    collector_class: item.collector_class.clone(),
                 });
             }
         }
