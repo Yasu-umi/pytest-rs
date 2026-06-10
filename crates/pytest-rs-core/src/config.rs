@@ -545,7 +545,17 @@ impl Config {
                 (rootdir, file_name, ini_file, Vec::new())
             } else {
                 let ancestor = common_ancestor(&dirs_from_args(&cwd, &argv));
-                find_ini(&ancestor)?
+                let (rootdir, file_name, ini, ignored) = find_ini(&ancestor)?;
+                if file_name.is_none() {
+                    // No config file found anywhere. pytest's determine_setup
+                    // falls back to the common ancestor of the invocation dir
+                    // and the args' ancestor, so e.g. `pytest a a/b` run from
+                    // the parent roots at the invocation dir, not at `a`.
+                    let rootdir = common_ancestor(&[cwd.clone(), ancestor]);
+                    (rootdir, file_name, ini, ignored)
+                } else {
+                    (rootdir, file_name, ini, ignored)
+                }
             };
 
         // --rootdir=DIR must point at an existing directory (upstream

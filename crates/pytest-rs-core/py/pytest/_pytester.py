@@ -510,12 +510,14 @@ class Pytester:
         else:
             env.pop("PYTEST_RS_HOOK_RELAY", None)
         start = time.perf_counter()
-        # cwd: use self.path explicitly so the inner run's rootdir discovery
-        # starts from the pytester temp dir, not from the outer binary's CWD.
-        # A test that os.chdir()s deeper can still pass an explicit path arg.
+        # cwd: use the live process cwd so the inner run's invocation dir
+        # matches upstream's in-process runpytest. The pytester fixture
+        # chdir's to self.path at setup, so this is normally self.path; a
+        # test that os.chdir()s (e.g. via monkeypatch) is honored, which
+        # rootdir discovery (determine_setup's invocation_dir) depends on.
         proc = subprocess.run(
             [exe, f"--basetemp={basetemp}", *extra_args, *[str(arg) for arg in args]],
-            cwd=str(self.path),
+            cwd=os.getcwd(),
             capture_output=True,
             text=True,
             timeout=timeout if timeout is not None else 120,
