@@ -3,7 +3,81 @@
 Notable changes per release. The release workflow uses the matching section
 as the GitHub release notes (auto-generated notes are the fallback).
 
-## v0.0.3 (unreleased)
+## v0.0.4 (unreleased)
+
+### Added
+
+- **Custom-collector subsystem** — `pytest_collect_file` hooks returning
+  `File` / `Item` subclasses (via `Node.from_parent`) are surfaced through
+  the plugin manager into `session.items`. This unlocks collector-based
+  plugins: `pytest-mypy`, `pytest-ruff`, `pytest-snapshot`, `pytest-icdiff`,
+  and friends now run their own suites.
+- **A large in-process pytester surface**, so upstream's own
+  pytester-driven tests run without a real in-process pytest:
+  `Pytester.parseconfig` / `parseconfigure`, `runitem`, `getnode` /
+  `getitems` / `collect_by_name` / `getmodpath`, a real `HookRecorder`
+  (PluginManager hook-call monitoring), `SetupState`, `ExceptionInfo` /
+  `CallInfo`, `SysModulesSnapshot` / `SysPathsSnapshot`, and `LineMatcher`
+  match-logging.
+- **15 new conformance suites** for popular plugins/frameworks:
+  `pytest-mypy`, `pytest-ruff`, `pytest-subtests`, `pytest-metadata`,
+  `pytest-snapshot`, `pytest-icdiff`, `pytest-socket`, `pytest-order`,
+  `pytest-repeat`, `pytest-instafail`, `pytest-env`, `pytest-rerunfailures`,
+  `pytest-randomly`, `pytest-bdd`, and a partial `pytest-django`.
+- **Config subsystem** — `Parser.parse_known_args`, `parseconfig` fires
+  conftest/plugin `pytest_addoption` over an ini type system, `--strict-config`
+  + unknown-config-option validation, fine-grained `--verbosity` and verbosity
+  inis, `required_plugins`, `confcutdir`, the `pythonpath` ini, `pytest.toml` /
+  `.pytest.ini` discovery, and `[pytest]`-section detection in `.cfg` files.
+- **Terminal reporting** — `console_output_style`
+  (progress/count/classic/times), `XFAILURES` / `XPASSES` sections and
+  `--xfail-tb`, `--showlocals` / `-l`, captured teardown sections in
+  failures/passes, verbose skip/xfail reasons, and header testpaths /
+  `--no-header`.
+- **`--dist=loadscope` / `loadfile` / `loadgroup` reorder work units by
+  descending size** (xdist's default), gated by `--loadscope-reorder` /
+  `--no-loadscope-reorder`.
+- `setup_function` / `teardown_function`, plugin/conftest
+  `pytest_generate_tests` + indirect parametrize, `pytest_assertrepr_compare`
+  plugin hooks, a `threading.excepthook` capture plugin, and
+  `pytest_load_initial_conftests` + the `PYTEST_PLUGINS` env var.
+
+### Fixed
+
+- A `UsageError` raised in `pytest_configure` exits with code 4 and still
+  runs `pytest_unconfigure`; `Skipped` raised from `pytest_ignore_collect` /
+  `pytest_collect_file` hooks is handled rather than crashing.
+- `--stepwise` now passes its full upstream suite (18/18), with an
+  `INTERRUPTED` exit when the session sets `shouldstop`.
+- `--assert=plain` disables the rewrite finder, and a non-string user
+  message in a rewritten assert is formatted (not stringified raw).
+- Symlinked test paths preserve the symlink name only for file symlinks,
+  not directory symlinks (matching pytest's collection).
+- The subprocess pytester restores the dynamic-loader path (and import path)
+  across `mock.patch.dict(os.environ, clear=True)` so nested runs still start.
+
+### Performance
+
+- Rewritten bytecode is cached as a hash-checked `.pyc` and GC is disabled
+  during collection — warm collection of a large suite drops from ~40s to
+  ~22.8s. Adds a profiling harness (A/B collect timing + py-spy `--native`
+  flame graphs) under `bench/`.
+
+### Conformance
+
+- pytest's own suite: 1421 → 1885 of 2246 graded tests, spanning config,
+  terminal reporting, collection, the in-process pytester API, and custom
+  collectors.
+- New plugin suites scored on first landing (e.g. `pytest-snapshot` 100/107,
+  `pytest-socket` 59/65, `pytest-order` 85/134); `pytest-django` is partially
+  integrated (Django framework support is ongoing).
+
+### Internal
+
+- `_pytester.py` (1936 lines) split into focused `_pytester_config`,
+  `_pytester_linematcher`, and `_pytester_relay` modules.
+
+## v0.0.3 (2026-06-08)
 
 ### Added
 
