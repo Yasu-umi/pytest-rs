@@ -788,16 +788,30 @@ class Pytester:
         # Collect items in-process so they carry full mark data
         # (keywords, get_closest_marker) — needed by mark-evaluation tests.
         # Fall back to nodeid-only stubs for doctest/text files.
+        import pathlib as _pathlib
+
         items = []
         for arg in args:
             path_str = str(arg)
             if "::" in path_str:
-                # nodeid selector: extract the file part
                 file_part = path_str.split("::")[0]
                 if file_part.endswith(".py"):
                     items.extend(self._collect_items_from_path(file_part))
                     continue
-            if path_str.endswith(".py"):
+            p = _pathlib.Path(path_str)
+            if not p.is_absolute():
+                p = self.path / p
+            if p.is_dir():
+                config = self._request.config if self._request is not None else None
+                python_files = "test_*.py *.py" if config is None else (
+                    config.getini("python_files") if hasattr(config, "getini") else "test_*.py"
+                )
+                patterns = python_files.split() if isinstance(python_files, str) else list(python_files)
+                for pat in patterns:
+                    for py_file in sorted(p.glob(pat)):
+                        if py_file.is_file():
+                            items.extend(self._collect_items_from_path(py_file))
+            elif path_str.endswith(".py"):
                 items.extend(self._collect_items_from_path(path_str))
             elif path_str.endswith((".txt", ".rst", ".md")):
                 from _pytest.doctest import DoctestItem, DoctestTextfile
@@ -809,13 +823,14 @@ class Pytester:
                 items.append(item)
         return items, reprec
 
-    def _collect_items_from_path(self, path):
+    def _collect_items_from_path(self, path, parent_collector=None):
         """In-process collection of Function items from an existing .py file.
 
         Returns items with full mark data (own_markers, get_closest_marker,
         keywords) — the same objects getitems() returns, but without needing
         source text."""
         import importlib.util
+        import itertools
         import pathlib
         import sys
 
@@ -841,13 +856,67 @@ class Pytester:
         session = _NodeSession(config)
         module_collector = _ModuleCollector(module, session, path)
 
-        def make_item(func, nodeid_name, extra_marks, cls=None):
-            marks = [*get_unpacked_marks(func), *extra_marks, *module_marks]
+        # Read python_classes / python_functions from the local ini file
+        # near the source file (not the outer session config, which belongs to
+        # the conformance suite itself and would override pytester.makeini()).
+        import configparser
+        import fnmatch as _fnmatch
+
+        def _read_local_ini_patterns(src_path):
+            """Walk up from src_path looking for pytest.ini/setup.cfg/tox.ini
+            and return (class_patterns, func_patterns) or (None, None)."""
+            for d in [src_path.parent, *src_path.parent.parents]:
+                for fname, section, cls_key, fn_key in [
+                    ("pytest.ini", "pytest", "python_classes", "python_functions"),
+                    ("setup.cfg", "tool:pytest", "python_classes", "python_functions"),
+                    ("tox.ini", "pytest", "python_classes", "python_functions"),
+                ]:
+                    cfg_path = d / fname
+                    if not cfg_path.is_file():
+                        continue
+                    cp = configparser.ConfigParser()
+                    try:
+                        cp.read(str(cfg_path), encoding="utf-8")
+                    except Exception:
+                        continue
+                    if not cp.has_section(section):
+                        continue
+                    cls_val = cp.get(section, cls_key, fallback=None)
+                    fn_val = cp.get(section, fn_key, fallback=None)
+                    if cls_val is None and fn_val is None:
+                        continue
+                    cls_pats = cls_val.split() if cls_val else None
+                    fn_pats = fn_val.split() if fn_val else None
+                    return cls_pats, fn_pats
+                # Stop at the pytester base dir — don't bleed into the outer tree
+                if (d / "pyproject.toml").is_file():
+                    # If pyproject exists but we didn't find ini patterns, stop
+                    break
+            return None, None
+
+        _class_patterns, _func_patterns = _read_local_ini_patterns(path)
+
+        def _is_test_func(name):
+            if _func_patterns is None:
+                return name.startswith("test")
+            return any(name.startswith(p) or _fnmatch.fnmatch(name, p) for p in _func_patterns)
+
+        def _is_test_class(name):
+            if _class_patterns is None:
+                return name.startswith("Test")
+            return any(name.startswith(p) or _fnmatch.fnmatch(name, p) for p in _class_patterns)
+
+        def _param_id(val):
+            if val is None:
+                return "None"
+            return str(val)
+
+        def make_item(func, nodeid_name, all_marks, cls=None, parent=None):
             lineno = getattr(getattr(func, "__code__", None), "co_firstlineno", 0)
             node = Function(
                 f"{path.name}::{nodeid_name}",
                 nodeid_name.rsplit("::", 1)[-1],
-                marks,
+                all_marks,
                 [],
                 func,
                 str(path),
@@ -855,24 +924,54 @@ class Pytester:
             )
             node.module = module
             node.cls = cls
-            node.parent = None
+            node.parent = parent
             node._module_collector = module_collector
             if config is not None:
                 node.config = config
             return node
 
+        def expand_parametrize(func, base_name, extra_marks, cls=None, parent=None):
+            """Return one item per parametrize combination, or one item if none."""
+            func_marks = get_unpacked_marks(func)
+            param_marks = [m for m in func_marks if m.name == "parametrize"]
+            non_param_marks = [m for m in func_marks if m.name != "parametrize"]
+            all_marks = [*non_param_marks, *extra_marks, *module_marks]
+
+            if not param_marks:
+                return [make_item(func, base_name, all_marks, cls, parent)]
+
+            all_id_lists = []
+            for pm in param_marks:
+                argvalues = list(pm.args[1]) if len(pm.args) > 1 else []
+                ids_kwarg = pm.kwargs.get("ids", None)
+                level_ids = [
+                    str(ids_kwarg[i]) if ids_kwarg is not None and i < len(ids_kwarg)
+                    else _param_id(val)
+                    for i, val in enumerate(argvalues)
+                ]
+                if level_ids:
+                    all_id_lists.append(level_ids)
+
+            if not all_id_lists:
+                return [make_item(func, base_name, all_marks, cls, parent)]
+
+            items = []
+            for combo in itertools.product(*all_id_lists):
+                suffix = "-".join(combo)
+                param_name = f"{base_name}[{suffix}]"
+                items.append(make_item(func, param_name, all_marks, cls, parent))
+            return items
+
         items = []
         for name, obj in vars(module).items():
-            if name.startswith("test") and callable(obj) and not isinstance(obj, type):
-                items.append(make_item(obj, name, []))
-            elif name.startswith("Test") and isinstance(obj, type):
+            if _is_test_func(name) and callable(obj) and not isinstance(obj, type):
+                items.extend(expand_parametrize(obj, name, [], parent=parent_collector))
+            elif _is_test_class(name) and isinstance(obj, type):
                 class_marks = get_unpacked_marks(obj)
-                # Collect test methods including inherited ones (dir()), then
-                # sort by source line so the order matches definition order.
                 methods = []
                 seen = set()
                 for mname in dir(obj):
-                    if not mname.startswith("test") or mname in seen:
+                    if not _is_test_func(mname) or mname in seen:
                         continue
                     seen.add(mname)
                     mobj = getattr(obj, mname, None)
@@ -883,7 +982,13 @@ class Pytester:
                         lineno = getattr(getattr(func, "__code__", None), "co_firstlineno", 0)
                         methods.append((lineno, mname, func))
                 for _ln, mname, func in sorted(methods):
-                    items.append(make_item(func, f"{name}::{mname}", class_marks, cls=obj))
+                    sub = expand_parametrize(
+                        func, f"{name}::{mname}", class_marks, cls=obj,
+                        parent=parent_collector,
+                    )
+                    for item in sub:
+                        item.instance = obj
+                    items.extend(sub)
         return items
 
     def getitems(self, source):
@@ -910,18 +1015,139 @@ class Pytester:
         return runtestprotocol(self.getitem(source, funcname), log=False)
 
     def getmodulecol(self, source, *, configargs=(), withinit=False):
-        """A lightweight Module collector for the source (upstream
-        getmodulecol). Carries .config/.path/.nodeid/.name — enough for the
-        TerminalReporter unit tests; collection is not run."""
+        """An in-process Module collector for the source. Supports .collect()
+        (returns Class + Function children) and .module/.cls/.instance attrs."""
+        import importlib.util
         import pathlib
+        import sys
 
-        from pytest._node import File
+        from pytest._marks import get_unpacked_marks
+        from pytest._node import Class, File, Function, _ModuleCollector, _NodeSession
 
         if withinit:
             (self.path / "__init__.py").touch()
         path = pathlib.Path(str(self.makepyfile(source)))
         config = self._request.config if self._request is not None else None
-        return File(name=path.name, config=config, path=path, nodeid=path.name)
+
+        # Import the module in-process
+        module_name = path.stem
+        spec = importlib.util.spec_from_file_location(module_name, path)
+        if spec is not None and spec.loader is not None:
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[module_name] = mod
+            try:
+                spec.loader.exec_module(mod)
+            except Exception:
+                mod = None
+        else:
+            mod = None
+
+        session = _NodeSession(config)
+        module_collector = _ModuleCollector(mod, session, path) if mod is not None else None
+        module_marks = get_unpacked_marks(mod) if mod is not None else []
+
+        pytester_self = self
+
+        class _IPModule(File):
+            """In-process Module collector returned by getmodulecol."""
+
+            def __init__(self):
+                super().__init__(name=path.name, config=config, path=path, nodeid=path.name)
+                self.module = mod
+                self.cls = None
+                self.instance = None
+                self._children = None
+
+            def collect(self):
+                if self._children is not None:
+                    return list(self._children)
+                if mod is None:
+                    self._children = []
+                    return []
+                children = []
+                for name, obj in vars(mod).items():
+                    if name.startswith("test") and callable(obj) and not isinstance(obj, type):
+                        marks = [*get_unpacked_marks(obj), *module_marks]
+                        lineno = getattr(getattr(obj, "__code__", None), "co_firstlineno", 0)
+                        fn = Function(
+                            f"{path.name}::{name}", name, marks, [], obj, str(path), lineno,
+                        )
+                        fn.module = mod
+                        fn.cls = None
+                        fn.parent = self
+                        if module_collector is not None:
+                            fn._module_collector = module_collector
+                        if config is not None:
+                            fn.config = config
+                        children.append(fn)
+                    elif name.startswith("Test") and isinstance(obj, type):
+                        cls_node = _IPClass(name, obj, self)
+                        children.append(cls_node)
+                self._children = children
+                return list(children)
+
+        class _IPClass(Class):
+            """In-process Class collector returned by collect_by_name on a Module."""
+
+            def __init__(self, name, cls_obj, parent_module):
+                super().__init__(name=name, config=config, path=path, nodeid=f"{path.name}::{name}")
+                self.parent = parent_module
+                self._cls_obj = cls_obj
+                self.module = mod
+                self.cls = cls_obj
+                self.instance = None
+                self._children = None
+
+            def collect(self):
+                if self._children is not None:
+                    return list(self._children)
+                children = []
+                class_marks = get_unpacked_marks(self._cls_obj)
+                seen = set()
+                methods = []
+                for mname in dir(self._cls_obj):
+                    if not mname.startswith("test") or mname in seen:
+                        continue
+                    seen.add(mname)
+                    mobj = getattr(self._cls_obj, mname, None)
+                    if mobj is None or not callable(mobj):
+                        continue
+                    func = getattr(mobj, "__func__", mobj)
+                    if callable(func):
+                        lineno = getattr(getattr(func, "__code__", None), "co_firstlineno", 0)
+                        methods.append((lineno, mname, func))
+                for _ln, mname, func in sorted(methods):
+                    marks = [*get_unpacked_marks(func), *class_marks, *module_marks]
+                    lineno = getattr(getattr(func, "__code__", None), "co_firstlineno", 0)
+                    fn = Function(
+                        f"{path.name}::{self.name}::{mname}",
+                        mname, marks, [], func, str(path), lineno,
+                    )
+                    fn.module = mod
+                    fn.cls = self._cls_obj
+                    fn.instance = self._cls_obj
+                    fn.parent = self
+                    if module_collector is not None:
+                        fn._module_collector = module_collector
+                    if config is not None:
+                        fn.config = config
+                    children.append(fn)
+                self._children = children
+                return list(children)
+
+        return _IPModule()
+
+    def collect_by_name(self, modcol, name):
+        """Return the first child of modcol whose .name == name, or None.
+        Caches the result of modcol.collect() across calls (upstream behaviour)."""
+        if not hasattr(self, "_mod_collections"):
+            self._mod_collections = {}
+        if modcol not in self._mod_collections:
+            self._mod_collections[modcol] = list(modcol.collect())
+        for colitem in self._mod_collections[modcol]:
+            if colitem.name == name:
+                return colitem
+        return None
 
     def mkpydir(self, name):
         path = self.path / name
@@ -1134,6 +1360,11 @@ class InlineRunResult:
         self._result = run_result
         self.ret = run_result.ret
         self._hook_calls = [_RelayHookCall._from_event(e) for e in (hook_events or [])]
+
+    @property
+    def calls(self):
+        """All recorded hook calls (upstream HookRecorder.calls list)."""
+        return self._hook_calls
 
     def getcalls(self, names):
         """Return recorded hook calls matching the given name(s) (space-sep string or list)."""

@@ -129,6 +129,43 @@ class Collector:
             if name is None or marker.name == name:
                 yield marker
 
+    def getparent(self, cls):
+        """Walk up the parent chain and return the first node that is an
+        instance of `cls`, or None. Mirrors pytest's Node.getparent."""
+        node = self
+        while node is not None:
+            if isinstance(node, cls):
+                return node
+            node = getattr(node, "parent", None)
+        return None
+
+    def listchain(self):
+        """Return the chain from the root down to this node (inclusive)."""
+        chain = []
+        node = self
+        while node is not None:
+            chain.append(node)
+            node = getattr(node, "parent", None)
+        chain.reverse()
+        return chain
+
+    def __eq__(self, other):
+        if not isinstance(other, Collector):
+            return NotImplemented
+        return self.nodeid == other.nodeid
+
+    def __ne__(self, other):
+        result = self.__eq__(other)
+        if result is NotImplemented:
+            return result
+        return not result
+
+    def __hash__(self):
+        return hash(self.nodeid)
+
+    def __repr__(self):
+        return f"<{type(self).__name__} {self.nodeid!r}>"
+
 
 def run_custom_item(item):
     """Run a custom collector Item (setup/runtest/teardown) and return a list
@@ -258,6 +295,11 @@ class File(Collector):
         return []
 
 
+class Package(File):
+    """Directory-level collector for Python packages (has __init__.py).
+    Alias used by upstream isinstance checks (e.g. pytest.Package in test_collection)."""
+
+
 class DoctestNode:
     """Node subtype for doctest items; recognized by _pytest.doctest.DoctestItem."""
 
@@ -280,6 +322,7 @@ class DoctestNode:
         # make_node from the already-imported module and the collected class.
         self.module = None
         self.cls = None
+        self.instance = None
 
     @property
     def fspath(self):
@@ -624,6 +667,7 @@ class Node(Item):
         # make_node from the already-imported module and the collected class.
         self.module = None
         self.cls = None
+        self.instance = None
 
     @property
     def keywords(self):
@@ -711,6 +755,20 @@ class Function(Node):
         attaches `_module_collector` so SetupState can set up module scope."""
         mod = getattr(self, "_module_collector", None)
         return [mod, self] if mod is not None else [self]
+
+    def getmodpath(self, stopatmodule=True):
+        """Return the dotted path from the module to this function/method.
+        E.g. "TestX.testmethod_one" or "test_func". If stopatmodule=False,
+        also prepends the module stem."""
+        import pathlib
+
+        parts = self.nodeid.split("::")
+        if stopatmodule:
+            path_parts = parts[1:]
+        else:
+            mod_stem = pathlib.Path(parts[0]).stem
+            path_parts = [mod_stem] + parts[1:]
+        return ".".join(path_parts)
 
     def setup(self):
         if self.module is not None:
