@@ -8,8 +8,8 @@
       "file": "testing/acceptance_test.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 4,
-      "failed": 1,
+      "passed": 17,
+      "failed": 24,
       "skipped": 0,
       "errors": 0
     }

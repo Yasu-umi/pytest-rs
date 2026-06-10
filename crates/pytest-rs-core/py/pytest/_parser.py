@@ -189,7 +189,7 @@ def _empty_for_type(type_: str | None) -> Any:
     return ""
 
 
-def _coerce_ini(type_: str | None, value: Any, rootpath: str | None) -> Any:
+def _coerce_ini(type_: str | None, value: Any, rootpath: str | None, name: str = "") -> Any:
     """Coerce a raw ini value to its registered type (pytest INI-mode
     coercion). Values are strings from .ini files; toml linelists may already
     be lists."""
@@ -215,9 +215,27 @@ def _coerce_ini(type_: str | None, value: Any, rootpath: str | None) -> Any:
     if type_ == "bool":
         return _strtobool(value.strip()) if isinstance(value, str) else bool(value)
     if type_ == "int":
-        return int(value)
+        if not isinstance(value, str):
+            raise TypeError(
+                f"Expected an int string for option {name} of type integer, but got: {value!r}"
+            )
+        try:
+            return int(value)
+        except ValueError:
+            raise TypeError(
+                f"Expected an int string for option {name} of type integer, but got: {value!r}"
+            ) from None
     if type_ == "float":
-        return float(value)
+        if not isinstance(value, str):
+            raise TypeError(
+                f"Expected a float string for option {name} of type float, but got: {value!r}"
+            )
+        try:
+            return float(value)
+        except ValueError:
+            raise TypeError(
+                f"Expected a float string for option {name} of type float, but got: {value!r}"
+            ) from None
     # string / None
     return value
 
@@ -256,7 +274,7 @@ def getini(name: str, inicfg: dict[str, str], rootpath: str | None, strict: bool
     if value is None:
         default = spec["default"]
         return _empty_for_type(type_) if default is _UNSET else default
-    return _coerce_ini(type_, value, rootpath)
+    return _coerce_ini(type_, value, rootpath, canonical)
 
 
 #: Inis the bundled native plugins read (registered in Rust via the plugin's
