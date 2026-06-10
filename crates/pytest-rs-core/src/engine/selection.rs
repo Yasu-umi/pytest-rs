@@ -51,11 +51,12 @@ impl Engine {
                 })
             })
             .unwrap_or_default();
-        let ini_lines = self
+        let ini_lines: Vec<String> = self
             .config
-            .get_ini("markers")
-            .map(|lines| lines.lines().map(str::to_string).collect::<Vec<_>>())
-            .unwrap_or_default();
+            .get_ini_lines("markers")
+            .into_iter()
+            .map(str::to_string)
+            .collect();
         let registered: std::collections::HashSet<String> = proxy_lines
             .iter()
             .chain(ini_lines.iter())

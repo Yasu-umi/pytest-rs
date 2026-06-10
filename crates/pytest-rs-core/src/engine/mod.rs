@@ -67,8 +67,18 @@ impl Engine {
             return exit_code::INTERNAL_ERROR;
         }
         // --debug: pytest's debug trace file (minimal: create the file and
-        // announce it on stderr like upstream).
-        if let Some(name) = self.config.get_value("debug") {
+        // announce it on stderr like upstream). The "wrote" message fires on
+        // drop so every exit path (early returns, NO_TESTS_COLLECTED, etc.)
+        // emits it.
+        struct DebugGuard(Option<std::path::PathBuf>);
+        impl Drop for DebugGuard {
+            fn drop(&mut self) {
+                if let Some(path) = &self.0 {
+                    eprintln!("wrote pytest debug information to {}", path.display());
+                }
+            }
+        }
+        let _debug_guard = if let Some(name) = self.config.get_value("debug") {
             let path = self.config.invocation_dir.join(name);
             let _ = std::fs::write(
                 &path,
@@ -78,8 +88,11 @@ impl Engine {
                     py.version().split_whitespace().next().unwrap_or("")
                 ),
             );
-            eprintln!("writing pytestdebug information to {}", path.display());
-        }
+            eprintln!("writing pytest debug information to {}", path.display());
+            DebugGuard(Some(path))
+        } else {
+            DebugGuard(None)
+        };
         if let Some(report) = self.config.get_value("doctest-report") {
             const CHOICES: &[&str] = &["none", "cdiff", "udiff", "ndiff", "only_first_failure"];
             if !CHOICES.iter().any(|c| c.eq_ignore_ascii_case(report)) {
@@ -92,16 +105,10 @@ impl Engine {
         }
         let ini_filters: Vec<String> = self
             .config
-            .get_ini("filterwarnings")
-            .map(|lines| {
-                lines
-                    .lines()
-                    .map(str::trim)
-                    .filter(|line| !line.is_empty())
-                    .map(str::to_string)
-                    .collect()
-            })
-            .unwrap_or_default();
+            .get_ini_lines("filterwarnings")
+            .into_iter()
+            .map(str::to_string)
+            .collect();
         if let Err(err) = python::install_warning_capture(py, &ini_filters, &self.config.w_options)
         {
             eprintln!("ERROR: {}", err.value(py));
@@ -732,10 +739,12 @@ impl Engine {
         // where collection starts; an empty glob warns and falls back to a
         // recursive search from the invocation dir, like pytest.
         let mut paths = self.config.paths.clone();
-        if paths.is_empty()
-            && let Some(testpaths) = self.config.get_ini("testpaths")
-        {
-            let entries: Vec<String> = testpaths.split_whitespace().map(str::to_string).collect();
+        let testpaths_lines = self.config.get_ini_lines("testpaths");
+        if paths.is_empty() && !testpaths_lines.is_empty() {
+            let entries: Vec<String> = testpaths_lines
+                .into_iter()
+                .flat_map(|v| v.split_whitespace().map(str::to_string))
+                .collect();
             if !entries.is_empty() {
                 let globbed = python::glob_testpaths(py, &rootdir, &entries)
                     .map_err(|err| python::format_exception(py, &err))?;

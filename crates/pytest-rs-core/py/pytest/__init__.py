@@ -56,6 +56,8 @@ from pytest._pytester import LineMatcher as LineMatcher
 from pytest._pytester import Pytester as Pytester
 from pytest._pytester import RunResult as RunResult
 from pytest._pytester import Testdir as Testdir
+from pytest._pytester import _config_for_test as _config_for_test
+from pytest._pytester import _sys_snapshot as _sys_snapshot
 from pytest._pytester import linecomp as linecomp
 from pytest._pytester import pytester as pytester
 from pytest._pytester import testdir as testdir

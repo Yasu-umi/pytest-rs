@@ -45,7 +45,7 @@ class OptionGroup:
             "nargs": attrs.get("nargs"),
         }
         for opt in opts:
-            if opt.startswith("--"):
+            if opt.startswith("-"):
                 flag_dests[opt] = dest
 
     _addoption = addoption
@@ -84,6 +84,16 @@ class Parser:
         aliases: Any = (),
     ) -> None:
         aliases = list(aliases)
+        for alias in aliases:
+            if alias in ini_specs:
+                raise ValueError(
+                    f"alias {alias!r} conflicts with existing configuration option"
+                )
+            existing = ini_aliases.get(alias)
+            if existing is not None and existing != name:
+                raise ValueError(
+                    f"{alias!r} is already an alias of {existing!r}"
+                )
         ini_specs[name] = {"type": type, "default": default, "aliases": aliases}
         for alias in aliases:
             ini_aliases[alias] = name
@@ -189,6 +199,21 @@ def _empty_for_type(type_: str | None) -> Any:
     return ""
 
 
+def _split_str(value: str, shlex_split: bool) -> list:
+    """Split a string ini value, detecting NUL-byte TOML array encoding.
+
+    When the Rust engine stores a TOML array it joins elements with NUL bytes
+    (``\\x00``) so multi-word items survive type coercion unchanged. Any value
+    without NUL bytes came from a traditional ini file and is parsed with
+    shlex (if shlex_split) or splitlines (for linelist types)."""
+    if "\x00" in value:
+        return value.split("\x00")
+    if shlex_split:
+        import shlex
+        return shlex.split(value)
+    return [line.strip() for line in value.splitlines() if line.strip()]
+
+
 def _coerce_ini(type_: str | None, value: Any, rootpath: str | None, name: str = "") -> Any:
     """Coerce a raw ini value to its registered type (pytest INI-mode
     coercion). Values are strings from .ini files; toml linelists may already
@@ -198,20 +223,20 @@ def _coerce_ini(type_: str | None, value: Any, rootpath: str | None, name: str =
 
     if type_ == "paths":
         base = Path(rootpath) if rootpath else Path.cwd()
-        parts = shlex.split(value) if isinstance(value, str) else list(value)
+        parts = _split_str(value, True) if isinstance(value, str) else list(value)
         return [base / p for p in parts]
     if type_ == "pathlist":
         from pytest._tmp_path import LocalPath
 
         base = Path(rootpath) if rootpath else Path.cwd()
-        parts = shlex.split(value) if isinstance(value, str) else list(value)
+        parts = _split_str(value, True) if isinstance(value, str) else list(value)
         return [LocalPath(str(base / p)) for p in parts]
     if type_ == "args":
-        return shlex.split(value) if isinstance(value, str) else list(value)
+        return _split_str(value, True) if isinstance(value, str) else list(value)
     if type_ == "linelist":
         if isinstance(value, list):
             return value
-        return [line.strip() for line in value.splitlines() if line.strip()]
+        return _split_str(value, False)
     if type_ == "bool":
         return _strtobool(value.strip()) if isinstance(value, str) else bool(value)
     if type_ == "int":
@@ -261,7 +286,7 @@ def getini(name: str, inicfg: dict[str, str], rootpath: str | None, strict: bool
             if raw is None:
                 return [] if name in _LINELIST_INIS else None
             if name in _LINELIST_INIS:
-                return [line.strip() for line in raw.splitlines() if line.strip()]
+                return _split_str(raw, False)
             return raw
     type_ = spec["type"]
     # Value precedence: canonical name first, then any alias.

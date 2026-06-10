@@ -62,8 +62,8 @@
       "file": "testing/test_cacheprovider.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 56,
-      "failed": 1,
+      "passed": 54,
+      "failed": 3,
       "skipped": 0,
       "errors": 0
     },
@@ -80,8 +80,8 @@
       "file": "testing/test_collect_imported_tests.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 2,
-      "failed": 1,
+      "passed": 1,
+      "failed": 2,
       "skipped": 0,
       "errors": 0
     },
@@ -89,8 +89,8 @@
       "file": "testing/test_collection.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 59,
-      "failed": 54,
+      "passed": 49,
+      "failed": 64,
       "skipped": 3,
       "errors": 0
     },
@@ -107,8 +107,8 @@
       "file": "testing/test_config.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 149,
-      "failed": 59,
+      "passed": 169,
+      "failed": 45,
       "skipped": 1,
       "errors": 0
     },
@@ -116,10 +116,10 @@
       "file": "testing/test_conftest.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 20,
-      "failed": 22,
+      "passed": 22,
+      "failed": 31,
       "skipped": 1,
-      "errors": 11
+      "errors": 0
     },
     {
       "file": "testing/test_doctest.py",
@@ -179,8 +179,8 @@
       "file": "testing/test_main.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 16,
-      "failed": 8,
+      "passed": 15,
+      "failed": 9,
       "skipped": 0,
       "errors": 0
     },
@@ -278,8 +278,8 @@
       "file": "testing/test_session.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 14,
-      "failed": 12,
+      "passed": 13,
+      "failed": 13,
       "skipped": 0,
       "errors": 0
     },
@@ -305,8 +305,8 @@
       "file": "testing/test_skipping.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 90,
-      "failed": 2,
+      "passed": 88,
+      "failed": 4,
       "skipped": 0,
       "errors": 0
     },
@@ -332,8 +332,8 @@
       "file": "testing/test_terminal.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 206,
-      "failed": 19,
+      "passed": 202,
+      "failed": 23,
       "skipped": 2,
       "errors": 0
     },
@@ -387,7 +387,7 @@
       "status": "failed",
       "exit_code": 1,
       "passed": 28,
-      "failed": 52,
+      "failed": 53,
       "skipped": 2,
       "errors": 0
     },

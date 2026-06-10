@@ -33,6 +33,10 @@ pub struct PyConfig {
     /// singleton, so plugin data stored here (e.g. pytest-timeout's
     /// session deadline) persists across hooks.
     stash: pyo3::sync::PyOnceLock<Py<PyAny>>,
+    /// Lazily-created per-config PluginManager for parseconfig contexts
+    /// (`strict = true`). Parseconfig tests register plugins here; the
+    /// session config uses the global shared PM instead.
+    local_pm: pyo3::sync::PyOnceLock<Py<PyAny>>,
 }
 
 impl PyConfig {
@@ -54,7 +58,22 @@ impl PyConfig {
             strict,
             option,
             stash: pyo3::sync::PyOnceLock::new(),
+            local_pm: pyo3::sync::PyOnceLock::new(),
         }
+    }
+
+    /// Resolve a CLI name to its option dest: "-X" / "--foo" → "foo" via the
+    /// registered flag_dests aliases; plain "foo" or unknown names fall back to
+    /// stripping leading dashes and replacing `-` with `_`.
+    fn opt2dest(py: Python<'_>, name: &str) -> PyResult<String> {
+        let flag_dests = py.import("pytest._parser")?.getattr("flag_dests")?;
+        if let Ok(dest) = flag_dests
+            .get_item(name)
+            .and_then(|d| d.extract::<String>())
+        {
+            return Ok(dest);
+        }
+        Ok(name.trim_start_matches('-').replace('-', "_"))
     }
 }
 
@@ -134,30 +153,42 @@ impl PyConfig {
         entry.push_str(line);
     }
 
-    #[pyo3(signature = (name, default = None))]
+    #[pyo3(signature = (name, default = None, skip = false))]
     fn getoption(
         &self,
         py: Python<'_>,
         name: &str,
         default: Option<Py<PyAny>>,
+        skip: bool,
     ) -> PyResult<Py<PyAny>> {
-        // Normalize: "--foo-bar" → "foo_bar", "foo-bar" → "foo_bar"
-        let attr = name.trim_start_matches('-').replace('-', "_");
+        let dest = Self::opt2dest(py, name)?;
         let ns = self.option.bind(py);
-        if let Ok(v) = ns.getattr(attr.as_str()) {
-            return Ok(v.into());
+        match ns.getattr(dest.as_str()) {
+            Ok(val) if val.is_none() && skip => {
+                // Registered option with None value + skip=True: use default or pytest.skip().
+                if let Some(d) = default {
+                    return Ok(d);
+                }
+                py.import("pytest")?
+                    .call_method1("skip", (format!("no {name:?} option found"),))?;
+                unreachable!()
+            }
+            Ok(val) => Ok(val.unbind()),
+            Err(_) => {
+                // AttributeError: option not declared in namespace.
+                if let Some(d) = default {
+                    return Ok(d);
+                }
+                if skip {
+                    py.import("pytest")?
+                        .call_method1("skip", (format!("no {name:?} option found"),))?;
+                    unreachable!()
+                }
+                Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    format!("no option named {name:?}"),
+                ))
+            }
         }
-        // Plugin-registered options (parser.addoption) behave as if parsed
-        // with their declared default; the default= argument only covers
-        // unregistered names (pytest semantics).
-        let (registered, value): (bool, Py<PyAny>) = py
-            .import("pytest._parser")?
-            .call_method1("option_lookup", (attr.as_str(),))?
-            .extract()?;
-        if registered {
-            return Ok(value);
-        }
-        Ok(default.unwrap_or_else(|| py.None()))
     }
 
     #[pyo3(signature = (name, default = None))]
@@ -167,29 +198,13 @@ impl PyConfig {
         name: &str,
         default: Option<Py<PyAny>>,
     ) -> PyResult<Py<PyAny>> {
-        self.getoption(py, name, default)
+        self.getoption(py, name, default, false)
     }
 
     /// `config.getvalueorskip(name)`: the option's value, or skip the test if
     /// it is unset/None (pytest's getoption(..., skip=True)).
     fn getvalueorskip(&self, py: Python<'_>, name: &str) -> PyResult<Py<PyAny>> {
-        let attr = name.trim_start_matches('-').replace('-', "_");
-        if let Ok(v) = self.option.bind(py).getattr(attr.as_str())
-            && !v.is_none()
-        {
-            return Ok(v.unbind());
-        }
-        let (registered, value): (bool, Py<PyAny>) = py
-            .import("pytest._parser")?
-            .call_method1("option_lookup", (attr.as_str(),))?
-            .extract()?;
-        if registered && !value.bind(py).is_none() {
-            return Ok(value);
-        }
-        py.import("pytest")?
-            .getattr("skip")?
-            .call1((format!("no {attr:?} option found"),))?;
-        Ok(py.None())
+        self.getoption(py, name, None, true)
     }
 
     /// `config.get_verbosity(type)`: the level for a fine-grained verbosity
@@ -325,10 +340,81 @@ impl PyConfig {
     /// pytest's config teardown (registered as a parseconfig finalizer).
     fn _ensure_unconfigure(&self) {}
 
+    /// `config.parse([])`: always raises AssertionError — the config was
+    /// already parsed by `parseconfig`/`parseconfigure` and cannot be re-parsed.
+    fn parse(&self, _args: Py<PyAny>) -> PyResult<()> {
+        Err(pyo3::exceptions::PyAssertionError::new_err(
+            "config was already parsed",
+        ))
+    }
+
+    /// `config.notify_exception(excinfo, option)`: fire the
+    /// `pytest_internalerror` hook; if no handler returns True, write the
+    /// exception repr to stderr (pytest's default behaviour).
+    #[pyo3(signature = (excinfo, option = None))]
+    fn notify_exception(
+        &self,
+        py: Python<'_>,
+        excinfo: Py<PyAny>,
+        option: Option<Py<PyAny>>,
+    ) -> PyResult<()> {
+        let _ = option;
+        let repr = excinfo.bind(py).call_method0("getrepr")?;
+        let hook_relay = self.hook(py)?;
+        let hook_caller = hook_relay.getattr("pytest_internalerror")?;
+        let kwargs = pyo3::types::PyDict::new(py);
+        kwargs.set_item("excrepr", &repr)?;
+        let handled = hook_caller.call((), Some(&kwargs))?;
+        let any_true = handled
+            .try_iter()
+            .map(|mut iter| {
+                iter.any(|v| {
+                    v.map_or(false, |v| v.is_truthy().unwrap_or(false))
+                })
+            })
+            .unwrap_or(false);
+        if !any_true {
+            let stderr = py.import("sys")?.getattr("stderr")?;
+            let repr_str = repr.str()?.to_str()?.to_string();
+            for line in repr_str.lines() {
+                stderr.call_method1("write", (format!("INTERNALERROR> {line}\n"),))?;
+            }
+            let _ = stderr.call_method0("flush");
+        }
+        Ok(())
+    }
+
+    /// `config.inicfg`: a mutable dict view of the ini-file values.
+    /// Mutations to the returned dict do not propagate back to the config
+    /// (matches pytest's recent behaviour where inicfg is a detached view).
+    #[getter]
+    fn inicfg(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let dict = pyo3::types::PyDict::new(py);
+        for (key, value) in self.ini.lock().expect("config lock poisoned").iter() {
+            dict.set_item(key, value)?;
+        }
+        Ok(dict.into_any().unbind())
+    }
+
     /// Minimal pluginmanager (getplugin("logging-plugin") etc.).
+    /// Parseconfig configs (`strict = true`) get their own fresh PM so that
+    /// test-registered plugins (e.g. `config.pluginmanager.register(A())`)
+    /// don't bleed into the session and the global terminal plugin doesn't
+    /// intercept `pytest_internalerror` before the test can check stderr.
     #[getter]
     fn pluginmanager<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        py.import("pytest._pluginmanager")?.getattr("pluginmanager")
+        if self.strict {
+            let pm = self.local_pm.get_or_try_init(py, || -> PyResult<Py<PyAny>> {
+                Ok(py
+                    .import("pytest._pluginmanager")?
+                    .getattr("PluginManager")?
+                    .call0()?
+                    .unbind())
+            })?;
+            Ok(pm.bind(py).clone())
+        } else {
+            py.import("pytest._pluginmanager")?.getattr("pluginmanager")
+        }
     }
 
     /// config.hook: the pluggy-lite hook relay (config.hook.<name>(**kw)

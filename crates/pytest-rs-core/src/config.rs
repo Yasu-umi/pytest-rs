@@ -20,44 +20,102 @@ const CONFIG_NAMES: [&str; 7] = [
 /// absent or carries no pytest config (load_config_dict_from_file). The
 /// pytest.toml/.pytest.toml and pytest.ini/.pytest.ini variants always count
 /// as config when present, even when empty.
-fn load_config(dir: &Path, name: &str) -> Option<HashMap<String, String>> {
-    let content = std::fs::read_to_string(dir.join(name)).ok()?;
+/// Returns Err for pyproject.toml conflicts (UsageError), Ok(None) when absent.
+fn load_config(
+    dir: &Path,
+    name: &str,
+) -> Result<Option<HashMap<String, String>>, String> {
+    let Ok(content) = std::fs::read_to_string(dir.join(name)) else {
+        return Ok(None);
+    };
     match name {
-        "pytest.toml" | ".pytest.toml" => Some(parse_toml_pytest(&content).unwrap_or_default()),
-        "pytest.ini" | ".pytest.ini" => {
-            Some(parse_ini_section(&content, "pytest").unwrap_or_default())
+        "pytest.toml" | ".pytest.toml" => {
+            Ok(Some(parse_toml_pytest(&content).unwrap_or_default()))
         }
+        "pytest.ini" | ".pytest.ini" => Ok(Some(
+            parse_ini_section(&content, "pytest").unwrap_or_default(),
+        )),
         "pyproject.toml" => parse_pyproject(&content),
-        "tox.ini" => parse_ini_section(&content, "pytest"),
-        "setup.cfg" => parse_ini_section(&content, "tool:pytest"),
-        _ => None,
+        "tox.ini" => Ok(parse_ini_section(&content, "pytest")),
+        "setup.cfg" => Ok(parse_ini_section(&content, "tool:pytest")),
+        _ => Ok(None),
     }
 }
 
 /// Locate the winning config file. Returns (rootdir, basename, values,
 /// ignored), where `ignored` lists lower-priority config files in the same
 /// directory that also hold pytest config — pytest warns about these.
+///
+/// Real pytest's `locate_config` fallback: if no file with pytest content is
+/// found but a `pyproject.toml` exists anywhere in the walk, the closest one
+/// (first encountered) becomes the inipath with an empty config dict.
+/// Returns Err when a pyproject.toml conflict is detected (UsageError).
 fn find_ini(
     start: &Path,
-) -> (
-    PathBuf,
-    Option<String>,
-    HashMap<String, String>,
-    Vec<String>,
-) {
+) -> Result<
+    (
+        PathBuf,
+        Option<String>,
+        HashMap<String, String>,
+        Vec<String>,
+    ),
+    String,
+> {
+    let mut first_pyproject_dir: Option<PathBuf> = None;
     for dir in start.ancestors() {
         for (i, name) in CONFIG_NAMES.iter().enumerate() {
-            if let Some(values) = load_config(dir, name) {
+            if *name == "pyproject.toml"
+                && first_pyproject_dir.is_none()
+                && dir.join(name).exists()
+            {
+                first_pyproject_dir = Some(dir.to_path_buf());
+            }
+            if let Some(values) = load_config(dir, name)? {
                 let ignored = CONFIG_NAMES[i + 1..]
                     .iter()
-                    .filter(|other| load_config(dir, other).is_some())
+                    .filter(|other| {
+                        load_config(dir, other).ok().flatten().is_some()
+                    })
                     .map(|other| other.to_string())
                     .collect();
-                return (dir.to_path_buf(), Some(name.to_string()), values, ignored);
+                return Ok((dir.to_path_buf(), Some(name.to_string()), values, ignored));
             }
         }
     }
-    (start.to_path_buf(), None, HashMap::new(), Vec::new())
+    if let Some(dir) = first_pyproject_dir {
+        return Ok((
+            dir,
+            Some("pyproject.toml".to_string()),
+            HashMap::new(),
+            Vec::new(),
+        ));
+    }
+    Ok((start.to_path_buf(), None, HashMap::new(), Vec::new()))
+}
+
+/// Load pytest config from an explicit path (for -c/--config-file).
+/// Returns Err on pyproject.toml conflicts; empty map on other failures.
+/// Mirrors real pytest's `load_config_dict_from_file` dispatch rules:
+/// - pytest.toml / .pytest.toml → `[pytest]` table
+/// - any other .toml (including pyproject.toml and custom names) → `[tool.pytest.ini_options]`
+/// - .cfg → `[tool:pytest]`
+/// - .ini and everything else → `[pytest]`
+fn load_config_from_path(path: &Path) -> Result<HashMap<String, String>, String> {
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return Ok(HashMap::new());
+    };
+    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+    match path.extension().and_then(|e| e.to_str()) {
+        Some("toml") => {
+            if matches!(name, "pytest.toml" | ".pytest.toml") {
+                Ok(parse_toml_pytest(&content).unwrap_or_default())
+            } else {
+                Ok(parse_pyproject(&content)?.unwrap_or_default())
+            }
+        }
+        Some("cfg") => Ok(parse_ini_section(&content, "tool:pytest").unwrap_or_default()),
+        _ => Ok(parse_ini_section(&content, "pytest").unwrap_or_default()),
+    }
 }
 
 /// Minimal INI parser: one named section, `key = value` pairs, indented
@@ -100,23 +158,38 @@ fn parse_ini_section(content: &str, section: &str) -> Option<HashMap<String, Str
 }
 
 /// pytest config from pyproject.toml: [tool.pytest] (pytest 9 toml mode,
-/// keys other than ini_options) or [tool.pytest.ini_options] (ini mode);
-/// stringified pytest-style (arrays become newline-joined linelists).
-/// Divergence: upstream errors when both styles are present; here toml
-/// mode wins.
-fn parse_pyproject(content: &str) -> Option<HashMap<String, String>> {
-    let document: toml::Table = content.parse().ok()?;
-    let tool_pytest = document.get("tool")?.get("pytest")?.as_table()?;
-    let toml_mode: Vec<(&String, &toml::Value)> = tool_pytest
-        .iter()
-        .filter(|(key, _)| key.as_str() != "ini_options")
-        .collect();
-    let entries: Vec<(&String, &toml::Value)> = if !toml_mode.is_empty() {
-        toml_mode
-    } else {
-        tool_pytest.get("ini_options")?.as_table()?.iter().collect()
+/// keys other than ini_options) or [tool.pytest.ini_options] (ini mode).
+/// Returns Err when both styles are present simultaneously (upstream
+/// UsageError), Ok(None) when no pytest config is found.
+fn parse_pyproject(content: &str) -> Result<Option<HashMap<String, String>>, String> {
+    let document: toml::Table = match content.parse() {
+        Ok(t) => t,
+        Err(_) => return Ok(None),
     };
-    Some(render_toml_entries(entries))
+    let Some(tool) = document.get("tool") else {
+        return Ok(None);
+    };
+    let Some(tool_pytest) = tool.get("pytest").and_then(|v| v.as_table()) else {
+        return Ok(None);
+    };
+    let has_native: bool = tool_pytest.keys().any(|k| k != "ini_options");
+    let has_ini_options: bool = tool_pytest.contains_key("ini_options");
+    if has_native && has_ini_options {
+        return Err(
+            "Cannot use both [tool.pytest.ini_options] and [tool.pytest] \
+             for pytest configuration in pyproject.toml"
+                .to_string(),
+        );
+    }
+    let entries: Vec<(&String, &toml::Value)> = if has_native {
+        tool_pytest.iter().collect()
+    } else {
+        match tool_pytest.get("ini_options").and_then(|v| v.as_table()) {
+            Some(t) => t.iter().collect(),
+            None => return Ok(None),
+        }
+    };
+    Ok(Some(render_toml_entries(entries)))
 }
 
 /// pytest config from a standalone pytest.toml / .pytest.toml: a top-level
@@ -142,7 +215,10 @@ fn render_toml_entries(entries: Vec<(&String, &toml::Value)>) -> HashMap<String,
                     other => other.to_string(),
                 })
                 .collect::<Vec<_>>()
-                .join("\n"),
+                // NUL-byte sentinel: signals to _coerce_ini that this is a
+                // pre-split TOML array (items may contain spaces), not an
+                // ini-file string that needs shlex.split().
+                .join("\x00"),
             other => other.to_string(),
         };
         values.insert(key.clone(), rendered);
@@ -264,10 +340,10 @@ pub struct Config {
     reporter_delegated: std::sync::atomic::AtomicBool,
 }
 
-/// pytest's rootdir-discovery inputs: cwd plus every arg token that exists
-/// on the filesystem (option values included; `::` node-id parts stripped).
+/// pytest's rootdir-discovery inputs: explicit filesystem path args, falling
+/// back to cwd when no path args exist (mirrors pytest's get_dirs_from_args).
 fn dirs_from_args(cwd: &Path, argv: &[String]) -> Vec<PathBuf> {
-    let mut dirs = vec![cwd.to_path_buf()];
+    let mut dirs = vec![];
     for arg in argv.iter().skip(1) {
         if arg.starts_with('-') {
             continue;
@@ -283,6 +359,9 @@ fn dirs_from_args(cwd: &Path, argv: &[String]) -> Vec<PathBuf> {
         } else {
             path
         });
+    }
+    if dirs.is_empty() {
+        dirs.push(cwd.to_path_buf());
     }
     dirs
 }
@@ -363,11 +442,48 @@ impl Config {
     pub fn from_args(parser: OptionParser, argv: Vec<String>) -> Result<Self, String> {
         let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
         let cwd = std::fs::canonicalize(&cwd).unwrap_or(cwd);
+        // Pre-scan argv for -c/--config-file; when present, use the explicit
+        // path directly instead of auto-discovery (pytest's inifile= path).
+        let explicit_config: Option<String> = {
+            let mut found = None;
+            let mut i = 1;
+            while i < argv.len() {
+                let arg = &argv[i];
+                if (arg == "-c" || arg == "--config-file") && i + 1 < argv.len() {
+                    found = Some(argv[i + 1].clone());
+                    break;
+                } else if let Some(rest) = arg.strip_prefix("--config-file=") {
+                    found = Some(rest.to_string());
+                    break;
+                }
+                i += 1;
+            }
+            found
+        };
+
         // Config-file search starts at the common ancestor of cwd and the
         // path-like args (pytest's rootdir algorithm); with no config file
         // anywhere, the ancestor itself is the rootdir.
-        let ancestor = common_ancestor(&dirs_from_args(&cwd, &argv));
-        let (rootdir, config_file_name, ini_file, ignored_config_files) = find_ini(&ancestor);
+        let (rootdir, config_file_name, ini_file, ignored_config_files) =
+            if let Some(cf_arg) = explicit_config {
+                let cf_path = if Path::new(&cf_arg).is_absolute() {
+                    PathBuf::from(&cf_arg)
+                } else {
+                    cwd.join(&cf_arg)
+                };
+                let ini_file = load_config_from_path(&cf_path)?;
+                let rootdir = cf_path
+                    .parent()
+                    .map(|p| p.to_path_buf())
+                    .unwrap_or_else(|| cwd.clone());
+                let file_name = cf_path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string());
+                (rootdir, file_name, ini_file, Vec::new())
+            } else {
+                let ancestor = common_ancestor(&dirs_from_args(&cwd, &argv));
+                find_ini(&ancestor)?
+            };
 
         // --rootdir=DIR must point at an existing directory (upstream
         // determine_setup raises a UsageError otherwise).
@@ -644,7 +760,7 @@ impl Config {
                 .num_args(0..=1)
                 .default_missing_value("pytestdebug.log")
                 .action(clap::ArgAction::Append)
-                .hide(true),
+                .help("Store internal tracing debug information in this log\nfile. This file is opened with 'w' and truncated as a\nresult.\nDefault: pytestdebug.log."),
         );
         for (name, short) in CORE_VALUES.into_iter().chain([("rootdir-opt", None)]) {
             if !has_xdist && xdist_only(name) {
@@ -942,6 +1058,21 @@ impl Config {
             .map(String::as_str)
     }
 
+    /// A multi-value ini (linelist/args type): returns non-empty trimmed lines.
+    /// Handles both `\n`-separated (traditional ini) and `\x00`-separated
+    /// (TOML array sentinel, mirrors `_split_str` in Python's `_parser.py`).
+    pub fn get_ini_lines(&self, name: &str) -> Vec<&str> {
+        let Some(value) = self.get_ini(name) else {
+            return vec![];
+        };
+        let sep = if value.contains('\x00') { '\x00' } else { '\n' };
+        value
+            .split(sep)
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .collect()
+    }
+
     /// The `[pytest]`-section keys read from the config file (excludes -o
     /// overrides), for unknown-config-option validation.
     pub fn ini_file_keys(&self) -> Vec<String> {
@@ -1049,34 +1180,43 @@ impl Config {
 
     /// python_files ini patterns (default test_*.py / *_test.py).
     pub fn python_files_patterns(&self) -> Vec<String> {
-        self.get_ini("python_files")
-            .map(|value| value.split_whitespace().map(str::to_string).collect())
-            .filter(|patterns: &Vec<String>| !patterns.is_empty())
-            .unwrap_or_else(|| vec!["test_*.py".to_string(), "*_test.py".to_string()])
+        let patterns: Vec<String> = self
+            .get_ini_lines("python_files")
+            .into_iter()
+            .flat_map(|v| v.split_whitespace().map(str::to_string))
+            .collect();
+        if patterns.is_empty() {
+            vec!["test_*.py".to_string(), "*_test.py".to_string()]
+        } else {
+            patterns
+        }
     }
 
     /// norecursedirs ini patterns: directory basenames (fnmatch) skipped
     /// during collection recursion (pytest's defaults).
     pub fn norecursedirs_patterns(&self) -> Vec<String> {
-        self.get_ini("norecursedirs")
-            .map(|value| value.split_whitespace().map(str::to_string).collect())
-            .filter(|patterns: &Vec<String>| !patterns.is_empty())
-            .unwrap_or_else(|| {
-                [
-                    "*.egg",
-                    ".*",
-                    "_darcs",
-                    "build",
-                    "CVS",
-                    "dist",
-                    "node_modules",
-                    "venv",
-                    "{arch}",
-                ]
-                .iter()
-                .map(|s| s.to_string())
-                .collect()
-            })
+        let patterns: Vec<String> = self
+            .get_ini_lines("norecursedirs")
+            .into_iter()
+            .flat_map(|v| v.split_whitespace().map(str::to_string))
+            .collect();
+        if !patterns.is_empty() {
+            return patterns;
+        }
+        [
+            "*.egg",
+            ".*",
+            "_darcs",
+            "build",
+            "CVS",
+            "dist",
+            "node_modules",
+            "venv",
+            "{arch}",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect()
     }
 
     /// The effective failure budget: -x/--exitfirst means 1, otherwise the

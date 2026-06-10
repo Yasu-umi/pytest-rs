@@ -8,8 +8,8 @@
       "file": "tests/test_env.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 55,
-      "failed": 9,
+      "passed": 56,
+      "failed": 8,
       "skipped": 0,
       "errors": 0
     },

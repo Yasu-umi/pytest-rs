@@ -9,6 +9,17 @@ from pytest import ExitCode, UsageError  # noqa: F401
 _notset = object()
 
 
+class ConftestImportFailure(Exception):
+    """Raised when importing a conftest.py fails (upstream parity)."""
+
+    def __init__(self, path, *, cause):
+        self.path = path
+        self.cause = cause
+
+    def __str__(self):
+        return f"{type(self.cause).__name__}: {self.cause} (from {self.path})"
+
+
 class Config:
     """Stub config type (mostly used for annotations upstream); instances
     built by _prepareconfig carry an option namespace for getoption()."""

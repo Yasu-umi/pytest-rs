@@ -1335,3 +1335,21 @@ def pytester(request, tmp_path_factory):
 @fixture
 def testdir(request, tmp_path_factory):
     yield from _make_runner_dir(request, tmp_path_factory, Testdir)
+
+
+@fixture
+def _sys_snapshot():
+    from _pytest.pytester import SysPathsSnapshot, SysModulesSnapshot
+    snappaths = SysPathsSnapshot()
+    snapmods = SysModulesSnapshot()
+    yield
+    snapmods.restore()
+    snappaths.restore()
+
+
+@fixture
+def _config_for_test():
+    from _pytest.config import _native_prepareconfig
+    config = _native_prepareconfig([])
+    yield config
+    config._ensure_unconfigure()
