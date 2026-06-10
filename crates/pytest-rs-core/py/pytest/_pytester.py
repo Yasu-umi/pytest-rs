@@ -8,6 +8,43 @@ import subprocess as _subprocess
 from pytest._fixtures import fixture
 from pytest._outcomes import fail
 
+# Split-out modules; re-exported so pytest._pytester.<name> keeps resolving
+# for pytest/__init__.py and Pytester's internal references.
+from pytest._pytester_config import (
+    _check_cfg_pytest_section as _check_cfg_pytest_section,
+)
+from pytest._pytester_config import (
+    _validate_required_plugins as _validate_required_plugins,
+)
+from pytest._pytester_linematcher import LineMatcher as LineMatcher
+from pytest._pytester_relay import (
+    InlineRunResult as InlineRunResult,
+)
+from pytest._pytester_relay import (
+    _OutcomeReport as _OutcomeReport,
+)
+from pytest._pytester_relay import (
+    _RelayCollector as _RelayCollector,
+)
+from pytest._pytester_relay import (
+    _RelayCollectReport as _RelayCollectReport,
+)
+from pytest._pytester_relay import (
+    _RelayHookCall as _RelayHookCall,
+)
+from pytest._pytester_relay import (
+    _RelayItem as _RelayItem,
+)
+from pytest._pytester_relay import (
+    _RelayItemResult as _RelayItemResult,
+)
+from pytest._pytester_relay import (
+    _RelaySession as _RelaySession,
+)
+from pytest._pytester_relay import (
+    _RelayTestReport as _RelayTestReport,
+)
+
 # Captured before any test mutates os.environ: tests sometimes
 # mock.patch.dict(os.environ, ..., clear=True) around runpytest(), which would
 # otherwise strip the runner path and the import path the subprocess pytester
@@ -26,26 +63,6 @@ _OUTCOME_RE = _re.compile(
     r"(\d+) (passed|failed|skipped|xfailed|xpassed|errors?|warnings?|deselected|rerun)"
 )
 _ANSI_RE = _re.compile(r"\x1b\[[0-9;]*m")
-
-
-# Split-out modules; re-exported so pytest._pytester.<name> keeps resolving
-# for pytest/__init__.py and Pytester's internal references.
-from pytest._pytester_config import (  # noqa: E402
-    _check_cfg_pytest_section as _check_cfg_pytest_section,
-    _validate_required_plugins as _validate_required_plugins,
-)
-from pytest._pytester_linematcher import LineMatcher as LineMatcher  # noqa: E402
-from pytest._pytester_relay import (  # noqa: E402
-    InlineRunResult as InlineRunResult,
-    _OutcomeReport as _OutcomeReport,
-    _RelayCollectReport as _RelayCollectReport,
-    _RelayCollector as _RelayCollector,
-    _RelayHookCall as _RelayHookCall,
-    _RelayItem as _RelayItem,
-    _RelayItemResult as _RelayItemResult,
-    _RelaySession as _RelaySession,
-    _RelayTestReport as _RelayTestReport,
-)
 
 
 class RunResult:
@@ -358,7 +375,9 @@ class Pytester:
             )
         return env
 
-    def popen(self, cmdargs, stdout=_subprocess.PIPE, stderr=_subprocess.PIPE, stdin=CLOSE_STDIN, **kw):
+    def popen(
+        self, cmdargs, stdout=_subprocess.PIPE, stderr=_subprocess.PIPE, stdin=CLOSE_STDIN, **kw
+    ):
         """Spawn a subprocess. ``stdin`` may be CLOSE_STDIN (close the pipe),
         bytes (written then left open for communicate()), or any value passed
         straight to Popen (e.g. PIPE, None)."""
@@ -596,10 +615,16 @@ class Pytester:
                 p = self.path / p
             if p.is_dir():
                 config = self._request.config if self._request is not None else None
-                python_files = "test_*.py" if config is None else (
-                    config.getini("python_files") if hasattr(config, "getini") else "test_*.py"
+                python_files = (
+                    "test_*.py"
+                    if config is None
+                    else (
+                        config.getini("python_files") if hasattr(config, "getini") else "test_*.py"
+                    )
                 )
-                patterns = python_files.split() if isinstance(python_files, str) else list(python_files)
+                patterns = (
+                    python_files.split() if isinstance(python_files, str) else list(python_files)
+                )
                 seen_files = set()
                 for pat in patterns:
                     for py_file in sorted(p.rglob(pat)):
@@ -630,9 +655,7 @@ class Pytester:
                                 ).resolve()
                                 if it_abs == src_abs:
                                     in_proc.append(
-                                        _RelayItemResult(
-                                            it["name"], it_nodeid, it_path_str
-                                        )
+                                        _RelayItemResult(it["name"], it_nodeid, it_path_str)
                                     )
                         break
                 items.extend(in_proc)
@@ -769,7 +792,8 @@ class Pytester:
                 argvalues = list(pm.args[1]) if len(pm.args) > 1 else []
                 ids_kwarg = pm.kwargs.get("ids", None)
                 level_ids = [
-                    str(ids_kwarg[i]) if ids_kwarg is not None and i < len(ids_kwarg)
+                    str(ids_kwarg[i])
+                    if ids_kwarg is not None and i < len(ids_kwarg)
                     else _param_id(val)
                     for i, val in enumerate(argvalues)
                 ]
@@ -814,7 +838,9 @@ class Pytester:
                         lineno = getattr(getattr(func, "__code__", None), "co_firstlineno", 0)
                         methods.append((lineno, mname, func))
                 for _ln, mname, func in sorted(methods):
-                    sub = expand_parametrize(func, f"{name}::{mname}", class_marks, cls=obj, parent=cls_node)
+                    sub = expand_parametrize(
+                        func, f"{name}::{mname}", class_marks, cls=obj, parent=cls_node
+                    )
                     for item in sub:
                         item.instance = obj
                     items.extend(sub)
@@ -875,8 +901,6 @@ class Pytester:
         module_collector = _ModuleCollector(mod, session, path) if mod is not None else None
         module_marks = get_unpacked_marks(mod) if mod is not None else []
 
-        pytester_self = self
-
         class _IPModule(File):
             """In-process Module collector returned by getmodulecol."""
 
@@ -899,7 +923,13 @@ class Pytester:
                         marks = [*get_unpacked_marks(obj), *module_marks]
                         lineno = getattr(getattr(obj, "__code__", None), "co_firstlineno", 0)
                         fn = Function(
-                            f"{path.name}::{name}", name, marks, [], obj, str(path), lineno,
+                            f"{path.name}::{name}",
+                            name,
+                            marks,
+                            [],
+                            obj,
+                            str(path),
+                            lineno,
                         )
                         fn.module = mod
                         fn.cls = None
@@ -950,7 +980,12 @@ class Pytester:
                     lineno = getattr(getattr(func, "__code__", None), "co_firstlineno", 0)
                     fn = Function(
                         f"{path.name}::{self.name}::{mname}",
-                        mname, marks, [], func, str(path), lineno,
+                        mname,
+                        marks,
+                        [],
+                        func,
+                        str(path),
+                        lineno,
                     )
                     fn.module = mod
                     fn.cls = self._cls_obj
@@ -1216,7 +1251,8 @@ def testdir(request, tmp_path_factory, monkeypatch):
 
 @fixture
 def _sys_snapshot():
-    from _pytest.pytester import SysPathsSnapshot, SysModulesSnapshot
+    from _pytest.pytester import SysModulesSnapshot, SysPathsSnapshot
+
     snappaths = SysPathsSnapshot()
     snapmods = SysModulesSnapshot()
     yield
@@ -1227,6 +1263,7 @@ def _sys_snapshot():
 @fixture
 def _config_for_test():
     from _pytest.config import _native_prepareconfig
+
     config = _native_prepareconfig([])
     yield config
     config._ensure_unconfigure()

@@ -117,13 +117,12 @@ impl Engine {
             .into_iter()
             .map(str::to_string)
             .collect();
-        if !self.config.plugin_disabled("warnings") {
-            if let Err(err) =
+        if !self.config.plugin_disabled("warnings")
+            && let Err(err) =
                 python::install_warning_capture(py, &ini_filters, &self.config.w_options)
-            {
-                eprintln!("ERROR: {}", err.value(py));
-                return exit_code::USAGE_ERROR;
-            }
+        {
+            eprintln!("ERROR: {}", err.value(py));
+            return exit_code::USAGE_ERROR;
         }
         if let Some(mode) = self
             .config
@@ -326,7 +325,7 @@ impl Engine {
                     sections: Vec::new(),
                     rerun: false,
                     xfail_longrepr: None,
-            reprcrash_message: None,
+                    reprcrash_message: None,
                 });
             }
             // --maxfail aborting collection exits TESTS_FAILED with a
@@ -1035,7 +1034,7 @@ impl Engine {
                     .and_then(|l| l.strip_prefix("pytest.UsageError: "))
                     .unwrap_or(msg.trim());
                 eprintln!("ERROR: {usage_msg}");
-                return Err(format!("\x00USAGE_ERROR\x00"));
+                return Err("\x00USAGE_ERROR\x00".to_string());
             }
             errors.push((rootdir.clone(), python::format_exception(py, &err)));
         }
@@ -1099,8 +1098,7 @@ impl Engine {
                     let f_canonical = std::fs::canonicalize(f).unwrap_or_else(|_| f.clone());
                     // collect_ignore: check if file or any ancestor is in the ignore list
                     for ip in &extra_ignore_paths {
-                        let ip_canonical = std::fs::canonicalize(ip)
-                            .unwrap_or_else(|_| ip.clone());
+                        let ip_canonical = std::fs::canonicalize(ip).unwrap_or_else(|_| ip.clone());
                         if f_canonical.starts_with(&ip_canonical) || f_canonical == ip_canonical {
                             return false;
                         }
@@ -1244,16 +1242,12 @@ impl Engine {
             };
             let module_ok = match collect_result {
                 Ok(()) => true,
-                Err(ref err)
-                    if err.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py) =>
-                {
+                Err(ref err) if err.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py) => {
                     // KeyboardInterrupt during collection stops immediately with
                     // the "!!! KeyboardInterrupt !!!" banner (exit 2).
-                    return Err(format!("\x00KEYBOARD_INTERRUPT\x00"));
+                    return Err("\x00KEYBOARD_INTERRUPT\x00".to_string());
                 }
-                Err(ref err)
-                    if err.is_instance_of::<pyo3::exceptions::PySystemExit>(py) =>
-                {
+                Err(ref err) if err.is_instance_of::<pyo3::exceptions::PySystemExit>(py) => {
                     // SystemExit during collection is an INTERNALERROR.
                     let msg = python::format_exception(py, err);
                     return Err(format!("\x00INTERNAL\x00{msg}"));
@@ -1279,7 +1273,7 @@ impl Engine {
                                 sections: Vec::new(),
                                 rerun: false,
                                 xfail_longrepr: None,
-            reprcrash_message: None,
+                                reprcrash_message: None,
                             });
                         }
                         Some(Err(message)) => errors.push((file.clone(), with_sections(message))),
@@ -1335,7 +1329,7 @@ impl Engine {
                                     sections: Vec::new(),
                                     rerun: false,
                                     xfail_longrepr: None,
-            reprcrash_message: None,
+                                    reprcrash_message: None,
                                 });
                             }
                         }
@@ -1415,7 +1409,7 @@ impl Engine {
                                 sections: Vec::new(),
                                 rerun: false,
                                 xfail_longrepr: None,
-            reprcrash_message: None,
+                                reprcrash_message: None,
                             });
                         } else {
                             errors.push((extra_file.clone(), python::format_exception(py, &err)));
@@ -1703,23 +1697,23 @@ fn scan_nontoplevel_pytest_plugins(
                     continue;
                 }
                 // Quick text scan for `pytest_plugins` assignment.
-                if let Ok(content) = std::fs::read_to_string(&child) {
-                    if content.contains("pytest_plugins") {
-                        let rel = child
-                            .strip_prefix(rootdir)
-                            .unwrap_or(&child)
-                            .components()
-                            .map(|c| c.as_os_str().to_string_lossy())
-                            .collect::<Vec<_>>()
-                            .join(std::path::MAIN_SEPARATOR_STR);
-                        errors.push((
-                            child,
-                            format!(
-                                "Defining 'pytest_plugins' in a non-top-level conftest is \
+                if let Ok(content) = std::fs::read_to_string(&child)
+                    && content.contains("pytest_plugins")
+                {
+                    let rel = child
+                        .strip_prefix(rootdir)
+                        .unwrap_or(&child)
+                        .components()
+                        .map(|c| c.as_os_str().to_string_lossy())
+                        .collect::<Vec<_>>()
+                        .join(std::path::MAIN_SEPARATOR_STR);
+                    errors.push((
+                        child,
+                        format!(
+                            "Defining 'pytest_plugins' in a non-top-level conftest is \
                                  no longer supported: please remove it from {rel}"
-                            ),
-                        ));
-                    }
+                        ),
+                    ));
                 }
             }
         }

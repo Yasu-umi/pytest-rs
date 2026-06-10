@@ -56,9 +56,7 @@ class ExceptionInfo[E: BaseException]:
         stripped (upstream strips a leading striptext)."""
         import traceback
 
-        text = "".join(
-            traceback.format_exception_only(self.type, self.value)
-        ).strip()
+        text = "".join(traceback.format_exception_only(self.type, self.value)).strip()
         if tryshort:
             prefix = "AssertionError: "
             if text.startswith(prefix):
@@ -91,9 +89,7 @@ class ExceptionInfo[E: BaseException]:
 
         if self.value is None:
             return _ExceptionRepr("")
-        text = "".join(
-            traceback.format_exception(self.type, self.value, self.tb)
-        ).rstrip("\n")
+        text = "".join(traceback.format_exception(self.type, self.value, self.tb)).rstrip("\n")
         # reprcrash points at the deepest non-__tracebackhide__ frame, like
         # pytest (so e.g. importorskip's skip() reports the caller, not the
         # internal helper). Falls back to the deepest frame if all are hidden.
@@ -108,9 +104,7 @@ class ExceptionInfo[E: BaseException]:
                 path = frame.f_code.co_filename
                 lineno = tb.tb_lineno
             tb = tb.tb_next
-        message = "".join(
-            traceback.format_exception_only(self.type, self.value)
-        ).strip()
+        message = "".join(traceback.format_exception_only(self.type, self.value)).strip()
         return _ExceptionRepr(text, path=path, lineno=lineno, message=message)
 
     def match(self, regexp):

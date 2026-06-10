@@ -86,14 +86,10 @@ class Parser:
         aliases = list(aliases)
         for alias in aliases:
             if alias in ini_specs:
-                raise ValueError(
-                    f"alias {alias!r} conflicts with existing configuration option"
-                )
+                raise ValueError(f"alias {alias!r} conflicts with existing configuration option")
             existing = ini_aliases.get(alias)
             if existing is not None and existing != name:
-                raise ValueError(
-                    f"{alias!r} is already an alias of {existing!r}"
-                )
+                raise ValueError(f"{alias!r} is already an alias of {existing!r}")
         ini_specs[name] = {"type": type, "default": default, "aliases": aliases}
         for alias in aliases:
             ini_aliases[alias] = name
@@ -210,6 +206,7 @@ def _split_str(value: str, shlex_split: bool) -> list:
         return value.split("\x00")
     if shlex_split:
         import shlex
+
         return shlex.split(value)
     return [line.strip() for line in value.splitlines() if line.strip()]
 
@@ -218,7 +215,6 @@ def _coerce_ini(type_: str | None, value: Any, rootpath: str | None, name: str =
     """Coerce a raw ini value to its registered type (pytest INI-mode
     coercion). Values are strings from .ini files; toml linelists may already
     be lists."""
-    import shlex
     from pathlib import Path
 
     if type_ == "paths":
@@ -265,7 +261,13 @@ def _coerce_ini(type_: str | None, value: Any, rootpath: str | None, name: str =
     return value
 
 
-def getini(name: str, inicfg: dict[str, str], rootpath: str | None, strict: bool = False, overrides: dict[str, str] | None = None) -> Any:
+def getini(
+    name: str,
+    inicfg: dict[str, str],
+    rootpath: str | None,
+    strict: bool = False,
+    overrides: dict[str, str] | None = None,
+) -> Any:
     """config.getini(name): the typed, alias-resolved ini value. Registered
     options (parser.addini) supply type conversion and defaults.
 

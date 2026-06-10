@@ -142,11 +142,13 @@ pub fn collect_test_files(
         let is_file_symlink = std::fs::symlink_metadata(&raw)
             .map(|m| m.file_type().is_symlink())
             .unwrap_or(false)
-            && std::fs::metadata(&raw).map(|m| m.is_file()).unwrap_or(false);
+            && std::fs::metadata(&raw)
+                .map(|m| m.is_file())
+                .unwrap_or(false);
         let path = if is_file_symlink {
             if let (Some(parent), Some(name)) = (raw.parent(), raw.file_name()) {
-                let canonical_parent = std::fs::canonicalize(parent)
-                    .unwrap_or_else(|_| parent.to_path_buf());
+                let canonical_parent =
+                    std::fs::canonicalize(parent).unwrap_or_else(|_| parent.to_path_buf());
                 canonical_parent.join(name)
             } else {
                 raw

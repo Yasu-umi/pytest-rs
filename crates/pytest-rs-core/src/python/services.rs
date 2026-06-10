@@ -128,7 +128,7 @@ pub fn pop_subtest_reports(
                 sections: Vec::new(),
                 rerun: false,
                 xfail_longrepr: None,
-            reprcrash_message: None,
+                reprcrash_message: None,
             });
         }
         Ok((reports, failed_fixture_subs))
@@ -198,10 +198,14 @@ pub fn cache_write_session(
 /// cache_hit is Some((nodeid, test_count, age_str)) when a valid prior failure
 /// is cached; error_msg is Some("error reading cache, ...") when the cache
 /// exists but is corrupt/invalid.
+#[allow(clippy::type_complexity)]
 pub fn cache_stepwise(
     py: Python<'_>,
     config: &crate::config::Config,
-) -> (Option<(String, Option<usize>, Option<String>)>, Option<String>) {
+) -> (
+    Option<(String, Option<usize>, Option<String>)>,
+    Option<String>,
+) {
     let read = || -> PyResult<(Option<(String, Option<usize>, Option<String>)>, Option<String>)> {
         let cache = cache_object(py, config)?;
         let result = py
@@ -267,10 +271,7 @@ pub fn config_has_workerinput(py: Python<'_>, config: &crate::config::Config) ->
     let Ok(proxy) = make_py_config(py, config) else {
         return false;
     };
-    proxy
-        .bind(py)
-        .hasattr("workerinput")
-        .unwrap_or(false)
+    proxy.bind(py).hasattr("workerinput").unwrap_or(false)
 }
 
 /// Arm the shim's MarkGenerator: unknown marks (not builtin, not in the

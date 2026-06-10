@@ -25,34 +25,40 @@ class _HookRelayPlugin:
             pass
 
     def pytest_deselected(self, items):
-        self._events.append({
-            "hook": "pytest_deselected",
-            "items": [{"name": i.name, "nodeid": i.nodeid} for i in items],
-        })
+        self._events.append(
+            {
+                "hook": "pytest_deselected",
+                "items": [{"name": i.name, "nodeid": i.nodeid} for i in items],
+            }
+        )
 
     def pytest_collectstart(self, collector):
-        self._events.append({
-            "hook": "pytest_collectstart",
-            "collector_path": str(getattr(collector, "path", "") or ""),
-            "collector_class": type(collector).__name__,
-            "session_path": str(
-                getattr(getattr(collector, "session", None), "path", "") or ""
-            ),
-        })
+        self._events.append(
+            {
+                "hook": "pytest_collectstart",
+                "collector_path": str(getattr(collector, "path", "") or ""),
+                "collector_class": type(collector).__name__,
+                "session_path": str(getattr(getattr(collector, "session", None), "path", "") or ""),
+            }
+        )
 
     def pytest_make_collect_report(self, collector):
-        self._events.append({
-            "hook": "pytest_make_collect_report",
-            "collector_path": str(getattr(collector, "path", "") or ""),
-            "collector_class": type(collector).__name__,
-        })
+        self._events.append(
+            {
+                "hook": "pytest_make_collect_report",
+                "collector_path": str(getattr(collector, "path", "") or ""),
+                "collector_class": type(collector).__name__,
+            }
+        )
 
     def pytest_pycollect_makeitem(self, collector, name, obj):
-        self._events.append({
-            "hook": "pytest_pycollect_makeitem",
-            "name": name,
-            "collector_path": str(getattr(collector, "path", "") or ""),
-        })
+        self._events.append(
+            {
+                "hook": "pytest_pycollect_makeitem",
+                "name": name,
+                "collector_path": str(getattr(collector, "path", "") or ""),
+            }
+        )
 
     def pytest_collectreport(self, report):
         result_items = getattr(report, "result", []) or []
@@ -66,27 +72,33 @@ class _HookRelayPlugin:
             for i in result_items
             if hasattr(i, "name")
         ]
-        self._events.append({
-            "hook": "pytest_collectreport",
-            "nodeid": getattr(report, "nodeid", ""),
-            "outcome": getattr(report, "outcome", ""),
-            "longrepr": str(getattr(report, "longrepr", "") or ""),
-            "result": result,
-        })
+        self._events.append(
+            {
+                "hook": "pytest_collectreport",
+                "nodeid": getattr(report, "nodeid", ""),
+                "outcome": getattr(report, "outcome", ""),
+                "longrepr": str(getattr(report, "longrepr", "") or ""),
+                "result": result,
+            }
+        )
 
     def pytest_runtest_logstart(self, nodeid, location):
-        self._events.append({
-            "hook": "pytest_runtest_logstart",
-            "nodeid": nodeid,
-            "location": list(location),
-        })
+        self._events.append(
+            {
+                "hook": "pytest_runtest_logstart",
+                "nodeid": nodeid,
+                "location": list(location),
+            }
+        )
 
     def pytest_runtest_logfinish(self, nodeid, location):
-        self._events.append({
-            "hook": "pytest_runtest_logfinish",
-            "nodeid": nodeid,
-            "location": list(location),
-        })
+        self._events.append(
+            {
+                "hook": "pytest_runtest_logfinish",
+                "nodeid": nodeid,
+                "location": list(location),
+            }
+        )
 
     def pytest_runtest_logreport(self, report):
         longrepr = getattr(report, "longrepr", None)
@@ -99,33 +111,37 @@ class _HookRelayPlugin:
                 "lineno": int(getattr(crash, "lineno", 0) or 0),
                 "message": str(getattr(crash, "message", "")),
             }
-        self._events.append({
-            "hook": "pytest_runtest_logreport",
-            "nodeid": getattr(report, "nodeid", ""),
-            "when": getattr(report, "when", ""),
-            "outcome": getattr(report, "outcome", ""),
-            "longrepr_type": longrepr_type,
-            "longrepr_crash": longrepr_crash,
-        })
+        self._events.append(
+            {
+                "hook": "pytest_runtest_logreport",
+                "nodeid": getattr(report, "nodeid", ""),
+                "when": getattr(report, "when", ""),
+                "outcome": getattr(report, "outcome", ""),
+                "longrepr_type": longrepr_type,
+                "longrepr_crash": longrepr_crash,
+            }
+        )
 
     def pytest_collection_finish(self, session):
-        self._events.append({
-            "hook": "pytest_collection_finish",
-            "session_path": str(getattr(session, "path", "") or ""),
-            "session_items": [
-                {
-                    "name": i.name,
-                    "nodeid": i.nodeid,
-                    "path": str(getattr(i, "path", "") or ""),
-                    "parent_class": (
-                        type(i.parent).__name__
-                        if getattr(i, "parent", None) is not None
-                        else ""
-                    ),
-                }
-                for i in session.items
-            ],
-        })
+        self._events.append(
+            {
+                "hook": "pytest_collection_finish",
+                "session_path": str(getattr(session, "path", "") or ""),
+                "session_items": [
+                    {
+                        "name": i.name,
+                        "nodeid": i.nodeid,
+                        "path": str(getattr(i, "path", "") or ""),
+                        "parent_class": (
+                            type(i.parent).__name__
+                            if getattr(i, "parent", None) is not None
+                            else ""
+                        ),
+                    }
+                    for i in session.items
+                ],
+            }
+        )
         # Don't flush here — run-phase events (logstart/logreport/logfinish)
         # come after collection. Final flush is in pytest_sessionfinish.
 

@@ -107,8 +107,9 @@ def runtestprotocol(item, log=True, nextitem=None):
                     item.ihook.pytest_runtest_logreport(report=report)
             return reports
 
-    from _pytest.skipping import evaluate_skip_marks, evaluate_xfail_marks
     from pytest._outcomes import Exit, Skipped
+
+    from _pytest.skipping import evaluate_skip_marks, evaluate_xfail_marks
 
     keywords = dict(getattr(item, "keywords", None) or {})
     reports = []
@@ -133,11 +134,15 @@ def runtestprotocol(item, log=True, nextitem=None):
                     tb = tb.tb_next
                 reason = setup_exc.msg or ""
                 reports.append(
-                    _ProtocolReport("setup", "skipped", keywords, (path, lineno, f"Skipped: {reason}"))
+                    _ProtocolReport(
+                        "setup", "skipped", keywords, (path, lineno, f"Skipped: {reason}")
+                    )
                 )
             else:
                 reports.append(
-                    _ProtocolReport("setup", "failed", keywords, "".join(traceback.format_exception(setup_exc)))
+                    _ProtocolReport(
+                        "setup", "failed", keywords, "".join(traceback.format_exception(setup_exc))
+                    )
                 )
             reports.append(_ProtocolReport("teardown", "passed", keywords))
             return reports
@@ -202,7 +207,12 @@ def runtestprotocol(item, log=True, nextitem=None):
             teardown_fn(item.obj)
         except BaseException as teardown_exc:
             reports.append(
-                _ProtocolReport("teardown", "failed", keywords, "".join(traceback.format_exception(teardown_exc)))
+                _ProtocolReport(
+                    "teardown",
+                    "failed",
+                    keywords,
+                    "".join(traceback.format_exception(teardown_exc)),
+                )
             )
             return reports
     reports.append(_ProtocolReport("teardown", "passed", keywords))

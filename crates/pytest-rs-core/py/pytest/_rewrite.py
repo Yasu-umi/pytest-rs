@@ -338,7 +338,7 @@ class _RewriteLoader(importlib.machinery.SourceFileLoader):
     @staticmethod
     def _cache_path(source_path):
         head, tail = os.path.split(source_path)
-        return os.path.join(head, "__pycache__", tail[:-len(".py")] + _PYC_TAIL)
+        return os.path.join(head, "__pycache__", tail[: -len(".py")] + _PYC_TAIL)
 
     @staticmethod
     def _read_pyc(source, cache_path):

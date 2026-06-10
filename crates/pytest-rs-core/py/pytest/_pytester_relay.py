@@ -3,6 +3,9 @@
 These reconstruct hook events / reports from the child run's relay file so
 InlineRunResult.getcalls() works without an in-process pytest."""
 
+from pytest._node import Item as _Item
+
+
 class _OutcomeReport:
     def __init__(self, nodeid, outcome=None, when="call", longrepr=None):
         self.nodeid = nodeid
@@ -40,9 +43,6 @@ class _RelayItem:
         return f"<_RelayItem {self.nodeid!r}>"
 
 
-from pytest._node import Item as _Item
-
-
 class _RelayItemResult(_Item):
     """Relay item rebuilt from hook relay JSON; passes isinstance(x, pytest.Item)."""
 
@@ -57,7 +57,7 @@ class _RelayItemResult(_Item):
         object.__setattr__(self, "parent", None)
         object.__setattr__(self, "config", None)
 
-    @property
+    @property  # type: ignore[misc]  # read-only view over the relayed nodeid
     def nodeid(self):
         return self._nodeid
 
@@ -166,12 +166,13 @@ class _RelayHookCall:
             )
             return cls(hook, {"collector": collector})
         if hook == "pytest_pycollect_makeitem":
-            return cls(hook, {
-                "name": event.get("name", ""),
-                "collector": _RelayCollector(
-                    event.get("collector_path", ""), "collector", ""
-                ),
-            })
+            return cls(
+                hook,
+                {
+                    "name": event.get("name", ""),
+                    "collector": _RelayCollector(event.get("collector_path", ""), "collector", ""),
+                },
+            )
         if hook in ("pytest_runtest_logstart", "pytest_runtest_logfinish"):
             location = event.get("location")
             if isinstance(location, list) and len(location) == 3:
@@ -182,7 +183,12 @@ class _RelayHookCall:
             crash_data = event.get("longrepr_crash")
             if event.get("longrepr_type") == "ExceptionChainRepr" and crash_data:
                 try:
-                    from _pytest._code.code import ExceptionChainRepr, ReprTraceback, ReprFileLocation
+                    from _pytest._code.code import (
+                        ExceptionChainRepr,
+                        ReprFileLocation,
+                        ReprTraceback,
+                    )
+
                     crash = ReprFileLocation(
                         path=crash_data.get("path", ""),
                         lineno=crash_data.get("lineno", 0),
@@ -247,6 +253,7 @@ class InlineRunResult:
                         session_path = item_path.parents[len(file_parts) - 1]
             # Group items by file (the path part of the nodeid, resolved via session_path)
             from collections import OrderedDict
+
             files_to_items = OrderedDict()
             for it in raw_items:
                 nodeid = it.get("nodeid", "")
@@ -265,26 +272,37 @@ class InlineRunResult:
 
             if session_path is not None:
                 # Session-level collectstart
-                calls.append(_RelayHookCall(
-                    "pytest_collectstart",
-                    {"collector": _RelayCollector(
-                        str(session_path), "Session", str(session_path)
-                    )},
-                ))
+                calls.append(
+                    _RelayHookCall(
+                        "pytest_collectstart",
+                        {
+                            "collector": _RelayCollector(
+                                str(session_path), "Session", str(session_path)
+                            )
+                        },
+                    )
+                )
                 # Session-level make_collect_report
-                calls.append(_RelayHookCall(
-                    "pytest_make_collect_report",
-                    {"collector": _RelayCollector(
-                        str(session_path), "Session", str(session_path)
-                    )},
-                ))
+                calls.append(
+                    _RelayHookCall(
+                        "pytest_make_collect_report",
+                        {
+                            "collector": _RelayCollector(
+                                str(session_path), "Session", str(session_path)
+                            )
+                        },
+                    )
+                )
             _MODULE_CLASSES = {"", "NoneType", "Function", "Node", "Module"}
             for key, (file_path, file_items) in files_to_items.items():
                 file_path_str = str(file_path) if file_path else ""
                 session_path_str2 = str(session_path) if session_path else ""
-                file_nodeid = file_items[0].get("nodeid", "").split("::")[0] if file_items else file_path_str
+                file_nodeid = (
+                    file_items[0].get("nodeid", "").split("::")[0] if file_items else file_path_str
+                )
                 # Separate custom-collector items (parent_class != Module) from Module items
                 from collections import OrderedDict as _OD
+
                 custom_groups = _OD()
                 module_items = []
                 for it in file_items:
@@ -295,43 +313,77 @@ class InlineRunResult:
                         module_items.append(it)
                 # Custom collectors: collectstart + make_collect_report + collectreport
                 for parent_cls, custom_items in custom_groups.items():
-                    calls.append(_RelayHookCall(
-                        "pytest_collectstart",
-                        {"collector": _RelayCollector(file_path_str, parent_cls, session_path_str2)},
-                    ))
-                    calls.append(_RelayHookCall(
-                        "pytest_make_collect_report",
-                        {"collector": _RelayCollector(file_path_str, parent_cls, session_path_str2)},
-                    ))
+                    calls.append(
+                        _RelayHookCall(
+                            "pytest_collectstart",
+                            {
+                                "collector": _RelayCollector(
+                                    file_path_str, parent_cls, session_path_str2
+                                )
+                            },
+                        )
+                    )
+                    calls.append(
+                        _RelayHookCall(
+                            "pytest_make_collect_report",
+                            {
+                                "collector": _RelayCollector(
+                                    file_path_str, parent_cls, session_path_str2
+                                )
+                            },
+                        )
+                    )
                     custom_nodeid = custom_items[0].get("nodeid", "").split("::")[0]
                     custom_result = [
-                        _RelayItemResult(it.get("name", ""), it.get("nodeid", ""), it.get("path", ""))
+                        _RelayItemResult(
+                            it.get("name", ""), it.get("nodeid", ""), it.get("path", "")
+                        )
                         for it in custom_items
                     ]
-                    calls.append(_RelayHookCall("pytest_collectreport",
-                        {"report": _RelayCollectReport(custom_nodeid, "passed", "", custom_result)}))
+                    calls.append(
+                        _RelayHookCall(
+                            "pytest_collectreport",
+                            {
+                                "report": _RelayCollectReport(
+                                    custom_nodeid, "passed", "", custom_result
+                                )
+                            },
+                        )
+                    )
                 # Module-level collectstart
-                calls.append(_RelayHookCall(
-                    "pytest_collectstart",
-                    {"collector": _RelayCollector(file_path_str, "Module", session_path_str2)},
-                ))
+                calls.append(
+                    _RelayHookCall(
+                        "pytest_collectstart",
+                        {"collector": _RelayCollector(file_path_str, "Module", session_path_str2)},
+                    )
+                )
                 # Module-level make_collect_report
-                calls.append(_RelayHookCall(
-                    "pytest_make_collect_report",
-                    {"collector": _RelayCollector(file_path_str, "Module", session_path_str2)},
-                ))
+                calls.append(
+                    _RelayHookCall(
+                        "pytest_make_collect_report",
+                        {"collector": _RelayCollector(file_path_str, "Module", session_path_str2)},
+                    )
+                )
                 # pycollect_makeitem only for Module-collected items
                 for it in module_items:
                     item_name = it.get("name", "")
-                    calls.append(_RelayHookCall(
-                        "pytest_pycollect_makeitem",
-                        {
-                            "name": item_name,
-                            "collector": _RelayCollector(file_path_str, "Module", session_path_str2),
-                        },
-                    ))
+                    calls.append(
+                        _RelayHookCall(
+                            "pytest_pycollect_makeitem",
+                            {
+                                "name": item_name,
+                                "collector": _RelayCollector(
+                                    file_path_str, "Module", session_path_str2
+                                ),
+                            },
+                        )
+                    )
                 # collectreport for module items
-                module_nodeid = module_items[0].get("nodeid", "").split("::")[0] if module_items else file_nodeid
+                module_nodeid = (
+                    module_items[0].get("nodeid", "").split("::")[0]
+                    if module_items
+                    else file_nodeid
+                )
                 module_result = [
                     _RelayItemResult(it.get("name", ""), it.get("nodeid", ""), it.get("path", ""))
                     for it in module_items
@@ -381,6 +433,7 @@ class InlineRunResult:
                     break
             else:
                 from pytest._outcomes import fail
+
                 fail(f"could not find {name!r} check {check!r}")
 
     def listoutcomes(self):

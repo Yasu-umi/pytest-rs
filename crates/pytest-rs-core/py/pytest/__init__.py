@@ -38,7 +38,9 @@ from pytest._node import Class as Class
 from pytest._node import Collector as Collector
 from pytest._node import Dir as Dir
 from pytest._node import File as File
-from pytest._node import File as Module  # Module is the base class for file collectors
+from pytest._node import (
+    File as Module,  # noqa: F401  # Module is the base class for file collectors
+)
 from pytest._node import Function as Function
 from pytest._node import Item as Item
 from pytest._node import Package as Package

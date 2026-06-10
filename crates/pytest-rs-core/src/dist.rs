@@ -855,7 +855,7 @@ impl WorkerOwner {
                     sections: Vec::new(),
                     rerun: false,
                     xfail_longrepr: None,
-            reprcrash_message: None,
+                    reprcrash_message: None,
                 },
                 worker: self.index,
             });

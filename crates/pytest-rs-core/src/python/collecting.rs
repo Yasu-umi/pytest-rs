@@ -509,9 +509,7 @@ pub(crate) fn introspect_namespace(
         {
             return Err(collect_error(
                 py,
-                &format!(
-                    "'yield' keyword is allowed in fixtures, but not in tests ({name})"
-                ),
+                &format!("'yield' keyword is allowed in fixtures, but not in tests ({name})"),
             ));
         }
         let mut marks = read_marks(py, &value)?;
@@ -1525,14 +1523,13 @@ pub fn keyword_match_names(py: Python<'_>, item: &TestItem) -> Vec<String> {
         names.push(mark.name.clone());
     }
     // extra_keyword_matches set by pytest_pycollect_makeitem hooks on the class.
-    if let Some(cls) = &item.cls {
-        if let Ok(extras) = cls
+    if let Some(cls) = &item.cls
+        && let Ok(extras) = cls
             .bind(py)
             .getattr("_pytest_extra_keyword_matches")
             .and_then(|v| v.extract::<Vec<String>>())
-        {
-            names.extend(extras);
-        }
+    {
+        names.extend(extras);
     }
     names
 }

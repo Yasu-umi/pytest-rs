@@ -27,6 +27,7 @@ def get_empty_parameterset_mark(config, argnames, func):
         fname = getattr(func, "__name__", "?")
         raise Collector.CollectError(f"Empty parameter set in '{fname}' at line {lineno}")
     import pytest
+
     raise pytest.UsageError(
         f"{EMPTY_PARAMETERSET_OPTION!r} has unknown value {requested_mark!r}",
     )

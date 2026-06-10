@@ -115,14 +115,10 @@ class LineMatcher:
                     if consecutive and started:
                         msg = f"no consecutive match: {line!r}"
                         self._log(msg)
-                        self._log(
-                            "{:>{width}}".format("with:", width=wnick), repr(nextline)
-                        )
+                        self._log("{:>{width}}".format("with:", width=wnick), repr(nextline))
                         self._fail(msg)
                     if not nomatchprinted:
-                        self._log(
-                            "{:>{width}}".format("nomatch:", width=wnick), repr(line)
-                        )
+                        self._log("{:>{width}}".format("nomatch:", width=wnick), repr(line))
                         nomatchprinted = True
                     self._log("{:>{width}}".format("and:", width=wnick), repr(nextline))
                 extralines.append(nextline)

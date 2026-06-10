@@ -22,10 +22,7 @@ const CONFIG_NAMES: [&str; 7] = [
 /// as config when present, even when empty.
 /// Returns Err for parse errors or pyproject.toml conflicts (UsageError),
 /// Ok(None) when absent.
-fn load_config(
-    dir: &Path,
-    name: &str,
-) -> Result<Option<HashMap<String, String>>, String> {
+fn load_config(dir: &Path, name: &str) -> Result<Option<HashMap<String, String>>, String> {
     let Ok(content) = std::fs::read_to_string(dir.join(name)) else {
         return Ok(None);
     };
@@ -39,7 +36,9 @@ fn load_config(
             if let Some(line) = detect_missing_section_header(&content) {
                 return Err(format!("{}:{}: no section header defined", path, line));
             }
-            Ok(Some(parse_ini_section(&content, "pytest").unwrap_or_default()))
+            Ok(Some(
+                parse_ini_section(&content, "pytest").unwrap_or_default(),
+            ))
         }
         "pyproject.toml" => parse_pyproject(&content, Some(&path)),
         "tox.ini" => Ok(parse_ini_section(&content, "pytest")),
@@ -75,6 +74,7 @@ fn detect_missing_section_header(content: &str) -> Option<usize> {
 /// found but a `pyproject.toml` exists anywhere in the walk, the closest one
 /// (first encountered) becomes the inipath with an empty config dict.
 /// Returns Err when a pyproject.toml conflict is detected (UsageError).
+#[allow(clippy::type_complexity)]
 fn find_ini(
     start: &Path,
 ) -> Result<
@@ -89,18 +89,14 @@ fn find_ini(
     let mut first_pyproject_dir: Option<PathBuf> = None;
     for dir in start.ancestors() {
         for (i, name) in CONFIG_NAMES.iter().enumerate() {
-            if *name == "pyproject.toml"
-                && first_pyproject_dir.is_none()
-                && dir.join(name).exists()
+            if *name == "pyproject.toml" && first_pyproject_dir.is_none() && dir.join(name).exists()
             {
                 first_pyproject_dir = Some(dir.to_path_buf());
             }
             if let Some(values) = load_config(dir, name)? {
                 let ignored = CONFIG_NAMES[i + 1..]
                     .iter()
-                    .filter(|other| {
-                        load_config(dir, other).ok().flatten().is_some()
-                    })
+                    .filter(|other| load_config(dir, other).ok().flatten().is_some())
                     .map(|other| other.to_string())
                     .collect();
                 return Ok((dir.to_path_buf(), Some(name.to_string()), values, ignored));
@@ -188,9 +184,18 @@ fn parse_ini_section(content: &str, section: &str) -> Option<HashMap<String, Str
 fn semver_ge(current: &str, required: &str) -> bool {
     let parse = |v: &str| -> (u64, u64, u64) {
         let mut parts = v.split('.');
-        let major = parts.next().and_then(|s| s.trim().parse().ok()).unwrap_or(0);
-        let minor = parts.next().and_then(|s| s.trim().parse().ok()).unwrap_or(0);
-        let patch = parts.next().and_then(|s| s.trim().parse().ok()).unwrap_or(0);
+        let major = parts
+            .next()
+            .and_then(|s| s.trim().parse().ok())
+            .unwrap_or(0);
+        let minor = parts
+            .next()
+            .and_then(|s| s.trim().parse().ok())
+            .unwrap_or(0);
+        let patch = parts
+            .next()
+            .and_then(|s| s.trim().parse().ok())
+            .unwrap_or(0);
         (major, minor, patch)
     };
     parse(current) >= parse(required)
@@ -200,7 +205,10 @@ fn semver_ge(current: &str, required: &str) -> bool {
 /// keys other than ini_options) or [tool.pytest.ini_options] (ini mode).
 /// Returns Err when both styles are present simultaneously (upstream
 /// UsageError), Ok(None) when no pytest config is found.
-fn parse_pyproject(content: &str, path: Option<&str>) -> Result<Option<HashMap<String, String>>, String> {
+fn parse_pyproject(
+    content: &str,
+    path: Option<&str>,
+) -> Result<Option<HashMap<String, String>>, String> {
     let document: toml::Table = match content.parse() {
         Ok(t) => t,
         Err(e) => {
@@ -239,7 +247,10 @@ fn parse_pyproject(content: &str, path: Option<&str>) -> Result<Option<HashMap<S
 /// pytest config from a standalone pytest.toml / .pytest.toml: a top-level
 /// `[pytest]` table (pytest 9 toml mode). Returns None when no `[pytest]`
 /// table is present (the caller still treats the file as config, just empty).
-fn parse_toml_pytest(content: &str, path: Option<&str>) -> Result<Option<HashMap<String, String>>, String> {
+fn parse_toml_pytest(
+    content: &str,
+    path: Option<&str>,
+) -> Result<Option<HashMap<String, String>>, String> {
     let document: toml::Table = match content.parse() {
         Ok(t) => t,
         Err(e) => {
@@ -439,8 +450,13 @@ fn common_ancestor(dirs: &[PathBuf]) -> PathBuf {
 /// (contains `/`, `\`, or a Python-file extension). Used to avoid greedily
 /// consuming test-path positionals as values for deferred plugin flags.
 fn looks_like_path(s: &str) -> bool {
-    s.contains('/') || s.contains('\\') || s.ends_with(".py") || s.ends_with(".txt")
-        || s.ends_with(".toml") || s.ends_with(".cfg") || s.ends_with(".ini")
+    s.contains('/')
+        || s.contains('\\')
+        || s.ends_with(".py")
+        || s.ends_with(".txt")
+        || s.ends_with(".toml")
+        || s.ends_with(".cfg")
+        || s.ends_with(".ini")
         || s.starts_with('.') // ./relative or ../up
 }
 
@@ -539,9 +555,7 @@ impl Config {
                     .parent()
                     .map(|p| p.to_path_buf())
                     .unwrap_or_else(|| cwd.clone());
-                let file_name = cf_path
-                    .file_name()
-                    .map(|n| n.to_string_lossy().to_string());
+                let file_name = cf_path.file_name().map(|n| n.to_string_lossy().to_string());
                 (rootdir, file_name, ini_file, Vec::new())
             } else {
                 let ancestor = common_ancestor(&dirs_from_args(&cwd, &argv));
@@ -681,10 +695,10 @@ impl Config {
             "loadscope-reorder", // xdist: reorder loadscope work units by size (default on)
             "no-loadscope-reorder", // xdist: keep collection order for loadscope work units
             "force-short-summary", // truncate short-summary messages even at -vv
-            "no-fold-skipped",     // list each skipped test in the short summary
-            "xfail-tb",            // show tracebacks for xfailed tests in XFAILURES
-            "no-showlocals",       // overrides an addopts --showlocals / -l
-            "markers",             // list registered markers (ini + plugin-registered) and exit
+            "no-fold-skipped",   // list each skipped test in the short summary
+            "xfail-tb",          // show tracebacks for xfailed tests in XFAILURES
+            "no-showlocals",     // overrides an addopts --showlocals / -l
+            "markers",           // list registered markers (ini + plugin-registered) and exit
             "strict-config",
             "strict-markers",
             "strict",
@@ -1082,19 +1096,23 @@ impl Config {
         // Compare against the pytest API version we track (9.0.3), not the
         // pytest-rs package version (0.0.4), since minversion targets pytest.
         {
-            let required = ini_overrides.get("minversion")
+            let required = ini_overrides
+                .get("minversion")
                 .or_else(|| ini_file.get("minversion"));
             if let Some(required) = required {
                 // pytest API compatibility version (kept in sync with the
                 // embedded pytest.__version__ shim).
                 const PYTEST_COMPAT_VERSION: &str = "9.0.3";
                 if !semver_ge(PYTEST_COMPAT_VERSION, required.trim()) {
-                    let path = config_file_name.as_ref()
+                    let path = config_file_name
+                        .as_ref()
                         .map(|n| rootdir.join(n).display().to_string())
                         .unwrap_or_default();
                     return Err(format!(
                         "{}: 'minversion' requires pytest-{}, actual pytest-{}",
-                        path, required.trim(), PYTEST_COMPAT_VERSION
+                        path,
+                        required.trim(),
+                        PYTEST_COMPAT_VERSION
                     ));
                 }
             }

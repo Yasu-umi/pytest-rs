@@ -54,7 +54,9 @@ impl Engine {
         let maxfail = config.maxfail();
         // --stepwise stops after the first failing item (--stepwise-skip
         // ignores the first one); the resume point persists via the cache.
-        let stepwise = (config.get_flag("sw") || config.get_flag("sw-skip") || config.get_flag("sw-reset")) && maxfail.is_none();
+        let stepwise =
+            (config.get_flag("sw") || config.get_flag("sw-skip") || config.get_flag("sw-reset"))
+                && maxfail.is_none();
         let sw_skip = config.get_flag("sw-skip");
         let mut sw_failed_items = 0usize;
         // Collection errors (--continue-on-collection-errors) already count
@@ -534,7 +536,7 @@ pub(crate) fn run_one_body(
                 sections: Vec::new(),
                 rerun: false,
                 xfail_longrepr: None,
-            reprcrash_message: None,
+                reprcrash_message: None,
             });
             return reports;
         }
@@ -798,7 +800,15 @@ pub(crate) fn run_one_body(
             }
             if name == "request" {
                 let node = python::make_node(py, item)?;
-                let req = Py::new(py, crate::request::PyRequest::new(None, node, None, crate::fixture::Scope::Function))?;
+                let req = Py::new(
+                    py,
+                    crate::request::PyRequest::new(
+                        None,
+                        node,
+                        None,
+                        crate::fixture::Scope::Function,
+                    ),
+                )?;
                 kwargs.push((name.clone(), req.clone_ref(py).into_any()));
                 test_request = Some(req);
                 continue;
@@ -889,7 +899,7 @@ pub(crate) fn run_one_body(
         sections: Vec::new(),
         rerun: false,
         xfail_longrepr: None,
-            reprcrash_message: None,
+        reprcrash_message: None,
     });
 
     if setup_show_active(config) {
@@ -950,7 +960,7 @@ pub(crate) fn run_one_body(
                     sections: Vec::new(),
                     rerun: false,
                     xfail_longrepr: None,
-            reprcrash_message: None,
+                    reprcrash_message: None,
                 });
                 teardown_one(py, plugins, session, config, item, true, &mut reports);
                 close_item_filters(py);
@@ -1052,7 +1062,7 @@ pub(crate) fn run_one_body(
                     sections: Vec::new(),
                     rerun: false,
                     xfail_longrepr: None,
-            reprcrash_message: None,
+                    reprcrash_message: None,
                 }
             } else {
                 match python::call_with_kwargs(py, &callable, &kwargs) {
@@ -1067,7 +1077,7 @@ pub(crate) fn run_one_body(
                         sections: python::log_failure_sections(py),
                         rerun: false,
                         xfail_longrepr: None,
-            reprcrash_message: None,
+                        reprcrash_message: None,
                     },
                     Err(err) => {
                         if let Some(code) = python::session_abort_code(py, &err) {
@@ -1402,7 +1412,7 @@ pub(crate) fn teardown_scope_reported(
         sections,
         rerun: false,
         xfail_longrepr: None,
-            reprcrash_message: None,
+        reprcrash_message: None,
     })
 }
 

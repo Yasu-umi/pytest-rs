@@ -13,9 +13,7 @@ class SysModulesSnapshot:
 
     def restore(self):
         if self.__preserve:
-            self.__saved.update(
-                (k, m) for k, m in sys.modules.items() if self.__preserve(k)
-            )
+            self.__saved.update((k, m) for k, m in sys.modules.items() if self.__preserve(k))
         sys.modules.clear()
         sys.modules.update(self.__saved)
 
@@ -31,7 +29,7 @@ class SysPathsSnapshot:
         sys.path[:], sys.meta_path[:] = self.__saved
 
 
-from pytest._outcomes import fail
+from pytest._outcomes import fail  # noqa: E402
 
 
 class RecordedHookCall:
@@ -128,8 +126,7 @@ class HookRecorder:
                 values.append(rep)
         if not values:
             raise ValueError(
-                f"could not find test report matching {inamepart!r}: "
-                "no test reports at all!"
+                f"could not find test report matching {inamepart!r}: no test reports at all!"
             )
         if len(values) > 1:
             raise ValueError(f"found 2 or more testreports matching {inamepart!r}: {values}")

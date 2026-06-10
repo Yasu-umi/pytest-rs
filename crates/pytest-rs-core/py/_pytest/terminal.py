@@ -1223,11 +1223,15 @@ class TerminalProgressPlugin:
             assert progress is not None
             sequence = f"\x1b]9;4;1;{progress}\x1b\\"
         elif state == "error":
-            sequence = f"\x1b]9;4;2;{progress}\x1b\\" if progress is not None else "\x1b]9;4;2;\x1b\\"
+            sequence = (
+                f"\x1b]9;4;2;{progress}\x1b\\" if progress is not None else "\x1b]9;4;2;\x1b\\"
+            )
         elif state == "indeterminate":
             sequence = "\x1b]9;4;3;\x1b\\"
         elif state == "paused":
-            sequence = f"\x1b]9;4;4;{progress}\x1b\\" if progress is not None else "\x1b]9;4;4;\x1b\\"
+            sequence = (
+                f"\x1b]9;4;4;{progress}\x1b\\" if progress is not None else "\x1b]9;4;4;\x1b\\"
+            )
         else:
             return
         self._tr.write_raw(sequence, flush=True)

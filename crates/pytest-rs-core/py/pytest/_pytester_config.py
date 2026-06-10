@@ -8,7 +8,6 @@ def _check_cfg_pytest_section(path, args) -> None:
     .cfg config file (auto-discovered or via -c/--config-file) contains a bare
     [pytest] section (which is no longer supported; users must use [tool:pytest])."""
     import configparser
-    import pytest
 
     CFG_MSG = "[pytest] section in {filename} files is no longer supported, change to [tool:pytest] instead."
 
@@ -56,7 +55,7 @@ def _validate_required_plugins(config) -> None:
         return
 
     try:
-        from packaging.requirements import Requirement, InvalidRequirement
+        from packaging.requirements import InvalidRequirement, Requirement
         from packaging.version import Version
     except ImportError:
         return
@@ -89,6 +88,4 @@ def _validate_required_plugins(config) -> None:
             missing.append(req_str)
 
     if missing:
-        raise pytest.UsageError(
-            "Missing required plugins: {}".format(", ".join(missing))
-        )
+        raise pytest.UsageError("Missing required plugins: {}".format(", ".join(missing)))

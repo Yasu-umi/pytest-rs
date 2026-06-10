@@ -715,9 +715,7 @@ impl Engine {
                     .as_deref()
                     .map(str::to_string)
                     .or_else(|| report.longrepr.as_deref().and_then(short_message));
-                if !is_collect_error
-                    && let Some(message) = crash_msg
-                {
+                if !is_collect_error && let Some(message) = crash_msg {
                     // pytest's _get_line_with_reprcrash_message: failure/error
                     // lines show the full crash message on CI or at -vv, but
                     // otherwise (and always under --force-short-summary) trim it

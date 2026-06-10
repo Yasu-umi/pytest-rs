@@ -48,6 +48,7 @@ pub struct PyConfig {
 }
 
 impl PyConfig {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         rootdir: String,
         inipath: Option<String>,
@@ -173,7 +174,11 @@ impl PyConfig {
         kwargs.set_item("overrides", &overrides)?;
         Ok(py
             .import("pytest._parser")?
-            .call_method("getini", (name, inicfg, self.rootdir.as_str(), self.strict), Some(&kwargs))?
+            .call_method(
+                "getini",
+                (name, inicfg, self.rootdir.as_str(), self.strict),
+                Some(&kwargs),
+            )?
             .unbind())
     }
 
@@ -234,9 +239,9 @@ impl PyConfig {
                         .call_method1("skip", (format!("no {name:?} option found"),))?;
                     unreachable!()
                 }
-                Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    format!("no option named {name:?}"),
-                ))
+                Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                    "no option named {name:?}"
+                )))
             }
         }
     }
@@ -295,10 +300,10 @@ impl PyConfig {
     #[getter]
     fn workerinput<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         // Check for an explicit override set via the setter.
-        if let Ok(guard) = self.workerinput_override.lock() {
-            if let Some(ref v) = *guard {
-                return Ok(v.bind(py).clone());
-            }
+        if let Ok(guard) = self.workerinput_override.lock()
+            && let Some(ref v) = *guard
+        {
+            return Ok(v.bind(py).clone());
         }
         match std::env::var("PYTEST_XDIST_WORKER") {
             Ok(worker_id) => {
@@ -433,11 +438,7 @@ impl PyConfig {
         let handled = hook_caller.call((), Some(&kwargs))?;
         let any_true = handled
             .try_iter()
-            .map(|mut iter| {
-                iter.any(|v| {
-                    v.map_or(false, |v| v.is_truthy().unwrap_or(false))
-                })
-            })
+            .map(|mut iter| iter.any(|v| v.is_ok_and(|v| v.is_truthy().unwrap_or(false))))
             .unwrap_or(false);
         if !any_true {
             let stderr = py.import("sys")?.getattr("stderr")?;
@@ -470,13 +471,15 @@ impl PyConfig {
     #[getter]
     fn pluginmanager<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         if self.strict {
-            let pm = self.local_pm.get_or_try_init(py, || -> PyResult<Py<PyAny>> {
-                Ok(py
-                    .import("pytest._pluginmanager")?
-                    .getattr("PluginManager")?
-                    .call0()?
-                    .unbind())
-            })?;
+            let pm = self
+                .local_pm
+                .get_or_try_init(py, || -> PyResult<Py<PyAny>> {
+                    Ok(py
+                        .import("pytest._pluginmanager")?
+                        .getattr("PluginManager")?
+                        .call0()?
+                        .unbind())
+                })?;
             Ok(pm.bind(py).clone())
         } else {
             py.import("pytest._pluginmanager")?.getattr("pluginmanager")

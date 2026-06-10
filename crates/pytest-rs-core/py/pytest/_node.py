@@ -186,9 +186,7 @@ class _NodeBase:
         elif isinstance(marker, MarkDecorator):
             marker = marker.mark
         else:
-            raise ValueError(
-                f"is not a string or pytest.mark.* Marker object: {marker!r}"
-            )
+            raise ValueError(f"is not a string or pytest.mark.* Marker object: {marker!r}")
         if append:
             self.own_markers.append(marker)
         else:
@@ -372,30 +370,60 @@ class Session(Collector):
                 continue
             if file_part.is_dir():
                 try:
-                    rel = str(file_part.resolve().relative_to(self.path.resolve())).replace("\\", "/")
+                    rel = str(file_part.resolve().relative_to(self.path.resolve())).replace(
+                        "\\", "/"
+                    )
                 except ValueError:
                     rel = file_part.name
-                dir_node = Dir(name=file_part.name, config=self.config, path=file_part, nodeid=rel, session=self)
+                dir_node = Dir(
+                    name=file_part.name,
+                    config=self.config,
+                    path=file_part,
+                    nodeid=rel,
+                    session=self,
+                )
                 dir_node.parent = self
                 results.append(dir_node)
             elif file_part.is_file():
                 parent_dir = file_part.parent
                 is_pkg = (parent_dir / "__init__.py").is_file()
                 try:
-                    parent_rel = str(parent_dir.resolve().relative_to(self.path.resolve())).replace("\\", "/")
+                    parent_rel = str(parent_dir.resolve().relative_to(self.path.resolve())).replace(
+                        "\\", "/"
+                    )
                 except ValueError:
                     parent_rel = parent_dir.name
                 if is_pkg:
-                    mid_node = Package(name=parent_dir.name, config=self.config, path=parent_dir, nodeid=parent_rel, session=self)
+                    mid_node = Package(
+                        name=parent_dir.name,
+                        config=self.config,
+                        path=parent_dir,
+                        nodeid=parent_rel,
+                        session=self,
+                    )
                     mid_node.parent = self
                 else:
-                    mid_node = Dir(name=parent_dir.name, config=self.config, path=parent_dir, nodeid=parent_rel, session=self)
+                    mid_node = Dir(
+                        name=parent_dir.name,
+                        config=self.config,
+                        path=parent_dir,
+                        nodeid=parent_rel,
+                        session=self,
+                    )
                     mid_node.parent = self
                 try:
-                    file_rel = str(file_part.resolve().relative_to(self.path.resolve())).replace("\\", "/")
+                    file_rel = str(file_part.resolve().relative_to(self.path.resolve())).replace(
+                        "\\", "/"
+                    )
                 except ValueError:
                     file_rel = file_part.name
-                mod_node = File(name=file_part.name, config=self.config, path=file_part, nodeid=file_rel, session=self)
+                mod_node = File(
+                    name=file_part.name,
+                    config=self.config,
+                    path=file_part,
+                    nodeid=file_rel,
+                    session=self,
+                )
                 mod_node.parent = mid_node
                 results.append(mod_node)
         return results
@@ -667,9 +695,7 @@ class _SetupState:
                 exceptions.extend(node_exceptions)
             elif node_exceptions:
                 exceptions.append(
-                    BaseExceptionGroup(
-                        f"errors while tearing down {node!r}", node_exceptions[::-1]
-                    )
+                    BaseExceptionGroup(f"errors while tearing down {node!r}", node_exceptions[::-1])
                 )
         if len(exceptions) == 1:
             raise exceptions[0]
@@ -767,9 +793,7 @@ class _NodeSession:
         elif isinstance(marker, MarkDecorator):
             marker = marker.mark
         else:
-            raise ValueError(
-                f"is not a string or pytest.mark.* Marker object: {marker!r}"
-            )
+            raise ValueError(f"is not a string or pytest.mark.* Marker object: {marker!r}")
         _session_state["session_markers"].append(marker)
 
 
@@ -881,9 +905,7 @@ class Node(Item):
         elif isinstance(marker, MarkDecorator):
             marker = marker.mark
         else:
-            raise ValueError(
-                f"is not a string or pytest.mark.* Marker object: {marker!r}"
-            )
+            raise ValueError(f"is not a string or pytest.mark.* Marker object: {marker!r}")
         if append:
             self.own_markers.append(marker)
         else:
@@ -932,9 +954,11 @@ class Function(Node):
 # pytest_pycollect_makeitem hookwrapper support
 # ---------------------------------------------------------------------------
 
+
 class _CollectedClass:
     """Minimal class-node shim passed as the 'item' result to
     pytest_pycollect_makeitem hookwrappers (e.g. for extra_keyword_matches)."""
+
     def __init__(self, name):
         self.name = name
         self.extra_keyword_matches = set()
@@ -952,6 +976,7 @@ def fire_makeitem_for_class(name: str) -> set:
     """Fire pytest_pycollect_makeitem hookwrappers for a class, returning
     extra_keyword_matches set that plugins may have populated."""
     import inspect
+
     node = _CollectedClass(name)
     if not _pycollect_makeitem_hooks:
         return node.extra_keyword_matches
@@ -980,6 +1005,7 @@ def fire_makeitem_for_class(name: str) -> set:
         try:
             if old_style:
                 from pytest._pluginmanager import _Result
+
                 outcome = _Result(result)
                 try:
                     gen.send(outcome)

@@ -535,8 +535,8 @@ pub fn extract_collect_ignores(
     conftest_path: &Path,
 ) -> (Vec<PathBuf>, Vec<String>) {
     let conftest_str = conftest_path.to_string_lossy();
-    let conftest_canonical = std::fs::canonicalize(conftest_path)
-        .unwrap_or_else(|_| conftest_path.to_path_buf());
+    let conftest_canonical =
+        std::fs::canonicalize(conftest_path).unwrap_or_else(|_| conftest_path.to_path_buf());
 
     let Ok(sys_modules) = py.import("sys").and_then(|s| s.getattr("modules")) else {
         return (Vec::new(), Vec::new());
@@ -546,14 +546,14 @@ pub fn extract_collect_ignores(
         let mut found = None;
         if let Ok(values) = sys_modules.call_method0("values") {
             for m in values.try_iter().into_iter().flatten().flatten() {
-                if let Ok(file_attr) = m.getattr("__file__") {
-                    if let Ok(file_str) = file_attr.extract::<String>() {
-                        let canon = std::fs::canonicalize(&file_str)
-                            .unwrap_or_else(|_| std::path::PathBuf::from(&file_str));
-                        if canon == conftest_canonical || file_str == conftest_str.as_ref() {
-                            found = Some(m);
-                            break;
-                        }
+                if let Ok(file_attr) = m.getattr("__file__")
+                    && let Ok(file_str) = file_attr.extract::<String>()
+                {
+                    let canon = std::fs::canonicalize(&file_str)
+                        .unwrap_or_else(|_| std::path::PathBuf::from(&file_str));
+                    if canon == conftest_canonical || file_str == conftest_str.as_ref() {
+                        found = Some(m);
+                        break;
                     }
                 }
             }
@@ -568,32 +568,32 @@ pub fn extract_collect_ignores(
     let mut globs = Vec::new();
 
     // collect_ignore: list of path-like objects, resolved relative to conftest_dir
-    if let Ok(ignore_list) = module.getattr("collect_ignore") {
-        if let Ok(iter) = ignore_list.try_iter() {
-            for item in iter.flatten() {
-                // os.fspath converts PathLike → str/bytes; fallback to str()
-                let path_str: Option<String> = py
-                    .import("os")
-                    .and_then(|os| os.getattr("fspath"))
-                    .and_then(|fsp| fsp.call1((&item,)))
-                    .and_then(|s| s.extract::<String>())
-                    .or_else(|_| item.str().and_then(|s| s.extract::<String>()))
-                    .ok();
-                if let Some(s) = path_str {
-                    let abs = conftest_dir.join(&s);
-                    paths.push(abs);
-                }
+    if let Ok(ignore_list) = module.getattr("collect_ignore")
+        && let Ok(iter) = ignore_list.try_iter()
+    {
+        for item in iter.flatten() {
+            // os.fspath converts PathLike → str/bytes; fallback to str()
+            let path_str: Option<String> = py
+                .import("os")
+                .and_then(|os| os.getattr("fspath"))
+                .and_then(|fsp| fsp.call1((&item,)))
+                .and_then(|s| s.extract::<String>())
+                .or_else(|_| item.str().and_then(|s| s.extract::<String>()))
+                .ok();
+            if let Some(s) = path_str {
+                let abs = conftest_dir.join(&s);
+                paths.push(abs);
             }
         }
     }
 
     // collect_ignore_glob: list of glob pattern strings
-    if let Ok(glob_list) = module.getattr("collect_ignore_glob") {
-        if let Ok(iter) = glob_list.try_iter() {
-            for item in iter.flatten() {
-                if let Ok(s) = item.str().and_then(|s| s.extract::<String>()) {
-                    globs.push(s);
-                }
+    if let Ok(glob_list) = module.getattr("collect_ignore_glob")
+        && let Ok(iter) = glob_list.try_iter()
+    {
+        for item in iter.flatten() {
+            if let Ok(s) = item.str().and_then(|s| s.extract::<String>()) {
+                globs.push(s);
             }
         }
     }

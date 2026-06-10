@@ -1,5 +1,5 @@
-use pytest_rs_core::pyo3::types::PyAnyMethods;
 use pytest_rs_core::pyo3::Python;
+use pytest_rs_core::pyo3::types::PyAnyMethods;
 use pytest_rs_core::{Config, Engine, OptionParser, Plugin};
 
 // Feature-gated pushes; vec![] cannot hold cfg'd elements.

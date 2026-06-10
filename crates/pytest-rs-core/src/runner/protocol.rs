@@ -106,10 +106,7 @@ fn report_from_proxy(py: Python<'_>, report: &Bound<'_, PyAny>) -> PyResult<Test
         "passed" if wasxfail.is_some() => (Outcome::XPassed, false),
         _ => (Outcome::Passed, false),
     };
-    let longrepr_obj = report
-        .getattr("longrepr")
-        .ok()
-        .filter(|v| !v.is_none());
+    let longrepr_obj = report.getattr("longrepr").ok().filter(|v| !v.is_none());
     let reprcrash_message = longrepr_obj
         .as_ref()
         .and_then(|lr| lr.getattr("reprcrash").ok())

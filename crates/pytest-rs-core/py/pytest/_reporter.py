@@ -137,6 +137,7 @@ def logstart(nodeid: str, location: tuple) -> None:
     if reporter is not None:
         _call(reporter, "pytest_runtest_logstart", nodeid=nodeid, location=location)
     from pytest._pluginmanager import instance_hook_impls
+
     for impl in instance_hook_impls("pytest_runtest_logstart"):
         try:
             impl(nodeid=nodeid, location=location)
@@ -149,6 +150,7 @@ def logreport(report: Any) -> None:
     if reporter is not None:
         _call(reporter, "pytest_runtest_logreport", report=report)
     from pytest._pluginmanager import instance_hook_impls
+
     for impl in instance_hook_impls("pytest_runtest_logreport"):
         try:
             impl(report=report)
@@ -161,6 +163,7 @@ def logfinish(nodeid: str, location: tuple) -> None:
     if reporter is not None:
         _call(reporter, "pytest_runtest_logfinish", nodeid=nodeid, location=location)
     from pytest._pluginmanager import instance_hook_impls
+
     for impl in instance_hook_impls("pytest_runtest_logfinish"):
         try:
             impl(nodeid=nodeid, location=location)
@@ -174,6 +177,7 @@ def collectreport(report: Any) -> None:
         _call(reporter, "pytest_collectreport", report=report)
     # Also dispatch to instance-registered plugins (e.g., relay plugin).
     from pytest._pluginmanager import instance_hook_impls
+
     for impl in instance_hook_impls("pytest_collectreport"):
         try:
             impl(report=report)
@@ -234,6 +238,7 @@ def finish(session: Any, exitstatus: int, shouldfail: str | None = None) -> None
     progress line first, then summaries, then the stats line)."""
     # Fire pytest_sessionfinish on instance-registered plugins (e.g., relay plugin).
     from pytest._pluginmanager import instance_hook_impls
+
     for impl in instance_hook_impls("pytest_sessionfinish"):
         try:
             impl(session=session, exitstatus=exitstatus)
