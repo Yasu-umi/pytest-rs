@@ -133,10 +133,27 @@ pub fn collect_test_files(
         // Node-id args select within a file; only the path part is
         // collected here (the engine filters items afterwards).
         let path_arg = arg.split("::").next().unwrap_or(arg);
-        // Canonicalize so symlinked paths (e.g. /tmp on macOS) match the
-        // canonical rootdir when computing node ids.
-        let path = invocation_dir.join(path_arg);
-        let path = std::fs::canonicalize(&path).unwrap_or(path);
+        // For a symlink-to-file argument (e.g. symlink.py → real.py), preserve
+        // the symlink name for node-id purposes while only canonicalizing the
+        // parent (/tmp → /private/tmp on macOS).  For directory symlinks and
+        // regular paths (including paths through symlink dirs), use full
+        // canonicalization so files within resolve to paths that match rootdir.
+        let raw = invocation_dir.join(path_arg);
+        let is_file_symlink = std::fs::symlink_metadata(&raw)
+            .map(|m| m.file_type().is_symlink())
+            .unwrap_or(false)
+            && std::fs::metadata(&raw).map(|m| m.is_file()).unwrap_or(false);
+        let path = if is_file_symlink {
+            if let (Some(parent), Some(name)) = (raw.parent(), raw.file_name()) {
+                let canonical_parent = std::fs::canonicalize(parent)
+                    .unwrap_or_else(|_| parent.to_path_buf());
+                canonical_parent.join(name)
+            } else {
+                raw
+            }
+        } else {
+            std::fs::canonicalize(&raw).unwrap_or(raw)
+        };
         // Upstream UsageError wording, with the argument as the user gave it.
         let meta =
             std::fs::metadata(&path).map_err(|_| format!("file or directory not found: {arg}"))?;
