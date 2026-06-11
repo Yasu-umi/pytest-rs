@@ -125,6 +125,36 @@ pub(crate) fn getfixturevalue(py: Python<'_>, name: &str) -> PyResult<Py<PyAny>>
     )
 }
 
+/// Build a pytest-bdd-compatible FixtureManager view of the running item's
+/// fixture registry: `_arg2fixturedefs` seeded with a ShimFixtureDef per
+/// registered definition (carrying its func/baseid so pytest-bdd can match
+/// step fixtures by `_pytest_bdd_step_context` and alias them by name).
+#[allow(unsafe_code)]
+pub(crate) fn build_fixturemanager(py: Python<'_>) -> PyResult<Py<PyAny>> {
+    let session_ptr = RESOLVE_CTX.with(|stack| stack.borrow().last().map(|ctx| ctx.session));
+    let Some(session_ptr) = session_ptr else {
+        return Err(pyo3::exceptions::PyRuntimeError::new_err(
+            "_fixturemanager is only available while a test is running",
+        ));
+    };
+    // Safety: same invariant as getfixturevalue — the run_one frame below us
+    // owns this pointer and is suspended in the Python call that reached here.
+    let session = unsafe { &*session_ptr };
+    let entries = pyo3::types::PyList::empty(py);
+    for def in session.registry.all_defs() {
+        entries.append((
+            def.name.as_str(),
+            def.func.bind(py),
+            def.baseid.as_str(),
+            def.scope.as_str(),
+        ))?;
+    }
+    py.import("pytest._fixturemanager")?
+        .getattr("build_manager")?
+        .call1((entries,))
+        .map(|fm| fm.unbind())
+}
+
 /// Resolve one fixture by name for an item, using the cache, recursing into
 /// dependencies, and letting plugins claim setup (async fixtures).
 #[allow(clippy::too_many_arguments)]

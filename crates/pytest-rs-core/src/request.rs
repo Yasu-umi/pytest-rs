@@ -540,6 +540,9 @@ pub struct PyRequest {
     fixturename: Option<String>,
     scope: crate::fixture::Scope,
     finalizers: Mutex<Vec<Py<PyAny>>>,
+    /// Lazily-built pytest-bdd FixtureManager view; once present, mutations
+    /// (injected step fixtures / target_fixtures) persist across the request.
+    fixturemanager: Mutex<Option<Py<PyAny>>>,
 }
 
 impl PyRequest {
@@ -555,7 +558,50 @@ impl PyRequest {
             fixturename,
             scope,
             finalizers: Mutex::new(Vec::new()),
+            fixturemanager: Mutex::new(None),
         }
+    }
+
+    /// The cached pytest-bdd FixtureManager, if one was built for this request.
+    fn manager(&self, py: Python<'_>) -> Option<Py<PyAny>> {
+        self.fixturemanager
+            .lock()
+            .expect("request lock poisoned")
+            .as_ref()
+            .map(|fm| fm.clone_ref(py))
+    }
+
+    /// Resolve `argname` through the FixtureManager's `_arg2fixturedefs` if it
+    /// holds a def for that name: a pinned `cached_result` (injected
+    /// target_fixture) wins; otherwise an alias to a collected fixture
+    /// (`registry_name`) resolves through the normal Rust path. Returns None
+    /// when the manager has nothing for `argname` (fall back to the registry).
+    fn resolve_via_manager(
+        py: Python<'_>,
+        fm: &Bound<'_, PyAny>,
+        argname: &str,
+    ) -> PyResult<Option<Py<PyAny>>> {
+        let defs = fm
+            .getattr("_arg2fixturedefs")?
+            .call_method1("get", (argname,))?;
+        if defs.is_none() {
+            return Ok(None);
+        }
+        let len = defs.len().unwrap_or(0);
+        if len == 0 {
+            return Ok(None);
+        }
+        let def = defs.get_item(len - 1)?;
+        if def.hasattr("cached_result")? {
+            let cached = def.getattr("cached_result")?;
+            return Ok(Some(cached.get_item(0)?.unbind()));
+        }
+        if let Ok(reg) = def.getattr("registry_name")
+            && let Ok(Some(reg_name)) = reg.extract::<Option<String>>()
+        {
+            return Ok(Some(crate::runner::getfixturevalue(py, &reg_name)?));
+        }
+        Ok(None)
     }
 
     /// Finalizers registered via addfinalizer, in registration order.
@@ -670,8 +716,49 @@ impl PyRequest {
 
     /// Dynamically resolve (and cache) a fixture by name, like pytest's
     /// request.getfixturevalue. Delegates to the runner's per-item context.
+    ///
+    /// pytest-bdd injects step fixtures and target_fixtures into this
+    /// request's FixtureManager view rather than the Rust registry; consult
+    /// it first so those names resolve (a pinned `cached_result` value, or an
+    /// alias to a collected step fixture via `registry_name`).
     fn getfixturevalue(&self, py: Python<'_>, argname: &str) -> PyResult<Py<PyAny>> {
+        if let Some(fm) = self.manager(py)
+            && let Some(value) = Self::resolve_via_manager(py, fm.bind(py), argname)?
+        {
+            return Ok(value);
+        }
         crate::runner::getfixturevalue(py, argname)
+    }
+
+    /// pytest-bdd's FixtureManager view. Built lazily from the running item's
+    /// fixture registry and cached so injected defs persist for the request.
+    #[getter]
+    fn _fixturemanager(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut guard = self.fixturemanager.lock().expect("request lock poisoned");
+        if let Some(fm) = guard.as_ref() {
+            return Ok(fm.clone_ref(py));
+        }
+        let fm = crate::runner::build_fixturemanager(py)?;
+        *guard = Some(fm.clone_ref(py));
+        Ok(fm)
+    }
+
+    /// The active (most-recently-registered) ShimFixtureDef for `name`, which
+    /// pytest-bdd's inject_fixture pins a `cached_result` on. Builds the
+    /// manager if needed.
+    fn _get_active_fixturedef(&self, py: Python<'_>, name: &str) -> PyResult<Py<PyAny>> {
+        let fm = self._fixturemanager(py)?;
+        let defs = fm
+            .bind(py)
+            .getattr("_arg2fixturedefs")?
+            .call_method1("get", (name,))?;
+        if !defs.is_none()
+            && let Ok(len) = defs.len()
+            && len > 0
+        {
+            return Ok(defs.get_item(len - 1)?.unbind());
+        }
+        Err(pyo3::exceptions::PyKeyError::new_err(name.to_string()))
     }
 
     /// Apply a marker to the running item (pytest's request.applymarker);

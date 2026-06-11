@@ -23,6 +23,16 @@ impl Scope {
             _ => None,
         }
     }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Function => "function",
+            Self::Class => "class",
+            Self::Module => "module",
+            Self::Package => "package",
+            Self::Session => "session",
+        }
+    }
 }
 
 /// One `@pytest.fixture` definition discovered at collection time, or
@@ -65,6 +75,12 @@ impl FixtureRegistry {
             .entry(def.name.clone())
             .or_default()
             .push(Arc::new(def));
+    }
+
+    /// Every registered definition (all names, all overrides), for building
+    /// the pytest-bdd FixtureManager._arg2fixturedefs view.
+    pub fn all_defs(&self) -> impl Iterator<Item = &Arc<FixtureDef>> {
+        self.by_name.values().flatten()
     }
 
     /// The most specific definition of `name` visible from `nodeid`.
