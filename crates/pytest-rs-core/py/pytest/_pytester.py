@@ -572,6 +572,7 @@ class Pytester:
         import pytest._capture as _capture
         import pytest._marks as _marks
         import pytest._node as _node
+        import pytest._tmp_path as _tmp_path
         from _pytest.pytester import HookRecorder
         from pytest._pluginmanager import pluginmanager
 
@@ -600,6 +601,16 @@ class Pytester:
         _node._added_marks.clear()
         _mark_attrs = ("_config", "_strict", "_markers", "_strict_parametrization_ids")
         old_mark_state = {k: getattr(_marks.mark, k, _sentinel) for k in _mark_attrs}
+        # tmp_path machinery: the nested run reconfigures basetemp/retention and
+        # records its own pass/fail outcomes; snapshot so the outer run's
+        # retention bookkeeping survives (run_nested resets these).
+        old_tmp_state = {
+            "_given_basetemp": _tmp_path._given_basetemp,
+            "_retention_count": _tmp_path._retention_count,
+            "_retention_policy": _tmp_path._retention_policy,
+            "_call_results": dict(_tmp_path._call_results),
+            "_any_failed": _tmp_path._any_failed,
+        }
 
         reprec = HookRecorder(pluginmanager)
         # The inner run gets a fresh global capture state so its per-item
@@ -647,6 +658,12 @@ class Pytester:
                         delattr(_marks.mark, key)
                 else:
                     setattr(_marks.mark, key, value)
+            _tmp_path._given_basetemp = old_tmp_state["_given_basetemp"]
+            _tmp_path._retention_count = old_tmp_state["_retention_count"]
+            _tmp_path._retention_policy = old_tmp_state["_retention_policy"]
+            _tmp_path._call_results.clear()
+            _tmp_path._call_results.update(old_tmp_state["_call_results"])
+            _tmp_path._any_failed = old_tmp_state["_any_failed"]
             # Restore the module table, sys.path and cwd (SysModulesSnapshot).
             for name in list(sys.modules):
                 if name not in modules_before:

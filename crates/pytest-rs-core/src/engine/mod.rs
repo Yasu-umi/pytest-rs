@@ -804,6 +804,16 @@ impl Engine {
             self.config.get_value("capture").unwrap_or("fd")
         };
         python::configure_capture(py, capture_mode);
+        // Reconfigure the tmp_path machinery for this nested config (its own
+        // --basetemp / retention) and reset retention bookkeeping, so the
+        // nested run does not inherit the outer run's basetemp or pass/fail
+        // outcomes (tmp_path_retention_policy tests).
+        python::configure_tmp_path(
+            py,
+            self.config.get_value("basetemp"),
+            self.config.get_ini("tmp_path_retention_count"),
+            self.config.get_ini("tmp_path_retention_policy"),
+        );
         // Tests (and gc-dependent plugins) run, so gc must be on; the outer
         // run leaves it enabled post-collection, but be explicit.
         python::set_gc_enabled(py, true);

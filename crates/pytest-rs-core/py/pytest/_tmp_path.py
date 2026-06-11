@@ -27,12 +27,17 @@ _any_failed = False
 
 
 def configure(basetemp, retention_count=None, retention_policy=None):
-    global _given_basetemp, _retention_count, _retention_policy
+    global _given_basetemp, _retention_count, _retention_policy, _any_failed
     _given_basetemp = basetemp
     if retention_count is not None:
         _retention_count = int(retention_count)
     if retention_policy is not None:
         _retention_policy = retention_policy
+    # Each session starts retention bookkeeping fresh; otherwise an in-process
+    # nested run would inherit the outer run's pass/fail outcomes and prune the
+    # wrong tmp dirs (tmp_path_retention_policy="failed").
+    _call_results.clear()
+    _any_failed = False
 
 
 def record_call(nodeid, passed):
