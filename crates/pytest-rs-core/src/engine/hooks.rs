@@ -85,7 +85,11 @@ impl Engine {
         let hook_funcs = hook_for("pytest_collection_modifyitems");
         let itemcollected_funcs = hook_for("pytest_itemcollected");
         let collectstart_funcs = hook_for("pytest_collectstart");
-        if hook_funcs.is_empty() && itemcollected_funcs.is_empty() && collectstart_funcs.is_empty()
+        let recording = crate::engine::inprocess::recording();
+        if hook_funcs.is_empty()
+            && itemcollected_funcs.is_empty()
+            && collectstart_funcs.is_empty()
+            && !recording
         {
             return Ok(());
         }
@@ -155,6 +159,26 @@ impl Engine {
                     ("session", python::make_session_proxy(py, &self.config)?),
                 ],
             )?;
+        }
+
+        // In a nested run, surface itemcollected (per item) and the single
+        // modifyitems call to the HookRecorder even without conftest impls;
+        // pytest always dispatches these through pluggy. (pytest_collectstart
+        // / pytest_collectreport need the full collector tree and are out of
+        // scope here.)
+        if recording {
+            for node in node_list.iter() {
+                python::record_hook(py, "pytest_itemcollected", &[("item", node.clone().unbind())]);
+            }
+            python::record_hook(
+                py,
+                "pytest_collection_modifyitems",
+                &[
+                    ("config", config_proxy.clone_ref(py)),
+                    ("items", node_list.clone().unbind().into_any()),
+                    ("session", python::make_session_proxy(py, &self.config)?),
+                ],
+            );
         }
 
         // session.add_marker() calls store in _session_state["session_markers"]; append
