@@ -518,129 +518,101 @@ fn shlex_split(input: &str) -> Vec<String> {
 }
 
 impl Config {
-    pub fn from_args(parser: OptionParser, argv: Vec<String>) -> Result<Self, String> {
-        let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
-        let cwd = std::fs::canonicalize(&cwd).unwrap_or(cwd);
-        // Pre-scan argv for -c/--config-file; when present, use the explicit
-        // path directly instead of auto-discovery (pytest's inifile= path).
-        let explicit_config: Option<String> = {
-            let mut found = None;
-            let mut i = 1;
-            while i < argv.len() {
-                let arg = &argv[i];
-                if (arg == "-c" || arg == "--config-file") && i + 1 < argv.len() {
-                    found = Some(argv[i + 1].clone());
-                    break;
-                } else if let Some(rest) = arg.strip_prefix("--config-file=") {
-                    found = Some(rest.to_string());
-                    break;
-                }
-                i += 1;
-            }
-            found
-        };
+    // Core pytest options parsed into flags/values (queried via
+    // get_flag/get_value); some are still inert and gain behavior as
+    // features land.
+    const CORE_FLAGS: [&str; 27] = [
+        "loadscope-reorder", // xdist: reorder loadscope work units by size (default on)
+        "no-loadscope-reorder", // xdist: keep collection order for loadscope work units
+        "force-short-summary", // truncate short-summary messages even at -vv
+        "no-fold-skipped",   // list each skipped test in the short summary
+        "xfail-tb",          // show tracebacks for xfailed tests in XFAILURES
+        "no-showlocals",     // overrides an addopts --showlocals / -l
+        "markers",           // list registered markers (ini + plugin-registered) and exit
+        "strict-config",
+        "strict-markers",
+        "strict",
+        "collect-in-virtualenv",
+        "cache-clear",
+        "no-header",
+        "no-summary",
+        "continue-on-collection-errors",
+        "exact-mode", // placeholder; harmless
+        "doctest-modules",
+        "doctest-continue-on-failure",
+        "doctest-ignore-import-errors",
+        "nbmake",          // accepted-but-inert: notebook collection not implemented
+        "worker",          // hidden: this process is a -n worker (IPC on stdin/stdout)
+        "runxfail",        // report xfail-marked tests as if unmarked
+        "setup-only",      // run fixtures, skip the tests
+        "setup-plan",      // like --setup-only (fixtures do execute here)
+        "setup-show",      // run tests, narrating fixture setup/teardown
+        "traceconfig",     // accepted-but-inert: plugin trace header not implemented
+        "keep-duplicates", // collect the same file once per duplicated arg
+    ];
+    const CORE_VALUES: [(&str, Option<char>); 42] = [
+        ("confcutdir", None),
+        ("deselect", None),
+        ("log-level", None),
+        ("log-format", None),
+        ("log-date-format", None),
+        ("log-cli-level", None),
+        ("log-cli-format", None),
+        ("log-cli-date-format", None),
+        ("log-file", None),
+        ("log-file-level", None),
+        ("log-file-mode", None),
+        ("log-file-format", None),
+        ("log-file-date-format", None),
+        ("log-disable", None),
+        ("last-failed-no-failures", None),
+        ("report-chars", Some('r')),
+        ("markexpr", Some('m')),
+        ("keyword", Some('k')),
+        ("plugin", Some('p')),
+        ("config-file", Some('c')),
+        ("numprocesses", Some('n')),
+        ("assert", None),
+        ("tb", None),
+        ("maxfail", None),
+        ("durations", None),
+        ("durations-min", None),
+        ("color", None),
+        ("basetemp", None),
+        ("import-mode", None),
+        ("capture", None),
+        ("show-capture", None), // which captured sections to show on failure
+        ("doctest-glob", None),
+        ("doctest-report", None),
+        ("ignore", None),             // paths pruned from collection
+        ("ignore-glob", None),        // fnmatch patterns pruned from collection
+        ("junit-xml", None),          // JUnit XML report path (--junitxml alias)
+        ("junit-prefix", None),       // classname prefix (--junitprefix alias)
+        ("dist", None), // accepted-but-inert: module-affinity load is the only mode
+        ("maxprocesses", None), // accepted-but-inert
+        ("max-worker-restart", None), // accepted-but-inert: workers are not restarted
+        ("tx", None),   // xdist gateway specs ("2*popen", "popen//chdir=DIR")
+        ("rsyncdir", None), // accepted-but-inert: fork workers share the filesystem
+    ];
 
-        // Config-file search starts at the common ancestor of cwd and the
-        // path-like args (pytest's rootdir algorithm); with no config file
-        // anywhere, the ancestor itself is the rootdir.
-        let (rootdir, config_file_name, ini_file, ignored_config_files) =
-            if let Some(cf_arg) = explicit_config {
-                let cf_path = if Path::new(&cf_arg).is_absolute() {
-                    PathBuf::from(&cf_arg)
-                } else {
-                    cwd.join(&cf_arg)
-                };
-                let ini_file = load_config_from_path(&cf_path)?;
-                let rootdir = cf_path
-                    .parent()
-                    .map(|p| p.to_path_buf())
-                    .unwrap_or_else(|| cwd.clone());
-                let file_name = cf_path.file_name().map(|n| n.to_string_lossy().to_string());
-                (rootdir, file_name, ini_file, Vec::new())
-            } else {
-                let ancestor = common_ancestor(&dirs_from_args(&cwd, &argv));
-                let (rootdir, file_name, ini, ignored) = find_ini(&ancestor)?;
-                if file_name.is_none() {
-                    // No config file found anywhere. pytest's determine_setup
-                    // falls back to the common ancestor of the invocation dir
-                    // and the args' ancestor, so e.g. `pytest a a/b` run from
-                    // the parent roots at the invocation dir, not at `a`.
-                    let rootdir = common_ancestor(&[cwd.clone(), ancestor]);
-                    (rootdir, file_name, ini, ignored)
-                } else {
-                    (rootdir, file_name, ini, ignored)
-                }
-            };
+    fn xdist_only(name: &str) -> bool {
+        matches!(
+            name,
+            "numprocesses"
+                | "dist"
+                | "maxprocesses"
+                | "worker"
+                | "tx"
+                | "rsyncdir"
+                | "loadscope-reorder"
+                | "no-loadscope-reorder"
+        )
+    }
 
-        // --rootdir=DIR must point at an existing directory (upstream
-        // determine_setup raises a UsageError otherwise).
-        let rootdir_arg = {
-            let mut value = None;
-            let mut iter = argv.iter();
-            while let Some(arg) = iter.next() {
-                if let Some(rest) = arg.strip_prefix("--rootdir=") {
-                    value = Some(rest.to_string());
-                } else if arg == "--rootdir" {
-                    value = iter.next().cloned();
-                }
-            }
-            value
-        };
-        if let Some(arg) = &rootdir_arg {
-            let path = cwd.join(arg);
-            if !path.is_dir() {
-                return Err(format!(
-                    "Directory '{}' not found. Check your '--rootdir' option.",
-                    path.display()
-                ));
-            }
-        }
-
-        // addopts from the config file are prepended to the CLI args.
-        // `-o addopts=...` wins over the file: it must apply here, before
-        // clap parsing, or the override could never disable addopts.
-        let mut argv = argv;
-        let mut override_addopts: Option<String> = None;
-        let mut idx = 1;
-        while idx < argv.len() {
-            let arg = &argv[idx];
-            let entry: Option<&str> = if arg == "-o" || arg == "--override-ini" {
-                idx += 1;
-                argv.get(idx).map(String::as_str)
-            } else if let Some(rest) = arg.strip_prefix("--override-ini=") {
-                Some(rest)
-            } else if let Some(rest) = arg.strip_prefix("-o") {
-                (!rest.is_empty()).then_some(rest)
-            } else {
-                None
-            };
-            if let Some(value) = entry.and_then(|entry| entry.strip_prefix("addopts=")) {
-                override_addopts = Some(value.to_string());
-            }
-            idx += 1;
-        }
-        // PYTEST_ADDOPTS env args sit between ini addopts and the CLI
-        // (upstream: ini addopts, then env, then command line).
-        if let Ok(env_addopts) = std::env::var("PYTEST_ADDOPTS")
-            && !env_addopts.trim().is_empty()
-        {
-            argv.splice(1..1, shlex_split(&env_addopts));
-        }
-        let addopts = override_addopts.or_else(|| ini_file.get("addopts").cloned());
-        if let Some(addopts) = addopts {
-            // A TOML-array addopts is stored NUL-joined (see parse_toml_pytest);
-            // each element is already one literal argument, so split on the
-            // sentinel rather than shlex-splitting (which would re-split an
-            // element like "not performance"). A plain string addopts has no
-            // NUL and shlex-splits: `-m "not performance"` stays one argument.
-            let args: Vec<String> = if addopts.contains('\x00') {
-                addopts.split('\x00').map(str::to_string).collect()
-            } else {
-                shlex_split(&addopts)
-            };
-            argv.splice(1..1, args);
-        }
-
+    /// Assemble the clap parser: core pytest flags/values, cacheprovider
+    /// and -n/xdist options (when built in), plus plugin pytest_addoption
+    /// specs. Depends only on the parser's registered option specs.
+    fn build_clap_command(parser: &OptionParser) -> clap::Command {
         let mut cmd = clap::Command::new("pytest-rs")
             .disable_help_flag(false)
             .version(concat!(env!("CARGO_PKG_VERSION"), " (pytest-compatible)"))
@@ -696,102 +668,9 @@ impl Config {
                     .value_name("WARNING")
                     .action(clap::ArgAction::Append),
             );
-
-        // Core pytest options parsed into flags/values (queried via
-        // get_flag/get_value); some are still inert and gain behavior as
-        // features land.
-        const CORE_FLAGS: [&str; 27] = [
-            "loadscope-reorder", // xdist: reorder loadscope work units by size (default on)
-            "no-loadscope-reorder", // xdist: keep collection order for loadscope work units
-            "force-short-summary", // truncate short-summary messages even at -vv
-            "no-fold-skipped",   // list each skipped test in the short summary
-            "xfail-tb",          // show tracebacks for xfailed tests in XFAILURES
-            "no-showlocals",     // overrides an addopts --showlocals / -l
-            "markers",           // list registered markers (ini + plugin-registered) and exit
-            "strict-config",
-            "strict-markers",
-            "strict",
-            "collect-in-virtualenv",
-            "cache-clear",
-            "no-header",
-            "no-summary",
-            "continue-on-collection-errors",
-            "exact-mode", // placeholder; harmless
-            "doctest-modules",
-            "doctest-continue-on-failure",
-            "doctest-ignore-import-errors",
-            "nbmake",          // accepted-but-inert: notebook collection not implemented
-            "worker",          // hidden: this process is a -n worker (IPC on stdin/stdout)
-            "runxfail",        // report xfail-marked tests as if unmarked
-            "setup-only",      // run fixtures, skip the tests
-            "setup-plan",      // like --setup-only (fixtures do execute here)
-            "setup-show",      // run tests, narrating fixture setup/teardown
-            "traceconfig",     // accepted-but-inert: plugin trace header not implemented
-            "keep-duplicates", // collect the same file once per duplicated arg
-        ];
-        const CORE_VALUES: [(&str, Option<char>); 42] = [
-            ("confcutdir", None),
-            ("deselect", None),
-            ("log-level", None),
-            ("log-format", None),
-            ("log-date-format", None),
-            ("log-cli-level", None),
-            ("log-cli-format", None),
-            ("log-cli-date-format", None),
-            ("log-file", None),
-            ("log-file-level", None),
-            ("log-file-mode", None),
-            ("log-file-format", None),
-            ("log-file-date-format", None),
-            ("log-disable", None),
-            ("last-failed-no-failures", None),
-            ("report-chars", Some('r')),
-            ("markexpr", Some('m')),
-            ("keyword", Some('k')),
-            ("plugin", Some('p')),
-            ("config-file", Some('c')),
-            ("numprocesses", Some('n')),
-            ("assert", None),
-            ("tb", None),
-            ("maxfail", None),
-            ("durations", None),
-            ("durations-min", None),
-            ("color", None),
-            ("basetemp", None),
-            ("import-mode", None),
-            ("capture", None),
-            ("show-capture", None), // which captured sections to show on failure
-            ("doctest-glob", None),
-            ("doctest-report", None),
-            ("ignore", None),             // paths pruned from collection
-            ("ignore-glob", None),        // fnmatch patterns pruned from collection
-            ("junit-xml", None),          // JUnit XML report path (--junitxml alias)
-            ("junit-prefix", None),       // classname prefix (--junitprefix alias)
-            ("dist", None), // accepted-but-inert: module-affinity load is the only mode
-            ("maxprocesses", None), // accepted-but-inert
-            ("max-worker-restart", None), // accepted-but-inert: workers are not restarted
-            ("tx", None),   // xdist gateway specs ("2*popen", "popen//chdir=DIR")
-            ("rsyncdir", None), // accepted-but-inert: fork workers share the filesystem
-        ];
-        // Without the xdist feature these options stay unregistered, so
-        // `-n` is an unknown-option usage error, like pytest without the
-        // pytest-xdist plugin installed.
-        let xdist_only = |name: &str| {
-            matches!(
-                name,
-                "numprocesses"
-                    | "dist"
-                    | "maxprocesses"
-                    | "worker"
-                    | "tx"
-                    | "rsyncdir"
-                    | "loadscope-reorder"
-                    | "no-loadscope-reorder"
-            )
-        };
         let has_xdist = cfg!(feature = "xdist");
-        for flag in CORE_FLAGS {
-            if !has_xdist && xdist_only(flag) {
+        for flag in Self::CORE_FLAGS {
+            if !has_xdist && Self::xdist_only(flag) {
                 continue;
             }
             cmd = cmd.arg(
@@ -873,8 +752,8 @@ impl Config {
                 .action(clap::ArgAction::Append)
                 .help("Store internal tracing debug information in this log\nfile. This file is opened with 'w' and truncated as a\nresult.\nDefault: pytestdebug.log."),
         );
-        for (name, short) in CORE_VALUES.into_iter().chain([("rootdir-opt", None)]) {
-            if !has_xdist && xdist_only(name) {
+        for (name, short) in Self::CORE_VALUES.into_iter().chain([("rootdir-opt", None)]) {
+            if !has_xdist && Self::xdist_only(name) {
                 continue;
             }
             let mut arg = clap::Arg::new(name)
@@ -914,7 +793,193 @@ impl Config {
             };
             cmd = cmd.arg(arg);
         }
+        cmd
+    }
 
+    /// Read the parsed clap matches into the core flag set, value map, and
+    /// plugin option list (-p NAME), honoring the xdist build gate.
+    fn extract_match_flags_values(
+        matches: &clap::ArgMatches,
+        parser: &OptionParser,
+    ) -> (HashSet<String>, HashMap<String, String>, Vec<String>) {
+        let has_xdist = cfg!(feature = "xdist");
+        let mut flags = HashSet::new();
+        let mut values = HashMap::new();
+        for opt in &parser.opts {
+            if opt.takes_value {
+                if let Some(parsed) = matches.get_many::<String>(&opt.name) {
+                    let parsed: Vec<&str> = parsed.map(String::as_str).collect();
+                    let stored = if opt.optional_value {
+                        // Append semantics: occurrences newline-joined
+                        // (split back via get_values).
+                        parsed.join("\n")
+                    } else {
+                        // argparse semantics: the last occurrence wins.
+                        (*parsed.last().expect("get_many is non-empty")).to_string()
+                    };
+                    values.insert(opt.name.clone(), stored);
+                }
+            } else if matches.get_flag(&opt.name) {
+                flags.insert(opt.name.clone());
+            }
+        }
+        for flag in Self::CORE_FLAGS.into_iter().chain([
+            "capture-disable",
+            "showlocals",
+            "lf",
+            "ff",
+            "nf",
+            "sw",
+            "sw-skip",
+            "sw-reset",
+        ]) {
+            if !has_xdist && Self::xdist_only(flag) {
+                continue;
+            }
+            if matches.get_flag(flag) {
+                flags.insert(flag.to_string());
+            }
+        }
+        if has_xdist && matches.get_flag("dist-load") {
+            flags.insert("dist-load".to_string());
+        }
+        if let Some(mut parsed) = matches.get_many::<String>("cache-show")
+            && let Some(last) = parsed.next_back()
+        {
+            values.insert("cache-show".to_string(), last.clone());
+        }
+        if let Some(mut parsed) = matches.get_many::<String>("debug")
+            && let Some(last) = parsed.next_back()
+        {
+            values.insert("debug".to_string(), last.clone());
+        }
+        let mut plugin_opts = Vec::new();
+        for (name, _) in Self::CORE_VALUES {
+            if !has_xdist && Self::xdist_only(name) {
+                continue;
+            }
+            let Some(parsed) = matches.get_many::<String>(name) else {
+                continue;
+            };
+            let parsed: Vec<&String> = parsed.collect();
+            if name == "plugin" {
+                plugin_opts = parsed.iter().map(|v| v.to_string()).collect();
+            }
+            if matches!(
+                name,
+                "deselect"
+                    | "doctest-glob"
+                    | "log-disable"
+                    | "tx"
+                    | "rsyncdir"
+                    | "ignore"
+                    | "ignore-glob"
+            ) {
+                // Every occurrence matters (newline-joined for get_values).
+                let joined = parsed
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                values.insert(name.to_string(), joined);
+            } else if let Some(last) = parsed.last() {
+                values.insert(name.to_string(), (*last).clone());
+            }
+        }
+        (flags, values, plugin_opts)
+    }
+
+    /// Locate the pytest config file (explicit -c, else auto-discovery) and
+    /// the rootdir, validating --rootdir. Returns
+    /// (rootdir, config file name, parsed ini map, ignored config files).
+    fn resolve_config_and_rootdir(
+        argv: &[String],
+        cwd: &Path,
+    ) -> Result<(PathBuf, Option<String>, HashMap<String, String>, Vec<String>), String> {
+        let cwd = cwd.to_path_buf();
+        // Pre-scan argv for -c/--config-file; when present, use the explicit
+        // path directly instead of auto-discovery (pytest's inifile= path).
+        let explicit_config: Option<String> = {
+            let mut found = None;
+            let mut i = 1;
+            while i < argv.len() {
+                let arg = &argv[i];
+                if (arg == "-c" || arg == "--config-file") && i + 1 < argv.len() {
+                    found = Some(argv[i + 1].clone());
+                    break;
+                } else if let Some(rest) = arg.strip_prefix("--config-file=") {
+                    found = Some(rest.to_string());
+                    break;
+                }
+                i += 1;
+            }
+            found
+        };
+
+        // Config-file search starts at the common ancestor of cwd and the
+        // path-like args (pytest's rootdir algorithm); with no config file
+        // anywhere, the ancestor itself is the rootdir.
+        let (rootdir, config_file_name, ini_file, ignored_config_files) =
+            if let Some(cf_arg) = explicit_config {
+                let cf_path = if Path::new(&cf_arg).is_absolute() {
+                    PathBuf::from(&cf_arg)
+                } else {
+                    cwd.join(&cf_arg)
+                };
+                let ini_file = load_config_from_path(&cf_path)?;
+                let rootdir = cf_path
+                    .parent()
+                    .map(|p| p.to_path_buf())
+                    .unwrap_or_else(|| cwd.clone());
+                let file_name = cf_path.file_name().map(|n| n.to_string_lossy().to_string());
+                (rootdir, file_name, ini_file, Vec::new())
+            } else {
+                let ancestor = common_ancestor(&dirs_from_args(&cwd, &argv));
+                let (rootdir, file_name, ini, ignored) = find_ini(&ancestor)?;
+                if file_name.is_none() {
+                    // No config file found anywhere. pytest's determine_setup
+                    // falls back to the common ancestor of the invocation dir
+                    // and the args' ancestor, so e.g. `pytest a a/b` run from
+                    // the parent roots at the invocation dir, not at `a`.
+                    let rootdir = common_ancestor(&[cwd.clone(), ancestor]);
+                    (rootdir, file_name, ini, ignored)
+                } else {
+                    (rootdir, file_name, ini, ignored)
+                }
+            };
+
+        // --rootdir=DIR must point at an existing directory (upstream
+        // determine_setup raises a UsageError otherwise).
+        let rootdir_arg = {
+            let mut value = None;
+            let mut iter = argv.iter();
+            while let Some(arg) = iter.next() {
+                if let Some(rest) = arg.strip_prefix("--rootdir=") {
+                    value = Some(rest.to_string());
+                } else if arg == "--rootdir" {
+                    value = iter.next().cloned();
+                }
+            }
+            value
+        };
+        if let Some(arg) = &rootdir_arg {
+            let path = cwd.join(arg);
+            if !path.is_dir() {
+                return Err(format!(
+                    "Directory '{}' not found. Check your '--rootdir' option.",
+                    path.display()
+                ));
+            }
+        }
+        Ok((rootdir, config_file_name, ini_file, ignored_config_files))
+    }
+
+    /// Split argv into the args clap parses (`kept`) and the long flags it
+    /// doesn't know, deferred for python-plugin pytest_addoption specs.
+    fn partition_plugin_args(
+        argv: Vec<String>,
+        cmd: &clap::Command,
+    ) -> (Vec<String>, Vec<String>) {
         // Long flags clap doesn't know are deferred for python-plugin
         // option specs (pytest_addoption runs after the interpreter is up).
         // Only the self-contained `--flag` / `--flag=value` forms are
@@ -957,7 +1022,63 @@ impl Config {
                 plugin_args.push(tokens.next().expect("peeked").1);
             }
         }
-        let argv = kept;
+        (kept, plugin_args)
+    }
+
+    pub fn from_args(parser: OptionParser, argv: Vec<String>) -> Result<Self, String> {
+        let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
+        let cwd = std::fs::canonicalize(&cwd).unwrap_or(cwd);
+        let (rootdir, config_file_name, ini_file, ignored_config_files) =
+            Self::resolve_config_and_rootdir(&argv, &cwd)?;
+
+        // addopts from the config file are prepended to the CLI args.
+        // `-o addopts=...` wins over the file: it must apply here, before
+        // clap parsing, or the override could never disable addopts.
+        let mut argv = argv;
+        let mut override_addopts: Option<String> = None;
+        let mut idx = 1;
+        while idx < argv.len() {
+            let arg = &argv[idx];
+            let entry: Option<&str> = if arg == "-o" || arg == "--override-ini" {
+                idx += 1;
+                argv.get(idx).map(String::as_str)
+            } else if let Some(rest) = arg.strip_prefix("--override-ini=") {
+                Some(rest)
+            } else if let Some(rest) = arg.strip_prefix("-o") {
+                (!rest.is_empty()).then_some(rest)
+            } else {
+                None
+            };
+            if let Some(value) = entry.and_then(|entry| entry.strip_prefix("addopts=")) {
+                override_addopts = Some(value.to_string());
+            }
+            idx += 1;
+        }
+        // PYTEST_ADDOPTS env args sit between ini addopts and the CLI
+        // (upstream: ini addopts, then env, then command line).
+        if let Ok(env_addopts) = std::env::var("PYTEST_ADDOPTS")
+            && !env_addopts.trim().is_empty()
+        {
+            argv.splice(1..1, shlex_split(&env_addopts));
+        }
+        let addopts = override_addopts.or_else(|| ini_file.get("addopts").cloned());
+        if let Some(addopts) = addopts {
+            // A TOML-array addopts is stored NUL-joined (see parse_toml_pytest);
+            // each element is already one literal argument, so split on the
+            // sentinel rather than shlex-splitting (which would re-split an
+            // element like "not performance"). A plain string addopts has no
+            // NUL and shlex-splits: `-m "not performance"` stays one argument.
+            let args: Vec<String> = if addopts.contains('\x00') {
+                addopts.split('\x00').map(str::to_string).collect()
+            } else {
+                shlex_split(&addopts)
+            };
+            argv.splice(1..1, args);
+        }
+
+        let cmd = Self::build_clap_command(&parser);
+
+        let (argv, plugin_args) = Self::partition_plugin_args(argv, &cmd);
 
         let effective_args = argv.clone();
         let matches = match cmd.try_get_matches_from(argv) {
@@ -989,89 +1110,8 @@ impl Config {
             }
         };
 
-        let mut flags = HashSet::new();
-        let mut values = HashMap::new();
-        for opt in &parser.opts {
-            if opt.takes_value {
-                if let Some(parsed) = matches.get_many::<String>(&opt.name) {
-                    let parsed: Vec<&str> = parsed.map(String::as_str).collect();
-                    let stored = if opt.optional_value {
-                        // Append semantics: occurrences newline-joined
-                        // (split back via get_values).
-                        parsed.join("\n")
-                    } else {
-                        // argparse semantics: the last occurrence wins.
-                        (*parsed.last().expect("get_many is non-empty")).to_string()
-                    };
-                    values.insert(opt.name.clone(), stored);
-                }
-            } else if matches.get_flag(&opt.name) {
-                flags.insert(opt.name.clone());
-            }
-        }
-        for flag in CORE_FLAGS.into_iter().chain([
-            "capture-disable",
-            "showlocals",
-            "lf",
-            "ff",
-            "nf",
-            "sw",
-            "sw-skip",
-            "sw-reset",
-        ]) {
-            if !has_xdist && xdist_only(flag) {
-                continue;
-            }
-            if matches.get_flag(flag) {
-                flags.insert(flag.to_string());
-            }
-        }
-        if has_xdist && matches.get_flag("dist-load") {
-            flags.insert("dist-load".to_string());
-        }
-        if let Some(mut parsed) = matches.get_many::<String>("cache-show")
-            && let Some(last) = parsed.next_back()
-        {
-            values.insert("cache-show".to_string(), last.clone());
-        }
-        if let Some(mut parsed) = matches.get_many::<String>("debug")
-            && let Some(last) = parsed.next_back()
-        {
-            values.insert("debug".to_string(), last.clone());
-        }
-        let mut plugin_opts = Vec::new();
-        for (name, _) in CORE_VALUES {
-            if !has_xdist && xdist_only(name) {
-                continue;
-            }
-            let Some(parsed) = matches.get_many::<String>(name) else {
-                continue;
-            };
-            let parsed: Vec<&String> = parsed.collect();
-            if name == "plugin" {
-                plugin_opts = parsed.iter().map(|v| v.to_string()).collect();
-            }
-            if matches!(
-                name,
-                "deselect"
-                    | "doctest-glob"
-                    | "log-disable"
-                    | "tx"
-                    | "rsyncdir"
-                    | "ignore"
-                    | "ignore-glob"
-            ) {
-                // Every occurrence matters (newline-joined for get_values).
-                let joined = parsed
-                    .iter()
-                    .map(|s| s.as_str())
-                    .collect::<Vec<_>>()
-                    .join("\n");
-                values.insert(name.to_string(), joined);
-            } else if let Some(last) = parsed.last() {
-                values.insert(name.to_string(), (*last).clone());
-            }
-        }
+        let (flags, values, plugin_opts) =
+            Self::extract_match_flags_values(&matches, &parser);
 
         let mut ini_overrides = HashMap::new();
         if let Some(overrides) = matches.get_many::<String>("override-ini") {
