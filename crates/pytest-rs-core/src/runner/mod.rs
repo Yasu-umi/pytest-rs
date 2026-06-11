@@ -216,71 +216,7 @@ impl Engine {
                     // -p no:terminal, or a delegated protocol whose shim
                     // TerminalReporter already rendered: no native output.
                 } else if tc >= 1 {
-                    if report.phase == Phase::Call || report.outcome != Outcome::Passed {
-                        // A pytest_report_teststatus hook may override the
-                        // verbose word and its markup; otherwise use the
-                        // built-in outcome word/color.
-                        let status = report_teststatus(py, session, &report, Some(item.lineno));
-                        // Skip/xfail/xpass reasons are appended separately so
-                        // they can be trimmed (-v) or wrapped (-vv) to width; a
-                        // teststatus hook word is used verbatim with no reason.
-                        let (word, reason) = match &status {
-                            Some(s) => (s.word.clone(), None),
-                            None => verbose_outcome(&report),
-                        };
-                        let codes = status
-                            .as_ref()
-                            .and_then(|s| s.markup.clone())
-                            .unwrap_or_else(|| outcome_codes(&report).to_vec());
-                        // pytest's _locationline appends " <- <src>" when the
-                        // test's code has no real source file — an exec'd def
-                        // reports co_filename "<string>". Real files (including
-                        // wrapper shims like _unittest.py, whose co_filename is
-                        // not the test module) are not flagged.
-                        let loc_suffix = item
-                            .func
-                            .bind(py)
-                            .getattr("__code__")
-                            .and_then(|c| c.getattr("co_filename"))
-                            .and_then(|f| f.extract::<String>())
-                            .ok()
-                            .filter(|co| !std::path::Path::new(co).is_file())
-                            .map(|co| format!(" <- {co}"))
-                            .unwrap_or_default();
-                        let prefix = format!("{}{} {}", item.nodeid, loc_suffix, word);
-                        let reason_suffix = match &reason {
-                            Some(r) => python::format_verbose_reason(
-                                py,
-                                prefix.chars().count(),
-                                r,
-                                tc,
-                                term_width(),
-                            ),
-                            None => String::new(),
-                        };
-                        let plain = format!("{prefix}{reason_suffix}");
-                        let rendered = format!(
-                            "{}{} {}{reason_suffix}",
-                            item.nodeid,
-                            loc_suffix,
-                            crate::tw::markup(&word, &codes)
-                        );
-                        // The progress field right-aligns against the last line
-                        // (a -vv reason may wrap across several).
-                        let last_line = plain.rsplit('\n').next().unwrap_or(&plain);
-                        // "times" in verbose mode reports each test's own
-                        // duration (pytest's per-item showlongtestinfo).
-                        let msg = progress_message(pkind, done, total, report.duration);
-                        println!(
-                            "{rendered}{}",
-                            progress_suffix(
-                                last_line,
-                                &msg,
-                                fill_color(py, session, done == total)
-                            )
-                        );
-                        let _ = std::io::stdout().flush();
-                    }
+                    print_verbose_report_line(py, session, item, &report, done, total, tc, pkind);
                 } else if session.live_logging && !config.quiet {
                     // log_cli: outcome words print via live_flush (between
                     // the call phase and teardown logs).
@@ -366,6 +302,87 @@ impl Engine {
 
         session.items = items;
     }
+}
+
+/// Verbose (`-v`+) per-item terminal line: the outcome word (honoring a
+/// pytest_report_teststatus override), a trimmed/wrapped reason, the
+/// location suffix, and the right-aligned progress field.
+fn print_verbose_report_line(
+    py: Python<'_>,
+    session: &Session,
+    item: &TestItem,
+    report: &TestReport,
+    done: usize,
+    total: usize,
+    tc: i32,
+    pkind: crate::config::ProgressKind,
+) {
+    if !(report.phase == Phase::Call || report.outcome != Outcome::Passed) {
+        return;
+    }
+            // A pytest_report_teststatus hook may override the
+            // verbose word and its markup; otherwise use the
+            // built-in outcome word/color.
+            let status = report_teststatus(py, session, report, Some(item.lineno));
+            // Skip/xfail/xpass reasons are appended separately so
+            // they can be trimmed (-v) or wrapped (-vv) to width; a
+            // teststatus hook word is used verbatim with no reason.
+            let (word, reason) = match &status {
+                Some(s) => (s.word.clone(), None),
+                None => verbose_outcome(report),
+            };
+            let codes = status
+                .as_ref()
+                .and_then(|s| s.markup.clone())
+                .unwrap_or_else(|| outcome_codes(report).to_vec());
+            // pytest's _locationline appends " <- <src>" when the
+            // test's code has no real source file — an exec'd def
+            // reports co_filename "<string>". Real files (including
+            // wrapper shims like _unittest.py, whose co_filename is
+            // not the test module) are not flagged.
+            let loc_suffix = item
+                .func
+                .bind(py)
+                .getattr("__code__")
+                .and_then(|c| c.getattr("co_filename"))
+                .and_then(|f| f.extract::<String>())
+                .ok()
+                .filter(|co| !std::path::Path::new(co).is_file())
+                .map(|co| format!(" <- {co}"))
+                .unwrap_or_default();
+            let prefix = format!("{}{} {}", item.nodeid, loc_suffix, word);
+            let reason_suffix = match &reason {
+                Some(r) => python::format_verbose_reason(
+                    py,
+                    prefix.chars().count(),
+                    r,
+                    tc,
+                    term_width(),
+                ),
+                None => String::new(),
+            };
+            let plain = format!("{prefix}{reason_suffix}");
+            let rendered = format!(
+                "{}{} {}{reason_suffix}",
+                item.nodeid,
+                loc_suffix,
+                crate::tw::markup(&word, &codes)
+            );
+            // The progress field right-aligns against the last line
+            // (a -vv reason may wrap across several).
+            let last_line = plain.rsplit('\n').next().unwrap_or(&plain);
+            // "times" in verbose mode reports each test's own
+            // duration (pytest's per-item showlongtestinfo).
+            let msg = progress_message(pkind, done, total, report.duration);
+            println!(
+                "{rendered}{}",
+                progress_suffix(
+                    last_line,
+                    &msg,
+                    fill_color(py, session, done == total)
+                )
+            );
+            let _ = std::io::stdout().flush();
 }
 
 pub(crate) fn run_one(

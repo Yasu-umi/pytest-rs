@@ -202,65 +202,7 @@ impl Engine {
     }
 
     pub(crate) fn run_dist(&mut self, py: Python<'_>, workers: usize) {
-        let dist_mode = self.config.get_value("dist").unwrap_or("load");
-        let per_module = matches!(dist_mode, "loadscope" | "loadfile" | "loadgroup");
-
-        // loadgroup: same-group items always batch together (one worker),
-        // and their -v nodeids display as "nodeid@group".
-        let mut nodeid_groups: HashMap<String, String> = HashMap::new();
-        let mut group_batches: HashMap<String, usize> = HashMap::new();
-        let mut batches: VecDeque<Vec<String>> = VecDeque::new();
-        for item in &self.session.items {
-            if dist_mode == "loadgroup"
-                && let Some(group) = Self::xdist_group_of(py, item)
-            {
-                nodeid_groups.insert(item.nodeid.clone(), group.clone());
-                match group_batches.get(&group) {
-                    Some(&index) => batches[index].push(item.nodeid.clone()),
-                    None => {
-                        group_batches.insert(group, batches.len());
-                        batches.push_back(vec![item.nodeid.clone()]);
-                    }
-                }
-                continue;
-            }
-            let file = item.nodeid.split("::").next().unwrap_or("");
-            let same_module = per_module
-                && batches.back().is_some_and(|batch: &Vec<String>| {
-                    batch.first().is_some_and(|first| {
-                        first.split("::").next().unwrap_or("") == file
-                            // Never fold ungrouped items into a group batch.
-                            && !nodeid_groups.contains_key(first)
-                    })
-                });
-            if same_module {
-                batches
-                    .back_mut()
-                    .expect("just checked")
-                    .push(item.nodeid.clone());
-            } else {
-                batches.push_back(vec![item.nodeid.clone()]);
-            }
-        }
-        // loadscope/loadfile/loadgroup reorder the work queue by descending
-        // unit size by default (xdist LoadScopeScheduling.schedule, gated on
-        // --loadscope-reorder / --no-loadscope-reorder; default on). The sort
-        // is stable, so equal-size units keep collection order. This is what
-        // sends the largest scope to the first available worker.
-        let reorder = per_module && !self.config.get_flag("no-loadscope-reorder");
-        if reorder {
-            let mut ordered: Vec<Vec<String>> = batches.into_iter().collect();
-            ordered.sort_by_key(|batch| std::cmp::Reverse(batch.len()));
-            batches = ordered.into();
-        }
-
-        if dist_mode == "each" {
-            // every test runs on every worker
-            let base: Vec<Vec<String>> = batches.iter().cloned().collect();
-            for _ in 1..workers {
-                batches.extend(base.iter().cloned());
-            }
-        }
+        let (batches, nodeid_groups) = self.build_dist_batches(py, workers);
 
         self.print_dist_banner(workers);
 
@@ -377,6 +319,152 @@ impl Engine {
         drop(sender);
 
         // Merge loop: progress streams in arrival order (xdist-style).
+        let (reports, extras, failed, maxfail_hit) =
+            self.run_dist_merge_loop(py, receiver, &queue, &nodes, &nodeid_groups);
+        for handle in handles {
+            let _ = handle.join();
+        }
+
+        if maxfail_hit {
+            // Upstream DSession: -x/--maxfail interrupts the session (exit
+            // 2) with the "stopping after N failures" banner.
+            self.session.stopped_after = Some(failed);
+            self.session.exit_code_override = Some(crate::report::exit_code::INTERRUPTED);
+        }
+
+        // All workers are down: conftest pytest_testnodedown hooks see the
+        // final node.workeroutput (upstream fires one per departing node).
+        let testnodedown_hooks: Vec<Py<pyo3::PyAny>> = self
+            .session
+            .py_hooks
+            .iter()
+            .filter(|hook| hook.name == "pytest_testnodedown")
+            .map(|hook| hook.func.clone_ref(py))
+            .collect();
+        if !testnodedown_hooks.is_empty() {
+            for node in nodes.iter().flatten() {
+                for func in &testnodedown_hooks {
+                    if let Err(err) = crate::python::call_py_hook(
+                        py,
+                        func,
+                        &[("node", node.clone_ref(py)), ("error", py.None())],
+                    ) {
+                        eprintln!(
+                            "INTERNAL ERROR: {}",
+                            crate::python::format_exception(py, &err)
+                        );
+                    }
+                }
+            }
+        }
+
+        self.session.reports = reports;
+
+        // Per-plugin state dumps (cov hits, benchmark results) merge before
+        // sessionfinish builds reports.
+        let mut ctx = HookContext {
+            py,
+            session: &mut self.session,
+            config: &self.config,
+        };
+        for (plugin_name, payload) in extras {
+            for plugin in self.plugins.iter_mut() {
+                if plugin.name() == plugin_name {
+                    if let Err(err) = plugin.pytest_worker_load(&mut ctx, &payload) {
+                        eprintln!(
+                            "INTERNAL ERROR: merging {plugin_name} worker state: {}",
+                            crate::python::format_exception(py, &err)
+                        );
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    /// Partition collected items into worker batches for the active dist
+    /// mode (loadscope/loadfile/loadgroup fold per file/group; `each`
+    /// duplicates the queue per worker) and reorder largest-first. Returns
+    /// the batch queue and the nodeid -> xdist_group map (for -v display).
+    fn build_dist_batches(
+        &self,
+        py: Python<'_>,
+        workers: usize,
+    ) -> (VecDeque<Vec<String>>, HashMap<String, String>) {
+        let dist_mode = self.config.get_value("dist").unwrap_or("load");
+        let per_module = matches!(dist_mode, "loadscope" | "loadfile" | "loadgroup");
+
+        // loadgroup: same-group items always batch together (one worker),
+        // and their -v nodeids display as "nodeid@group".
+        let mut nodeid_groups: HashMap<String, String> = HashMap::new();
+        let mut group_batches: HashMap<String, usize> = HashMap::new();
+        let mut batches: VecDeque<Vec<String>> = VecDeque::new();
+        for item in &self.session.items {
+            if dist_mode == "loadgroup"
+                && let Some(group) = Self::xdist_group_of(py, item)
+            {
+                nodeid_groups.insert(item.nodeid.clone(), group.clone());
+                match group_batches.get(&group) {
+                    Some(&index) => batches[index].push(item.nodeid.clone()),
+                    None => {
+                        group_batches.insert(group, batches.len());
+                        batches.push_back(vec![item.nodeid.clone()]);
+                    }
+                }
+                continue;
+            }
+            let file = item.nodeid.split("::").next().unwrap_or("");
+            let same_module = per_module
+                && batches.back().is_some_and(|batch: &Vec<String>| {
+                    batch.first().is_some_and(|first| {
+                        first.split("::").next().unwrap_or("") == file
+                            // Never fold ungrouped items into a group batch.
+                            && !nodeid_groups.contains_key(first)
+                    })
+                });
+            if same_module {
+                batches
+                    .back_mut()
+                    .expect("just checked")
+                    .push(item.nodeid.clone());
+            } else {
+                batches.push_back(vec![item.nodeid.clone()]);
+            }
+        }
+        // loadscope/loadfile/loadgroup reorder the work queue by descending
+        // unit size by default (xdist LoadScopeScheduling.schedule, gated on
+        // --loadscope-reorder / --no-loadscope-reorder; default on). The sort
+        // is stable, so equal-size units keep collection order. This is what
+        // sends the largest scope to the first available worker.
+        let reorder = per_module && !self.config.get_flag("no-loadscope-reorder");
+        if reorder {
+            let mut ordered: Vec<Vec<String>> = batches.into_iter().collect();
+            ordered.sort_by_key(|batch| std::cmp::Reverse(batch.len()));
+            batches = ordered.into();
+        }
+
+        if dist_mode == "each" {
+            // every test runs on every worker
+            let base: Vec<Vec<String>> = batches.iter().cloned().collect();
+            for _ in 1..workers {
+                batches.extend(base.iter().cloned());
+            }
+        }
+        (batches, nodeid_groups)
+    }
+
+    /// Drain worker events in arrival order: stream progress, accumulate
+    /// reports/extras, drive the delegated reporter, and honor the shared
+    /// --maxfail budget. Returns (reports, plugin extras, failed count,
+    /// whether --maxfail tripped).
+    fn run_dist_merge_loop(
+        &mut self,
+        py: Python<'_>,
+        receiver: mpsc::Receiver<Event>,
+        queue: &Arc<WorkQueue>,
+        nodes: &[Option<Py<pyo3::PyAny>>],
+        nodeid_groups: &HashMap<String, String>,
+    ) -> (Vec<TestReport>, Vec<(String, String)>, usize, bool) {
         let mut reports: Vec<TestReport> = Vec::new();
         let mut extras: Vec<(String, String)> = Vec::new();
         let show_progress =
@@ -514,65 +602,7 @@ impl Engine {
             let body = " ".repeat(printed % 80);
             println!("{}", crate::runner::progress_suffix(&body, &msg, color));
         }
-        for handle in handles {
-            let _ = handle.join();
-        }
-
-        if maxfail_hit {
-            // Upstream DSession: -x/--maxfail interrupts the session (exit
-            // 2) with the "stopping after N failures" banner.
-            self.session.stopped_after = Some(failed);
-            self.session.exit_code_override = Some(crate::report::exit_code::INTERRUPTED);
-        }
-
-        // All workers are down: conftest pytest_testnodedown hooks see the
-        // final node.workeroutput (upstream fires one per departing node).
-        let testnodedown_hooks: Vec<Py<pyo3::PyAny>> = self
-            .session
-            .py_hooks
-            .iter()
-            .filter(|hook| hook.name == "pytest_testnodedown")
-            .map(|hook| hook.func.clone_ref(py))
-            .collect();
-        if !testnodedown_hooks.is_empty() {
-            for node in nodes.iter().flatten() {
-                for func in &testnodedown_hooks {
-                    if let Err(err) = crate::python::call_py_hook(
-                        py,
-                        func,
-                        &[("node", node.clone_ref(py)), ("error", py.None())],
-                    ) {
-                        eprintln!(
-                            "INTERNAL ERROR: {}",
-                            crate::python::format_exception(py, &err)
-                        );
-                    }
-                }
-            }
-        }
-
-        self.session.reports = reports;
-
-        // Per-plugin state dumps (cov hits, benchmark results) merge before
-        // sessionfinish builds reports.
-        let mut ctx = HookContext {
-            py,
-            session: &mut self.session,
-            config: &self.config,
-        };
-        for (plugin_name, payload) in extras {
-            for plugin in self.plugins.iter_mut() {
-                if plugin.name() == plugin_name {
-                    if let Err(err) = plugin.pytest_worker_load(&mut ctx, &payload) {
-                        eprintln!(
-                            "INTERNAL ERROR: merging {plugin_name} worker state: {}",
-                            crate::python::format_exception(py, &err)
-                        );
-                    }
-                    break;
-                }
-            }
-        }
+        (reports, extras, failed, maxfail_hit)
     }
 
     /// Fork one child per worker slot off the already-imported parent
