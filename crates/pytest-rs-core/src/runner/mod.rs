@@ -523,25 +523,206 @@ fn run_custom_item(py: Python<'_>, config: &Config, item: &TestItem) -> Vec<Test
     reports
 }
 
-pub(crate) fn run_one_body(
+/// Test-item setup: run pytest_runtest_setup hooks, build the (fresh)
+/// class instance, resolve autouse + usefixtures + signature fixtures, and
+/// assemble the call kwargs. Returns (callable, kwargs, the test's own
+/// `request` if it takes one).
+type SetupOk = (
+    Py<PyAny>,
+    Vec<(String, Py<PyAny>)>,
+    Option<Py<crate::request::PyRequest>>,
+);
+
+fn build_test_setup(
     py: Python<'_>,
     plugins: &[Box<dyn Plugin>],
     session: &mut Session,
     config: &Config,
     item: &TestItem,
-) -> Vec<TestReport> {
-    // Custom collector items (pytest-ruff/pytest-mypy): the func IS a
-    // pytest.Item with setup()/runtest()/teardown(); run that protocol with
-    // no fixtures instead of calling it as a test function. Detect precisely
-    // via isinstance(pytest.Item) — a hasattr("runtest") probe would also
-    // match Mocks and other auto-attr objects used as test funcs.
+) -> PyResult<SetupOk> {
+    {
+        let mut ctx = HookContext {
+            py,
+            session,
+            config,
+        };
+        for plugin in plugins {
+            plugin.pytest_runtest_setup(&mut ctx, item)?;
+        }
+    }
+    fire_runtest_py_hooks(py, session, item, "pytest_runtest_setup")?;
+    // A fresh class instance per test (pytest behavior). For
+    // unittest.TestCase items the shim runner creates the case;
+    // exposing it here lets @pytest.fixture METHODS on the TestCase
+    // bind to the instance the test runs on (upstream item.instance).
+    let instance: Option<Py<PyAny>> = match &item.cls {
+        Some(cls) => Some(cls.bind(py).call0()?.unbind()),
+        None => {
+            let func = item.func.bind(py);
+            if func.hasattr("make_case")? {
+                Some(func.call_method0("make_case")?.unbind())
+            } else {
+                None
+            }
+        }
+    };
+    // unittest items keep the shim runner (setUp/tearDown/skip
+    // handling) — only pytest classes rebind the method on the
+    // fresh instance.
+    let callable = match (&item.cls, &instance) {
+        (Some(_), Some(instance)) => {
+            instance.bind(py).getattr(item.func_name.as_str())?.unbind()
+        }
+        _ => item.func.clone_ref(py),
+    };
+
+    set_resolve_ctx_instance(py, instance.as_ref());
+
+    // TestCase items poisoned by fixture parametrization error at setup
+    // with upstream's bare nofuncargs message (no traceback).
+    if let Ok(msg) = item.func.bind(py).getattr("_pytest_unsupported_fixtures") {
+        let failed = py
+            .import("pytest._outcomes")?
+            .getattr("Failed")?
+            .call1((msg,))?;
+        failed.setattr("pytrace", false)?;
+        return Err(PyErr::from_value(failed));
+    }
+
+    // xunit-style setup_module/setup_class/setup_method/setup_function.
+    python::ensure_xunit_setup(py, session, item, instance.as_ref())?;
+
+    // autouse fixtures run first, then the requested ones.
+    let mut stack = Vec::new();
+    for def in session.registry.autouse_for(&item.nodeid) {
+        resolve_fixture(
+            py,
+            plugins,
+            session,
+            config,
+            &def.name,
+            item,
+            instance.as_ref(),
+            &mut stack,
+        )?;
+    }
+    // @pytest.mark.usefixtures (and the usefixtures ini option): named
+    // fixtures are set up before the test's own, values not passed in.
+    // Mark order follows iter_markers (upstream _getusefixturesnames):
+    // function marks, class marks base-class-first, module marks.
+    let usefixtures: Vec<String> = config
+        .get_ini("usefixtures")
+        .map(|value| {
+            value
+                .split_whitespace()
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default()
+        .into_iter()
+        .chain(
+            item.marks
+                .iter()
+                .filter(|mark| mark.name == "usefixtures")
+                .flat_map(|mark| {
+                    mark.obj
+                        .bind(py)
+                        .getattr("args")
+                        .ok()
+                        .and_then(|args| args.extract::<Vec<String>>().ok())
+                        .unwrap_or_default()
+                }),
+        )
+        .collect();
+    for name in &usefixtures {
+        if item.callspec.iter().any(|(param, _)| param == name) {
+            continue;
+        }
+        // `request` is the always-available pseudo-fixture, never in the
+        // registry; usefixtures("request") (pytest-bdd marks scenario
+        // functions that declare a `request` arg this way) is a no-op.
+        if name == "request" {
+            continue;
+        }
+        resolve_fixture(
+            py,
+            plugins,
+            session,
+            config,
+            name,
+            item,
+            instance.as_ref(),
+            &mut stack,
+        )?;
+    }
+    let mut kwargs = Vec::new();
+    let mut test_request: Option<Py<crate::request::PyRequest>> = None;
+    for name in &item.fixture_names {
+        if item.callspec.iter().any(|(param, _)| param == name) {
+            continue;
+        }
+        if name == "request" {
+            let node = crate::runner::item_node(py, item)?;
+            let req = Py::new(
+                py,
+                crate::request::PyRequest::new(
+                    None,
+                    node,
+                    None,
+                    crate::fixture::Scope::Function,
+                ),
+            )?;
+            kwargs.push((name.clone(), req.clone_ref(py).into_any()));
+            test_request = Some(req);
+            continue;
+        }
+        let value = resolve_fixture(
+            py,
+            plugins,
+            session,
+            config,
+            name,
+            item,
+            instance.as_ref(),
+            &mut stack,
+        )?;
+        kwargs.push((name.clone(), value));
+    }
+    for (name, value) in &item.callspec {
+        // A callspec name outside the signature parametrizes a closure
+        // fixture (its value overrides the fixture, resolved on demand)
+        // and is not passed to the test (pytest semantics).
+        if item.fixture_names.iter().any(|fixture| fixture == name) {
+            kwargs.push((name.clone(), value.clone_ref(py)));
+        }
+    }
+    Ok((callable, kwargs, test_request))
+}
+
+/// What @pytest.mark.skip/skipif/xfail and the custom-item check decide
+/// before setup runs: either a finished outcome (`Done`) or the xfail
+/// state to carry into setup/call (`Run`).
+enum ItemPrelude {
+    Done(Vec<TestReport>),
+    Run {
+        xfailed: Option<XfailEval>,
+        runxfail: bool,
+    },
+}
+
+fn evaluate_item_prelude(
+    py: Python<'_>,
+    session: &Session,
+    config: &Config,
+    item: &TestItem,
+) -> ItemPrelude {
     let is_custom_item = py
         .import("pytest._node")
         .and_then(|m| m.getattr("Item"))
         .and_then(|cls| item.func.bind(py).is_instance(&cls))
         .unwrap_or(false);
     if is_custom_item {
-        return run_custom_item(py, config, item);
+        return ItemPrelude::Done(run_custom_item(py, config, item));
     }
 
     let mut reports = Vec::new();
@@ -572,7 +753,7 @@ pub(crate) fn run_one_body(
                 reprcrash_message: None,
                 head_line: None,
             });
-            return reports;
+            return ItemPrelude::Done(reports);
         }
         Ok(None) => {}
         Err(err) => {
@@ -584,7 +765,7 @@ pub(crate) fn run_one_body(
                 Instant::now(),
                 &err,
             ));
-            return reports;
+            return ItemPrelude::Done(reports);
         }
     }
     // @pytest.mark.xfail evaluation (conditions, run/strict/raises kwargs).
@@ -594,7 +775,7 @@ pub(crate) fn run_one_body(
         .import("pytest._node")
         .and_then(|m| m.call_method0("clear_added_marks"));
     let runxfail = config.get_flag("runxfail");
-    let mut xfailed = match evaluate_xfail_marks(py, session, config, item, &[]) {
+    let xfailed = match evaluate_xfail_marks(py, session, config, item, &[]) {
         Ok(xfailed) => xfailed,
         Err(err) => {
             reports.push(report_from_err(
@@ -605,7 +786,7 @@ pub(crate) fn run_one_body(
                 Instant::now(),
                 &err,
             ));
-            return reports;
+            return ItemPrelude::Done(reports);
         }
     };
     // run=False: report XFAIL without setting up or calling the test.
@@ -627,8 +808,28 @@ pub(crate) fn run_one_body(
             reprcrash_message: None,
             head_line: None,
         });
-        return reports;
+        return ItemPrelude::Done(reports);
     }
+    ItemPrelude::Run { xfailed, runxfail }
+}
+
+pub(crate) fn run_one_body(
+    py: Python<'_>,
+    plugins: &[Box<dyn Plugin>],
+    session: &mut Session,
+    config: &Config,
+    item: &TestItem,
+) -> Vec<TestReport> {
+    // Custom collector items (pytest-ruff/pytest-mypy): the func IS a
+    // pytest.Item with setup()/runtest()/teardown(); run that protocol with
+    // no fixtures instead of calling it as a test function. Detect precisely
+    // via isinstance(pytest.Item) — a hasattr("runtest") probe would also
+    // match Mocks and other auto-attr objects used as test funcs.
+    let (mut xfailed, runxfail) = match evaluate_item_prelude(py, session, config, item) {
+        ItemPrelude::Done(reports) => return reports,
+        ItemPrelude::Run { xfailed, runxfail } => (xfailed, runxfail),
+    };
+    let mut reports = Vec::new();
     let xfail = xfailed.is_some() && !runxfail;
 
     // request.getfixturevalue() support: expose this item's engine state to
@@ -712,170 +913,7 @@ pub(crate) fn run_one_body(
         .or_else(|| config.get_ini("log_level").map(str::to_string));
     python::log_start_phase(py, "setup", log_level_cfg.as_deref());
     let setup_started = Instant::now();
-    type SetupOk = (
-        Py<PyAny>,
-        Vec<(String, Py<PyAny>)>,
-        Option<Py<crate::request::PyRequest>>,
-    );
-    let setup_result = (|| -> PyResult<SetupOk> {
-        {
-            let mut ctx = HookContext {
-                py,
-                session,
-                config,
-            };
-            for plugin in plugins {
-                plugin.pytest_runtest_setup(&mut ctx, item)?;
-            }
-        }
-        fire_runtest_py_hooks(py, session, item, "pytest_runtest_setup")?;
-        // A fresh class instance per test (pytest behavior). For
-        // unittest.TestCase items the shim runner creates the case;
-        // exposing it here lets @pytest.fixture METHODS on the TestCase
-        // bind to the instance the test runs on (upstream item.instance).
-        let instance: Option<Py<PyAny>> = match &item.cls {
-            Some(cls) => Some(cls.bind(py).call0()?.unbind()),
-            None => {
-                let func = item.func.bind(py);
-                if func.hasattr("make_case")? {
-                    Some(func.call_method0("make_case")?.unbind())
-                } else {
-                    None
-                }
-            }
-        };
-        // unittest items keep the shim runner (setUp/tearDown/skip
-        // handling) — only pytest classes rebind the method on the
-        // fresh instance.
-        let callable = match (&item.cls, &instance) {
-            (Some(_), Some(instance)) => {
-                instance.bind(py).getattr(item.func_name.as_str())?.unbind()
-            }
-            _ => item.func.clone_ref(py),
-        };
-
-        set_resolve_ctx_instance(py, instance.as_ref());
-
-        // TestCase items poisoned by fixture parametrization error at setup
-        // with upstream's bare nofuncargs message (no traceback).
-        if let Ok(msg) = item.func.bind(py).getattr("_pytest_unsupported_fixtures") {
-            let failed = py
-                .import("pytest._outcomes")?
-                .getattr("Failed")?
-                .call1((msg,))?;
-            failed.setattr("pytrace", false)?;
-            return Err(PyErr::from_value(failed));
-        }
-
-        // xunit-style setup_module/setup_class/setup_method/setup_function.
-        python::ensure_xunit_setup(py, session, item, instance.as_ref())?;
-
-        // autouse fixtures run first, then the requested ones.
-        let mut stack = Vec::new();
-        for def in session.registry.autouse_for(&item.nodeid) {
-            resolve_fixture(
-                py,
-                plugins,
-                session,
-                config,
-                &def.name,
-                item,
-                instance.as_ref(),
-                &mut stack,
-            )?;
-        }
-        // @pytest.mark.usefixtures (and the usefixtures ini option): named
-        // fixtures are set up before the test's own, values not passed in.
-        // Mark order follows iter_markers (upstream _getusefixturesnames):
-        // function marks, class marks base-class-first, module marks.
-        let usefixtures: Vec<String> = config
-            .get_ini("usefixtures")
-            .map(|value| {
-                value
-                    .split_whitespace()
-                    .map(str::to_string)
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default()
-            .into_iter()
-            .chain(
-                item.marks
-                    .iter()
-                    .filter(|mark| mark.name == "usefixtures")
-                    .flat_map(|mark| {
-                        mark.obj
-                            .bind(py)
-                            .getattr("args")
-                            .ok()
-                            .and_then(|args| args.extract::<Vec<String>>().ok())
-                            .unwrap_or_default()
-                    }),
-            )
-            .collect();
-        for name in &usefixtures {
-            if item.callspec.iter().any(|(param, _)| param == name) {
-                continue;
-            }
-            // `request` is the always-available pseudo-fixture, never in the
-            // registry; usefixtures("request") (pytest-bdd marks scenario
-            // functions that declare a `request` arg this way) is a no-op.
-            if name == "request" {
-                continue;
-            }
-            resolve_fixture(
-                py,
-                plugins,
-                session,
-                config,
-                name,
-                item,
-                instance.as_ref(),
-                &mut stack,
-            )?;
-        }
-        let mut kwargs = Vec::new();
-        let mut test_request: Option<Py<crate::request::PyRequest>> = None;
-        for name in &item.fixture_names {
-            if item.callspec.iter().any(|(param, _)| param == name) {
-                continue;
-            }
-            if name == "request" {
-                let node = crate::runner::item_node(py, item)?;
-                let req = Py::new(
-                    py,
-                    crate::request::PyRequest::new(
-                        None,
-                        node,
-                        None,
-                        crate::fixture::Scope::Function,
-                    ),
-                )?;
-                kwargs.push((name.clone(), req.clone_ref(py).into_any()));
-                test_request = Some(req);
-                continue;
-            }
-            let value = resolve_fixture(
-                py,
-                plugins,
-                session,
-                config,
-                name,
-                item,
-                instance.as_ref(),
-                &mut stack,
-            )?;
-            kwargs.push((name.clone(), value));
-        }
-        for (name, value) in &item.callspec {
-            // A callspec name outside the signature parametrizes a closure
-            // fixture (its value overrides the fixture, resolved on demand)
-            // and is not passed to the test (pytest semantics).
-            if item.fixture_names.iter().any(|fixture| fixture == name) {
-                kwargs.push((name.clone(), value.clone_ref(py)));
-            }
-        }
-        Ok((callable, kwargs, test_request))
-    })();
+    let setup_result = build_test_setup(py, plugins, session, config, item);
 
     let (callable, kwargs, test_request) = match setup_result {
         Ok(setup) => setup,
