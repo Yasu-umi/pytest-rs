@@ -67,6 +67,21 @@ class _CoreHeader:
         return lines
 
 
+class _CoreTestStatus:
+    """The (category, letter, word) default upstream's _pytest.runner /
+    _pytest.skipping pytest_report_teststatus impls provide. Registered first
+    so it dispatches last (the relay runs registered plugins LIFO), letting
+    plugin impls win the firstresult. Without it, plugins that call
+    config.hook.pytest_report_teststatus directly (pytest-bdd's
+    gherkin-terminal-reporter) get None and crash unpacking it."""
+
+    @staticmethod
+    def pytest_report_teststatus(report: Any, config: Any) -> Any:
+        from _pytest.terminal import _default_teststatus
+
+        return _default_teststatus(report)
+
+
 def setup(config: Any) -> None:
     """Register the default terminalreporter (called before the engine
     fires pytest_configure into Python plugins)."""
@@ -76,6 +91,7 @@ def setup(config: Any) -> None:
     from _pytest.terminal import TerminalReporter
 
     pluginmanager.register(_CoreHeader(), "_core_report_header")
+    pluginmanager.register(_CoreTestStatus(), "_core_teststatus")
     _default = TerminalReporter(config)
     pluginmanager.register(_default, "terminalreporter")
 
