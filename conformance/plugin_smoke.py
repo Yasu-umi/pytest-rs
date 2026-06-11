@@ -34,15 +34,15 @@ DEPS = [
     # The reporter byte-diff compares against this exact pytest (the shim
     # reports the same version string).
     "pytest==9.0.3",
-    "pytest-sugar",
-    "pytest-pretty",
-    "Faker",
-    "time-machine",
-    "requests-mock",
-    "pytest-randomly",
-    "inline-snapshot",
-    "pytest-run-parallel",
-    "requests",
+    "pytest-sugar==1.1.1",
+    "pytest-pretty==1.3.0",
+    "Faker==40.21.0",
+    "time-machine==3.2.0",
+    "requests-mock==1.12.1",
+    "pytest-randomly==4.1.0",
+    "inline-snapshot==0.34.1",
+    "pytest-run-parallel==0.9.1",
+    "requests==2.34.2",
 ]
 TIMEOUT_S = 120
 
@@ -53,6 +53,16 @@ NORMALIZERS = [
     (re.compile(r"pluggy-\d+\.\d+(\.\d+)?"), "pluggy-X"),
     (re.compile(r"^plugins: .*$", re.MULTILINE), "plugins: X"),
     (re.compile(r"^rootdir: .*$", re.MULTILINE), "rootdir: X"),
+    # The session-start header has two interchangeable layouts: pytest's
+    # classic two-line banner and pytest-sugar's one-line "Test session starts
+    # (platform: ...)". Which one a reporter emits is environment-dependent
+    # (it diverged only on linux/py3.13), so collapse both to one token — the
+    # header itself isn't what this reporter byte-diff is meant to assert.
+    (
+        re.compile(r"^=+ test session starts =+\nplatform .*$", re.MULTILINE),
+        "SESSION_HEADER",
+    ),
+    (re.compile(r"^Test session starts \(platform:.*$", re.MULTILINE), "SESSION_HEADER"),
 ]
 
 
