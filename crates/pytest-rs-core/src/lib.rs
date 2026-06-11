@@ -23,5 +23,6 @@ pub use pyo3;
 
 pub use config::{Config, OptDef, OptionParser};
 pub use engine::Engine;
+pub use engine::inprocess::{PluginFactory, register_plugin_factory};
 pub use hooks::{HookContext, HookResult, Plugin};
 pub use session::Session;

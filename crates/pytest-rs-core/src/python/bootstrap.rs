@@ -109,6 +109,25 @@ if not hasattr(_main, '__file__'):
     py.import("_pytest.config")?
         .setattr("_native_prepareconfig", prepareconfig)?;
 
+    // In-process nested run backing `pytester.inline_run`: builds a fresh
+    // config + plugin set from args and runs a whole session in this process.
+    // Returns the exit code; the Python wrapper handles sys.* snapshots, fd
+    // capture and HookRecorder registration around it.
+    let inline_run = pyo3::types::PyCFunction::new_closure(
+        py,
+        Some(c"_native_inline_run"),
+        None,
+        |args: &Bound<'_, pyo3::types::PyTuple>,
+         _kwargs: Option<&Bound<'_, pyo3::types::PyDict>>|
+         -> PyResult<Py<PyAny>> {
+            let py = args.py();
+            let arglist: Vec<String> = args.get_item(0)?.extract()?;
+            let code = crate::engine::inprocess::run_inprocess(py, arglist)?;
+            Ok(code.into_pyobject(py)?.into_any().unbind())
+        },
+    )?;
+    pytest_module.setattr("_native_inline_run", inline_run)?;
+
     // runtestprotocol delegation (pytest-rerunfailures): the re-entrant phase
     // runner and the logreport capture sink that records what a delegated
     // protocol logs. Both are no-ops outside a delegated run.

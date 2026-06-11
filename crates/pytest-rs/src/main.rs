@@ -48,6 +48,9 @@ fn main() {
     // Explicit interpreter startup (no pyo3 auto-initialize): required so the
     // binary can embed libpython statically for distribution.
     Python::initialize();
+    // In-process nested runs (pytester inline_run) build a fresh plugin set
+    // through this factory; the concrete (feature-gated) set lives here.
+    pytest_rs_core::register_plugin_factory(build_plugins);
     let mut plugins = build_plugins();
 
     let mut parser = OptionParser::default();

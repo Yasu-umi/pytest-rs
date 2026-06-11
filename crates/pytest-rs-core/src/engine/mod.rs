@@ -35,6 +35,7 @@ pub struct Engine {
 }
 
 mod hooks;
+pub mod inprocess;
 mod selection;
 mod terminal;
 
@@ -775,6 +776,35 @@ impl Engine {
             }
         }
         code
+    }
+
+    /// In-process nested run (backs pytester's `inline_run`): a fresh session
+    /// inside the already-running outer process. The shim, virtualenv, and
+    /// assertion rewriting are global and already installed by the outer run,
+    /// so we skip them and (re)configure only the per-session global state the
+    /// `run_session` core depends on, then run it.
+    ///
+    /// The caller swaps in a fresh global capture state and snapshots `sys.*`
+    /// around this call; minimal setup here is intentional — save/restore of
+    /// each global is added empirically as nested fidelity requires it.
+    pub(crate) fn run_nested(&mut self, py: Python<'_>) -> i32 {
+        let started = Instant::now();
+        // The nested config may declare its own pythonpath ini entries.
+        for rel in self.config.get_ini_lines("pythonpath") {
+            let abs = self.config.rootdir.join(rel);
+            let _ = python::sys_path_prepend(py, &abs);
+        }
+        // Capture: the caller pushed a fresh CaptureState; arm it for this run.
+        let capture_mode = if self.config.get_flag("capture-disable") {
+            "no"
+        } else {
+            self.config.get_value("capture").unwrap_or("fd")
+        };
+        python::configure_capture(py, capture_mode);
+        // Tests (and gc-dependent plugins) run, so gc must be on; the outer
+        // run leaves it enabled post-collection, but be explicit.
+        python::set_gc_enabled(py, true);
+        self.run_session(py, started)
     }
 
     /// Returns per-file collection errors (formatted).
