@@ -643,7 +643,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
 | rich | v14.2.0 | 855 | 0 | 0 | 25 | 880 | 100.0% | 60 | 62 | 0 |
-| pytest-bdd | 8.1.0 | 119 | 19 | 0 | 1 | 139 | 86.3% | 26 | 35 | 0 |
+| pytest-bdd | 8.1.0 | 120 | 18 | 0 | 1 | 139 | 87.1% | 26 | 35 | 0 |
 | pytest-django | v4.9.0 | 146 | 69 | 0 | 1 | 216 | 68.1% | 2 | 13 | 0 |
 
 ### pytest @ 9.0.3
@@ -1187,7 +1187,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/steps/test_given.py | passed | 1 | 0 | 0 | 0 |
 | tests/steps/test_keyword.py | passed | 1 | 0 | 0 | 0 |
 | tests/steps/test_unicode.py | passed | 2 | 0 | 0 | 0 |
-| tests/test_hooks.py | failed | 1 | 3 | 0 | 0 |
+| tests/test_hooks.py | failed | 2 | 2 | 0 | 0 |
 
 </details>
 

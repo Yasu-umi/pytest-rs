@@ -168,6 +168,44 @@ impl TestStatus {
     }
 }
 
+/// Fire conftest/plugin `pytest_pyfunc_call(pyfuncitem)` hooks (firstresult)
+/// before the native call. A truthy return means a plugin ran the test, so
+/// the engine skips its native invocation; None (e.g. a logging-only hook)
+/// falls through. The pyfuncitem exposes funcargs/obj like upstream.
+pub(crate) fn fire_pyfunc_call_hooks(
+    py: Python<'_>,
+    session: &Session,
+    item: &TestItem,
+    callable: &Py<PyAny>,
+    kwargs: &[(String, Py<PyAny>)],
+) -> PyResult<bool> {
+    let funcs: Vec<Py<PyAny>> = session
+        .py_hooks
+        .iter()
+        .filter(|hook| {
+            hook.name == "pytest_pyfunc_call" && item.nodeid.starts_with(hook.baseid.as_str())
+        })
+        .map(|hook| hook.func.clone_ref(py))
+        .collect();
+    if funcs.is_empty() {
+        return Ok(false);
+    }
+    let node = super::item_node(py, item)?;
+    let funcargs = pyo3::types::PyDict::new(py);
+    for (name, value) in kwargs {
+        funcargs.set_item(name, value.bind(py))?;
+    }
+    node.bind(py).setattr("funcargs", &funcargs)?;
+    node.bind(py).setattr("obj", callable.bind(py))?;
+    for func in funcs {
+        let result = python::call_py_hook_raw(py, &func, &[("pyfuncitem", node.clone_ref(py))])?;
+        if result.bind(py).is_truthy()? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
 pub(crate) fn fire_runtest_py_hooks(
     py: Python<'_>,
     session: &Session,

@@ -1008,6 +1008,13 @@ pub(crate) fn run_one_body(
         Err(err)
     } else {
         (|| -> PyResult<bool> {
+            // Native plugins (the Rust anyio/asyncio runners) claim async test
+            // calls first — their Python counterparts also expose a
+            // pytest_pyfunc_call, so letting those run instead would
+            // double-drive the test. Only if no native plugin handles the call
+            // do conftest/plugin pytest_pyfunc_call hooks get a turn (a truthy
+            // return means a hook invoked the test; a logging-only hook returns
+            // None and the engine calls it natively).
             let mut ctx = HookContext {
                 py,
                 session,
@@ -1020,6 +1027,9 @@ pub(crate) fn run_one_body(
                 {
                     return Ok(true);
                 }
+            }
+            if fire_pyfunc_call_hooks(py, session, item, &callable, &kwargs)? {
+                return Ok(true);
             }
             Ok(false)
         })()
