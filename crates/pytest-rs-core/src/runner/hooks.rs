@@ -219,12 +219,30 @@ pub(crate) fn fire_runtest_py_hooks(
         .filter(|hook| hook.name == name && item.nodeid.starts_with(hook.baseid.as_str()))
         .map(|hook| hook.func.clone_ref(py))
         .collect();
-    if funcs.is_empty() {
+    let recording = crate::engine::inprocess::recording();
+    if funcs.is_empty() && !recording {
         return Ok(());
     }
-    let node = super::item_node(py, item)?;
-    for func in funcs {
-        python::call_py_hook(py, &func, &[("item", node.clone_ref(py))])?;
+    // logstart/logfinish hookspecs take (nodeid, location); setup/teardown
+    // take (item). call_py_hook passes only what each impl's signature
+    // requests, so providing the right available kwargs per hook is enough.
+    let location_based =
+        name == "pytest_runtest_logstart" || name == "pytest_runtest_logfinish";
+    let kwargs: Vec<(&str, Py<PyAny>)> = if location_based {
+        let location = python::item_location(py, item)?;
+        vec![
+            ("nodeid", item.nodeid.clone().into_pyobject(py)?.into_any().unbind()),
+            ("location", location.unbind()),
+        ]
+    } else {
+        let node = super::item_node(py, item)?;
+        vec![("item", node)]
+    };
+    for func in &funcs {
+        python::call_py_hook(py, func, &kwargs)?;
+    }
+    if recording {
+        python::record_hook(py, name, &kwargs);
     }
     Ok(())
 }
@@ -250,6 +268,12 @@ pub(crate) fn start_runtest_py_wrappers(
         .filter(|hook| hook.name == name && item.nodeid.starts_with(hook.baseid.as_str()))
         .map(|hook| hook.func.clone_ref(py))
         .collect();
+    // In a nested run, surface the call-phase hook to the HookRecorder once
+    // per item (fixtures tests read getcalls("pytest_runtest_call")[0].item).
+    if name == "pytest_runtest_call" && crate::engine::inprocess::recording() {
+        let node = super::item_node(py, item)?;
+        python::record_hook(py, name, &[("item", node)]);
+    }
     if funcs.is_empty() {
         return Ok(Vec::new());
     }
