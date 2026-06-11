@@ -643,7 +643,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
 | rich | v14.2.0 | 855 | 0 | 0 | 25 | 880 | 100.0% | 60 | 62 | 0 |
-| pytest-bdd | 8.1.0 | 109 | 29 | 0 | 1 | 139 | 79.1% | 21 | 35 | 0 |
+| pytest-bdd | 8.1.0 | 118 | 20 | 0 | 1 | 139 | 85.6% | 26 | 35 | 0 |
 | pytest-django | v4.9.0 | 146 | 69 | 0 | 1 | 216 | 68.1% | 2 | 13 | 0 |
 
 ### pytest @ 9.0.3
@@ -1153,9 +1153,9 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| tests/args/cfparse/test_args.py | failed | 1 | 1 | 0 | 0 |
-| tests/args/parse/test_args.py | failed | 1 | 1 | 0 | 0 |
-| tests/args/regex/test_args.py | failed | 2 | 1 | 0 | 0 |
+| tests/args/cfparse/test_args.py | passed | 2 | 0 | 0 | 0 |
+| tests/args/parse/test_args.py | passed | 2 | 0 | 0 | 0 |
+| tests/args/regex/test_args.py | passed | 3 | 0 | 0 | 0 |
 | tests/args/test_common.py | passed | 2 | 0 | 0 | 0 |
 | tests/datatable/test_datatable.py | passed | 4 | 0 | 0 | 0 |
 | tests/feature/test_alias.py | passed | 1 | 0 | 0 | 0 |
@@ -1165,7 +1165,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/feature/test_feature_base_dir.py | passed | 7 | 0 | 0 | 0 |
 | tests/feature/test_gherkin_terminal_reporter.py | failed | 10 | 4 | 0 | 0 |
 | tests/feature/test_no_scenario.py | passed | 1 | 0 | 0 | 0 |
-| tests/feature/test_outline.py | failed | 4 | 3 | 0 | 0 |
+| tests/feature/test_outline.py | passed | 7 | 0 | 0 | 0 |
 | tests/feature/test_outline_empty_values.py | passed | 1 | 0 | 0 | 0 |
 | tests/feature/test_report.py | failed | 0 | 1 | 0 | 1 |
 | tests/feature/test_rule_example_format.py | passed | 1 | 0 | 0 | 0 |
@@ -1176,7 +1176,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/feature/test_tags.py | passed | 5 | 0 | 0 | 0 |
 | tests/feature/test_wrong.py | passed | 1 | 0 | 0 | 0 |
 | tests/generation/test_generate_missing.py | failed | 1 | 2 | 0 | 0 |
-| tests/library/test_parent.py | failed | 2 | 3 | 0 | 0 |
+| tests/library/test_parent.py | passed | 5 | 0 | 0 | 0 |
 | tests/parser/test_errors.py | passed | 7 | 0 | 0 | 0 |
 | tests/parser/test_parser.py | passed | 1 | 0 | 0 | 0 |
 | tests/scripts/test_generate.py | failed | 1 | 2 | 0 | 0 |

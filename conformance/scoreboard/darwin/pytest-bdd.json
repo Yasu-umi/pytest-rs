@@ -6,28 +6,28 @@
   "files": [
     {
       "file": "tests/args/cfparse/test_args.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 1,
-      "failed": 1,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 2,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },
     {
       "file": "tests/args/parse/test_args.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 1,
-      "failed": 1,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 2,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },
     {
       "file": "tests/args/regex/test_args.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 2,
-      "failed": 1,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 3,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },
@@ -114,10 +114,10 @@
     },
     {
       "file": "tests/feature/test_outline.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 4,
-      "failed": 3,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 7,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },
@@ -213,10 +213,10 @@
     },
     {
       "file": "tests/library/test_parent.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 2,
-      "failed": 3,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 5,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },

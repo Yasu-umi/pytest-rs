@@ -799,6 +799,12 @@ pub(crate) fn run_one_body(
             if item.callspec.iter().any(|(param, _)| param == name) {
                 continue;
             }
+            // `request` is the always-available pseudo-fixture, never in the
+            // registry; usefixtures("request") (pytest-bdd marks scenario
+            // functions that declare a `request` arg this way) is a no-op.
+            if name == "request" {
+                continue;
+            }
             resolve_fixture(
                 py,
                 plugins,

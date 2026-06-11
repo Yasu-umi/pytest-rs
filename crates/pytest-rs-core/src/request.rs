@@ -721,8 +721,15 @@ impl PyRequest {
     /// request's FixtureManager view rather than the Rust registry; consult
     /// it first so those names resolve (a pinned `cached_result` value, or an
     /// alias to a collected step fixture via `registry_name`).
-    fn getfixturevalue(&self, py: Python<'_>, argname: &str) -> PyResult<Py<PyAny>> {
-        if let Some(fm) = self.manager(py)
+    fn getfixturevalue(slf: Bound<'_, Self>, argname: &str) -> PyResult<Py<PyAny>> {
+        let py = slf.py();
+        // pytest's `request` fixture resolves to the request itself
+        // (pytest-bdd asks for it when a scenario function declares `request`).
+        if argname == "request" {
+            return Ok(slf.into_any().unbind());
+        }
+        let this = slf.borrow();
+        if let Some(fm) = this.manager(py)
             && let Some(value) = Self::resolve_via_manager(py, fm.bind(py), argname)?
         {
             return Ok(value);
