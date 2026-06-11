@@ -1,0 +1,69 @@
+# CI-parity linux/py3.13 dev environment (see docker/dev.Dockerfile).
+#
+# Reproduces the GitHub Actions `rust (python 3.13)` job locally, for the
+# conformance / plugin-smoke results that diverge from macOS. The target/ and
+# .tmp/ trees are named volumes so the linux build and linux-installed suite
+# deps never clobber the host (macOS) ones.
+#
+#   docker compose run --rm build        # cargo build
+#   docker compose run --rm test         # cargo test --workspace
+#   docker compose run --rm lint         # cargo fmt/clippy + ruff/mypy (pre-push gate)
+#   docker compose run --rm smoke        # build + plugin_smoke (reporter byte-diffs)
+#   docker compose run --rm conformance  # build + conformance --check (pin gate)
+#   docker compose run --rm ci           # the full CI gate (lint + build + both)
+#   docker compose run --rm dev          # interactive shell in the CI-parity env
+#   docker compose run --rm dev bash -lc "<any command>"   # one-off in CI-parity env
+#
+# target/ and .tmp/ are named volumes, so the linux build cache and suite deps
+# persist across runs (incremental cargo builds) without touching the host.
+
+x-dev: &dev
+  build:
+    context: .
+    dockerfile: docker/dev.Dockerfile
+  image: pytest-rs-dev
+  volumes:
+    - .:/workspace
+    - linux-target:/workspace/target # linux build, isolated from host target/
+    - linux-tmp:/workspace/.tmp # linux suite deps + checkouts, isolated from host
+  working_dir: /workspace
+
+services:
+  dev:
+    <<: *dev
+    command: bash
+
+  build:
+    <<: *dev
+    command: cargo build
+
+  test:
+    <<: *dev
+    command: cargo test --workspace
+
+  lint:
+    <<: *dev
+    command: >
+      bash -lc "uv sync &&
+                uv run --no-sync ruff check crates conformance &&
+                uv run --no-sync ruff format --check crates conformance &&
+                uv run --no-sync mypy &&
+                for t in crates/pytest-rs-asyncio crates/pytest-rs-benchmark crates/pytest-rs-cov crates/pytest-rs-mock; do uv run --no-sync mypy \"$$t/py\"; done &&
+                cargo fmt --all --check &&
+                cargo clippy --all-targets -- -D warnings"
+
+  smoke:
+    <<: *dev
+    command: bash -lc "cargo build && python conformance/plugin_smoke.py"
+
+  conformance:
+    <<: *dev
+    command: bash -lc "cargo build && python conformance/runner.py --check"
+
+  ci:
+    <<: *dev
+    command: bash -lc "cargo build && python conformance/runner.py --check && python conformance/plugin_smoke.py"
+
+volumes:
+  linux-target:
+  linux-tmp:
