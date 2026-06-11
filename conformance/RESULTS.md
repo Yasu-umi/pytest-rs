@@ -6,7 +6,9 @@ this file and the README table. Linux is canonical: CI re-runs the suites
 and auto-commits updated results on pushes to main.
 
 Accounting: `total = passed + failed + errors + skipped`, summed over the
-upstream test files of each suite. `skipped` counts tests the upstream
+upstream test files of each suite. `conformant % = (passed + skipped) /
+total` — reproducing an upstream skip matches pytest's behaviour, so it
+counts toward conformance. `skipped` counts tests the upstream
 suites explicitly skip when run under pytest-rs. Excluded files (the
 per-suite lists in `conformance/expected/*.toml` plus path patterns in
 `conformance/suites.toml`) are not run at all and only show up in the
@@ -14,17 +16,17 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 ## linux (CI-verified)
 
-| suite | tag | passed | failed | errors | skipped | total | pass % | files all-pass | files run | files excluded |
+| suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 1861 | 356 | 4 | 24 | 2245 | 82.9% | 8 | 45 | 63 |
+| pytest | 9.0.3 | 1861 | 356 | 4 | 24 | 2245 | 84.0% | 8 | 45 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
-| pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 98.9% | 1 | 1 | 0 |
-| pytest-cov | v7.1.0 | 186 | 20 | 0 | 3 | 209 | 89.0% | 0 | 1 | 0 |
+| pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
+| pytest-cov | v7.1.0 | 186 | 20 | 0 | 3 | 209 | 90.4% | 0 | 1 | 0 |
 | pytest-xdist | v3.8.0 | 90 | 8 | 0 | 0 | 98 | 91.8% | 0 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
-| pytest-benchmark | v5.1.0 | 91 | 31 | 0 | 1 | 123 | 74.0% | 4 | 7 | 6 |
-| pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 41 | 97.6% | 1 | 1 | 0 |
-| anyio | 4.13.0 | 3120 | 0 | 0 | 42 | 3162 | 98.7% | 26 | 26 | 0 |
+| pytest-benchmark | v5.1.0 | 91 | 31 | 0 | 1 | 123 | 74.8% | 4 | 7 | 6 |
+| pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 41 | 100.0% | 1 | 1 | 0 |
+| anyio | 4.13.0 | 3120 | 0 | 0 | 42 | 3162 | 100.0% | 26 | 26 | 0 |
 | pytest-mypy | v1.0.1 | 24 | 54 | 0 | 0 | 78 | 30.8% | 0 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-subtests | v0.14.2 | 10 | 22 | 0 | 0 | 32 | 31.2% | 0 | 1 | 0 |
@@ -36,14 +38,14 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pytest-repeat | v0.9.4 | 11 | 5 | 0 | 0 | 16 | 68.8% | 0 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 48 | 15 | 0 | 0 | 63 | 76.2% | 0 | 1 | 0 |
 | pytest-env | 1.6.0 | 67 | 8 | 0 | 0 | 75 | 89.3% | 2 | 3 | 0 |
-| pytest-rerunfailures | 9.1.1 | 34 | 13 | 0 | 1 | 48 | 70.8% | 0 | 1 | 0 |
+| pytest-rerunfailures | 9.1.1 | 34 | 13 | 0 | 1 | 48 | 72.9% | 0 | 1 | 0 |
 | pytest-randomly | 4.1.0 | 32 | 5 | 0 | 0 | 37 | 86.5% | 0 | 1 | 0 |
-| click | 8.3.1 | 1314 | 0 | 0 | 21 | 1335 | 98.4% | 20 | 20 | 0 |
+| click | 8.3.1 | 1314 | 0 | 0 | 21 | 1335 | 100.0% | 20 | 20 | 0 |
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
-| rich | v14.2.0 | 855 | 0 | 0 | 25 | 880 | 97.2% | 60 | 62 | 0 |
-| pytest-bdd | 8.1.0 | 37 | 101 | 0 | 1 | 139 | 26.6% | 6 | 35 | 0 |
-| pytest-django | v4.9.0 | 146 | 69 | 0 | 1 | 216 | 67.6% | 2 | 13 | 0 |
+| rich | v14.2.0 | 855 | 0 | 0 | 25 | 880 | 100.0% | 60 | 62 | 0 |
+| pytest-bdd | 8.1.0 | 37 | 101 | 0 | 1 | 139 | 27.3% | 6 | 35 | 0 |
+| pytest-django | v4.9.0 | 146 | 69 | 0 | 1 | 216 | 68.1% | 2 | 13 | 0 |
 
 ### pytest @ 9.0.3
 
@@ -613,17 +615,17 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 ## darwin (dev snapshot)
 
-| suite | tag | passed | failed | errors | skipped | total | pass % | files all-pass | files run | files excluded |
+| suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 1885 | 333 | 4 | 24 | 2246 | 83.9% | 8 | 46 | 63 |
+| pytest | 9.0.3 | 1885 | 333 | 4 | 24 | 2246 | 85.0% | 8 | 46 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
-| pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 98.9% | 1 | 1 | 0 |
-| pytest-cov | v7.1.0 | 186 | 19 | 0 | 4 | 209 | 89.0% | 0 | 1 | 0 |
+| pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
+| pytest-cov | v7.1.0 | 186 | 19 | 0 | 4 | 209 | 90.9% | 0 | 1 | 0 |
 | pytest-xdist | v3.8.0 | 26 | 4 | 0 | 0 | 30 | 86.7% | 0 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
-| pytest-benchmark | v5.1.0 | 91 | 31 | 0 | 1 | 123 | 74.0% | 4 | 7 | 6 |
-| pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 41 | 97.6% | 1 | 1 | 0 |
-| anyio | 4.13.0 | 2860 | 0 | 0 | 302 | 3162 | 90.4% | 26 | 26 | 0 |
+| pytest-benchmark | v5.1.0 | 91 | 31 | 0 | 1 | 123 | 74.8% | 4 | 7 | 6 |
+| pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 41 | 100.0% | 1 | 1 | 0 |
+| anyio | 4.13.0 | 2860 | 0 | 0 | 302 | 3162 | 100.0% | 26 | 26 | 0 |
 | pytest-mypy | v1.0.1 | 25 | 53 | 0 | 0 | 78 | 32.1% | 0 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-subtests | v0.14.2 | 10 | 22 | 0 | 0 | 32 | 31.2% | 0 | 1 | 0 |
@@ -635,13 +637,13 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pytest-repeat | v0.9.4 | 11 | 5 | 0 | 0 | 16 | 68.8% | 0 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 48 | 15 | 0 | 0 | 63 | 76.2% | 0 | 1 | 0 |
 | pytest-env | 1.6.0 | 67 | 8 | 0 | 0 | 75 | 89.3% | 2 | 3 | 0 |
-| pytest-rerunfailures | 9.1.1 | 34 | 13 | 0 | 1 | 48 | 70.8% | 0 | 1 | 0 |
+| pytest-rerunfailures | 9.1.1 | 34 | 13 | 0 | 1 | 48 | 72.9% | 0 | 1 | 0 |
 | pytest-randomly | 4.1.0 | 32 | 5 | 0 | 0 | 37 | 86.5% | 0 | 1 | 0 |
-| click | 8.3.1 | 1313 | 0 | 0 | 22 | 1335 | 98.4% | 20 | 20 | 0 |
+| click | 8.3.1 | 1313 | 0 | 0 | 22 | 1335 | 100.0% | 20 | 20 | 0 |
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
-| rich | v14.2.0 | 855 | 0 | 0 | 25 | 880 | 97.2% | 60 | 62 | 0 |
-| pytest-bdd | 8.1.0 | 37 | 101 | 0 | 1 | 139 | 26.6% | 6 | 35 | 0 |
+| rich | v14.2.0 | 855 | 0 | 0 | 25 | 880 | 100.0% | 60 | 62 | 0 |
+| pytest-bdd | 8.1.0 | 37 | 101 | 0 | 1 | 139 | 27.3% | 6 | 35 | 0 |
 | pytest-django | v4.9.0 | 0 | 0 | 0 | 0 | 0 | - | 0 | 13 | 0 |
 
 ### pytest @ 9.0.3

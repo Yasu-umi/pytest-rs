@@ -244,17 +244,20 @@ def load_excluded(suite: Suite) -> dict[str, str]:
 
 
 def suite_summary(results: list[FileResult], excluded: int) -> str:
-    """Aligned stats: tests passed/total (%), file tally, oddity notes.
+    """Aligned stats: tests conformant/total (%), file tally, oddity notes.
 
     "tests" counts individual test outcomes summed across every file, with
-    total = passed + failed + errors + skipped; "files" counts per-file runs
-    (a file is all-pass only when its whole run exited cleanly)."""
+    total = passed + failed + errors + skipped; conformant = passed + skipped
+    (reproducing an upstream skip is matching pytest's behaviour, so it counts
+    toward conformance). "files" counts per-file runs (a file is all-pass only
+    when its whole run exited cleanly)."""
     passed = sum(r.passed for r in results)
     failed = sum(r.failed for r in results)
     errors = sum(r.errors for r in results)
     skipped = sum(r.skipped for r in results)
     total = passed + failed + errors + skipped
-    pct = f"{passed / total * 100:5.1f}%" if total else "    -"
+    conformant = passed + skipped
+    pct = f"{conformant / total * 100:5.1f}%" if total else "    -"
     files_ok = sum(1 for r in results if r.status == "passed")
     notes = []
     if skipped:
@@ -269,7 +272,7 @@ def suite_summary(results: list[FileResult], excluded: int) -> str:
         notes.append(f"{excluded} files excluded")
     note = f"  [{'; '.join(notes)}]" if notes else ""
     return (
-        f"tests {passed:>5}/{total:<5} ({pct})   "
+        f"tests {conformant:>5}/{total:<5} ({pct})   "
         f"files {files_ok:>2}/{len(results):<3} all-pass{note}"
     )
 
@@ -423,7 +426,7 @@ def cross_suite_tables(boards: list[dict]) -> list[str]:
 def cross_suite_table(boards: list[dict]) -> list[str]:
     """One cross-suite markdown table."""
     lines = [
-        "| suite | tag | passed | failed | errors | skipped | total | pass % "
+        "| suite | tag | passed | failed | errors | skipped | total | conformant % "
         "| files all-pass | files run | files excluded |",
         "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
@@ -434,7 +437,7 @@ def cross_suite_table(boards: list[dict]) -> list[str]:
         errors = sum(f["errors"] for f in files)
         skipped = sum(f["skipped"] for f in files)
         total = passed + failed + errors + skipped
-        pct = f"{passed / total * 100:.1f}%" if total else "-"
+        pct = f"{(passed + skipped) / total * 100:.1f}%" if total else "-"
         files_ok = sum(1 for f in files if f["status"] == "passed")
         lines.append(
             f"| {board['suite']} | {board['tag']} | {passed} | {failed} | {errors} "
@@ -457,7 +460,9 @@ def render_results_doc(suites: list[Suite]) -> str:
         "and auto-commits updated results on pushes to main.",
         "",
         "Accounting: `total = passed + failed + errors + skipped`, summed over the",
-        "upstream test files of each suite. `skipped` counts tests the upstream",
+        "upstream test files of each suite. `conformant % = (passed + skipped) /",
+        "total` — reproducing an upstream skip matches pytest's behaviour, so it",
+        "counts toward conformance. `skipped` counts tests the upstream",
         "suites explicitly skip when run under pytest-rs. Excluded files (the",
         "per-suite lists in `conformance/expected/*.toml` plus path patterns in",
         "`conformance/suites.toml`) are not run at all and only show up in the",
