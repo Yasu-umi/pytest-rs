@@ -132,10 +132,10 @@
     },
     {
       "file": "tests/feature/test_report.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 0,
-      "failed": 1,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
       "skipped": 1,
       "errors": 0
     },
@@ -177,10 +177,10 @@
     },
     {
       "file": "tests/feature/test_steps.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 11,
-      "failed": 2,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 13,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },

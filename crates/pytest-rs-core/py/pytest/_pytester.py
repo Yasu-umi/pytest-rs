@@ -522,10 +522,22 @@ class Pytester:
         return self.path / f".{prefix}-{n}"
 
     def inline_run(self, *args):
-        # No in-process runner: a subprocess -v run parsed into a
-        # HookRecorder-shaped result (ret / assertoutcome / listoutcomes).
-        # The child's output is echoed so capsys sees what an in-process
-        # run would have printed.
+        # Two backends: a subprocess run parsed into a HookRecorder-shaped
+        # result (the default, robust for the whole suite) and an in-process
+        # nested run that captures live hook-call objects via a real
+        # HookRecorder. The in-process path is still being hardened (hook
+        # instrumentation + session-global save/restore), so it is opt-in
+        # behind PYTEST_RS_INLINE_INPROCESS until it is net-positive.
+        import os
+
+        if os.environ.get("PYTEST_RS_INLINE_INPROCESS"):
+            return self._inline_run_inprocess(*args)
+        return self._inline_run_subprocess(*args)
+
+    def _inline_run_subprocess(self, *args):
+        # A subprocess -v run parsed into a HookRecorder-shaped result
+        # (ret / assertoutcome / listoutcomes). The child's output is echoed
+        # so capsys sees what an in-process run would have printed.
         import json
         import sys
 
@@ -545,6 +557,122 @@ class Pytester:
         except (OSError, Exception):
             pass
         return InlineRunResult(result, hook_events)
+
+    def _inline_run_inprocess(self, *args):
+        # In-process nested run: the native engine runs a whole session in
+        # this process and fires its hooks through the monitored plugin
+        # manager, so the HookRecorder captures live call objects (getcalls,
+        # getreports, assertoutcome) — including custom hooks a subprocess
+        # JSON relay could never carry.
+        import os
+        import sys
+        import tempfile
+
+        import pytest
+        import pytest._capture as _capture
+        import pytest._marks as _marks
+        import pytest._node as _node
+        from _pytest.pytester import HookRecorder
+        from pytest._pluginmanager import pluginmanager
+
+        run_args = [str(arg) for arg in args]
+
+        # Snapshot module/path/cwd so the inner run does not pollute ours
+        # (a separate subprocess used to give this isolation for free).
+        modules_before = sys.modules.copy()
+        syspath_before = list(sys.path)
+        cwd_before = os.getcwd()
+
+        # Per-session global state the native engine mutates lives in shim
+        # module singletons; a nested run would leak it to the outer session
+        # (e.g. an inner `-x` run setting session.shouldstop, or reconfiguring
+        # the mark generator). Swap in fresh state and restore afterwards.
+        _sentinel = object()
+        old_session_state = _node._session_state
+        _node._session_state = {
+            "shouldfail": None,
+            "shouldstop": None,
+            "items": [],
+            "session_markers": [],
+            "session_keywords": {},
+        }
+        old_added_marks = list(_node._added_marks)
+        _node._added_marks.clear()
+        _mark_attrs = ("_config", "_strict", "_markers", "_strict_parametrization_ids")
+        old_mark_state = {k: getattr(_marks.mark, k, _sentinel) for k in _mark_attrs}
+
+        reprec = HookRecorder(pluginmanager)
+        # The inner run gets a fresh global capture state so its per-item
+        # capture bookkeeping does not corrupt the outer session's.
+        old_capstate = _capture.state
+        inner_capstate = _capture.CaptureState()
+        _capture.state = inner_capstate
+
+        # Redirect fds 1/2 to temp files: the inner run's terminal output
+        # (printed by the native engine straight to the fds) is collected
+        # here, then echoed into the outer streams so capsys/caplog of the
+        # enclosing test see what an in-process run would have printed.
+        out_f = tempfile.TemporaryFile()
+        err_f = tempfile.TemporaryFile()
+        sys.stdout.flush()
+        sys.stderr.flush()
+        saved_out = os.dup(1)
+        saved_err = os.dup(2)
+        os.dup2(out_f.fileno(), 1)
+        os.dup2(err_f.fileno(), 2)
+        try:
+            ret = pytest._native_inline_run(run_args)
+        finally:
+            sys.stdout.flush()
+            sys.stderr.flush()
+            os.dup2(saved_out, 1)
+            os.dup2(saved_err, 2)
+            os.close(saved_out)
+            os.close(saved_err)
+            # Stop the inner capture if a run path left it active, so its
+            # temp files are closed (else a ResourceWarning leaks).
+            try:
+                if inner_capstate._capture is not None:
+                    inner_capstate.session_end()
+            except Exception:
+                pass
+            _capture.state = old_capstate
+            reprec.finish_recording()
+            # Restore the session-state singletons swapped in above.
+            _node._session_state = old_session_state
+            _node._added_marks[:] = old_added_marks
+            for key, value in old_mark_state.items():
+                if value is _sentinel:
+                    if hasattr(_marks.mark, key):
+                        delattr(_marks.mark, key)
+                else:
+                    setattr(_marks.mark, key, value)
+            # Restore the module table, sys.path and cwd (SysModulesSnapshot).
+            for name in list(sys.modules):
+                if name not in modules_before:
+                    del sys.modules[name]
+            sys.modules.update(modules_before)
+            sys.path[:] = syspath_before
+            os.chdir(cwd_before)
+
+        out_f.seek(0)
+        err_f.seek(0)
+        outlines = out_f.read().decode(errors="replace").splitlines()
+        errlines = err_f.read().decode(errors="replace").splitlines()
+        out_f.close()
+        err_f.close()
+        if outlines:
+            sys.stdout.write("\n".join(outlines) + "\n")
+        if errlines:
+            sys.stderr.write("\n".join(errlines) + "\n")
+
+        reprec.ret = ret
+        # Carry the captured output for tests reaching past the HookRecorder
+        # API (e.g. result.stdout / .outlines like the old InlineRunResult).
+        reprec._result = RunResult(ret, outlines, errlines, 0.0)
+        reprec.outlines = outlines
+        reprec.errlines = errlines
+        return reprec
 
     def inline_runsource(self, source, *args):
         path = self.makepyfile(source)
