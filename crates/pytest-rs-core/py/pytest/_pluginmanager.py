@@ -138,13 +138,22 @@ class HookCaller:
         # pluggy wrapper semantics: wrapper/hookwrapper impls surround the
         # plain impls (run-parallel wraps pytest_report_teststatus this way).
         wrappers = []
-        plain = []
+        plain_first = []
+        plain_normal = []
+        plain_last = []
         for func in impls:
             opts = getattr(func, "pytest_impl", None) or {}
             if opts.get("wrapper") or opts.get("hookwrapper"):
                 wrappers.append((func, bool(opts.get("hookwrapper"))))
+            elif opts.get("tryfirst"):
+                plain_first.append(func)
+            elif opts.get("trylast"):
+                plain_last.append(func)
             else:
-                plain.append(func)
+                plain_normal.append(func)
+        # pluggy order: tryfirst impls run first, trylast last, others between
+        # (stable within each group — `impls` is already reverse-registration).
+        plain = plain_first + plain_normal + plain_last
 
         started = []
         for func, old_style in wrappers:
@@ -256,6 +265,7 @@ class PluginManager:
         # plugin registers them via pytest_addhooks.
         self._specs: dict[str, dict[str, Any]] = {
             "pytest_report_teststatus": {"firstresult": True},
+            "pytest_runtest_makereport": {"firstresult": True},
         }
         # (before, after) callbacks fired around every hook call (HookRecorder
         # registers itself here to record calls; see add_hookcall_monitoring).

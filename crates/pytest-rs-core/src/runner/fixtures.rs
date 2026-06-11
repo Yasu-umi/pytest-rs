@@ -24,6 +24,26 @@ pub(crate) struct ResolveCtx {
 thread_local! {
     static RESOLVE_CTX: std::cell::RefCell<Vec<ResolveCtx>> =
         const { std::cell::RefCell::new(Vec::new()) };
+    /// The running item's node proxy, shared by every `request.node` and the
+    /// logreport/makereport report so attributes a plugin sets during the
+    /// test (pytest-bdd's `__scenario_report__`) survive to makereport.
+    static ITEM_NODE: std::cell::RefCell<Option<(String, Py<PyAny>)>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// A node proxy for `item`, stable across the item's run (cached per nodeid).
+/// Use wherever request.node and the report must be the same object.
+pub(crate) fn item_node(py: Python<'_>, item: &TestItem) -> PyResult<Py<PyAny>> {
+    ITEM_NODE.with(|cell| {
+        if let Some((nodeid, node)) = cell.borrow().as_ref()
+            && nodeid == &item.nodeid
+        {
+            return Ok(node.clone_ref(py));
+        }
+        let node = python::make_node(py, item)?;
+        *cell.borrow_mut() = Some((item.nodeid.clone(), node.clone_ref(py)));
+        Ok(node)
+    })
 }
 
 /// Pops the context pushed by `push_resolve_ctx` (kept alive for the whole
@@ -53,6 +73,9 @@ pub(crate) fn push_resolve_ctx(
             class_instance: None,
         });
     });
+    // New item run: drop the previous item's cached node so request.node and
+    // the report node for this item share a fresh object.
+    ITEM_NODE.with(|cell| *cell.borrow_mut() = None);
     ResolveCtxGuard(())
 }
 
@@ -278,7 +301,7 @@ pub(crate) fn resolve_fixture_def(
         let mut kwargs = Vec::new();
         for dep in &def.param_names {
             if dep == "request" {
-                let node = python::make_node(py, item)?;
+                let node = item_node(py, item)?;
                 let req = Py::new(
                     py,
                     crate::request::PyRequest::new(

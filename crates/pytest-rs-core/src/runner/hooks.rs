@@ -51,6 +51,30 @@ pub(crate) fn fire_logreport_hooks(
             Ok(())
         })();
     }
+    // Fire pytest_runtest_makereport hookwrappers so plugins enrich the report
+    // (pytest-bdd attaches .scenario for its gherkin reporter) before logging.
+    // Only when such a hook is registered for this item and we know its node.
+    if let Some(item) = item
+        && session.py_hooks.iter().any(|h| {
+            h.name == "pytest_runtest_makereport" && report.nodeid.starts_with(h.baseid.as_str())
+        })
+    {
+        let when = match report.phase {
+            crate::report::Phase::Setup => "setup",
+            crate::report::Phase::Call => "call",
+            crate::report::Phase::Teardown => "teardown",
+        };
+        let result = (|| -> PyResult<()> {
+            let node = super::item_node(py, item)?;
+            py.import("pytest._reporter")?
+                .getattr("run_makereport")?
+                .call1((proxy.bind(py), node, when))?;
+            Ok(())
+        })();
+        if let Err(err) = result {
+            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+        }
+    }
     for func in &funcs {
         if let Err(err) = python::call_py_hook(py, func, &[("report", proxy.clone_ref(py))]) {
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
@@ -159,7 +183,7 @@ pub(crate) fn fire_runtest_py_hooks(
     if funcs.is_empty() {
         return Ok(());
     }
-    let node = python::make_node(py, item)?;
+    let node = super::item_node(py, item)?;
     for func in funcs {
         python::call_py_hook(py, &func, &[("item", node.clone_ref(py))])?;
     }
@@ -190,7 +214,7 @@ pub(crate) fn start_runtest_py_wrappers(
     if funcs.is_empty() {
         return Ok(Vec::new());
     }
-    let node = python::make_node(py, item)?;
+    let node = super::item_node(py, item)?;
     let next_fn = py.import("builtins")?.getattr("next")?;
     let isgenfunc = py.import("inspect")?.getattr("isgeneratorfunction")?;
     let mut wrappers = Vec::new();

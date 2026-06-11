@@ -817,7 +817,7 @@ pub(crate) fn run_one_body(
                 continue;
             }
             if name == "request" {
-                let node = python::make_node(py, item)?;
+                let node = crate::runner::item_node(py, item)?;
                 let req = Py::new(
                     py,
                     crate::request::PyRequest::new(

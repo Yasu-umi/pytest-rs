@@ -19,6 +19,13 @@ from pytest._pluginmanager import _accepted_kwargs, pluginmanager
 _default: Any = None
 
 
+def _trylast(func):
+    """Mark a hook impl to dispatch last (pluggy trylast) without importing
+    pytest here — the relay reads `pytest_impl`."""
+    func.pytest_impl = {"trylast": True}
+    return func
+
+
 class _CoreHeader:
     """The rootdir/plugins header lines upstream's built-in
     pytest_report_header impls contribute (reporter-replacing plugins call
@@ -76,10 +83,51 @@ class _CoreTestStatus:
     gherkin-terminal-reporter) get None and crash unpacking it."""
 
     @staticmethod
+    @_trylast
     def pytest_report_teststatus(report: Any, config: Any) -> Any:
         from _pytest.terminal import _default_teststatus
 
         return _default_teststatus(report)
+
+
+class _CallInfo:
+    """Minimal _pytest.runner.CallInfo stand-in for pytest_runtest_makereport
+    consumers (pytest-bdd reads only item/report; others may read when)."""
+
+    def __init__(self, when, excinfo=None):
+        self.when = when
+        self.excinfo = excinfo
+        self.result = None
+        self.start = 0.0
+        self.stop = 0.0
+        self.duration = 0.0
+
+
+_makereport_result: Any = None
+
+
+class _CoreMakeReport:
+    """The plain (firstresult) pytest_runtest_makereport impl upstream's
+    _pytest.runner provides: it returns the report the engine already built,
+    which registered hookwrappers (pytest-bdd attaching .scenario) post-process
+    before pytest_runtest_logreport. Registered first so it dispatches last."""
+
+    @staticmethod
+    @_trylast
+    def pytest_runtest_makereport(item: Any, call: Any) -> Any:
+        return _makereport_result
+
+
+def run_makereport(report: Any, node: Any, when: str) -> Any:
+    """Drive registered pytest_runtest_makereport hookwrappers over `report`
+    so plugins can enrich it (pytest-bdd's .scenario) before it is logged."""
+    global _makereport_result
+    _makereport_result = report
+    try:
+        pluginmanager.hook.pytest_runtest_makereport(item=node, call=_CallInfo(when))
+    finally:
+        _makereport_result = None
+    return report
 
 
 def setup(config: Any) -> None:
@@ -92,6 +140,7 @@ def setup(config: Any) -> None:
 
     pluginmanager.register(_CoreHeader(), "_core_report_header")
     pluginmanager.register(_CoreTestStatus(), "_core_teststatus")
+    pluginmanager.register(_CoreMakeReport(), "_core_makereport")
     _default = TerminalReporter(config)
     pluginmanager.register(_default, "terminalreporter")
 
