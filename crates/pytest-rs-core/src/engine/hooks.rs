@@ -403,10 +403,14 @@ impl Engine {
         // Publish session.items / session.testscollected regardless of
         // hook presence: pytest_sessionfinish readers need them too.
         python::set_session_items(py, &self.session.items)?;
-        if hook_funcs.is_empty() && self.session.custom_reporter.is_none() {
+        if hook_funcs.is_empty()
+            && self.session.custom_reporter.is_none()
+            && !crate::engine::inprocess::recording()
+        {
             return Ok(());
         }
         let session = python::make_session_proxy(py, &self.config)?;
+        python::record_hook(py, "pytest_collection_finish", &[("session", session.clone_ref(py))]);
         for func in &hook_funcs {
             python::call_py_hook(py, func, &[("session", session.clone_ref(py))])?;
         }

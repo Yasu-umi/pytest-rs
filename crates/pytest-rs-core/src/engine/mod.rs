@@ -789,6 +789,9 @@ impl Engine {
     /// each global is added empirically as nested fidelity requires it.
     pub(crate) fn run_nested(&mut self, py: Python<'_>) -> i32 {
         let started = Instant::now();
+        // While this guard lives, hook dispatch notifies the plugin manager's
+        // call monitors (HookRecorder) with live kwargs so getcalls works.
+        let _recording = inprocess::RecordingGuard::enter();
         // The nested config may declare its own pythonpath ini entries.
         for rel in self.config.get_ini_lines("pythonpath") {
             let abs = self.config.rootdir.join(rel);

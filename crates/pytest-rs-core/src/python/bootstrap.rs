@@ -493,6 +493,25 @@ pub fn scan_py_hooks(
     Ok(())
 }
 
+/// During an in-process nested run, notify the plugin manager's call
+/// monitors (a HookRecorder) of a hook invocation with its live kwargs, so
+/// `getcalls` observes the call — including custom hooks the native engine
+/// dispatches directly rather than through pluggy. No-op on the outer run
+/// (recording depth is zero, so this never crosses into Python).
+pub fn record_hook(py: Python<'_>, name: &str, available: &[(&str, Py<PyAny>)]) {
+    if !crate::engine::inprocess::recording() {
+        return;
+    }
+    let kwargs = PyDict::new(py);
+    for (key, value) in available {
+        let _ = kwargs.set_item(key, value.bind(py));
+    }
+    let _ = py
+        .import("pytest._pluginmanager")
+        .and_then(|m| m.getattr("pluginmanager"))
+        .and_then(|pm| pm.call_method1("record_hook", (name, kwargs)));
+}
+
 /// Call a conftest/plugin hook with only the keyword arguments its
 /// signature requests, without driving generator results — callers that
 /// wrap a phase (hookwrappers) advance/finish the generator themselves.

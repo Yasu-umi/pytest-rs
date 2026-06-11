@@ -287,6 +287,21 @@ class PluginManager:
 
         return undo
 
+    def record_hook(self, name, kwargs):
+        """Notify the registered call monitors of a hook invocation without
+        executing any implementations. The native engine dispatches conftest
+        and plugin hooks directly (not through HookCaller), so during an
+        in-process nested run it calls this so a HookRecorder's getcalls sees
+        the live call objects (including custom hooks)."""
+        monitors = self._call_monitors
+        if not monitors:
+            return
+        for before, _after in monitors:
+            before(name, [], kwargs)
+        outcome = _Result(None)
+        for _before, after in monitors:
+            after(outcome, name, [], kwargs)
+
     def getplugin(self, name: str) -> Any:
         if name in self._names:
             return self._names[name]

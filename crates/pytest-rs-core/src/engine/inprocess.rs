@@ -6,11 +6,40 @@
 //! JSON relay can never carry.
 
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use pyo3::prelude::*;
 
 use crate::engine::Engine;
 use crate::hooks::Plugin;
+
+/// Depth of active in-process nested runs. While > 0, Rust hook dispatch
+/// also notifies the plugin manager's call monitors (HookRecorder) with the
+/// live kwargs, so getcalls works. Zero on the outer run — its hot-path
+/// dispatch never crosses into Python to check for monitors.
+static RECORDING_DEPTH: AtomicUsize = AtomicUsize::new(0);
+
+/// True while inside an in-process nested run (recording hook calls).
+pub fn recording() -> bool {
+    RECORDING_DEPTH.load(Ordering::Relaxed) > 0
+}
+
+/// Brackets a nested run: bumps the recording depth for its lifetime so
+/// re-entrancy (a nested run inside a nested run) is counted correctly.
+pub(crate) struct RecordingGuard;
+
+impl RecordingGuard {
+    pub(crate) fn enter() -> Self {
+        RECORDING_DEPTH.fetch_add(1, Ordering::Relaxed);
+        RecordingGuard
+    }
+}
+
+impl Drop for RecordingGuard {
+    fn drop(&mut self) {
+        RECORDING_DEPTH.fetch_sub(1, Ordering::Relaxed);
+    }
+}
 
 /// Builds the bundled plugin set. Registered by the binary crate at startup,
 /// since the concrete plugin set (feature-gated) lives there, not in core.
