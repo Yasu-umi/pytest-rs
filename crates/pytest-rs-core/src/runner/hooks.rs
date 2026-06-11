@@ -75,6 +75,7 @@ pub(crate) fn fire_logreport_hooks(
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
         }
     }
+    python::record_hook(py, "pytest_runtest_logreport", &[("report", proxy.clone_ref(py))]);
     for func in &funcs {
         if let Err(err) = python::call_py_hook(py, func, &[("report", proxy.clone_ref(py))]) {
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
