@@ -231,6 +231,13 @@ impl Engine {
             );
         }
 
+        self.run_session(py, started)
+    }
+
+    /// Collection + run-loop + reporting core. Shared by the outer process
+    /// run (above) and in-process nested sub-sessions. Assumes the global
+    /// setup layer (capture, logging, gc, shim, junit, ...) has already run.
+    fn run_session(&mut self, py: Python<'_>, started: Instant) -> i32 {
         if let Err(err) = self
             .fire_configure(py)
             .and_then(|()| self.fire_sessionstart(py))
