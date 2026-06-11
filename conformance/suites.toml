@@ -61,6 +61,10 @@ tag = "v3.8.0"
 testpaths = ["testing"]
 local = "conformance/suites/pytest-xdist"
 deps = ["execnet==2.1.2", "filelock==3.29.1", "py==1.11.0"]
+# acceptance_test.py spins up real worker subprocesses for ~100 tests; near
+# the default timeout it sometimes runs only part of the file, drifting the
+# scoreboard run-to-run (which trips the release's no-drift gate).
+slow_files = ["testing/acceptance_test.py"]
 enabled = true
 
 [pytest-split]
@@ -125,6 +129,10 @@ testpaths = ["tests"]
 # back the checker and its cross-worker lock.
 deps = ["pytest-mypy==1.0.1", "mypy==2.1.0", "filelock==3.29.1"]
 use_src = false
+# Each item shells out to mypy (type-checking is slow); the whole file can
+# exceed the default timeout and time out wholesale, drifting the scoreboard
+# between runs (which trips the release's no-drift gate).
+slow_files = ["tests/test_pytest_mypy.py"]
 category = "third-party"
 enabled = true
 
