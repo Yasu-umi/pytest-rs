@@ -594,6 +594,55 @@ def is_doctest_textfile(path: str, config: Any) -> bool:
     return any(fnmatch.fnmatch(basename, g) for g in globs)
 
 
+class _DoctestLineShim:
+    """Carries the lineno that DoctestItem.reportinfo needs when an item is
+    rebuilt in-process (pytester.inline_genitems) without the full DocTest."""
+
+    def __init__(self, lineno: int) -> None:
+        self.lineno = lineno
+        self.examples = [None]
+
+
+def inprocess_doctest_items(
+    path: str,
+    config: Any,
+    doctest_modules: bool,
+    glob_patterns: list,
+    nodeid_base: str,
+) -> list:
+    """Collect a file's doctests in-process as real DoctestItem objects (with a
+    DoctestModule/DoctestTextfile parent and a reportinfo lineno), for
+    pytester.inline_genitems. Returns [] when doctest collection doesn't apply
+    to `path` (a .py file without --doctest-modules, or a text file matching no
+    --doctest-glob pattern)."""
+    import fnmatch as _fnmatch
+
+    basename = os.path.basename(path)
+    if path.endswith(".py"):
+        if not doctest_modules:
+            return []
+        module_name = os.path.splitext(basename)[0]
+        try:
+            results = collect_module_doctests(module_name, path, nodeid_base, config)
+        except Exception:
+            return []
+        parent: Any = DoctestModule(path, config)
+    elif any(_fnmatch.fnmatch(basename, pat) for pat in glob_patterns):
+        results = collect_textfile_doctests(path, nodeid_base, config)
+        parent = DoctestTextfile(path, config)
+    else:
+        return []
+
+    items = []
+    for nodeid, _func, lineno in results:
+        item = DoctestItem(nodeid, _DoctestLineShim(lineno))  # type: ignore[arg-type]
+        item._pytest_doctest_item = True  # type: ignore[attr-defined]
+        item.nodeid = nodeid  # type: ignore[attr-defined]
+        item.parent = parent  # type: ignore[attr-defined]
+        items.append(item)
+    return items
+
+
 def _get_ignore_import_errors(config: Any) -> bool:
     try:
         return bool(config.getoption("doctest_ignore_import_errors"))

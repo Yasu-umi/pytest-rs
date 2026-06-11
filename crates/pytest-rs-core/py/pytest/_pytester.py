@@ -596,6 +596,29 @@ class Pytester:
 
         collect_args = path_args
 
+        # Doctest collection mode, for the DoctestItem-producing branches below.
+        args_str = [str(a) for a in args]
+        doctest_modules = "--doctest-modules" in args_str
+        glob_patterns = []
+        for _i, _a in enumerate(args_str):
+            if _a.startswith("--doctest-glob="):
+                glob_patterns.append(_a.split("=", 1)[1])
+            elif _a == "--doctest-glob" and _i + 1 < len(args_str):
+                glob_patterns.append(args_str[_i + 1])
+        if not glob_patterns:
+            glob_patterns = ["test*.txt"]
+        config_obj = self._request.config if self._request is not None else None
+
+        def _doctest_items(file_path):
+            from _pytest.doctest import inprocess_doctest_items
+
+            fp = _pathlib.Path(file_path)
+            try:
+                nb = str(fp.relative_to(self.path))
+            except ValueError:
+                nb = fp.name
+            return inprocess_doctest_items(str(fp), config_obj, doctest_modules, glob_patterns, nb)
+
         items = []
         for arg in collect_args:
             path_str = str(arg)
@@ -634,17 +657,44 @@ class Pytester:
                                 continue
                             seen_files.add(py_file)
                             items.extend(self._collect_items_from_path(py_file))
+                # Doctests in the directory: module doctests under
+                # --doctest-modules, plus text files matching --doctest-glob.
+                seen_dt: set = set()
+                if doctest_modules:
+                    for py_file in sorted(p.rglob("*.py")):
+                        if not py_file.is_file() or py_file in seen_dt:
+                            continue
+                        if any(part.startswith((".", "__pycache__")) for part in py_file.parts):
+                            continue
+                        seen_dt.add(py_file)
+                        items.extend(_doctest_items(py_file))
+                for pat in glob_patterns:
+                    for tf in sorted(p.rglob(pat)):
+                        if not tf.is_file() or tf in seen_dt:
+                            continue
+                        if any(part.startswith((".", "__pycache__")) for part in tf.parts):
+                            continue
+                        seen_dt.add(tf)
+                        items.extend(_doctest_items(tf))
             elif path_str.endswith(".py"):
                 in_proc = self._collect_items_from_path(path_str)
+                # Under --doctest-modules a .py file also yields DoctestItems.
+                doctest_items = _doctest_items(p) if doctest_modules else []
                 # Supplement with relay items for custom collectors (e.g. pytest_collect_file
-                # hooks that return non-standard File subclasses alongside the normal Module).
-                in_proc_nodeids = {i.nodeid for i in in_proc}
-                for event in hook_events:
+                # hooks that return non-standard File subclasses alongside the normal Module),
+                # skipping anything already produced in-process (functions + doctests).
+                known_nodeids = {i.nodeid for i in in_proc}
+                known_nodeids.update(i.nodeid for i in doctest_items)
+                # Under --doctest-modules the subprocess also reports the
+                # doctests (different nodeid shape than ours), so skip the
+                # custom-collector relay supplement to avoid double-counting —
+                # the doctests already come from _doctest_items above.
+                for event in hook_events if not doctest_modules else []:
                     if event.get("hook") == "pytest_collection_finish":
                         for it in event.get("session_items", []):
                             it_path_str = it.get("path", "")
                             it_nodeid = it.get("nodeid", "")
-                            if it_nodeid in in_proc_nodeids:
+                            if it_nodeid in known_nodeids:
                                 continue
                             if it_path_str:
                                 it_abs = _pathlib.Path(it_path_str).resolve()
@@ -659,14 +709,12 @@ class Pytester:
                                     )
                         break
                 items.extend(in_proc)
+                items.extend(doctest_items)
             elif path_str.endswith((".txt", ".rst", ".md")):
-                from _pytest.doctest import DoctestItem, DoctestTextfile
-
-                parent = DoctestTextfile(path_str, None)
-                item = DoctestItem(path_str, None)
-                item.parent = parent
-                item.nodeid = path_str
-                items.append(item)
+                # Real DoctestItem(s) with a DoctestTextfile parent when the
+                # file matches a --doctest-glob pattern; empty/non-matching
+                # files yield nothing.
+                items.extend(_doctest_items(p))
         return items, reprec
 
     def _collect_items_from_path(self, path, parent_collector=None):
