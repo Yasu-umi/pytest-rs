@@ -201,9 +201,16 @@ def _split_str(value: str, shlex_split: bool) -> list:
     When the Rust engine stores a TOML array it joins elements with NUL bytes
     (``\\x00``) so multi-word items survive type coercion unchanged. Any value
     without NUL bytes came from a traditional ini file and is parsed with
-    shlex (if shlex_split) or splitlines (for linelist types)."""
+    shlex (if shlex_split) or splitlines (for linelist types).
+
+    A value can carry BOTH separators: a TOML-array ini (NUL-joined) that a
+    plugin later appended to via ``config.addinivalue_line`` (newline-joined,
+    e.g. pytest-django registering its ``django_db`` marker). Split on both so
+    every entry comes out separate rather than the last array element being
+    glued to the first appended line."""
     if "\x00" in value:
-        return value.split("\x00")
+        parts = [p for chunk in value.split("\x00") for p in chunk.split("\n")]
+        return [p for p in parts if p] if shlex_split else [p.strip() for p in parts if p.strip()]
     if shlex_split:
         import shlex
 
