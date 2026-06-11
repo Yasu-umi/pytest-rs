@@ -315,6 +315,10 @@ deps = ["pytest-bdd==8.1.0", "Mako==1.3.12", "parse==1.22.1", "parse-type==0.6.6
 use_src = false
 category = "third-party"
 enabled = true
+# pytester inline_run via the in-process backend: bdd's tests inspect live
+# hook calls / fixtures a subprocess JSON relay cannot carry. Per-suite (the
+# runner launches each suite separately), so other suites are unaffected.
+env = { PYTEST_RS_INLINE_INPROCESS = "1" }
 
 # pytest-django: deferred. Needs Parser.parse_known_args plus full Django
 # framework integration (DJANGO_SETTINGS_MODULE handling, db/transactional_db

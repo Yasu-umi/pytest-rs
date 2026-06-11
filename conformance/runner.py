@@ -80,6 +80,11 @@ class Suite:
         # upstream too): they get a 3x timeout and submit first so they
         # never start at the tail of the pool.
         self.slow_files: list[str] = config.get("slow_files", [])
+        # Extra environment variables for this suite's runner invocations
+        # (e.g. PYTEST_RS_INLINE_INPROCESS=1 for suites whose pytester
+        # inline_run benefits from the in-process backend). Per-suite because
+        # the runner launches each suite as its own process.
+        self.env: dict[str, str] = {str(k): str(v) for k, v in config.get("env", {}).items()}
         self.checkout = CACHE / f"{self.name}-{self.tag}"
         self.src_dir: Path | None = None
 
@@ -163,6 +168,7 @@ class Suite:
         extra_paths.extend(str((self.checkout / entry).resolve()) for entry in self.pythonpath)
         if extra_paths:
             env["PYTHONPATH"] = ":".join(extra_paths)
+        env.update(self.env)
         timeout = TIMEOUT_S * 3 if rel in self.slow_files else TIMEOUT_S
         try:
             proc = subprocess.run(
