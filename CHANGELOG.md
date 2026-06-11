@@ -55,6 +55,15 @@ as the GitHub release notes (auto-generated notes are the fallback).
   not directory symlinks (matching pytest's collection).
 - The subprocess pytester restores the dynamic-loader path (and import path)
   across `mock.patch.dict(os.environ, clear=True)` so nested runs still start.
+- A `pyproject.toml` `addopts` written as a TOML array (e.g.
+  `["--strict-markers", "-ra"]`) is split into separate arguments instead of
+  collapsing into one bogus token.
+- A linelist ini given as a TOML array (e.g. `markers`) still merges a plugin's
+  `config.addinivalue_line` appends, so `--strict-markers` recognizes
+  plugin-registered marks (e.g. pytest-django's `django_db`).
+- `pytester.inline_genitems` returns real `DoctestItem`s (with a
+  `DoctestModule` / `DoctestTextfile` parent) for `--doctest-modules` and
+  `--doctest-glob` collection.
 
 ### Performance
 
