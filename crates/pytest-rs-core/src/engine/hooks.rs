@@ -213,7 +213,8 @@ impl Engine {
                 .map(|hook| hook.func.clone_ref(py)),
         );
         let delegated = self.session.custom_reporter.is_some();
-        if hook_funcs.is_empty() && !delegated {
+        let recording = crate::engine::inprocess::recording();
+        if hook_funcs.is_empty() && !delegated && !recording {
             return Ok(());
         }
         let nodes: Vec<Py<pyo3::PyAny>> = self
@@ -230,6 +231,13 @@ impl Engine {
                 &[("items", node_list.clone().unbind().into_any())],
             )?;
         }
+        // In a nested run, surface the call to the HookRecorder even when no
+        // conftest impl exists (pytest always dispatches it through pluggy).
+        python::record_hook(
+            py,
+            "pytest_deselected",
+            &[("items", node_list.clone().unbind().into_any())],
+        );
         // The replacement reporter's own pytest_deselected hookimpl (stats
         // bookkeeping behind "X deselected" in its summary).
         if delegated {
