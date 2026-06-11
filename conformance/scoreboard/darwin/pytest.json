@@ -195,10 +195,10 @@
     },
     {
       "file": "testing/test_mark.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 105,
-      "failed": 0,
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 104,
+      "failed": 1,
       "skipped": 0,
       "errors": 0
     },
@@ -233,8 +233,8 @@
       "file": "testing/test_pytester.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 47,
-      "failed": 5,
+      "passed": 48,
+      "failed": 4,
       "skipped": 0,
       "errors": 0
     },
@@ -267,10 +267,10 @@
     },
     {
       "file": "testing/test_runner_xunit.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 9,
-      "failed": 4,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 13,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },
@@ -287,8 +287,8 @@
       "file": "testing/test_session.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 14,
-      "failed": 12,
+      "passed": 16,
+      "failed": 10,
       "skipped": 0,
       "errors": 0
     },

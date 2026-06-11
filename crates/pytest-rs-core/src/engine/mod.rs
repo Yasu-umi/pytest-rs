@@ -1,10 +1,9 @@
-use std::path::PathBuf;
 use std::time::Instant;
 
 use pyo3::prelude::*;
 
 use crate::config::Config;
-use crate::hooks::{HookContext, Plugin};
+use crate::hooks::Plugin;
 use crate::python;
 use crate::report::{Outcome, Phase, exit_code};
 use crate::session::Session;
@@ -34,6 +33,7 @@ pub struct Engine {
     cache: Option<crate::cache::CacheState>,
 }
 
+mod collect;
 mod hooks;
 pub mod inprocess;
 mod selection;
@@ -311,6 +311,83 @@ impl Engine {
         // Collection done: tests (and gc-dependent plugins) run from here on.
         python::set_gc_enabled(py, true);
         let n_collect_errors = collect_errors.len();
+        if let Some(code) = self.handle_collection_errors(py, collect_errors, started) {
+            return code;
+        }
+
+        if let Err(message) = self.check_strict_markers(py) {
+            println!("{message}");
+            return exit_code::USAGE_ERROR;
+        }
+
+        let collected = self.session.items.len();
+        if let Err(err) = self.apply_deselect() {
+            eprintln!("INTERNAL ERROR: {err}");
+            return exit_code::INTERNAL_ERROR;
+        }
+        if let Err(err) = self.fire_collection_modifyitems(py) {
+            if python::is_usage_error(py, &err) {
+                eprintln!("ERROR: {}", err.value(py));
+                return exit_code::USAGE_ERROR;
+            }
+            // Upstream pytest_internalerror: the traceback goes to the
+            // terminal (stdout), each line prefixed "INTERNALERROR> ".
+            for line in python::format_exception(py, &err).lines() {
+                println!("INTERNALERROR> {line}");
+            }
+            return exit_code::INTERNAL_ERROR;
+        }
+        if let Some(cache) = &mut self.cache {
+            cache.modify_items(
+                &self.config,
+                &mut self.session.items,
+                &mut self.session.deselected_items,
+            );
+        }
+        if let Err(err) = self.fire_py_deselected(py) {
+            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+            return exit_code::INTERNAL_ERROR;
+        }
+
+        let n_items = self.session.items.len();
+        // Plugins may also expand items (e.g. loop-factory
+        // parametrization), so saturate against growth.
+        self.session.deselected = collected.saturating_sub(n_items);
+        // Collection settled: pytest_collection_finish python hooks see the
+        // final item set (sugar's progress total comes from here).
+        if let Err(err) = self.fire_py_collection_finish(py) {
+            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+        }
+        self.print_collection_count(py, collected, n_collect_errors, n_items);
+
+        if self.config.collect_only {
+            return self.run_collect_only(py, started, n_collect_errors, n_items);
+        }
+        if n_items == 0 {
+            return self.handle_no_tests(py, started);
+        }
+
+        #[cfg(feature = "xdist")]
+        match self.resolve_numprocesses(py) {
+            Some(workers) => self.run_dist(py, workers),
+            None => self.run_items(py),
+        }
+        #[cfg(not(feature = "xdist"))]
+        self.run_items(py);
+
+        self.finish_session(py, started)
+    }
+
+    /// Records collection-error reports and, when collection must abort
+    /// (no --continue-on-collection-errors, or --maxfail hit), prints the
+    /// summary and returns the exit code. Returns `None` to keep running.
+    fn handle_collection_errors(
+        &mut self,
+        py: Python<'_>,
+        collect_errors: Vec<(std::path::PathBuf, String)>,
+        started: Instant,
+    ) -> Option<i32> {
+        let n_collect_errors = collect_errors.len();
         if n_collect_errors > 0 {
             // Collection errors still report as errors in the summary.
             for (path, err) in collect_errors {
@@ -445,53 +522,21 @@ impl Engine {
                     };
                     python::reporter_finish(py, &self.config, code, banner.as_deref());
                 }
-                return code;
+                return Some(code);
             }
         }
+        None
+    }
 
-        if let Err(message) = self.check_strict_markers(py) {
-            println!("{message}");
-            return exit_code::USAGE_ERROR;
-        }
-
-        let collected = self.session.items.len();
-        if let Err(err) = self.apply_deselect() {
-            eprintln!("INTERNAL ERROR: {err}");
-            return exit_code::INTERNAL_ERROR;
-        }
-        if let Err(err) = self.fire_collection_modifyitems(py) {
-            if python::is_usage_error(py, &err) {
-                eprintln!("ERROR: {}", err.value(py));
-                return exit_code::USAGE_ERROR;
-            }
-            // Upstream pytest_internalerror: the traceback goes to the
-            // terminal (stdout), each line prefixed "INTERNALERROR> ".
-            for line in python::format_exception(py, &err).lines() {
-                println!("INTERNALERROR> {line}");
-            }
-            return exit_code::INTERNAL_ERROR;
-        }
-        if let Some(cache) = &mut self.cache {
-            cache.modify_items(
-                &self.config,
-                &mut self.session.items,
-                &mut self.session.deselected_items,
-            );
-        }
-        if let Err(err) = self.fire_py_deselected(py) {
-            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
-            return exit_code::INTERNAL_ERROR;
-        }
-
-        let n_items = self.session.items.len();
-        // Plugins may also expand items (e.g. loop-factory
-        // parametrization), so saturate against growth.
-        self.session.deselected = collected.saturating_sub(n_items);
-        // Collection settled: pytest_collection_finish python hooks see the
-        // final item set (sugar's progress total comes from here).
-        if let Err(err) = self.fire_py_collection_finish(py) {
-            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
-        }
+    /// Prints the "collected N items" line plus cache status / stepwise lines
+    /// and the pytest_report_collectionfinish hook output.
+    fn print_collection_count(
+        &mut self,
+        py: Python<'_>,
+        collected: usize,
+        n_collect_errors: usize,
+        n_items: usize,
+    ) {
         // The replacement reporter prints its own "collected N items" line.
         if self.session.custom_reporter.is_some() {
             python::reporter_collection_finish(py, &self.config, collected);
@@ -543,8 +588,16 @@ impl Engine {
                 println!();
             }
         }
+    }
 
-        if self.config.collect_only {
+    /// --collect-only: print the collected tree/nodeids/counts and return.
+    fn run_collect_only(
+        &mut self,
+        py: Python<'_>,
+        started: Instant,
+        n_collect_errors: usize,
+        n_items: usize,
+    ) -> i32 {
             // The --collect-only tree prints natively even in delegated
             // mode: upstream reporter plugins inherit it from the base
             // class rather than reimplementing it.
@@ -602,8 +655,11 @@ impl Engine {
             } else {
                 exit_code::OK
             };
-        }
-        if n_items == 0 {
+    }
+
+    /// Zero collected items: fire sessionfinish, print summaries, and return
+    /// NO_TESTS_COLLECTED.
+    fn handle_no_tests(&mut self, py: Python<'_>, started: Instant) -> i32 {
             // Upstream: zero collected items is NO_TESTS_COLLECTED even when
             // module-level skips produced skip reports.
             let code = exit_code::NO_TESTS_COLLECTED;
@@ -636,16 +692,11 @@ impl Engine {
                 }
             }
             return code;
-        }
+    }
 
-        #[cfg(feature = "xdist")]
-        match self.resolve_numprocesses(py) {
-            Some(workers) => self.run_dist(py, workers),
-            None => self.run_items(py),
-        }
-        #[cfg(not(feature = "xdist"))]
-        self.run_items(py);
-
+    /// Post-run finalization: sessionfinish, caches, the terminal-summary
+    /// block, and unraisable/threadexception cleanup. Returns the exit code.
+    fn finish_session(&mut self, py: Python<'_>, started: Instant) -> i32 {
         let failed = self
             .session
             .reports
@@ -822,847 +873,6 @@ impl Engine {
         // run leaves it enabled post-collection, but be explicit.
         python::set_gc_enabled(py, true);
         self.run_session(py, started)
-    }
-
-    /// Returns per-file collection errors (formatted).
-    fn collect(&mut self, py: Python<'_>) -> Result<Vec<(PathBuf, String)>, String> {
-        let rootdir = self.config.rootdir.clone();
-        // No CLI paths: the `testpaths` ini (globbed against rootdir) decides
-        // where collection starts; an empty glob warns and falls back to a
-        // recursive search from the invocation dir, like pytest.
-        let mut paths = self.config.paths.clone();
-        let testpaths_lines = self.config.get_ini_lines("testpaths");
-        // testpaths only applies when invocation_dir == rootdir (like pytest):
-        // if you cd into a subdirectory, pytest ignores testpaths and collects
-        // from the current directory instead.
-        let invocation_is_root = self.config.invocation_dir == rootdir;
-        if paths.is_empty() && !testpaths_lines.is_empty() && invocation_is_root {
-            let entries: Vec<String> = testpaths_lines
-                .into_iter()
-                .flat_map(|v| v.split_whitespace().map(str::to_string))
-                .collect();
-            if !entries.is_empty() {
-                let globbed = python::glob_testpaths(py, &rootdir, &entries)
-                    .map_err(|err| python::format_exception(py, &err))?;
-                if globbed.is_empty() {
-                    let _ = python::warn_explicit_at(
-                        py,
-                        "PytestConfigWarning",
-                        "No files were found in testpaths; consider removing or adjusting \
-                         your testpaths configuration. Searching recursively from the \
-                         current directory instead.",
-                        &rootdir.to_string_lossy(),
-                        0,
-                    );
-                } else {
-                    paths = globbed;
-                }
-            }
-        }
-        // Relative CLI paths (and bare collection) resolve against the
-        // invocation dir; rootdir only anchors node ids.
-        let python_files = self.config.python_files_patterns();
-        let norecursedirs = self.config.norecursedirs_patterns();
-        let mut files = crate::collect::collect_test_files(
-            &self.config.invocation_dir,
-            &paths,
-            self.config.get_flag("collect-in-virtualenv"),
-            &python_files,
-            &norecursedirs,
-            self.config.get_flag("keep-duplicates"),
-            &crate::collect::CollectIgnores::from_config(&self.config),
-        )?;
-
-        // -p NAME (non-"no:") plugins import before conftests, like
-        // pytest's cmdline plugin loading. PYTEST_PLUGINS (comma-separated
-        // module names) loads the same way — pytest's env-driven early
-        // plugins, used when PYTEST_DISABLE_PLUGIN_AUTOLOAD is set.
-        let mut named_plugins: Vec<String> = self
-            .config
-            .plugin_opts
-            .iter()
-            .filter(|spec| !spec.starts_with("no:"))
-            .cloned()
-            .collect();
-        if let Ok(env_plugins) = std::env::var("PYTEST_PLUGINS") {
-            for name in env_plugins
-                .split(',')
-                .map(str::trim)
-                .filter(|s| !s.is_empty())
-            {
-                if !named_plugins.iter().any(|n| n == name) {
-                    named_plugins.push(name.to_string());
-                }
-            }
-        }
-        if !named_plugins.is_empty()
-            && let Err(err) = python::load_named_plugins(
-                py,
-                &named_plugins,
-                Some(&self.config.invocation_dir),
-                &mut self.session.registry,
-                &mut self.session.py_hooks,
-            )
-        {
-            return Err(python::format_exception(py, &err));
-        }
-
-        // Installed third-party plugins (pytest11 entry points) autoload
-        // next, before conftests — pytest's setuptools plugin loading.
-        let blocked: Vec<String> = self
-            .config
-            .plugin_opts
-            .iter()
-            .filter_map(|spec| spec.strip_prefix("no:"))
-            .map(str::to_string)
-            .collect();
-        if let Err(err) = python::load_entrypoint_plugins(
-            py,
-            &blocked,
-            &mut self.session.registry,
-            &mut self.session.py_hooks,
-            &mut self.session.plugin_distinfo,
-        ) {
-            return Err(python::format_exception(py, &err));
-        }
-
-        // Conftests load for every collection start dir (even ones with no
-        // test files — pytest imports initial conftests during dir scan),
-        // plus each collected file's directory chain.
-        let mut start_dirs: Vec<PathBuf> = Vec::new();
-        if paths.is_empty() {
-            start_dirs.push(self.config.invocation_dir.clone());
-        } else {
-            for path in &paths {
-                let fs_part = path.split("::").next().unwrap_or_default();
-                let resolved = self.config.invocation_dir.join(fs_part);
-                if resolved.is_dir() {
-                    start_dirs.push(resolved);
-                } else if let Some(parent) = resolved.parent() {
-                    start_dirs.push(parent.to_path_buf());
-                }
-            }
-        }
-        start_dirs.extend(
-            files
-                .iter()
-                .filter_map(|f| f.parent().map(std::path::Path::to_path_buf)),
-        );
-
-        let mut conftests: Vec<PathBuf> = Vec::new();
-        for start in &start_dirs {
-            let mut dir = Some(start.as_path());
-            let mut chain = Vec::new();
-            while let Some(d) = dir {
-                let conftest = d.join("conftest.py");
-                if conftest.exists() {
-                    chain.push(conftest);
-                }
-                if d == rootdir {
-                    break;
-                }
-                dir = d.parent();
-            }
-            chain.reverse();
-            for conftest in chain {
-                if !conftests.contains(&conftest) {
-                    conftests.push(conftest);
-                }
-            }
-        }
-
-        let mut errors = Vec::new();
-        if let Err(err) = python::register_builtin_fixtures(py, &mut self.session.registry) {
-            return Err(python::format_exception(py, &err));
-        }
-        for conftest in &conftests {
-            if let Err(err) = python::collect_conftest(
-                py,
-                &rootdir,
-                conftest,
-                &mut self.session.registry,
-                &mut self.session.py_hooks,
-            ) {
-                errors.push((conftest.clone(), python::format_exception(py, &err)));
-            }
-        }
-        // Upstream reports pytest_plugins in non-top-level conftests as an error.
-        // When explicit paths are given, conftests in those ascending chains are
-        // loaded before configure (exempt). When collecting from invocation_dir,
-        // all non-rootdir conftests are loaded after configure and must be checked.
-        let scan_skip_loaded = !paths.is_empty();
-        scan_nontoplevel_pytest_plugins(
-            &rootdir,
-            &start_dirs,
-            if scan_skip_loaded { &conftests } else { &[] },
-            &mut errors,
-        );
-
-        // Plugin/conftest pytest_addoption hooks record their option and
-        // ini specs (defaults for getoption/getini) before configure.
-        if let Err(err) = self.fire_py_addoption_hooks(py) {
-            errors.push((rootdir.clone(), python::format_exception(py, &err)));
-        }
-        // CLI tokens clap didn't know resolve against the specs registered
-        // above; anything still unknown is a usage error (pytest parity).
-        if let Err(err) = self.apply_plugin_cli_args(py) {
-            // Usage errors print their bare message ("ERROR: <message>"),
-            // not a class-prefixed traceback line.
-            if python::is_usage_error(py, &err) {
-                return Err(err.value(py).to_string());
-            }
-            return Err(python::format_exception(py, &err));
-        }
-        // Unknown config-option validation (pytest's _validate_config_options):
-        // [pytest]-section keys that are neither a registered (plugin/conftest)
-        // nor a core ini. Under --strict-config / the strict_config / strict
-        // ini, the first is a fatal UsageError; otherwise each warns (and is
-        // silenceable via filterwarnings).
-        if !self.config.is_worker() {
-            let ini_keys = self.config.ini_file_keys();
-            let unknown = python::unknown_ini_keys(py, &ini_keys)
-                .map_err(|err| python::format_exception(py, &err))?;
-            if !unknown.is_empty() {
-                let strict_config = self.config.ini_bool("strict_config");
-                let strict = self.config.get_flag("strict-config")
-                    || strict_config == Some(true)
-                    || (strict_config.is_none()
-                        && (self.config.get_flag("strict")
-                            || self.config.ini_bool("strict") == Some(true)));
-                if strict {
-                    return Err(format!("Unknown config option: {}", unknown[0]));
-                }
-                let inipath = self
-                    .config
-                    .config_file_name
-                    .as_ref()
-                    .map(|name| rootdir.join(name).to_string_lossy().to_string())
-                    .unwrap_or_else(|| rootdir.to_string_lossy().to_string());
-                for key in &unknown {
-                    let _ = python::warn_explicit_at(
-                        py,
-                        "PytestConfigWarning",
-                        &format!("Unknown config option: {key}"),
-                        &inipath,
-                        0,
-                    );
-                }
-            }
-        }
-        // --override-ini keys that aren't registered/core get the same warning
-        // as unknown ini file keys (upstream issues this via config.getoption).
-        if !self.config.is_worker() {
-            let override_keys: Vec<String> = self.config.ini_overrides.keys().cloned().collect();
-            if !override_keys.is_empty() {
-                let unknown_overrides = python::unknown_ini_keys(py, &override_keys)
-                    .map_err(|err| python::format_exception(py, &err))?;
-                for key in &unknown_overrides {
-                    let _ = python::warn_explicit_at(
-                        py,
-                        "PytestConfigWarning",
-                        &format!("Unknown config option: {key}"),
-                        "<cmdline>",
-                        0,
-                    );
-                }
-            }
-        }
-        // pytest_load_initial_conftests (pytest-env sets os.environ here),
-        // after option specs are registered so getini resolves, before configure.
-        if let Err(err) = self.fire_py_load_initial_conftests(py) {
-            errors.push((rootdir.clone(), python::format_exception(py, &err)));
-        }
-        // The default 'terminalreporter' plugin registers before configure
-        // so reporter-replacing plugins (pytest-sugar/pretty) find it.
-        if let Err(err) = python::reporter_setup(py, &self.config) {
-            errors.push((rootdir.clone(), python::format_exception(py, &err)));
-        }
-        // conftest pytest_configure hooks run once conftests are loaded.
-        if let Err(err) = self.fire_py_hooks_simple(py, "pytest_configure") {
-            if python::is_usage_error(py, &err) {
-                // UsageError in configure → eprintln ERROR: msg, then exit 4.
-                let msg = python::format_exception(py, &err);
-                // Extract just the exception message (drop "pytest.UsageError: " prefix).
-                let usage_msg = msg
-                    .lines()
-                    .last()
-                    .and_then(|l| l.strip_prefix("pytest.UsageError: "))
-                    .unwrap_or(msg.trim());
-                eprintln!("ERROR: {usage_msg}");
-                return Err("\x00USAGE_ERROR\x00".to_string());
-            }
-            errors.push((rootdir.clone(), python::format_exception(py, &err)));
-        }
-        // A plugin swapped in its own terminal reporter: suppress native
-        // terminal output and drive the replacement object instead.
-        if let Some(reporter) = python::reporter_replacement(py) {
-            self.session.custom_reporter = Some(reporter);
-            self.config.set_reporter_delegated();
-        }
-        // pytest_sessionstart python hooks fire before the header, like
-        // upstream (the terminal's own sessionstart, which prints the header,
-        // runs last under pluggy LIFO). A conftest sessionstart may stash
-        // state the pytest_report_header hooks read back (e.g. config._x).
-        if let Err(err) = self.fire_py_sessionstart(py) {
-            // An unexpected exception in pytest_sessionstart is an INTERNALERROR
-            // (exit 3), not a collection error (exit 2). Signal the caller with
-            // a sentinel prefix so it can print the INTERNALERROR banner.
-            let msg = python::format_exception(py, &err);
-            return Err(format!("\x00INTERNAL\x00{msg}"));
-        }
-        // The session header: the replacement reporter's pytest_sessionstart
-        // owns it in delegated mode (upstream prints it from that hook);
-        // otherwise the native header plus pytest_report_header lines
-        // (e.g. pytest-timeout's "timeout: 1.0s" block).
-        if self.session.custom_reporter.is_some() {
-            python::reporter_sessionstart(py, &self.config);
-        } else {
-            self.print_header(py);
-            if let Err(err) = self.print_py_report_header(py) {
-                errors.push((rootdir.clone(), python::format_exception(py, &err)));
-            }
-        }
-        // --markers: list registered markers (configure hooks above already
-        // ran their addinivalue_line("markers", ...)) and skip collection.
-        if self.config.get_flag("markers") {
-            if let Err(err) = self.print_markers(py) {
-                errors.push((rootdir.clone(), python::format_exception(py, &err)));
-            }
-            return Ok(errors);
-        }
-        // Apply collect_ignore / collect_ignore_glob / pytest_ignore_collect from
-        // loaded conftests. This is a post-filter after collect_test_files so that
-        // conftest hooks can prune files from the collection set.
-        // Note: for explicit path args, pytest_ignore_collect is NOT called (upstream
-        // "not called on argument" behaviour). collect_ignore is always applied.
-        let no_explicit_file_args = paths.is_empty();
-        {
-            // Gather ignore paths/globs from all loaded conftest modules.
-            let mut extra_ignore_paths: Vec<std::path::PathBuf> = Vec::new();
-            let mut extra_ignore_globs: Vec<String> = Vec::new();
-            for conftest_path in &conftests {
-                if let Some(conftest_dir) = conftest_path.parent() {
-                    let (mut paths_from, mut globs_from) =
-                        python::extract_collect_ignores(py, conftest_dir, conftest_path);
-                    extra_ignore_paths.append(&mut paths_from);
-                    extra_ignore_globs.append(&mut globs_from);
-                }
-            }
-            if !extra_ignore_paths.is_empty() || !extra_ignore_globs.is_empty() {
-                files.retain(|f| {
-                    let f_canonical = std::fs::canonicalize(f).unwrap_or_else(|_| f.clone());
-                    // collect_ignore: check if file or any ancestor is in the ignore list
-                    for ip in &extra_ignore_paths {
-                        let ip_canonical = std::fs::canonicalize(ip).unwrap_or_else(|_| ip.clone());
-                        if f_canonical.starts_with(&ip_canonical) || f_canonical == ip_canonical {
-                            return false;
-                        }
-                    }
-                    // collect_ignore_glob: check against full path
-                    if !extra_ignore_globs.is_empty() {
-                        let f_str = f_canonical.to_string_lossy();
-                        let f_name = f_canonical
-                            .file_name()
-                            .and_then(|n| n.to_str())
-                            .unwrap_or("");
-                        for glob in &extra_ignore_globs {
-                            if crate::collect::wildcard_match(glob, f_name)
-                                || crate::collect::wildcard_match(glob, &f_str)
-                            {
-                                return false;
-                            }
-                        }
-                    }
-                    true
-                });
-            }
-            // pytest_ignore_collect: only applied when no explicit file args
-            if no_explicit_file_args {
-                let mut kept = Vec::with_capacity(files.len());
-                for f in files.drain(..) {
-                    match python::call_ignore_collect_hooks(
-                        py,
-                        &self.session.py_hooks,
-                        &f,
-                        &rootdir,
-                    ) {
-                        None => kept.push(f),
-                        Some(None) => {} // ignored silently
-                        Some(Some(reason)) => {
-                            // pytest.skip() in the hook: emit a skip report for this file
-                            let nodeid = crate::collect::file_nodeid(&rootdir, &f);
-                            self.session.reports.push(crate::report::TestReport {
-                                nodeid,
-                                phase: crate::report::Phase::Setup,
-                                outcome: crate::report::Outcome::Skipped,
-                                duration: std::time::Duration::ZERO,
-                                longrepr: Some(reason),
-                                location: None,
-                                subtest_desc: None,
-                                sections: Vec::new(),
-                                rerun: false,
-                                xfail_longrepr: None,
-                                reprcrash_message: None,
-                                head_line: None,
-                            });
-                        }
-                    }
-                }
-                files = kept;
-            }
-        }
-
-        // pytest's catching_logs around pytest_collection: a root handler
-        // during import keeps module-level logging calls from triggering
-        // logging.basicConfig (issue #6240).
-        let log_level_cfg: Option<String> = self
-            .config
-            .get_value("log-level")
-            .map(str::to_string)
-            .or_else(|| self.config.get_ini("log_level").map(str::to_string));
-        python::log_start_phase(py, "collection", log_level_cfg.as_deref());
-        // Expose pytest_pycollect_makeitem hooks to Python for collect_class.
-        {
-            use pyo3::types::PyAnyMethods;
-            let makeitem_hooks: Vec<Py<PyAny>> = self
-                .session
-                .py_hooks
-                .iter()
-                .filter(|h| h.name == "pytest_pycollect_makeitem")
-                .map(|h| h.func.clone_ref(py))
-                .collect();
-            let _ = py
-                .import("pytest._node")
-                .and_then(|m| m.call_method1("set_pycollect_hooks", (makeitem_hooks,)));
-        }
-        // Explicit non-Python, non-text-doctest file args that no collector handles.
-        let mut not_found_files: Vec<PathBuf> = Vec::new();
-        for file in &files {
-            // --maxfail aborts collection once the budget is spent on
-            // collection errors, ignoring further files.
-            if let Some(m) = self.config.maxfail()
-                && errors.len() >= m
-            {
-                break;
-            }
-            let is_py = file.extension().and_then(|e| e.to_str()) == Some("py");
-            if !is_py {
-                // Non-Python files: only text files with doctest content.
-                // For explicitly-specified files, collect regardless of --doctest-glob.
-                // For scanned files, the glob loop below handles them.
-                let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
-                let is_text_doctest = matches!(ext, "txt" | "rst" | "md");
-                if is_text_doctest {
-                    if let Ok(py_config) = python::make_py_config(py, &self.config)
-                        && let Err(err) = python::collect_doctests_from_textfile(
-                            py,
-                            &rootdir,
-                            file,
-                            &py_config,
-                            &mut self.session.items,
-                        )
-                    {
-                        errors.push((file.clone(), python::format_exception(py, &err)));
-                    }
-                } else {
-                    // No collector can handle this file type (e.g. .pyc).
-                    not_found_files.push(file.clone());
-                }
-                continue;
-            }
-            // Import-time output attaches to a failing collect report as
-            // "Captured stdout/stderr" sections (pytest's
-            // pytest_make_collect_report capture).
-            python::capture_collect_begin(py);
-            // Where this file's items start: --doctest-modules inserts the
-            // module's doctest items BEFORE its functions (upstream order).
-            let file_items_start = self.session.items.len();
-            let collect_result = python::collect_module(
-                py,
-                &rootdir,
-                file,
-                &mut self.session.items,
-                &mut self.session.registry,
-                &mut self.session.py_hooks,
-            );
-            let collect_sections = python::capture_collect_end(py);
-            let with_sections = |mut message: String| {
-                for (title, text) in &collect_sections {
-                    message.push_str(&format!(
-                        "\n{:-^80}\n{}",
-                        format!(" {title} "),
-                        text.trim_end_matches('\n')
-                    ));
-                }
-                message
-            };
-            let module_ok = match collect_result {
-                Ok(()) => true,
-                Err(ref err) if err.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py) => {
-                    // KeyboardInterrupt during collection stops immediately with
-                    // the "!!! KeyboardInterrupt !!!" banner (exit 2).
-                    return Err("\x00KEYBOARD_INTERRUPT\x00".to_string());
-                }
-                Err(ref err) if err.is_instance_of::<pyo3::exceptions::PySystemExit>(py) => {
-                    // SystemExit during collection is an INTERNALERROR.
-                    let msg = python::format_exception(py, err);
-                    return Err(format!("\x00INTERNAL\x00{msg}"));
-                }
-                Err(err) => {
-                    // pytest.skip(..., allow_module_level=True) or
-                    // unittest.SkipTest at module import skip the whole module;
-                    // a bare pytest.skip there is an error.
-                    match python::module_level_skip(py, &err) {
-                        Some(Ok(reason)) => {
-                            let nodeid = crate::collect::file_nodeid(&rootdir, file);
-                            // The skip call site (file:line), like pytest.
-                            let location = python::raise_location(py, &err)
-                                .unwrap_or_else(|| format!("{nodeid}:1"));
-                            self.session.reports.push(crate::report::TestReport {
-                                nodeid: nodeid.clone(),
-                                phase: crate::report::Phase::Setup,
-                                outcome: crate::report::Outcome::Skipped,
-                                duration: std::time::Duration::ZERO,
-                                longrepr: Some(reason),
-                                location: Some(location),
-                                subtest_desc: None,
-                                sections: Vec::new(),
-                                rerun: false,
-                                xfail_longrepr: None,
-                                reprcrash_message: None,
-                                head_line: None,
-                            });
-                        }
-                        Some(Err(message)) => errors.push((file.clone(), with_sections(message))),
-                        // CollectError carries a user-facing message, no traceback.
-                        None => {
-                            match python::collect_error_message(py, &err) {
-                                Some(message) => {
-                                    errors.push((file.clone(), with_sections(message)))
-                                }
-                                None if python::is_import_error(py, &err) => {
-                                    // A test module that fails to import gets
-                                    // pytest's wrapped CollectError header
-                                    // (importtestmodule), with a short-style
-                                    // traceback.
-                                    let tb = python::format_test_failure(py, &err, "short");
-                                    let message = format!(
-                                        "ImportError while importing test module '{}'.\n\
-                                         Hint: make sure your test modules/packages have valid Python names.\n\
-                                         Traceback:\n{tb}",
-                                        file.display()
-                                    );
-                                    errors.push((file.clone(), with_sections(message)));
-                                }
-                                None => errors.push((
-                                    file.clone(),
-                                    // pytest-style frames + E lines (upstream
-                                    // collect errors honor --tb; default "short"
-                                    // matches pytest's auto style for collection).
-                                    with_sections(python::format_test_failure(
-                                        py,
-                                        &err,
-                                        self.config.get_value("tb").unwrap_or("short"),
-                                    )),
-                                )),
-                            }
-                            // Upstream DoctestModule: with --doctest-ignore-import-errors
-                            // the doctest collector skips while the Module still errors.
-                            if self.config.get_flag("doctest-modules")
-                                && self.config.get_flag("doctest-ignore-import-errors")
-                            {
-                                let nodeid = crate::collect::file_nodeid(&rootdir, file);
-                                let longrepr = format!(
-                                    "unable to import module PosixPath('{}')",
-                                    file.display()
-                                );
-                                python::record_collect_skip(py, &nodeid, &longrepr);
-                                self.session.reports.push(crate::report::TestReport {
-                                    nodeid: nodeid.clone(),
-                                    phase: crate::report::Phase::Setup,
-                                    outcome: crate::report::Outcome::Skipped,
-                                    duration: std::time::Duration::ZERO,
-                                    longrepr: Some(longrepr),
-                                    location: Some(format!("{nodeid}:1")),
-                                    subtest_desc: None,
-                                    sections: Vec::new(),
-                                    rerun: false,
-                                    xfail_longrepr: None,
-                                    reprcrash_message: None,
-                                    head_line: None,
-                                });
-                            }
-                        }
-                    }
-                    false
-                }
-            };
-            // --doctest-modules: collect doctests from each successfully-imported module.
-            if module_ok
-                && self.config.get_flag("doctest-modules")
-                && let Ok(py_config) = python::make_py_config(py, &self.config)
-            {
-                let doctests_start = self.session.items.len();
-                match python::collect_doctests_from_module(
-                    py,
-                    &rootdir,
-                    file,
-                    &py_config,
-                    &mut self.session.items,
-                ) {
-                    Ok(()) => {
-                        // The module's doctests run BEFORE its functions
-                        // (upstream collects the DoctestModule first).
-                        let n_doctests = self.session.items.len().saturating_sub(doctests_start);
-                        self.session.items[file_items_start..].rotate_right(n_doctests);
-                    }
-                    Err(err) => {
-                        // Non-fatal: log as collect error and continue.
-                        errors.push((file.clone(), python::format_exception(py, &err)));
-                    }
-                }
-            }
-        }
-
-        // Explicit file args with no matching collector → USAGE_ERROR.
-        if !not_found_files.is_empty() {
-            for file in &not_found_files {
-                eprintln!("ERROR: not found: {}", file.display());
-                eprintln!("(no match in any of [<Session ''>])");
-                eprintln!();
-            }
-            return Err("\x00USAGE_ERROR\x00".to_string());
-        }
-
-        // --doctest-modules: also scan ALL .py files (not just test files) for doctests.
-        if self.config.get_flag("doctest-modules") {
-            let extra_py = crate::collect::collect_all_python_files(
-                &self.config.invocation_dir,
-                &paths,
-                self.config.get_flag("collect-in-virtualenv"),
-                &files,
-            );
-            if let Ok(py_config) = python::make_py_config(py, &self.config) {
-                for extra_file in &extra_py {
-                    // Import the module and collect doctests.
-                    if let Err(err) = python::collect_doctests_from_module(
-                        py,
-                        &rootdir,
-                        extra_file,
-                        &py_config,
-                        &mut self.session.items,
-                    ) {
-                        // Import errors skip the module with --doctest-ignore-import-errors.
-                        if self.config.get_flag("doctest-ignore-import-errors") {
-                            let nodeid = crate::collect::file_nodeid(&rootdir, extra_file);
-                            let longrepr = format!(
-                                "unable to import module PosixPath('{}')",
-                                extra_file.display()
-                            );
-                            python::record_collect_skip(py, &nodeid, &longrepr);
-                            self.session.reports.push(crate::report::TestReport {
-                                nodeid: nodeid.clone(),
-                                phase: crate::report::Phase::Setup,
-                                outcome: crate::report::Outcome::Skipped,
-                                duration: std::time::Duration::ZERO,
-                                longrepr: Some(longrepr),
-                                location: Some(format!("{nodeid}:1")),
-                                subtest_desc: None,
-                                sections: Vec::new(),
-                                rerun: false,
-                                xfail_longrepr: None,
-                                reprcrash_message: None,
-                                head_line: None,
-                            });
-                        } else {
-                            errors.push((extra_file.clone(), python::format_exception(py, &err)));
-                        }
-                    }
-                }
-            }
-        }
-
-        // Text files matching the glob (default: test*.txt) are always collected
-        // even without explicit --doctest-modules or --doctest-glob flags, mirroring
-        // upstream pytest's _is_doctest() behavior.
-        let scan_text_files = true;
-        if scan_text_files && let Ok(py_config) = python::make_py_config(py, &self.config) {
-            let text_files =
-                crate::collect::collect_doctest_textfiles(&self.config.invocation_dir, &paths);
-            for tf in text_files {
-                // Skip files already collected in the explicit-file loop above.
-                if files.contains(&tf) {
-                    continue;
-                }
-                if let Ok(true) = python::is_doctest_textfile(py, &tf, &py_config)
-                    && let Err(err) = python::collect_doctests_from_textfile(
-                        py,
-                        &rootdir,
-                        &tf,
-                        &py_config,
-                        &mut self.session.items,
-                    )
-                {
-                    errors.push((tf.clone(), python::format_exception(py, &err)));
-                }
-            }
-        }
-
-        // Custom collectors: plugins like pytest-ruff / pytest-mypy collect
-        // non-test files via pytest_collect_file -> pytest.File.collect().
-        // Only walk the (broader) candidate file set when such a hook exists.
-        if python::has_collect_file_hook(py, &self.session.py_hooks) {
-            let candidate = crate::collect::collect_all_python_files_ext(
-                &self.config.invocation_dir,
-                &paths,
-                self.config.get_flag("collect-in-virtualenv"),
-                &[],
-                // pytest-mypy's pytest_collect_file also handles .pyi stubs.
-                true,
-            );
-            let hooks = std::mem::take(&mut self.session.py_hooks);
-            let result = python::collect_custom_files(
-                py,
-                &rootdir,
-                &candidate,
-                &hooks,
-                &mut self.session.items,
-            );
-            self.session.py_hooks = hooks;
-            match result {
-                Ok(skipped_files) => {
-                    for (file, reason) in skipped_files {
-                        let nodeid = crate::collect::file_nodeid(&rootdir, &file);
-                        self.session.reports.push(crate::report::TestReport {
-                            nodeid,
-                            phase: crate::report::Phase::Setup,
-                            outcome: crate::report::Outcome::Skipped,
-                            duration: std::time::Duration::ZERO,
-                            longrepr: Some(reason),
-                            location: None,
-                            subtest_desc: None,
-                            sections: Vec::new(),
-                            rerun: false,
-                            xfail_longrepr: None,
-                            reprcrash_message: None,
-                            head_line: None,
-                        });
-                    }
-                }
-                Err(err) => {
-                    errors.push((rootdir.clone(), python::format_exception(py, &err)));
-                }
-            }
-        }
-
-        // Collection over: close its catching_logs phase.
-        python::log_end_phase(py);
-
-        // Expand items over parametrized fixtures in their closure; plugins
-        // first get to inject closure-affecting marks (anyio's usefixtures).
-        let mut items = std::mem::take(&mut self.session.items);
-        {
-            let mut ctx = HookContext {
-                py,
-                session: &mut self.session,
-                config: &self.config,
-            };
-            for plugin in &self.plugins {
-                if let Err(err) = plugin.pytest_collection_preexpand(&mut ctx, &mut items) {
-                    self.session.items = items;
-                    return Err(python::format_exception(py, &err));
-                }
-            }
-        }
-        match python::expand_fixture_params(py, items, &self.session.registry) {
-            Ok(expanded) => self.session.items = expanded,
-            Err(err) => return Err(python::format_exception(py, &err)),
-        }
-
-        // request.fixturenames must list the item's whole fixture closure
-        // (transitive deps + autouse), not just its direct params — plugins
-        // probe it (pytest-django: "transactional_db" in request.fixturenames,
-        // pulled in transitively by django_db_reset_sequences). Record the
-        // closure-only names as extra fixturenames (display only; the fixtures
-        // themselves resolve through the dependency chain).
-        for item in &mut self.session.items {
-            let mut direct: Vec<String> = item.fixture_names.clone();
-            direct.extend(item.extra_fixture_names.iter().cloned());
-            let closure = self.session.registry.closure_for(&item.nodeid, &direct);
-            for def in closure {
-                if !item.fixture_names.contains(&def.name)
-                    && !item.extra_fixture_names.contains(&def.name)
-                {
-                    item.extra_fixture_names.push(def.name.clone());
-                }
-            }
-        }
-
-        // Node-id args ("file.py::TestCls::test_a") restrict collection to
-        // matching items; unlike -k/-m this is not a deselection.
-        enum ArgSel {
-            Path(PathBuf),
-            NodeId(String),
-        }
-        if paths.iter().any(|arg| arg.contains("::")) {
-            let arg_sels: Vec<ArgSel> = paths
-                .iter()
-                .map(|arg| match arg.split_once("::") {
-                    Some((file_part, rest)) => {
-                        let path = self.config.invocation_dir.join(file_part);
-                        let path = std::fs::canonicalize(&path).unwrap_or(path);
-                        ArgSel::NodeId(format!(
-                            "{}::{}",
-                            crate::collect::file_nodeid(&rootdir, &path),
-                            rest
-                        ))
-                    }
-                    None => {
-                        let path = self.config.invocation_dir.join(arg);
-                        ArgSel::Path(std::fs::canonicalize(&path).unwrap_or(path))
-                    }
-                })
-                .collect();
-            self.session.items.retain(|item| {
-                arg_sels.iter().any(|sel| match sel {
-                    ArgSel::Path(path) => item.path.starts_with(path),
-                    ArgSel::NodeId(sel) => {
-                        item.nodeid == *sel
-                            || item
-                                .nodeid
-                                .strip_prefix(sel.as_str())
-                                .is_some_and(|rest| rest.starts_with('[') || rest.starts_with("::"))
-                    }
-                })
-            });
-            // Emit "not found" error to stderr for NodeId args that matched nothing.
-            for sel in &arg_sels {
-                if let ArgSel::NodeId(nodeid) = sel {
-                    let matched = self.session.items.iter().any(|item| {
-                        item.nodeid == *nodeid
-                            || item
-                                .nodeid
-                                .strip_prefix(nodeid.as_str())
-                                .is_some_and(|r| r.starts_with('[') || r.starts_with("::"))
-                    });
-                    if !matched {
-                        eprintln!("ERROR: not found: {nodeid}");
-                    }
-                }
-            }
-        }
-
-        // --lf drops failure-free files (and non-failed top-level functions
-        // of failed files) at collection time.
-        if let Some(cache) = &mut self.cache {
-            cache.filter_collected_items(
-                &rootdir,
-                &self.config.invocation_dir,
-                &paths,
-                &mut self.session.items,
-            );
-        }
-        Ok(errors)
     }
 }
 
