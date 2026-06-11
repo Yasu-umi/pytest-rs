@@ -8,8 +8,8 @@
       "file": "test_instafail.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 45,
-      "failed": 18,
+      "passed": 48,
+      "failed": 15,
       "skipped": 0,
       "errors": 0
     }

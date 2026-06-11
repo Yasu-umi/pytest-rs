@@ -6,10 +6,10 @@
   "files": [
     {
       "file": "tests/test_class_marks.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 5,
-      "failed": 4,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 9,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },
@@ -125,8 +125,8 @@
       "file": "tests/test_relative_ordering.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 17,
-      "failed": 4,
+      "passed": 18,
+      "failed": 3,
       "skipped": 0,
       "errors": 0
     },

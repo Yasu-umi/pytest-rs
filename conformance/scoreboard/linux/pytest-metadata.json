@@ -8,8 +8,8 @@
       "file": "tests/test_metadata.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 6,
-      "failed": 4,
+      "passed": 5,
+      "failed": 5,
       "skipped": 0,
       "errors": 0
     }
