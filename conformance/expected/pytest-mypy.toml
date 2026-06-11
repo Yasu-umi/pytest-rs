@@ -1,9 +1,12 @@
 # Upstream pytest-mypy tests that must keep passing under pytest-rs.
 #
-# tests (~27/78): the custom-collector subsystem runs pytest-mypy's
+# tests (~73/78): the custom-collector subsystem runs pytest-mypy's
 # MypyFile/MypyFileItem/MypyStatusItem (registered via pluginmanager at
-# configure). session.items exposes the collected items so MypyResults
-# aggregates the file paths and runs mypy once.
+# configure under the "mypy" entry-point name so conftests can patch it).
+# session.items is published incrementally during collection so the
+# one-per-session MypyStatusItem check works; MypyItem.repr_failure and
+# reportinfo()[2] drive the clean failure body and section heading;
+# --mypy-xfail markers added mid-runtest are honored.
 
 [files]
 
@@ -11,6 +14,8 @@
 # (partial — tracked by the scoreboard)
 
 # Known remaining gaps:
-#   mypy-config-driven strict checks (error-line fnmatch), the custom
-#   reportinfo test-name in verbose nodeids (UnmistakableTestName/NodeIDName),
-#   --mypy-xfail item markers, and a few testdir.move/py.path helpers.
+#   --looponfail (-f watch mode, unsupported), test_py_typed (shells out to
+#   the `mypy` console script), and --mypy-config-file passed as a separate
+#   value token (`--mypy-config-file foo.ini`; the `=` form works) — the
+#   deferred plugin-arg splitter can't tell a path-like value from a test path
+#   before pytest_addoption runs.

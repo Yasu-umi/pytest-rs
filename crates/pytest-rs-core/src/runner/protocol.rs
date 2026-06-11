@@ -135,6 +135,7 @@ fn report_from_proxy(py: Python<'_>, report: &Bound<'_, PyAny>) -> PyResult<Test
         rerun,
         xfail_longrepr: None,
         reprcrash_message,
+        head_line: None,
     })
 }
 

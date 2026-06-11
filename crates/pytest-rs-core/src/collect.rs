@@ -384,6 +384,24 @@ pub fn collect_all_python_files(
     collect_in_virtualenv: bool,
     already_collected: &[PathBuf],
 ) -> Vec<PathBuf> {
+    collect_all_python_files_ext(
+        invocation_dir,
+        paths,
+        collect_in_virtualenv,
+        already_collected,
+        false,
+    )
+}
+
+/// `include_pyi` extends the sweep to `.pyi` stubs, for custom collectors
+/// (pytest-mypy) whose `pytest_collect_file` handles `.pyi` files.
+pub fn collect_all_python_files_ext(
+    invocation_dir: &Path,
+    paths: &[String],
+    collect_in_virtualenv: bool,
+    already_collected: &[PathBuf],
+    include_pyi: bool,
+) -> Vec<PathBuf> {
     let args: Vec<String> = if paths.is_empty() {
         vec![".".to_string()]
     } else {
@@ -395,8 +413,8 @@ pub fn collect_all_python_files(
         let path = invocation_dir.join(arg);
         let path = std::fs::canonicalize(&path).unwrap_or(path);
         if path.is_dir() {
-            collect_all_py_dir(&path, &mut files, collect_in_virtualenv);
-        } else if path.extension().and_then(|e| e.to_str()) == Some("py")
+            collect_all_py_dir(&path, &mut files, collect_in_virtualenv, include_pyi);
+        } else if is_py_candidate(&path, include_pyi)
             && !files.contains(&path)
             && !already_collected.contains(&path)
         {
@@ -408,7 +426,20 @@ pub fn collect_all_python_files(
     files
 }
 
-fn collect_all_py_dir(dir: &Path, files: &mut Vec<PathBuf>, collect_in_virtualenv: bool) {
+fn is_py_candidate(path: &Path, include_pyi: bool) -> bool {
+    match path.extension().and_then(|e| e.to_str()) {
+        Some("py") => true,
+        Some("pyi") => include_pyi,
+        _ => false,
+    }
+}
+
+fn collect_all_py_dir(
+    dir: &Path,
+    files: &mut Vec<PathBuf>,
+    collect_in_virtualenv: bool,
+    include_pyi: bool,
+) {
     const NORECURSE: &[&str] = &[
         ".git",
         ".venv",
@@ -432,12 +463,9 @@ fn collect_all_py_dir(dir: &Path, files: &mut Vec<PathBuf>, collect_in_virtualen
                 && !name.starts_with('.')
                 && (collect_in_virtualenv || !in_venv(&path))
             {
-                collect_all_py_dir(&path, files, collect_in_virtualenv);
+                collect_all_py_dir(&path, files, collect_in_virtualenv, include_pyi);
             }
-        } else if path.extension().and_then(|e| e.to_str()) == Some("py")
-            && path.is_file()
-            && !files.contains(&path)
-        {
+        } else if is_py_candidate(&path, include_pyi) && path.is_file() && !files.contains(&path) {
             files.push(path);
         }
     }

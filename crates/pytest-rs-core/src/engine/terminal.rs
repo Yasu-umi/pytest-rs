@@ -416,7 +416,12 @@ impl Engine {
         }
         println!("\n{}", center_banner("FAILURES"));
         for report in &failures {
-            let mut name = Self::failure_title(&report.nodeid);
+            // A custom item's reportinfo()[2] (pytest-mypy's test_name_formatter)
+            // overrides the nodeid-derived heading.
+            let mut name = report
+                .head_line
+                .clone()
+                .unwrap_or_else(|| Self::failure_title(&report.nodeid));
             // Subtest headings append the description: "test_foo [msg]".
             if let Some(desc) = &report.subtest_desc {
                 name = format!("{name} {desc}");
@@ -794,7 +799,12 @@ impl Engine {
                         }
                     }
                     // The stand-in buffers through a TerminalWriter on
-                    // sys.stdout; nothing to flush explicitly.
+                    // sys.stdout; flush it so a trailing write() with no
+                    // newline (pytest-mypy's --mypy-xfail stdout dump) isn't
+                    // stranded in the buffer when the engine exits.
+                    if let Ok(stdout) = py.import("sys").and_then(|m| m.getattr("stdout")) {
+                        let _ = stdout.call_method0("flush");
+                    }
                 }
             }
         }

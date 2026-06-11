@@ -159,6 +159,12 @@ pub fn collect_custom_files(
     let collector_cls = node_mod.getattr("Collector")?;
     // A session stand-in with .config (plugins read parent.session.config).
     let session = node_mod.getattr("_NodeSession")?.call1((&config,))?;
+    // Custom collectors (pytest-mypy) inspect session.items mid-collection to
+    // decide what to yield; start from a clean slate and publish each yielded
+    // item so later files see their siblings, matching real pytest's
+    // incremental `self.items.extend(self.genitems(node))`.
+    node_mod.call_method0("reset_collection_items")?;
+    let publish_item = node_mod.getattr("publish_collection_item")?;
     for file in files {
         let file_path = pathlib.call1((file.to_string_lossy().as_ref(),))?;
         let parent = collector_cls.call(
@@ -230,6 +236,10 @@ pub fn collect_custom_files(
             // Call collect() for new items not already found by standard collection.
             for item_obj in collector.call_method0("collect")?.try_iter()? {
                 let item_obj = item_obj?;
+                // Publish to session.items immediately so a later file's
+                // collect() sees this item (pytest-mypy's one-per-session
+                // MypyStatusItem check).
+                publish_item.call1((&item_obj,))?;
                 let nodeid: String = item_obj.getattr("nodeid")?.extract()?;
                 if pre_existing.contains(&nodeid) {
                     continue;

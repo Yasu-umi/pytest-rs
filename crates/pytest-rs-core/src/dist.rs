@@ -856,6 +856,7 @@ impl WorkerOwner {
                     rerun: false,
                     xfail_longrepr: None,
                     reprcrash_message: None,
+                    head_line: None,
                 },
                 worker: self.index,
             });

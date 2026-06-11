@@ -336,9 +336,12 @@ result = sorted({(ep.name, ep.value.split(':')[0].strip(), (dist.metadata.get('N
         // Track the module in the shim pluginmanager so its custom-hook
         // impls are reachable via config.pluginmanager.hook.<name> and its
         // pytest_addhooks specs register (pluggy registration parity).
+        // Register under the entry-point name (as pytest does) so
+        // config.pluginmanager.getplugin("<ep_name>") resolves the module
+        // (pytest-mypy's conftest patches plugin.MypyFileItem this way).
         py.import("pytest._pluginmanager")?
             .getattr("pluginmanager")?
-            .call_method1("register", (&plugin,))?;
+            .call_method1("register", (&plugin, ep_name.as_str()))?;
         // The "plugins:" header label: pytest strips a leading "pytest-"
         // from the dist name and appends the version (_plugin_nameversions),
         // deduped.

@@ -38,6 +38,7 @@ fn send_collect_error(nodeid: &str, message: String) {
             rerun: false,
             xfail_longrepr: None,
             reprcrash_message: None,
+            head_line: None,
         },
     });
     send(&WorkerMsg::Report {
@@ -53,6 +54,7 @@ fn send_collect_error(nodeid: &str, message: String) {
             rerun: false,
             xfail_longrepr: None,
             reprcrash_message: None,
+            head_line: None,
         },
     });
 }

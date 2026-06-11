@@ -254,6 +254,59 @@ class Collector(_NodeBase):
         """An error during collection, shown without a traceback."""
 
 
+def _custom_item_xfail_mark(item):
+    """The last @pytest.mark.xfail on a custom item, or None. pytest-mypy adds
+    one dynamically in runtest() (via add_marker) before raising MypyError when
+    --mypy-xfail is set."""
+    for marker in reversed(getattr(item, "own_markers", []) or []):
+        if getattr(marker, "name", None) == "xfail":
+            return marker
+    return None
+
+
+def _custom_item_runxfail(item):
+    config = getattr(item, "config", None) or getattr(
+        getattr(item, "session", None), "config", None
+    )
+    try:
+        return bool(config.getoption("runxfail"))
+    except Exception:
+        return False
+
+
+def _custom_item_xfail(item, exc):
+    """Return the xfail reason if `exc` from a custom item's runtest is expected
+    by an xfail marker (matching its `raises`), else None."""
+    marker = _custom_item_xfail_mark(item)
+    if marker is None or _custom_item_runxfail(item):
+        return None
+    raises = marker.kwargs.get("raises")
+    if raises is not None and not isinstance(exc, raises):
+        return None
+    return marker.kwargs.get("reason") or (marker.args[0] if marker.args else "")
+
+
+def _custom_item_pass_report(item):
+    """A custom item that ran clean: XPASS if an xfail marker fired anyway
+    (strict-aware), else a plain pass."""
+    marker = _custom_item_xfail_mark(item)
+    if marker is None or _custom_item_runxfail(item):
+        return ("call", "passed", None)
+    reason = marker.kwargs.get("reason") or (marker.args[0] if marker.args else "")
+    config = getattr(item, "config", None) or getattr(
+        getattr(item, "session", None), "config", None
+    )
+    strict = marker.kwargs.get("strict")
+    if strict is None:
+        try:
+            strict = bool(config.getini("xfail_strict"))
+        except Exception:
+            strict = False
+    if strict:
+        return ("call", "failed", f"[XPASS(strict)] {reason}")
+    return ("call", "xpassed", reason)
+
+
 def run_custom_item(item):
     """Run a custom collector Item (setup/runtest/teardown) and return a list
     of (when, outcome, longrepr) tuples for the engine. Failures get their
@@ -272,6 +325,9 @@ def run_custom_item(item):
 
             def exconly(self, tryshort=False):
                 return f"{type(exc).__name__}: {exc}"
+
+            def errisinstance(self, cls):
+                return isinstance(exc, cls)
 
         return _ExcInfo()
 
@@ -320,11 +376,15 @@ def run_custom_item(item):
 
     try:
         item.runtest()
-        reports.append(("call", "passed", None))
+        reports.append(_custom_item_pass_report(item))
     except Skipped as exc:
         reports.append(("call", "skipped", str(getattr(exc, "msg", exc) or exc)))
     except BaseException as exc:  # noqa: BLE001
-        reports.append(("call", "failed", _failrepr("call", exc)))
+        xfail = _custom_item_xfail(item, exc)
+        if xfail is not None:
+            reports.append(("call", "xfailed", xfail))
+        else:
+            reports.append(("call", "failed", _failrepr("call", exc)))
 
     try:
         item.teardown()
@@ -602,6 +662,21 @@ def set_session_items(items):
     """Collected item proxies, published once collection finishes (the
     engine fires pytest_collection_finish with them on the session)."""
     _session_state["items"] = list(items)
+
+
+def reset_collection_items():
+    """Start a fresh custom-collection pass with an empty session.items so a
+    prior in-process run's items don't leak into the isinstance checks below."""
+    _session_state["items"] = []
+
+
+def publish_collection_item(item):
+    """Append a custom-collected item to session.items mid-collection. Real
+    pytest's `self.items.extend(self.genitems(node))` appends each yielded item
+    as the generator produces it, so a later collector's collect() sees its
+    siblings (pytest-mypy's MypyFile.collect skips adding a second
+    MypyStatusItem once one is already in session.items)."""
+    _session_state["items"].append(item)
 
 
 def get_session_keywords() -> dict:

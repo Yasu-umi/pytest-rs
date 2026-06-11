@@ -425,6 +425,16 @@ pub(crate) fn run_one(
 /// run_custom_item, mapping its (when, outcome, longrepr) tuples to reports.
 fn run_custom_item(py: Python<'_>, config: &Config, item: &TestItem) -> Vec<TestReport> {
     let started = Instant::now();
+    // reportinfo()[2] is the failure-section heading (pytest-mypy's
+    // test_name_formatter); empty means "use the nodeid domain" (default Item).
+    let head_line = item
+        .func
+        .bind(py)
+        .call_method0("reportinfo")
+        .ok()
+        .and_then(|info| info.get_item(2).ok())
+        .and_then(|name| name.extract::<String>().ok())
+        .filter(|name| !name.is_empty());
     let result = py
         .import("pytest._node")
         .and_then(|m| m.getattr("run_custom_item"))
@@ -470,9 +480,14 @@ fn run_custom_item(py: Python<'_>, config: &Config, item: &TestItem) -> Vec<Test
         let oc = match outcome.as_str() {
             "passed" => Outcome::Passed,
             "skipped" => Outcome::Skipped,
+            // pytest-mypy's --mypy-xfail adds an xfail marker mid-runtest;
+            // _node.run_custom_item evaluates it and reports the outcome.
+            "xfailed" => Outcome::XFailed,
+            "xpassed" => Outcome::XPassed,
             _ => Outcome::Failed,
         };
-        let location = (oc == Outcome::Skipped).then(|| item.nodeid.clone());
+        let location =
+            matches!(oc, Outcome::Skipped | Outcome::XFailed).then(|| item.nodeid.clone());
         reports.push(TestReport {
             nodeid: item.nodeid.clone(),
             phase,
@@ -485,6 +500,7 @@ fn run_custom_item(py: Python<'_>, config: &Config, item: &TestItem) -> Vec<Test
             rerun: false,
             xfail_longrepr: None,
             reprcrash_message: None,
+            head_line: head_line.clone(),
         });
     }
     reports
@@ -537,6 +553,7 @@ pub(crate) fn run_one_body(
                 rerun: false,
                 xfail_longrepr: None,
                 reprcrash_message: None,
+                head_line: None,
             });
             return reports;
         }
@@ -591,6 +608,7 @@ pub(crate) fn run_one_body(
             rerun: false,
             xfail_longrepr: None,
             reprcrash_message: None,
+            head_line: None,
         });
         return reports;
     }
@@ -900,6 +918,7 @@ pub(crate) fn run_one_body(
         rerun: false,
         xfail_longrepr: None,
         reprcrash_message: None,
+        head_line: None,
     });
 
     if setup_show_active(config) {
@@ -961,6 +980,7 @@ pub(crate) fn run_one_body(
                     rerun: false,
                     xfail_longrepr: None,
                     reprcrash_message: None,
+                    head_line: None,
                 });
                 teardown_one(py, plugins, session, config, item, true, &mut reports);
                 close_item_filters(py);
@@ -1040,6 +1060,7 @@ pub(crate) fn run_one_body(
             rerun: false,
             xfail_longrepr: None,
             reprcrash_message: None,
+            head_line: None,
         },
         Ok(false) => {
             if item.is_coroutine {
@@ -1063,6 +1084,7 @@ pub(crate) fn run_one_body(
                     rerun: false,
                     xfail_longrepr: None,
                     reprcrash_message: None,
+                    head_line: None,
                 }
             } else {
                 match python::call_with_kwargs(py, &callable, &kwargs) {
@@ -1078,6 +1100,7 @@ pub(crate) fn run_one_body(
                         rerun: false,
                         xfail_longrepr: None,
                         reprcrash_message: None,
+                        head_line: None,
                     },
                     Err(err) => {
                         if let Some(code) = python::session_abort_code(py, &err) {
@@ -1313,6 +1336,7 @@ fn teardown_one(
             rerun: false,
             xfail_longrepr: None,
             reprcrash_message: None,
+            head_line: None,
         });
     } else {
         reports.push(TestReport {
@@ -1335,6 +1359,7 @@ fn teardown_one(
             rerun: false,
             xfail_longrepr: None,
             reprcrash_message: None,
+            head_line: None,
         });
     }
     python::log_finish_item(py);
@@ -1397,6 +1422,7 @@ pub(crate) fn teardown_scope_reported(
             rerun: false,
             xfail_longrepr: None,
             reprcrash_message: None,
+            head_line: None,
         });
     }
     let sections = python::log_failure_sections(py);
@@ -1413,6 +1439,7 @@ pub(crate) fn teardown_scope_reported(
         rerun: false,
         xfail_longrepr: None,
         reprcrash_message: None,
+        head_line: None,
     })
 }
 

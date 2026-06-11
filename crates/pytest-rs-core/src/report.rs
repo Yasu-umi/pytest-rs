@@ -53,6 +53,10 @@ pub struct TestReport {
     /// used for short test summary lines regardless of --tb style.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reprcrash_message: Option<String>,
+    /// Failure-section heading override from a custom item's reportinfo()[2]
+    /// (pytest-mypy's test_name_formatter); falls back to the nodeid domain.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub head_line: Option<String>,
 }
 
 impl TestReport {

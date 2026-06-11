@@ -132,10 +132,10 @@
     },
     {
       "file": "testing/test_doctest.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 133,
-      "failed": 6,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 139,
+      "failed": 0,
       "skipped": 1,
       "errors": 0
     },

@@ -326,6 +326,7 @@ impl Engine {
                     rerun: false,
                     xfail_longrepr: None,
                     reprcrash_message: None,
+                    head_line: None,
                 });
             }
             // --maxfail aborting collection exits TESTS_FAILED with a
@@ -1148,6 +1149,7 @@ impl Engine {
                                 rerun: false,
                                 xfail_longrepr: None,
                                 reprcrash_message: None,
+                                head_line: None,
                             });
                         }
                     }
@@ -1274,6 +1276,7 @@ impl Engine {
                                 rerun: false,
                                 xfail_longrepr: None,
                                 reprcrash_message: None,
+                                head_line: None,
                             });
                         }
                         Some(Err(message)) => errors.push((file.clone(), with_sections(message))),
@@ -1330,6 +1333,7 @@ impl Engine {
                                     rerun: false,
                                     xfail_longrepr: None,
                                     reprcrash_message: None,
+                                    head_line: None,
                                 });
                             }
                         }
@@ -1410,6 +1414,7 @@ impl Engine {
                                 rerun: false,
                                 xfail_longrepr: None,
                                 reprcrash_message: None,
+                                head_line: None,
                             });
                         } else {
                             errors.push((extra_file.clone(), python::format_exception(py, &err)));
@@ -1449,11 +1454,13 @@ impl Engine {
         // non-test files via pytest_collect_file -> pytest.File.collect().
         // Only walk the (broader) candidate file set when such a hook exists.
         if python::has_collect_file_hook(py, &self.session.py_hooks) {
-            let candidate = crate::collect::collect_all_python_files(
+            let candidate = crate::collect::collect_all_python_files_ext(
                 &self.config.invocation_dir,
                 &paths,
                 self.config.get_flag("collect-in-virtualenv"),
                 &[],
+                // pytest-mypy's pytest_collect_file also handles .pyi stubs.
+                true,
             );
             let hooks = std::mem::take(&mut self.session.py_hooks);
             let result = python::collect_custom_files(
@@ -1480,6 +1487,7 @@ impl Engine {
                             rerun: false,
                             xfail_longrepr: None,
                             reprcrash_message: None,
+                            head_line: None,
                         });
                     }
                 }

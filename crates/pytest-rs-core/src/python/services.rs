@@ -129,6 +129,7 @@ pub fn pop_subtest_reports(
                 rerun: false,
                 xfail_longrepr: None,
                 reprcrash_message: None,
+                head_line: None,
             });
         }
         Ok((reports, failed_fixture_subs))
