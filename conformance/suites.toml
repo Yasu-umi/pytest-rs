@@ -21,6 +21,11 @@ slow_files = [
   "testing/test_junitxml.py",
 ]
 enabled = true
+# pytester inline_run via the in-process backend: pytest's own tests inspect
+# live hook calls (getcalls/getreports/assertoutcome) a subprocess JSON relay
+# cannot carry. Net-positive over the subprocess path here; xdist stays on the
+# subprocess backend (it nests `-n` runs that don't compose in-process).
+env = { PYTEST_RS_INLINE_INPROCESS = "1" }
 
 [pytest-asyncio]
 repo = "https://github.com/pytest-dev/pytest-asyncio"
