@@ -84,6 +84,9 @@ if not hasattr(_main, '__file__'):
     // Expose the Rust-backed request type for `_pytest.fixtures` imports.
     let pytest_module = py.import("pytest")?;
     pytest_module.setattr("FixtureRequest", py.get_type::<crate::request::PyRequest>())?;
+    // The pytest-rs crate version, for the session-header "pytest-rs-X" tag
+    // (a replacement TerminalReporter must match the native header).
+    pytest_module.setattr("_rs_version", env!("CARGO_PKG_VERSION"))?;
     // pytest.Config: the config type, for annotations/isinstance (pytest-django).
     pytest_module.setattr("Config", py.get_type::<crate::request::PyConfig>())?;
 

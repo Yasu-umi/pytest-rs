@@ -627,13 +627,11 @@ class TerminalReporter:
             verinfo = platform.python_version()
             import pytest
 
-            msg = f"platform {sys.platform} -- Python {verinfo}, pytest-{pytest.__version__}"
-            try:
-                import pluggy
-
-                msg += f", pluggy-{pluggy.__version__}"
-            except Exception:
-                pass
+            # Match the native engine header ("pytest-rs-<crate version>", no
+            # pluggy): a replacement reporter's header must equal the native
+            # one — pytest-bdd's gherkin reporter test compares them line by line.
+            rs_version = getattr(pytest, "_rs_version", pytest.__version__)
+            msg = f"platform {sys.platform} -- Python {verinfo}, pytest-rs-{rs_version}"
             if self.verbosity > 0:
                 msg += " -- " + str(sys.executable)
             self.write_line(msg)
