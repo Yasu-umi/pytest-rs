@@ -164,9 +164,45 @@ pub fn reporter_collect_error(py: Python<'_>, nodeid: &str, longrepr: &str) {
             .import("_pytest.reports")?
             .getattr("CollectReport")?
             .call((), Some(&kwargs))?;
+        // In a nested run, surface the failed collection to the HookRecorder
+        // (getfailedcollections / assertoutcome read pytest_collectreport).
+        crate::python::record_hook(
+            py,
+            "pytest_collectreport",
+            &[("report", report.clone().unbind())],
+        );
         py.import("pytest._reporter")?
             .getattr("collectreport")?
             .call1((report,))?;
+        Ok(())
+    })();
+    if let Err(err) = result {
+        eprintln!("INTERNAL ERROR: {}", format_exception(py, &err));
+    }
+}
+
+/// In a nested run, surface a skipped collection (e.g. a DoctestModule that
+/// could not import under --doctest-ignore-import-errors) to the HookRecorder
+/// as a skipped CollectReport, matching upstream's collect-time Skipped.
+/// No-op on the outer run.
+pub fn record_collect_skip(py: Python<'_>, nodeid: &str, longrepr: &str) {
+    if !crate::engine::inprocess::recording() {
+        return;
+    }
+    let result = (|| -> PyResult<()> {
+        let kwargs = PyDict::new(py);
+        kwargs.set_item("nodeid", nodeid)?;
+        kwargs.set_item("outcome", "skipped")?;
+        kwargs.set_item("longrepr", longrepr)?;
+        let file = nodeid.split("::").next().unwrap_or(nodeid);
+        kwargs.set_item("location", (file, py.None(), file))?;
+        kwargs.set_item("result", pyo3::types::PyList::empty(py))?;
+        kwargs.set_item("sections", pyo3::types::PyList::empty(py))?;
+        let report = py
+            .import("_pytest.reports")?
+            .getattr("CollectReport")?
+            .call((), Some(&kwargs))?;
+        crate::python::record_hook(py, "pytest_collectreport", &[("report", report.unbind())]);
         Ok(())
     })();
     if let Err(err) = result {

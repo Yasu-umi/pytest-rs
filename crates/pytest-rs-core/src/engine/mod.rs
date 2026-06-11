@@ -1372,15 +1372,17 @@ impl Engine {
                                 && self.config.get_flag("doctest-ignore-import-errors")
                             {
                                 let nodeid = crate::collect::file_nodeid(&rootdir, file);
+                                let longrepr = format!(
+                                    "unable to import module PosixPath('{}')",
+                                    file.display()
+                                );
+                                python::record_collect_skip(py, &nodeid, &longrepr);
                                 self.session.reports.push(crate::report::TestReport {
                                     nodeid: nodeid.clone(),
                                     phase: crate::report::Phase::Setup,
                                     outcome: crate::report::Outcome::Skipped,
                                     duration: std::time::Duration::ZERO,
-                                    longrepr: Some(format!(
-                                        "unable to import module PosixPath('{}')",
-                                        file.display()
-                                    )),
+                                    longrepr: Some(longrepr),
                                     location: Some(format!("{nodeid}:1")),
                                     subtest_desc: None,
                                     sections: Vec::new(),
@@ -1453,15 +1455,17 @@ impl Engine {
                         // Import errors skip the module with --doctest-ignore-import-errors.
                         if self.config.get_flag("doctest-ignore-import-errors") {
                             let nodeid = crate::collect::file_nodeid(&rootdir, extra_file);
+                            let longrepr = format!(
+                                "unable to import module PosixPath('{}')",
+                                extra_file.display()
+                            );
+                            python::record_collect_skip(py, &nodeid, &longrepr);
                             self.session.reports.push(crate::report::TestReport {
                                 nodeid: nodeid.clone(),
                                 phase: crate::report::Phase::Setup,
                                 outcome: crate::report::Outcome::Skipped,
                                 duration: std::time::Duration::ZERO,
-                                longrepr: Some(format!(
-                                    "unable to import module PosixPath('{}')",
-                                    extra_file.display()
-                                )),
+                                longrepr: Some(longrepr),
                                 location: Some(format!("{nodeid}:1")),
                                 subtest_desc: None,
                                 sections: Vec::new(),
