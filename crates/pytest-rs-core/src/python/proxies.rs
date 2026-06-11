@@ -10,12 +10,51 @@ use pyo3::types::PyDict;
 /// conftest hooks (e.g. `config.option.foo = ...`) stay visible everywhere.
 pub(crate) static CONFIG_PROXY: std::sync::OnceLock<Py<PyAny>> = std::sync::OnceLock::new();
 
-/// The process-global Config proxy, if one was built already.
+thread_local! {
+    /// Config proxies for active in-process nested runs (a stack for
+    /// re-entrancy). While non-empty, the top shadows the process-global
+    /// CONFIG_PROXY so a nested run sees its own config/ini values instead of
+    /// the outer run's cached singleton (e.g. getini("markers") read from the
+    /// nested run's tox.ini).
+    static NESTED_CONFIG_PROXY: std::cell::RefCell<Vec<Py<PyAny>>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Build a config proxy for a nested run and push it as the active one. The
+/// returned guard pops it when the nested run ends.
+pub(crate) fn push_nested_config_proxy(
+    py: Python<'_>,
+    config: &crate::config::Config,
+) -> PyResult<NestedConfigGuard> {
+    let proxy = build_py_config(py, config, false)?;
+    NESTED_CONFIG_PROXY.with(|stack| stack.borrow_mut().push(proxy));
+    Ok(NestedConfigGuard)
+}
+
+pub(crate) struct NestedConfigGuard;
+
+impl Drop for NestedConfigGuard {
+    fn drop(&mut self) {
+        NESTED_CONFIG_PROXY.with(|stack| {
+            stack.borrow_mut().pop();
+        });
+    }
+}
+
+fn nested_config_proxy(py: Python<'_>) -> Option<Py<PyAny>> {
+    NESTED_CONFIG_PROXY.with(|stack| stack.borrow().last().map(|proxy| proxy.clone_ref(py)))
+}
+
+/// The active Config proxy, if one was built already (nested run's shadows
+/// the process-global one).
 pub fn existing_py_config(py: Python<'_>) -> Option<Py<PyAny>> {
-    CONFIG_PROXY.get().map(|proxy| proxy.clone_ref(py))
+    nested_config_proxy(py).or_else(|| CONFIG_PROXY.get().map(|proxy| proxy.clone_ref(py)))
 }
 
 pub fn make_py_config(py: Python<'_>, config: &crate::config::Config) -> PyResult<Py<PyAny>> {
+    if let Some(proxy) = nested_config_proxy(py) {
+        return Ok(proxy);
+    }
     if let Some(proxy) = CONFIG_PROXY.get() {
         return Ok(proxy.clone_ref(py));
     }
@@ -222,7 +261,7 @@ pub fn make_node(py: Python<'_>, item: &TestItem) -> PyResult<Py<PyAny>> {
     // node.config: plugins reach the pluginmanager and stash through it
     // (e.g. pytest-timeout's item.config.pluginmanager.hook). The proxy is
     // initialized at configure time, well before any node exists.
-    if let Some(proxy) = CONFIG_PROXY.get() {
+    if let Some(proxy) = existing_py_config(py) {
         node.setattr("config", proxy.bind(py))?;
     }
     // node.module / node.cls: reordering plugins (pytest-randomly,

@@ -140,12 +140,10 @@ pub fn collect_custom_files(
     items: &mut Vec<TestItem>,
 ) -> PyResult<Vec<(PathBuf, String)>> {
     let mut skipped: Vec<(PathBuf, String)> = Vec::new();
-    let Some(config) = crate::python::proxies::CONFIG_PROXY
-        .get()
-        .map(|c| c.bind(py))
-    else {
+    let Some(config) = crate::python::proxies::existing_py_config(py) else {
         return Ok(skipped);
     };
+    let config = config.bind(py);
     // pytest_collect_file impls live on the shim pluginmanager (autoloaded
     // plugin modules + objects registered at configure, e.g. pytest-mypy);
     // the hook relay reaches them all.
@@ -846,10 +844,7 @@ pub(crate) fn push_test_items(
     if let Some(hook) = generate_hook {
         // metafunc.config (option.count etc.) and definition markers
         // (get_closest_marker) let plugin impls like pytest-repeat decide.
-        let config = crate::python::proxies::CONFIG_PROXY
-            .get()
-            .map(|c| c.clone_ref(py).into_bound(py))
-            .map(|c| c.into_any());
+        let config = crate::python::proxies::existing_py_config(py).map(|c| c.into_bound(py));
         let mark_objs = pyo3::types::PyList::empty(py);
         for m in &marks {
             mark_objs.append(m.obj.bind(py))?;

@@ -792,6 +792,10 @@ impl Engine {
         // While this guard lives, hook dispatch notifies the plugin manager's
         // call monitors (HookRecorder) with live kwargs so getcalls works.
         let _recording = inprocess::RecordingGuard::enter();
+        // Shadow the process-global config proxy with one built from the nested
+        // config, so getini/getoption read the nested run's tox.ini/options
+        // instead of the cached outer singleton. Dropped when the run ends.
+        let _config_proxy = python::push_nested_config_proxy(py, &self.config).ok();
         // The nested config may declare its own pythonpath ini entries.
         for rel in self.config.get_ini_lines("pythonpath") {
             let abs = self.config.rootdir.join(rel);

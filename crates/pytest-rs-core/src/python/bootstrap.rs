@@ -676,9 +676,7 @@ pub fn call_ignore_collect_hooks(
         Err(_) => return None,
     };
     // Build a minimal config proxy for the hook parameter
-    let config = crate::python::proxies::CONFIG_PROXY
-        .get()
-        .map(|c| c.bind(py).clone());
+    let config = crate::python::proxies::existing_py_config(py).map(|c| c.into_bound(py));
     for hook in &ignore_hooks {
         // Only apply hooks from conftests whose baseid is relevant to this path
         // (baseid is "" for root conftest, "subdir" for subdir conftest).
