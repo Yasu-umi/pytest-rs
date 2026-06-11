@@ -628,8 +628,17 @@ impl Config {
         }
         let addopts = override_addopts.or_else(|| ini_file.get("addopts").cloned());
         if let Some(addopts) = addopts {
-            // shlex-style splitting: `-m "not performance"` is one argument.
-            argv.splice(1..1, shlex_split(&addopts));
+            // A TOML-array addopts is stored NUL-joined (see parse_toml_pytest);
+            // each element is already one literal argument, so split on the
+            // sentinel rather than shlex-splitting (which would re-split an
+            // element like "not performance"). A plain string addopts has no
+            // NUL and shlex-splits: `-m "not performance"` stays one argument.
+            let args: Vec<String> = if addopts.contains('\x00') {
+                addopts.split('\x00').map(str::to_string).collect()
+            } else {
+                shlex_split(&addopts)
+            };
+            argv.splice(1..1, args);
         }
 
         let mut cmd = clap::Command::new("pytest-rs")
