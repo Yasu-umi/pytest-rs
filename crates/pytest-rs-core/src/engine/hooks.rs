@@ -203,24 +203,33 @@ impl Engine {
         }
 
         // Read back order/membership (by nodeid) and any added markers.
-        let mut by_nodeid: std::collections::HashMap<String, crate::collect::TestItem> =
-            std::mem::take(items)
-                .into_iter()
-                .map(|item| (item.nodeid.clone(), item))
-                .collect();
+        // Use VecDeque per nodeid to correctly handle --keep-duplicates
+        // where the same nodeid appears multiple times in the item list.
+        let mut by_nodeid: std::collections::HashMap<
+            String,
+            std::collections::VecDeque<crate::collect::TestItem>,
+        > = Default::default();
+        for item in std::mem::take(items) {
+            by_nodeid
+                .entry(item.nodeid.clone())
+                .or_default()
+                .push_back(item);
+        }
         for node in node_list.iter() {
             let nodeid: String = node.getattr("nodeid")?.extract()?;
-            if let Some(mut item) = by_nodeid.remove(&nodeid) {
-                let mut marks = Vec::new();
-                for mark in node.getattr("own_markers")?.try_iter()? {
-                    let mark = mark?;
-                    marks.push(crate::collect::MarkData {
-                        name: mark.getattr("name")?.extract()?,
-                        obj: mark.unbind(),
-                    });
+            if let Some(queue) = by_nodeid.get_mut(&nodeid) {
+                if let Some(mut item) = queue.pop_front() {
+                    let mut marks = Vec::new();
+                    for mark in node.getattr("own_markers")?.try_iter()? {
+                        let mark = mark?;
+                        marks.push(crate::collect::MarkData {
+                            name: mark.getattr("name")?.extract()?,
+                            obj: mark.unbind(),
+                        });
+                    }
+                    item.marks = marks;
+                    items.push(item);
                 }
-                item.marks = marks;
-                items.push(item);
             }
         }
         Ok(())

@@ -962,15 +962,57 @@ impl Config {
             }
             value
         };
-        if let Some(arg) = &rootdir_arg {
-            let path = cwd.join(arg);
+        let rootdir = if let Some(arg) = rootdir_arg {
+            // Expand $ENV_VAR references (pytest uses os.path.expandvars).
+            let expanded = {
+                let s = arg.clone();
+                // Walk through and replace $VAR or ${VAR} tokens.
+                let mut out = String::with_capacity(s.len());
+                let bytes = s.as_bytes();
+                let mut i = 0;
+                while i < bytes.len() {
+                    if bytes[i] == b'$' {
+                        i += 1;
+                        let braced = i < bytes.len() && bytes[i] == b'{';
+                        if braced {
+                            i += 1;
+                        }
+                        let start = i;
+                        while i < bytes.len()
+                            && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_')
+                        {
+                            i += 1;
+                        }
+                        if braced && i < bytes.len() && bytes[i] == b'}' {
+                            i += 1;
+                        }
+                        let name = &s[start..i - if braced { 1 } else { 0 }];
+                        if let Ok(val) = std::env::var(name) {
+                            out.push_str(&val);
+                        }
+                    } else {
+                        out.push(bytes[i] as char);
+                        i += 1;
+                    }
+                }
+                out
+            };
+            let path = if Path::new(&expanded).is_absolute() {
+                PathBuf::from(&expanded)
+            } else {
+                cwd.join(&expanded)
+            };
             if !path.is_dir() {
                 return Err(format!(
                     "Directory '{}' not found. Check your '--rootdir' option.",
                     path.display()
                 ));
             }
-        }
+            // Canonicalize to resolve symlinks (macOS /var → /private/var).
+            path.canonicalize().unwrap_or(path)
+        } else {
+            rootdir
+        };
         Ok((rootdir, config_file_name, ini_file, ignored_config_files))
     }
 
