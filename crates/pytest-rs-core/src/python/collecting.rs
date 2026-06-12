@@ -920,6 +920,24 @@ pub(crate) struct ParamVariant {
     extra_marks: Vec<MarkData>,
 }
 
+/// One parameter set (one `pytest.param`/value row) within a single
+/// `@pytest.mark.parametrize` mark.
+struct ParamSet {
+    /// None hides the set from the test ID (pytest.HIDDEN_PARAM).
+    id_part: Option<String>,
+    params: Vec<(String, Py<PyAny>)>,
+    /// indirect=True/[names]: the value parametrizes the same-named
+    /// fixture (request.param) instead of being passed to the test.
+    indirect_params: Vec<(String, usize, Py<PyAny>)>,
+    extra_marks: Vec<MarkData>,
+}
+
+/// One `@pytest.mark.parametrize` mark's worth of parameter sets; stacked
+/// marks become separate dimensions in the cartesian product.
+struct Dim {
+    sets: Vec<ParamSet>,
+}
+
 /// Expand stacked @pytest.mark.parametrize marks into the cartesian product
 /// of parameter sets. Marks appear in pytestmark order (bottom decorator
 /// first); ids join in that order and later marks vary fastest.
@@ -929,19 +947,6 @@ pub(crate) fn expand_parametrize(
     nodeid: &str,
     func: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<Vec<ParamVariant>> {
-    struct ParamSet {
-        /// None hides the set from the test ID (pytest.HIDDEN_PARAM).
-        id_part: Option<String>,
-        params: Vec<(String, Py<PyAny>)>,
-        /// indirect=True/[names]: the value parametrizes the same-named
-        /// fixture (request.param) instead of being passed to the test.
-        indirect_params: Vec<(String, usize, Py<PyAny>)>,
-        extra_marks: Vec<MarkData>,
-    }
-    struct Dim {
-        sets: Vec<ParamSet>,
-    }
-
     let param_spec_cls = py.import("pytest")?.getattr("ParamSpec")?;
     let hidden_param = py.import("pytest")?.getattr("HIDDEN_PARAM")?;
     // Armed by configure_mark_generator once the session config is known.
@@ -1120,119 +1125,9 @@ pub(crate) fn expand_parametrize(
                 extra_marks,
             });
         }
-        // pytest's make_unique_parameterset_ids: duplicate IDs within one
-        // parametrize call either error out (strict_parametrization_ids)
-        // or get a counter suffix ("_" separator after a trailing digit).
-        let mut counts: std::collections::HashMap<Option<String>, usize> =
-            std::collections::HashMap::new();
-        for set in &sets {
-            *counts.entry(set.id_part.clone()).or_default() += 1;
-        }
-        if counts.values().any(|&count| count > 1) {
-            let display =
-                |id: &Option<String>| id.clone().unwrap_or_else(|| "<hidden>".to_string());
-            if strict_ids {
-                let mut reprs = Vec::new();
-                for set in &sets {
-                    let values =
-                        PyList::new(py, set.params.iter().map(|(_, value)| value.bind(py)))?;
-                    reprs.push(values.repr()?.to_string());
-                }
-                let mut seen = std::collections::HashSet::new();
-                let duplicates: Vec<String> = sets
-                    .iter()
-                    .filter(|set| counts[&set.id_part] > 1)
-                    .filter(|set| seen.insert(set.id_part.clone()))
-                    .map(|set| display(&set.id_part))
-                    .collect();
-                let ids: Vec<String> = sets.iter().map(|set| display(&set.id_part)).collect();
-                let message = format!(
-                    "Duplicate parametrization IDs detected, but strict_parametrization_ids is set.\n\
-                     \n\
-                     Test name:      {nodeid}\n\
-                     Parameters:     {}\n\
-                     Parameter sets: {}\n\
-                     IDs:            {}\n\
-                     Duplicates:     {}\n\
-                     \n\
-                     You can fix this problem using `@pytest.mark.parametrize(..., ids=...)` or `pytest.param(..., id=...)`.",
-                    argnames.join(", "),
-                    reprs.join(", "),
-                    ids.join(", "),
-                    duplicates.join(", "),
-                );
-                return Err(collect_error(py, &message));
-            }
-            if counts.get(&None).copied().unwrap_or(0) > 1 {
-                return Err(collect_error(
-                    py,
-                    &format!(
-                        "In {nodeid}: multiple instances of HIDDEN_PARAM cannot be used in \
-                         the same parametrize call, because the tests names need to be unique."
-                    ),
-                ));
-            }
-            let mut existing: std::collections::HashSet<String> =
-                sets.iter().filter_map(|set| set.id_part.clone()).collect();
-            let mut suffixes: std::collections::HashMap<String, usize> =
-                std::collections::HashMap::new();
-            for set in sets.iter_mut() {
-                let Some(id) = set.id_part.clone() else {
-                    continue;
-                };
-                if counts[&Some(id.clone())] <= 1 {
-                    continue;
-                }
-                let sep = if id.chars().last().is_some_and(|c| c.is_ascii_digit()) {
-                    "_"
-                } else {
-                    ""
-                };
-                let counter = suffixes.entry(id.clone()).or_insert(0);
-                let mut new_id = format!("{id}{sep}{counter}");
-                while existing.contains(&new_id) {
-                    *counter += 1;
-                    new_id = format!("{id}{sep}{counter}");
-                }
-                existing.insert(new_id.clone());
-                set.id_part = Some(new_id);
-                *counter += 1;
-            }
-        }
+        dedup_param_ids(py, &mut sets, nodeid, &argnames, strict_ids)?;
         if sets.is_empty() {
-            // Upstream: empty argvalues collect one NOTSET parameter set
-            // carrying the empty_parameter_set_mark (default skip; a user
-            // ids callable is never invoked, #13031).
-            let mark_decorator = py
-                .import("_pytest.mark")?
-                .getattr("get_empty_parameterset_mark")?
-                .call1((
-                    existing_py_config(py).unwrap_or_else(|| py.None()),
-                    argnames.clone(),
-                    func.map(|f| f.clone().unbind())
-                        .unwrap_or_else(|| py.None()),
-                ))?;
-            let mark_obj = mark_decorator.getattr("mark")?;
-            let mark_name: String = mark_obj.getattr("name")?.extract()?;
-            let notset = py.import("_pytest.compat")?.getattr("NOTSET")?;
-            let mut params: Vec<(String, Py<PyAny>)> = Vec::new();
-            let mut indirect_params: Vec<(String, usize, Py<PyAny>)> = Vec::new();
-            for argname in argnames.iter().cloned() {
-                if is_indirect(&argname) {
-                    indirect_params.push((argname, 0usize, notset.clone().unbind()));
-                } else {
-                    params.push((argname, notset.clone().unbind()));
-                }
-            }
-            sets.push(ParamSet {
-                id_part: Some("NOTSET".to_string()),
-                params,
-                indirect_params,
-                extra_marks: vec![MarkData {
-                    name: mark_name,
-                    obj: mark_obj.unbind(),
-                }],
-            });
+            sets.push(notset_param_set(py, &argnames, func, indirect_all, &indirect_names)?);
         }
         dims.push(Dim { sets });
     }
@@ -1251,7 +1146,12 @@ pub(crate) fn expand_parametrize(
         return Ok(Vec::new());
     }
 
-    // Odometer over dims; the last dim varies fastest, ids join in dim order.
+    Ok(cartesian_param_variants(py, &dims))
+}
+
+/// Cartesian product over the parametrize dimensions: the last dim varies
+/// fastest and IDs join in dim order (matching stacked-decorator order).
+fn cartesian_param_variants(py: Python<'_>, dims: &[Dim]) -> Vec<ParamVariant> {
     let mut variants = Vec::new();
     let mut indices = vec![0usize; dims.len()];
     'outer: loop {
@@ -1297,7 +1197,136 @@ pub(crate) fn expand_parametrize(
             }
         }
     }
-    Ok(variants)
+    variants
+}
+
+/// Resolve duplicate parameter-set IDs within one parametrize mark:
+/// under strict_parametrization_ids a duplicate is a CollectError;
+/// otherwise pytest's make_unique_parameterset_ids counter suffix applies.
+fn dedup_param_ids(
+    py: Python<'_>,
+    sets: &mut [ParamSet],
+    nodeid: &str,
+    argnames: &[String],
+    strict_ids: bool,
+) -> PyResult<()> {
+    let mut counts: std::collections::HashMap<Option<String>, usize> =
+        std::collections::HashMap::new();
+    for set in sets.iter() {
+        *counts.entry(set.id_part.clone()).or_default() += 1;
+    }
+    if counts.values().any(|&count| count > 1) {
+        let display =
+            |id: &Option<String>| id.clone().unwrap_or_else(|| "<hidden>".to_string());
+        if strict_ids {
+            let mut reprs = Vec::new();
+            for set in sets.iter() {
+                let values =
+                    PyList::new(py, set.params.iter().map(|(_, value)| value.bind(py)))?;
+                reprs.push(values.repr()?.to_string());
+            }
+            let mut seen = std::collections::HashSet::new();
+            let duplicates: Vec<String> = sets
+                .iter()
+                .filter(|set| counts[&set.id_part] > 1)
+                .filter(|set| seen.insert(set.id_part.clone()))
+                .map(|set| display(&set.id_part))
+                .collect();
+            let ids: Vec<String> = sets.iter().map(|set| display(&set.id_part)).collect();
+            let message = format!(
+                "Duplicate parametrization IDs detected, but strict_parametrization_ids is set.\n\
+                 \n\
+                 Test name:      {nodeid}\n\
+                 Parameters:     {}\n\
+                 Parameter sets: {}\n\
+                 IDs:            {}\n\
+                 Duplicates:     {}\n\
+                 \n\
+                 You can fix this problem using `@pytest.mark.parametrize(..., ids=...)` or `pytest.param(..., id=...)`.",
+                argnames.join(", "),
+                reprs.join(", "),
+                ids.join(", "),
+                duplicates.join(", "),
+            );
+            return Err(collect_error(py, &message));
+        }
+        if counts.get(&None).copied().unwrap_or(0) > 1 {
+            return Err(collect_error(
+                py,
+                &format!(
+                    "In {nodeid}: multiple instances of HIDDEN_PARAM cannot be used in \
+                     the same parametrize call, because the tests names need to be unique."
+                ),
+            ));
+        }
+        let mut existing: std::collections::HashSet<String> =
+            sets.iter().filter_map(|set| set.id_part.clone()).collect();
+        let mut suffixes: std::collections::HashMap<String, usize> =
+            std::collections::HashMap::new();
+        for set in sets.iter_mut() {
+            let Some(id) = set.id_part.clone() else {
+                continue;
+            };
+            if counts[&Some(id.clone())] <= 1 {
+                continue;
+            }
+            let sep = if id.chars().last().is_some_and(|c| c.is_ascii_digit()) {
+                "_"
+            } else {
+                ""
+            };
+            let counter = suffixes.entry(id.clone()).or_insert(0);
+            let mut new_id = format!("{id}{sep}{counter}");
+            while existing.contains(&new_id) {
+                *counter += 1;
+                new_id = format!("{id}{sep}{counter}");
+            }
+            existing.insert(new_id.clone());
+            set.id_part = Some(new_id);
+            *counter += 1;
+        }
+    }
+    Ok(())
+}
+
+/// The single NOTSET parameter set pytest collects for empty argvalues,
+/// carrying the configured empty_parameter_set_mark (default: skip).
+fn notset_param_set(
+    py: Python<'_>,
+    argnames: &[String],
+    func: Option<&Bound<'_, PyAny>>,
+    indirect_all: bool,
+    indirect_names: &[String],
+) -> PyResult<ParamSet> {
+    let mark_decorator = py
+        .import("_pytest.mark")?
+        .getattr("get_empty_parameterset_mark")?
+        .call1((
+            existing_py_config(py).unwrap_or_else(|| py.None()),
+            argnames.to_vec(),
+            func.map(|f| f.clone().unbind()).unwrap_or_else(|| py.None()),
+        ))?;
+    let mark_obj = mark_decorator.getattr("mark")?;
+    let mark_name: String = mark_obj.getattr("name")?.extract()?;
+    let notset = py.import("_pytest.compat")?.getattr("NOTSET")?;
+    let mut params: Vec<(String, Py<PyAny>)> = Vec::new();
+    let mut indirect_params: Vec<(String, usize, Py<PyAny>)> = Vec::new();
+    for argname in argnames.iter().cloned() {
+        if indirect_all || indirect_names.iter().any(|n| n == &argname) {
+            indirect_params.push((argname, 0usize, notset.clone().unbind()));
+        } else {
+            params.push((argname, notset.clone().unbind()));
+        }
+    }
+    Ok(ParamSet {
+        id_part: Some("NOTSET".to_string()),
+        params,
+        indirect_params,
+        extra_marks: vec![MarkData {
+            name: mark_name,
+            obj: mark_obj.unbind(),
+        }],
+    })
 }
 
 /// A pytest.Collector.CollectError carrying `message`: collection fails
