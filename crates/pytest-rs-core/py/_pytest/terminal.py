@@ -141,9 +141,8 @@ class _CallableBool:
 def _getreportopt(config):
     """Trimmed getreportopt: expand the -r option chars (default 'fE'
     plus warnings)."""
-    reportchars = ""
     try:
-        reportchars = config.getoption("r", None) or config.getoption("reportchars", None) or "fE"
+        reportchars = getattr(config.option, "reportchars", None) or "fE"
     except Exception:
         reportchars = "fE"
     if "w" not in reportchars:
