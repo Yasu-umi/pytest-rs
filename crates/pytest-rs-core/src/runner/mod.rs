@@ -825,7 +825,7 @@ pub(crate) fn run_one_body(
     // no fixtures instead of calling it as a test function. Detect precisely
     // via isinstance(pytest.Item) — a hasattr("runtest") probe would also
     // match Mocks and other auto-attr objects used as test funcs.
-    let (mut xfailed, runxfail) = match evaluate_item_prelude(py, session, config, item) {
+    let (xfailed, runxfail) = match evaluate_item_prelude(py, session, config, item) {
         ItemPrelude::Done(reports) => return reports,
         ItemPrelude::Run { xfailed, runxfail } => (xfailed, runxfail),
     };
@@ -905,6 +905,29 @@ pub(crate) fn run_one_body(
             .and_then(|m| m.call_method1("set_current_test", (py.None(),)));
     };
 
+    let teardown_xfail =
+        run_item_body(py, plugins, session, config, item, &mut reports, xfailed, runxfail, xfail);
+    teardown_one(py, plugins, session, config, item, teardown_xfail, &mut reports);
+    close_item_filters(py);
+    python::end_item_context(py);
+    reports
+}
+
+/// Run the setup -> call -> outcome phases for one item, pushing each
+/// phase report into `reports`. Returns the xfail flag the caller's
+/// teardown should use (a NOTRUN-at-call forces it on). Teardown and the
+/// filter/context close are the caller's single trailing step.
+fn run_item_body(
+    py: Python<'_>,
+    plugins: &[Box<dyn Plugin>],
+    session: &mut Session,
+    config: &Config,
+    item: &TestItem,
+    reports: &mut Vec<TestReport>,
+    mut xfailed: Option<XfailEval>,
+    runxfail: bool,
+    xfail: bool,
+) -> bool {
     // ---- setup -----------------------------------------------------------
     // Per-phase log capture (caplog records + "Captured log" sections).
     let log_level_cfg: Option<String> = config
@@ -929,10 +952,7 @@ pub(crate) fn run_one_body(
                 report.longrepr = Some(xf.reason.clone());
             }
             reports.push(report);
-            teardown_one(py, plugins, session, config, item, xfail, &mut reports);
-            close_item_filters(py);
-            python::end_item_context(py);
-            return reports;
+            return xfail;
         }
     };
     // Unraisable exceptions surfaced during setup (upstream's trylast
@@ -946,10 +966,7 @@ pub(crate) fn run_one_body(
             setup_started,
             &err,
         ));
-        teardown_one(py, plugins, session, config, item, xfail, &mut reports);
-        close_item_filters(py);
-        python::end_item_context(py);
-        return reports;
+        return xfail;
     }
     // Unhandled thread exceptions surfaced during setup (upstream's trylast
     // pytest_runtest_setup hookimpl): an error filter fails the setup.
@@ -962,10 +979,7 @@ pub(crate) fn run_one_body(
             setup_started,
             &err,
         ));
-        teardown_one(py, plugins, session, config, item, xfail, &mut reports);
-        close_item_filters(py);
-        python::end_item_context(py);
-        return reports;
+        return xfail;
     }
     reports.push(TestReport {
         nodeid: item.nodeid.clone(),
@@ -1011,10 +1025,7 @@ pub(crate) fn run_one_body(
         python::capture_resume(py);
         if config.get_flag("setup-only") || config.get_flag("setup-plan") {
             // Fixtures only: tear down without calling the test.
-            teardown_one(py, plugins, session, config, item, xfail, &mut reports);
-            close_item_filters(py);
-            python::end_item_context(py);
-            return reports;
+            return xfail;
         }
     }
 
@@ -1043,10 +1054,7 @@ pub(crate) fn run_one_body(
                     reprcrash_message: None,
                     head_line: None,
                 });
-                teardown_one(py, plugins, session, config, item, true, &mut reports);
-                close_item_filters(py);
-                python::end_item_context(py);
-                return reports;
+                return true;
             }
         }
     }
@@ -1111,10 +1119,7 @@ pub(crate) fn run_one_body(
         // inside a subtest block records a failed subtest, then aborts).
         let (sub_reports, _) = python::pop_subtest_reports(py, config, item, quiet_subtests);
         reports.extend(sub_reports);
-        teardown_one(py, plugins, session, config, item, xfail, &mut reports);
-        close_item_filters(py);
-        python::end_item_context(py);
-        return reports;
+        return xfail;
     }
 
     let mut raises_ok = true;
@@ -1180,10 +1185,7 @@ pub(crate) fn run_one_body(
                             let (sub_reports, _) =
                                 python::pop_subtest_reports(py, config, item, quiet_subtests);
                             reports.extend(sub_reports);
-                            teardown_one(py, plugins, session, config, item, xfail, &mut reports);
-                            close_item_filters(py);
-                            python::end_item_context(py);
-                            return reports;
+                            return xfail;
                         }
                         raises_ok = xfail_raises_ok(py, &xfailed, &err);
                         report_from_err(py, config, item, Phase::Call, call_started, &err)
@@ -1285,12 +1287,9 @@ pub(crate) fn run_one_body(
             });
         }
     }
-
-    teardown_one(py, plugins, session, config, item, xfail, &mut reports);
-    close_item_filters(py);
-    python::end_item_context(py);
-    reports
+    xfail
 }
+
 
 fn teardown_one(
     py: Python<'_>,
