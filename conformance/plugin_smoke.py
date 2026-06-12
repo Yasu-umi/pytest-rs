@@ -52,7 +52,11 @@ ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 NORMALIZERS = [
     (re.compile(r"\d+\.\d+s"), "Xs"),
     (re.compile(r"Python \d+\.\d+\.\d+"), "Python X"),
-    (re.compile(r"pluggy-\d+\.\d+(\.\d+)?"), "pluggy-X"),
+    # Normalize pytest/pytest-rs versions + optional pluggy suffix on the
+    # platform line.  Real pytest produces "pytest-9.0.3, pluggy-1.6.0";
+    # pytest-rs produces "pytest-rs-0.0.4" (no pluggy tag).  Both map to
+    # "pytest-X" so the platform lines compare equal.
+    (re.compile(r"pytest(?:-rs)?-[\d.]+(?:, pluggy-[\d.]+)?"), "pytest-X"),
     (re.compile(r"^plugins: .*$", re.MULTILINE), "plugins: X"),
     (re.compile(r"^rootdir: .*$", re.MULTILINE), "rootdir: X"),
 ]
