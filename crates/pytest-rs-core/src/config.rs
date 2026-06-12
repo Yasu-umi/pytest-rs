@@ -521,7 +521,7 @@ impl Config {
     // Core pytest options parsed into flags/values (queried via
     // get_flag/get_value); some are still inert and gain behavior as
     // features land.
-    const CORE_FLAGS: [&str; 27] = [
+    const CORE_FLAGS: [&str; 28] = [
         "loadscope-reorder", // xdist: reorder loadscope work units by size (default on)
         "no-loadscope-reorder", // xdist: keep collection order for loadscope work units
         "force-short-summary", // truncate short-summary messages even at -vv
@@ -549,6 +549,7 @@ impl Config {
         "setup-show",      // run tests, narrating fixture setup/teardown
         "traceconfig",     // accepted-but-inert: plugin trace header not implemented
         "keep-duplicates", // collect the same file once per duplicated arg
+        "noconftest",      // do not load any conftest.py files
     ];
     const CORE_VALUES: [(&str, Option<char>); 42] = [
         ("confcutdir", None),

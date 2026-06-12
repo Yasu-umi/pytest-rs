@@ -7,6 +7,9 @@ pytest_timeout_set_timer). Core plugin loading stays the Rust engine's job."""
 from __future__ import annotations
 
 import inspect
+import pathlib
+import sys
+import types
 from typing import Any
 
 
@@ -271,6 +274,14 @@ class PluginManager:
         # registers itself here to record calls; see add_hookcall_monitoring).
         self._call_monitors: list[tuple[Any, Any]] = []
         self.hook = HookRelay(self)
+        # Conftest loading state
+        self._dirpath2confmods: dict[pathlib.Path, list[types.ModuleType]] = {}
+        self._conftest_plugins: set[types.ModuleType] = set()
+        self._noconftest: bool = False
+        self._confcutdir: pathlib.Path | None = None
+        self._using_pyargs: bool = False
+        self._configured: bool = False
+        self._blocked_plugins: set[str] = set()
 
     def add_hookcall_monitoring(self, before, after):
         """Register before(name, hook_impls, kwargs) / after(outcome, name,
@@ -450,6 +461,184 @@ class PluginManager:
             if hasattr(method, attr):
                 return {attr: getattr(method, attr)}
         return None
+
+    def get_plugins(self) -> list[Any]:
+        return list(self._plugins)
+
+    def is_blocked(self, name: str) -> bool:
+        return name in self._blocked_plugins
+
+    def set_blocked(self, name: str) -> None:
+        self._blocked_plugins.add(name)
+
+    def unblock(self, name: str) -> None:
+        self._blocked_plugins.discard(name)
+
+    def trace(self, msg: str) -> None:
+        pass
+
+    def _get_directory(self, path: pathlib.Path) -> pathlib.Path:
+        return path.parent if path.is_file() else path
+
+    def _is_in_confcutdir(self, path: pathlib.Path) -> bool:
+        if self._confcutdir is None:
+            return True
+        return path not in self._confcutdir.parents
+
+    def _try_load_conftest(
+        self,
+        anchor: pathlib.Path,
+        importmode: str,
+        rootpath: pathlib.Path,
+        *,
+        consider_namespace_packages: bool,
+    ) -> None:
+        self._loadconftestmodules(
+            anchor, importmode, rootpath, consider_namespace_packages=consider_namespace_packages
+        )
+        if anchor.is_dir():
+            for x in anchor.glob("test*"):
+                if x.is_dir():
+                    self._loadconftestmodules(
+                        x, importmode, rootpath, consider_namespace_packages=consider_namespace_packages
+                    )
+
+    def _loadconftestmodules(
+        self,
+        path: pathlib.Path,
+        importmode: str,
+        rootpath: pathlib.Path,
+        *,
+        consider_namespace_packages: bool,
+    ) -> None:
+        if self._noconftest:
+            return
+        directory = self._get_directory(path)
+        if directory in self._dirpath2confmods:
+            return
+        clist: list[types.ModuleType] = []
+        for parent in reversed((directory, *directory.parents)):
+            if self._is_in_confcutdir(parent):
+                conftestpath = parent / "conftest.py"
+                if conftestpath.is_file():
+                    mod = self._importconftest(
+                        conftestpath, importmode, rootpath,
+                        consider_namespace_packages=consider_namespace_packages,
+                    )
+                    clist.append(mod)
+        self._dirpath2confmods[directory] = clist
+
+    def _getconftestmodules(self, path: pathlib.Path) -> list[types.ModuleType]:
+        directory = self._get_directory(path)
+        return self._dirpath2confmods.get(directory, [])
+
+    def _rget_with_confmod(
+        self, name: str, path: pathlib.Path
+    ) -> tuple[types.ModuleType, Any]:
+        modules = self._getconftestmodules(path)
+        for mod in reversed(modules):
+            try:
+                return mod, getattr(mod, name)
+            except AttributeError:
+                continue
+        raise KeyError(name)
+
+    def _importconftest(
+        self,
+        conftestpath: pathlib.Path,
+        importmode: str,
+        rootpath: pathlib.Path,
+        *,
+        consider_namespace_packages: bool,
+    ) -> types.ModuleType:
+        conftestpath = pathlib.Path(conftestpath)
+        conftestpath_plugin_name = str(conftestpath)
+        existing = self.getplugin(conftestpath_plugin_name)
+        if existing is not None:
+            return existing  # type: ignore[return-value]
+
+        # Non-package conftest.py files all have module name "conftest"; clear
+        # the cache entry so a fresh load doesn't return the previous one.
+        try:
+            del sys.modules[conftestpath.stem]
+        except KeyError:
+            pass
+
+        try:
+            from _pytest.pathlib import import_path
+            mod = import_path(
+                conftestpath, mode=importmode, root=rootpath,
+                consider_namespace_packages=consider_namespace_packages,
+            )
+        except Exception as e:
+            from _pytest.config import ConftestImportFailure
+            raise ConftestImportFailure(conftestpath, cause=e) from e
+
+        self._conftest_plugins.add(mod)
+        dirpath = conftestpath.parent
+        if dirpath in self._dirpath2confmods:
+            for p, mods in self._dirpath2confmods.items():
+                if dirpath in p.parents or p == dirpath:
+                    if mod not in mods:
+                        mods.append(mod)
+        self.trace(f"loading conftestmodule {mod!r}")
+        self.consider_conftest(mod, registration_name=conftestpath_plugin_name)
+        return mod
+
+    def _set_initial_conftests(
+        self,
+        args: Any,
+        pyargs: bool,
+        noconftest: bool,
+        rootpath: pathlib.Path,
+        confcutdir: pathlib.Path | None,
+        invocation_dir: pathlib.Path,
+        importmode: str,
+        *,
+        consider_namespace_packages: bool,
+    ) -> None:
+        from _pytest.pathlib import absolutepath, safe_exists
+
+        self._confcutdir = absolutepath(invocation_dir / confcutdir) if confcutdir else None
+        self._noconftest = noconftest
+        self._using_pyargs = pyargs
+        foundanchor = False
+        for initial_path in args:
+            path = str(initial_path)
+            i = path.find("::")
+            if i != -1:
+                path = path[:i]
+            anchor = absolutepath(invocation_dir / path)
+            if safe_exists(anchor):
+                self._try_load_conftest(
+                    anchor, importmode, rootpath,
+                    consider_namespace_packages=consider_namespace_packages,
+                )
+                foundanchor = True
+        if not foundanchor:
+            self._try_load_conftest(
+                invocation_dir, importmode, rootpath,
+                consider_namespace_packages=consider_namespace_packages,
+            )
+
+    def consider_conftest(
+        self, conftestmodule: types.ModuleType, registration_name: str
+    ) -> None:
+        self.register(conftestmodule, name=registration_name)
+
+    def import_plugin(self, modname: str, consider_entry_points: bool = False) -> None:
+        assert isinstance(modname, str), f"module name as text required, got {modname!r}"
+        if self.is_blocked(modname) or self.getplugin(modname) is not None:
+            return
+        try:
+            __import__(modname)
+        except ImportError as e:
+            raise ImportError(
+                f'Error importing plugin "{modname}": {e.args[0]}'
+            ).with_traceback(e.__traceback__) from e
+        else:
+            mod = sys.modules[modname]
+            self.register(mod, modname)
 
 
 pluginmanager = PluginManager()

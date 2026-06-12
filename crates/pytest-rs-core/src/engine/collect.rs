@@ -155,6 +155,20 @@ impl Engine {
         paths: &[String],
         files: &[PathBuf],
     ) -> (Vec<PathBuf>, Vec<PathBuf>) {
+        if self.config.get_flag("noconftest") {
+            let start_dirs = if paths.is_empty() {
+                vec![self.config.invocation_dir.clone()]
+            } else {
+                paths
+                    .iter()
+                    .map(|p| {
+                        let resolved = self.config.invocation_dir.join(p.split("::").next().unwrap_or_default());
+                        if resolved.is_dir() { resolved } else { resolved.parent().map(std::path::Path::to_path_buf).unwrap_or_default() }
+                    })
+                    .collect()
+            };
+            return (start_dirs, Vec::new());
+        }
         // Conftests load for every collection start dir (even ones with no
         // test files — pytest imports initial conftests during dir scan),
         // plus each collected file's directory chain.
@@ -224,7 +238,11 @@ impl Engine {
                 &mut self.session.registry,
                 &mut self.session.py_hooks,
             ) {
-                errors.push((conftest.clone(), python::format_exception(py, &err)));
+                let err_msg = python::format_exception(py, &err);
+                // Conftest import failures are a configuration error (USAGE_ERROR),
+                // not a collection error (INTERRUPTED). Signal with the sentinel so
+                // the caller in mod.rs returns the right exit code.
+                return Err(format!("\x00USAGE_ERROR\x00{err_msg}"));
             }
         }
         // Upstream reports pytest_plugins in non-top-level conftests as an error.

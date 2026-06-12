@@ -307,8 +307,11 @@ impl Engine {
                     return exit_code::INTERRUPTED;
                 }
                 // Sentinel "\x00USAGE_ERROR\x00": UsageError in configure —
-                // message already printed; run unconfigure and exit 4.
-                if message == "\x00USAGE_ERROR\x00" {
+                // run unconfigure and exit 4. May have an error message appended.
+                if let Some(inner) = message.strip_prefix("\x00USAGE_ERROR\x00") {
+                    if !inner.is_empty() {
+                        eprintln!("ERROR during collection:\n{inner}");
+                    }
                     let _ = self.fire_py_hooks_simple(py, "pytest_unconfigure");
                     return exit_code::USAGE_ERROR;
                 }
