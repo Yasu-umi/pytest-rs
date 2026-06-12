@@ -260,8 +260,7 @@ def pytest_runtest_call(item):
         sys.last_type = type(exc)
         sys.last_value = exc
         sys.last_traceback = exc.__traceback__
-        if sys.version_info >= (3, 12):
-            sys.last_exc = exc  # type: ignore[attr-defined]
+        sys.last_exc = exc
         raise
 
 

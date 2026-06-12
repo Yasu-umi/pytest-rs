@@ -5,6 +5,8 @@ attribute access work correctly for the subset of the API our suites need.
 """
 from __future__ import annotations
 
+from _pytest._stub import __getattr__  # noqa: F401
+
 
 class ReprFileLocation:
     """Minimal crash location (path + lineno + message)."""
@@ -86,6 +88,3 @@ class TracebackEntry:
 
     def __init__(self, lines=()):
         self.lines = list(lines)
-
-
-from _pytest._stub import __getattr__  # noqa: F401

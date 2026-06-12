@@ -1,3 +1,4 @@
+from datetime import datetime as _dt
 from time import perf_counter, sleep, time  # noqa: F401
 
 
@@ -18,9 +19,6 @@ class Instant:
 
     def elapsed(self):
         return Duration(perf_counter() - self._perf, time() - self._time)
-
-
-from datetime import datetime as _dt
 
 
 class MockTiming:

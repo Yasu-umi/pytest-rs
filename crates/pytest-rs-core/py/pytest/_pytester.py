@@ -584,12 +584,13 @@ class Pytester:
         import sys
         import tempfile
 
+        from _pytest.pytester import HookRecorder
+
         import pytest
         import pytest._capture as _capture
         import pytest._marks as _marks
         import pytest._node as _node
         import pytest._tmp_path as _tmp_path
-        from _pytest.pytester import HookRecorder
         from pytest._pluginmanager import pluginmanager
 
         run_args = [str(arg) for arg in args]
