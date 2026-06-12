@@ -843,14 +843,22 @@ impl Engine {
             println!("{}", center_with(msg, '!'));
         }
         // A test/plugin set session.shouldstop with a reason: pytest banners
-        // it after the failure summary (the INTERRUPTED-exit case shows it via
-        // the interrupt report instead). Exit code is INTERRUPTED regardless
-        // of whether any tests also failed (e.g. --stepwise stops after the
-        // first failure).
+        // it after the failure summary. When shouldfail is NOT also set (e.g.
+        // stepwise stops on first failure), real pytest raises Interrupted which
+        // produces "Interrupted: <reason>" in the repr; when shouldfail IS also
+        // set (--maxfail + manual shouldstop) the banner is printed plain.
+        // Check both Rust-side (timeout) and Python-side (maxfail plugin) shouldfail.
         if self.session.abort_banner.is_none()
             && let Some(reason) = python::session_shouldstop(py)
         {
-            println!("{}", center_with(&format!("Interrupted: {reason}"), '!'));
+            let has_shouldfail = self.session.shouldfail.is_some()
+                || python::session_shouldfail(py).is_some();
+            let banner = if has_shouldfail {
+                reason
+            } else {
+                format!("Interrupted: {reason}")
+            };
+            println!("{}", center_with(&banner, '!'));
             code = exit_code::INTERRUPTED;
         }
         let warning_count = python::warning_count(py) + self.session.worker_warning_count;

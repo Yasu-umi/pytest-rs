@@ -8,8 +8,8 @@
       "file": "test_pytest_rerunfailures.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 29,
-      "failed": 18,
+      "passed": 30,
+      "failed": 17,
       "skipped": 1,
       "errors": 0
     }
