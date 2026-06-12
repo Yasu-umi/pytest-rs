@@ -23,6 +23,7 @@ pub(crate) use marks::*;
 pub use progress::*;
 pub(crate) use protocol::{capture_logreport, run_item_phases};
 pub(crate) use item::*;
+pub(crate) use teardown::setup_show_active;
 pub(crate) use teardown::*;
 
 impl Engine {

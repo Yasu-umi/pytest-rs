@@ -297,7 +297,6 @@ impl Engine {
         if self.session.collect_errors.is_empty() && phase_errors.is_empty() {
             return;
         }
-        println!();
         println!("{}", center_banner("ERRORS"));
         for (nodeid, err) in &self.session.collect_errors {
             println!(
@@ -420,7 +419,7 @@ impl Engine {
         if failures.is_empty() {
             return;
         }
-        println!("\n{}", center_banner("FAILURES"));
+        println!("{}", center_banner("FAILURES"));
         for report in &failures {
             // A custom item's reportinfo()[2] (pytest-mypy's test_name_formatter)
             // overrides the nodeid-derived heading.
@@ -558,7 +557,7 @@ impl Engine {
         if xfailures.is_empty() {
             return;
         }
-        println!("\n{}", center_banner("XFAILURES"));
+        println!("{}", center_banner("XFAILURES"));
         let show_capture = self.config.get_value("show-capture").unwrap_or("all");
         for report in &xfailures {
             let tb = report.xfail_longrepr.as_deref().unwrap_or_default();

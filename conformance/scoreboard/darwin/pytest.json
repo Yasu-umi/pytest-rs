@@ -132,10 +132,10 @@
     },
     {
       "file": "testing/test_doctest.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 138,
-      "failed": 1,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 139,
+      "failed": 0,
       "skipped": 1,
       "errors": 0
     },
@@ -296,8 +296,8 @@
       "file": "testing/test_setuponly.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 21,
-      "failed": 5,
+      "passed": 23,
+      "failed": 3,
       "skipped": 0,
       "errors": 0
     },

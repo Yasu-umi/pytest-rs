@@ -105,10 +105,10 @@
     },
     {
       "file": "tests/test_console.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 98,
-      "failed": 1,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 99,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },

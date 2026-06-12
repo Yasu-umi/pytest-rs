@@ -769,6 +769,11 @@ impl Engine {
             code = forced;
         }
 
+        if !self.config.no_terminal() && !self.session.reports.is_empty() {
+            // Real pytest's sessionfinish prints _tw.line("") before the summary
+            // sections, creating a blank line between test output and the summary.
+            println!();
+        }
         if self.config.no_terminal() {
             self.write_junit_xml(py);
             // Delegated mode: the replacement reporter renders the
