@@ -304,6 +304,16 @@ impl Engine {
                     let _ = self.fire_py_hooks_simple(py, "pytest_unconfigure");
                     return exit_code::USAGE_ERROR;
                 }
+                // Sentinel "\x00EXIT\x00{code}": pytest.exit() during configure or
+                // sessionstart — banner already set on session if needed.
+                if let Some(rest) = message.strip_prefix("\x00EXIT\x00") {
+                    let code = rest.parse().unwrap_or(exit_code::INTERRUPTED);
+                    if let Some(banner) = &self.session.abort_banner.clone() {
+                        println!("{}", center_with(banner, '!'));
+                    }
+                    let _ = self.fire_py_hooks_simple(py, "pytest_unconfigure");
+                    return code;
+                }
                 eprintln!("ERROR: {message}");
                 return exit_code::USAGE_ERROR;
             }
@@ -358,7 +368,19 @@ impl Engine {
         if let Err(err) = self.fire_py_collection_finish(py) {
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
         }
-        self.print_collection_count(py, collected, n_collect_errors, n_items);
+        // Count module-level skips (pytest.skip/importorskip at module level)
+        // that were recorded during collection; these show as "/ N skipped"
+        // in the "collected N items" line, matching pytest's format.
+        let n_collect_skips = self
+            .session
+            .reports
+            .iter()
+            .filter(|r| {
+                r.phase == crate::report::Phase::Setup
+                    && r.outcome == crate::report::Outcome::Skipped
+            })
+            .count();
+        self.print_collection_count(py, collected, n_collect_errors, n_collect_skips, n_items);
 
         if self.config.collect_only {
             return self.run_collect_only(py, started, n_collect_errors, n_items);
@@ -543,6 +565,7 @@ impl Engine {
         py: Python<'_>,
         collected: usize,
         n_collect_errors: usize,
+        n_collect_skips: usize,
         n_items: usize,
     ) {
         // The replacement reporter prints its own "collected N items" line.
@@ -558,7 +581,7 @@ impl Engine {
                 ""
             };
             // pytest's report_collect builds the line incrementally so error,
-            // deselected and selected counts can all appear together.
+            // deselected, skipped and selected counts can all appear together.
             let mut line = format!(
                 "{prefix}collected {collected} item{}",
                 if collected == 1 { "" } else { "s" }
@@ -567,6 +590,11 @@ impl Engine {
                 line += &format!(
                     " / {n_collect_errors} error{}",
                     if n_collect_errors == 1 { "" } else { "s" }
+                );
+            }
+            if n_collect_skips > 0 {
+                line += &format!(
+                    " / {n_collect_skips} skipped",
                 );
             }
             if deselected > 0 {

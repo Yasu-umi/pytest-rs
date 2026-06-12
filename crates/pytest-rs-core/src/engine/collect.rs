@@ -345,6 +345,17 @@ impl Engine {
                 eprintln!("ERROR: {usage_msg}");
                 return Err("\x00USAGE_ERROR\x00".to_string());
             }
+            // pytest.exit() in pytest_configure: print "Exit: msg" to stderr
+            // (no banner), return the requested exit code.
+            if let Some(code) = python::session_abort_code(py, &err) {
+                let exit_msg = err
+                    .value(py)
+                    .getattr("msg")
+                    .and_then(|m| m.extract::<String>())
+                    .unwrap_or_default();
+                eprintln!("Exit: {exit_msg}");
+                return Err(format!("\x00EXIT\x00{code}"));
+            }
             errors.push((rootdir.to_path_buf(), python::format_exception(py, &err)));
         }
         // A plugin swapped in its own terminal reporter: suppress native
@@ -358,6 +369,18 @@ impl Engine {
         // runs last under pluggy LIFO). A conftest sessionstart may stash
         // state the pytest_report_header hooks read back (e.g. config._x).
         if let Err(err) = self.fire_py_sessionstart(py) {
+            // pytest.exit() in pytest_sessionstart: print "Exit: msg" to stderr
+            // AND show a "!!! Exit: msg !!!" banner in stdout.
+            if let Some(code) = python::session_abort_code(py, &err) {
+                let exit_msg = err
+                    .value(py)
+                    .getattr("msg")
+                    .and_then(|m| m.extract::<String>())
+                    .unwrap_or_default();
+                eprintln!("Exit: {exit_msg}");
+                self.session.abort_banner = Some(format!("Exit: {exit_msg}"));
+                return Err(format!("\x00EXIT\x00{code}"));
+            }
             // An unexpected exception in pytest_sessionstart is an INTERNALERROR
             // (exit 3), not a collection error (exit 2). Signal the caller with
             // a sentinel prefix so it can print the INTERNALERROR banner.
