@@ -1,5 +1,9 @@
 """pytester LineMatcher (split out of _pytester.py)."""
 
+import collections.abc
+import fnmatch
+import re
+
 from pytest._outcomes import fail
 
 
@@ -32,14 +36,10 @@ class LineMatcher:
 
     def fnmatch_lines_random(self, lines2):
         __tracebackhide__ = True
-        import fnmatch
-
         self._match_lines_random(lines2, fnmatch.fnmatch)
 
     def re_match_lines_random(self, lines2):
         __tracebackhide__ = True
-        import re
-
         self._match_lines_random(lines2, lambda name, pat: bool(re.match(pat, name)))
 
     def _match_lines_random(self, lines2, match_func):
@@ -56,8 +56,6 @@ class LineMatcher:
                 self._fail(msg)
 
     def get_lines_after(self, fnline):
-        import fnmatch
-
         for i, line in enumerate(self.lines):
             if fnline == line or fnmatch.fnmatch(line, fnline):
                 return self.lines[i + 1 :]
@@ -72,14 +70,10 @@ class LineMatcher:
 
     def fnmatch_lines(self, lines2, *, consecutive=False):
         __tracebackhide__ = True
-        import fnmatch
-
         self._match_lines(lines2, fnmatch.fnmatch, "fnmatch", consecutive=consecutive)
 
     def re_match_lines(self, lines2, *, consecutive=False):
         __tracebackhide__ = True
-        import re
-
         self._match_lines(
             lines2,
             lambda name, pat: bool(re.match(pat, name)),
@@ -88,8 +82,6 @@ class LineMatcher:
         )
 
     def _match_lines(self, lines2, match_func, match_nickname, *, consecutive=False):
-        import collections.abc
-
         if not isinstance(lines2, collections.abc.Sequence):
             raise TypeError(f"invalid type for lines2: {type(lines2).__name__}")
         lines2 = self._getlines(lines2)
@@ -130,14 +122,10 @@ class LineMatcher:
 
     def no_fnmatch_line(self, pat):
         __tracebackhide__ = True
-        import fnmatch
-
         self._no_match_line(pat, fnmatch.fnmatch, "fnmatch")
 
     def no_re_match_line(self, pat):
         __tracebackhide__ = True
-        import re
-
         self._no_match_line(pat, lambda name, pat: bool(re.match(pat, name)), "re.match")
 
     def _no_match_line(self, pat, match_func, match_nickname):

@@ -10,6 +10,7 @@ import inspect
 import pathlib
 import sys
 import types
+import warnings
 from typing import Any
 
 
@@ -19,8 +20,6 @@ def instance_hook_impls(name: str) -> list:
     Module-level impls fire via the engine's py_hooks instead, and the
     'terminalreporter' plugin is driven through its own delegation path;
     both are excluded here to avoid double dispatch."""
-    import types
-
     reporter = pluginmanager.getplugin("terminalreporter")
     impls = []
     for plugin in pluginmanager._plugins:
@@ -216,9 +215,6 @@ class HookCaller:
         fspath_var, path_var = pair
         if fspath_var not in kwargs and path_var not in kwargs:
             return kwargs
-        import pathlib
-        import warnings
-
         from _pytest.deprecated import HOOK_LEGACY_PATH_ARG
 
         kwargs = dict(kwargs)
@@ -353,8 +349,6 @@ class PluginManager:
     def _warn_legacy_marking(cls, func, name, kind):
         """Attribute-style hook configuration is deprecated (upstream
         HOOK_LEGACY_MARKING, warned at the hook's definition site)."""
-        import warnings
-
         from _pytest.deprecated import HOOK_LEGACY_MARKING
 
         opts = [
@@ -383,9 +377,6 @@ class PluginManager:
 
     @classmethod
     def _warn_legacy_path_args(cls, func, name):
-        import inspect
-        import warnings
-
         from _pytest.deprecated import HOOK_LEGACY_PATH_ARG
 
         legacy = cls._LEGACY_PATH_HOOK_ARGS.get(name)

@@ -1,10 +1,14 @@
 """tmp_path / tmp_path_factory builtin fixtures (upstream _pytest/tmpdir.py
 port: pytest-of-{user} numbered basetemps with lock-driven retention)."""
 
+import getpass
 import os
 import pathlib
+import re
+import shutil
 import stat
 import tempfile
+import time
 
 from pytest._fixtures import fixture
 
@@ -64,8 +68,6 @@ def rm_rf(path):
 
 def _sweep_stale_basetemps():
     """Best-effort removal of legacy mkdtemp basetemps left by old builds."""
-    import time
-
     cutoff = time.time() - _STALE_SECONDS
     try:
         entries = list(pathlib.Path(tempfile.gettempdir()).iterdir())
@@ -86,8 +88,6 @@ def get_user():
     in the current environment (see #1010)."""
     try:
         # In some exotic environments, getpass may not be importable.
-        import getpass
-
         return getpass.getuser()
     except (ImportError, OSError, KeyError):
         return None
@@ -263,8 +263,6 @@ def tmp_path_factory():
 
 @fixture
 def tmp_path(tmp_path_factory, request):
-    import re
-
     name = re.sub(r"\W", "_", request.node.name)[:30]
     path = tmp_path_factory.mktemp(name, numbered=True)
     yield path
@@ -358,8 +356,6 @@ class LocalPath:
         return self._path.is_dir()
 
     def remove(self, ignore_errors=False):
-        import shutil
-
         if self._path.is_dir():
             shutil.rmtree(self._path, ignore_errors=ignore_errors)
         else:
@@ -387,8 +383,6 @@ class LocalPath:
         return [LocalPath(child) for child in sorted(self._path.iterdir())]
 
     def chdir(self):
-        import os
-
         old = os.getcwd()
         os.chdir(self._path)
         return LocalPath(old)

@@ -2,6 +2,7 @@
 (upstream unit-tests these functions directly)."""
 
 import os
+import tomllib
 from dataclasses import KW_ONLY, dataclass
 from pathlib import Path
 
@@ -98,8 +99,6 @@ def load_config_dict_from_file(filepath):
     # (toml mode) or [tool.pytest.ini_options] table (ini mode) for
     # pyproject.toml, or [pytest] table (toml mode) for pytest.toml.
     elif filepath.suffix == ".toml":
-        import tomllib
-
         toml_text = filepath.read_text(encoding="utf-8")
         try:
             config = tomllib.loads(toml_text)

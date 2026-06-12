@@ -2,10 +2,15 @@
 upstream runtestprotocol's report shape (setup/call/teardown) with
 skip/xfail mark semantics; no fixtures."""
 
+import sys
 import traceback
 
 from _pytest.reports import CollectReport as CollectReport
 from _pytest.reports import TestReport as TestReport
+from _pytest.reports import _LongRepr as _LR
+from _pytest.skipping import evaluate_skip_marks, evaluate_xfail_marks
+from pytest._outcomes import Exit, Skipped
+from pytest._raises import ExceptionInfo
 
 
 class CallInfo:
@@ -20,8 +25,6 @@ class CallInfo:
 
     @classmethod
     def from_call(cls, func, when, reraise=None):
-        from pytest._raises import ExceptionInfo
-
         excinfo = None
         result = None
         try:
@@ -42,8 +45,6 @@ class _ProtocolReport:
     """The TestReport subset the mark-evaluation tests inspect."""
 
     def __init__(self, when, outcome, keywords, longrepr=None):
-        from _pytest.reports import _LongRepr as _LR
-
         self.when = when
         self.outcome = outcome
         self.keywords = keywords
@@ -110,10 +111,6 @@ def runtestprotocol(item, log=True, nextitem=None):
                 for report in reports:
                     item.ihook.pytest_runtest_logreport(report=report)
             return reports
-
-    from pytest._outcomes import Exit, Skipped
-
-    from _pytest.skipping import evaluate_skip_marks, evaluate_xfail_marks
 
     keywords = dict(getattr(item, "keywords", None) or {})
     reports = []
@@ -247,8 +244,6 @@ def collect_one_node(collector):
 
 def pytest_runtest_call(item):
     """Run item.runtest() and store sys.last_* on exception (upstream API)."""
-    import sys
-
     for attr in ("last_type", "last_value", "last_traceback", "last_exc"):
         try:
             delattr(sys, attr)
@@ -264,4 +259,4 @@ def pytest_runtest_call(item):
         raise
 
 
-from _pytest._stub import __getattr__  # noqa: E402, F401
+from _pytest._stub import __getattr__  # noqa: F401

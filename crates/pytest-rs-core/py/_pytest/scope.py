@@ -4,6 +4,8 @@ from enum import Enum
 from functools import total_ordering
 from typing import Literal
 
+from _pytest.outcomes import fail
+
 _ScopeName = Literal["session", "package", "module", "class", "function"]
 
 
@@ -35,8 +37,6 @@ class Scope(Enum):
 
     @classmethod
     def from_user(cls, scope_name: _ScopeName, descr: str, where: str | None = None) -> Scope:
-        from _pytest.outcomes import fail
-
         try:
             return Scope(scope_name)
         except ValueError:

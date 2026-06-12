@@ -8,8 +8,12 @@ engine drives phases via start_phase()/finish_item().
 """
 
 import contextlib
+import datetime
 import io
 import logging
+import os
+import pickle
+import sys
 import types
 
 from pytest._fixtures import fixture
@@ -54,8 +58,6 @@ class _LiveLogHandler(logging.StreamHandler):
     section header before the first record of each phase."""
 
     def __init__(self):
-        import sys
-
         super().__init__(sys.stdout)
         self.when = None
         self._header_printed = False
@@ -93,8 +95,6 @@ class _RelayHandler(logging.Handler):
         self._path = path
 
     def emit(self, record):
-        import pickle
-
         # SocketHandler-style: merge args into msg and drop unpicklables.
         payload = dict(record.__dict__)
         payload["msg"] = record.getMessage()
@@ -114,8 +114,6 @@ class DatetimeFormatter(logging.Formatter):
 
     def formatTime(self, record, datefmt=None):
         if datefmt and "%f" in datefmt:
-            import datetime
-
             ct = datetime.datetime.fromtimestamp(record.created).astimezone()
             return ct.strftime(datefmt)
         return super().formatTime(record, datefmt)
@@ -158,8 +156,6 @@ class LoggingState:
     def configure(self, settings):
         """Wire session handlers from CLI/ini settings (a str->str dict with
         keys like log_cli, log_cli_level, log_file, log_disable...)."""
-        import os
-        import sys
 
         def get(key):
             value = settings.get(key)

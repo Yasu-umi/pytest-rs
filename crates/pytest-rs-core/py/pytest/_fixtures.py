@@ -1,5 +1,7 @@
 """The @pytest.fixture decorator: records metadata, resolved by the engine."""
 
+import warnings
+
 
 class FixtureLookupError(LookupError):
     """Raised by request.getfixturevalue() for unknown fixture names."""
@@ -16,8 +18,6 @@ class FixtureFunctionMarker:
     def __call__(self, function):
         if hasattr(function, "pytestmark"):
             # Marks below the @fixture decorator are inert (#3364).
-            import warnings
-
             from _pytest.deprecated import MARKED_FIXTURE
 
             warnings.warn(MARKED_FIXTURE, stacklevel=2)
@@ -43,8 +43,6 @@ def yield_fixture(
     fixture_function=None, *, scope="function", params=None, autouse=False, ids=None, name=None
 ):
     """Deprecated alias for :func:`fixture`."""
-    import warnings
-
     from _pytest.deprecated import YIELD_FIXTURE
 
     warnings.warn(YIELD_FIXTURE, stacklevel=2)

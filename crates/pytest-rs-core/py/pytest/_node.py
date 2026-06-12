@@ -1,5 +1,10 @@
 """The `request.node` object: a minimal pytest Item surface."""
 
+import inspect
+import pathlib
+import traceback
+import warnings
+
 # Marks added at runtime (node.add_marker / request.applymarker) for the
 # currently running item; the engine re-evaluates xfail against these and
 # clears the list per item.
@@ -117,8 +122,6 @@ class _NodeBase:
         session=None,
         **kwargs,
     ):
-        import pathlib
-
         self.parent = parent
         self.config = config if config is not None else getattr(parent, "config", None)
         self.session = session if session is not None else getattr(parent, "session", None)
@@ -150,8 +153,6 @@ class _NodeBase:
         if isinstance(self, Item) and parent_id:
             return f"{parent_id}::{self.name}"
         if self.path is not None and self.config is not None:
-            import pathlib
-
             root = getattr(self.config, "rootpath", None) or getattr(self.config, "rootdir", None)
             if root is not None:
                 try:
@@ -321,8 +322,6 @@ def run_custom_item(item):
     of (when, outcome, longrepr) tuples for the engine. Failures get their
     longrepr from Item.repr_failure plus any pytest_exception_interact hook
     (pytest-ruff sets the ruff error message there)."""
-    import traceback
-
     from pytest._outcomes import Skipped
 
     def _excinfo(exc):
@@ -415,8 +414,6 @@ class Session(Collector):
 
     @classmethod
     def from_config(cls, config):
-        import pathlib
-
         rootdir = getattr(config, "rootpath", None) or getattr(config, "rootdir", None)
         rootdir = pathlib.Path(str(rootdir)) if rootdir is not None else pathlib.Path.cwd()
         session = cls(name=rootdir.name or ".", config=config, path=rootdir, nodeid="")
@@ -424,8 +421,6 @@ class Session(Collector):
         return session
 
     def perform_collect(self, args=None, genitems=False):
-        import pathlib
-
         if not args or args == [self.nodeid] or args == [""]:
             return [self]
         results = []
@@ -597,8 +592,6 @@ class DoctestNode:
     def warn(self, warning):
         """Issue a warning attributed to this item's definition site
         (pytest's Node.warn: warn_explicit with the item location)."""
-        import warnings
-
         if not isinstance(warning, Warning):
             raise ValueError(
                 f"warning must be an instance of Warning or subclass, got {warning!r} instead"
@@ -726,8 +719,6 @@ class _CallSpec:
 def _call_optional_arg(func, arg):
     """Call an xunit function with the node arg if it accepts one, else
     with no arguments (pytest's _call_with_optional_argument)."""
-    import inspect
-
     try:
         nparams = len(inspect.signature(func).parameters)
     except (TypeError, ValueError):
@@ -839,8 +830,6 @@ class _NodeSession:
     def shouldfail(self, value):
         # Upstream issue #11706: once set, shouldfail cannot be unset.
         if value is False and _session_state["shouldfail"]:
-            import warnings
-
             from pytest._warning_types import PytestWarning
 
             warnings.warn(
@@ -859,8 +848,6 @@ class _NodeSession:
     @shouldstop.setter
     def shouldstop(self, value):
         if value is False and _session_state["shouldstop"]:
-            import warnings
-
             from pytest._warning_types import PytestWarning
 
             warnings.warn(
@@ -967,8 +954,6 @@ class Node(Item):
     def warn(self, warning):
         """Issue a warning attributed to this item's definition site
         (pytest's Node.warn: warn_explicit with the item location)."""
-        import warnings
-
         if not isinstance(warning, Warning):
             raise ValueError(
                 f"warning must be an instance of Warning or subclass, got {warning!r} instead"
@@ -1026,7 +1011,6 @@ class Function(Node):
         """Return the dotted path from the module to this function/method.
         E.g. "TestX.testmethod_one" or "test_func". If stopatmodule=False,
         also prepends the module stem."""
-        import pathlib
 
         parts = self.nodeid.split("::")
         if stopatmodule:
@@ -1074,8 +1058,6 @@ def set_pycollect_hooks(hooks: list) -> None:
 def fire_makeitem_for_class(name: str) -> set:
     """Fire pytest_pycollect_makeitem hookwrappers for a class, returning
     extra_keyword_matches set that plugins may have populated."""
-    import inspect
-
     node = _CollectedClass(name)
     if not _pycollect_makeitem_hooks:
         return node.extra_keyword_matches

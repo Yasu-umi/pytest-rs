@@ -1,11 +1,18 @@
 """The cache: `config.cache` / the `cache` fixture, backed by
 {cache_dir}/v JSON files like pytest's cacheprovider."""
 
+import errno
 import json
 import os
+import shutil
+import tempfile
+import warnings
+from datetime import datetime, timedelta
 from pathlib import Path
+from pprint import pformat
 
 from pytest._fixtures import fixture
+from pytest._warning_types import PytestCacheWarning
 
 README_CONTENT = """\
 # pytest cache directory #
@@ -58,18 +65,12 @@ class Cache:
 
     def clear_cache(self):
         """--cache-clear: drop the value and directory stores."""
-        import shutil
-
         for prefix in (self._CACHE_PREFIX_DIRS, self._CACHE_PREFIX_VALUES):
             d = self._cachedir / prefix
             if d.is_dir():
                 shutil.rmtree(d, ignore_errors=True)
 
     def warn(self, fmt, **args):
-        import warnings
-
-        from pytest._warning_types import PytestCacheWarning
-
         warnings.warn(PytestCacheWarning(fmt.format(**args) if args else fmt), stacklevel=3)
 
     def _mkdir(self, path):
@@ -115,8 +116,6 @@ class Cache:
         if self._cachedir.is_dir():
             return
         self._cachedir.parent.mkdir(parents=True, exist_ok=True)
-        import tempfile
-
         with tempfile.TemporaryDirectory(
             prefix="pytest-cache-files-", dir=self._cachedir.parent
         ) as newpath:
@@ -134,8 +133,6 @@ class Cache:
             try:
                 path.rename(self._cachedir)
             except OSError as e:
-                import errno
-
                 # Lost a concurrent-creation race: the cache dir now exists
                 # with the same supporting files, so nothing left to do.
                 if e.errno not in (errno.ENOTEMPTY, errno.EEXIST):
@@ -155,8 +152,6 @@ def _sep(title):
 def cacheshow(cachedir, glob):
     """--cache-show: list cached values and directories (pytest's
     cacheshow session)."""
-    from pprint import pformat
-
     cache = Cache(cachedir)
     print("cachedir: " + str(cache._cachedir))
     if not cache._cachedir.is_dir():
@@ -194,8 +189,6 @@ def stepwise_info(cache_obj):
     error_msg is non-None when the cache exists but is invalid (e.g. corrupted);
     in that case last_failed/test_count/age_str are all None.
     """
-    from datetime import datetime, timedelta
-
     info = cache_obj.get("cache/stepwise", None)
     if info is None:
         return None, None, None, None
@@ -225,8 +218,6 @@ def stepwise_info(cache_obj):
 
 def stepwise_write(cache_obj, nodeid, test_count=None):
     """Persist the stepwise resume point (or clear it with nodeid=None)."""
-    from datetime import datetime
-
     if nodeid is None:
         cache_obj.set("cache/stepwise", None)
     else:

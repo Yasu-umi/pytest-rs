@@ -11,6 +11,8 @@ import sys
 import warnings
 from collections import Counter
 
+from pytest._warning_types import PytestConfigWarning, PytestRemovedIn9Warning
+
 captured: list[dict[str, object]] = []
 current_test: str | None = None
 
@@ -45,8 +47,6 @@ def install():
         # deprecation warnings by default (#2908).
         warnings.filterwarnings("always", category=DeprecationWarning)
         warnings.filterwarnings("always", category=PendingDeprecationWarning)
-    from pytest._warning_types import PytestRemovedIn9Warning
-
     warnings.filterwarnings("error", category=PytestRemovedIn9Warning)
     _original_showwarning = warnings.showwarning
     warnings.showwarning = _showwarning
@@ -140,8 +140,6 @@ def parse_filter(arg, escape):
 
 
 def _apply_filter(spec, escape):
-    from pytest._warning_types import PytestConfigWarning
-
     try:
         warnings.filterwarnings(*parse_filter(spec, escape=escape))
     except ImportError as e:
@@ -158,8 +156,6 @@ def apply_session_filters(ini_specs, w_specs):
     specs (escaped, python -W semantics) so the command line wins. A parent
     pytester's forwarded filterwarnings marks apply first — lowest priority,
     like upstream's in-process nesting."""
-    import os
-
     forwarded = [
         spec
         for spec in os.environ.get("PYTEST_RS_FORWARDED_FILTERS", "").split("\n")

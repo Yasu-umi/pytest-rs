@@ -4,11 +4,18 @@
 from __future__ import annotations
 
 import collections.abc
+import dataclasses
+import difflib
 import pprint
+import sys
+import traceback
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from collections.abc import Set as AbstractSet
+from difflib import ndiff
 from typing import Any, Literal, Protocol
 from unicodedata import normalize
+
+from pytest._approx import _Approx as ApproxBase
 
 from _pytest import outcomes
 from _pytest._io.pprint import PrettyPrinter
@@ -223,9 +230,6 @@ def assertrepr_compare(
     except Exception:
         # pytest formats this via ExceptionInfo._getreprcrash (file:line:
         # message of the innermost frame); recover the same from sys.
-        import sys
-        import traceback
-
         exc_type, exc, tb = sys.exc_info()
         entry = traceback.extract_tb(tb)[-1] if tb is not None else None
         location = f"{entry.filename}:{entry.lineno}: " if entry is not None else ""
@@ -250,8 +254,6 @@ def _compare_eq_any(
     if istext(left) and istext(right):
         explanation = _diff_text(left, right, highlighter, verbose)
     else:
-        from pytest._approx import _Approx as ApproxBase
-
         if (isinstance(left, ApproxBase) or isinstance(right, ApproxBase)) and hasattr(
             left if isinstance(left, ApproxBase) else right, "_repr_compare"
         ):
@@ -286,8 +288,6 @@ def _diff_text(left: str, right: str, highlighter: _HighlightFunc, verbose: int 
     Unless --verbose is used this will skip leading and trailing
     characters which are identical to keep the diff minimal.
     """
-    from difflib import ndiff
-
     explanation: list[str] = []
 
     if verbose < 1:
@@ -338,9 +338,6 @@ def _compare_eq_iterable(
 ) -> list[str]:
     if verbose <= 0 and not running_on_ci():
         return ["Use -v to get more diff"]
-    # dynamic import to speedup pytest
-    import difflib
-
     left_formatting = PrettyPrinter().pformat(left).splitlines()
     right_formatting = PrettyPrinter().pformat(right).splitlines()
 
@@ -531,8 +528,6 @@ def _compare_eq_cls(left: Any, right: Any, highlighter: _HighlightFunc, verbose:
     if not has_default_eq(left):
         return []
     if isdatacls(left):
-        import dataclasses
-
         all_fields = dataclasses.fields(left)
         fields_to_check = [info.name for info in all_fields if info.compare]
     elif isattrs(left):

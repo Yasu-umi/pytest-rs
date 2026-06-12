@@ -6,11 +6,15 @@ and for text files matching --doctest-glob patterns.
 
 from __future__ import annotations
 
+import contextlib
 import doctest
+import fnmatch
+import importlib.util
 import inspect
 import os
 import re
 import sys
+import traceback as tb_mod
 import types
 import warnings
 from functools import cached_property
@@ -133,8 +137,6 @@ class DoctestUnexpected(Exception):
         return self._format()
 
     def _format(self) -> str:
-        import traceback as tb_mod
-
         exc_type, exc_val, exc_tb = self._exc_info
         lines = _format_context_lines(self._test, self._example)
         lines.append(f"UNEXPECTED EXCEPTION: {exc_type.__name__}({exc_val})")
@@ -148,8 +150,6 @@ class DoctestUnexpected(Exception):
 
 def _format_unexpected(failure: doctest.UnexpectedException) -> str:
     """Format a doctest.UnexpectedException (used in continue-on-failure mode)."""
-    import traceback as tb_mod
-
     test = failure.test
     ex = failure.example
     exc_type, exc_val, exc_tb = failure.exc_info
@@ -489,8 +489,6 @@ def collect_module_doctests(
     try:
         module = sys.modules.get(module_name)
         if module is None:
-            import importlib.util
-
             spec = importlib.util.spec_from_file_location(module_name, path)
             if spec is None or spec.loader is None:
                 return []
@@ -588,8 +586,6 @@ def is_doctest_textfile(path: str, config: Any) -> bool:
         except Exception:
             pass
         globs = globs_from_ini or ["test*.txt"]
-    import fnmatch
-
     basename = os.path.basename(path)
     return any(fnmatch.fnmatch(basename, g) for g in globs)
 
@@ -615,8 +611,6 @@ def inprocess_doctest_items(
     pytester.inline_genitems. Returns [] when doctest collection doesn't apply
     to `path` (a .py file without --doctest-modules, or a text file matching no
     --doctest-glob pattern)."""
-    import fnmatch as _fnmatch
-
     basename = os.path.basename(path)
     if path.endswith(".py"):
         if not doctest_modules:
@@ -627,7 +621,7 @@ def inprocess_doctest_items(
         except Exception:
             return []
         parent: Any = DoctestModule(path, config)
-    elif any(_fnmatch.fnmatch(basename, pat) for pat in glob_patterns):
+    elif any(fnmatch.fnmatch(basename, pat) for pat in glob_patterns):
         results = collect_textfile_doctests(path, nodeid_base, config)
         parent = DoctestTextfile(path, config)
     else:
@@ -686,7 +680,6 @@ def _is_mocked(obj: Any) -> bool:
 def _patch_unwrap_mock_aware():
     """Context manager that patches inspect.unwrap to skip mock objects
     and warn (then re-raise) when a broken object explodes during unwrap."""
-    import contextlib
 
     @contextlib.contextmanager
     def _ctx():
@@ -750,17 +743,12 @@ class DoctestItem(metaclass=_DoctestItemMeta):
         parts = dotname.split(".", 1)
         qualified = parts[1] if len(parts) > 1 else parts[0]
         try:
-            import importlib.util as _ilu
-            import types as _types
-
-            spec = _ilu.spec_from_file_location("_ri_tmp_", abs_path)
+            spec = importlib.util.spec_from_file_location("_ri_tmp_", abs_path)
             if spec is None or spec.loader is None:
                 return None
-            mod = _types.ModuleType("_ri_tmp_")
+            mod = types.ModuleType("_ri_tmp_")
             spec.loader.exec_module(mod)  # type: ignore[union-attr]
-            import doctest as _dt
-
-            for t in _dt.DocTestFinder().find(mod):
+            for t in doctest.DocTestFinder().find(mod):
                 t_qualified = t.name.split(".", 1)[1] if "." in t.name else t.name
                 if t_qualified == qualified:
                     return t.lineno

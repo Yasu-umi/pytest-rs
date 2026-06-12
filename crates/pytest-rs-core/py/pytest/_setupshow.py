@@ -1,10 +1,10 @@
 """--setup-show / --setup-only teardown-line printers."""
 
+import sys
+
 
 def teardown_printer(indent, scope_char, name):
     def printer():
-        import sys
-
         from pytest import _capture
 
         # The narration must reach the real terminal, not the capture;

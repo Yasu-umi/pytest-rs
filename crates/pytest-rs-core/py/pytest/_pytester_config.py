@@ -1,5 +1,8 @@
 """pytester config-validation helpers (split out of _pytester.py)."""
 
+import configparser
+import importlib.metadata
+
 from pytest._outcomes import fail
 
 
@@ -7,8 +10,6 @@ def _check_cfg_pytest_section(path, args) -> None:
     """Mimic upstream in-process behaviour: raise pytest.fail.Exception if any
     .cfg config file (auto-discovered or via -c/--config-file) contains a bare
     [pytest] section (which is no longer supported; users must use [tool:pytest])."""
-    import configparser
-
     CFG_MSG = "[pytest] section in {filename} files is no longer supported, change to [tool:pytest] instead."
 
     def _has_pytest_section(cfg_path) -> bool:
@@ -45,8 +46,6 @@ def _check_cfg_pytest_section(path, args) -> None:
 
 def _validate_required_plugins(config) -> None:
     """Check required_plugins ini; raise UsageError if any are missing or version-mismatched."""
-    import importlib.metadata
-
     try:
         required = config.getini("required_plugins")
     except Exception:

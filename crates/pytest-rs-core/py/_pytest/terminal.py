@@ -12,10 +12,16 @@ Two consumers:
 
 import datetime
 import os
+import platform
 import sys
+import textwrap
+import time
+from functools import partial
 from pathlib import Path
 
 from _pytest._io import TerminalWriter
+from _pytest._io.wcwidth import wcswidth
+from _pytest.compat import running_on_ci
 
 
 def _plugin_nameversions(plugininfo):
@@ -273,8 +279,6 @@ class TerminalReporter:
         self.hasmarkup = self._tw.hasmarkup
         self.isatty = _CallableBool(bool(getattr(file, "isatty", lambda: False)()))
         self._show_progress_info = self._determine_show_progress_info()
-        import time
-
         self._sessionstarttime = time.time()
 
     # ---- config access (defensive: upstream unit-tests hand minimal
@@ -384,8 +388,6 @@ class TerminalReporter:
 
     def wrap_write(self, content, *, flush=False, margin=8, line_sep="\n", **markup):
         """Wrap message with margin for progress info."""
-        import textwrap
-
         width_of_current_line = self._tw.width_of_current_line
         wrapped = line_sep.join(
             textwrap.wrap(
@@ -614,9 +616,6 @@ class TerminalReporter:
             self.write_line(line)
 
     def pytest_sessionstart(self, session):
-        import platform
-        import time
-
         self._session = session
         self._sessionstarttime = time.time()
         if not self.showheader:
@@ -832,8 +831,6 @@ class TerminalReporter:
             self._tw.line(content)
 
     def summary_stats(self):
-        import time
-
         if self.verbosity < -1:
             return
 
@@ -928,8 +925,6 @@ class TerminalReporter:
                 for rep in skipped:
                     reason = _crash_message(rep) or ""
                     lines.append(f"{markup_word} {rep.nodeid} - {reason}")
-
-        from functools import partial
 
         reportchar_actions = {
             "x": show_xfailed,
@@ -1079,8 +1074,6 @@ def _format_trimmed(format: str, msg: str, available_width: int):
     """Format msg into format, ellipsizing it if it doesn't fit in
     available_width (pytest's helper). Returns None if even the ellipsis
     can't fit."""
-    from _pytest._io.wcwidth import wcswidth
-
     # Only use the first line.
     i = msg.find("\n")
     if i != -1:
@@ -1111,8 +1104,6 @@ def format_verbose_reason(prefix_width, reason, verbosity, fullwidth):
     if verbosity < 2:
         available = fullwidth - prefix_width - len(" [100%]") - 1
         return _format_trimmed(" ({})", reason, available) or ""
-    import textwrap
-
     content = f" ({reason})"
     wrapped = "\n".join(
         textwrap.wrap(
@@ -1138,9 +1129,6 @@ def _get_node_id_with_markup(tw, config, rep):
 def _get_line_with_reprcrash_message(config, rep, tw, word_markup):
     """Summary line for a report, trying to append the reprcrash message
     (trimmed to the terminal width unless on CI / -vv)."""
-    from _pytest._io.wcwidth import wcswidth
-    from _pytest.compat import running_on_ci
-
     verbose_word, verbose_markup = rep._get_verbose_word_with_markup(config, word_markup)
     word = tw.markup(verbose_word, **verbose_markup)
     node = _get_node_id_with_markup(tw, config, rep)

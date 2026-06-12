@@ -4,10 +4,12 @@ test suite drives these functions directly)."""
 
 import atexit
 import contextlib
+import importlib.util
 import itertools
 import os
 import pathlib
 import shutil
+import stat
 import sys
 import uuid
 import warnings
@@ -84,8 +86,6 @@ def on_rm_rf_error(func, path, excinfo, *, start_path):
         return False
 
     # Chmod + retry.
-    import stat
-
     def chmod_rw(p):
         mode = os.stat(p).st_mode
         os.chmod(p, mode | stat.S_IRUSR | stat.S_IWUSR)
@@ -357,9 +357,6 @@ def symlink_or_skip(src, dst, **kwargs):
 
 
 def import_path(path, *, root=None, mode=None, consider_namespace_packages=False):
-    import importlib.util
-    import sys
-
     path = pathlib.Path(path)
     module_name = path.stem
     spec = importlib.util.spec_from_file_location(module_name, path)

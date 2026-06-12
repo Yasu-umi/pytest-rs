@@ -5,6 +5,10 @@ timer (perf_counter unless a test injects `benchmark._timer`), so
 per-iteration overhead matches pytest-benchmark's generated runner.
 """
 
+import cProfile
+import gc
+import importlib
+import time
 from time import perf_counter
 
 
@@ -33,8 +37,6 @@ def make_runner(func, args, kwargs, timer=None, disable_gc=False):
         return timed
 
     def runner(loops):
-        import gc
-
         gc_enabled = gc.isenabled()
         gc.disable()
         try:
@@ -88,16 +90,12 @@ def resolution(timer=None):
 def wall_clock():
     """Real elapsed-time probe for the calibration warmup budget
     (upstream uses time.time even with an injected benchmark timer)."""
-    import time
-
     return time.time()
 
 
 def cprofile_call(func, args, kwargs, loops=1):
     """Invocations under cProfile (upstream profiles loops_range calls
     after the timed rounds); returns the last call's result."""
-    import cProfile
-
     profile = cProfile.Profile()
     result = None
     for _ in range(max(loops, 1)):
@@ -116,6 +114,4 @@ def resolve_timer(spec):
     module_name, _, attr = spec.rpartition(".")
     if not module_name:
         raise ValueError(f"Value for --benchmark-timer must be in dotted form. Got: {spec!r}")
-    import importlib
-
     return getattr(importlib.import_module(module_name), attr)

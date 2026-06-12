@@ -3,6 +3,10 @@
 These reconstruct hook events / reports from the child run's relay file so
 InlineRunResult.getcalls() works without an in-process pytest."""
 
+import pathlib
+import re
+import sys
+
 from pytest._node import Item as _Item
 
 
@@ -33,8 +37,6 @@ class _RelayItem:
     """Lightweight reconstruction of a pytest node from relay JSON data."""
 
     def __init__(self, name, nodeid, path=None):
-        import pathlib
-
         self.name = name
         self.nodeid = nodeid
         self.path = pathlib.Path(path) if path else None
@@ -47,8 +49,6 @@ class _RelayItemResult(_Item):
     """Relay item rebuilt from hook relay JSON; passes isinstance(x, pytest.Item)."""
 
     def __init__(self, name, nodeid, path=None):
-        import pathlib
-
         object.__setattr__(self, "name", name)
         object.__setattr__(self, "_nodeid", nodeid)
         _p = pathlib.Path(path).resolve() if path else None
@@ -69,8 +69,6 @@ class _RelayCollector:
     """Fake collector reconstructed from relay JSON (for assert_contains checks)."""
 
     def __init__(self, path, class_name, session_path):
-        import pathlib
-
         self.path = pathlib.Path(path) if path else None
         self._session_path = pathlib.Path(session_path) if session_path else None
         # Create a named subclass so __class__.__name__ == class_name
@@ -228,8 +226,6 @@ class InlineRunResult:
     @staticmethod
     def _build_calls(hook_events):
         """Convert relay events to _RelayHookCall list, synthesizing collection hooks."""
-        import pathlib
-
         calls = []
         for event in hook_events:
             if event.get("hook") != "pytest_collection_finish":
@@ -415,8 +411,6 @@ class InlineRunResult:
 
     def assert_contains(self, entries):
         """Assert that recorded hook calls contain the given (name, expr) pairs in order."""
-        import sys
-
         __tracebackhide__ = True
         i = 0
         entries = list(entries)
@@ -482,8 +476,6 @@ class InlineRunResult:
     def _teardown_reports(self):
         """Failed teardown reports parsed from the "ERROR at teardown of X"
         failure sections."""
-        import re
-
         text = "\n".join(self._result.outlines)
         return [
             _OutcomeReport(match.group(1), "failed", "teardown", match.group(2))

@@ -22,6 +22,7 @@ The semantics are:
 """
 
 import ast
+import collections
 import dataclasses
 import enum
 import keyword
@@ -324,8 +325,6 @@ class MarkMatcher:
 
     @classmethod
     def from_markers(cls, markers) -> "MarkMatcher":
-        import collections
-
         mark_name_mapping = collections.defaultdict(list)
         for mark in markers:
             mark_name_mapping[mark.name].append(mark)

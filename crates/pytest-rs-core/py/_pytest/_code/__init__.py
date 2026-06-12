@@ -1,3 +1,6 @@
+import inspect
+import textwrap
+
 from pytest._raises import ExceptionInfo as ExceptionInfo  # noqa: F401
 
 from _pytest._stub import __getattr__  # noqa: F401
@@ -5,9 +8,6 @@ from _pytest._stub import __getattr__  # noqa: F401
 
 class Source:
     def __init__(self, obj=None):
-        import inspect
-        import textwrap
-
         if obj is None:
             self.lines = []
         elif isinstance(obj, str):

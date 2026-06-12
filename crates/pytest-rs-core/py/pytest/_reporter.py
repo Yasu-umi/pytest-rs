@@ -12,9 +12,12 @@ from __future__ import annotations
 
 import sys
 import traceback
+import warnings as _warnings
 from typing import Any
 
-from pytest._pluginmanager import _accepted_kwargs, pluginmanager
+from _pytest.terminal import TerminalReporter, WarningReport, _default_teststatus
+
+from pytest._pluginmanager import _accepted_kwargs, instance_hook_impls, pluginmanager
 
 _default: Any = None
 
@@ -85,8 +88,6 @@ class _CoreTestStatus:
     @staticmethod
     @_trylast
     def pytest_report_teststatus(report: Any, config: Any) -> Any:
-        from _pytest.terminal import _default_teststatus
-
         return _default_teststatus(report)
 
 
@@ -136,8 +137,6 @@ def setup(config: Any) -> None:
     global _default
     if _default is not None:
         return
-    from _pytest.terminal import TerminalReporter
-
     pluginmanager.register(_CoreHeader(), "_core_report_header")
     pluginmanager.register(_CoreTestStatus(), "_core_teststatus")
     pluginmanager.register(_CoreMakeReport(), "_core_makereport")
@@ -201,8 +200,6 @@ def logstart(nodeid: str, location: tuple) -> None:
     reporter = replacement()
     if reporter is not None:
         _call(reporter, "pytest_runtest_logstart", nodeid=nodeid, location=location)
-    from pytest._pluginmanager import instance_hook_impls
-
     for impl in instance_hook_impls("pytest_runtest_logstart"):
         try:
             impl(nodeid=nodeid, location=location)
@@ -214,8 +211,6 @@ def logreport(report: Any) -> None:
     reporter = replacement()
     if reporter is not None:
         _call(reporter, "pytest_runtest_logreport", report=report)
-    from pytest._pluginmanager import instance_hook_impls
-
     for impl in instance_hook_impls("pytest_runtest_logreport"):
         try:
             impl(report=report)
@@ -227,8 +222,6 @@ def logfinish(nodeid: str, location: tuple) -> None:
     reporter = replacement()
     if reporter is not None:
         _call(reporter, "pytest_runtest_logfinish", nodeid=nodeid, location=location)
-    from pytest._pluginmanager import instance_hook_impls
-
     for impl in instance_hook_impls("pytest_runtest_logfinish"):
         try:
             impl(nodeid=nodeid, location=location)
@@ -241,8 +234,6 @@ def collectreport(report: Any) -> None:
     if reporter is not None:
         _call(reporter, "pytest_collectreport", report=report)
     # Also dispatch to instance-registered plugins (e.g., relay plugin).
-    from pytest._pluginmanager import instance_hook_impls
-
     for impl in instance_hook_impls("pytest_collectreport"):
         try:
             impl(report=report)
@@ -253,11 +244,7 @@ def collectreport(report: Any) -> None:
 def _feed_warnings(reporter: Any) -> None:
     """Mirror captured warnings into reporter.stats['warnings'] (upstream
     feeds them live via pytest_warning_recorded)."""
-    import warnings as _warnings
-
     try:
-        from _pytest.terminal import WarningReport
-
         from pytest import _wcapture
 
         stats = getattr(reporter, "stats", None)
@@ -302,8 +289,6 @@ def finish(session: Any, exitstatus: int, shouldfail: str | None = None) -> None
     pytest_sessionfinish wrapper order (the sessionfinish wrapper closes the
     progress line first, then summaries, then the stats line)."""
     # Fire pytest_sessionfinish on instance-registered plugins (e.g., relay plugin).
-    from pytest._pluginmanager import instance_hook_impls
-
     for impl in instance_hook_impls("pytest_sessionfinish"):
         try:
             impl(session=session, exitstatus=exitstatus)

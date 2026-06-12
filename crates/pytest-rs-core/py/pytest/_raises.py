@@ -1,6 +1,8 @@
 """pytest.raises (context manager and callable forms)."""
 
 import re as _re
+import sys
+import traceback
 
 from pytest._outcomes import fail
 
@@ -24,8 +26,6 @@ class ExceptionInfo[E: BaseException]:
     @classmethod
     def from_current(cls):
         """An ExceptionInfo for the exception currently being handled."""
-        import sys
-
         self = cls()
         self._set(*sys.exc_info())
         return self
@@ -54,8 +54,6 @@ class ExceptionInfo[E: BaseException]:
         """The exception's `type: message` line(s), like pytest's exconly.
         With tryshort, the rewritten-assert "AssertionError: " noise is
         stripped (upstream strips a leading striptext)."""
-        import traceback
-
         text = "".join(traceback.format_exception_only(self.type, self.value)).strip()
         if tryshort:
             prefix = "AssertionError: "
@@ -85,8 +83,6 @@ class ExceptionInfo[E: BaseException]:
         """A printable traceback representation (str() yields the formatted
         exception). Enough for pytest_internalerror and report longrepr; the
         style/showlocals knobs are accepted but not honored."""
-        import traceback
-
         if self.value is None:
             return _ExceptionRepr("")
         text = "".join(traceback.format_exception(self.type, self.value, self.tb)).rstrip("\n")

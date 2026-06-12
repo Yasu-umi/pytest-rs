@@ -1,5 +1,8 @@
 """Outcome exceptions and helpers (skip/fail/xfail/importorskip)."""
 
+import importlib
+import warnings
+
 
 class OutcomeException(BaseException):
     def __init__(self, msg=None):
@@ -59,9 +62,6 @@ def exit(reason="", returncode=None):
 
 def importorskip(modname, minversion=None, reason=None, *, exc_type=None):
     __tracebackhide__ = True
-    import importlib
-    import warnings
-
     # Validate module name: real pytest raises SyntaxError for invalid names
     # (e.g. spaces or = signs that can never be module names).
     if not all(part.isidentifier() for part in modname.split(".")):

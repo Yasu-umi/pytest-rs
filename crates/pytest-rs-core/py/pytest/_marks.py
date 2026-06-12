@@ -1,6 +1,9 @@
 """Marks (@pytest.mark.*) and pytest.param: metadata records only."""
 
 import enum
+import warnings
+
+from pytest._warning_types import PytestUnknownMarkWarning
 
 
 class _HiddenParam(enum.Enum):
@@ -124,8 +127,6 @@ def store_mark(obj, mark, *, stacklevel=3):
     from the object's OWN marks so inherited lists are never mutated."""
     if hasattr(obj, "_pytestfixturefunction"):
         # Marks applied to a fixture are inert (#3364).
-        import warnings
-
         from _pytest.deprecated import MARKED_FIXTURE
 
         warnings.warn(MARKED_FIXTURE, stacklevel=stacklevel)
@@ -157,10 +158,6 @@ class MarkGenerator:
                     fail(f"Unknown '{name}' mark, did you mean 'parametrize'?")
                 # Under --strict-markers the engine fails collection itself.
                 if not self._strict:
-                    import warnings
-
-                    from pytest._warning_types import PytestUnknownMarkWarning
-
                     warnings.warn(
                         f"Unknown pytest.mark.{name} - is this a typo?  You can register "
                         "custom marks to avoid this warning - for details, see "

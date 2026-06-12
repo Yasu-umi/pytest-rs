@@ -2,6 +2,7 @@ import enum
 import functools
 import inspect
 import os
+import sys
 
 
 def assert_never(value):
@@ -55,8 +56,6 @@ LEGACY_PATH = None  # py.path.local itself is not bundled
 def get_user_id():
     """Return the current process's real user id or None if it could not be
     determined (upstream get_user_id)."""
-    import sys
-
     if sys.platform == "win32" or sys.platform == "emscripten":
         # win32 does not have a getuid() function;
         # Emscripten has a return 0 stub.
@@ -68,4 +67,4 @@ def get_user_id():
     return uid if uid != erruid else None
 
 
-from _pytest._stub import __getattr__  # noqa: E402, F401
+from _pytest._stub import __getattr__  # noqa: F401

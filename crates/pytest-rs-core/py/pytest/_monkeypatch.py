@@ -1,6 +1,13 @@
 """MonkeyPatch and its fixture."""
 
+import contextlib
+import inspect
+import os
+import sys
+import warnings
+
 from pytest._fixtures import fixture
+from pytest._warning_types import PytestWarning
 
 
 class MonkeyPatch:
@@ -14,8 +21,6 @@ class MonkeyPatch:
 
     @classmethod
     def context(cls):
-        import contextlib
-
         @contextlib.contextmanager
         def _context():
             m = cls()
@@ -81,8 +86,6 @@ class MonkeyPatch:
     def _old_value(self, target, name):
         """The restore value: for classes, read the raw __dict__ entry so
         descriptors (staticmethod/classmethod) are not unwrapped."""
-        import inspect
-
         if inspect.isclass(target):
             return target.__dict__.get(name, self._notset)
         return getattr(target, name, self._notset)
@@ -101,10 +104,6 @@ class MonkeyPatch:
 
     @staticmethod
     def _warn_if_env_name_is_not_str(name):
-        import warnings
-
-        from pytest._warning_types import PytestWarning
-
         if not isinstance(name, str):
             warnings.warn(
                 PytestWarning(f"Environment variable name {name!r} should be a str"),
@@ -112,12 +111,7 @@ class MonkeyPatch:
             )
 
     def setenv(self, name, value, prepend=None):
-        import os
-        import warnings
-
         if not isinstance(value, str):
-            from pytest._warning_types import PytestWarning
-
             warnings.warn(
                 PytestWarning(
                     f"Value of environment variable {name} type should be str, but got "
@@ -132,29 +126,20 @@ class MonkeyPatch:
         self.setitem(os.environ, name, value)
 
     def delenv(self, name, raising=True):
-        import os
-
         self._warn_if_env_name_is_not_str(name)
         self.delitem(os.environ, name, raising=raising)
 
     def syspath_prepend(self, path):
-        import sys
-
         if self._savesyspath is None:
             self._savesyspath = sys.path[:]
         sys.path.insert(0, str(path))
 
     def chdir(self, path):
-        import os
-
         if self._cwd is None:
             self._cwd = os.getcwd()
         os.chdir(path)
 
     def undo(self):
-        import os
-        import sys
-
         for target, name, old in reversed(self._setattr):
             if old is self._notset:
                 try:

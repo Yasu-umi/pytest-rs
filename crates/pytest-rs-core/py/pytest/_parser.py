@@ -6,6 +6,8 @@ wired up yet — unknown flags still error at the Rust argument parser."""
 
 from __future__ import annotations
 
+import shlex
+from pathlib import Path
 from typing import Any
 
 # Sentinel for "no default passed to addini" — distinct from an explicit
@@ -212,8 +214,6 @@ def _split_str(value: str, shlex_split: bool) -> list:
         parts = [p for chunk in value.split("\x00") for p in chunk.split("\n")]
         return [p for p in parts if p] if shlex_split else [p.strip() for p in parts if p.strip()]
     if shlex_split:
-        import shlex
-
         return shlex.split(value)
     return [line.strip() for line in value.splitlines() if line.strip()]
 
@@ -222,8 +222,6 @@ def _coerce_ini(type_: str | None, value: Any, rootpath: str | None, name: str =
     """Coerce a raw ini value to its registered type (pytest INI-mode
     coercion). Values are strings from .ini files; toml linelists may already
     be lists."""
-    from pathlib import Path
-
     if type_ == "paths":
         base = Path(rootpath) if rootpath else Path.cwd()
         parts = _split_str(value, True) if isinstance(value, str) else list(value)

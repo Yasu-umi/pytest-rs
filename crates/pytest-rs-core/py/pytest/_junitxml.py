@@ -16,6 +16,7 @@ import time
 import xml.etree.ElementTree as ET
 
 from pytest._fixtures import fixture
+from pytest._warning_types import PytestExperimentalApiWarning, PytestWarning
 
 
 def bin_xml_escape(arg):
@@ -612,8 +613,6 @@ def _warn_incompatibility_with_xunit2(request, fixture_name):
     """PytestWarning (at the item's location) when the fixture is used
     under junit_family=xunit2."""
     if state.log_xml is not None and state.log_xml.family not in ("xunit1", "legacy"):
-        from pytest._warning_types import PytestWarning
-
         request.node.warn(
             PytestWarning(
                 f"{fixture_name} is incompatible with junit_family "
@@ -645,8 +644,6 @@ def record_xml_attribute(request):
     The fixture is callable with ``name, value``; the value is
     automatically XML-encoded.
     """
-    from pytest._warning_types import PytestExperimentalApiWarning
-
     request.node.warn(
         PytestExperimentalApiWarning("record_xml_attribute is an experimental feature")
     )

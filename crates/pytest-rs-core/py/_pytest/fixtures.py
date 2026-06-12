@@ -1,3 +1,6 @@
+import functools
+import inspect
+
 import pytest
 
 # Set on the pytest module by the Rust engine at startup (a pyo3 class).
@@ -29,9 +32,6 @@ def call_fixture_func(fixturefunc, request, kwargs):
     """Call a fixture-style function, honoring a single `yield` for teardown
     (pytest-bdd runs step functions through this so steps may yield). Mirrors
     _pytest.fixtures.call_fixture_func for the sync case."""
-    import functools
-    import inspect
-
     if inspect.isgeneratorfunction(fixturefunc):
         generator = fixturefunc(**kwargs)
         try:

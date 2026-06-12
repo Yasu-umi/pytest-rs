@@ -7,6 +7,8 @@ anyio is imported lazily so the plugin stays inert when it is not installed.
 """
 
 from contextlib import ExitStack, contextmanager
+from functools import wraps
+from inspect import iscoroutinefunction
 
 _current_runner = None
 _runner_stack = None
@@ -118,8 +120,6 @@ def hypothesis_async_inner(func):
     """The hypothesis inner_test if it is (or wraps) a coroutine function,
     else None. A previously installed backend wrapper is unwrapped so each
     backend-parametrized item rewraps the original."""
-    from inspect import iscoroutinefunction
-
     hypothesis = getattr(func, "hypothesis", None)
     inner = getattr(hypothesis, "inner_test", None) if hypothesis is not None else None
     if inner is None:
@@ -131,7 +131,6 @@ def hypothesis_async_inner(func):
 def hypothesis_wrap(inner, backend):
     """A sync inner_test driving each hypothesis example through the
     backend's runner (upstream's run_with_hypothesis)."""
-    from functools import wraps
 
     @wraps(inner)
     def run_with_hypothesis(**kwargs):

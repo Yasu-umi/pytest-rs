@@ -1,6 +1,10 @@
 """Event-loop helpers for pytest-rs-asyncio."""
 
 import asyncio
+import contextvars
+import functools
+import inspect
+import warnings
 
 
 def new_loop():
@@ -21,8 +25,6 @@ def new_loop_with_policy(policy):
     lifetime — close_loop restores the previous one. The policy-API
     deprecations (Python 3.14) are suppressed for these internal calls, as
     upstream does."""
-    import warnings
-
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", DeprecationWarning)
         prev = asyncio.get_event_loop_policy()
@@ -38,8 +40,6 @@ def set_current_loop(loop):
 
 
 def close_loop(loop):
-    import warnings
-
     try:
         shutdown = loop.shutdown_asyncgens()
         try:
@@ -60,8 +60,6 @@ def close_loop(loop):
         asyncio.set_event_loop(None)
         prev = getattr(loop, "_pytest_rs_prev_policy", None)
         if prev is not None:
-            import warnings
-
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", DeprecationWarning)
                 asyncio.set_event_loop_policy(prev)
@@ -87,8 +85,6 @@ def adopt_context():
     """Adopt a copy of the current item context for subsequent fixture/test
     calls (upstream: contextvars set in an async fixture propagate to the
     test and are undone at the fixture's teardown). Returns (new, prev)."""
-    import contextvars
-
     import pytest._ctx as _ctx
 
     prev = _ctx._current
@@ -119,8 +115,6 @@ def context_restoring_finalizer(inner, new, prev):
 def hypothesis_async_inner(func):
     """The async inner_test behind a hypothesis-decorated callable, if any
     (unwrapping a shim installed by a previous parametrized run)."""
-    import inspect
-
     hypothesis = getattr(func, "hypothesis", None)
     if hypothesis is None:
         return None
@@ -134,7 +128,6 @@ def hypothesis_async_inner(func):
 def hypothesis_wrap(loop, inner):
     """Sync shim around an async hypothesis inner_test: each example runs
     to completion on the item's event loop."""
-    import functools
 
     @functools.wraps(inner)
     def wrapper(*args, **kwargs):
