@@ -8,8 +8,8 @@
       "file": "tests/test_assert_match.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 34,
-      "failed": 4,
+      "passed": 0,
+      "failed": 38,
       "skipped": 0,
       "errors": 0
     },
@@ -17,8 +17,8 @@
       "file": "tests/test_assert_match_dir.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 27,
-      "failed": 1,
+      "passed": 0,
+      "failed": 28,
       "skipped": 0,
       "errors": 0
     },
@@ -26,8 +26,8 @@
       "file": "tests/test_misc.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 39,
-      "failed": 2,
+      "passed": 38,
+      "failed": 3,
       "skipped": 0,
       "errors": 0
     }

@@ -853,7 +853,7 @@ impl Engine {
             self.config.global_verbosity(),
         );
         if !summary.is_empty() {
-            println!("\n{summary}");
+            println!("{summary}");
         }
         // Unraisable leftovers (e.g. refcycles with broken __del__, only
         // collectable after a forced gc) drain after the terminal reporter

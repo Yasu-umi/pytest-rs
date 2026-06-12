@@ -207,18 +207,14 @@ impl Engine {
         if self.config.get_flag("no-header") {
             return;
         }
-        // Upstream's "platform darwin -- Python 3.13.2, pytest-9.0.3, ..."
-        // shape (sys.platform naming), with pytest-rs as the tool.
+        // Upstream's "platform darwin -- Python 3.13.2, pytest-9.0.3, pluggy-1.6.0"
         let platform = match std::env::consts::OS {
             "macos" => "darwin",
             "windows" => "win32",
             other => other,
         };
         let version = py.version().split_whitespace().next().unwrap_or("");
-        println!(
-            "platform {platform} -- Python {version}, pytest-rs-{}",
-            env!("CARGO_PKG_VERSION"),
-        );
+        println!("platform {platform} -- Python {version}, pytest-9.0.3, pluggy-1.6.0");
         // pytest shows the cachedir only when it is non-default or -v.
         let default_dir = std::env::var("TOX_ENV_DIR")
             .map(|tox| format!("{tox}/.pytest_cache"))

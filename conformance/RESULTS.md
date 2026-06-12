@@ -617,11 +617,11 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 1935 | 293 | 3 | 24 | 2255 | 86.9% | 11 | 45 | 63 |
+| pytest | 9.0.3 | 1963 | 266 | 3 | 24 | 2256 | 88.1% | 11 | 46 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 19 | 0 | 4 | 209 | 90.9% | 0 | 1 | 0 |
-| pytest-xdist | v3.8.0 | 25 | 6 | 0 | 0 | 31 | 80.6% | 0 | 1 | 6 |
+| pytest-xdist | v3.8.0 | 18 | 5 | 0 | 0 | 23 | 78.3% | 0 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 91 | 31 | 0 | 1 | 123 | 74.8% | 4 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 41 | 100.0% | 1 | 1 | 0 |
@@ -630,25 +630,25 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-subtests | v0.14.2 | 10 | 22 | 0 | 0 | 32 | 31.2% | 0 | 1 | 0 |
 | pytest-metadata | v2.0.4 | 0 | 0 | 0 | 0 | 0 | - | 0 | 1 | 0 |
-| pytest-snapshot | v0.9.0 | 100 | 7 | 0 | 0 | 107 | 93.5% | 0 | 3 | 0 |
-| pytest-icdiff | 0.5 | 7 | 5 | 0 | 0 | 12 | 58.3% | 0 | 1 | 0 |
+| pytest-snapshot | v0.9.0 | 38 | 69 | 0 | 0 | 107 | 35.5% | 0 | 3 | 0 |
+| pytest-icdiff | 0.5 | 3 | 9 | 0 | 0 | 12 | 25.0% | 0 | 1 | 0 |
 | pytest-socket | 0.7.0 | 59 | 6 | 0 | 0 | 65 | 90.8% | 2 | 6 | 0 |
 | pytest-order | v1.4.0 | 85 | 49 | 0 | 0 | 134 | 63.4% | 3 | 16 | 0 |
 | pytest-repeat | v0.9.4 | 11 | 5 | 0 | 0 | 16 | 68.8% | 0 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 48 | 15 | 0 | 0 | 63 | 76.2% | 0 | 1 | 0 |
 | pytest-env | 1.6.0 | 67 | 8 | 0 | 0 | 75 | 89.3% | 2 | 3 | 0 |
-| pytest-rerunfailures | 9.1.1 | 34 | 13 | 0 | 1 | 48 | 72.9% | 0 | 1 | 0 |
+| pytest-rerunfailures | 9.1.1 | 29 | 18 | 0 | 1 | 48 | 62.5% | 0 | 1 | 0 |
 | pytest-randomly | 4.1.0 | 32 | 5 | 0 | 0 | 37 | 86.5% | 0 | 1 | 0 |
 | click | 8.3.1 | 1313 | 0 | 0 | 22 | 1335 | 100.0% | 20 | 20 | 0 |
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
-| rich | v14.2.0 | 855 | 0 | 0 | 25 | 880 | 100.0% | 60 | 62 | 0 |
+| rich | v14.2.0 | 854 | 1 | 0 | 25 | 880 | 99.9% | 59 | 62 | 0 |
 | pytest-bdd | 8.1.0 | 123 | 15 | 0 | 1 | 139 | 89.2% | 28 | 35 | 0 |
-| pytest-django | v4.9.0 | 146 | 69 | 0 | 1 | 216 | 68.1% | 2 | 13 | 0 |
+| pytest-django | v4.9.0 | 147 | 68 | 0 | 1 | 216 | 68.5% | 2 | 13 | 0 |
 
 ### pytest @ 9.0.3
 
-<details><summary>per-file detail (45 files)</summary>
+<details><summary>per-file detail (46 files)</summary>
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
@@ -664,8 +664,9 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_collection.py | failed | 94 | 19 | 0 | 3 |
 | testing/test_compat.py | passed | 10 | 0 | 0 | 0 |
 | testing/test_config.py | failed | 183 | 31 | 0 | 1 |
-| testing/test_conftest.py | failed | 22 | 31 | 0 | 1 |
-| testing/test_doctest.py | passed | 139 | 0 | 0 | 1 |
+| testing/test_conftest.py | failed | 46 | 7 | 0 | 1 |
+| testing/test_debug_session.py | passed | 1 | 0 | 0 | 0 |
+| testing/test_doctest.py | failed | 138 | 1 | 0 | 1 |
 | testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 |
 | testing/test_faulthandler.py | failed | 5 | 7 | 0 | 0 |
 | testing/test_helpconfig.py | failed | 6 | 6 | 0 | 0 |
@@ -683,18 +684,18 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_runner_xunit.py | passed | 13 | 0 | 0 | 0 |
 | testing/test_scope.py | passed | 4 | 0 | 0 | 0 |
 | testing/test_session.py | failed | 18 | 8 | 0 | 0 |
-| testing/test_setuponly.py | failed | 22 | 4 | 0 | 0 |
+| testing/test_setuponly.py | failed | 21 | 5 | 0 | 0 |
 | testing/test_setupplan.py | failed | 1 | 2 | 0 | 0 |
 | testing/test_skipping.py | failed | 91 | 1 | 0 | 0 |
 | testing/test_stepwise.py | passed | 18 | 0 | 0 | 0 |
 | testing/test_subtests.py | failed | 29 | 5 | 0 | 0 |
-| testing/test_terminal.py | failed | 205 | 20 | 0 | 2 |
+| testing/test_terminal.py | failed | 206 | 19 | 0 | 2 |
 | testing/test_threadexception.py | failed | 7 | 1 | 0 | 0 |
 | testing/test_tmpdir.py | passed | 39 | 0 | 0 | 1 |
 | testing/test_unittest.py | failed | 57 | 13 | 0 | 9 |
 | testing/test_unraisableexception.py | failed | 10 | 1 | 0 | 0 |
-| testing/test_warnings.py | failed | 36 | 7 | 0 | 1 |
-| testing/acceptance_test.py | failed | 35 | 56 | 0 | 2 |
+| testing/test_warnings.py | failed | 38 | 5 | 0 | 1 |
+| testing/acceptance_test.py | failed | 37 | 54 | 0 | 2 |
 | testing/deprecated_test.py | failed | 10 | 5 | 0 | 0 |
 | testing/python/show_fixtures_per_test.py | failed | 0 | 8 | 0 | 0 |
 
@@ -765,7 +766,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| testing/acceptance_test.py | failed | 25 | 6 | 0 | 0 |
+| testing/acceptance_test.py | failed | 18 | 5 | 0 | 0 |
 
 </details>
 
@@ -886,9 +887,9 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| tests/test_assert_match.py | failed | 34 | 4 | 0 | 0 |
-| tests/test_assert_match_dir.py | failed | 27 | 1 | 0 | 0 |
-| tests/test_misc.py | failed | 39 | 2 | 0 | 0 |
+| tests/test_assert_match.py | failed | 0 | 38 | 0 | 0 |
+| tests/test_assert_match_dir.py | failed | 0 | 28 | 0 | 0 |
+| tests/test_misc.py | failed | 38 | 3 | 0 | 0 |
 
 </details>
 
@@ -898,7 +899,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| tests/test_pytest_icdiff.py | failed | 7 | 5 | 0 | 0 |
+| tests/test_pytest_icdiff.py | failed | 3 | 9 | 0 | 0 |
 
 </details>
 
@@ -980,7 +981,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| test_pytest_rerunfailures.py | failed | 34 | 13 | 0 | 1 |
+| test_pytest_rerunfailures.py | failed | 29 | 18 | 0 | 1 |
 
 </details>
 
@@ -1092,7 +1093,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_color_triplet.py | passed | 3 | 0 | 0 | 0 |
 | tests/test_columns.py | passed | 1 | 0 | 0 | 0 |
 | tests/test_columns_align.py | passed | 1 | 0 | 0 | 0 |
-| tests/test_console.py | passed | 99 | 0 | 0 | 0 |
+| tests/test_console.py | failed | 98 | 1 | 0 | 0 |
 | tests/test_constrain.py | passed | 1 | 0 | 0 | 0 |
 | tests/test_containers.py | passed | 4 | 0 | 0 | 0 |
 | tests/test_control.py | passed | 7 | 0 | 0 | 0 |
@@ -1162,7 +1163,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/feature/test_cucumber_json.py | passed | 1 | 0 | 0 | 0 |
 | tests/feature/test_description.py | passed | 1 | 0 | 0 | 0 |
 | tests/feature/test_feature_base_dir.py | passed | 7 | 0 | 0 | 0 |
-| tests/feature/test_gherkin_terminal_reporter.py | failed | 11 | 3 | 0 | 0 |
+| tests/feature/test_gherkin_terminal_reporter.py | failed | 10 | 4 | 0 | 0 |
 | tests/feature/test_no_scenario.py | passed | 1 | 0 | 0 | 0 |
 | tests/feature/test_outline.py | passed | 7 | 0 | 0 | 0 |
 | tests/feature/test_outline_empty_values.py | passed | 1 | 0 | 0 | 0 |
@@ -1186,7 +1187,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/steps/test_given.py | passed | 1 | 0 | 0 | 0 |
 | tests/steps/test_keyword.py | passed | 1 | 0 | 0 | 0 |
 | tests/steps/test_unicode.py | passed | 2 | 0 | 0 | 0 |
-| tests/test_hooks.py | failed | 2 | 2 | 0 | 0 |
+| tests/test_hooks.py | failed | 3 | 1 | 0 | 0 |
 
 </details>
 
@@ -1201,7 +1202,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_db_access_in_repr.py | failed | 0 | 1 | 0 | 0 |
 | tests/test_db_setup.py | failed | 0 | 14 | 0 | 0 |
 | tests/test_django_configurations.py | no-tests | 0 | 0 | 0 | 1 |
-| tests/test_django_settings_module.py | failed | 9 | 10 | 0 | 0 |
+| tests/test_django_settings_module.py | failed | 10 | 9 | 0 | 0 |
 | tests/test_environment.py | failed | 12 | 10 | 0 | 0 |
 | tests/test_fixtures.py | failed | 43 | 9 | 0 | 0 |
 | tests/test_initialization.py | failed | 0 | 1 | 0 | 0 |
