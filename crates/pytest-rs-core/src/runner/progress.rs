@@ -247,7 +247,11 @@ pub(crate) fn report_from_err(
         // explicit `_location` on the exception (unittest decorators) wins.
         let location = python::skip_location_override(py, err).or_else(|| {
             if phase == Phase::Setup {
-                let file = item.nodeid.split("::").next().unwrap_or("");
+                // Use invocation-dir-relative path so the SKIPPED summary shows
+                // "tests/test_1.py:N" when rootdir is a subdirectory (not just
+                // "test_1.py" which is rootdir-relative).
+                let file =
+                    crate::collect::file_nodeid(&config.invocation_dir, &item.path);
                 Some(format!("{file}:{}", item.lineno))
             } else {
                 python::raise_location(py, err)
