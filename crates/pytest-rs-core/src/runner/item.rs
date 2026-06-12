@@ -363,11 +363,13 @@ fn evaluate_item_prelude(
     // errors report as setup errors, like pytest.fail in runtest_setup).
     match evaluate_skip_marks(py, session, item) {
         Ok(Some((reason, module_level))) => {
-            let file = item.nodeid.split("::").next().unwrap_or("");
+            // Use invocation-dir-relative path so the SKIPPED summary shows
+            // "tests/test_1.py:N" when rootdir is a subdirectory.
+            let file = crate::collect::file_nodeid(&config.invocation_dir, &item.path);
             // Marker skips report the item's definition site; module-level
             // pytestmark skips fold per file, without a line number.
             let location = if module_level {
-                file.to_string()
+                file
             } else {
                 format!("{file}:{}", item.lineno)
             };
@@ -849,6 +851,9 @@ fn run_item_body(
                 // short summary's "XFAIL nodeid - reason").
                 xfail_longrepr: report.longrepr.clone(),
                 longrepr: Some(xf.reason.clone()),
+                // Clear the crash message: the short summary uses longrepr
+                // (the reason) for XFAIL lines, not reprcrash_message.
+                reprcrash_message: None,
                 ..report
             },
             Outcome::Passed => {
