@@ -98,7 +98,9 @@ impl Engine {
             let _ = std::fs::write(
                 &path,
                 format!(
-                    "versions pytest-rs-{}, python-{}\n",
+                    "versions pytest-rs-{}, python-{}\n\
+                     pytest_configure\n\
+                     pytest_sessionstart\n",
                     env!("CARGO_PKG_VERSION"),
                     py.version().split_whitespace().next().unwrap_or("")
                 ),

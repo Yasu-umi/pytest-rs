@@ -600,9 +600,14 @@ class DoctestNode:
         (pytest's Node.warn: warn_explicit with the item location)."""
         import warnings
 
+        if not isinstance(warning, Warning):
+            raise ValueError(
+                "warning must be an instance of Warning or subclass, "
+                f"got {warning!r} instead"
+            )
         warnings.warn_explicit(
             warning,
-            category=None,
+            category=type(warning),
             filename=str(self.path) if self.path else "<unknown>",
             lineno=self.lineno or 0,
         )
@@ -966,9 +971,14 @@ class Node(Item):
         (pytest's Node.warn: warn_explicit with the item location)."""
         import warnings
 
+        if not isinstance(warning, Warning):
+            raise ValueError(
+                "warning must be an instance of Warning or subclass, "
+                f"got {warning!r} instead"
+            )
         warnings.warn_explicit(
             warning,
-            category=None,
+            category=type(warning),
             filename=str(self.path) if self.path else "<unknown>",
             lineno=self.lineno or 0,
         )

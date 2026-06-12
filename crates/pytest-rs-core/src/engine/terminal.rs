@@ -266,6 +266,10 @@ impl Engine {
         // --traceconfig: show registered plugins (minimal list; mirrors what
         // real pytest's _pytest.helpconfig shows in pytest_report_header).
         if self.config.get_flag("traceconfig") {
+            println!(
+                "using: pytest-9.0.3 (pytest-rs-{}, embedded)",
+                env!("CARGO_PKG_VERSION")
+            );
             println!("active plugins:");
             println!("    pytest-rs               : pytest-rs-{}", env!("CARGO_PKG_VERSION"));
         }

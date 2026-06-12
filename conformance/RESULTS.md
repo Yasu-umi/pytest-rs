@@ -617,7 +617,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 1930 | 298 | 3 | 24 | 2255 | 86.7% | 11 | 45 | 63 |
+| pytest | 9.0.3 | 1935 | 293 | 3 | 24 | 2255 | 86.9% | 11 | 45 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 19 | 0 | 4 | 209 | 90.9% | 0 | 1 | 0 |
@@ -668,13 +668,13 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_doctest.py | passed | 139 | 0 | 0 | 1 |
 | testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 |
 | testing/test_faulthandler.py | failed | 5 | 7 | 0 | 0 |
-| testing/test_helpconfig.py | failed | 2 | 10 | 0 | 0 |
+| testing/test_helpconfig.py | failed | 6 | 6 | 0 | 0 |
 | testing/test_junitxml.py | failed | 129 | 8 | 0 | 0 |
 | testing/test_link_resolve.py | failed | 0 | 1 | 0 | 0 |
 | testing/test_main.py | failed | 16 | 8 | 0 | 0 |
 | testing/test_mark.py | passed | 105 | 0 | 0 | 0 |
 | testing/test_monkeypatch.py | passed | 33 | 0 | 0 | 2 |
-| testing/test_nodes.py | failed | 5 | 3 | 0 | 0 |
+| testing/test_nodes.py | failed | 6 | 2 | 0 | 0 |
 | testing/test_pastebin.py | failed | 0 | 5 | 3 | 0 |
 | testing/test_pytester.py | failed | 48 | 4 | 0 | 0 |
 | testing/test_python_path.py | failed | 3 | 3 | 0 | 0 |

@@ -615,7 +615,17 @@ impl Config {
     fn build_clap_command(parser: &OptionParser) -> clap::Command {
         let mut cmd = clap::Command::new("pytest-rs")
             .disable_help_flag(false)
-            .version(concat!(env!("CARGO_PKG_VERSION"), " (pytest-compatible)"))
+            .disable_version_flag(true)
+            .arg(
+                clap::Arg::new("version")
+                    .short('V')
+                    .long("version")
+                    .action(clap::ArgAction::Count)
+                    .help(
+                        "Display pytest version and information about plugins.\n\
+                         When given twice, also display information about\nplugins.",
+                    ),
+            )
             .arg(
                 clap::Arg::new("paths")
                     .num_args(0..)
@@ -1121,6 +1131,26 @@ impl Config {
                 shlex_split(&addopts)
             };
             argv.splice(1..1, args);
+        }
+
+        // Handle --version/-V before clap so we control the output format.
+        // Count occurrences: single = short version, 2+ = verbose with path.
+        let version_count = argv
+            .iter()
+            .filter(|a| *a == "--version" || *a == "-V")
+            .count();
+        if version_count >= 1 {
+            const PYTEST_API_VERSION: &str = "9.0.3";
+            let msg = if version_count >= 2 {
+                format!(
+                    "pytest {} imported from pytest-rs-{}\n",
+                    PYTEST_API_VERSION,
+                    env!("CARGO_PKG_VERSION")
+                )
+            } else {
+                format!("pytest {}\n", PYTEST_API_VERSION)
+            };
+            return Err(format!("{}{}", crate::EXIT_ZERO_SENTINEL, msg));
         }
 
         let cmd = Self::build_clap_command(&parser);

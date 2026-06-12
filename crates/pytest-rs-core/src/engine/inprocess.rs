@@ -77,6 +77,10 @@ pub fn run_inprocess(py: Python<'_>, args: Vec<String>) -> PyResult<i32> {
     let config = match crate::config::Config::from_args(parser, argv) {
         Ok(config) => config,
         Err(message) if message.starts_with(crate::EXIT_ZERO_SENTINEL) => {
+            let content = &message[crate::EXIT_ZERO_SENTINEL.len()..];
+            if !content.is_empty() {
+                print!("{}", content);
+            }
             return Err(PyErr::new::<pyo3::exceptions::PySystemExit, _>(0_i32));
         }
         Err(message) => {
