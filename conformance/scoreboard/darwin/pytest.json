@@ -122,15 +122,6 @@
       "errors": 0
     },
     {
-      "file": "testing/test_debug_session.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 1,
-      "failed": 0,
-      "skipped": 0,
-      "errors": 0
-    },
-    {
       "file": "testing/test_doctest.py",
       "status": "passed",
       "exit_code": 0,
@@ -195,10 +186,10 @@
     },
     {
       "file": "testing/test_mark.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 104,
-      "failed": 1,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 105,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },
@@ -314,8 +305,8 @@
       "file": "testing/test_skipping.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 87,
-      "failed": 5,
+      "passed": 90,
+      "failed": 2,
       "skipped": 0,
       "errors": 0
     },
@@ -341,8 +332,8 @@
       "file": "testing/test_terminal.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 203,
-      "failed": 22,
+      "passed": 204,
+      "failed": 21,
       "skipped": 2,
       "errors": 0
     },

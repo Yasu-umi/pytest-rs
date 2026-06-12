@@ -617,7 +617,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 1898 | 320 | 4 | 24 | 2246 | 85.6% | 9 | 46 | 63 |
+| pytest | 9.0.3 | 1902 | 315 | 4 | 24 | 2245 | 85.8% | 9 | 45 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 19 | 0 | 4 | 209 | 90.9% | 0 | 1 | 0 |
@@ -648,7 +648,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 ### pytest @ 9.0.3
 
-<details><summary>per-file detail (46 files)</summary>
+<details><summary>per-file detail (45 files)</summary>
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
@@ -665,7 +665,6 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_compat.py | failed | 6 | 4 | 0 | 0 |
 | testing/test_config.py | failed | 183 | 31 | 0 | 1 |
 | testing/test_conftest.py | failed | 22 | 31 | 0 | 1 |
-| testing/test_debug_session.py | passed | 1 | 0 | 0 | 0 |
 | testing/test_doctest.py | passed | 139 | 0 | 0 | 1 |
 | testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 |
 | testing/test_faulthandler.py | failed | 5 | 7 | 0 | 0 |
@@ -673,7 +672,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_junitxml.py | failed | 129 | 7 | 1 | 0 |
 | testing/test_link_resolve.py | failed | 0 | 1 | 0 | 0 |
 | testing/test_main.py | failed | 16 | 8 | 0 | 0 |
-| testing/test_mark.py | failed | 104 | 1 | 0 | 0 |
+| testing/test_mark.py | passed | 105 | 0 | 0 | 0 |
 | testing/test_monkeypatch.py | passed | 33 | 0 | 0 | 2 |
 | testing/test_nodes.py | failed | 3 | 5 | 0 | 0 |
 | testing/test_pastebin.py | failed | 0 | 5 | 3 | 0 |
@@ -686,10 +685,10 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_session.py | failed | 18 | 8 | 0 | 0 |
 | testing/test_setuponly.py | failed | 22 | 4 | 0 | 0 |
 | testing/test_setupplan.py | failed | 1 | 2 | 0 | 0 |
-| testing/test_skipping.py | failed | 87 | 5 | 0 | 0 |
+| testing/test_skipping.py | failed | 90 | 2 | 0 | 0 |
 | testing/test_stepwise.py | passed | 18 | 0 | 0 | 0 |
 | testing/test_subtests.py | failed | 29 | 5 | 0 | 0 |
-| testing/test_terminal.py | failed | 203 | 22 | 0 | 2 |
+| testing/test_terminal.py | failed | 204 | 21 | 0 | 2 |
 | testing/test_threadexception.py | failed | 7 | 1 | 0 | 0 |
 | testing/test_tmpdir.py | passed | 39 | 0 | 0 | 1 |
 | testing/test_unittest.py | failed | 58 | 12 | 0 | 9 |
