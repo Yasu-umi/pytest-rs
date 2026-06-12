@@ -192,14 +192,35 @@ impl Engine {
                 .filter_map(|f| f.parent().map(std::path::Path::to_path_buf)),
         );
 
+        // Resolve --confcutdir: if set, skip conftests in ancestors of that dir.
+        let confcutdir: Option<PathBuf> = self.config.get_value("confcutdir").map(|v| {
+            let p = std::path::Path::new(v);
+            if p.is_absolute() {
+                p.to_path_buf()
+            } else {
+                self.config.invocation_dir.join(p)
+            }
+        });
+
+        let is_in_confcutdir = |dir: &std::path::Path| -> bool {
+            match &confcutdir {
+                None => true,
+                // Skip dir if it is a *strict ancestor* of confcutdir
+                // (i.e. confcutdir is a descendant of dir → dir is too high up).
+                Some(cut) => !cut.starts_with(dir) || dir == cut,
+            }
+        };
+
         let mut conftests: Vec<PathBuf> = Vec::new();
         for start in &start_dirs {
             let mut dir = Some(start.as_path());
             let mut chain = Vec::new();
             while let Some(d) = dir {
-                let conftest = d.join("conftest.py");
-                if conftest.exists() {
-                    chain.push(conftest);
+                if is_in_confcutdir(d) {
+                    let conftest = d.join("conftest.py");
+                    if conftest.exists() {
+                        chain.push(conftest);
+                    }
                 }
                 if d == rootdir {
                     break;
