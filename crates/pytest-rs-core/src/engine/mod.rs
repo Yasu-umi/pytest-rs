@@ -726,9 +726,13 @@ impl Engine {
                     python::reporter_finish(py, &self.config, code, None);
                 }
             } else {
-                self.print_warnings_summary(py, 0, false);
+                let warnings_shown = self.print_warnings_summary(py, 0, false);
+                if let Err(err) = self.print_plugin_summaries(py, code) {
+                    eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+                }
                 self.write_junit_xml(py);
                 self.print_short_summary();
+                self.print_warnings_summary(py, warnings_shown, true);
                 let summary = crate::runner::summary_line(
                     &self.session.reports,
                     self.session.deselected,

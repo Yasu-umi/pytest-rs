@@ -617,11 +617,11 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 1966 | 263 | 3 | 24 | 2256 | 88.2% | 12 | 46 | 63 |
+| pytest | 9.0.3 | 1967 | 262 | 3 | 24 | 2256 | 88.3% | 12 | 46 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 19 | 0 | 4 | 209 | 90.9% | 0 | 1 | 0 |
-| pytest-xdist | v3.8.0 | 10 | 1 | 0 | 0 | 11 | 90.9% | 0 | 1 | 6 |
+| pytest-xdist | v3.8.0 | 14 | 5 | 0 | 0 | 19 | 73.7% | 0 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 91 | 31 | 0 | 1 | 123 | 74.8% | 4 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 41 | 100.0% | 1 | 1 | 0 |
@@ -689,7 +689,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_skipping.py | failed | 91 | 1 | 0 | 0 |
 | testing/test_stepwise.py | passed | 18 | 0 | 0 | 0 |
 | testing/test_subtests.py | failed | 29 | 5 | 0 | 0 |
-| testing/test_terminal.py | failed | 206 | 19 | 0 | 2 |
+| testing/test_terminal.py | failed | 207 | 18 | 0 | 2 |
 | testing/test_threadexception.py | failed | 7 | 1 | 0 | 0 |
 | testing/test_tmpdir.py | passed | 39 | 0 | 0 | 1 |
 | testing/test_unittest.py | failed | 57 | 13 | 0 | 9 |
@@ -766,7 +766,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| testing/acceptance_test.py | failed | 10 | 1 | 0 | 0 |
+| testing/acceptance_test.py | failed | 14 | 5 | 0 | 0 |
 
 </details>
 
