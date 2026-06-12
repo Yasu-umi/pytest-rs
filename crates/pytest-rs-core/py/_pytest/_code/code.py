@@ -3,6 +3,7 @@
 These are real classes (not _Unsupported stubs) so isinstance() and
 attribute access work correctly for the subset of the API our suites need.
 """
+
 from __future__ import annotations
 
 from _pytest._stub import __getattr__  # noqa: F401
@@ -80,6 +81,7 @@ class ExceptionChainRepr:
 
 class FormattedExcinfo:
     """Minimal stub for FormattedExcinfo."""
+
     pass
 
 

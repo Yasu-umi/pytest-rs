@@ -37,6 +37,7 @@ class MockTiming:
 
     def patch(self, monkeypatch) -> None:
         import _pytest.timing as _timing
+
         monkeypatch.setattr(_timing, "sleep", self.sleep)
         monkeypatch.setattr(_timing, "time", self.time)
         monkeypatch.setattr(_timing, "perf_counter", self.perf_counter)

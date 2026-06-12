@@ -362,6 +362,7 @@ class Pytester:
         subprocess backend like runpytest().
         """
         import os
+
         if os.environ.get("PYTEST_RS_INLINE_INPROCESS"):
             return self.inline_run(*args)
         return self.runpytest(*args, timeout=timeout)

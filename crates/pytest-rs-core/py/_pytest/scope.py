@@ -36,6 +36,7 @@ class Scope(Enum):
     @classmethod
     def from_user(cls, scope_name: _ScopeName, descr: str, where: str | None = None) -> Scope:
         from _pytest.outcomes import fail
+
         try:
             return Scope(scope_name)
         except ValueError:

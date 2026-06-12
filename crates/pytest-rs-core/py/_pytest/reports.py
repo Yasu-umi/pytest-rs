@@ -164,7 +164,9 @@ class TestReport(BaseReport):
 class CollectReport(BaseReport):
     when = "collect"
 
-    def __init__(self, nodeid=None, outcome=None, longrepr=None, result=None, sections=(), **kwargs):
+    def __init__(
+        self, nodeid=None, outcome=None, longrepr=None, result=None, sections=(), **kwargs
+    ):
         if nodeid is not None:
             kwargs["nodeid"] = nodeid
         if outcome is not None:

@@ -8,9 +8,7 @@ from pytest._node import Item as Item  # noqa: F401
 from pytest._node import Node  # noqa: F401
 
 
-def _check_initialpaths_for_relpath(
-    initial_paths: frozenset, path: Path
-) -> str | None:
+def _check_initialpaths_for_relpath(initial_paths: frozenset, path: Path) -> str | None:
     if path in initial_paths:
         return ""
     for parent in path.parents:

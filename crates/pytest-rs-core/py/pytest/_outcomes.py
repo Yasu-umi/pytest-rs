@@ -77,6 +77,7 @@ def importorskip(modname, minversion=None, reason=None, *, exc_type=None):
         # warning; real pytest will drop this behaviour in a future version).
         if exc_type is None and not isinstance(exc, ModuleNotFoundError):
             from pytest._warning_types import PytestDeprecationWarning
+
             warnings.warn(
                 f"Module {modname!r} was found, but when imported by pytest it raised:\n"
                 f"      {exc!r}\n"

@@ -59,7 +59,9 @@ class ShimFixtureManager:
     def _register_fixture(self, *, name, func, nodeid="", scope="function", params=None, **_):
         """pytest >= 8.1 dynamic registration (pytest-bdd inject_fixture). The
         caller sets `.cached_result` on the returned def to pin the value."""
-        fixture_def = ShimFixtureDef(argname=name, func=func, baseid=nodeid or "", scope=scope, params=params)
+        fixture_def = ShimFixtureDef(
+            argname=name, func=func, baseid=nodeid or "", scope=scope, params=params
+        )
         self._arg2fixturedefs.setdefault(name, []).append(fixture_def)
         return fixture_def
 

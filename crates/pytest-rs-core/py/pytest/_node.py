@@ -141,8 +141,7 @@ class _NodeBase:
             )
         if "config" in kwargs:
             raise TypeError(
-                "config is a keyword-only argument of Node.from_parent; "
-                "pass it via parent.config"
+                "config is a keyword-only argument of Node.from_parent; pass it via parent.config"
             )
         return cls(parent=parent, **kwargs)
 
@@ -602,8 +601,7 @@ class DoctestNode:
 
         if not isinstance(warning, Warning):
             raise ValueError(
-                "warning must be an instance of Warning or subclass, "
-                f"got {warning!r} instead"
+                f"warning must be an instance of Warning or subclass, got {warning!r} instead"
             )
         warnings.warn_explicit(
             warning,
@@ -973,8 +971,7 @@ class Node(Item):
 
         if not isinstance(warning, Warning):
             raise ValueError(
-                "warning must be an instance of Warning or subclass, "
-                f"got {warning!r} instead"
+                f"warning must be an instance of Warning or subclass, got {warning!r} instead"
             )
         warnings.warn_explicit(
             warning,

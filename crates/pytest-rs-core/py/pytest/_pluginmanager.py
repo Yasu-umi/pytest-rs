@@ -500,7 +500,10 @@ class PluginManager:
             for x in anchor.glob("test*"):
                 if x.is_dir():
                     self._loadconftestmodules(
-                        x, importmode, rootpath, consider_namespace_packages=consider_namespace_packages
+                        x,
+                        importmode,
+                        rootpath,
+                        consider_namespace_packages=consider_namespace_packages,
                     )
 
     def _loadconftestmodules(
@@ -522,7 +525,9 @@ class PluginManager:
                 conftestpath = parent / "conftest.py"
                 if conftestpath.is_file():
                     mod = self._importconftest(
-                        conftestpath, importmode, rootpath,
+                        conftestpath,
+                        importmode,
+                        rootpath,
                         consider_namespace_packages=consider_namespace_packages,
                     )
                     clist.append(mod)
@@ -532,9 +537,7 @@ class PluginManager:
         directory = self._get_directory(path)
         return self._dirpath2confmods.get(directory, [])
 
-    def _rget_with_confmod(
-        self, name: str, path: pathlib.Path
-    ) -> tuple[types.ModuleType, Any]:
+    def _rget_with_confmod(self, name: str, path: pathlib.Path) -> tuple[types.ModuleType, Any]:
         modules = self._getconftestmodules(path)
         for mod in reversed(modules):
             try:
@@ -566,12 +569,16 @@ class PluginManager:
 
         try:
             from _pytest.pathlib import import_path
+
             mod = import_path(
-                conftestpath, mode=importmode, root=rootpath,
+                conftestpath,
+                mode=importmode,
+                root=rootpath,
                 consider_namespace_packages=consider_namespace_packages,
             )
         except Exception as e:
             from _pytest.config import ConftestImportFailure
+
             raise ConftestImportFailure(conftestpath, cause=e) from e
 
         self._conftest_plugins.add(mod)
@@ -611,19 +618,21 @@ class PluginManager:
             anchor = absolutepath(invocation_dir / path)
             if safe_exists(anchor):
                 self._try_load_conftest(
-                    anchor, importmode, rootpath,
+                    anchor,
+                    importmode,
+                    rootpath,
                     consider_namespace_packages=consider_namespace_packages,
                 )
                 foundanchor = True
         if not foundanchor:
             self._try_load_conftest(
-                invocation_dir, importmode, rootpath,
+                invocation_dir,
+                importmode,
+                rootpath,
                 consider_namespace_packages=consider_namespace_packages,
             )
 
-    def consider_conftest(
-        self, conftestmodule: types.ModuleType, registration_name: str
-    ) -> None:
+    def consider_conftest(self, conftestmodule: types.ModuleType, registration_name: str) -> None:
         self.register(conftestmodule, name=registration_name)
 
     def import_plugin(self, modname: str, consider_entry_points: bool = False) -> None:
@@ -633,9 +642,9 @@ class PluginManager:
         try:
             __import__(modname)
         except ImportError as e:
-            raise ImportError(
-                f'Error importing plugin "{modname}": {e.args[0]}'
-            ).with_traceback(e.__traceback__) from e
+            raise ImportError(f'Error importing plugin "{modname}": {e.args[0]}').with_traceback(
+                e.__traceback__
+            ) from e
         else:
             mod = sys.modules[modname]
             self.register(mod, modname)

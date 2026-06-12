@@ -10,6 +10,7 @@ def assert_never(value):
 
 def safe_getattr(object, name, default):
     from _pytest.outcomes import OutcomeException
+
     try:
         return getattr(object, name, default)
     except (OutcomeException, Exception):
