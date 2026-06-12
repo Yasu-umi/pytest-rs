@@ -46,6 +46,7 @@ class Scope(Enum):
                 ),
                 pytrace=False,
             )
+            raise AssertionError("unreachable") from None
 
 
 _ALL_SCOPES = list(Scope)

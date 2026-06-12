@@ -202,9 +202,7 @@ fn build_test_setup(
     // handling) — only pytest classes rebind the method on the
     // fresh instance.
     let callable = match (&item.cls, &instance) {
-        (Some(_), Some(instance)) => {
-            instance.bind(py).getattr(item.func_name.as_str())?.unbind()
-        }
+        (Some(_), Some(instance)) => instance.bind(py).getattr(item.func_name.as_str())?.unbind(),
         _ => item.func.clone_ref(py),
     };
 
@@ -297,12 +295,7 @@ fn build_test_setup(
             let node = crate::runner::item_node(py, item)?;
             let req = Py::new(
                 py,
-                crate::request::PyRequest::new(
-                    None,
-                    node,
-                    None,
-                    crate::fixture::Scope::Function,
-                ),
+                crate::request::PyRequest::new(None, node, None, crate::fixture::Scope::Function),
             )?;
             kwargs.push((name.clone(), req.clone_ref(py).into_any()));
             test_request = Some(req);
@@ -539,9 +532,26 @@ pub(crate) fn run_one_body(
             .and_then(|m| m.call_method1("set_current_test", (py.None(),)));
     };
 
-    let teardown_xfail =
-        run_item_body(py, plugins, session, config, item, &mut reports, xfailed, runxfail, xfail);
-    teardown_one(py, plugins, session, config, item, teardown_xfail, &mut reports);
+    let teardown_xfail = run_item_body(
+        py,
+        plugins,
+        session,
+        config,
+        item,
+        &mut reports,
+        xfailed,
+        runxfail,
+        xfail,
+    );
+    teardown_one(
+        py,
+        plugins,
+        session,
+        config,
+        item,
+        teardown_xfail,
+        &mut reports,
+    );
     close_item_filters(py);
     python::end_item_context(py);
     reports
@@ -551,6 +561,7 @@ pub(crate) fn run_one_body(
 /// phase report into `reports`. Returns the xfail flag the caller's
 /// teardown should use (a NOTRUN-at-call forces it on). Teardown and the
 /// filter/context close are the caller's single trailing step.
+#[allow(clippy::too_many_arguments)]
 fn run_item_body(
     py: Python<'_>,
     plugins: &[Box<dyn Plugin>],
@@ -568,7 +579,11 @@ fn run_item_body(
         .get_value("log-level")
         .map(str::to_string)
         .or_else(|| config.get_ini("log_level").map(str::to_string));
-    python::setenv(py, "PYTEST_CURRENT_TEST", &format!("{} (setup)", item.nodeid));
+    python::setenv(
+        py,
+        "PYTEST_CURRENT_TEST",
+        &format!("{} (setup)", item.nodeid),
+    );
     python::log_start_phase(py, "setup", log_level_cfg.as_deref());
     let setup_started = Instant::now();
     let setup_result = build_test_setup(py, plugins, session, config, item);
@@ -665,7 +680,11 @@ fn run_item_body(
     }
 
     // ---- call --------------------------------------------------------------
-    python::setenv(py, "PYTEST_CURRENT_TEST", &format!("{} (call)", item.nodeid));
+    python::setenv(
+        py,
+        "PYTEST_CURRENT_TEST",
+        &format!("{} (call)", item.nodeid),
+    );
     // Fixtures may have applied an xfail marker dynamically during setup;
     // pytest re-evaluates at call start (including run=False NOTRUN).
     if xfailed.is_none() {

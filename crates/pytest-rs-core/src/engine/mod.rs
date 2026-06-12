@@ -606,9 +606,7 @@ impl Engine {
                 );
             }
             if n_collect_skips > 0 {
-                line += &format!(
-                    " / {n_collect_skips} skipped",
-                );
+                line += &format!(" / {n_collect_skips} skipped",);
             }
             if deselected > 0 {
                 line += &format!(" / {deselected} deselected");
@@ -647,104 +645,104 @@ impl Engine {
         n_collect_errors: usize,
         n_items: usize,
     ) -> i32 {
-            // The --collect-only tree prints natively even in delegated
-            // mode: upstream reporter plugins inherit it from the base
-            // class rather than reimplementing it.
-            if !self.config.no_terminal_explicit() {
-                // pytest's _printcollecteditems keys the layout on the
-                // test-case verbosity: < -1 → per-file counts, == -1 →
-                // bare nodeids, >= 0 → the node tree (docstrings at >= 1).
-                let tc = self.config.test_case_verbosity();
-                if tc < -1 {
-                    // -qq / verbosity_test_cases<-1: per-file counts.
-                    let mut counts: Vec<(String, usize)> = Vec::new();
-                    for item in &self.session.items {
-                        let file = item.nodeid.split("::").next().unwrap_or("").to_string();
-                        match counts.iter_mut().find(|(name, _)| name == &file) {
-                            Some((_, count)) => *count += 1,
-                            None => counts.push((file, 1)),
-                        }
+        // The --collect-only tree prints natively even in delegated
+        // mode: upstream reporter plugins inherit it from the base
+        // class rather than reimplementing it.
+        if !self.config.no_terminal_explicit() {
+            // pytest's _printcollecteditems keys the layout on the
+            // test-case verbosity: < -1 → per-file counts, == -1 →
+            // bare nodeids, >= 0 → the node tree (docstrings at >= 1).
+            let tc = self.config.test_case_verbosity();
+            if tc < -1 {
+                // -qq / verbosity_test_cases<-1: per-file counts.
+                let mut counts: Vec<(String, usize)> = Vec::new();
+                for item in &self.session.items {
+                    let file = item.nodeid.split("::").next().unwrap_or("").to_string();
+                    match counts.iter_mut().find(|(name, _)| name == &file) {
+                        Some((_, count)) => *count += 1,
+                        None => counts.push((file, 1)),
                     }
-                    for (file, count) in counts {
-                        println!("{file}: {count}");
-                    }
-                } else if tc == -1 {
-                    for item in &self.session.items {
-                        println!("{}", item.nodeid);
-                    }
-                } else {
-                    self.print_collect_tree(py, tc >= 1);
                 }
-                if self.session.custom_reporter.is_some() {
-                    // The closing stats line is the replacement reporter's
-                    // (upstream collect-only still runs its sessionfinish
-                    // wrapper, e.g. pretty's "Results:" table).
-                    let code = if n_items == 0 {
-                        exit_code::NO_TESTS_COLLECTED
-                    } else {
-                        exit_code::OK
-                    };
-                    if let Err(err) = self.fire_py_sessionfinish(py, code) {
-                        eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
-                    }
-                    python::reporter_finish(py, &self.config, code, None);
-                } else {
-                    // Collection errors still surface their traceback (the
-                    // ERRORS section) above the collected-count summary.
-                    if n_collect_errors > 0 {
-                        self.print_collect_errors();
-                    }
-                    self.print_collect_only_summary(started.elapsed(), n_collect_errors);
+                for (file, count) in counts {
+                    println!("{file}: {count}");
                 }
-            }
-            return if n_collect_errors > 0 {
-                exit_code::INTERRUPTED
-            } else if n_items == 0 {
-                exit_code::NO_TESTS_COLLECTED
+            } else if tc == -1 {
+                for item in &self.session.items {
+                    println!("{}", item.nodeid);
+                }
             } else {
-                exit_code::OK
-            };
+                self.print_collect_tree(py, tc >= 1);
+            }
+            if self.session.custom_reporter.is_some() {
+                // The closing stats line is the replacement reporter's
+                // (upstream collect-only still runs its sessionfinish
+                // wrapper, e.g. pretty's "Results:" table).
+                let code = if n_items == 0 {
+                    exit_code::NO_TESTS_COLLECTED
+                } else {
+                    exit_code::OK
+                };
+                if let Err(err) = self.fire_py_sessionfinish(py, code) {
+                    eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+                }
+                python::reporter_finish(py, &self.config, code, None);
+            } else {
+                // Collection errors still surface their traceback (the
+                // ERRORS section) above the collected-count summary.
+                if n_collect_errors > 0 {
+                    self.print_collect_errors();
+                }
+                self.print_collect_only_summary(started.elapsed(), n_collect_errors);
+            }
+        }
+        if n_collect_errors > 0 {
+            exit_code::INTERRUPTED
+        } else if n_items == 0 {
+            exit_code::NO_TESTS_COLLECTED
+        } else {
+            exit_code::OK
+        }
     }
 
     /// Zero collected items: fire sessionfinish, print summaries, and return
     /// NO_TESTS_COLLECTED.
     fn handle_no_tests(&mut self, py: Python<'_>, started: Instant) -> i32 {
-            // Upstream: zero collected items is NO_TESTS_COLLECTED even when
-            // module-level skips produced skip reports.
-            let code = exit_code::NO_TESTS_COLLECTED;
-            if let Err(err) = self.fire_py_sessionfinish(py, code) {
+        // Upstream: zero collected items is NO_TESTS_COLLECTED even when
+        // module-level skips produced skip reports.
+        let code = exit_code::NO_TESTS_COLLECTED;
+        if let Err(err) = self.fire_py_sessionfinish(py, code) {
+            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+        }
+        // Stop the session-wide capture (errors surface on stderr).
+        python::capture_session_end(py);
+        if let Some(cache) = &self.cache {
+            cache.sessionfinish(py, &self.config, &self.session.reports, &self.session.items);
+        }
+        if self.config.no_terminal() {
+            self.write_junit_xml(py);
+            if self.session.custom_reporter.is_some() && !self.config.is_worker() {
+                python::reporter_finish(py, &self.config, code, None);
+            }
+        } else {
+            let warnings_shown = self.print_warnings_summary(py, 0, false);
+            if let Err(err) = self.print_plugin_summaries(py, code) {
                 eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
             }
-            // Stop the session-wide capture (errors surface on stderr).
-            python::capture_session_end(py);
-            if let Some(cache) = &self.cache {
-                cache.sessionfinish(py, &self.config, &self.session.reports, &self.session.items);
+            self.write_junit_xml(py);
+            self.print_short_summary();
+            self.print_warnings_summary(py, warnings_shown, true);
+            let summary = crate::runner::summary_line(
+                &self.session.reports,
+                self.session.deselected,
+                python::warning_count(py),
+                started.elapsed(),
+                self.config.global_verbosity(),
+            );
+            if !summary.is_empty() {
+                println!("{summary}");
             }
-            if self.config.no_terminal() {
-                self.write_junit_xml(py);
-                if self.session.custom_reporter.is_some() && !self.config.is_worker() {
-                    python::reporter_finish(py, &self.config, code, None);
-                }
-            } else {
-                let warnings_shown = self.print_warnings_summary(py, 0, false);
-                if let Err(err) = self.print_plugin_summaries(py, code) {
-                    eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
-                }
-                self.write_junit_xml(py);
-                self.print_short_summary();
-                self.print_warnings_summary(py, warnings_shown, true);
-                let summary = crate::runner::summary_line(
-                    &self.session.reports,
-                    self.session.deselected,
-                    python::warning_count(py),
-                    started.elapsed(),
-                    self.config.global_verbosity(),
-                );
-                if !summary.is_empty() {
-                    println!("{summary}");
-                }
-            }
-            return code;
+        }
+        code
     }
 
     /// Post-run finalization: sessionfinish, caches, the terminal-summary
@@ -851,8 +849,8 @@ impl Engine {
         if self.session.abort_banner.is_none()
             && let Some(reason) = python::session_shouldstop(py)
         {
-            let has_shouldfail = self.session.shouldfail.is_some()
-                || python::session_shouldfail(py).is_some();
+            let has_shouldfail =
+                self.session.shouldfail.is_some() || python::session_shouldfail(py).is_some();
             let banner = if has_shouldfail {
                 reason
             } else {

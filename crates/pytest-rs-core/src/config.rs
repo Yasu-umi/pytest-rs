@@ -1,6 +1,13 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
+type ConfigResult = (
+    PathBuf,
+    Option<String>,
+    HashMap<String, String>,
+    Vec<String>,
+);
+
 /// Find and parse the pytest config file: walk up from `start` looking for
 /// pytest.ini ([pytest]), pyproject.toml ([tool.pytest.ini_options]),
 /// tox.ini ([pytest]) or setup.cfg ([tool:pytest]) — first hit wins and its
@@ -589,11 +596,11 @@ impl Config {
         ("ignore-glob", None),        // fnmatch patterns pruned from collection
         ("junit-xml", None),          // JUnit XML report path (--junitxml alias)
         ("junit-prefix", None),       // classname prefix (--junitprefix alias)
-        ("dist", None), // accepted-but-inert: module-affinity load is the only mode
-        ("maxprocesses", None), // accepted-but-inert
+        ("dist", None),               // accepted-but-inert: module-affinity load is the only mode
+        ("maxprocesses", None),       // accepted-but-inert
         ("max-worker-restart", None), // accepted-but-inert: workers are not restarted
-        ("tx", None),   // xdist gateway specs ("2*popen", "popen//chdir=DIR")
-        ("rsyncdir", None), // accepted-but-inert: fork workers share the filesystem
+        ("tx", None),                 // xdist gateway specs ("2*popen", "popen//chdir=DIR")
+        ("rsyncdir", None),           // accepted-but-inert: fork workers share the filesystem
     ];
 
     fn xdist_only(name: &str) -> bool {
@@ -903,10 +910,7 @@ impl Config {
     /// Locate the pytest config file (explicit -c, else auto-discovery) and
     /// the rootdir, validating --rootdir. Returns
     /// (rootdir, config file name, parsed ini map, ignored config files).
-    fn resolve_config_and_rootdir(
-        argv: &[String],
-        cwd: &Path,
-    ) -> Result<(PathBuf, Option<String>, HashMap<String, String>, Vec<String>), String> {
+    fn resolve_config_and_rootdir(argv: &[String], cwd: &Path) -> Result<ConfigResult, String> {
         let cwd = cwd.to_path_buf();
         // Pre-scan argv for -c/--config-file; when present, use the explicit
         // path directly instead of auto-discovery (pytest's inifile= path).
@@ -945,7 +949,7 @@ impl Config {
                 let file_name = cf_path.file_name().map(|n| n.to_string_lossy().to_string());
                 (rootdir, file_name, ini_file, Vec::new())
             } else {
-                let ancestor = common_ancestor(&dirs_from_args(&cwd, &argv));
+                let ancestor = common_ancestor(&dirs_from_args(cwd.as_ref(), argv));
                 let (rootdir, file_name, ini, ignored) = find_ini(&ancestor)?;
                 if file_name.is_none() {
                     // No config file found anywhere. pytest's determine_setup
@@ -1029,10 +1033,7 @@ impl Config {
 
     /// Split argv into the args clap parses (`kept`) and the long flags it
     /// doesn't know, deferred for python-plugin pytest_addoption specs.
-    fn partition_plugin_args(
-        argv: Vec<String>,
-        cmd: &clap::Command,
-    ) -> (Vec<String>, Vec<String>) {
+    fn partition_plugin_args(argv: Vec<String>, cmd: &clap::Command) -> (Vec<String>, Vec<String>) {
         // Long flags clap doesn't know are deferred for python-plugin
         // option specs (pytest_addoption runs after the interpreter is up).
         // Only the self-contained `--flag` / `--flag=value` forms are
@@ -1192,8 +1193,7 @@ impl Config {
             }
         };
 
-        let (flags, values, plugin_opts) =
-            Self::extract_match_flags_values(&matches, &parser);
+        let (flags, values, plugin_opts) = Self::extract_match_flags_values(&matches, &parser);
 
         let mut ini_overrides = HashMap::new();
         if let Some(overrides) = matches.get_many::<String>("override-ini") {

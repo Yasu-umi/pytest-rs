@@ -267,7 +267,10 @@ impl Engine {
                 env!("CARGO_PKG_VERSION")
             );
             println!("active plugins:");
-            println!("    pytest-rs               : pytest-rs-{}", env!("CARGO_PKG_VERSION"));
+            println!(
+                "    pytest-rs               : pytest-rs-{}",
+                env!("CARGO_PKG_VERSION")
+            );
         }
     }
 

@@ -172,7 +172,11 @@ impl Engine {
                 );
             }
             for node in node_list.iter() {
-                python::record_hook(py, "pytest_itemcollected", &[("item", node.clone().unbind())]);
+                python::record_hook(
+                    py,
+                    "pytest_itemcollected",
+                    &[("item", node.clone().unbind())],
+                );
             }
             python::record_hook(
                 py,
@@ -217,19 +221,19 @@ impl Engine {
         }
         for node in node_list.iter() {
             let nodeid: String = node.getattr("nodeid")?.extract()?;
-            if let Some(queue) = by_nodeid.get_mut(&nodeid) {
-                if let Some(mut item) = queue.pop_front() {
-                    let mut marks = Vec::new();
-                    for mark in node.getattr("own_markers")?.try_iter()? {
-                        let mark = mark?;
-                        marks.push(crate::collect::MarkData {
-                            name: mark.getattr("name")?.extract()?,
-                            obj: mark.unbind(),
-                        });
-                    }
-                    item.marks = marks;
-                    items.push(item);
+            if let Some(queue) = by_nodeid.get_mut(&nodeid)
+                && let Some(mut item) = queue.pop_front()
+            {
+                let mut marks = Vec::new();
+                for mark in node.getattr("own_markers")?.try_iter()? {
+                    let mark = mark?;
+                    marks.push(crate::collect::MarkData {
+                        name: mark.getattr("name")?.extract()?,
+                        obj: mark.unbind(),
+                    });
                 }
+                item.marks = marks;
+                items.push(item);
             }
         }
         Ok(())
@@ -262,11 +266,7 @@ impl Engine {
             let kw = PyDict::new(py);
             let _ = kw.set_item("nodeid", nodeid);
             if let Ok(stub) = simple_ns.call((), Some(&kw)) {
-                python::record_hook(
-                    py,
-                    "pytest_collectstart",
-                    &[("collector", stub.unbind())],
-                );
+                python::record_hook(py, "pytest_collectstart", &[("collector", stub.unbind())]);
             }
         };
 
@@ -337,8 +337,7 @@ impl Engine {
             let mut seen: std::collections::HashSet<String> = Default::default();
             for item in items {
                 let mut parts = item.nodeid.splitn(3, "::");
-                if let (Some(file), Some(cls), Some(_)) =
-                    (parts.next(), parts.next(), parts.next())
+                if let (Some(file), Some(cls), Some(_)) = (parts.next(), parts.next(), parts.next())
                 {
                     let key = format!("{}::{}", file, cls);
                     if seen.insert(key.clone()) {
@@ -599,7 +598,11 @@ impl Engine {
             return Ok(());
         }
         let session = python::make_session_proxy(py, &self.config)?;
-        python::record_hook(py, "pytest_collection_finish", &[("session", session.clone_ref(py))]);
+        python::record_hook(
+            py,
+            "pytest_collection_finish",
+            &[("session", session.clone_ref(py))],
+        );
         for func in &hook_funcs {
             python::call_py_hook(py, func, &[("session", session.clone_ref(py))])?;
         }

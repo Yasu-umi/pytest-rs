@@ -68,7 +68,11 @@ pub(crate) fn teardown_one(
         .get_value("log-level")
         .map(str::to_string)
         .or_else(|| config.get_ini("log_level").map(str::to_string));
-    python::setenv(py, "PYTEST_CURRENT_TEST", &format!("{} (teardown)", item.nodeid));
+    python::setenv(
+        py,
+        "PYTEST_CURRENT_TEST",
+        &format!("{} (teardown)", item.nodeid),
+    );
     python::log_start_phase(py, "teardown", log_level_cfg.as_deref());
     let teardown_started = Instant::now();
     let mut errors = teardown_scope(

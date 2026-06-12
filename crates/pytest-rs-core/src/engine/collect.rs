@@ -162,8 +162,18 @@ impl Engine {
                 paths
                     .iter()
                     .map(|p| {
-                        let resolved = self.config.invocation_dir.join(p.split("::").next().unwrap_or_default());
-                        if resolved.is_dir() { resolved } else { resolved.parent().map(std::path::Path::to_path_buf).unwrap_or_default() }
+                        let resolved = self
+                            .config
+                            .invocation_dir
+                            .join(p.split("::").next().unwrap_or_default());
+                        if resolved.is_dir() {
+                            resolved
+                        } else {
+                            resolved
+                                .parent()
+                                .map(std::path::Path::to_path_buf)
+                                .unwrap_or_default()
+                        }
                     })
                     .collect()
             };

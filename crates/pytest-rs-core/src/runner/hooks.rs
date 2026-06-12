@@ -75,7 +75,11 @@ pub(crate) fn fire_logreport_hooks(
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
         }
     }
-    python::record_hook(py, "pytest_runtest_logreport", &[("report", proxy.clone_ref(py))]);
+    python::record_hook(
+        py,
+        "pytest_runtest_logreport",
+        &[("report", proxy.clone_ref(py))],
+    );
     for func in &funcs {
         if let Err(err) = python::call_py_hook(py, func, &[("report", proxy.clone_ref(py))]) {
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
@@ -226,12 +230,14 @@ pub(crate) fn fire_runtest_py_hooks(
     // logstart/logfinish hookspecs take (nodeid, location); setup/teardown
     // take (item). call_py_hook passes only what each impl's signature
     // requests, so providing the right available kwargs per hook is enough.
-    let location_based =
-        name == "pytest_runtest_logstart" || name == "pytest_runtest_logfinish";
+    let location_based = name == "pytest_runtest_logstart" || name == "pytest_runtest_logfinish";
     let kwargs: Vec<(&str, Py<PyAny>)> = if location_based {
         let location = python::item_location(py, item)?;
         vec![
-            ("nodeid", item.nodeid.clone().into_pyobject(py)?.into_any().unbind()),
+            (
+                "nodeid",
+                item.nodeid.clone().into_pyobject(py)?.into_any().unbind(),
+            ),
             ("location", location.unbind()),
         ]
     } else {

@@ -1134,7 +1134,13 @@ pub(crate) fn expand_parametrize(
         }
         dedup_param_ids(py, &mut sets, nodeid, &argnames, strict_ids)?;
         if sets.is_empty() {
-            sets.push(notset_param_set(py, &argnames, func, indirect_all, &indirect_names)?);
+            sets.push(notset_param_set(
+                py,
+                &argnames,
+                func,
+                indirect_all,
+                &indirect_names,
+            )?);
         }
         dims.push(Dim { sets });
     }
@@ -1223,13 +1229,11 @@ fn dedup_param_ids(
         *counts.entry(set.id_part.clone()).or_default() += 1;
     }
     if counts.values().any(|&count| count > 1) {
-        let display =
-            |id: &Option<String>| id.clone().unwrap_or_else(|| "<hidden>".to_string());
+        let display = |id: &Option<String>| id.clone().unwrap_or_else(|| "<hidden>".to_string());
         if strict_ids {
             let mut reprs = Vec::new();
             for set in sets.iter() {
-                let values =
-                    PyList::new(py, set.params.iter().map(|(_, value)| value.bind(py)))?;
+                let values = PyList::new(py, set.params.iter().map(|(_, value)| value.bind(py)))?;
                 reprs.push(values.repr()?.to_string());
             }
             let mut seen = std::collections::HashSet::new();
@@ -1311,7 +1315,8 @@ fn notset_param_set(
         .call1((
             existing_py_config(py).unwrap_or_else(|| py.None()),
             argnames.to_vec(),
-            func.map(|f| f.clone().unbind()).unwrap_or_else(|| py.None()),
+            func.map(|f| f.clone().unbind())
+                .unwrap_or_else(|| py.None()),
         ))?;
     let mark_obj = mark_decorator.getattr("mark")?;
     let mark_name: String = mark_obj.getattr("name")?.extract()?;
