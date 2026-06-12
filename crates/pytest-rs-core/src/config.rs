@@ -1436,15 +1436,21 @@ impl Config {
         .collect()
     }
 
-    /// The effective failure budget: -x/--exitfirst means 1, otherwise the
-    /// --maxfail=N value (0 disables, as in pytest).
+    /// The effective failure budget: explicit --maxfail=N takes precedence
+    /// over -x/--exitfirst (which means 1). Returns None when unlimited.
     pub fn maxfail(&self) -> Option<usize> {
+        // Explicit --maxfail=N overrides -x (pytest: --maxfail overrides exitfirst).
+        let explicit = self
+            .get_value("maxfail")
+            .and_then(|v| v.parse().ok())
+            .filter(|&n: &usize| n > 0);
+        if explicit.is_some() {
+            return explicit;
+        }
         if self.exitfirst {
             return Some(1);
         }
-        self.get_value("maxfail")
-            .and_then(|v| v.parse().ok())
-            .filter(|&n| n > 0)
+        None
     }
 
     /// The raw -n value (xdist-style): "auto" / "logical" / a number.

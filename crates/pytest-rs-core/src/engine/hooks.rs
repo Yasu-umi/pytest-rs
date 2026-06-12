@@ -161,12 +161,16 @@ impl Engine {
             )?;
         }
 
-        // In a nested run, surface itemcollected (per item) and the single
-        // modifyitems call to the HookRecorder even without conftest impls;
-        // pytest always dispatches these through pluggy. (pytest_collectstart
-        // / pytest_collectreport need the full collector tree and are out of
-        // scope here.)
+        // In a nested run, surface the collector tree, per-item itemcollected,
+        // and the single modifyitems call to the HookRecorder so that
+        // getcalls/getreports work as they do in real pytest.
         if recording {
+            if let Err(err) = self.record_collector_tree(py, items) {
+                eprintln!(
+                    "INTERNAL ERROR: record_collector_tree: {}",
+                    python::format_exception(py, &err)
+                );
+            }
             for node in node_list.iter() {
                 python::record_hook(py, "pytest_itemcollected", &[("item", node.clone().unbind())]);
             }
@@ -219,6 +223,150 @@ impl Engine {
                 items.push(item);
             }
         }
+        Ok(())
+    }
+
+    /// Emit pytest_collectstart + pytest_collectreport pairs for the full
+    /// collector tree to the in-process HookRecorder.  Called only when
+    /// recording() is true (inside a nested run).
+    ///
+    /// pytest collects in a tree (Session → Dir/Package → Module → Class →
+    /// Function) and fires these hooks as each collector opens and closes.
+    /// We reconstruct that tree from the flat item list and the collect-error
+    /// list that were already captured by the time modifyitems runs.
+    ///
+    /// The failed-module collectreport is already in the recorder (emitted
+    /// by `reporter_collect_error` in handle_collection_errors), so we only
+    /// emit its collectstart here.
+    fn record_collector_tree(
+        &self,
+        py: Python<'_>,
+        items: &[crate::collect::TestItem],
+    ) -> PyResult<()> {
+        use pyo3::types::{PyDict, PyList};
+
+        let collect_report_cls = py.import("_pytest.reports")?.getattr("CollectReport")?;
+        let simple_ns = py.import("types")?.getattr("SimpleNamespace")?;
+
+        // Helper: emit pytest_collectstart with a stub collector (nodeid only).
+        let emit_start = |nodeid: &str| {
+            let kw = PyDict::new(py);
+            let _ = kw.set_item("nodeid", nodeid);
+            if let Ok(stub) = simple_ns.call((), Some(&kw)) {
+                python::record_hook(
+                    py,
+                    "pytest_collectstart",
+                    &[("collector", stub.unbind())],
+                );
+            }
+        };
+
+        // Helper: emit pytest_collectreport(passed).
+        let emit_passed = |nodeid: &str| -> PyResult<()> {
+            let kw = PyDict::new(py);
+            kw.set_item("nodeid", nodeid)?;
+            kw.set_item("outcome", "passed")?;
+            kw.set_item("longrepr", py.None())?;
+            let file = nodeid.split("::").next().unwrap_or(nodeid);
+            kw.set_item("location", (file, py.None(), file))?;
+            kw.set_item("result", PyList::empty(py))?;
+            kw.set_item("sections", PyList::empty(py))?;
+            let report = collect_report_cls.call((), Some(&kw))?.unbind();
+            python::record_hook(py, "pytest_collectreport", &[("report", report)]);
+            Ok(())
+        };
+
+        // Unique passing-module paths (nodeid prefix before first "::").
+        let mut passing_modules: Vec<String> = Vec::new();
+        {
+            let mut seen: std::collections::HashSet<String> = Default::default();
+            for item in items {
+                let file = item
+                    .nodeid
+                    .split("::")
+                    .next()
+                    .unwrap_or(&item.nodeid)
+                    .to_string();
+                if seen.insert(file.clone()) {
+                    passing_modules.push(file);
+                }
+            }
+        }
+
+        // Unique failing-module nodeids from session.collect_errors
+        // (their collectreport was already emitted by reporter_collect_error).
+        let failing_modules: Vec<&str> = self
+            .session
+            .collect_errors
+            .iter()
+            .map(|(nodeid, _)| nodeid.as_str())
+            .collect();
+
+        // Unique directories (parent of each module file; "" → ".").
+        let mut dirs: Vec<String> = Vec::new();
+        {
+            let mut seen: std::collections::HashSet<String> = Default::default();
+            let all_files = passing_modules
+                .iter()
+                .map(|s| s.as_str())
+                .chain(failing_modules.iter().copied());
+            for file in all_files {
+                let dir = match std::path::Path::new(file).parent() {
+                    Some(p) if p.as_os_str().is_empty() => ".".to_string(),
+                    Some(p) => p.to_string_lossy().into_owned(),
+                    None => ".".to_string(),
+                };
+                if seen.insert(dir.clone()) {
+                    dirs.push(dir);
+                }
+            }
+        }
+
+        // Unique class nodeids ("file::ClassName") for items inside a class.
+        let mut classes: Vec<String> = Vec::new();
+        {
+            let mut seen: std::collections::HashSet<String> = Default::default();
+            for item in items {
+                let mut parts = item.nodeid.splitn(3, "::");
+                if let (Some(file), Some(cls), Some(_)) =
+                    (parts.next(), parts.next(), parts.next())
+                {
+                    let key = format!("{}::{}", file, cls);
+                    if seen.insert(key.clone()) {
+                        classes.push(key);
+                    }
+                }
+            }
+        }
+
+        // ── Emit collector tree ──────────────────────────────────────────────
+        // Order: Session → Dirs → passing Modules → Classes (start+report) →
+        // Module reports → failing Module starts → Dir reports → Session report.
+        // The failed-module collectreport is already recorded; we only start it.
+
+        emit_start("");
+
+        for dir in &dirs {
+            emit_start(dir.as_str());
+        }
+        for file in &passing_modules {
+            emit_start(file.as_str());
+        }
+        for class in &classes {
+            emit_start(class.as_str());
+            emit_passed(class.as_str())?;
+        }
+        for file in &passing_modules {
+            emit_passed(file.as_str())?;
+        }
+        for nodeid in &failing_modules {
+            emit_start(nodeid);
+        }
+        for dir in &dirs {
+            emit_passed(dir.as_str())?;
+        }
+        emit_passed("")?;
+
         Ok(())
     }
 

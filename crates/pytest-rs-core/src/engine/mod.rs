@@ -420,9 +420,17 @@ impl Engine {
             // --collect-only still lists the items it did collect plus an
             // error count (pytest's "3 tests collected, 1 error"), so it falls
             // through to the collect-only branch like continue-on-errors.
-            if (!self.config.get_flag("continue-on-collection-errors") && !self.config.collect_only)
-                || maxfail_hit
+            // With explicit --maxfail=N, allow N errors before aborting (so
+            // --maxfail=2 overrides -x, which would otherwise abort at 1).
+            let should_abort = if self.config.get_flag("continue-on-collection-errors")
+                || self.config.collect_only
             {
+                false
+            } else {
+                let budget = self.config.maxfail().unwrap_or(1);
+                n_collect_errors >= budget
+            };
+            if should_abort {
                 // Under -n, xdist reports collection errors as plain errors
                 // (exit 1, no Interrupted banner) below the worker banner.
                 #[cfg(feature = "xdist")]
