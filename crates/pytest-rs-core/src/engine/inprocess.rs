@@ -76,6 +76,9 @@ pub fn run_inprocess(py: Python<'_>, args: Vec<String>) -> PyResult<i32> {
     argv.extend(args);
     let config = match crate::config::Config::from_args(parser, argv) {
         Ok(config) => config,
+        Err(message) if message.starts_with(crate::EXIT_ZERO_SENTINEL) => {
+            return Err(PyErr::new::<pyo3::exceptions::PySystemExit, _>(0_i32));
+        }
         Err(message) => {
             let exc = py
                 .import("pytest")?

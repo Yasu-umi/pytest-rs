@@ -134,6 +134,16 @@ class _NodeBase:
     @classmethod
     def from_parent(cls, parent, **kwargs):
         """Construct a child node under `parent` (pytest's Node.from_parent)."""
+        if "session" in kwargs:
+            raise TypeError(
+                "session is a keyword-only argument of Node.from_parent; "
+                "pass it via parent.session or the config"
+            )
+        if "config" in kwargs:
+            raise TypeError(
+                "config is a keyword-only argument of Node.from_parent; "
+                "pass it via parent.config"
+            )
         return cls(parent=parent, **kwargs)
 
     def _compute_nodeid(self):

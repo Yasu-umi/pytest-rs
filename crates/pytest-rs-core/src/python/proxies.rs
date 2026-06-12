@@ -203,6 +203,11 @@ pub fn prepare_config(py: Python<'_>, args: Vec<String>) -> PyResult<Py<PyAny>> 
     let parser = crate::config::OptionParser::default();
     match crate::config::Config::from_args(parser, argv) {
         Ok(config) => build_py_config(py, &config, true),
+        Err(message) if message.starts_with(crate::EXIT_ZERO_SENTINEL) => {
+            // --help/--version in-process: raise SystemExit(0) so the caller
+            // can catch it (real pytest raises SystemExit from argparse too).
+            Err(PyErr::new::<pyo3::exceptions::PySystemExit, _>(0_i32))
+        }
         Err(message) => {
             let exc = py
                 .import("pytest")?

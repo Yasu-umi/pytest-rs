@@ -617,7 +617,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 1906 | 311 | 4 | 24 | 2245 | 86.0% | 9 | 45 | 63 |
+| pytest | 9.0.3 | 1930 | 298 | 3 | 24 | 2255 | 86.7% | 11 | 45 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 19 | 0 | 4 | 209 | 90.9% | 0 | 1 | 0 |
@@ -662,39 +662,39 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_capture.py | failed | 130 | 1 | 0 | 1 |
 | testing/test_collect_imported_tests.py | failed | 2 | 1 | 0 | 0 |
 | testing/test_collection.py | failed | 94 | 19 | 0 | 3 |
-| testing/test_compat.py | failed | 6 | 4 | 0 | 0 |
+| testing/test_compat.py | passed | 10 | 0 | 0 | 0 |
 | testing/test_config.py | failed | 183 | 31 | 0 | 1 |
 | testing/test_conftest.py | failed | 22 | 31 | 0 | 1 |
 | testing/test_doctest.py | passed | 139 | 0 | 0 | 1 |
 | testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 |
 | testing/test_faulthandler.py | failed | 5 | 7 | 0 | 0 |
 | testing/test_helpconfig.py | failed | 2 | 10 | 0 | 0 |
-| testing/test_junitxml.py | failed | 129 | 7 | 1 | 0 |
+| testing/test_junitxml.py | failed | 129 | 8 | 0 | 0 |
 | testing/test_link_resolve.py | failed | 0 | 1 | 0 | 0 |
 | testing/test_main.py | failed | 16 | 8 | 0 | 0 |
 | testing/test_mark.py | passed | 105 | 0 | 0 | 0 |
 | testing/test_monkeypatch.py | passed | 33 | 0 | 0 | 2 |
-| testing/test_nodes.py | failed | 3 | 5 | 0 | 0 |
+| testing/test_nodes.py | failed | 5 | 3 | 0 | 0 |
 | testing/test_pastebin.py | failed | 0 | 5 | 3 | 0 |
 | testing/test_pytester.py | failed | 48 | 4 | 0 | 0 |
 | testing/test_python_path.py | failed | 3 | 3 | 0 | 0 |
 | testing/test_recwarn.py | passed | 63 | 0 | 0 | 0 |
-| testing/test_runner.py | failed | 50 | 16 | 0 | 0 |
+| testing/test_runner.py | failed | 61 | 5 | 0 | 0 |
 | testing/test_runner_xunit.py | passed | 13 | 0 | 0 | 0 |
-| testing/test_scope.py | failed | 0 | 4 | 0 | 0 |
+| testing/test_scope.py | passed | 4 | 0 | 0 | 0 |
 | testing/test_session.py | failed | 18 | 8 | 0 | 0 |
 | testing/test_setuponly.py | failed | 22 | 4 | 0 | 0 |
 | testing/test_setupplan.py | failed | 1 | 2 | 0 | 0 |
-| testing/test_skipping.py | failed | 90 | 2 | 0 | 0 |
+| testing/test_skipping.py | failed | 91 | 1 | 0 | 0 |
 | testing/test_stepwise.py | passed | 18 | 0 | 0 | 0 |
 | testing/test_subtests.py | failed | 29 | 5 | 0 | 0 |
-| testing/test_terminal.py | failed | 204 | 21 | 0 | 2 |
+| testing/test_terminal.py | failed | 205 | 20 | 0 | 2 |
 | testing/test_threadexception.py | failed | 7 | 1 | 0 | 0 |
 | testing/test_tmpdir.py | passed | 39 | 0 | 0 | 1 |
-| testing/test_unittest.py | failed | 58 | 12 | 0 | 9 |
+| testing/test_unittest.py | failed | 57 | 13 | 0 | 9 |
 | testing/test_unraisableexception.py | failed | 10 | 1 | 0 | 0 |
 | testing/test_warnings.py | failed | 36 | 7 | 0 | 1 |
-| testing/acceptance_test.py | failed | 33 | 48 | 0 | 2 |
+| testing/acceptance_test.py | failed | 35 | 56 | 0 | 2 |
 | testing/deprecated_test.py | failed | 10 | 5 | 0 | 0 |
 | testing/python/show_fixtures_per_test.py | failed | 0 | 8 | 0 | 0 |
 

@@ -1,4 +1,5 @@
 import enum
+import functools
 import inspect
 import os
 
@@ -8,9 +9,10 @@ def assert_never(value):
 
 
 def safe_getattr(object, name, default):
+    from _pytest.outcomes import OutcomeException
     try:
         return getattr(object, name, default)
-    except Exception:
+    except (OutcomeException, Exception):
         return default
 
 
@@ -22,8 +24,9 @@ def safe_isclass(obj):
 
 
 def get_real_func(obj):
-    while hasattr(obj, "__wrapped__"):
-        obj = obj.__wrapped__
+    obj = inspect.unwrap(obj)
+    if isinstance(obj, functools.partial):
+        obj = obj.func
     return obj
 
 

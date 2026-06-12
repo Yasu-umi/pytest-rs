@@ -21,6 +21,10 @@ pub mod worker;
 // version exists in the dependency graph.
 pub use pyo3;
 
+/// Prefix returned by Config::from_args when --help/--version is requested.
+/// The caller should print the rest of the message and exit with code 0.
+pub const EXIT_ZERO_SENTINEL: &str = "\x00__exit_zero__\x00";
+
 pub use config::{Config, OptDef, OptionParser};
 pub use engine::Engine;
 pub use engine::inprocess::{PluginFactory, register_plugin_factory};

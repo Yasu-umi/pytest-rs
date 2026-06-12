@@ -61,6 +61,10 @@ fn main() {
     let argv: Vec<String> = std::env::args().collect();
     let config = match Config::from_args(parser, argv) {
         Ok(config) => config,
+        Err(message) if message.starts_with(pytest_rs_core::EXIT_ZERO_SENTINEL) => {
+            print!("{}", &message[pytest_rs_core::EXIT_ZERO_SENTINEL.len()..]);
+            std::process::exit(0);
+        }
         Err(message) => {
             eprintln!("ERROR: {message}");
             std::process::exit(pytest_rs_core::report::exit_code::USAGE_ERROR);

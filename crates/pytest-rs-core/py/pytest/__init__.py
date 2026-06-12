@@ -37,6 +37,7 @@ from pytest._monkeypatch import monkeypatch as monkeypatch
 from pytest._node import Class as Class
 from pytest._node import Collector as Collector
 from pytest._node import Dir as Dir
+from pytest._node import Dir as Directory  # noqa: F401  # pytest.Directory alias
 from pytest._node import File as File
 from pytest._node import (
     File as Module,  # noqa: F401  # Module is the base class for file collectors

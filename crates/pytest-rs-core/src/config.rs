@@ -1026,7 +1026,7 @@ impl Config {
         // option specs (pytest_addoption runs after the interpreter is up).
         // Only the self-contained `--flag` / `--flag=value` forms are
         // recognized; unregistered leftovers usage-error at configure.
-        let known_longs: HashSet<String> = cmd
+        let mut known_longs: HashSet<String> = cmd
             .get_arguments()
             .flat_map(|arg| {
                 arg.get_long().into_iter().map(str::to_string).chain(
@@ -1037,6 +1037,11 @@ impl Config {
                 )
             })
             .collect();
+        // clap's auto-generated --help and --version don't appear in
+        // get_arguments(), so add them explicitly so they are never
+        // deferred to plugin_args (where they would cause a USAGE_ERROR).
+        known_longs.insert("help".to_string());
+        known_longs.insert("version".to_string());
         let mut plugin_args = Vec::new();
         let mut kept = Vec::new();
         let mut tokens = argv.into_iter().enumerate().peekable();
@@ -1125,16 +1130,20 @@ impl Config {
         let effective_args = argv.clone();
         let matches = match cmd.try_get_matches_from(argv) {
             Ok(matches) => matches,
-            // --help/--version display and exit 0, like pytest (even when
-            // combined with other options, e.g. --cache-show --help).
+            // --help/--version: return a sentinel so the caller can print and
+            // exit cleanly. Using process::exit here would kill the Python
+            // interpreter when called in-process (pytester.parseconfig()).
             Err(err)
                 if matches!(
                     err.kind(),
                     clap::error::ErrorKind::DisplayHelp | clap::error::ErrorKind::DisplayVersion
                 ) =>
             {
-                let _ = err.print();
-                std::process::exit(0);
+                return Err(format!(
+                    "{}{}",
+                    crate::EXIT_ZERO_SENTINEL,
+                    err.render().ansi()
+                ));
             }
             Err(err) => {
                 let msg = err.to_string();

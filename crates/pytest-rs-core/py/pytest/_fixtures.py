@@ -22,6 +22,11 @@ class FixtureFunctionMarker:
 
             warnings.warn(MARKED_FIXTURE, stacklevel=2)
         function._pytestfixturefunction = self
+        # Real pytest wraps fixtures in FixtureFunctionDefinition which has
+        # _get_wrapped_function(); replicate that on the plain function so
+        # get_real_func() tests can call it.
+        _fn = function
+        function._get_wrapped_function = lambda: _fn
         return function
 
 
