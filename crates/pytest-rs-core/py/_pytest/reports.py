@@ -33,10 +33,20 @@ class _ReprTraceback:
         self.reprentries = reprentries
 
 
-class _LongRepr(str):
+from _pytest._code.code import ExceptionChainRepr as _ExceptionChainRepr  # noqa: E402
+
+
+class _LongRepr(str, _ExceptionChainRepr):
     """The longrepr string with upstream's `.reprcrash` / `.chain`
     attributes, so consumers like pytest-pretty's ' - <crash message>'
-    suffixes and failure table work."""
+    suffixes and failure table work. Inherits from ExceptionChainRepr so
+    isinstance(longrepr, ExceptionChainRepr) checks pass."""
+
+    def __new__(cls, value=""):
+        return str.__new__(cls, value)
+
+    def __init__(self, value=""):
+        pass
 
     def _location(self):
         """(path, lineno, error) from the trailing 'file.py:NN: Error'
@@ -154,7 +164,17 @@ class TestReport(BaseReport):
 class CollectReport(BaseReport):
     when = "collect"
 
-    def __init__(self, **kwargs):
+    def __init__(self, nodeid=None, outcome=None, longrepr=None, result=None, sections=(), **kwargs):
+        if nodeid is not None:
+            kwargs["nodeid"] = nodeid
+        if outcome is not None:
+            kwargs["outcome"] = outcome
+        if longrepr is not None:
+            kwargs["longrepr"] = longrepr
+        if result is not None:
+            kwargs["result"] = result
+        if sections:
+            kwargs["sections"] = list(sections)
         _set_report_attrs(self, kwargs)
 
 

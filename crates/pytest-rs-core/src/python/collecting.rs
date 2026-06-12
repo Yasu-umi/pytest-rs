@@ -231,8 +231,15 @@ pub fn collect_custom_files(
                     }
                 })
                 .collect();
-            // Call collect() for new items not already found by standard collection.
-            for item_obj in collector.call_method0("collect")?.try_iter()? {
+            // If the hook returned a bare Item (not a Collector), treat it
+            // directly as a single leaf item without calling .collect().
+            let item_iter: Box<dyn Iterator<Item = PyResult<Bound<'_, PyAny>>>> =
+                if collector.hasattr("collect")? {
+                    Box::new(collector.call_method0("collect")?.try_iter()?)
+                } else {
+                    Box::new(std::iter::once(Ok(collector.clone())))
+                };
+            for item_obj in item_iter {
                 let item_obj = item_obj?;
                 // Publish to session.items immediately so a later file's
                 // collect() sees this item (pytest-mypy's one-per-session

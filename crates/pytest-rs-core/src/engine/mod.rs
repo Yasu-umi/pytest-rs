@@ -67,6 +67,12 @@ impl Engine {
             eprintln!("INTERNAL ERROR: failed to install pytest shim: {err}");
             return exit_code::INTERNAL_ERROR;
         }
+        // pytest sets PYTEST_VERSION to its own __version__ at startup so
+        // tests can check os.environ["PYTEST_VERSION"] == pytest.__version__.
+        // Query after shim install so the shim's pytest is the one we read.
+        if let Ok(version) = python::pytest_version(py) {
+            python::setenv(py, "PYTEST_VERSION", &version);
+        }
         // pythonpath ini: add paths relative to rootdir to sys.path early,
         // before conftest/plugin imports (mirrors _pytest/python_path.py).
         for rel in self.config.get_ini_lines("pythonpath") {
@@ -534,23 +540,25 @@ impl Engine {
                 } else {
                     exit_code::INTERRUPTED
                 };
-                if self.session.custom_reporter.is_some() && !self.config.is_worker() {
+                if !self.config.is_worker() {
                     // pytest fires sessionfinish even on aborted collection
                     // (pretty's wall-clock end time comes from it).
                     if let Err(err) = self.fire_py_sessionfinish(py, code) {
                         eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
                     }
-                    let banner = if maxfail_hit {
-                        Some(format!("stopping after {n_collect_errors} failures"))
-                    } else if dist_workers.is_none() {
-                        Some(format!(
-                            "Interrupted: {n_collect_errors} error{} during collection",
-                            if n_collect_errors == 1 { "" } else { "s" }
-                        ))
-                    } else {
-                        None
-                    };
-                    python::reporter_finish(py, &self.config, code, banner.as_deref());
+                    if self.session.custom_reporter.is_some() {
+                        let banner = if maxfail_hit {
+                            Some(format!("stopping after {n_collect_errors} failures"))
+                        } else if dist_workers.is_none() {
+                            Some(format!(
+                                "Interrupted: {n_collect_errors} error{} during collection",
+                                if n_collect_errors == 1 { "" } else { "s" }
+                            ))
+                        } else {
+                            None
+                        };
+                        python::reporter_finish(py, &self.config, code, banner.as_deref());
+                    }
                 }
                 return Some(code);
             }
@@ -908,6 +916,11 @@ impl Engine {
         // Tests (and gc-dependent plugins) run, so gc must be on; the outer
         // run leaves it enabled post-collection, but be explicit.
         python::set_gc_enabled(py, true);
+        // Re-set PYTEST_VERSION so monkeypatch overrides in the outer test don't
+        // bleed into the inner run (the outer run sets it once in Engine::run).
+        if let Ok(version) = python::pytest_version(py) {
+            python::setenv(py, "PYTEST_VERSION", &version);
+        }
         self.run_session(py, started)
     }
 }

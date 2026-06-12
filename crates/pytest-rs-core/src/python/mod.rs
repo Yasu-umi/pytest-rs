@@ -44,3 +44,25 @@ pub fn sys_path_prepend(py: Python<'_>, path: &Path) -> PyResult<()> {
     }
     Ok(())
 }
+
+/// Return the `pytest.__version__` string from the Python environment.
+pub fn pytest_version(py: Python<'_>) -> PyResult<String> {
+    py.import("pytest")?.getattr("__version__")?.extract()
+}
+
+/// Set an environment variable via Python's os.environ (avoids unsafe Rust
+/// env mutation, and keeps Python's os.environ in sync).
+pub fn setenv(py: Python<'_>, key: &str, value: &str) {
+    let _ = py
+        .import("os")
+        .and_then(|os| os.getattr("environ"))
+        .and_then(|env| env.set_item(key, value));
+}
+
+/// Remove an environment variable via Python's os.environ.
+pub fn unsetenv(py: Python<'_>, key: &str) {
+    let _ = py
+        .import("os")
+        .and_then(|os| os.getattr("environ"))
+        .and_then(|env| env.call_method1("pop", (key, py.None())));
+}

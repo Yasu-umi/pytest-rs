@@ -224,7 +224,13 @@ class Pytester:
         sys.path.insert(0, entry)
         self._syspaths.insert(0, entry)
 
-    def runpytest(self, *args, timeout=None):
+    def runpytest(self, *args, timeout=None, syspathinsert=False, no_reraise_ctrlc=False):
+        # syspathinsert=True: insert self.path into sys.path so the child can
+        # import test-local plugins written to self.path.
+        if syspathinsert:
+            self.syspathinsert()
+        # no_reraise_ctrlc is a subprocess-mode hint; we always run as a
+        # subprocess, so it's a no-op here.
         # Upstream's (default) in-process runs share the outer test's
         # warning-filter state: mirror the item's filterwarnings marks into
         # the child as -W options (farthest first, so the closest wins).
@@ -348,7 +354,17 @@ class Pytester:
                 )
         return self._runpytest(args, timeout=timeout, forward_filters=False)
 
-    runpytest_inprocess = runpytest
+    def runpytest_inprocess(self, *args, timeout=None):
+        """Run pytest in-process (shares sys state with the outer test).
+
+        When PYTEST_RS_INLINE_INPROCESS is set (as in the conformance suite),
+        this uses the native in-process backend; otherwise falls back to the
+        subprocess backend like runpytest().
+        """
+        import os
+        if os.environ.get("PYTEST_RS_INLINE_INPROCESS"):
+            return self.inline_run(*args)
+        return self.runpytest(*args, timeout=timeout)
 
     def make_hook_recorder(self, pluginmanager):
         """Attach a HookRecorder to ``pluginmanager`` and finish recording at
@@ -578,11 +594,12 @@ class Pytester:
 
         run_args = [str(arg) for arg in args]
 
-        # Snapshot module/path/cwd so the inner run does not pollute ours
+        # Snapshot module/path/cwd/env so the inner run does not pollute ours
         # (a separate subprocess used to give this isolation for free).
         modules_before = sys.modules.copy()
         syspath_before = list(sys.path)
         cwd_before = os.getcwd()
+        env_before = dict(os.environ)
 
         # Per-session global state the native engine mutates lives in shim
         # module singletons; a nested run would leak it to the outer session
@@ -664,13 +681,26 @@ class Pytester:
             _tmp_path._call_results.clear()
             _tmp_path._call_results.update(old_tmp_state["_call_results"])
             _tmp_path._any_failed = old_tmp_state["_any_failed"]
-            # Restore the module table, sys.path and cwd (SysModulesSnapshot).
+            # Restore the module table, sys.path, cwd, and env.
             for name in list(sys.modules):
                 if name not in modules_before:
                     del sys.modules[name]
             sys.modules.update(modules_before)
             sys.path[:] = syspath_before
             os.chdir(cwd_before)
+            # Restore env: add back removed vars, update changed ones, remove
+            # new ones — but do NOT restore PYTEST_CURRENT_TEST (the inner
+            # run's teardown already unset it, and the outer runner will re-set
+            # it for the outer item's teardown phase).
+            _no_restore = {"PYTEST_CURRENT_TEST"}
+            for key in list(os.environ):
+                if key not in env_before and key not in _no_restore:
+                    del os.environ[key]
+            for key, val in env_before.items():
+                if key in _no_restore:
+                    continue
+                if os.environ.get(key) != val:
+                    os.environ[key] = val
 
         out_f.seek(0)
         err_f.seek(0)
@@ -678,10 +708,11 @@ class Pytester:
         errlines = err_f.read().decode(errors="replace").splitlines()
         out_f.close()
         err_f.close()
-        if outlines:
-            sys.stdout.write("\n".join(outlines) + "\n")
-        if errlines:
-            sys.stderr.write("\n".join(errlines) + "\n")
+        # Always echo inner run output so outer test capsys/--tb sees it.
+        for line in outlines:
+            print(line)
+        for line in errlines:
+            print(line, file=sys.stderr)
 
         reprec.ret = ret
         # Carry the captured output for tests reaching past the HookRecorder

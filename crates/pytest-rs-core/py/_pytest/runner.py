@@ -42,9 +42,13 @@ class _ProtocolReport:
     """The TestReport subset the mark-evaluation tests inspect."""
 
     def __init__(self, when, outcome, keywords, longrepr=None):
+        from _pytest.reports import _LongRepr as _LR
+
         self.when = when
         self.outcome = outcome
         self.keywords = keywords
+        if isinstance(longrepr, str) and not isinstance(longrepr, _LR):
+            longrepr = _LR(longrepr)
         self.longrepr = longrepr
 
     @property
@@ -217,6 +221,48 @@ def runtestprotocol(item, log=True, nextitem=None):
             return reports
     reports.append(_ProtocolReport("teardown", "passed", keywords))
     return reports
+
+
+def collect_one_node(collector):
+    """Run collector.collect() and return a CollectReport (upstream API)."""
+    try:
+        result = list(collector.collect())
+        outcome = "passed"
+        longrepr = None
+    except Exception as exc:
+        result = None
+        outcome = "failed"
+        longrepr = "".join(traceback.format_exception(exc))
+    rep = CollectReport(
+        nodeid=getattr(collector, "nodeid", ""),
+        outcome=outcome,
+        longrepr=longrepr,
+        result=result,
+    )
+    path = getattr(collector, "path", None)
+    if path is not None:
+        rep.location = (str(path.name), None, str(path.name))
+    return rep
+
+
+def pytest_runtest_call(item):
+    """Run item.runtest() and store sys.last_* on exception (upstream API)."""
+    import sys
+
+    for attr in ("last_type", "last_value", "last_traceback", "last_exc"):
+        try:
+            delattr(sys, attr)
+        except AttributeError:
+            pass
+    try:
+        item.runtest()
+    except Exception as exc:
+        sys.last_type = type(exc)
+        sys.last_value = exc
+        sys.last_traceback = exc.__traceback__
+        if sys.version_info >= (3, 12):
+            sys.last_exc = exc  # type: ignore[attr-defined]
+        raise
 
 
 from _pytest._stub import __getattr__  # noqa: E402, F401

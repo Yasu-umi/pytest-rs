@@ -57,14 +57,34 @@ def exit(reason="", returncode=None):
     raise Exit(reason, returncode)
 
 
-def importorskip(modname, minversion=None, reason=None):
+def importorskip(modname, minversion=None, reason=None, *, exc_type=None):
     __tracebackhide__ = True
     import importlib
+    import warnings
+
+    # Validate module name: real pytest raises SyntaxError for invalid names
+    # (e.g. spaces or = signs that can never be module names).
+    if not all(part.isidentifier() for part in modname.split(".")):
+        raise SyntaxError(f"Not a valid module name: {modname!r}")
 
     try:
         mod = importlib.import_module(modname)
     except ImportError as exc:
-        # pytest parity: importorskip may skip whole modules at import time.
+        if exc_type is not None and not isinstance(exc, exc_type):
+            raise
+        # Distinguish ModuleNotFoundError (module not installed, no warning)
+        # from ImportError (module found but failed during import → deprecation
+        # warning; real pytest will drop this behaviour in a future version).
+        if exc_type is None and not isinstance(exc, ModuleNotFoundError):
+            from pytest._warning_types import PytestDeprecationWarning
+            warnings.warn(
+                f"Module {modname!r} was found, but when imported by pytest it raised:\n"
+                f"      {exc!r}\n"
+                "In the future only ModuleNotFoundError will be caught. "
+                "Pass `exc_type=ImportError` to suppress this warning.",
+                PytestDeprecationWarning,
+                stacklevel=2,
+            )
         skipped = Skipped(msg=reason or f"could not import {modname!r}: {exc}")
         skipped.allow_module_level = True
         raise skipped from None

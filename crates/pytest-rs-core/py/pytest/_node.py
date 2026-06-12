@@ -689,9 +689,16 @@ def session_obj_overrides():
     """(nodeid, obj) for items whose `obj` a plugin swapped after they were
     published (pytest-run-parallel wraps test functions for threaded
     repeats); the engine writes these back into its own items."""
-    return [
-        (node.nodeid, node.obj) for node in _session_state["items"] if node.obj is not node.function
-    ]
+    result = []
+    for node in _session_state["items"]:
+        try:
+            obj = node.obj
+            fn = node.function
+        except AttributeError:
+            continue
+        if obj is not fn:
+            result.append((node.nodeid, obj))
+    return result
 
 
 class _CallSpec:

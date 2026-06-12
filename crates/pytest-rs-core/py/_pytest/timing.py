@@ -20,4 +20,30 @@ class Instant:
         return Duration(perf_counter() - self._perf, time() - self._time)
 
 
+from datetime import datetime as _dt
+
+
+class MockTiming:
+    """Deterministic time mock for timing tests (mirrors real _pytest.timing.MockTiming)."""
+
+    _current_time: float = _dt(2020, 5, 22, 14, 20, 50).timestamp()
+
+    def sleep(self, seconds: float) -> None:
+        self._current_time += seconds
+
+    def time(self) -> float:
+        return self._current_time
+
+    def perf_counter(self) -> float:
+        return self._current_time
+
+    def patch(self, monkeypatch) -> None:
+        import _pytest.timing as _timing
+        monkeypatch.setattr(_timing, "sleep", self.sleep)
+        monkeypatch.setattr(_timing, "time", self.time)
+        monkeypatch.setattr(_timing, "perf_counter", self.perf_counter)
+
+
+del _dt
+
 from _pytest._stub import __getattr__  # noqa: E402, F401

@@ -568,6 +568,7 @@ fn run_item_body(
         .get_value("log-level")
         .map(str::to_string)
         .or_else(|| config.get_ini("log_level").map(str::to_string));
+    python::setenv(py, "PYTEST_CURRENT_TEST", &format!("{} (setup)", item.nodeid));
     python::log_start_phase(py, "setup", log_level_cfg.as_deref());
     let setup_started = Instant::now();
     let setup_result = build_test_setup(py, plugins, session, config, item);
@@ -664,6 +665,7 @@ fn run_item_body(
     }
 
     // ---- call --------------------------------------------------------------
+    python::setenv(py, "PYTEST_CURRENT_TEST", &format!("{} (call)", item.nodeid));
     // Fixtures may have applied an xfail marker dynamically during setup;
     // pytest re-evaluates at call start (including run=False NOTRUN).
     if xfailed.is_none() {

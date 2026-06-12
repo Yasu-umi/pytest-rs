@@ -21,4 +21,6 @@ class Source:
         return self
 
 
+from pytest._raises import ExceptionInfo as ExceptionInfo  # noqa: E402, F401
+
 from _pytest._stub import __getattr__  # noqa: E402, F401

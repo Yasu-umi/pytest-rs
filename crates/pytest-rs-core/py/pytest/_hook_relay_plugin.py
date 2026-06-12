@@ -102,7 +102,6 @@ class _HookRelayPlugin:
 
     def pytest_runtest_logreport(self, report):
         longrepr = getattr(report, "longrepr", None)
-        longrepr_type = type(longrepr).__name__ if longrepr is not None else ""
         longrepr_crash = None
         if hasattr(longrepr, "reprcrash") and longrepr.reprcrash is not None:
             crash = longrepr.reprcrash
@@ -111,6 +110,12 @@ class _HookRelayPlugin:
                 "lineno": int(getattr(crash, "lineno", 0) or 0),
                 "message": str(getattr(crash, "message", "")),
             }
+        # Map pytest-rs's _LongRepr to ExceptionChainRepr so downstream code
+        # (e.g. isinstance(rep.longrepr, ExceptionChainRepr)) works correctly.
+        if longrepr_crash is not None:
+            longrepr_type = "ExceptionChainRepr"
+        else:
+            longrepr_type = type(longrepr).__name__ if longrepr is not None else ""
         self._events.append(
             {
                 "hook": "pytest_runtest_logreport",

@@ -263,6 +263,12 @@ impl Engine {
         if !self.session.plugin_distinfo.is_empty() {
             println!("plugins: {}", self.session.plugin_distinfo.join(", "));
         }
+        // --traceconfig: show registered plugins (minimal list; mirrors what
+        // real pytest's _pytest.helpconfig shows in pytest_report_header).
+        if self.config.get_flag("traceconfig") {
+            println!("active plugins:");
+            println!("    pytest-rs               : pytest-rs-{}", env!("CARGO_PKG_VERSION"));
+        }
     }
 
     /// The ERRORS section: "ERROR collecting <file>" banners per collection

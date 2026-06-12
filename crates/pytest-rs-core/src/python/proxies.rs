@@ -110,7 +110,7 @@ fn build_py_config(
     option_ns.setattr("no_summary", config.get_flag("no-summary"))?;
     option_ns.setattr("fulltrace", config.get_flag("full-trace"))?;
     option_ns.setattr("xfail_tb", config.get_flag("xfail-tb"))?;
-    option_ns.setattr("traceconfig", false)?;
+    option_ns.setattr("traceconfig", config.get_flag("traceconfig"))?;
     option_ns.setattr("debug", false)?;
     option_ns.setattr(
         "capture",
