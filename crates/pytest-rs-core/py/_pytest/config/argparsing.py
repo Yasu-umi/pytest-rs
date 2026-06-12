@@ -1,3 +1,6 @@
+from _pytest._stub import __getattr__  # noqa: F401
+
+
 def get_ini_default_for_type(type):
     """Used by addini to get the default value for a given config option
     type, when default is not supplied."""
@@ -11,6 +14,3 @@ def get_ini_default_for_type(type):
         return 0.0
     else:
         return ""
-
-
-from _pytest._stub import __getattr__  # noqa: E402, F401

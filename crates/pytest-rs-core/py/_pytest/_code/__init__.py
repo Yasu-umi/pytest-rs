@@ -1,3 +1,8 @@
+from pytest._raises import ExceptionInfo as ExceptionInfo  # noqa: F401
+
+from _pytest._stub import __getattr__  # noqa: F401
+
+
 class Source:
     def __init__(self, obj=None):
         import inspect
@@ -19,8 +24,3 @@ class Source:
         this exists so callers can write ``Source(x).strip().lines`` (the
         shape LineMatcher._getlines relies on)."""
         return self
-
-
-from pytest._raises import ExceptionInfo as ExceptionInfo  # noqa: E402, F401
-
-from _pytest._stub import __getattr__  # noqa: E402, F401

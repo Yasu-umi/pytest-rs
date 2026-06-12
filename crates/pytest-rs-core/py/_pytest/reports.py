@@ -1,3 +1,6 @@
+from _pytest._code.code import ExceptionChainRepr as _ExceptionChainRepr  # noqa: F401
+
+
 class _ReprCrash:
     """Upstream's reprcrash surface (path, lineno, message) recovered from
     the shim's formatted-string longrepr."""
@@ -31,9 +34,6 @@ class _ReprEntry:
 class _ReprTraceback:
     def __init__(self, reprentries):
         self.reprentries = reprentries
-
-
-from _pytest._code.code import ExceptionChainRepr as _ExceptionChainRepr  # noqa: E402
 
 
 class _LongRepr(str, _ExceptionChainRepr):
