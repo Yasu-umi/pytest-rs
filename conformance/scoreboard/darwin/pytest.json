@@ -89,8 +89,8 @@
       "file": "testing/test_collection.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 94,
-      "failed": 19,
+      "passed": 96,
+      "failed": 17,
       "skipped": 3,
       "errors": 0
     },
@@ -119,15 +119,6 @@
       "passed": 46,
       "failed": 7,
       "skipped": 1,
-      "errors": 0
-    },
-    {
-      "file": "testing/test_debug_session.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 1,
-      "failed": 0,
-      "skipped": 0,
       "errors": 0
     },
     {

@@ -185,6 +185,25 @@ impl Engine {
             return exit_code::USAGE_ERROR;
         }
         python::configure_capture(py, capture_mode);
+        // --basetemp must not be the cwd or an ancestor of the cwd (pytest parity).
+        if let Some(bt) = self.config.get_value("basetemp") {
+            let bt_path = std::path::Path::new(bt);
+            let resolved = if bt_path.is_absolute() {
+                bt_path.to_path_buf()
+            } else {
+                self.config.invocation_dir.join(bt_path)
+            };
+            let resolved = std::fs::canonicalize(&resolved).unwrap_or(resolved);
+            let cwd = std::fs::canonicalize(&self.config.invocation_dir)
+                .unwrap_or_else(|_| self.config.invocation_dir.clone());
+            if resolved == cwd || cwd.starts_with(&resolved) {
+                eprintln!(
+                    "ERROR: basetemp must not be the current directory or an ancestor \
+                     directory. Use a relative path: {bt}"
+                );
+                return exit_code::USAGE_ERROR;
+            }
+        }
         python::configure_tmp_path(
             py,
             self.config.get_value("basetemp"),
