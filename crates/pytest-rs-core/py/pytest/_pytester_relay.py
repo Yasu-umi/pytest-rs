@@ -89,6 +89,8 @@ class _RelaySession:
 class _RelayCollectReport:
     """Lightweight CollectReport reconstructed from relay JSON."""
 
+    when = "collect"
+
     def __init__(self, nodeid, outcome, longrepr, result=None):
         self.nodeid = nodeid
         self.outcome = outcome
@@ -97,6 +99,7 @@ class _RelayCollectReport:
         self.passed = outcome == "passed"
         self.skipped = outcome == "skipped"
         self.result = result or []
+        self.sections = []
 
     @property
     def longreprtext(self):
@@ -105,6 +108,22 @@ class _RelayCollectReport:
         if isinstance(self.longrepr, tuple):
             return str(self.longrepr[2]) if len(self.longrepr) >= 3 else str(self.longrepr)
         return str(self.longrepr)
+
+    def _to_json(self):
+        longrepr = None
+        if self.longrepr is not None:
+            longrepr = str(self.longrepr)
+        d = {
+            "nodeid": self.nodeid,
+            "outcome": self.outcome,
+            "longrepr": longrepr,
+            "result": [],
+            "sections": list(self.sections),
+        }
+        for k, v in vars(self).items():
+            if k not in d and k not in ("failed", "passed", "skipped"):
+                d[k] = v
+        return d
 
 
 class _RelayTestReport:
@@ -115,6 +134,8 @@ class _RelayTestReport:
         self.when = when
         self.outcome = outcome
         self.longrepr = longrepr
+        self.sections = []
+        self.keywords = {}
 
     @property
     def passed(self):
@@ -127,6 +148,25 @@ class _RelayTestReport:
     @property
     def skipped(self):
         return self.outcome == "skipped"
+
+    def _to_json(self):
+        longrepr = None
+        if self.longrepr is not None:
+            # Return as string for basic serialization; full ExceptionRepr
+            # serialization (reprtraceback, reprcrash) is not implemented.
+            longrepr = str(self.longrepr)
+        d = {
+            "nodeid": self.nodeid,
+            "when": self.when,
+            "outcome": self.outcome,
+            "longrepr": longrepr,
+            "sections": list(self.sections),
+            "keywords": dict(self.keywords),
+        }
+        for k, v in vars(self).items():
+            if k not in d and k not in ("sections", "keywords"):
+                d[k] = v
+        return d
 
 
 class _RelayHookCall:

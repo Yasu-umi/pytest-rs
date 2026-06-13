@@ -172,6 +172,43 @@ def _set_report_attrs(report, kwargs):
 class TestReport(BaseReport):
     def __init__(self, **kwargs):
         _set_report_attrs(self, kwargs)
+        if not hasattr(self, "sections"):
+            self.sections = []
+        if not hasattr(self, "keywords"):
+            self.keywords = {}
+
+    def _to_json(self):
+        longrepr = None
+        if getattr(self, "longrepr", None) is not None:
+            longrepr = str(self.longrepr)
+        d = {
+            "nodeid": getattr(self, "nodeid", ""),
+            "when": getattr(self, "when", ""),
+            "outcome": getattr(self, "outcome", ""),
+            "longrepr": longrepr,
+            "sections": list(getattr(self, "sections", [])),
+            "keywords": dict(getattr(self, "keywords", {})),
+        }
+        for k, v in vars(self).items():
+            if k not in d:
+                try:
+                    d[k] = v
+                except Exception:
+                    pass
+        return d
+
+    @classmethod
+    def _from_json(cls, data):
+        return cls(
+            nodeid=data.get("nodeid", ""),
+            when=data.get("when", ""),
+            outcome=data.get("outcome", ""),
+            longrepr=data.get("longrepr"),
+            sections=data.get("sections") or [],
+            keywords=data.get("keywords") or {},
+            **{k: v for k, v in data.items()
+               if k not in ("nodeid", "when", "outcome", "longrepr", "sections", "keywords")},
+        )
 
 
 class CollectReport(BaseReport):
@@ -190,6 +227,39 @@ class CollectReport(BaseReport):
         if sections:
             kwargs["sections"] = list(sections)
         _set_report_attrs(self, kwargs)
+        if not hasattr(self, "sections"):
+            self.sections = []
+
+    def _to_json(self):
+        longrepr = None
+        if getattr(self, "longrepr", None) is not None:
+            longrepr = str(self.longrepr)
+        d = {
+            "nodeid": getattr(self, "nodeid", ""),
+            "outcome": getattr(self, "outcome", ""),
+            "longrepr": longrepr,
+            "result": [],
+            "sections": list(getattr(self, "sections", [])),
+        }
+        for k, v in vars(self).items():
+            if k not in d:
+                try:
+                    d[k] = v
+                except Exception:
+                    pass
+        return d
+
+    @classmethod
+    def _from_json(cls, data):
+        return cls(
+            nodeid=data.get("nodeid", ""),
+            outcome=data.get("outcome", ""),
+            longrepr=data.get("longrepr"),
+            result=data.get("result") or [],
+            sections=data.get("sections") or [],
+            **{k: v for k, v in data.items()
+               if k not in ("nodeid", "outcome", "longrepr", "result", "sections")},
+        )
 
 
 from _pytest._stub import __getattr__  # noqa: E402, F401
