@@ -1073,12 +1073,17 @@ impl Config {
             // positional args for clap, not values for the deferred flag.
             let space_value = !token.contains('=');
             plugin_args.push(token);
-            if space_value
-                && let Some((_, next)) = tokens.peek()
-                && !next.starts_with('-')
-                && !looks_like_path(next)
-            {
-                plugin_args.push(tokens.next().expect("peeked").1);
+            // Consume all non-flag, non-path tokens following the flag so
+            // that plugin options with nargs>1 (e.g. `--metadata key value`)
+            // are fully captured instead of leaving trailing values for clap
+            // to misinterpret as file paths.
+            if space_value {
+                while let Some((_, next)) = tokens.peek() {
+                    if next.starts_with('-') || looks_like_path(next) {
+                        break;
+                    }
+                    plugin_args.push(tokens.next().expect("peeked").1);
+                }
             }
         }
         (kept, plugin_args)
