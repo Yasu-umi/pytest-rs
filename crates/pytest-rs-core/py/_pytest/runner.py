@@ -5,12 +5,13 @@ skip/xfail mark semantics; no fixtures."""
 import sys
 import traceback
 
+from pytest._outcomes import Exit, Skipped
+from pytest._raises import ExceptionInfo
+
 from _pytest.reports import CollectReport as CollectReport
 from _pytest.reports import TestReport as TestReport
 from _pytest.reports import _LongRepr as _LR
 from _pytest.skipping import evaluate_skip_marks, evaluate_xfail_marks
-from pytest._outcomes import Exit, Skipped
-from pytest._raises import ExceptionInfo
 
 
 class CallInfo:
@@ -259,4 +260,4 @@ def pytest_runtest_call(item):
         raise
 
 
-from _pytest._stub import __getattr__  # noqa: F401
+from _pytest._stub import __getattr__  # noqa: E402, F401

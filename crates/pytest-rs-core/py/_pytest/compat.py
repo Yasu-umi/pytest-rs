@@ -67,4 +67,4 @@ def get_user_id():
     return uid if uid != erruid else None
 
 
-from _pytest._stub import __getattr__  # noqa: F401
+from _pytest._stub import __getattr__  # noqa: E402, F401
