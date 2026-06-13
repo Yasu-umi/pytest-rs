@@ -45,6 +45,7 @@ class OptionGroup:
             "type": attrs.get("type"),
             "action": attrs.get("action"),
             "nargs": attrs.get("nargs"),
+            "choices": attrs.get("choices"),
         }
         for opt in opts:
             if opt.startswith("-"):
@@ -435,6 +436,17 @@ def apply_cli_args(namespace: Any, tokens: list[str]) -> list[str]:
                     unknown.append(token)
                     continue
             converted = convert(value) if callable(convert) else value
+        # Validate choices (argparse-compatible behaviour).
+        choices = spec.get("choices")
+        if choices is not None:
+            check_vals = converted if isinstance(converted, list) else [converted]
+            for val in check_vals:
+                if val not in choices:
+                    from pytest import UsageError
+                    choices_str = ", ".join(repr(c) for c in choices)
+                    raise UsageError(
+                        f"error: argument {name}: invalid choice: {val!r} (choose from {choices_str})"
+                    )
         # action="append" accumulates into a list (default []).
         if spec["action"] == "append":
             existing = getattr(namespace, dest, None)

@@ -351,6 +351,15 @@ impl Engine {
         // Collection done: tests (and gc-dependent plugins) run from here on.
         python::set_gc_enabled(py, true);
         let n_collect_errors = collect_errors.len();
+
+        // --markers (and similar early-exit modes) printed their output during
+        // collect and skipped item collection.  Return OK now — falling through
+        // would reach handle_no_tests() → exit 5 ("no tests ran").
+        if self.config.get_flag("markers") {
+            let _ = self.fire_py_hooks_simple(py, "pytest_unconfigure");
+            return exit_code::OK;
+        }
+
         if let Some(code) = self.handle_collection_errors(py, collect_errors, started) {
             return code;
         }

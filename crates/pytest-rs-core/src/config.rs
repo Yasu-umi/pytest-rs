@@ -1069,15 +1069,19 @@ impl Config {
             }
             // A separate value token (`--flag value`) is deferred with the
             // flag; whether the spec consumes it is decided at apply time.
-            // Skip the peek for path-like tokens (test file args): they're
-            // positional args for clap, not values for the deferred flag.
             let space_value = !token.contains('=');
             plugin_args.push(token);
-            // Consume all non-flag, non-path tokens following the flag so
-            // that plugin options with nargs>1 (e.g. `--metadata key value`)
-            // are fully captured instead of leaving trailing values for clap
-            // to misinterpret as file paths.
             if space_value {
+                // Always consume the first non-flag token: most plugin
+                // options take exactly one value, and that value may be a
+                // path (e.g. `--metadata-from-json-file /path/to/f.json`).
+                if let Some((_, next)) = tokens.peek() {
+                    if !next.starts_with('-') {
+                        plugin_args.push(tokens.next().expect("peeked").1);
+                    }
+                }
+                // Continue consuming non-flag, non-path tokens for nargs>1
+                // options (e.g. `--metadata key value`).
                 while let Some((_, next)) = tokens.peek() {
                     if next.starts_with('-') || looks_like_path(next) {
                         break;
