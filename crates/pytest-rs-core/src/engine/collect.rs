@@ -262,6 +262,40 @@ impl Engine {
             return Err(python::format_exception(py, &err));
         }
         for conftest in conftests {
+            // Skip conftests in directories that are ignored by pytest_ignore_collect.
+            // Since conftests are ordered root→inner, ancestor hooks are already loaded
+            // by the time we process a subdirectory's conftest.
+            let conftest_dir = conftest
+                .parent()
+                .map(std::path::Path::to_path_buf)
+                .unwrap_or_else(|| rootdir.to_path_buf());
+            if conftest_dir != rootdir {
+                let mut ancestor = conftest_dir.clone();
+                let mut dir_ignored = false;
+                loop {
+                    if ancestor == rootdir {
+                        break;
+                    }
+                    if python::call_ignore_collect_hooks(
+                        py,
+                        &self.session.py_hooks,
+                        &ancestor,
+                        rootdir,
+                    )
+                    .is_some()
+                    {
+                        dir_ignored = true;
+                        break;
+                    }
+                    match ancestor.parent() {
+                        Some(p) => ancestor = p.to_path_buf(),
+                        None => break,
+                    }
+                }
+                if dir_ignored {
+                    continue;
+                }
+            }
             if let Err(err) = python::collect_conftest(
                 py,
                 rootdir,
@@ -513,8 +547,46 @@ impl Engine {
         }
         // pytest_ignore_collect: only applied when no explicit file args
         if no_explicit_file_args {
+            // Cache ignored/ok directories to avoid redundant hook calls.
+            let mut known_ignored: std::collections::HashSet<PathBuf> = Default::default();
+            let mut known_ok: std::collections::HashSet<PathBuf> = Default::default();
+
             let mut kept = Vec::with_capacity(files.len());
             for f in files.drain(..) {
+                // Check ancestor directories: real pytest calls pytest_ignore_collect on
+                // directories too, not just files. If a parent dir is ignored, all files
+                // within it are skipped without inspecting them individually.
+                let mut dir_ignored = false;
+                let mut ancestor = f.parent().map(std::path::Path::to_path_buf);
+                while let Some(ref d) = ancestor {
+                    if d == rootdir {
+                        break;
+                    }
+                    if known_ignored.contains(d) {
+                        dir_ignored = true;
+                        break;
+                    }
+                    if !known_ok.contains(d) {
+                        if python::call_ignore_collect_hooks(
+                            py,
+                            &self.session.py_hooks,
+                            d,
+                            rootdir,
+                        )
+                        .is_some()
+                        {
+                            known_ignored.insert(d.clone());
+                            dir_ignored = true;
+                            break;
+                        }
+                        known_ok.insert(d.clone());
+                    }
+                    ancestor = d.parent().map(std::path::Path::to_path_buf);
+                }
+                if dir_ignored {
+                    continue;
+                }
+
                 match python::call_ignore_collect_hooks(py, &self.session.py_hooks, &f, rootdir) {
                     None => kept.push(f),
                     Some(None) => {} // ignored silently
