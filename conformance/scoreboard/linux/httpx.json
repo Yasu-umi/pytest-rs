@@ -1,0 +1,287 @@
+{
+  "suite": "httpx",
+  "tag": "0.28.1",
+  "category": "real-world",
+  "excluded_files": 0,
+  "files": [
+    {
+      "file": "tests/client/test_async_client.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 48,
+      "failed": 4,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/client/test_auth.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 79,
+      "failed": 0,
+      "skipped": 1,
+      "errors": 0
+    },
+    {
+      "file": "tests/client/test_client.py",
+      "status": "timeout",
+      "exit_code": null,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/client/test_cookies.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/client/test_event_hooks.py",
+      "status": "timeout",
+      "exit_code": null,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/client/test_headers.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 17,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/client/test_properties.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/client/test_proxies.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 69,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/client/test_queryparams.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/client/test_redirects.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 31,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/models/test_cookies.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/models/test_headers.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 27,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/models/test_queryparams.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/models/test_requests.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 24,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/models/test_responses.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 104,
+      "failed": 2,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/models/test_url.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 90,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/models/test_whatwg.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 563,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_api.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_asgi.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 24,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_auth.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_config.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 28,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_content.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 43,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_decoders.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 38,
+      "failed": 2,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_exceptions.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_exported_members.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_main.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_multipart.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 38,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_status_codes.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_timeouts.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 9,
+      "failed": 1,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_utils.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 40,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_wsgi.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    }
+  ]
+}
