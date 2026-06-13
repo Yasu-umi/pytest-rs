@@ -57,10 +57,17 @@ class TerminalWriter:
         self.hasmarkup = should_do_markup(self._file)
         self.code_highlight = False
         self._current_line = ""
+        self._fullwidth = None
 
     @property
     def fullwidth(self):
+        if self._fullwidth is not None:
+            return self._fullwidth
         return get_terminal_width()
+
+    @fullwidth.setter
+    def fullwidth(self, value):
+        self._fullwidth = value
 
     @property
     def width_of_current_line(self):

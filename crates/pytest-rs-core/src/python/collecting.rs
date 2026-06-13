@@ -1411,7 +1411,9 @@ pub(crate) fn user_id_from_value(py: Python<'_>, id: &Bound<'_, PyAny>) -> Optio
 }
 
 pub(crate) fn ascii_escaped_str(value: &Bound<'_, PyAny>, s: String) -> String {
-    if s.chars().all(|c| matches!(c, ' '..='~')) {
+    // Pass printable ASCII through unchanged, but backslashes must be escaped
+    // via unicode_escape (real pytest: "\\" → "\\\\") so node IDs are unambiguous.
+    if s.chars().all(|c| matches!(c, ' '..='~')) && !s.contains('\\') {
         return s;
     }
     value

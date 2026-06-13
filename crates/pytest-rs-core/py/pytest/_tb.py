@@ -255,6 +255,9 @@ def format_exception(exc, style="long"):
 
     frames = _visible_frames(exc)
     if not frames:
+        if isinstance(exc, LookupError):
+            exc_lines = _exception_lines(exc)
+            return "\n".join(f"E   {line}" for line in exc_lines)
         return "".join(traceback.format_exception(exc))
 
     if style == "line":

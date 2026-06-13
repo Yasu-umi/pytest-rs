@@ -214,9 +214,8 @@ pub(crate) fn resolve_fixture(
         if name == "pytestconfig" {
             return python::make_py_config(py, config);
         }
-        return Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
-            "fixture '{name}' not found for test {}",
-            item.nodeid
+        return Err(pyo3::exceptions::PyLookupError::new_err(format!(
+            "fixture '{name}' not found"
         )));
     };
     resolve_fixture_def(
