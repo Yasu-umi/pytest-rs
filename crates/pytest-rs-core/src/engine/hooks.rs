@@ -637,6 +637,7 @@ impl Engine {
         // Publish session.items / session.testscollected regardless of
         // hook presence: pytest_sessionfinish readers need them too.
         python::set_session_items(py, &self.session.items)?;
+        python::set_session_skipped_modules(py, &self.session.skipped_modules)?;
         if hook_funcs.is_empty()
             && self.session.custom_reporter.is_none()
             && !crate::engine::inprocess::recording()

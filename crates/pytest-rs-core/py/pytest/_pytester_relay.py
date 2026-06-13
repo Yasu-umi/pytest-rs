@@ -98,6 +98,14 @@ class _RelayCollectReport:
         self.skipped = outcome == "skipped"
         self.result = result or []
 
+    @property
+    def longreprtext(self):
+        if self.longrepr is None:
+            return ""
+        if isinstance(self.longrepr, tuple):
+            return str(self.longrepr[2]) if len(self.longrepr) >= 3 else str(self.longrepr)
+        return str(self.longrepr)
+
 
 class _RelayTestReport:
     """Lightweight TestReport reconstructed from relay JSON."""
@@ -387,6 +395,63 @@ class InlineRunResult:
                 report = _RelayCollectReport(module_nodeid, "passed", "", module_result)
                 calls.append(_RelayHookCall("pytest_collectreport", {"report": report}))
 
+            # Synthesize Session + skipped-module + Dir collectreports when
+            # all collected items are module-level skips (0 normal items).
+            raw_skipped = event.get("skipped_modules", [])
+            if raw_skipped and not raw_items and session_path is not None:
+                session_path_str3 = str(session_path)
+                # Session collectreport (passed)
+                calls.append(
+                    _RelayHookCall(
+                        "pytest_collectreport",
+                        {"report": _RelayCollectReport("", "passed", "")},
+                    )
+                )
+                # One collectreport per skipped module
+                dirs_seen: set = set()
+                for sm in raw_skipped:
+                    sm_nodeid = sm.get("nodeid", "")
+                    sm_reason = sm.get("reason", "")
+                    sm_location = sm.get("location", "")
+                    # Parse location "file:lineno" into (path, lineno)
+                    loc_file, lineno = sm_nodeid, 1
+                    if sm_location:
+                        colon_idx = sm_location.rfind(":")
+                        if colon_idx >= 0:
+                            loc_file = sm_location[:colon_idx]
+                            try:
+                                lineno = int(sm_location[colon_idx + 1:])
+                            except ValueError:
+                                pass
+                    longrepr_tuple = (loc_file, lineno, f"Skipped: {sm_reason}")
+                    calls.append(
+                        _RelayHookCall(
+                            "pytest_collectreport",
+                            {
+                                "report": _RelayCollectReport(
+                                    sm_nodeid, "skipped", longrepr_tuple
+                                )
+                            },
+                        )
+                    )
+                    # Track dirs for Dir-level collectreports
+                    sm_dir = str(pathlib.Path(sm_nodeid).parent)
+                    if sm_dir == ".":
+                        sm_dir = ""
+                    dirs_seen.add(sm_dir)
+                # Dir collectreport (passed) for each unique dir
+                for d in dirs_seen:
+                    calls.append(
+                        _RelayHookCall(
+                            "pytest_collectreport",
+                            {
+                                "report": _RelayCollectReport(
+                                    d, "passed", "", []
+                                )
+                            },
+                        )
+                    )
+
             # Append the original collection_finish
             calls.append(_RelayHookCall._from_event(event))
 
@@ -433,6 +498,19 @@ class InlineRunResult:
     def listoutcomes(self):
         outcomes = {"passed": [], "skipped": [], "failed": []}
         seen = set()
+
+        # Build map of relay test reports keyed by nodeid for longrepr access.
+        # Prefer call-phase reports; fall back to setup/teardown if they carry longrepr.
+        relay_reports: dict = {}
+        for call in self._hook_calls:
+            if call._name == "pytest_runtest_logreport" and hasattr(call, "report"):
+                rep = call.report
+                nid = rep.nodeid
+                if rep.when == "call":
+                    relay_reports[nid] = rep
+                elif nid not in relay_reports and rep.longrepr is not None:
+                    relay_reports[nid] = rep
+
         for line in self._result.outlines:
             parts = line.split()
             if len(parts) < 2:
@@ -456,7 +534,10 @@ class InlineRunResult:
             )
             if bucket is not None and is_test_node and nodeid not in seen:
                 seen.add(nodeid)
-                outcomes[bucket].append(_OutcomeReport(nodeid, bucket))
+                report = relay_reports.get(nodeid)
+                if report is None:
+                    report = _OutcomeReport(nodeid, bucket)
+                outcomes[bucket].append(report)
         # Collect-level reports (e.g. a skipped DoctestModule, a module that
         # failed to import) have no per-item lines; the final summary counts
         # are authoritative, so pad each bucket up to them. Upstream's

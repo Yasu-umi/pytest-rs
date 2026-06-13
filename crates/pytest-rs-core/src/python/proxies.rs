@@ -393,6 +393,23 @@ pub fn set_session_items(py: Python<'_>, items: &[crate::collect::TestItem]) -> 
     Ok(())
 }
 
+/// Publish skipped-module records [(nodeid, reason, location), ...] on the
+/// session state so the relay plugin can serialize them in collection_finish.
+pub fn set_session_skipped_modules(
+    py: Python<'_>,
+    modules: &[(String, String, String)],
+) -> PyResult<()> {
+    let list = pyo3::types::PyList::empty(py);
+    for (nodeid, reason, location) in modules {
+        let tup = pyo3::types::PyTuple::new(py, [nodeid.as_str(), reason.as_str(), location.as_str()])?;
+        list.append(tup)?;
+    }
+    py.import("pytest._node")?
+        .getattr("set_session_skipped_modules")?
+        .call1((list,))?;
+    Ok(())
+}
+
 /// Write back `item.obj` swaps a plugin made on the published session
 /// items (pytest-run-parallel wraps test functions for threaded repeats
 /// during pytest_collection_finish).

@@ -128,6 +128,7 @@ class _HookRelayPlugin:
         )
 
     def pytest_collection_finish(self, session):
+        skipped_raw = getattr(session, "_rs_skipped_modules", None) or []
         self._events.append(
             {
                 "hook": "pytest_collection_finish",
@@ -144,6 +145,10 @@ class _HookRelayPlugin:
                         ),
                     }
                     for i in session.items
+                ],
+                "skipped_modules": [
+                    {"nodeid": m[0], "reason": m[1], "location": m[2]}
+                    for m in skipped_raw
                 ],
             }
         )

@@ -642,6 +642,7 @@ _session_state: dict = {
     "items": [],
     "session_markers": [],
     "session_keywords": {},
+    "skipped_modules": [],
 }
 
 
@@ -670,10 +671,17 @@ def set_session_items(items):
     _session_state["items"] = list(items)
 
 
+def set_session_skipped_modules(modules):
+    """Skipped-module records [(nodeid, reason, location), ...], published
+    before pytest_collection_finish so the relay can serialize them."""
+    _session_state["skipped_modules"] = list(modules)
+
+
 def reset_collection_items():
     """Start a fresh custom-collection pass with an empty session.items so a
     prior in-process run's items don't leak into the isinstance checks below."""
     _session_state["items"] = []
+    _session_state["skipped_modules"] = []
 
 
 def publish_collection_item(item):
@@ -860,8 +868,16 @@ class _NodeSession:
         _session_state["shouldstop"] = value
 
     @property
+    def path(self):
+        return getattr(self.config, "rootpath", None) or getattr(self.config, "rootdir", None)
+
+    @property
     def items(self):
         return _session_state["items"]
+
+    @property
+    def _rs_skipped_modules(self):
+        return _session_state["skipped_modules"]
 
     @property
     def testscollected(self):
