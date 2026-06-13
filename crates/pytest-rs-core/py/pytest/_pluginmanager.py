@@ -311,12 +311,26 @@ class PluginManager:
 
     # Core plugin names that are always present in pytest-rs (the Rust engine
     # provides them natively; returning a sentinel keeps hasplugin() truthful).
-    _CORE_PLUGIN_NAMES: frozenset = frozenset({
-        "python", "main", "config", "runner", "terminal",
-        "debugging", "warnings", "faulthandler", "helpconfig",
-        "junitxml", "tmpdir", "cacheprovider", "doctest",
-        "hookspec", "pastebin", "pytester",
-    })
+    _CORE_PLUGIN_NAMES: frozenset = frozenset(
+        {
+            "python",
+            "main",
+            "config",
+            "runner",
+            "terminal",
+            "debugging",
+            "warnings",
+            "faulthandler",
+            "helpconfig",
+            "junitxml",
+            "tmpdir",
+            "cacheprovider",
+            "doctest",
+            "hookspec",
+            "pastebin",
+            "pytester",
+        }
+    )
 
     def getplugin(self, name: str) -> Any:
         if name in self._names:

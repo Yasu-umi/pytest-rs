@@ -567,13 +567,8 @@ impl Engine {
                         break;
                     }
                     if !known_ok.contains(d) {
-                        if python::call_ignore_collect_hooks(
-                            py,
-                            &self.session.py_hooks,
-                            d,
-                            rootdir,
-                        )
-                        .is_some()
+                        if python::call_ignore_collect_hooks(py, &self.session.py_hooks, d, rootdir)
+                            .is_some()
                         {
                             known_ignored.insert(d.clone());
                             dir_ignored = true;

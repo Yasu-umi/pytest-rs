@@ -452,7 +452,6 @@ class InlineRunResult:
             # all collected items are module-level skips (0 normal items).
             raw_skipped = event.get("skipped_modules", [])
             if raw_skipped and not raw_items and session_path is not None:
-                session_path_str3 = str(session_path)
                 # Session collectreport (passed)
                 calls.append(
                     _RelayHookCall(
@@ -473,18 +472,14 @@ class InlineRunResult:
                         if colon_idx >= 0:
                             loc_file = sm_location[:colon_idx]
                             try:
-                                lineno = int(sm_location[colon_idx + 1:])
+                                lineno = int(sm_location[colon_idx + 1 :])
                             except ValueError:
                                 pass
                     longrepr_tuple = (loc_file, lineno, f"Skipped: {sm_reason}")
                     calls.append(
                         _RelayHookCall(
                             "pytest_collectreport",
-                            {
-                                "report": _RelayCollectReport(
-                                    sm_nodeid, "skipped", longrepr_tuple
-                                )
-                            },
+                            {"report": _RelayCollectReport(sm_nodeid, "skipped", longrepr_tuple)},
                         )
                     )
                     # Track dirs for Dir-level collectreports
@@ -497,11 +492,7 @@ class InlineRunResult:
                     calls.append(
                         _RelayHookCall(
                             "pytest_collectreport",
-                            {
-                                "report": _RelayCollectReport(
-                                    d, "passed", "", []
-                                )
-                            },
+                            {"report": _RelayCollectReport(d, "passed", "", [])},
                         )
                     )
 

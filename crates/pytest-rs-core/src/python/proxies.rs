@@ -401,7 +401,8 @@ pub fn set_session_skipped_modules(
 ) -> PyResult<()> {
     let list = pyo3::types::PyList::empty(py);
     for (nodeid, reason, location) in modules {
-        let tup = pyo3::types::PyTuple::new(py, [nodeid.as_str(), reason.as_str(), location.as_str()])?;
+        let tup =
+            pyo3::types::PyTuple::new(py, [nodeid.as_str(), reason.as_str(), location.as_str()])?;
         list.append(tup)?;
     }
     py.import("pytest._node")?

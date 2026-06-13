@@ -142,6 +142,7 @@ def main(args=None, plugins=None):
     import subprocess
     import sys
     from pathlib import Path
+
     from pytest._pytester import _RUNNER_LIBPATH
 
     exe = os.environ.get("PYTEST_RS_EXE")
@@ -158,7 +159,7 @@ def main(args=None, plugins=None):
         cli = [str(a) for a in args]
 
     extra = []
-    for p in (plugins or []):
+    for p in plugins or []:
         if isinstance(p, str):
             extra += ["-p", p]
         # object plugins are not passable to a subprocess; skip them

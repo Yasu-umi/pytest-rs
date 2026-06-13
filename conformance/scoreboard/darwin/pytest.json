@@ -51,19 +51,19 @@
     },
     {
       "file": "testing/test_assertion.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 145,
-      "failed": 15,
+      "status": "timeout",
+      "exit_code": null,
+      "passed": 0,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },
     {
       "file": "testing/test_cacheprovider.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 56,
-      "failed": 1,
+      "status": "timeout",
+      "exit_code": null,
+      "passed": 0,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },
@@ -87,11 +87,11 @@
     },
     {
       "file": "testing/test_collection.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 97,
-      "failed": 16,
-      "skipped": 3,
+      "status": "timeout",
+      "exit_code": null,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
       "errors": 0
     },
     {

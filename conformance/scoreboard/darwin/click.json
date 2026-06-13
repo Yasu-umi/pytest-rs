@@ -177,10 +177,10 @@
     },
     {
       "file": "tests/test_utils.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 143,
-      "failed": 0,
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 135,
+      "failed": 8,
       "skipped": 0,
       "errors": 0
     }

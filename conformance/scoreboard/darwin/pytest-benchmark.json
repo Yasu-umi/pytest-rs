@@ -6,10 +6,10 @@
   "files": [
     {
       "file": "tests/test_benchmark.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 23,
-      "failed": 30,
+      "status": "timeout",
+      "exit_code": null,
+      "passed": 0,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },

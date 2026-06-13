@@ -206,8 +206,11 @@ class TestReport(BaseReport):
             longrepr=data.get("longrepr"),
             sections=data.get("sections") or [],
             keywords=data.get("keywords") or {},
-            **{k: v for k, v in data.items()
-               if k not in ("nodeid", "when", "outcome", "longrepr", "sections", "keywords")},
+            **{
+                k: v
+                for k, v in data.items()
+                if k not in ("nodeid", "when", "outcome", "longrepr", "sections", "keywords")
+            },
         )
 
 
@@ -257,8 +260,11 @@ class CollectReport(BaseReport):
             longrepr=data.get("longrepr"),
             result=data.get("result") or [],
             sections=data.get("sections") or [],
-            **{k: v for k, v in data.items()
-               if k not in ("nodeid", "outcome", "longrepr", "result", "sections")},
+            **{
+                k: v
+                for k, v in data.items()
+                if k not in ("nodeid", "outcome", "longrepr", "result", "sections")
+            },
         )
 
 

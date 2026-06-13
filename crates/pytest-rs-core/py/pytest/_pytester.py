@@ -891,7 +891,8 @@ class Pytester:
         # Apply assertion rewriting when enabled (spec_from_file_location
         # bypasses sys.meta_path, so we must apply the rewrite loader manually).
         try:
-            from pytest._rewrite import _RewriteLoader, _is_rewrite_target, _rewrite_enabled
+            from pytest._rewrite import _is_rewrite_target, _rewrite_enabled, _RewriteLoader
+
             if _rewrite_enabled and spec.origin and _is_rewrite_target(str(spec.origin)):
                 spec.loader = _RewriteLoader(spec.name, str(spec.origin))
         except Exception:

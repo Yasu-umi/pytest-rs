@@ -172,8 +172,7 @@ class _HookRelayPlugin:
                     for i in session.items
                 ],
                 "skipped_modules": [
-                    {"nodeid": m[0], "reason": m[1], "location": m[2]}
-                    for m in skipped_raw
+                    {"nodeid": m[0], "reason": m[1], "location": m[2]} for m in skipped_raw
                 ],
             }
         )
