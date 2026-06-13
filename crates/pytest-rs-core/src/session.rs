@@ -91,6 +91,10 @@ pub struct Session {
     /// Collection errors as (nodeid, longrepr), shown in the ERRORS section
     /// (and excluded from FAILURES / " - msg" summary suffixes).
     pub collect_errors: Vec<(String, String)>,
+    /// Module nodeids skipped at collection time (pytest.skip(allow_module_level=True),
+    /// --doctest-ignore-import-errors, etc.), for collector-tree hook synthesis.
+    /// Each entry is (nodeid, reason, location) where location is "file:line".
+    pub skipped_modules: Vec<(String, String, String)>,
     /// Set when --maxfail/-x stopped the run, with the failure count, for
     /// the "stopping after N failures" banner.
     pub stopped_after: Option<usize>,
@@ -136,6 +140,7 @@ impl Session {
             deselected: 0,
             deselected_items: Vec::new(),
             collect_errors: Vec::new(),
+            skipped_modules: Vec::new(),
             stopped_after: None,
             shouldfail: None,
             custom_reporter: None,

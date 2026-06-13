@@ -133,6 +133,19 @@ class BaseReport:
             return location[2]
         return getattr(self, "nodeid", "")
 
+    @property
+    def longreprtext(self):
+        """Return the full string representation of longrepr."""
+        longrepr = getattr(self, "longrepr", None)
+        if longrepr is None:
+            return ""
+        if isinstance(longrepr, tuple):
+            return str(longrepr[2]) if len(longrepr) >= 3 else str(longrepr)
+        try:
+            return str(longrepr)
+        except Exception:
+            return "<unprintable longrepr>"
+
     def toterminal(self, tw):
         """Write longrepr to a TerminalWriter (upstream delegates to the
         repr object tree; the shim's longrepr is a formatted string).
@@ -171,8 +184,7 @@ class CollectReport(BaseReport):
             kwargs["nodeid"] = nodeid
         if outcome is not None:
             kwargs["outcome"] = outcome
-        if longrepr is not None:
-            kwargs["longrepr"] = longrepr
+        kwargs["longrepr"] = longrepr
         if result is not None:
             kwargs["result"] = result
         if sections:

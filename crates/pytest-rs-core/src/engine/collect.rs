@@ -731,6 +731,11 @@ impl Engine {
                             // The skip call site (file:line), like pytest.
                             let location = python::raise_location(py, &err)
                                 .unwrap_or_else(|| format!("{nodeid}:1"));
+                            self.session.skipped_modules.push((
+                                nodeid.clone(),
+                                reason.clone(),
+                                location.clone(),
+                            ));
                             self.session.reports.push(crate::report::TestReport {
                                 nodeid: nodeid.clone(),
                                 phase: crate::report::Phase::Setup,
@@ -885,6 +890,11 @@ impl Engine {
                                 extra_file.display()
                             );
                             python::record_collect_skip(py, &nodeid, &longrepr);
+                            self.session.skipped_modules.push((
+                                nodeid.clone(),
+                                longrepr.clone(),
+                                format!("{nodeid}:1"),
+                            ));
                             self.session.reports.push(crate::report::TestReport {
                                 nodeid: nodeid.clone(),
                                 phase: crate::report::Phase::Setup,
@@ -955,24 +965,13 @@ impl Engine {
             );
             self.session.py_hooks = hooks;
             match result {
-                Ok(skipped_files) => {
-                    for (file, reason) in skipped_files {
-                        let nodeid = crate::collect::file_nodeid(rootdir, &file);
-                        self.session.reports.push(crate::report::TestReport {
-                            nodeid,
-                            phase: crate::report::Phase::Setup,
-                            outcome: crate::report::Outcome::Skipped,
-                            duration: std::time::Duration::ZERO,
-                            longrepr: Some(reason),
-                            location: None,
-                            subtest_desc: None,
-                            sections: Vec::new(),
-                            rerun: false,
-                            xfail_longrepr: None,
-                            reprcrash_message: None,
-                            head_line: None,
-                        });
-                    }
+                Ok(_skipped_files) => {
+                    // pytest_collect_file raises pytest.skip to mean "don't
+                    // collect this file for my plugin" — not a module-level
+                    // skip.  Real pytest emits no Module collectreport in this
+                    // case (the Dir's collect call itself would raise Skipped),
+                    // so we don't record these in skipped_modules or as test
+                    // reports.
                 }
                 Err(err) => {
                     errors.push((rootdir.to_path_buf(), python::format_exception(py, &err)));

@@ -285,6 +285,32 @@ impl Engine {
             Ok(())
         };
 
+        // Helper: emit pytest_collectreport(skipped) for module-level skips.
+        // longrepr is a (file, line, "Skipped: reason") tuple as pytest emits.
+        let emit_skipped = |nodeid: &str, reason: &str, location: &str| -> PyResult<()> {
+            // Parse "file:line" location into file and lineno.
+            let (loc_file, lineno) = if let Some(colon) = location.rfind(':') {
+                let f = &location[..colon];
+                let ln: u64 = location[colon + 1..].parse().unwrap_or(1);
+                (f, ln)
+            } else {
+                (location, 1u64)
+            };
+            let skip_reason = format!("Skipped: {reason}");
+            let longrepr = (loc_file, lineno, skip_reason);
+            let kw = PyDict::new(py);
+            kw.set_item("nodeid", nodeid)?;
+            kw.set_item("outcome", "skipped")?;
+            kw.set_item("longrepr", longrepr)?;
+            let file = nodeid.split("::").next().unwrap_or(nodeid);
+            kw.set_item("location", (file, py.None(), nodeid))?;
+            kw.set_item("result", PyList::empty(py))?;
+            kw.set_item("sections", PyList::empty(py))?;
+            let report = collect_report_cls.call((), Some(&kw))?.unbind();
+            python::record_hook(py, "pytest_collectreport", &[("report", report)]);
+            Ok(())
+        };
+
         // Unique passing-module paths (nodeid prefix before first "::").
         let mut passing_modules: Vec<String> = Vec::new();
         {
@@ -311,6 +337,14 @@ impl Engine {
             .map(|(nodeid, _)| nodeid.as_str())
             .collect();
 
+        // Unique skipped-module nodeids (pytest.skip(allow_module_level=True), etc.).
+        let skipped_modules: Vec<(&str, &str, &str)> = self
+            .session
+            .skipped_modules
+            .iter()
+            .map(|(nodeid, reason, loc)| (nodeid.as_str(), reason.as_str(), loc.as_str()))
+            .collect();
+
         // Unique directories (parent of each module file; "" → ".").
         let mut dirs: Vec<String> = Vec::new();
         {
@@ -318,7 +352,8 @@ impl Engine {
             let all_files = passing_modules
                 .iter()
                 .map(|s| s.as_str())
-                .chain(failing_modules.iter().copied());
+                .chain(failing_modules.iter().copied())
+                .chain(skipped_modules.iter().map(|(nodeid, _, _)| *nodeid));
             for file in all_files {
                 let dir = match std::path::Path::new(file).parent() {
                     Some(p) if p.as_os_str().is_empty() => ".".to_string(),
@@ -348,18 +383,30 @@ impl Engine {
         }
 
         // ── Emit collector tree ──────────────────────────────────────────────
-        // Order: Session → Dirs → passing Modules → Classes (start+report) →
-        // Module reports → failing Module starts → Dir reports → Session report.
-        // The failed-module collectreport is already recorded; we only start it.
+        // Real pytest order (perform_collect + genitems post-order):
+        //   collectstarts: Session → Dirs → Modules (top-down)
+        //   collectreports: Session first (before genitems), then per genitems
+        //     post-order: Class reports → Module reports → Dir reports
+        // Failing-module collectreports are already recorded; we only start them.
 
+        // collectstarts (top-down: Session → Dirs → Modules)
         emit_start("");
-
         for dir in &dirs {
             emit_start(dir.as_str());
         }
         for file in &passing_modules {
             emit_start(file.as_str());
         }
+        for (nodeid, _, _) in &skipped_modules {
+            emit_start(nodeid);
+        }
+        for nodeid in &failing_modules {
+            emit_start(nodeid);
+        }
+
+        // collectreports (Session first, then post-order: Class → Module → Dir)
+        emit_passed("")?; // Session
+
         for class in &classes {
             emit_start(class.as_str());
             emit_passed(class.as_str())?;
@@ -367,13 +414,12 @@ impl Engine {
         for file in &passing_modules {
             emit_passed(file.as_str())?;
         }
-        for nodeid in &failing_modules {
-            emit_start(nodeid);
+        for (nodeid, reason, location) in &skipped_modules {
+            emit_skipped(nodeid, reason, location)?;
         }
         for dir in &dirs {
             emit_passed(dir.as_str())?;
         }
-        emit_passed("")?;
 
         Ok(())
     }
