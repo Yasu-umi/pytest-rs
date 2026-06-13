@@ -549,10 +549,13 @@ impl Engine {
         }
         let config_proxy = python::make_py_config(py, &self.config)?;
         let option = config_proxy.bind(py).getattr("option")?;
-        let unknown: Vec<String> = py
+        let (unknown, positionals): (Vec<String>, Vec<String>) = py
             .import("pytest._parser")?
             .call_method1("apply_cli_args", (option, self.config.plugin_args.clone()))?
             .extract()?;
+        if !positionals.is_empty() {
+            self.config.paths.extend(positionals);
+        }
         if !unknown.is_empty() {
             // Match argparse/pytest's MyOptionParser.error: a
             // "<prog>: error: <message>" line followed by the sorted

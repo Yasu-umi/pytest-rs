@@ -386,21 +386,23 @@ class OptionNamespace:
         raise AttributeError(name)
 
 
-def apply_cli_args(namespace: Any, tokens: list[str]) -> list[str]:
+def apply_cli_args(namespace: Any, tokens: list[str]) -> tuple[list[str], list[str]]:
     """Apply deferred CLI tokens (`--flag=value`, or `--flag` optionally
     followed by its separate value token) against the registered option
-    specs, setting converted values on config.option. Returns the tokens no
-    plugin registered (the engine usage-errors on them, like pytest's
-    "unrecognized arguments")."""
+    specs, setting converted values on config.option.  Returns
+    (unknown_flags, leftover_positionals): unknown_flags are ``--flag``
+    tokens no plugin registered (the engine usage-errors on them);
+    leftover_positionals are non-flag tokens that were eagerly consumed
+    during partitioning but turned out to be positional test-path args
+    (e.g. ``--fail test_a.py`` where ``--fail`` is store_true)."""
     unknown = []
+    positionals = []
     index = 0
     while index < len(tokens):
         token = tokens[index]
         index += 1
         if not token.startswith("--"):
-            # A value token its flag didn't consume (store_true followed by
-            # a positional, or an unknown flag's value).
-            unknown.append(token)
+            positionals.append(token)
             continue
         name, eq, value = token.partition("=")
         dest = flag_dests.get(name)
@@ -456,4 +458,4 @@ def apply_cli_args(namespace: Any, tokens: list[str]) -> list[str]:
             setattr(namespace, dest, existing)
         else:
             setattr(namespace, dest, converted)
-    return unknown
+    return unknown, positionals
