@@ -309,6 +309,15 @@ class PluginManager:
         for _before, after in monitors:
             after(outcome, name, [], kwargs)
 
+    # Core plugin names that are always present in pytest-rs (the Rust engine
+    # provides them natively; returning a sentinel keeps hasplugin() truthful).
+    _CORE_PLUGIN_NAMES: frozenset = frozenset({
+        "python", "main", "config", "runner", "terminal",
+        "debugging", "warnings", "faulthandler", "helpconfig",
+        "junitxml", "tmpdir", "cacheprovider", "doctest",
+        "hookspec", "pastebin", "pytester",
+    })
+
     def getplugin(self, name: str) -> Any:
         if name in self._names:
             return self._names[name]
@@ -320,6 +329,8 @@ class PluginManager:
             from pytest import _capture
 
             return _capture.manager
+        if name in self._CORE_PLUGIN_NAMES:
+            return True  # sentinel: plugin exists but has no Python object
         return None
 
     get_plugin = getplugin

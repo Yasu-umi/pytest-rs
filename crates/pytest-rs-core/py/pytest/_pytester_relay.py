@@ -211,6 +211,19 @@ class _RelayHookCall:
                 longrepr=longrepr,
             )
             return cls(hook, {"report": report})
+        if hook == "pytest_itemcollected":
+            item = _RelayItem(
+                event.get("name", ""),
+                event.get("nodeid", ""),
+                event.get("path", ""),
+            )
+            return cls(hook, {"item": item})
+        if hook == "pytest_collection_modifyitems":
+            items = [
+                _RelayItem(i.get("name", ""), i.get("nodeid", ""), i.get("path", ""))
+                for i in event.get("items", [])
+            ]
+            return cls(hook, {"items": items})
         return cls(hook, {k: v for k, v in event.items() if k != "hook"})
 
 
@@ -451,6 +464,38 @@ class InlineRunResult:
                             },
                         )
                     )
+
+            # Synthesize pytest_itemcollected (one per collected item)
+            for it in raw_items:
+                calls.append(
+                    _RelayHookCall(
+                        "pytest_itemcollected",
+                        {
+                            "item": _RelayItem(
+                                it.get("name", ""),
+                                it.get("nodeid", ""),
+                                it.get("path", ""),
+                            )
+                        },
+                    )
+                )
+            # Synthesize pytest_collection_modifyitems with all collected items
+            if raw_items:
+                calls.append(
+                    _RelayHookCall(
+                        "pytest_collection_modifyitems",
+                        {
+                            "items": [
+                                _RelayItem(
+                                    it.get("name", ""),
+                                    it.get("nodeid", ""),
+                                    it.get("path", ""),
+                                )
+                                for it in raw_items
+                            ]
+                        },
+                    )
+                )
 
             # Append the original collection_finish
             calls.append(_RelayHookCall._from_event(event))

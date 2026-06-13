@@ -82,6 +82,31 @@ class _HookRelayPlugin:
             }
         )
 
+    def pytest_itemcollected(self, item):
+        self._events.append(
+            {
+                "hook": "pytest_itemcollected",
+                "nodeid": getattr(item, "nodeid", ""),
+                "name": getattr(item, "name", ""),
+                "path": str(getattr(item, "path", "") or ""),
+            }
+        )
+
+    def pytest_collection_modifyitems(self, session, config, items):
+        self._events.append(
+            {
+                "hook": "pytest_collection_modifyitems",
+                "items": [
+                    {
+                        "nodeid": getattr(i, "nodeid", ""),
+                        "name": getattr(i, "name", ""),
+                        "path": str(getattr(i, "path", "") or ""),
+                    }
+                    for i in items
+                ],
+            }
+        )
+
     def pytest_runtest_logstart(self, nodeid, location):
         self._events.append(
             {

@@ -130,6 +130,50 @@ def console_main() -> int:
     raise NotImplementedError("pytest.console_main is not supported by pytest-rs")
 
 
+def main(args=None, plugins=None):
+    """Run pytest, returning an integer exit code.
+
+    args: list of CLI arg strings, or a single path-like object, or None
+          (defaults to sys.argv[1:]).
+    plugins: list of plugin objects or strings (only string plugin names are
+             supported; object plugins are silently ignored).
+    """
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+    from pytest._pytester import _RUNNER_LIBPATH
+
+    exe = os.environ.get("PYTEST_RS_EXE")
+    if exe is None:
+        raise RuntimeError("PYTEST_RS_EXE is not set; pytest.main() cannot find the runner")
+
+    if args is None:
+        cli = list(sys.argv[1:])
+    elif isinstance(args, (str, bytes)):
+        raise TypeError(f"expected to be a list of strings, got: {args!r}")
+    elif isinstance(args, Path):
+        cli = [str(args)]
+    else:
+        cli = [str(a) for a in args]
+
+    extra = []
+    for p in (plugins or []):
+        if isinstance(p, str):
+            extra += ["-p", p]
+        # object plugins are not passable to a subprocess; skip them
+
+    env = os.environ.copy()
+    for var, val in _RUNNER_LIBPATH.items():
+        env.setdefault(var, val)
+
+    proc = subprocess.run(
+        [str(exe), *extra, *cli],
+        env=env,
+    )
+    return proc.returncode
+
+
 def hookimpl(function=None, **kwargs):
     """Record hook implementation options on the function (inert for now:
     conftest hook functions are not yet called by the runner)."""

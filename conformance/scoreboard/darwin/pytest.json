@@ -107,8 +107,8 @@
       "file": "testing/test_config.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 183,
-      "failed": 31,
+      "passed": 184,
+      "failed": 30,
       "skipped": 1,
       "errors": 0
     },
@@ -395,8 +395,8 @@
       "file": "testing/acceptance_test.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 36,
-      "failed": 55,
+      "passed": 42,
+      "failed": 49,
       "skipped": 2,
       "errors": 0
     },

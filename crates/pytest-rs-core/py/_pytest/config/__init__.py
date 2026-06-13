@@ -78,6 +78,13 @@ def main(args=None, plugins=None):
     raise NotImplementedError("_pytest.config.main is not supported by pytest-rs")
 
 
+def get_plugin_manager() -> "PytestPluginManager":
+    """Return the global plugin manager (backward-compat API, upstream #787)."""
+    from pytest._pluginmanager import pluginmanager
+
+    return pluginmanager
+
+
 def _prepareconfig(args=None, plugins=None):
     """Build a default-options Config. Upstream parses the full command
     line; here only the defaults consumed by ported helpers (e.g. the

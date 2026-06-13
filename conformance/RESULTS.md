@@ -617,7 +617,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 1977 | 252 | 3 | 24 | 2256 | 88.7% | 12 | 46 | 63 |
+| pytest | 9.0.3 | 1984 | 245 | 3 | 24 | 2256 | 89.0% | 12 | 46 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 19 | 0 | 4 | 209 | 90.9% | 0 | 1 | 0 |
@@ -643,7 +643,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
 | rich | v14.2.0 | 855 | 0 | 0 | 25 | 880 | 100.0% | 60 | 62 | 0 |
-| pytest-bdd | 8.1.0 | 123 | 15 | 0 | 1 | 139 | 89.2% | 28 | 35 | 0 |
+| pytest-bdd | 8.1.0 | 124 | 14 | 0 | 1 | 139 | 89.9% | 29 | 35 | 0 |
 | pytest-django | v4.9.0 | 147 | 68 | 0 | 1 | 216 | 68.5% | 2 | 13 | 0 |
 
 ### pytest @ 9.0.3
@@ -663,7 +663,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_collect_imported_tests.py | failed | 2 | 1 | 0 | 0 |
 | testing/test_collection.py | failed | 97 | 16 | 0 | 3 |
 | testing/test_compat.py | passed | 10 | 0 | 0 | 0 |
-| testing/test_config.py | failed | 183 | 31 | 0 | 1 |
+| testing/test_config.py | failed | 184 | 30 | 0 | 1 |
 | testing/test_conftest.py | failed | 46 | 7 | 0 | 1 |
 | testing/test_debug_session.py | passed | 1 | 0 | 0 | 0 |
 | testing/test_doctest.py | passed | 139 | 0 | 0 | 1 |
@@ -695,7 +695,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_unittest.py | failed | 58 | 12 | 0 | 9 |
 | testing/test_unraisableexception.py | failed | 10 | 1 | 0 | 0 |
 | testing/test_warnings.py | failed | 38 | 5 | 0 | 1 |
-| testing/acceptance_test.py | failed | 36 | 55 | 0 | 2 |
+| testing/acceptance_test.py | failed | 42 | 49 | 0 | 2 |
 | testing/deprecated_test.py | failed | 10 | 5 | 0 | 0 |
 | testing/python/show_fixtures_per_test.py | failed | 0 | 8 | 0 | 0 |
 
@@ -1180,7 +1180,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/parser/test_errors.py | passed | 7 | 0 | 0 | 0 |
 | tests/parser/test_parser.py | passed | 1 | 0 | 0 | 0 |
 | tests/scripts/test_generate.py | failed | 1 | 2 | 0 | 0 |
-| tests/scripts/test_main.py | failed | 1 | 1 | 0 | 0 |
+| tests/scripts/test_main.py | passed | 2 | 0 | 0 | 0 |
 | tests/scripts/test_migrate.py | passed | 1 | 0 | 0 | 0 |
 | tests/steps/test_common.py | failed | 7 | 1 | 0 | 0 |
 | tests/steps/test_docstring.py | passed | 4 | 0 | 0 | 0 |
