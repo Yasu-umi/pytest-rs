@@ -134,6 +134,50 @@ pub fn reporter_feed_default(py: Python<'_>, report: &Bound<'_, PyAny>) {
     }
 }
 
+/// Ensure the default reporter has a trailing newline (plugins may
+/// have written partial lines through the hook relay).
+pub fn reporter_ensure_newline(py: Python<'_>) {
+    let _ = py
+        .import("pytest._reporter")
+        .and_then(|m| m.getattr("ensure_newline"))
+        .and_then(|f| f.call0());
+}
+
+/// Drain plugin-emitted reports (e.g., subtests) from the `_logreport_sink`.
+/// These are reports that plugins logged via `ihook.pytest_runtest_logreport`
+/// during normal (non-delegated) runs. Returns Rust `TestReport`s for the
+/// engine to count and include in the session.
+pub fn drain_plugin_reports(
+    py: Python<'_>,
+) -> Vec<crate::report::TestReport> {
+    let result = (|| -> PyResult<Vec<crate::report::TestReport>> {
+        let sink = py.import("_pytest.runner")?.getattr("_logreport_sink")?;
+        let reports: Vec<Bound<'_, PyAny>> = sink.call_method0("drain_plugin_reports")?.extract()?;
+        let mut out = Vec::new();
+        for report in &reports {
+            match crate::runner::report_from_proxy(py, &report) {
+                Ok(r) => out.push(r),
+                Err(err) => {
+                    eprintln!("INTERNAL ERROR: {}", format_exception(py, &err));
+                }
+            }
+        }
+        Ok(out)
+    })();
+    result.unwrap_or_default()
+}
+
+/// Subtest stat counts from the default reporter (populated by the
+/// pytest-subtests plugin via the hook relay). Returns a map like
+/// {"subtests passed": 3, "subtests failed": 2}.
+pub fn reporter_subtest_stats(py: Python<'_>) -> std::collections::HashMap<String, usize> {
+    py.import("pytest._reporter")
+        .and_then(|m| m.getattr("subtest_stats"))
+        .and_then(|f| f.call0())
+        .and_then(|r| r.extract())
+        .unwrap_or_default()
+}
+
 /// Drive the replacement reporter's pytest_runtest_logfinish.
 pub fn reporter_logfinish(py: Python<'_>, item: &TestItem) {
     let result = (|| -> PyResult<()> {

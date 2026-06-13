@@ -55,6 +55,9 @@ class _SubtestRecorder:
             self._record(desc, "passed")
         else:
             self._record(desc, "failed", exc=exc_info[1])
+            from pytest._debugging import maybe_interact
+
+            maybe_interact(test_case, exc_info[1])
 
     def addSkip(self, test, reason) -> None:
         # Only subtest-level skips arrive here (main-body SkipTest

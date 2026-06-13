@@ -22,7 +22,7 @@ pub(crate) use hooks::*;
 pub(crate) use item::*;
 pub(crate) use marks::*;
 pub use progress::*;
-pub(crate) use protocol::{capture_logreport, run_item_phases};
+pub(crate) use protocol::{capture_logreport, report_from_proxy, run_item_phases};
 pub(crate) use teardown::setup_show_active;
 pub(crate) use teardown::*;
 
@@ -218,7 +218,8 @@ impl Engine {
                     // -p no:terminal, or a delegated protocol whose shim
                     // TerminalReporter already rendered: no native output.
                 } else if tc >= 1 {
-                    print_verbose_report_line(py, session, item, &report, done, total, tc, pkind);
+                    python::reporter_ensure_newline(py);
+                    print_verbose_report_line(py, config, session, item, &report, done, total, tc, pkind);
                 } else if session.live_logging && !config.quiet {
                     // log_cli: outcome words print via live_flush (between
                     // the call phase and teardown logs).
@@ -312,6 +313,7 @@ impl Engine {
 #[allow(clippy::too_many_arguments)]
 fn print_verbose_report_line(
     py: Python<'_>,
+    config: &crate::config::Config,
     session: &Session,
     item: &TestItem,
     report: &TestReport,
@@ -326,7 +328,7 @@ fn print_verbose_report_line(
     // A pytest_report_teststatus hook may override the
     // verbose word and its markup; otherwise use the
     // built-in outcome word/color.
-    let status = report_teststatus(py, session, report, Some(item.lineno));
+    let status = report_teststatus(py, config, session, report, Some(item.lineno));
     // Skip/xfail/xpass reasons are appended separately so
     // they can be trimmed (-v) or wrapped (-vv) to width; a
     // teststatus hook word is used verbatim with no reason.

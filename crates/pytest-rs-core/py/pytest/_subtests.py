@@ -134,11 +134,15 @@ class _SubTestContextManager:
     def __enter__(self) -> None:
         __tracebackhide__ = True
         self._start = time.perf_counter()
+        from pytest._capture import state as _capture_state
+        _capture_state.subtest_enter()
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
         __tracebackhide__ = True
         duration = time.perf_counter() - self._start
         from pytest._outcomes import Exit, Skipped, XFailed
+        from pytest._capture import state as _capture_state
+        sections = _capture_state.subtest_exit()
 
         record: dict[str, Any] = {
             "desc": _description(self.msg, self.kwargs),
@@ -146,6 +150,7 @@ class _SubTestContextManager:
             "exc": None,
             "reason": "",
             "location": None,
+            "sections": sections,
         }
         if exc_val is None:
             record["outcome"] = "passed"
@@ -170,6 +175,9 @@ class _SubTestContextManager:
                 _fail_budget -= 1
                 if _fail_budget <= 0:
                     return False
+            from pytest._debugging import maybe_interact
+
+            maybe_interact(None, exc_val)
         return True
 
     @staticmethod

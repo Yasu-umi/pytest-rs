@@ -10,7 +10,11 @@ use pyo3::types::PyModule;
 /// doctest_namespace) with global visibility.
 pub fn register_builtin_fixtures(py: Python<'_>, registry: &mut FixtureRegistry) -> PyResult<()> {
     let pytest_module = py.import("pytest")?;
-    register_fixtures_from(py, &pytest_module, "", registry)?;
+    let mut skip: Vec<&str> = Vec::new();
+    if registry.lookup("subtests", "").is_some() {
+        skip.push("subtests");
+    }
+    register_fixtures_from_skip(py, &pytest_module, "", registry, &skip)?;
     let doctest_module = py.import("_pytest.doctest")?;
     register_fixtures_from(py, &doctest_module, "", registry)?;
     Ok(())
@@ -202,10 +206,23 @@ pub(crate) fn register_fixtures_from(
     baseid: &str,
     registry: &mut FixtureRegistry,
 ) -> PyResult<()> {
+    register_fixtures_from_skip(py, module, baseid, registry, &[])
+}
+
+pub(crate) fn register_fixtures_from_skip(
+    py: Python<'_>,
+    module: &Bound<'_, PyModule>,
+    baseid: &str,
+    registry: &mut FixtureRegistry,
+    skip_names: &[&str],
+) -> PyResult<()> {
     for (key, value) in module.dict().iter() {
         let Ok(attr_name) = key.extract::<String>() else {
             continue;
         };
+        if skip_names.contains(&attr_name.as_str()) {
+            continue;
+        }
         if !value.is_callable() || !value.hasattr("_pytestfixturefunction")? {
             continue;
         }

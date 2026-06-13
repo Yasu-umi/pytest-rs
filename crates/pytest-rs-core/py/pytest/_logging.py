@@ -30,6 +30,32 @@ caplog_records_key = _StashKey()
 caplog_handler_key = _StashKey()
 
 
+class catching_logs:
+    """Context manager that prepares the whole logging machinery properly."""
+
+    __slots__ = ("handler", "level", "orig_level")
+
+    def __init__(self, handler, level=None):
+        self.handler = handler
+        self.level = level
+
+    def __enter__(self):
+        root_logger = logging.getLogger()
+        if self.level is not None:
+            self.handler.setLevel(self.level)
+        root_logger.addHandler(self.handler)
+        if self.level is not None:
+            self.orig_level = root_logger.level
+            root_logger.setLevel(min(self.orig_level, self.level))
+        return self.handler
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        root_logger = logging.getLogger()
+        if self.level is not None:
+            root_logger.setLevel(self.orig_level)
+        root_logger.removeHandler(self.handler)
+
+
 class LogCaptureHandler(logging.StreamHandler):
     """A logging handler that stores records and the formatted text."""
 
@@ -138,6 +164,7 @@ class LoggingState:
     def __init__(self):
         self.log_level = None  # int once log_level ini / --log-level is set
         formatter = logging.Formatter(DEFAULT_LOG_FORMAT)
+        self.formatter = formatter
         self.caplog_handler = LogCaptureHandler()
         self.caplog_handler.setFormatter(formatter)
         self.report_handler = LogCaptureHandler()
@@ -166,6 +193,7 @@ class LoggingState:
         log_date_format = get("log_date_format")
         # Captured-section formatter follows log_format/log_date_format ini.
         self._report_formatter = DatetimeFormatter(log_format, datefmt=log_date_format)
+        self.formatter = self._report_formatter
         self.caplog_handler.setFormatter(self._report_formatter)
         self.report_handler.setFormatter(self._report_formatter)
 

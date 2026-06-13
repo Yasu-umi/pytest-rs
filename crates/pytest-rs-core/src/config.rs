@@ -528,7 +528,7 @@ impl Config {
     // Core pytest options parsed into flags/values (queried via
     // get_flag/get_value); some are still inert and gain behavior as
     // features land.
-    const CORE_FLAGS: [&str; 28] = [
+    const CORE_FLAGS: [&str; 30] = [
         "loadscope-reorder", // xdist: reorder loadscope work units by size (default on)
         "no-loadscope-reorder", // xdist: keep collection order for loadscope work units
         "force-short-summary", // truncate short-summary messages even at -vv
@@ -557,8 +557,10 @@ impl Config {
         "traceconfig",     // accepted-but-inert: plugin trace header not implemented
         "keep-duplicates", // collect the same file once per duplicated arg
         "noconftest",      // do not load any conftest.py files
+        "pdb",             // start pdb on failures
+        "trace",           // break at start of each test
     ];
-    const CORE_VALUES: [(&str, Option<char>); 42] = [
+    const CORE_VALUES: [(&str, Option<char>); 43] = [
         ("confcutdir", None),
         ("deselect", None),
         ("log-level", None),
@@ -601,6 +603,7 @@ impl Config {
         ("max-worker-restart", None), // accepted-but-inert: workers are not restarted
         ("tx", None),                 // xdist gateway specs ("2*popen", "popen//chdir=DIR")
         ("rsyncdir", None),           // accepted-but-inert: fork workers share the filesystem
+        ("pdbcls", None),             // custom debugger class (modname:classname)
     ];
 
     fn xdist_only(name: &str) -> bool {

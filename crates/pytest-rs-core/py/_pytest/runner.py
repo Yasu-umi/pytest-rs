@@ -18,23 +18,32 @@ class CallInfo:
     """Result/exception of a single phase call (upstream runner.CallInfo):
     `result` is set only on success, `excinfo` only on failure."""
 
-    def __init__(self, when, result, excinfo):
+    def __init__(self, result=None, excinfo=None, *, start=0, stop=0, duration=0, when="call", _ispytest=False):
         self.when = when
         self.excinfo = excinfo
+        self.start = start
+        self.stop = stop
+        self.duration = duration
         if excinfo is None:
             self.result = result
 
     @classmethod
     def from_call(cls, func, when, reraise=None):
+        import time
         excinfo = None
         result = None
+        start = time.time()
+        precise_start = time.perf_counter()
         try:
             result = func()
         except BaseException:
             excinfo = ExceptionInfo.from_current()
             if reraise is not None and isinstance(excinfo.value, reraise):
                 raise
-        return cls(when, result, excinfo)
+        precise_stop = time.perf_counter()
+        duration = precise_stop - precise_start
+        stop = time.time()
+        return cls(result, excinfo, start=start, stop=stop, duration=duration, when=when)
 
     def __repr__(self):
         if self.excinfo is None:
@@ -87,14 +96,26 @@ class _ProtocolReport:
 
 class _LogreportSink:
     """Registered in the shim pluginmanager: when a delegated
-    pytest_runtest_protocol (pytest-rerunfailures) logs via
-    item.ihook.pytest_runtest_logreport, the engine records the report so it
-    can render and count it. A no-op outside a delegated run."""
+    pytest_runtest_protocol (pytest-rerunfailures) or a plugin (like
+    pytest-subtests) logs via item.ihook.pytest_runtest_logreport, the
+    engine records the report so it can render and count it."""
+
+    def __init__(self):
+        self._plugin_reports = []
 
     def pytest_runtest_logreport(self, report):
         capture = globals().get("_native_capture_logreport")
-        if capture is not None:
-            capture(report)
+        if capture is not None and capture(report):
+            return
+        self._plugin_reports.append(report)
+
+    def drain_plugin_reports(self):
+        reports = self._plugin_reports
+        self._plugin_reports = []
+        return reports
+
+
+_logreport_sink = _LogreportSink()
 
 
 def runtestprotocol(item, log=True, nextitem=None):
@@ -258,6 +279,51 @@ def pytest_runtest_call(item):
         sys.last_traceback = exc.__traceback__
         sys.last_exc = exc
         raise
+
+
+def pytest_runtest_makereport(item, call):
+    """Create a TestReport from an item and CallInfo (upstream default impl)."""
+    when = call.when
+    if call.excinfo is None:
+        outcome = "passed"
+        longrepr = None
+    else:
+        excinfo = call.excinfo
+        if isinstance(getattr(excinfo, "value", None), Skipped):
+            outcome = "skipped"
+            reason = getattr(excinfo.value, "msg", "") or ""
+            path = str(getattr(item, "path", ""))
+            longrepr = (path, 0, f"Skipped: {reason}")
+        else:
+            outcome = "failed"
+            longrepr = str(excinfo.value) if hasattr(excinfo, "value") else str(excinfo)
+    location = getattr(item, "location", None)
+    if location is None:
+        path = str(getattr(item, "path", "") or "")
+        location = (path, getattr(item, "lineno", None), getattr(item, "name", ""))
+    return TestReport(
+        nodeid=getattr(item, "nodeid", ""),
+        when=when,
+        outcome=outcome,
+        longrepr=longrepr,
+        location=location,
+        keywords=dict(getattr(item, "keywords", None) or {}),
+        duration=getattr(call, "duration", 0),
+        start=getattr(call, "start", 0),
+        stop=getattr(call, "stop", 0),
+    )
+
+
+def check_interactive_exception(call, report):
+    """Check whether the call raised an exception that should be reported as interactive."""
+    import bdb
+    if call.excinfo is None:
+        return False
+    if hasattr(report, "wasxfail"):
+        return False
+    if isinstance(call.excinfo.value, (Skipped, bdb.BdbQuit)):
+        return False
+    return True
 
 
 from _pytest._stub import __getattr__  # noqa: E402, F401

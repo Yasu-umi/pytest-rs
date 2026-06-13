@@ -70,9 +70,9 @@ pub(crate) fn run_item_phases(py: Python<'_>) -> PyResult<Py<PyAny>> {
 
 /// The capture sink registered in the shim pluginmanager: when a delegated
 /// protocol is active, record each report the plugin logs.
-pub(crate) fn capture_logreport(py: Python<'_>, report: &Bound<'_, PyAny>) -> PyResult<()> {
+pub(crate) fn capture_logreport(py: Python<'_>, report: &Bound<'_, PyAny>) -> PyResult<bool> {
     if !capture_active() {
-        return Ok(());
+        return Ok(false);
     }
     let converted = report_from_proxy(py, report)?;
     CAPTURE.with(|stack| {
@@ -80,12 +80,12 @@ pub(crate) fn capture_logreport(py: Python<'_>, report: &Bound<'_, PyAny>) -> Py
             buf.push(converted);
         }
     });
-    Ok(())
+    Ok(true)
 }
 
 /// `_pytest.reports.TestReport` proxy -> Rust `TestReport`. A "rerun" outcome
 /// (set by pytest-rerunfailures) maps to a failed report flagged `rerun`.
-fn report_from_proxy(py: Python<'_>, report: &Bound<'_, PyAny>) -> PyResult<TestReport> {
+pub(crate) fn report_from_proxy(py: Python<'_>, report: &Bound<'_, PyAny>) -> PyResult<TestReport> {
     let nodeid: String = report.getattr("nodeid")?.extract()?;
     let when: String = report
         .getattr("when")

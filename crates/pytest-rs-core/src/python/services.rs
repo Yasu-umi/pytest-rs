@@ -117,6 +117,10 @@ pub fn pop_subtest_reports(
             if quiet && outcome != crate::report::Outcome::Failed {
                 continue;
             }
+            let sections: Vec<(String, String)> = record
+                .call_method1("get", ("sections", pyo3::types::PyList::empty(py)))
+                .and_then(|s| s.extract())
+                .unwrap_or_default();
             reports.push(crate::report::TestReport {
                 nodeid: item.nodeid.clone(),
                 phase: crate::report::Phase::Call,
@@ -125,7 +129,7 @@ pub fn pop_subtest_reports(
                 longrepr,
                 location,
                 subtest_desc: Some(desc),
-                sections: Vec::new(),
+                sections,
                 rerun: false,
                 xfail_longrepr: None,
                 reprcrash_message: None,
@@ -506,6 +510,23 @@ pub fn configure_capture(py: Python<'_>, mode: &str) {
     let _ = py
         .import("pytest._capture")
         .and_then(|m| m.call_method1("configure", (mode,)));
+}
+
+pub fn configure_debugging(py: Python<'_>) {
+    if let Some(config) = super::existing_py_config(py) {
+        let _ = py
+            .import("pytest._debugging")
+            .and_then(|m| m.call_method1("configure", (config,)));
+    }
+}
+
+pub fn maybe_pdb_interact(py: Python<'_>, item: &crate::collect::TestItem, err: &pyo3::PyErr) {
+    let _ = (|| -> pyo3::PyResult<()> {
+        let m = py.import("pytest._debugging")?;
+        let node = crate::runner::item_node(py, item)?;
+        m.call_method1("maybe_interact", (node, err.value(py), ""))?;
+        Ok(())
+    })();
 }
 
 /// Tell the traceback formatter whether terminal color is on (E lines,

@@ -112,6 +112,19 @@ fn build_py_config(
     option_ns.setattr("xfail_tb", config.get_flag("xfail-tb"))?;
     option_ns.setattr("traceconfig", config.get_flag("traceconfig"))?;
     option_ns.setattr("debug", false)?;
+    option_ns.setattr("usepdb", config.get_flag("pdb"))?;
+    option_ns.setattr("trace", config.get_flag("trace"))?;
+    // --pdbcls=modname:classname → tuple (modname, classname) or None
+    if let Some(pdbcls) = config.get_value("pdbcls") {
+        if let Some((modname, classname)) = pdbcls.split_once(':') {
+            let tuple = pyo3::types::PyTuple::new(py, [modname, classname])?;
+            option_ns.setattr("usepdb_cls", tuple)?;
+        } else {
+            option_ns.setattr("usepdb_cls", py.None())?;
+        }
+    } else {
+        option_ns.setattr("usepdb_cls", py.None())?;
+    }
     option_ns.setattr(
         "capture",
         if config.get_flag("capture-disable") {

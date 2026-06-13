@@ -259,6 +259,8 @@ impl Engine {
             );
         }
 
+        python::configure_debugging(py);
+
         self.run_session(py, started)
     }
 
@@ -889,12 +891,14 @@ impl Engine {
             code = exit_code::INTERRUPTED;
         }
         let warning_count = python::warning_count(py) + self.session.worker_warning_count;
-        let summary = crate::runner::summary_line(
+        let extra_stats = python::reporter_subtest_stats(py);
+        let summary = crate::runner::summary_line_with_extras(
             &self.session.reports,
             self.session.deselected,
             warning_count,
             started.elapsed(),
             self.config.global_verbosity(),
+            &extra_stats,
         );
         if !summary.is_empty() {
             println!("{summary}");
@@ -970,6 +974,7 @@ impl Engine {
         if let Ok(version) = python::pytest_version(py) {
             python::setenv(py, "PYTEST_VERSION", &version);
         }
+        python::configure_debugging(py);
         self.run_session(py, started)
     }
 }

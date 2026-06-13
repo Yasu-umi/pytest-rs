@@ -21,9 +21,10 @@ def instance_hook_impls(name: str) -> list:
     'terminalreporter' plugin is driven through its own delegation path;
     both are excluded here to avoid double dispatch."""
     reporter = pluginmanager.getplugin("terminalreporter")
+    logreport_sink = pluginmanager.getplugin("_logreport_sink")
     impls = []
     for plugin in pluginmanager._plugins:
-        if isinstance(plugin, types.ModuleType) or plugin is reporter:
+        if isinstance(plugin, types.ModuleType) or plugin is reporter or plugin is logreport_sink:
             continue
         func = getattr(plugin, name, None)
         if callable(func):
@@ -450,7 +451,9 @@ class PluginManager:
             self._names[name] = plugin
         addhooks = getattr(plugin, "pytest_addhooks", None)
         if callable(addhooks):
-            addhooks(**_accepted_kwargs(addhooks, {"pluginmanager": self}))
+            from _pytest._stub import _Unsupported
+            if not isinstance(addhooks, _Unsupported):
+                addhooks(**_accepted_kwargs(addhooks, {"pluginmanager": self}))
         return plugin
 
     def unregister(self, plugin: Any = None, name: str | None = None) -> None:

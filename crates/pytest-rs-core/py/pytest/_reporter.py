@@ -271,6 +271,9 @@ def _feed_warnings(reporter: Any) -> None:
         pass
 
 
+_fed_counts: dict[str, int] = {}
+
+
 def feed_default(report: Any) -> None:
     """Feed a report to the default reporter's stats without printing terminal
     output. Used in native mode so conftest pytest_terminal_summary hooks can
@@ -280,8 +283,33 @@ def feed_default(report: Any) -> None:
     try:
         category, _, _ = _default._gettestkindstatus(report)
         _default._add_stats(category, [report])
+        _fed_counts[category] = _fed_counts.get(category, 0) + 1
     except Exception:
         pass
+
+
+def ensure_newline() -> None:
+    """Ensure the default reporter has a trailing newline (plugins may
+    have written partial lines through the relay)."""
+    if _default is not None:
+        _default.ensure_newline()
+
+
+def subtest_stats() -> dict[str, int]:
+    """Return plugin-driven stat counts from the default reporter that
+    the native engine does not see (reports emitted through the hook
+    relay, not through session.reports). Subtracts counts fed by the
+    engine via feed_default to avoid double-counting."""
+    if _default is None:
+        return {}
+    result = {}
+    for key, items in _default.stats.items():
+        if not items or key in ("", "warnings", "deselected", "error"):
+            continue
+        extra = len(items) - _fed_counts.get(key, 0)
+        if extra > 0:
+            result[key] = extra
+    return result
 
 
 def finish(session: Any, exitstatus: int, shouldfail: str | None = None) -> None:

@@ -64,7 +64,14 @@ from pytest._pytester_relay import (
 # needs (in-process pytester upstream shares sys.modules/sys.path, so a cleared
 # env still finds installed plugins; we approximate that by remembering both).
 _RUNNER_EXE = os.environ.get("PYTEST_RS_EXE")
+# Absolutize PYTHONPATH entries at capture time: pytester chdirs to a temp
+# directory before running subprocesses, so relative paths would resolve
+# against the wrong directory.
 _RUNNER_PYTHONPATH = os.environ.get("PYTHONPATH")
+if _RUNNER_PYTHONPATH:
+    _RUNNER_PYTHONPATH = os.pathsep.join(
+        os.path.abspath(p) for p in _RUNNER_PYTHONPATH.split(os.pathsep)
+    )
 # The engine binary is dynamically linked against libpython; the loader path
 # that lets it resolve libpython at runtime (LD_LIBRARY_PATH on linux, the
 # DYLD_* vars on macOS) must also survive a clear=True so the nested run can
@@ -167,7 +174,11 @@ class Pytester:
         if _RUNNER_EXE is None:
             _RUNNER_EXE = os.environ.get("PYTEST_RS_EXE")
         if _RUNNER_PYTHONPATH is None:
-            _RUNNER_PYTHONPATH = os.environ.get("PYTHONPATH")
+            raw = os.environ.get("PYTHONPATH")
+            if raw:
+                _RUNNER_PYTHONPATH = os.pathsep.join(
+                    os.path.abspath(p) for p in raw.split(os.pathsep)
+                )
         for _var in _LIBPATH_VARS:
             if _var not in _RUNNER_LIBPATH and _var in os.environ:
                 _RUNNER_LIBPATH[_var] = os.environ[_var]
@@ -238,12 +249,14 @@ class Pytester:
         # import test-local plugins written to self.path.
         if syspathinsert:
             self.syspathinsert()
-        # no_reraise_ctrlc is a subprocess-mode hint; we always run as a
-        # subprocess, so it's a no-op here.
-        # Upstream's (default) in-process runs share the outer test's
-        # warning-filter state: mirror the item's filterwarnings marks into
-        # the child as -W options (farthest first, so the closest wins).
+        # Upstream's default is in-process (shares module state); we default to
+        # subprocess but switch to in-process when the env var is set — this is
+        # needed for tests that monkeypatch module-level state and check it
+        # after the inner run (e.g. subtests pdb tests).
         _check_cfg_pytest_section(self.path, args)
+        if os.environ.get("PYTEST_RS_INLINE_INPROCESS"):
+            reprec = self._inline_run_inprocess(*args)
+            return getattr(reprec, "_result", reprec)
         return self._runpytest(args, timeout=timeout, forward_filters=True)
 
     def _runpytest(self, args, *, timeout=None, forward_filters=False, hook_relay=None):
@@ -1326,6 +1339,10 @@ class Pytester:
 class Testdir(Pytester):
     """Legacy pytester alias (the pre-7.0 testdir fixture API): paths are
     py.path-like LocalPath objects instead of pathlib.Path."""
+
+    @property
+    def monkeypatch(self):
+        return self._monkeypatch
 
     @property
     def tmpdir(self):

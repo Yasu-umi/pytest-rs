@@ -111,11 +111,12 @@ pub(crate) struct TestStatus {
 /// to the built-in outcome word/color.
 pub(crate) fn report_teststatus(
     py: Python<'_>,
+    config: &crate::config::Config,
     session: &Session,
     report: &TestReport,
     lineno: Option<u32>,
 ) -> Option<TestStatus> {
-    let funcs: Vec<Py<PyAny>> = session
+    let mut funcs: Vec<Py<PyAny>> = session
         .py_hooks
         .iter()
         .filter(|hook| {
@@ -124,12 +125,21 @@ pub(crate) fn report_teststatus(
         })
         .map(|hook| hook.func.clone_ref(py))
         .collect();
+    funcs.extend(python::instance_hook_funcs(py, "pytest_report_teststatus"));
     if funcs.is_empty() {
         return None;
     }
     let proxy = python::make_report_proxy(py, report, lineno).ok()?;
+    let config_proxy = python::make_py_config(py, config).ok()?;
     for func in funcs {
-        let result = match python::call_py_hook(py, &func, &[("report", proxy.clone_ref(py))]) {
+        let result = match python::call_py_hook(
+            py,
+            &func,
+            &[
+                ("report", proxy.clone_ref(py)),
+                ("config", config_proxy.clone_ref(py)),
+            ],
+        ) {
             Ok(result) => result,
             Err(err) => {
                 eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));

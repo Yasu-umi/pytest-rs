@@ -351,8 +351,6 @@ def unknown_ini_keys(inicfg_keys: Any) -> list[str]:
 # defensively off config.option (e.g. pytest-rerunfailures checks
 # config.option.usepdb to refuse reruns under the debugger).
 CORE_OPTION_DEFAULTS: dict[str, Any] = {
-    "usepdb": False,
-    "usepdb_cls": None,
     # assertion rewriting is pytest-rs's default; pytest-snapshot's test
     # helper reads config.option.assertmode to pick runpytest vs subprocess.
     "assertmode": "rewrite",

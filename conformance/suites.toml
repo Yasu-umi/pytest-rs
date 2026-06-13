@@ -160,6 +160,7 @@ deps = ["pytest-subtests==0.14.2"]
 use_src = false
 category = "third-party"
 enabled = true
+env = { "PYTEST_RS_INLINE_INPROCESS" = "1" }
 
 [pytest-metadata]
 repo = "https://github.com/pytest-dev/pytest-metadata"
@@ -210,7 +211,7 @@ enabled = true
 repo = "https://github.com/pytest-dev/pytest-order"
 tag = "v1.4.0"
 testpaths = ["tests"]
-deps = ["pytest-order==1.4.0"]
+deps = ["pytest-order==1.4.0", "pytest-mock"]
 category = "third-party"
 enabled = true
 

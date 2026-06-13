@@ -778,6 +778,7 @@ fn run_item_body(
     }
 
     let mut raises_ok = true;
+    let mut call_err: Option<PyErr> = None;
     let report = match call_result {
         Ok(true) => TestReport {
             nodeid: item.nodeid.clone(),
@@ -843,6 +844,7 @@ fn run_item_body(
                             return xfail;
                         }
                         raises_ok = xfail_raises_ok(py, &xfailed, &err);
+                        call_err = Some(err.clone_ref(py));
                         report_from_err(py, config, item, Phase::Call, call_started, &err)
                     }
                 }
@@ -850,6 +852,7 @@ fn run_item_body(
         }
         Err(err) => {
             raises_ok = xfail_raises_ok(py, &xfailed, &err);
+            call_err = Some(err.clone_ref(py));
             report_from_err(py, config, item, Phase::Call, call_started, &err)
         }
     };
@@ -897,6 +900,13 @@ fn run_item_body(
     } else {
         report
     };
+    if report.outcome == Outcome::Failed
+        && config.get_flag("pdb")
+    {
+        if let Some(err) = &call_err {
+            python::maybe_pdb_interact(py, item, err);
+        }
+    }
     // Subtests recorded during the call report individually before the
     // test's own report; a passed test containing failed subtests fails
     // (fixture subtests only; unittest subTest failures don't propagate).

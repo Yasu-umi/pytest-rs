@@ -84,6 +84,21 @@ if not hasattr(_main, '__file__'):
     // Expose the Rust-backed request type for `_pytest.fixtures` imports.
     let pytest_module = py.import("pytest")?;
     pytest_module.setattr("FixtureRequest", py.get_type::<crate::request::PyRequest>())?;
+    // Register a minimal plugin that provides pytest_runtest_makereport
+    // default through the hook relay (plugins like pytest-subtests call
+    // item.ihook.pytest_runtest_makereport).
+    py.run(
+        c"import _pytest.runner as _r
+import pytest._pluginmanager as _pm
+class _MakeReportPlugin:
+    @staticmethod
+    def pytest_runtest_makereport(item, call):
+        return _r.pytest_runtest_makereport(item, call)
+_pm.pluginmanager.register(_MakeReportPlugin(), '_pytest.runner')
+",
+        None,
+        None,
+    )?;
     // The pytest-rs crate version, for the session-header "pytest-rs-X" tag
     // (a replacement TerminalReporter must match the native header).
     pytest_module.setattr("_rs_version", env!("CARGO_PKG_VERSION"))?;
@@ -146,19 +161,20 @@ if not hasattr(_main, '__file__'):
         |args: &Bound<'_, pyo3::types::PyTuple>,
          _kwargs: Option<&Bound<'_, pyo3::types::PyDict>>|
          -> PyResult<Py<PyAny>> {
+            let py = args.py();
             let report = args.get_item(0)?;
-            crate::runner::capture_logreport(args.py(), &report)?;
-            Ok(args.py().None())
+            let captured = crate::runner::capture_logreport(py, &report)?;
+            Ok(pyo3::types::PyBool::new(py, captured).to_owned().into_any().unbind())
         },
     )?;
     let runner_mod = py.import("_pytest.runner")?;
     runner_mod.setattr("_native_run_item_phases", run_phases)?;
     runner_mod.setattr("_native_capture_logreport", capture)?;
-    // Register the capture sink so ihook.pytest_runtest_logreport reaches it.
-    let sink = runner_mod.getattr("_LogreportSink")?.call0()?;
+    // Register the module-level sink so ihook.pytest_runtest_logreport reaches it.
+    let sink = runner_mod.getattr("_logreport_sink")?;
     py.import("pytest._pluginmanager")?
         .getattr("pluginmanager")?
-        .call_method1("register", (sink,))?;
+        .call_method1("register", (sink, "_logreport_sink"))?;
 
     // Assertion rewriting: rewrite `assert` in test modules at import time.
     py.import("pytest._rewrite")?.call_method0("install")?;

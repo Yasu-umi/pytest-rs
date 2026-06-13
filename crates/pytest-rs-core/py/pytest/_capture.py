@@ -568,6 +568,8 @@ class CaptureState:
         self.fixture = None  # the active capsys/capfd CaptureFixture, if any
         self._capture = None
         self._installed = False
+        self._subtest_parent_out = []
+        self._subtest_parent_err = []
 
     @property
     def fixture_name(self):
@@ -663,6 +665,12 @@ class CaptureState:
             # the real fds redirected: restore them before propagating.
             self._emergency_suspend()
             raise
+        parent_out = "".join(self._subtest_parent_out)
+        parent_err = "".join(self._subtest_parent_err)
+        self._subtest_parent_out.clear()
+        self._subtest_parent_err.clear()
+        out = parent_out + out
+        err = parent_err + err
         if out:
             self.sections.append((f"Captured stdout {self.when}", out))
         if err:
@@ -679,6 +687,30 @@ class CaptureState:
             self._capture.suspend_capturing(in_=True)
             self._installed = False
         self.when = None
+
+    def subtest_enter(self):
+        if not self._installed or self._capture is None:
+            return
+        if self.fixture is not None:
+            self.fixture._pop_to_orig()
+        out, err = self._capture.readouterr()
+        if out:
+            self._subtest_parent_out.append(out)
+        if err:
+            self._subtest_parent_err.append(err)
+
+    def subtest_exit(self):
+        if not self._installed or self._capture is None:
+            return [], []
+        if self.fixture is not None:
+            self.fixture._pop_to_orig()
+        out, err = self._capture.readouterr()
+        sections = []
+        if out:
+            sections.append((f"Captured stdout {self.when}", out))
+        if err:
+            sections.append((f"Captured stderr {self.when}", err))
+        return sections
 
     @staticmethod
     def _peek(cap):
@@ -697,15 +729,14 @@ class CaptureState:
         """(title, text) report sections for a failing report."""
         out = list(self.sections)
         if self._installed and self.when is not None:
-            # The report is built before the next phase starts: flush the
-            # fixture's unread output to the global capture first, exactly
-            # like _snap_section will.
             if self.fixture is not None:
                 self.fixture._pop_to_orig()
-            text = self._peek(self._capture.out)
+            parent_out = "".join(self._subtest_parent_out)
+            parent_err = "".join(self._subtest_parent_err)
+            text = parent_out + self._peek(self._capture.out)
             if text:
                 out.append((f"Captured stdout {self.when}", text))
-            text = self._peek(self._capture.err)
+            text = parent_err + self._peek(self._capture.err)
             if text:
                 out.append((f"Captured stderr {self.when}", text))
         return out
@@ -759,6 +790,22 @@ class _GlobalCaptureManager:
         if state._capture is None:
             return ("", "")
         return state._capture.readouterr()
+
+    @contextlib.contextmanager
+    def global_and_fixture_disabled(self):
+        do_fixture = state.fixture is not None and state.fixture._capture is not None and state.fixture._capture.is_started()
+        if do_fixture:
+            state.fixture._suspend()
+        do_global = state._installed and state._capture is not None and state._capture.is_started()
+        if do_global:
+            state._capture.suspend_capturing()
+        try:
+            yield
+        finally:
+            if do_global:
+                state._capture.resume_capturing()
+            if do_fixture:
+                state.fixture._resume()
 
 
 manager = _GlobalCaptureManager()

@@ -72,7 +72,7 @@ pub(crate) fn fill_color(py: Python<'_>, session: &Session, finished: bool) -> u
 }
 
 /// The verbose outcome word for a report: "PASSED", "SKIPPED (why)",
-/// "SUBFAILED[desc]", ... (pytest appends reasons to skip/xfail words).
+/// "[desc] SUBFAIL", ... (pytest-subtests puts description before the word).
 pub(crate) fn outcome_word(report: &TestReport) -> String {
     let reasoned = |word: &str| match report.longrepr.as_deref() {
         Some(reason) if !reason.is_empty() && !reason.contains('\n') => {
@@ -82,10 +82,10 @@ pub(crate) fn outcome_word(report: &TestReport) -> String {
     };
     if let Some(desc) = &report.subtest_desc {
         match report.outcome {
-            Outcome::Failed => format!("SUBFAILED{desc}"),
-            Outcome::Skipped => reasoned(&format!("SUBSKIPPED{desc}")),
-            Outcome::XFailed => reasoned(&format!("SUBXFAIL{desc}")),
-            _ => format!("SUBPASSED{desc}"),
+            Outcome::Failed => format!("{desc} SUBFAIL"),
+            Outcome::Skipped => reasoned(&format!("{desc} SUBSKIP")),
+            Outcome::XFailed => reasoned(&format!("{desc} SUBXFAIL")),
+            _ => format!("{desc} SUBPASS"),
         }
     } else if report.rerun {
         "RERUN".to_string()
@@ -301,6 +301,17 @@ pub fn summary_line(
     elapsed: Duration,
     verbosity: i32,
 ) -> String {
+    summary_line_with_extras(reports, deselected, warning_count, elapsed, verbosity, &Default::default())
+}
+
+pub fn summary_line_with_extras(
+    reports: &[TestReport],
+    deselected: usize,
+    warning_count: usize,
+    elapsed: Duration,
+    verbosity: i32,
+    extra_stats: &std::collections::HashMap<String, usize>,
+) -> String {
     // -qq (verbosity < -1) suppresses the stats line entirely.
     if verbosity < -1 {
         return String::new();
@@ -337,27 +348,53 @@ pub fn summary_line(
         }
     }
     use crate::tw;
+    // Extra failed/skipped from plugin-driven reports (e.g. pytest-subtests
+    // categorizes subtest failures as "failed" in the TerminalReporter stats).
+    let extra_failed = *extra_stats.get("failed").unwrap_or(&0);
+    let extra_skipped = *extra_stats.get("skipped").unwrap_or(&0);
+    let total_failed = failed + extra_failed;
+    let total_skipped = skipped + extra_skipped;
     let mut parts: Vec<(String, u8)> = Vec::new();
-    if failed > 0 {
-        parts.push((format!("{failed} failed"), tw::RED));
+    if total_failed > 0 {
+        parts.push((format!("{total_failed} failed"), tw::RED));
     }
     if passed > 0 {
         parts.push((format!("{passed} passed"), tw::GREEN));
     }
-    if skipped > 0 {
-        parts.push((format!("{skipped} skipped"), tw::YELLOW));
+    if total_skipped > 0 {
+        parts.push((format!("{total_skipped} skipped"), tw::YELLOW));
     }
-    if subtests_passed > 0 {
-        parts.push((format!("{subtests_passed} subtests passed"), tw::GREEN));
+    // Plugin-driven subtest stats (from the TerminalReporter's stats dict,
+    // populated by the pytest-subtests plugin's pytest_report_teststatus hook).
+    let plugin_subtests_passed = *extra_stats.get("subtests passed").unwrap_or(&0);
+    let plugin_subtests_failed = *extra_stats.get("subtests failed").unwrap_or(&0);
+    let plugin_subtests_skipped = *extra_stats.get("subtests skipped").unwrap_or(&0);
+    let plugin_subtests_xfailed = *extra_stats.get("subtests xfailed").unwrap_or(&0);
+    let plugin_subtests_xpassed = *extra_stats.get("subtests xpassed").unwrap_or(&0);
+    let total_subtests_passed = subtests_passed + plugin_subtests_passed;
+    if total_subtests_passed > 0 {
+        parts.push((format!("{total_subtests_passed} subtests passed"), tw::GREEN));
+    }
+    if plugin_subtests_failed > 0 {
+        parts.push((format!("{plugin_subtests_failed} subtests failed"), tw::RED));
+    }
+    if plugin_subtests_skipped > 0 {
+        parts.push((format!("{plugin_subtests_skipped} subtests skipped"), tw::YELLOW));
     }
     if deselected > 0 {
         parts.push((format!("{deselected} deselected"), tw::YELLOW));
     }
-    if xfailed > 0 {
-        parts.push((format!("{xfailed} xfailed"), tw::YELLOW));
+    let total_xfailed = xfailed + plugin_subtests_xfailed;
+    if total_xfailed > 0 {
+        let label = if plugin_subtests_xfailed > 0 && xfailed == 0 {
+            "subtests xfailed"
+        } else {
+            "xfailed"
+        };
+        parts.push((format!("{total_xfailed} {label}"), tw::YELLOW));
     }
-    if xpassed > 0 {
-        parts.push((format!("{xpassed} xpassed"), tw::YELLOW));
+    if xpassed + plugin_subtests_xpassed > 0 {
+        parts.push((format!("{} xpassed", xpassed + plugin_subtests_xpassed), tw::YELLOW));
     }
     if rerun > 0 {
         parts.push((format!("{rerun} rerun"), tw::YELLOW));
@@ -381,11 +418,11 @@ pub fn summary_line(
         parts.push(("no tests ran".to_string(), tw::YELLOW));
     }
     let main = tw::main_color(
-        failed,
+        total_failed + plugin_subtests_failed,
         errors,
         warning_count,
-        xpassed,
-        passed + subtests_passed,
+        xpassed + plugin_subtests_xpassed,
+        passed + total_subtests_passed,
         true,
     );
     let plain_parts: Vec<&str> = parts.iter().map(|(text, _)| text.as_str()).collect();
