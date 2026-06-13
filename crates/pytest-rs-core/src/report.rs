@@ -66,13 +66,12 @@ impl TestReport {
             return Some('R');
         }
         if self.subtest_desc.is_some() {
-            // Upstream subtests short letters: u (failed/passed), - (skipped),
-            // y (xfail). Quiet subtest verbosity drops non-failed subtest
-            // reports before they reach here, so default runs print only 'u'.
             return match self.outcome {
+                Outcome::Passed => Some(','),
+                Outcome::Failed => Some('u'),
                 Outcome::Skipped => Some('-'),
                 Outcome::XFailed => Some('y'),
-                _ => Some('u'),
+                Outcome::XPassed => Some('Y'),
             };
         }
         match (self.phase, self.outcome) {

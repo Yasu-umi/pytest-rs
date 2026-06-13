@@ -79,7 +79,6 @@ pub fn pop_subtest_reports(
     py: Python<'_>,
     config: &crate::config::Config,
     item: &TestItem,
-    quiet: bool,
 ) -> (Vec<crate::report::TestReport>, usize) {
     let result: PyResult<(Vec<crate::report::TestReport>, usize)> = (|| {
         let module = py.import("pytest._subtests")?;
@@ -114,9 +113,6 @@ pub fn pop_subtest_reports(
                 "xfailed" => (crate::report::Outcome::XFailed, Some(reason)),
                 _ => (crate::report::Outcome::Passed, None),
             };
-            if quiet && outcome != crate::report::Outcome::Failed {
-                continue;
-            }
             let sections: Vec<(String, String)> = record
                 .call_method1("get", ("sections", pyo3::types::PyList::empty(py)))
                 .and_then(|s| s.extract())

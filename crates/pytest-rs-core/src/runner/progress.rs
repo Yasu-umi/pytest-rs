@@ -72,7 +72,7 @@ pub(crate) fn fill_color(py: Python<'_>, session: &Session, finished: bool) -> u
 }
 
 /// The verbose outcome word for a report: "PASSED", "SKIPPED (why)",
-/// "[desc] SUBFAIL", ... (pytest-subtests puts description before the word).
+/// "[desc] SUBFAIL", ... (pytest-subtests prepends description before the word).
 pub(crate) fn outcome_word(report: &TestReport) -> String {
     let reasoned = |word: &str| match report.longrepr.as_deref() {
         Some(reason) if !reason.is_empty() && !reason.contains('\n') => {
@@ -83,8 +83,8 @@ pub(crate) fn outcome_word(report: &TestReport) -> String {
     if let Some(desc) = &report.subtest_desc {
         match report.outcome {
             Outcome::Failed => format!("{desc} SUBFAIL"),
-            Outcome::Skipped => reasoned(&format!("{desc} SUBSKIP")),
-            Outcome::XFailed => reasoned(&format!("{desc} SUBXFAIL")),
+            Outcome::Skipped => format!("{desc} SUBSKIP"),
+            Outcome::XFailed => format!("{desc} SUBXFAIL"),
             _ => format!("{desc} SUBPASS"),
         }
     } else if report.rerun {
@@ -108,13 +108,19 @@ pub(crate) fn outcome_word(report: &TestReport) -> String {
 /// Other outcomes (and subtests/reruns, whose words already embed any reason)
 /// carry no separate reason.
 pub(crate) fn verbose_outcome(report: &TestReport) -> (String, Option<String>) {
-    if report.subtest_desc.is_some() || report.rerun {
+    if report.rerun {
         return (outcome_word(report), None);
     }
     let reason = report
         .longrepr
         .clone()
         .filter(|r| !r.is_empty() && !r.contains('\n'));
+    if report.subtest_desc.is_some() {
+        return match report.outcome {
+            Outcome::Skipped | Outcome::XFailed => (outcome_word(report), reason),
+            _ => (outcome_word(report), None),
+        };
+    }
     match report.outcome {
         Outcome::Skipped => ("SKIPPED".to_string(), reason),
         Outcome::XFailed => ("XFAIL".to_string(), reason),
@@ -323,19 +329,28 @@ pub fn summary_line_with_extras(
     let mut xfailed = 0usize;
     let mut xpassed = 0usize;
     let mut subtests_passed = 0usize;
+    let mut subtests_xfailed = 0usize;
     let mut rerun = 0usize;
     for report in reports {
-        // A retried attempt (pytest-rerunfailures): its own "rerun" category,
-        // never counted as failed/error.
         if report.rerun {
             rerun += 1;
             continue;
         }
-        // Passed subtests count their own category; other subtest outcomes
-        // fold into the regular buckets (upstream report_teststatus).
-        if report.subtest_desc.is_some() && report.outcome == Outcome::Passed {
-            subtests_passed += 1;
-            continue;
+        // Subtest outcomes use their own categories (upstream plugin's
+        // pytest_report_teststatus): passed → "subtests passed",
+        // xfailed → "subtests xfailed", failed/skipped → regular buckets.
+        if report.subtest_desc.is_some() {
+            match report.outcome {
+                Outcome::Passed => {
+                    subtests_passed += 1;
+                    continue;
+                }
+                Outcome::XFailed => {
+                    subtests_xfailed += 1;
+                    continue;
+                }
+                _ => {} // failed/skipped fall through to regular buckets
+            }
         }
         match (report.phase, report.outcome) {
             (Phase::Call, Outcome::Passed) => passed += 1,
@@ -384,9 +399,10 @@ pub fn summary_line_with_extras(
     if deselected > 0 {
         parts.push((format!("{deselected} deselected"), tw::YELLOW));
     }
-    let total_xfailed = xfailed + plugin_subtests_xfailed;
+    let total_subtests_xfailed = subtests_xfailed + plugin_subtests_xfailed;
+    let total_xfailed = xfailed + total_subtests_xfailed;
     if total_xfailed > 0 {
-        let label = if plugin_subtests_xfailed > 0 && xfailed == 0 {
+        let label = if total_subtests_xfailed > 0 && xfailed == 0 {
             "subtests xfailed"
         } else {
             "xfailed"

@@ -10,11 +10,7 @@ use pyo3::types::PyModule;
 /// doctest_namespace) with global visibility.
 pub fn register_builtin_fixtures(py: Python<'_>, registry: &mut FixtureRegistry) -> PyResult<()> {
     let pytest_module = py.import("pytest")?;
-    let mut skip: Vec<&str> = Vec::new();
-    if registry.lookup("subtests", "").is_some() {
-        skip.push("subtests");
-    }
-    register_fixtures_from_skip(py, &pytest_module, "", registry, &skip)?;
+    register_fixtures_from(py, &pytest_module, "", registry)?;
     let doctest_module = py.import("_pytest.doctest")?;
     register_fixtures_from(py, &doctest_module, "", registry)?;
     Ok(())

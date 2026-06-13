@@ -61,6 +61,12 @@ impl Engine {
                 && maxfail.is_none();
         let sw_skip = config.get_flag("sw-skip");
         let mut sw_failed_items = 0usize;
+        // Quiet subtest verbosity: non-failed subtests don't show progress
+        // chars or verbose lines (but still count in the summary).
+        let quiet_subtests = config
+            .get_ini("verbosity_subtests")
+            .map(|v| v.trim() == "0")
+            .unwrap_or(config.verbose == 0);
         // Collection errors (--continue-on-collection-errors) already count
         // toward the --maxfail budget, like pytest's session.testsfailed.
         let mut failed = session
@@ -214,9 +220,14 @@ impl Engine {
                 if report.progress_char().is_some() {
                     any_char = true;
                 }
+                let is_quiet_sub = quiet_subtests
+                    && report.subtest_desc.is_some()
+                    && report.outcome != Outcome::Failed;
                 if config.no_terminal() || delegated {
                     // -p no:terminal, or a delegated protocol whose shim
                     // TerminalReporter already rendered: no native output.
+                } else if is_quiet_sub {
+                    // Quiet subtest: counted in the summary but not displayed.
                 } else if tc >= 1 {
                     python::reporter_ensure_newline(py);
                     print_verbose_report_line(py, config, session, item, &report, done, total, tc, pkind);
@@ -325,13 +336,13 @@ fn print_verbose_report_line(
     if !(report.phase == Phase::Call || report.outcome != Outcome::Passed) {
         return;
     }
-    // A pytest_report_teststatus hook may override the
-    // verbose word and its markup; otherwise use the
-    // built-in outcome word/color.
-    let status = report_teststatus(py, config, session, report, Some(item.lineno));
-    // Skip/xfail/xpass reasons are appended separately so
-    // they can be trimmed (-v) or wrapped (-vv) to width; a
-    // teststatus hook word is used verbatim with no reason.
+    // Subtest reports use the built-in word (the report proxy isn't a
+    // SubTestReport so Python hooks return the generic PASSED/FAILED).
+    let status = if report.subtest_desc.is_some() {
+        None
+    } else {
+        report_teststatus(py, config, session, report, Some(item.lineno))
+    };
     let (word, reason) = match &status {
         Some(s) => (s.word.clone(), None),
         None => verbose_outcome(report),

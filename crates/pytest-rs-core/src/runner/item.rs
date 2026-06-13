@@ -758,12 +758,6 @@ fn run_item_body(
         Err(err) => call_result.and(Err(err)),
     };
 
-    // Quiet subtest verbosity (default) hides non-failed subtest reports.
-    let quiet_subtests = config
-        .get_ini("verbosity_subtests")
-        .map(|v| v.trim() == "0")
-        .unwrap_or(config.verbose == 0);
-
     // pytest.exit / Ctrl-C abort the session without a test outcome.
     if let Err(err) = &call_result
         && let Some(code) = python::session_abort_code(py, err)
@@ -772,7 +766,7 @@ fn run_item_body(
         session.abort_banner = python::session_abort_banner(py, err);
         // Subtests recorded before the abort still report (e.g. pytest.exit
         // inside a subtest block records a failed subtest, then aborts).
-        let (sub_reports, _) = python::pop_subtest_reports(py, config, item, quiet_subtests);
+        let (sub_reports, _) = python::pop_subtest_reports(py, config, item);
         reports.extend(sub_reports);
         return xfail;
     }
@@ -839,7 +833,7 @@ fn run_item_body(
                             session.exit_code_override = Some(code);
                             session.abort_banner = python::session_abort_banner(py, &err);
                             let (sub_reports, _) =
-                                python::pop_subtest_reports(py, config, item, quiet_subtests);
+                                python::pop_subtest_reports(py, config, item);
                             reports.extend(sub_reports);
                             return xfail;
                         }
@@ -908,22 +902,10 @@ fn run_item_body(
         }
     }
     // Subtests recorded during the call report individually before the
-    // test's own report; a passed test containing failed subtests fails
-    // (fixture subtests only; unittest subTest failures don't propagate).
-    let (sub_reports, failed_subs) = python::pop_subtest_reports(py, config, item, quiet_subtests);
+    // test's own report (the main test stays PASSED; failed subtest reports
+    // drive the exit code, matching upstream pytest-subtests).
+    let (sub_reports, _) = python::pop_subtest_reports(py, config, item);
     reports.extend(sub_reports);
-    let report = if failed_subs > 0 && report.outcome == Outcome::Passed {
-        TestReport {
-            outcome: Outcome::Failed,
-            longrepr: Some(format!(
-                "contains {failed_subs} failed subtest{}",
-                if failed_subs > 1 { "s" } else { "" }
-            )),
-            ..report
-        }
-    } else {
-        report
-    };
     // Unraisable exceptions surfaced during a passed call (upstream's
     // trylast pytest_runtest_call hookimpl, which pluggy skips when the
     // test itself raised): an error filter fails the call.
