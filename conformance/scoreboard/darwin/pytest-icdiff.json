@@ -8,8 +8,8 @@
       "file": "tests/test_pytest_icdiff.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 3,
-      "failed": 9,
+      "passed": 7,
+      "failed": 5,
       "skipped": 0,
       "errors": 0
     }

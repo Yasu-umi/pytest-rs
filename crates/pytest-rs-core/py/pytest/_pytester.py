@@ -888,6 +888,14 @@ class Pytester:
         spec = importlib.util.spec_from_file_location(module_name, path)
         if spec is None or spec.loader is None:
             return []
+        # Apply assertion rewriting when enabled (spec_from_file_location
+        # bypasses sys.meta_path, so we must apply the rewrite loader manually).
+        try:
+            from pytest._rewrite import _RewriteLoader, _is_rewrite_target, _rewrite_enabled
+            if _rewrite_enabled and spec.origin and _is_rewrite_target(str(spec.origin)):
+                spec.loader = _RewriteLoader(spec.name, str(spec.origin))
+        except Exception:
+            pass
         module = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = module
         try:

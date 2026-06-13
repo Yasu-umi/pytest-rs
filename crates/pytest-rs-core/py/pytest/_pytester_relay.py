@@ -455,7 +455,26 @@ class InlineRunResult:
             # Append the original collection_finish
             calls.append(_RelayHookCall._from_event(event))
 
-        return calls
+        # Deduplicate teardown logreports: our engine emits class/module-scope
+        # finalizer failures as EXTRA teardown reports AFTER the item's own
+        # (passed) teardown. Merge by replacing the first teardown occurrence
+        # with the failed one so getreports() returns the right outcome.
+        teardown_first: dict = {}  # nodeid → index in deduped list
+        deduped: list = []
+        for call in calls:
+            if (
+                call._name == "pytest_runtest_logreport"
+                and hasattr(call, "report")
+                and call.report.when == "teardown"
+            ):
+                nid = call.report.nodeid
+                if nid in teardown_first and call.report.failed:
+                    deduped[teardown_first[nid]] = call
+                    continue
+                if nid not in teardown_first:
+                    teardown_first[nid] = len(deduped)
+            deduped.append(call)
+        return deduped
 
     @property
     def calls(self):
