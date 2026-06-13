@@ -644,6 +644,10 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
 | rich | v14.2.0 | 855 | 0 | 0 | 25 | 880 | 100.0% | 60 | 62 | 0 |
 | pytest-bdd | 8.1.0 | 124 | 14 | 0 | 1 | 139 | 89.9% | 29 | 35 | 0 |
+| httpx | 0.28.1 | 1310 | 8 | 0 | 1 | 1319 | 99.4% | 23 | 31 | 0 |
+| starlette | 0.46.2 | 907 | 0 | 0 | 0 | 907 | 100.0% | 28 | 28 | 0 |
+| attrs | 25.3.0 | 1340 | 2 | 0 | 3 | 1345 | 99.9% | 21 | 24 | 0 |
+| more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 671 | 100.0% | 2 | 2 | 0 |
 | pytest-django | v4.9.0 | 147 | 68 | 0 | 1 | 216 | 68.5% | 2 | 13 | 0 |
 
 ### pytest @ 9.0.3
@@ -1188,6 +1192,127 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/steps/test_keyword.py | passed | 1 | 0 | 0 | 0 |
 | tests/steps/test_unicode.py | passed | 2 | 0 | 0 | 0 |
 | tests/test_hooks.py | failed | 3 | 1 | 0 | 0 |
+
+</details>
+
+### httpx @ 0.28.1
+
+<details><summary>per-file detail (31 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/client/test_async_client.py | failed | 48 | 4 | 0 | 0 |
+| tests/client/test_auth.py | passed | 79 | 0 | 0 | 1 |
+| tests/client/test_client.py | timeout | 0 | 0 | 0 | 0 |
+| tests/client/test_cookies.py | passed | 7 | 0 | 0 | 0 |
+| tests/client/test_event_hooks.py | passed | 9 | 0 | 0 | 0 |
+| tests/client/test_headers.py | passed | 17 | 0 | 0 | 0 |
+| tests/client/test_properties.py | passed | 8 | 0 | 0 | 0 |
+| tests/client/test_proxies.py | passed | 69 | 0 | 0 | 0 |
+| tests/client/test_queryparams.py | passed | 3 | 0 | 0 | 0 |
+| tests/client/test_redirects.py | passed | 31 | 0 | 0 | 0 |
+| tests/models/test_cookies.py | passed | 7 | 0 | 0 | 0 |
+| tests/models/test_headers.py | passed | 27 | 0 | 0 | 0 |
+| tests/models/test_queryparams.py | passed | 14 | 0 | 0 | 0 |
+| tests/models/test_requests.py | passed | 24 | 0 | 0 | 0 |
+| tests/models/test_responses.py | failed | 104 | 2 | 0 | 0 |
+| tests/models/test_url.py | passed | 90 | 0 | 0 | 0 |
+| tests/models/test_whatwg.py | passed | 563 | 0 | 0 | 0 |
+| tests/test_api.py | passed | 12 | 0 | 0 | 0 |
+| tests/test_asgi.py | passed | 24 | 0 | 0 | 0 |
+| tests/test_auth.py | passed | 8 | 0 | 0 | 0 |
+| tests/test_config.py | passed | 28 | 0 | 0 | 0 |
+| tests/test_content.py | passed | 43 | 0 | 0 | 0 |
+| tests/test_decoders.py | failed | 38 | 2 | 0 | 0 |
+| tests/test_exceptions.py | timeout | 0 | 0 | 0 | 0 |
+| tests/test_exported_members.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_main.py | timeout | 0 | 0 | 0 | 0 |
+| tests/test_multipart.py | passed | 38 | 0 | 0 | 0 |
+| tests/test_status_codes.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_timeouts.py | timeout | 0 | 0 | 0 | 0 |
+| tests/test_utils.py | timeout | 0 | 0 | 0 | 0 |
+| tests/test_wsgi.py | passed | 12 | 0 | 0 | 0 |
+
+</details>
+
+### starlette @ 0.46.2
+
+<details><summary>per-file detail (28 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/middleware/test_base.py | passed | 55 | 0 | 0 | 0 |
+| tests/middleware/test_cors.py | passed | 30 | 0 | 0 | 0 |
+| tests/middleware/test_errors.py | passed | 12 | 0 | 0 | 0 |
+| tests/middleware/test_gzip.py | passed | 14 | 0 | 0 | 0 |
+| tests/middleware/test_https_redirect.py | passed | 2 | 0 | 0 | 0 |
+| tests/middleware/test_middleware.py | passed | 2 | 0 | 0 | 0 |
+| tests/middleware/test_session.py | passed | 14 | 0 | 0 | 0 |
+| tests/middleware/test_trusted_host.py | passed | 5 | 0 | 0 | 0 |
+| tests/middleware/test_wsgi.py | passed | 10 | 0 | 0 | 0 |
+| tests/test__utils.py | passed | 10 | 0 | 0 | 0 |
+| tests/test_applications.py | passed | 54 | 0 | 0 | 0 |
+| tests/test_authentication.py | passed | 11 | 0 | 0 | 0 |
+| tests/test_background.py | passed | 8 | 0 | 0 | 0 |
+| tests/test_concurrency.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_config.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_convertors.py | passed | 16 | 0 | 0 | 0 |
+| tests/test_datastructures.py | passed | 30 | 0 | 0 | 0 |
+| tests/test_endpoints.py | passed | 20 | 0 | 0 | 0 |
+| tests/test_exceptions.py | passed | 20 | 0 | 0 | 0 |
+| tests/test_formparsers.py | passed | 76 | 0 | 0 | 0 |
+| tests/test_requests.py | passed | 85 | 0 | 0 | 0 |
+| tests/test_responses.py | passed | 111 | 0 | 0 | 0 |
+| tests/test_routing.py | passed | 91 | 0 | 0 | 0 |
+| tests/test_schemas.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_staticfiles.py | passed | 60 | 0 | 0 | 0 |
+| tests/test_templates.py | passed | 34 | 0 | 0 | 0 |
+| tests/test_testclient.py | passed | 48 | 0 | 0 | 0 |
+| tests/test_websockets.py | passed | 75 | 0 | 0 | 0 |
+
+</details>
+
+### attrs @ 25.3.0
+
+<details><summary>per-file detail (24 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_3rd_party.py | no-tests | 0 | 0 | 0 | 1 |
+| tests/test_abc.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_annotations.py | passed | 47 | 0 | 0 | 0 |
+| tests/test_cmp.py | passed | 78 | 0 | 0 | 0 |
+| tests/test_compat.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_config.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_converters.py | passed | 38 | 0 | 0 | 0 |
+| tests/test_dunders.py | failed | 98 | 1 | 0 | 0 |
+| tests/test_filters.py | passed | 33 | 0 | 0 | 0 |
+| tests/test_funcs.py | passed | 51 | 0 | 0 | 0 |
+| tests/test_functional.py | failed | 409 | 1 | 0 | 0 |
+| tests/test_hooks.py | passed | 14 | 0 | 0 | 0 |
+| tests/test_import.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_init_subclass.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_make.py | passed | 262 | 0 | 0 | 1 |
+| tests/test_next_gen.py | passed | 33 | 0 | 0 | 0 |
+| tests/test_packaging.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_pattern_matching.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_pyright.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_setattr.py | passed | 36 | 0 | 0 | 0 |
+| tests/test_slots.py | passed | 52 | 0 | 0 | 1 |
+| tests/test_utils.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_validators.py | passed | 153 | 0 | 0 | 0 |
+| tests/test_version_info.py | passed | 6 | 0 | 0 | 0 |
+
+</details>
+
+### more-itertools @ v10.7.0
+
+<details><summary>per-file detail (2 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_more.py | passed | 535 | 0 | 0 | 0 |
+| tests/test_recipes.py | passed | 135 | 0 | 0 | 1 |
 
 </details>
 
