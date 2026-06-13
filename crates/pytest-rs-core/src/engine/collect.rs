@@ -1008,6 +1008,12 @@ impl Engine {
             Err(err) => return Err(python::format_exception(py, &err)),
         }
 
+        // Scope-based item reordering: when metafunc.parametrize(scope=...)
+        // uses a scope higher than function, items must be reordered so
+        // that the high-scope parameter value changes as infrequently as
+        // possible (matching real pytest's reorder_items).
+        reorder_items_by_param_scope(&mut self.session.items);
+
         // request.fixturenames must list the item's whole fixture closure
         // (transitive deps + autouse), not just its direct params — plugins
         // probe it (pytest-django: "transactional_db" in request.fixturenames,
@@ -1092,5 +1098,66 @@ impl Engine {
             );
         }
         Ok(())
+    }
+}
+
+/// Reorder items so that higher-scoped parametrize values change less
+/// frequently.  For `parametrize(scope='session')`, all items sharing
+/// parameter value 0 run before any item with value 1.  For module/class
+/// scope the grouping respects module/class boundaries.
+fn reorder_items_by_param_scope(items: &mut Vec<crate::collect::TestItem>) {
+    use crate::fixture::Scope;
+
+    if items.iter().all(|item| item.max_param_scope == Scope::Function) {
+        return;
+    }
+
+    // Stable sort by a composite key: (scope_boundary, param_index).
+    // scope_boundary is "" for session (all items share it), the module
+    // nodeid prefix for module scope, or the class prefix for class scope.
+    // This ensures items from different modules/classes never intermix.
+    items.sort_by(|a, b| {
+        let a_keys = &a.scope_sort_keys;
+        let b_keys = &b.scope_sort_keys;
+        for (ak, bk) in a_keys.iter().zip(b_keys.iter()) {
+            if ak.0 != bk.0 {
+                return std::cmp::Ordering::Equal;
+            }
+            let a_boundary = scope_boundary(&a.nodeid, ak.0);
+            let b_boundary = scope_boundary(&b.nodeid, bk.0);
+            let cmp = a_boundary.cmp(&b_boundary).then(ak.1.cmp(&bk.1));
+            if cmp != std::cmp::Ordering::Equal {
+                return cmp;
+            }
+        }
+        std::cmp::Ordering::Equal
+    });
+}
+
+/// Extract the scope boundary key from a nodeid.
+/// Session: "" (all items grouped together)
+/// Module: "file.py" (everything before the first "::")
+/// Class: "file.py::ClassName" (everything before the last "::" if there's
+///        a class, otherwise the module)
+fn scope_boundary(nodeid: &str, scope: crate::fixture::Scope) -> String {
+    use crate::fixture::Scope;
+    match scope {
+        Scope::Session | Scope::Package => String::new(),
+        Scope::Module => nodeid
+            .split_once("::")
+            .map(|(m, _)| m.to_string())
+            .unwrap_or_default(),
+        Scope::Class => {
+            // file.py::Class::func[params] → "file.py::Class"
+            // file.py::func[params] → "file.py" (no class)
+            let base = nodeid.split('[').next().unwrap_or(nodeid);
+            let parts: Vec<&str> = base.splitn(3, "::").collect();
+            if parts.len() >= 3 {
+                format!("{}::{}", parts[0], parts[1])
+            } else {
+                parts[0].to_string()
+            }
+        }
+        Scope::Function => nodeid.to_string(),
     }
 }

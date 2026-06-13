@@ -498,6 +498,8 @@ pub fn expand_fixture_params(
                         .map(|(n, i, v)| (n.clone(), *i, v.clone_ref(py)))
                         .collect(),
                     collector_class: item.collector_class.clone(),
+                    max_param_scope: item.max_param_scope,
+                    scope_sort_keys: item.scope_sort_keys.clone(),
                 });
             }
         }

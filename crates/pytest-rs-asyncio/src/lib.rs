@@ -646,6 +646,8 @@ impl Plugin for AsyncioPlugin {
                     fixture_params,
                     lineno: item.lineno,
                     collector_class: item.collector_class.clone(),
+                    max_param_scope: item.max_param_scope,
+                    scope_sort_keys: item.scope_sort_keys.clone(),
                 });
             }
         }
@@ -812,6 +814,8 @@ impl Plugin for AsyncioPlugin {
                         .collect(),
                     lineno: item.lineno,
                     collector_class: item.collector_class.clone(),
+                    max_param_scope: item.max_param_scope,
+                    scope_sort_keys: item.scope_sort_keys.clone(),
                 });
             }
         }

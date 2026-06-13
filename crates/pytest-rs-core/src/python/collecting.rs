@@ -276,6 +276,8 @@ pub fn collect_custom_files(
                     fixture_params: Vec::new(),
                     lineno: 0,
                     collector_class: collector_class.clone(),
+                    max_param_scope: crate::fixture::Scope::Function,
+                    scope_sort_keys: Vec::new(),
                 });
             }
         }
@@ -358,6 +360,8 @@ pub fn collect_doctests_from_module(
             fixture_params: vec![],
             lineno,
             collector_class: String::new(),
+            max_param_scope: crate::fixture::Scope::Function,
+            scope_sort_keys: Vec::new(),
         });
     }
     Ok(())
@@ -400,6 +404,8 @@ pub fn collect_doctests_from_textfile(
             fixture_params: vec![],
             lineno,
             collector_class: String::new(),
+            max_param_scope: crate::fixture::Scope::Function,
+            scope_sort_keys: Vec::new(),
         });
     }
     Ok(())
@@ -682,6 +688,8 @@ pub(crate) fn collect_testcase(
             fixture_params: Vec::new(),
             lineno: first_lineno(py, &method),
             collector_class: String::new(),
+            max_param_scope: crate::fixture::Scope::Function,
+            scope_sort_keys: Vec::new(),
         });
     }
     Ok(())
@@ -912,6 +920,8 @@ pub(crate) fn push_test_items(
             fixture_params: variant.indirect_params,
             lineno: first_lineno(py, func),
             collector_class: String::new(),
+            max_param_scope: variant.max_param_scope,
+            scope_sort_keys: variant.scope_sort_keys,
         });
     }
     Ok(())
@@ -925,6 +935,12 @@ pub(crate) struct ParamVariant {
     indirect_params: Vec<(String, usize, Py<PyAny>)>,
     /// Marks attached via pytest.param(..., marks=...).
     extra_marks: Vec<MarkData>,
+    /// Highest parametrize scope across all dimensions (for item reordering).
+    max_param_scope: crate::fixture::Scope,
+    /// For each dimension with non-function scope, the 0-based set index
+    /// within that dimension.  Used as a stable-sort key so items sharing
+    /// the same high-scope parameter value stay grouped.
+    scope_sort_keys: Vec<(crate::fixture::Scope, usize)>,
 }
 
 /// One parameter set (one `pytest.param`/value row) within a single
@@ -943,6 +959,7 @@ struct ParamSet {
 /// marks become separate dimensions in the cartesian product.
 struct Dim {
     sets: Vec<ParamSet>,
+    scope: crate::fixture::Scope,
 }
 
 /// Expand stacked @pytest.mark.parametrize marks into the cartesian product
@@ -1013,6 +1030,15 @@ pub(crate) fn expand_parametrize(
             .and_then(|value| value.extract::<Vec<String>>().ok())
             .unwrap_or_default();
         let is_indirect = |name: &str| indirect_all || indirect_names.iter().any(|n| n == name);
+        let dim_scope = mark
+            .obj
+            .bind(py)
+            .getattr("kwargs")?
+            .get_item("scope")
+            .ok()
+            .and_then(|s| s.extract::<String>().ok())
+            .and_then(|s| crate::fixture::Scope::parse(&s))
+            .unwrap_or(crate::fixture::Scope::Function);
 
         let mut sets = Vec::new();
         for (index, value_set) in argvalues.try_iter()?.enumerate() {
@@ -1142,7 +1168,7 @@ pub(crate) fn expand_parametrize(
                 &indirect_names,
             )?);
         }
-        dims.push(Dim { sets });
+        dims.push(Dim { sets, scope: dim_scope });
     }
 
     if dims.is_empty() {
@@ -1151,6 +1177,8 @@ pub(crate) fn expand_parametrize(
             params: Vec::new(),
             indirect_params: Vec::new(),
             extra_marks: Vec::new(),
+            max_param_scope: crate::fixture::Scope::Function,
+            scope_sort_keys: Vec::new(),
         }]);
     }
     // An empty parameter set produces no items (pytest marks one skipped;
@@ -1191,12 +1219,25 @@ fn cartesian_param_variants(py: Python<'_>, dims: &[Dim]) -> Vec<ParamVariant> {
                 });
             }
         }
+        let max_param_scope = dims
+            .iter()
+            .map(|d| d.scope)
+            .max()
+            .unwrap_or(crate::fixture::Scope::Function);
+        let scope_sort_keys: Vec<(crate::fixture::Scope, usize)> = dims
+            .iter()
+            .zip(indices.iter())
+            .filter(|(d, _)| d.scope > crate::fixture::Scope::Function)
+            .map(|(d, &idx)| (d.scope, idx))
+            .collect();
         variants.push(ParamVariant {
             // All-hidden variants keep the bare test name (no brackets).
             id: (!id_parts.is_empty()).then(|| id_parts.join("-")),
             params,
             indirect_params,
             extra_marks,
+            max_param_scope,
+            scope_sort_keys,
         });
 
         for pos in (0..dims.len()).rev() {

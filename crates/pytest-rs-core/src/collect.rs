@@ -39,6 +39,12 @@ pub struct TestItem {
     /// Python collector class name for custom file collectors (e.g. "MyModule").
     /// Empty string means standard Module collection.
     pub collector_class: String,
+    /// Highest parametrize scope across all dimensions (for item reordering).
+    pub max_param_scope: crate::fixture::Scope,
+    /// For each non-function-scoped parametrize dimension, the 0-based set
+    /// index within that dimension.  Used as a stable-sort key so items
+    /// sharing the same high-scope parameter value stay grouped.
+    pub scope_sort_keys: Vec<(crate::fixture::Scope, usize)>,
 }
 
 impl TestItem {
