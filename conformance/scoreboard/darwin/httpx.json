@@ -24,10 +24,10 @@
     },
     {
       "file": "tests/client/test_client.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
-      "failed": 0,
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 31,
+      "failed": 4,
       "skipped": 0,
       "errors": 0
     },
@@ -213,9 +213,9 @@
     },
     {
       "file": "tests/test_exceptions.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 3,
       "failed": 0,
       "skipped": 0,
       "errors": 0
@@ -231,9 +231,9 @@
     },
     {
       "file": "tests/test_main.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 11,
       "failed": 0,
       "skipped": 0,
       "errors": 0
@@ -258,18 +258,18 @@
     },
     {
       "file": "tests/test_timeouts.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
-      "failed": 0,
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 9,
+      "failed": 1,
       "skipped": 0,
       "errors": 0
     },
     {
       "file": "tests/test_utils.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 40,
       "failed": 0,
       "skipped": 0,
       "errors": 0

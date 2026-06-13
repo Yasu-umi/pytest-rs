@@ -6,11 +6,11 @@
   "files": [
     {
       "file": "tests/test_pytest_cov.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
-      "failed": 0,
-      "skipped": 0,
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 186,
+      "failed": 19,
+      "skipped": 4,
       "errors": 0
     }
   ]
