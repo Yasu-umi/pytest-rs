@@ -56,7 +56,7 @@ class FileResult:
 class Suite:
     def __init__(self, name: str, config: dict):
         self.name = name
-        self.repo = config["repo"]
+        self.repo = config.get("repo", "")
         self.tag = config["tag"]
         self.testpaths = config["testpaths"]
         self.enabled = config.get("enabled", False)
@@ -85,12 +85,17 @@ class Suite:
         # inline_run benefits from the in-process backend). Per-suite because
         # the runner launches each suite as its own process.
         self.env: dict[str, str] = {str(k): str(v) for k, v in config.get("env", {}).items()}
+        # Install from PyPI wheel instead of cloning source (for packages
+        # with C extensions whose tests live inside the package).
+        self.package: str | None = config.get("package")
         self.checkout = CACHE / f"{self.name}-{self.tag}"
         self.src_dir: Path | None = None
 
     def deps_dir(self) -> Path | None:
         """Install the suite's extra runtime deps into a --target dir, used
         as PYTHONPATH so upstream tests can import them."""
+        if self.package:
+            return self.checkout
         if not self.deps:
             return None
         target = CACHE / "deps" / self.name
@@ -107,7 +112,26 @@ class Suite:
         marker.write_text(wanted)
         return target
 
+    def _install_package(self) -> None:
+        """Install a PyPI wheel into the checkout dir (for suites whose tests
+        live inside a compiled package — the wheel provides .so files)."""
+        marker = self.checkout / ".installed.txt"
+        all_pkgs = [self.package] + self.deps
+        wanted = "\n".join(sorted(all_pkgs))
+        if marker.exists() and marker.read_text() == wanted:
+            return
+        self.checkout.mkdir(parents=True, exist_ok=True)
+        subprocess.run(
+            ["uv", "pip", "install", "--target", str(self.checkout), *all_pkgs],
+            check=True,
+            capture_output=True,
+        )
+        marker.write_text(wanted)
+
     def fetch(self, use_local: bool) -> None:
+        if self.package:
+            self._install_package()
+            return
         if use_local and self.local is not None:
             local = (ROOT / self.local).resolve()
             if local.exists():

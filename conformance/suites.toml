@@ -395,3 +395,58 @@ pythonpath = ["."]
 use_src = false
 category = "third-party"
 enabled = true
+
+[werkzeug]
+repo = "https://github.com/pallets/werkzeug"
+tag = "3.1.3"
+testpaths = ["tests"]
+deps = ["werkzeug==3.1.3", "cryptography==45.0.4", "watchdog==6.0.0", "markupsafe==3.0.3", "ephemeral-port-reserve==1.1.4"]
+use_src = false
+category = "real-world"
+enabled = true
+
+[fastapi]
+repo = "https://github.com/fastapi/fastapi"
+tag = "0.115.12"
+testpaths = ["tests"]
+deps = [
+    "fastapi[standard]==0.115.12",
+    "httpx==0.28.1",
+    "anyio==4.13.0",
+    "trio==0.33.0",
+    "pydantic==2.11.7",
+    "sqlmodel==0.0.24",
+    "dirty-equals==0.9.0",
+    "inline-snapshot==0.22.2",
+    "orjson==3.10.18",
+    "ujson==5.10.0",
+    "a2wsgi==1.10.8",
+]
+use_src = false
+category = "real-world"
+enabled = true
+
+[packaging]
+repo = "https://github.com/pypa/packaging"
+tag = "25.0"
+testpaths = ["tests"]
+deps = ["pretend==1.0.9"]
+category = "real-world"
+enabled = true
+
+[pandas]
+tag = "v3.0.3"
+package = "pandas==3.0.3"
+testpaths = ["pandas/tests"]
+deps = ["hypothesis>=6.116.0"]
+category = "real-world"
+enabled = true
+
+[scikit-learn]
+tag = "1.9.0"
+package = "scikit-learn==1.9.0"
+testpaths = ["sklearn"]
+deps = ["hypothesis>=6.116.0"]
+category = "real-world"
+enabled = true
+

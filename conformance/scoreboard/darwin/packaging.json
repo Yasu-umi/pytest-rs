@@ -1,0 +1,116 @@
+{
+  "suite": "packaging",
+  "tag": "25.0",
+  "category": "real-world",
+  "excluded_files": 0,
+  "files": [
+    {
+      "file": "tests/test_elffile.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_licenses.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_manylinux.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 31,
+      "failed": 0,
+      "skipped": 1,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_markers.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 2245,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_metadata.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 245,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_musllinux.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_requirements.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 5286,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_specifiers.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 806,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_structures.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_tags.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 179,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_utils.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 54,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "tests/test_version.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 18060,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    }
+  ]
+}
