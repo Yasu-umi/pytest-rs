@@ -53,8 +53,8 @@
       "file": "testing/test_assertion.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 147,
-      "failed": 13,
+      "passed": 150,
+      "failed": 10,
       "skipped": 0,
       "errors": 0
     },
@@ -341,8 +341,8 @@
       "file": "testing/test_terminal.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 198,
-      "failed": 25,
+      "passed": 211,
+      "failed": 12,
       "skipped": 4,
       "errors": 0
     },
