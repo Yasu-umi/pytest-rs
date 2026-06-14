@@ -1,10 +1,8 @@
 # Upstream pytest-subtests tests that must keep passing under pytest-rs.
 #
-# tests (~8/32): pytest-rs already has native subtest support (the subtests
-# fixture, SUBPASS/SUBFAIL/SUBSKIP reports), so the suite runs with no code
-# changes. Remaining failures are summary-line subtest counts ("N subtests
-# passed/xfailed"), the verbose SUBPASS/SUBFAIL/SUBSKIP "(i=...)" word format,
-# pytester.run, and --pdb — formatting/pytester gaps, not architectural.
+# tests (26/32): pytest-rs has native subtest support (the subtests fixture,
+# SUBPASS/SUBFAIL/SUBSKIP reports, inline progress chars, per-subtest log/capture).
+# Remaining failures: pytester.run output matching, --pdb, upstream test issues.
 
 [files]
 
