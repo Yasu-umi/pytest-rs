@@ -347,6 +347,11 @@ deps = [
 ]
 category = "real-world"
 enabled = true
+slow_files = [
+    "tests/client/test_client.py",
+    "tests/client/test_event_hooks.py",
+    "tests/test_utils.py",
+]
 
 [starlette]
 repo = "https://github.com/encode/starlette"
