@@ -17,6 +17,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import warnings
 
 from pytest._fixtures import fixture
 from pytest._outcomes import fail, importorskip, skip
@@ -596,6 +597,7 @@ class Pytester:
         import pytest._marks as _marks
         import pytest._node as _node
         import pytest._tmp_path as _tmp_path
+        import pytest._wcapture as _wcapture
         from pytest._pluginmanager import pluginmanager
 
         run_args = [str(arg) for arg in args]
@@ -641,6 +643,15 @@ class Pytester:
         old_capstate = _capture.state
         inner_capstate = _capture.CaptureState()
         _capture.state = inner_capstate
+        # Warning capture: the inner run_session calls _wcapture.uninstall()
+        # on exit, breaking the outer capture. Save the full warning state
+        # and reinstall afterwards so the outer run's capture survives.
+        old_wcapture_captured = list(_wcapture.captured)
+        old_wcapture_current_test = _wcapture.current_test
+        old_wcapture_original_sw = _wcapture._original_showwarning
+        old_wcapture_session_specs = list(_wcapture.session_specs)
+        old_warn_filters = list(warnings.filters)
+        _wcapture.captured.clear()
 
         # Redirect fds 1/2 to temp files: the inner run's terminal output
         # (printed by the native engine straight to the fds) is collected
@@ -696,6 +707,14 @@ class Pytester:
             _tmp_path._call_results.clear()
             _tmp_path._call_results.update(old_tmp_state["_call_results"])
             _tmp_path._any_failed = old_tmp_state["_any_failed"]
+            # Restore warning capture: the inner run_session called
+            # _wcapture.uninstall() which broke the outer capture.
+            _wcapture.captured[:] = old_wcapture_captured
+            _wcapture.current_test = old_wcapture_current_test
+            _wcapture._original_showwarning = old_wcapture_original_sw
+            _wcapture.session_specs[:] = old_wcapture_session_specs
+            warnings.filters[:] = old_warn_filters
+            warnings.showwarning = _wcapture._showwarning
             # Restore the module table, sys.path, cwd, and env.
             for name in list(sys.modules):
                 if name not in modules_before:

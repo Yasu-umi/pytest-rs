@@ -995,6 +995,18 @@ impl Engine {
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
             return exit_code::INTERNAL_ERROR;
         }
+        // Warning capture: install with the nested config's filterwarnings/W
+        // options. The caller saves/restores the outer warning state; this
+        // arms the capture for the inner session's own filter specs.
+        let ini_filters: Vec<String> = self
+            .config
+            .get_ini_lines("filterwarnings")
+            .into_iter()
+            .map(str::to_string)
+            .collect();
+        if !self.config.plugin_disabled("warnings") {
+            let _ = python::install_warning_capture(py, &ini_filters, &self.config.w_options);
+        }
         self.run_session(py, started)
     }
 }
