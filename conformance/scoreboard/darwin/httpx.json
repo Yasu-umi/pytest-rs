@@ -24,10 +24,10 @@
     },
     {
       "file": "tests/client/test_client.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 31,
-      "failed": 4,
+      "status": "timeout",
+      "exit_code": null,
+      "passed": 0,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },
@@ -267,9 +267,9 @@
     },
     {
       "file": "tests/test_utils.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 40,
+      "status": "timeout",
+      "exit_code": null,
+      "passed": 0,
       "failed": 0,
       "skipped": 0,
       "errors": 0

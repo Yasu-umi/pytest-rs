@@ -1,0 +1,791 @@
+{
+  "suite": "scikit-learn-1",
+  "tag": "1.9.0",
+  "category": "real-world",
+  "excluded_files": 0,
+  "files": [
+    {
+      "file": "sklearn/metrics/_plot/tests/test_common_curve_display.py",
+      "status": "no-tests",
+      "exit_code": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 150,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/metrics/_plot/tests/test_confusion_matrix_display.py",
+      "status": "no-tests",
+      "exit_code": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 36,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/metrics/_plot/tests/test_det_curve_display.py",
+      "status": "no-tests",
+      "exit_code": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 35,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/metrics/_plot/tests/test_precision_recall_display.py",
+      "status": "no-tests",
+      "exit_code": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 84,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/metrics/_plot/tests/test_predict_error_display.py",
+      "status": "no-tests",
+      "exit_code": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 39,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/metrics/_plot/tests/test_roc_curve_display.py",
+      "status": "no-tests",
+      "exit_code": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 155,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/metrics/cluster/tests/test_bicluster.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/metrics/cluster/tests/test_common.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 79,
+      "failed": 0,
+      "skipped": 30,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/metrics/cluster/tests/test_supervised.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 57,
+      "failed": 0,
+      "skipped": 15,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/metrics/cluster/tests/test_unsupervised.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 50,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/metrics/tests/test_classification.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 250,
+      "failed": 0,
+      "skipped": 18,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/metrics/tests/test_common.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1629,
+      "failed": 0,
+      "skipped": 1986,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/metrics/tests/test_dist_metrics.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 268,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/metrics/tests/test_pairwise.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 284,
+      "failed": 0,
+      "skipped": 302,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/metrics/tests/test_pairwise_distances_reduction.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 129,
+      "failed": 0,
+      "skipped": 2,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/metrics/tests/test_ranking.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 243,
+      "failed": 5,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/metrics/tests/test_regression.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 27,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/metrics/tests/test_score_objects.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 281,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/_repr_html/tests/test_attributes.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 2,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/_repr_html/tests/test_estimator.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 51,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/_repr_html/tests/test_features.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 12,
+      "failed": 0,
+      "skipped": 3,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/_repr_html/tests/test_js.py",
+      "status": "no-tests",
+      "exit_code": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 5,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/_repr_html/tests/test_params.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_arpack.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 100,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_array_api.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 1922,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_arrayfuncs.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 18,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_bitset.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_bunch.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_chunking.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_class_weight.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 21,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_cython_blas.py",
+      "status": "no-tests",
+      "exit_code": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 44,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_dataframe.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 10,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_deprecation.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_encode.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 38,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_estimator_checks.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 47,
+      "failed": 0,
+      "skipped": 6,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_extmath.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 260,
+      "failed": 0,
+      "skipped": 45,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_fast_dict.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_fixes.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 39,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_graph.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_indexing.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 129,
+      "failed": 0,
+      "skipped": 430,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_mask.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_metaestimators.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_missing.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_mocking.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_multiclass.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 13,
+      "failed": 0,
+      "skipped": 36,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_murmurhash.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_optimize.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 15,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_parallel.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 15,
+      "failed": 0,
+      "skipped": 2,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_param_validation.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 147,
+      "failed": 0,
+      "skipped": 1,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_plotting.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 80,
+      "failed": 0,
+      "skipped": 28,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_pprint.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_random.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_response.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 63,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_seq_dataset.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 20,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_set_output.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 16,
+      "failed": 0,
+      "skipped": 8,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_shortest_path.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_show_versions.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_sorting.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_sparse.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 16,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_sparsefuncs.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 360,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_stats.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 79,
+      "failed": 8,
+      "skipped": 111,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_tags.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_testing.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 81,
+      "failed": 0,
+      "skipped": 43,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_typedefs.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 1
+    },
+    {
+      "file": "sklearn/utils/tests/test_unique.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_user_interface.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 23,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_validation.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 258,
+      "failed": 0,
+      "skipped": 259,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/utils/tests/test_weight_vector.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/linear_model/_glm/tests/test_glm.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 82,
+      "failed": 0,
+      "skipped": 45,
+      "errors": 192
+    },
+    {
+      "file": "sklearn/linear_model/tests/test_base.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 76,
+      "failed": 0,
+      "skipped": 2,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/linear_model/tests/test_bayes.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 24,
+      "failed": 0,
+      "skipped": 1,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/linear_model/tests/test_common.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/linear_model/tests/test_coordinate_descent.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 286,
+      "failed": 3,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/linear_model/tests/test_huber.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/linear_model/tests/test_least_angle.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 62,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/linear_model/tests/test_linear_loss.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 185,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/linear_model/tests/test_logistic.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 295,
+      "failed": 0,
+      "skipped": 393,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/linear_model/tests/test_omp.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 23,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/linear_model/tests/test_passive_aggressive.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 63,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/linear_model/tests/test_perceptron.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/linear_model/tests/test_quantile.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 54,
+      "failed": 0,
+      "skipped": 5,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/linear_model/tests/test_ransac.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 27,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/linear_model/tests/test_ridge.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1088,
+      "failed": 0,
+      "skipped": 348,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/linear_model/tests/test_sag.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 27,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/linear_model/tests/test_sgd.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 267,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/linear_model/tests/test_sparse_coordinate_descent.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 159,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "sklearn/linear_model/tests/test_theil_sen.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 16,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    }
+  ]
+}
