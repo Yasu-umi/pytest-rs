@@ -143,8 +143,8 @@
       "file": "testing/test_error_diffs.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 2,
-      "failed": 10,
+      "passed": 0,
+      "failed": 12,
       "skipped": 0,
       "errors": 0
     },
@@ -341,8 +341,8 @@
       "file": "testing/test_terminal.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 186,
-      "failed": 37,
+      "passed": 185,
+      "failed": 38,
       "skipped": 4,
       "errors": 0
     },
