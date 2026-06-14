@@ -33,10 +33,10 @@
     },
     {
       "file": "testing/logging/test_formatter.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 0,
-      "failed": 4,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 4,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },
@@ -303,10 +303,10 @@
     },
     {
       "file": "testing/test_setupplan.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 2,
-      "failed": 1,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 3,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },

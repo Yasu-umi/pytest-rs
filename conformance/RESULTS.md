@@ -2423,7 +2423,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 1811 | 415 | 3 | 28 | 2257 | 81.5% | 11 | 46 | 63 |
+| pytest | 9.0.3 | 1818 | 408 | 3 | 28 | 2257 | 81.8% | 14 | 46 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 19 | 0 | 4 | 209 | 90.9% | 0 | 1 | 0 |
@@ -2473,7 +2473,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/examples/test_issue519.py | failed | 0 | 1 | 0 | 0 |
 | testing/freeze/tests/test_trivial.py | passed | 2 | 0 | 0 | 0 |
 | testing/logging/test_fixture.py | failed | 26 | 1 | 0 | 0 |
-| testing/logging/test_formatter.py | failed | 0 | 4 | 0 | 0 |
+| testing/logging/test_formatter.py | passed | 4 | 0 | 0 | 0 |
 | testing/logging/test_reporting.py | failed | 15 | 37 | 0 | 0 |
 | testing/test_assertion.py | failed | 150 | 10 | 0 | 0 |
 | testing/test_cacheprovider.py | failed | 53 | 4 | 0 | 0 |
@@ -2502,8 +2502,8 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_runner_xunit.py | passed | 13 | 0 | 0 | 0 |
 | testing/test_scope.py | passed | 4 | 0 | 0 | 0 |
 | testing/test_session.py | failed | 20 | 6 | 0 | 0 |
-| testing/test_setuponly.py | failed | 25 | 1 | 0 | 0 |
-| testing/test_setupplan.py | failed | 1 | 2 | 0 | 0 |
+| testing/test_setuponly.py | passed | 26 | 0 | 0 | 0 |
+| testing/test_setupplan.py | passed | 3 | 0 | 0 | 0 |
 | testing/test_skipping.py | failed | 91 | 1 | 0 | 0 |
 | testing/test_stepwise.py | passed | 18 | 0 | 0 | 0 |
 | testing/test_subtests.py | failed | 12 | 22 | 0 | 0 |
