@@ -301,16 +301,14 @@ impl Engine {
                         if def.scope == Scope::Session {
                             let next_uses_same = nextitem
                                 .map(|next| {
-                                    next.fixture_params.iter().any(|(n, i, _)| {
-                                        n == fixture_name && i == param_idx
-                                    })
+                                    next.fixture_params
+                                        .iter()
+                                        .any(|(n, i, _)| n == fixture_name && i == param_idx)
                                 })
                                 .unwrap_or(false);
                             if !next_uses_same {
-                                let instance = format!(
-                                    "\x00session_param:{}:{}",
-                                    fixture_name, param_idx
-                                );
+                                let instance =
+                                    format!("\x00session_param:{}:{}", fixture_name, param_idx);
                                 report_scope_teardown!(Scope::Session, &instance, item);
                             }
                         }

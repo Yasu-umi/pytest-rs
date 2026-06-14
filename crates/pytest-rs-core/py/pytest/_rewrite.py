@@ -124,9 +124,11 @@ class _RewriteConfig:
 
             if lexer == "diff":
                 from pygments.lexers.diff import DiffLexer
+
                 pygments_lexer = DiffLexer()
             else:
                 from pygments.lexers.python import PythonLexer
+
                 pygments_lexer = PythonLexer()
 
             mode = os.getenv("PYTEST_THEME_MODE", "dark")

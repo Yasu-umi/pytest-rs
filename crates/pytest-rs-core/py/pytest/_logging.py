@@ -142,12 +142,8 @@ class DatetimeFormatter(logging.Formatter):
     def formatTime(self, record, datefmt=None):
         if datefmt and "%f" in datefmt:
             ct = self.converter(record.created)
-            tz = datetime.timezone(
-                datetime.timedelta(seconds=ct.tm_gmtoff), ct.tm_zone
-            )
-            dt = datetime.datetime(
-                *ct[0:6], microsecond=int(record.msecs * 1000), tzinfo=tz
-            )
+            tz = datetime.timezone(datetime.timedelta(seconds=ct.tm_gmtoff), ct.tm_zone)
+            dt = datetime.datetime(*ct[0:6], microsecond=int(record.msecs * 1000), tzinfo=tz)
             return dt.strftime(datefmt)
         return super().formatTime(record, datefmt)
 
@@ -591,9 +587,7 @@ class PercentStyleMultiline(logging.PercentStyle):
                 lines = record.message.splitlines()
                 formatted = self._fmt % {**record.__dict__, "message": lines[0]}
                 if auto_indent < 0:
-                    indentation = _remove_ansi_escape_sequences(formatted).find(
-                        lines[0]
-                    )
+                    indentation = _remove_ansi_escape_sequences(formatted).find(lines[0])
                 else:
                     indentation = auto_indent
                 lines[0] = formatted
