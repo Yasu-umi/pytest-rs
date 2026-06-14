@@ -129,13 +129,12 @@ def _exception_lines(exc):
         # "AssertionError: " stays. str()/repr() can themselves raise (a
         # failing __repr__), so guard them and keep format_exception_only's
         # safe "<exception str() failed>" text in that case.
+        from _pytest._io.saferepr import saferepr as _saferepr
+
         tryshort = (
             isinstance(exc, AssertionError)
             and str(exc).startswith("assert")
-            and (
-                repr(exc).startswith("AssertionError('assert ")
-                or repr(exc).startswith('AssertionError("assert ')
-            )
+            and _saferepr(exc).startswith("AssertionError('assert ")
         )
     except Exception:
         tryshort = False

@@ -129,6 +129,28 @@ pub fn session_abort_code(py: Python<'_>, err: &PyErr) -> Option<i32> {
     None
 }
 
+/// Like `session_abort_code` but distinguishes `Exit(returncode=None)` from
+/// `Exit(returncode=42)`.  Returns `Some(None)` when the Exit carries no
+/// explicit returncode (caller should keep its current exit code).
+pub fn exit_returncode(py: Python<'_>, err: &PyErr) -> Option<Option<i32>> {
+    if !err_matches_shim(py, err, "Exit") {
+        return None;
+    }
+    let code = err
+        .value(py)
+        .getattr("returncode")
+        .ok()
+        .and_then(|v| if v.is_none() { None } else { v.extract::<i32>().ok() });
+    Some(code)
+}
+
+pub fn exit_msg(py: Python<'_>, err: &PyErr) -> String {
+    err.value(py)
+        .getattr("msg")
+        .and_then(|m| m.extract::<String>())
+        .unwrap_or_default()
+}
+
 /// Classify a module-import error as a module-level skip.
 /// Some(Ok(reason)): the whole module skips (allow_module_level=True or
 /// unittest.SkipTest). Some(Err(message)): pytest.skip misused at module

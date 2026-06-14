@@ -670,7 +670,9 @@ impl Engine {
             // The blank line separating collection from the run is omitted
             // at negative test-case verbosity (the progress chars group
             // directly under "collected N items"); --collect-only keeps it.
-            if self.config.collect_only || self.config.test_case_verbosity() >= 0 {
+            // With zero items the run never starts; the blank line belongs
+            // to handle_no_tests / finish_session (before the summary).
+            if n_items > 0 && (self.config.collect_only || self.config.test_case_verbosity() >= 0) {
                 println!();
             }
         }
@@ -748,14 +750,32 @@ impl Engine {
     fn handle_no_tests(&mut self, py: Python<'_>, started: Instant) -> i32 {
         // Upstream: zero collected items is NO_TESTS_COLLECTED even when
         // module-level skips produced skip reports.
-        let code = exit_code::NO_TESTS_COLLECTED;
+        let mut code = exit_code::NO_TESTS_COLLECTED;
+        let mut session_exited = false;
         if let Err(err) = self.fire_py_sessionfinish(py, code) {
-            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+            if let Some(returncode) = python::exit_returncode(py, &err) {
+                let msg = python::exit_msg(py, &err);
+                if !msg.is_empty() {
+                    eprintln!("Exit: {msg}");
+                }
+                if let Some(rc) = returncode {
+                    code = rc;
+                }
+                session_exited = true;
+            } else {
+                eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+            }
         }
         // Stop the session-wide capture (errors surface on stderr).
         python::capture_session_end(py);
         if let Some(cache) = &self.cache {
             cache.sessionfinish(py, &self.config, &self.session.reports, &self.session.items);
+        }
+        if session_exited {
+            return code;
+        }
+        if !self.config.no_terminal() {
+            println!();
         }
         if self.config.no_terminal() {
             self.write_junit_xml(py);
@@ -798,17 +818,19 @@ impl Engine {
             exit_code::OK
         };
 
+        let mut session_exited = false;
         if let Err(err) = self.fire_sessionfinish(py, code) {
-            if let Some(exit_code) = python::session_abort_code(py, &err) {
-                let exit_msg = err
-                    .value(py)
-                    .getattr("msg")
-                    .and_then(|m| m.extract::<String>())
-                    .unwrap_or_default();
-                if !exit_msg.is_empty() {
-                    eprintln!("Exit: {exit_msg}");
+            if let Some(returncode) = python::exit_returncode(py, &err) {
+                let msg = python::exit_msg(py, &err);
+                if !msg.is_empty() {
+                    eprintln!("Exit: {msg}");
                 }
-                code = exit_code;
+                if let Some(rc) = returncode {
+                    code = rc;
+                }
+                session_exited = true;
+            } else if err.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py) {
+                code = exit_code::INTERRUPTED;
             } else {
                 eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
             }
@@ -817,6 +839,9 @@ impl Engine {
         python::capture_session_end(py);
         if let Some(cache) = &self.cache {
             cache.sessionfinish(py, &self.config, &self.session.reports, &self.session.items);
+        }
+        if session_exited {
+            return code;
         }
         if let Some(forced) = self.session.exit_code_override {
             code = forced;
