@@ -71,8 +71,10 @@ jobs:
             suites: "fastapi,packaging"
           - group: pandas
             suites: "pandas"
-          - group: scikit-learn
-            suites: "scikit-learn"
+          - group: scikit-learn-1
+            suites: "scikit-learn-1"
+          - group: scikit-learn-2
+            suites: "scikit-learn-2"
     steps:
       - uses: actions/checkout@v5
 

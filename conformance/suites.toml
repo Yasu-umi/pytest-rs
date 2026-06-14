@@ -443,10 +443,45 @@ deps = ["hypothesis>=6.116.0"]
 category = "real-world"
 enabled = true
 
-[scikit-learn]
+[scikit-learn-1]
 tag = "1.9.0"
 package = "scikit-learn==1.9.0"
-testpaths = ["sklearn"]
+testpaths = ["sklearn/metrics", "sklearn/utils", "sklearn/linear_model"]
+deps = ["hypothesis>=6.116.0"]
+category = "real-world"
+enabled = true
+
+[scikit-learn-2]
+tag = "1.9.0"
+package = "scikit-learn==1.9.0"
+testpaths = [
+    "sklearn/_loss",
+    "sklearn/callback",
+    "sklearn/cluster",
+    "sklearn/compose",
+    "sklearn/covariance",
+    "sklearn/cross_decomposition",
+    "sklearn/datasets",
+    "sklearn/decomposition",
+    "sklearn/ensemble",
+    "sklearn/experimental",
+    "sklearn/feature_extraction",
+    "sklearn/feature_selection",
+    "sklearn/frozen",
+    "sklearn/gaussian_process",
+    "sklearn/impute",
+    "sklearn/inspection",
+    "sklearn/manifold",
+    "sklearn/mixture",
+    "sklearn/model_selection",
+    "sklearn/neighbors",
+    "sklearn/neural_network",
+    "sklearn/preprocessing",
+    "sklearn/semi_supervised",
+    "sklearn/svm",
+    "sklearn/tests",
+    "sklearn/tree",
+]
 deps = ["hypothesis>=6.116.0"]
 category = "real-world"
 enabled = true
