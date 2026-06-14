@@ -400,6 +400,7 @@ impl Engine {
                     &report,
                     Some(lineno),
                     Some(item),
+                    false,
                 );
                 send(&WorkerMsg::Report { report });
             }

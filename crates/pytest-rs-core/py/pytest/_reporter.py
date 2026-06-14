@@ -274,6 +274,20 @@ def _feed_warnings(reporter: Any) -> None:
 _fed_counts: dict[str, int] = {}
 
 
+def _track_delegated_report(report: Any) -> None:
+    """Account for a report the default reporter received via the shim PM
+    during a delegated protocol.  Incrementing _fed_counts prevents
+    subtest_stats() from returning it as an 'extra' count (the engine
+    already tracks it in session.reports)."""
+    if _default is None:
+        return
+    try:
+        category, _, _ = _default._gettestkindstatus(report)
+        _fed_counts[category] = _fed_counts.get(category, 0) + 1
+    except Exception:
+        pass
+
+
 def feed_default(report: Any) -> None:
     """Feed a report to the default reporter's stats without printing terminal
     output. Used in native mode so conftest pytest_terminal_summary hooks can

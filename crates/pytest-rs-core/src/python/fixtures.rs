@@ -21,8 +21,8 @@ pub fn register_builtin_fixtures(py: Python<'_>, registry: &mut FixtureRegistry)
 /// (pytest's cached-failure semantics).
 #[derive(Default)]
 pub(crate) struct XunitState {
-    modules: std::collections::HashMap<String, Option<Py<PyAny>>>,
-    classes: std::collections::HashMap<String, Option<Py<PyAny>>>,
+    pub(crate) modules: std::collections::HashMap<String, Option<Py<PyAny>>>,
+    pub(crate) classes: std::collections::HashMap<String, Option<Py<PyAny>>>,
 }
 
 /// The cached setup status for a key: None = never ran, Some(None) = ok,

@@ -50,6 +50,23 @@ pub(crate) fn run_one(
         Ok(None) => run_one_body(py, plugins, session, config, item),
         Err(err) => {
             let _ = finish_runtest_py_wrappers(py, &wrappers);
+            if err.is_instance_of::<pyo3::exceptions::PyException>(py) {
+                let is_usage = (|| -> PyResult<bool> {
+                    let cls = py.import("pytest")?.getattr("UsageError")?;
+                    Ok(err.is_instance(py, cls.downcast()?))
+                })()
+                .unwrap_or(false);
+                if is_usage {
+                    let msg = err
+                        .value(py)
+                        .str()
+                        .map(|s| s.to_string())
+                        .unwrap_or_default();
+                    eprintln!("ERROR: {msg}");
+                    python::set_session_shouldstop(py, &msg);
+                    return vec![];
+                }
+            }
             return vec![report_from_err(
                 py,
                 config,

@@ -59,6 +59,13 @@ pub(crate) fn run_item_phases(py: Python<'_>) -> PyResult<Py<PyAny>> {
     // Safety: pushed by the run_one frame suspended below us in the delegated
     // hook call; it does not touch the session while Python runs.
     let (plugins, session, config, item) = unsafe { (&*plugins, &mut *session, &*config, &*item) };
+    // The plugin (e.g. rerunfailures) may have cleared Python-side setup
+    // state between rerun attempts; mirror that to the Rust xunit cache so
+    // setup_class/setup_module re-execute on the next attempt.
+    if let Some(state) = session.stash_get_mut::<crate::python::XunitState>() {
+        state.classes.clear();
+        state.modules.clear();
+    }
     let reports = super::run_one_body(py, plugins, session, config, item);
     let proxies = pyo3::types::PyList::empty(py);
     for report in &reports {

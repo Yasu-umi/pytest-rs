@@ -117,6 +117,12 @@ class _LogreportSink:
     def pytest_runtest_logreport(self, report):
         capture = globals().get("_native_capture_logreport")
         if capture is not None and capture(report):
+            # The report was captured for the engine. The default reporter
+            # also received it via shim PM dispatch; track it so
+            # subtest_stats() subtracts it from the extra count.
+            from pytest._reporter import _track_delegated_report
+
+            _track_delegated_report(report)
             return
         self._plugin_reports.append(report)
 

@@ -17,6 +17,7 @@ pub(crate) fn fire_logreport_hooks(
     report: &TestReport,
     lineno: Option<u32>,
     item: Option<&TestItem>,
+    protocol_delegated: bool,
 ) {
     let funcs: Vec<Py<PyAny>> = session
         .py_hooks
@@ -85,14 +86,14 @@ pub(crate) fn fire_logreport_hooks(
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
         }
     }
-    // Drive both the replacement reporter (if any) and instance-registered
-    // plugins (e.g. relay plugin). In native mode also feed the default
-    // reporter's stats for conftest pytest_terminal_summary hooks.
-    python::reporter_logreport(py, proxy.bind(py));
-    if !delegated {
-        // Native mode: feed stats so conftest pytest_terminal_summary hooks
-        // can access terminalreporter.stats['passed'] etc.
-        python::reporter_feed_default(py, proxy.bind(py));
+    // When the protocol was delegated (e.g. pytest-rerunfailures), the plugin
+    // already called ihook.pytest_runtest_logreport which dispatched to the
+    // shim PM's reporters; driving them again would double-count stats.
+    if !protocol_delegated {
+        python::reporter_logreport(py, proxy.bind(py));
+        if !delegated {
+            python::reporter_feed_default(py, proxy.bind(py));
+        }
     }
 }
 
