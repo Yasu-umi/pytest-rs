@@ -146,7 +146,7 @@ _linux (CI-verified)_
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
 | rich | v14.2.0 | 855 | 0 | 0 | 25 | 880 | 100.0% | 60 | 62 | 0 |
-| httpx | 0.28.1 | 1364 | 9 | 0 | 1 | 1374 | 99.3% | 25 | 31 | 0 |
+| httpx | 0.28.1 | 1324 | 9 | 0 | 1 | 1334 | 99.3% | 24 | 31 | 0 |
 | starlette | 0.46.2 | 902 | 0 | 1 | 0 | 903 | 99.9% | 27 | 28 | 0 |
 | attrs | 25.3.0 | 1339 | 2 | 0 | 4 | 1345 | 99.9% | 20 | 24 | 0 |
 | more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 671 | 100.0% | 2 | 2 | 0 |
@@ -155,7 +155,8 @@ _linux (CI-verified)_
 | packaging | 25.0 | 26948 | 0 | 0 | 0 | 26948 | 100.0% | 12 | 12 | 0 |
 | pandas | v3.0.3 | 160650 | 39 | 371 | 25459 | 186519 | 99.8% | 860 | 964 | 0 |
 | scikit-learn-1 | 1.9.0 | 6991 | 13 | 193 | 6295 | 13492 | 98.5% | 68 | 87 | 0 |
-| scikit-learn-2 | 1.9.0 | 11807 | 6 | 2 | 3518 | 15333 | 99.9% | 128 | 172 | 0 |
+| scikit-learn-2 | 1.9.0 | 3824 | 0 | 2 | 1603 | 5429 | 100.0% | 41 | 58 | 0 |
+| scikit-learn-3 | 1.9.0 | 7983 | 6 | 0 | 1915 | 9904 | 99.9% | 87 | 114 | 0 |
 <!-- conformance-results:end -->
 
 The suites are included as **shallow git submodules** under `conformance/suites/` at the pinned release tags. Initialize them once after cloning:

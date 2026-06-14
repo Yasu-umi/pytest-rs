@@ -45,7 +45,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
 | rich | v14.2.0 | 855 | 0 | 0 | 25 | 880 | 100.0% | 60 | 62 | 0 |
 | pytest-bdd | 8.1.0 | 89 | 49 | 0 | 1 | 139 | 64.7% | 18 | 35 | 0 |
-| httpx | 0.28.1 | 1364 | 9 | 0 | 1 | 1374 | 99.3% | 25 | 31 | 0 |
+| httpx | 0.28.1 | 1324 | 9 | 0 | 1 | 1334 | 99.3% | 24 | 31 | 0 |
 | starlette | 0.46.2 | 902 | 0 | 1 | 0 | 903 | 99.9% | 27 | 28 | 0 |
 | attrs | 25.3.0 | 1339 | 2 | 0 | 4 | 1345 | 99.9% | 20 | 24 | 0 |
 | more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 671 | 100.0% | 2 | 2 | 0 |
@@ -55,7 +55,8 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | packaging | 25.0 | 26948 | 0 | 0 | 0 | 26948 | 100.0% | 12 | 12 | 0 |
 | pandas | v3.0.3 | 160650 | 39 | 371 | 25459 | 186519 | 99.8% | 860 | 964 | 0 |
 | scikit-learn-1 | 1.9.0 | 6991 | 13 | 193 | 6295 | 13492 | 98.5% | 68 | 87 | 0 |
-| scikit-learn-2 | 1.9.0 | 11807 | 6 | 2 | 3518 | 15333 | 99.9% | 128 | 172 | 0 |
+| scikit-learn-2 | 1.9.0 | 3824 | 0 | 2 | 1603 | 5429 | 100.0% | 41 | 58 | 0 |
+| scikit-learn-3 | 1.9.0 | 7983 | 6 | 0 | 1915 | 9904 | 99.9% | 87 | 114 | 0 |
 
 ### pytest @ 9.0.3
 
@@ -636,7 +637,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_multipart.py | passed | 38 | 0 | 0 | 0 |
 | tests/test_status_codes.py | passed | 6 | 0 | 0 | 0 |
 | tests/test_timeouts.py | failed | 9 | 1 | 0 | 0 |
-| tests/test_utils.py | passed | 40 | 0 | 0 | 0 |
+| tests/test_utils.py | timeout | 0 | 0 | 0 | 0 |
 | tests/test_wsgi.py | passed | 12 | 0 | 0 | 0 |
 
 </details>
@@ -2189,7 +2190,74 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 ### scikit-learn-2 @ 1.9.0
 
-<details><summary>per-file detail (172 files)</summary>
+<details><summary>per-file detail (58 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| sklearn/tests/test_base.py | passed | 103 | 0 | 0 | 6 |
+| sklearn/tests/test_build.py | passed | 2 | 0 | 0 | 0 |
+| sklearn/tests/test_calibration.py | timeout | 0 | 0 | 0 | 0 |
+| sklearn/tests/test_check_build.py | passed | 1 | 0 | 0 | 0 |
+| sklearn/tests/test_common.py | timeout | 0 | 0 | 0 | 0 |
+| sklearn/tests/test_config.py | timeout | 0 | 0 | 0 | 0 |
+| sklearn/tests/test_discriminant_analysis.py | passed | 56 | 0 | 0 | 0 |
+| sklearn/tests/test_docstring_parameters.py | no-tests | 0 | 0 | 0 | 212 |
+| sklearn/tests/test_docstring_parameters_consistency.py | no-tests | 0 | 0 | 0 | 4 |
+| sklearn/tests/test_docstrings.py | no-tests | 0 | 0 | 0 | 1 |
+| sklearn/tests/test_dummy.py | passed | 60 | 0 | 0 | 1 |
+| sklearn/tests/test_init.py | passed | 1 | 0 | 0 | 0 |
+| sklearn/tests/test_isotonic.py | passed | 48 | 0 | 0 | 1 |
+| sklearn/tests/test_kernel_approximation.py | passed | 78 | 0 | 0 | 332 |
+| sklearn/tests/test_kernel_ridge.py | passed | 10 | 0 | 0 | 0 |
+| sklearn/tests/test_metadata_routing.py | passed | 100 | 0 | 0 | 0 |
+| sklearn/tests/test_metaestimators.py | passed | 31 | 0 | 0 | 0 |
+| sklearn/tests/test_metaestimators_metadata_routing.py | passed | 271 | 0 | 0 | 0 |
+| sklearn/tests/test_min_dependencies_readme.py | passed | 6 | 0 | 0 | 2 |
+| sklearn/tests/test_multiclass.py | passed | 59 | 0 | 0 | 0 |
+| sklearn/tests/test_multioutput.py | timeout | 0 | 0 | 0 | 0 |
+| sklearn/tests/test_naive_bayes.py | passed | 86 | 0 | 0 | 61 |
+| sklearn/tests/test_pipeline.py | timeout | 0 | 0 | 0 | 0 |
+| sklearn/tests/test_public_functions.py | passed | 220 | 0 | 0 | 0 |
+| sklearn/tests/test_random_projection.py | passed | 239 | 0 | 0 | 0 |
+| sklearn/ensemble/_hist_gradient_boosting/tests/test_binning.py | passed | 63 | 0 | 0 | 0 |
+| sklearn/ensemble/_hist_gradient_boosting/tests/test_compare_lightgbm.py | no-tests | 0 | 0 | 0 | 100 |
+| sklearn/ensemble/_hist_gradient_boosting/tests/test_gradient_boosting.py | passed | 146 | 0 | 0 | 16 |
+| sklearn/ensemble/_hist_gradient_boosting/tests/test_grower.py | passed | 45 | 0 | 0 | 0 |
+| sklearn/ensemble/_hist_gradient_boosting/tests/test_histogram.py | passed | 7 | 0 | 0 | 0 |
+| sklearn/ensemble/_hist_gradient_boosting/tests/test_monotonic_constraints.py | passed | 12 | 0 | 0 | 2 |
+| sklearn/ensemble/_hist_gradient_boosting/tests/test_predictor.py | passed | 10 | 0 | 0 | 0 |
+| sklearn/ensemble/_hist_gradient_boosting/tests/test_splitting.py | error | 0 | 0 | 1 | 0 |
+| sklearn/ensemble/_hist_gradient_boosting/tests/test_warm_start.py | passed | 20 | 0 | 0 | 0 |
+| sklearn/ensemble/tests/test_bagging.py | timeout | 0 | 0 | 0 | 0 |
+| sklearn/ensemble/tests/test_base.py | passed | 2 | 0 | 0 | 0 |
+| sklearn/ensemble/tests/test_bootstrap.py | passed | 8 | 0 | 0 | 0 |
+| sklearn/ensemble/tests/test_common.py | passed | 19 | 0 | 0 | 0 |
+| sklearn/ensemble/tests/test_forest.py | timeout | 0 | 0 | 0 | 0 |
+| sklearn/ensemble/tests/test_gradient_boosting.py | passed | 129 | 0 | 0 | 1 |
+| sklearn/ensemble/tests/test_iforest.py | passed | 32 | 0 | 0 | 1 |
+| sklearn/ensemble/tests/test_stacking.py | passed | 82 | 0 | 0 | 0 |
+| sklearn/ensemble/tests/test_voting.py | timeout | 0 | 0 | 0 | 0 |
+| sklearn/ensemble/tests/test_weight_boosting.py | passed | 43 | 0 | 0 | 0 |
+| sklearn/model_selection/tests/test_classification_threshold.py | passed | 61 | 0 | 0 | 0 |
+| sklearn/model_selection/tests/test_plot.py | no-tests | 0 | 0 | 0 | 29 |
+| sklearn/model_selection/tests/test_search.py | timeout | 0 | 0 | 0 | 0 |
+| sklearn/model_selection/tests/test_split.py | passed | 226 | 0 | 0 | 45 |
+| sklearn/model_selection/tests/test_successive_halving.py | error | 0 | 0 | 1 | 0 |
+| sklearn/model_selection/tests/test_validation.py | timeout | 0 | 0 | 0 | 0 |
+| sklearn/preprocessing/tests/test_common.py | passed | 9 | 0 | 0 | 9 |
+| sklearn/preprocessing/tests/test_data.py | passed | 450 | 0 | 0 | 279 |
+| sklearn/preprocessing/tests/test_discretization.py | passed | 99 | 0 | 0 | 0 |
+| sklearn/preprocessing/tests/test_encoders.py | passed | 232 | 0 | 0 | 32 |
+| sklearn/preprocessing/tests/test_function_transformer.py | passed | 26 | 0 | 0 | 33 |
+| sklearn/preprocessing/tests/test_label.py | passed | 49 | 0 | 0 | 171 |
+| sklearn/preprocessing/tests/test_polynomial.py | passed | 628 | 0 | 0 | 255 |
+| sklearn/preprocessing/tests/test_target_encoder.py | passed | 55 | 0 | 0 | 10 |
+
+</details>
+
+### scikit-learn-3 @ 1.9.0
+
+<details><summary>per-file detail (114 files)</summary>
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
@@ -2243,25 +2311,6 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | sklearn/decomposition/tests/test_pca.py | passed | 386 | 0 | 0 | 220 |
 | sklearn/decomposition/tests/test_sparse_pca.py | timeout | 0 | 0 | 0 | 0 |
 | sklearn/decomposition/tests/test_truncated_svd.py | passed | 46 | 0 | 0 | 0 |
-| sklearn/ensemble/_hist_gradient_boosting/tests/test_binning.py | passed | 63 | 0 | 0 | 0 |
-| sklearn/ensemble/_hist_gradient_boosting/tests/test_compare_lightgbm.py | no-tests | 0 | 0 | 0 | 100 |
-| sklearn/ensemble/_hist_gradient_boosting/tests/test_gradient_boosting.py | passed | 146 | 0 | 0 | 16 |
-| sklearn/ensemble/_hist_gradient_boosting/tests/test_grower.py | passed | 45 | 0 | 0 | 0 |
-| sklearn/ensemble/_hist_gradient_boosting/tests/test_histogram.py | passed | 7 | 0 | 0 | 0 |
-| sklearn/ensemble/_hist_gradient_boosting/tests/test_monotonic_constraints.py | passed | 12 | 0 | 0 | 2 |
-| sklearn/ensemble/_hist_gradient_boosting/tests/test_predictor.py | passed | 10 | 0 | 0 | 0 |
-| sklearn/ensemble/_hist_gradient_boosting/tests/test_splitting.py | error | 0 | 0 | 1 | 0 |
-| sklearn/ensemble/_hist_gradient_boosting/tests/test_warm_start.py | passed | 20 | 0 | 0 | 0 |
-| sklearn/ensemble/tests/test_bagging.py | timeout | 0 | 0 | 0 | 0 |
-| sklearn/ensemble/tests/test_base.py | passed | 2 | 0 | 0 | 0 |
-| sklearn/ensemble/tests/test_bootstrap.py | passed | 8 | 0 | 0 | 0 |
-| sklearn/ensemble/tests/test_common.py | passed | 19 | 0 | 0 | 0 |
-| sklearn/ensemble/tests/test_forest.py | timeout | 0 | 0 | 0 | 0 |
-| sklearn/ensemble/tests/test_gradient_boosting.py | passed | 129 | 0 | 0 | 1 |
-| sklearn/ensemble/tests/test_iforest.py | passed | 32 | 0 | 0 | 1 |
-| sklearn/ensemble/tests/test_stacking.py | passed | 82 | 0 | 0 | 0 |
-| sklearn/ensemble/tests/test_voting.py | timeout | 0 | 0 | 0 | 0 |
-| sklearn/ensemble/tests/test_weight_boosting.py | passed | 43 | 0 | 0 | 0 |
 | sklearn/experimental/tests/test_enable_hist_gradient_boosting.py | failed | 0 | 1 | 0 | 0 |
 | sklearn/experimental/tests/test_enable_iterative_imputer.py | failed | 0 | 1 | 0 | 0 |
 | sklearn/experimental/tests/test_enable_successive_halving.py | failed | 0 | 1 | 0 | 0 |
@@ -2299,12 +2348,6 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | sklearn/mixture/tests/test_bayesian_mixture.py | passed | 17 | 0 | 0 | 0 |
 | sklearn/mixture/tests/test_gaussian_mixture.py | passed | 56 | 0 | 0 | 291 |
 | sklearn/mixture/tests/test_mixture.py | passed | 4 | 0 | 0 | 0 |
-| sklearn/model_selection/tests/test_classification_threshold.py | passed | 61 | 0 | 0 | 0 |
-| sklearn/model_selection/tests/test_plot.py | no-tests | 0 | 0 | 0 | 29 |
-| sklearn/model_selection/tests/test_search.py | timeout | 0 | 0 | 0 | 0 |
-| sklearn/model_selection/tests/test_split.py | passed | 226 | 0 | 0 | 45 |
-| sklearn/model_selection/tests/test_successive_halving.py | error | 0 | 0 | 1 | 0 |
-| sklearn/model_selection/tests/test_validation.py | timeout | 0 | 0 | 0 | 0 |
 | sklearn/neighbors/tests/test_ball_tree.py | passed | 64 | 0 | 0 | 0 |
 | sklearn/neighbors/tests/test_graph.py | passed | 4 | 0 | 0 | 0 |
 | sklearn/neighbors/tests/test_kd_tree.py | timeout | 0 | 0 | 0 | 0 |
@@ -2320,44 +2363,11 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | sklearn/neural_network/tests/test_mlp.py | passed | 57 | 0 | 0 | 2 |
 | sklearn/neural_network/tests/test_rbm.py | passed | 24 | 0 | 0 | 0 |
 | sklearn/neural_network/tests/test_stochastic_optimizers.py | passed | 6 | 0 | 0 | 0 |
-| sklearn/preprocessing/tests/test_common.py | passed | 9 | 0 | 0 | 9 |
-| sklearn/preprocessing/tests/test_data.py | passed | 450 | 0 | 0 | 279 |
-| sklearn/preprocessing/tests/test_discretization.py | passed | 99 | 0 | 0 | 0 |
-| sklearn/preprocessing/tests/test_encoders.py | passed | 232 | 0 | 0 | 32 |
-| sklearn/preprocessing/tests/test_function_transformer.py | passed | 26 | 0 | 0 | 33 |
-| sklearn/preprocessing/tests/test_label.py | passed | 49 | 0 | 0 | 171 |
-| sklearn/preprocessing/tests/test_polynomial.py | passed | 628 | 0 | 0 | 255 |
-| sklearn/preprocessing/tests/test_target_encoder.py | passed | 55 | 0 | 0 | 10 |
 | sklearn/semi_supervised/tests/test_label_propagation.py | passed | 173 | 0 | 0 | 58 |
 | sklearn/semi_supervised/tests/test_self_training.py | passed | 30 | 0 | 0 | 0 |
 | sklearn/svm/tests/test_bounds.py | passed | 22 | 0 | 0 | 0 |
 | sklearn/svm/tests/test_sparse.py | passed | 158 | 0 | 0 | 0 |
 | sklearn/svm/tests/test_svm.py | passed | 128 | 0 | 0 | 0 |
-| sklearn/tests/test_base.py | passed | 103 | 0 | 0 | 6 |
-| sklearn/tests/test_build.py | passed | 2 | 0 | 0 | 0 |
-| sklearn/tests/test_calibration.py | timeout | 0 | 0 | 0 | 0 |
-| sklearn/tests/test_check_build.py | passed | 1 | 0 | 0 | 0 |
-| sklearn/tests/test_common.py | timeout | 0 | 0 | 0 | 0 |
-| sklearn/tests/test_config.py | timeout | 0 | 0 | 0 | 0 |
-| sklearn/tests/test_discriminant_analysis.py | passed | 56 | 0 | 0 | 0 |
-| sklearn/tests/test_docstring_parameters.py | no-tests | 0 | 0 | 0 | 212 |
-| sklearn/tests/test_docstring_parameters_consistency.py | no-tests | 0 | 0 | 0 | 4 |
-| sklearn/tests/test_docstrings.py | no-tests | 0 | 0 | 0 | 1 |
-| sklearn/tests/test_dummy.py | passed | 60 | 0 | 0 | 1 |
-| sklearn/tests/test_init.py | passed | 1 | 0 | 0 | 0 |
-| sklearn/tests/test_isotonic.py | passed | 48 | 0 | 0 | 1 |
-| sklearn/tests/test_kernel_approximation.py | passed | 78 | 0 | 0 | 332 |
-| sklearn/tests/test_kernel_ridge.py | passed | 10 | 0 | 0 | 0 |
-| sklearn/tests/test_metadata_routing.py | passed | 100 | 0 | 0 | 0 |
-| sklearn/tests/test_metaestimators.py | passed | 31 | 0 | 0 | 0 |
-| sklearn/tests/test_metaestimators_metadata_routing.py | passed | 271 | 0 | 0 | 0 |
-| sklearn/tests/test_min_dependencies_readme.py | passed | 6 | 0 | 0 | 2 |
-| sklearn/tests/test_multiclass.py | passed | 59 | 0 | 0 | 0 |
-| sklearn/tests/test_multioutput.py | timeout | 0 | 0 | 0 | 0 |
-| sklearn/tests/test_naive_bayes.py | passed | 86 | 0 | 0 | 61 |
-| sklearn/tests/test_pipeline.py | timeout | 0 | 0 | 0 | 0 |
-| sklearn/tests/test_public_functions.py | passed | 220 | 0 | 0 | 0 |
-| sklearn/tests/test_random_projection.py | passed | 239 | 0 | 0 | 0 |
 | sklearn/tree/tests/test_export.py | passed | 15 | 0 | 0 | 5 |
 | sklearn/tree/tests/test_fenwick.py | passed | 1 | 0 | 0 | 0 |
 | sklearn/tree/tests/test_monotonic_tree.py | passed | 224 | 0 | 0 | 0 |
