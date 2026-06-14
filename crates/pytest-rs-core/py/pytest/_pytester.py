@@ -676,7 +676,7 @@ class Pytester:
                 ret = int(exc.code) if exc.code is not None else 0
             except Exception as exc:
                 if type(exc).__name__ == "UsageError":
-                    sys.stderr.write(f"ERROR: {exc}\n")
+                    os.write(2, f"ERROR: {exc}\n".encode())
                     ret = 4
                 else:
                     raise
