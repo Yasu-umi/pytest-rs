@@ -499,3 +499,112 @@ def caplog():
     capture = LogCaptureFixture(types.SimpleNamespace(stash=state.stash))
     yield capture
     capture._finalize()
+
+
+import re as _re
+
+_ANSI_ESCAPE_SEQ = _re.compile(r"\x1b\[[\d;]+m")
+
+
+def _remove_ansi_escape_sequences(text):
+    return _ANSI_ESCAPE_SEQ.sub("", text)
+
+
+class DatetimeFormatter(logging.Formatter):
+    def formatTime(self, record, datefmt=None):
+        if datefmt and "%f" in datefmt:
+            ct = self.converter(record.created)
+            tz = datetime.timezone(
+                datetime.timedelta(seconds=ct.tm_gmtoff), ct.tm_zone
+            )
+            dt = datetime.datetime(
+                *ct[0:6], microsecond=int(record.msecs * 1000), tzinfo=tz
+            )
+            return dt.strftime(datefmt)
+        return super().formatTime(record, datefmt)
+
+
+class ColoredLevelFormatter(DatetimeFormatter):
+    LOGLEVEL_COLOROPTS = {
+        logging.CRITICAL: {"red"},
+        logging.ERROR: {"red", "bold"},
+        logging.WARNING: {"yellow"},
+        logging.WARN: {"yellow"},
+        logging.INFO: {"green"},
+        logging.DEBUG: {"purple"},
+        logging.NOTSET: set(),
+    }
+    LEVELNAME_FMT_REGEX = _re.compile(r"%\(levelname\)([+-.]?\d*(?:\.\d+)?s)")
+
+    def __init__(self, terminalwriter, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._terminalwriter = terminalwriter
+        self._original_fmt = self._style._fmt
+        self._level_to_fmt_mapping = {}
+        for level, color_opts in self.LOGLEVEL_COLOROPTS.items():
+            self.add_color_level(level, *color_opts)
+
+    def add_color_level(self, level, *color_opts):
+        assert self._fmt is not None
+        levelname_fmt_match = self.LEVELNAME_FMT_REGEX.search(self._fmt)
+        if not levelname_fmt_match:
+            return
+        levelname_fmt = levelname_fmt_match.group()
+        formatted_levelname = levelname_fmt % {"levelname": logging.getLevelName(level)}
+        color_kwargs = {name: True for name in color_opts}
+        colorized_formatted_levelname = self._terminalwriter.markup(
+            formatted_levelname, **color_kwargs
+        )
+        self._level_to_fmt_mapping[level] = self.LEVELNAME_FMT_REGEX.sub(
+            colorized_formatted_levelname, self._fmt
+        )
+
+    def format(self, record):
+        fmt = self._level_to_fmt_mapping.get(record.levelno, self._original_fmt)
+        self._style._fmt = fmt
+        return super().format(record)
+
+
+class PercentStyleMultiline(logging.PercentStyle):
+    def __init__(self, fmt, auto_indent):
+        super().__init__(fmt)
+        self._auto_indent = self._get_auto_indent(auto_indent)
+
+    @staticmethod
+    def _get_auto_indent(auto_indent_option):
+        if auto_indent_option is None:
+            return 0
+        elif isinstance(auto_indent_option, bool):
+            return -1 if auto_indent_option else 0
+        elif isinstance(auto_indent_option, int):
+            return int(auto_indent_option)
+        elif isinstance(auto_indent_option, str):
+            try:
+                return int(auto_indent_option)
+            except ValueError:
+                pass
+            val = auto_indent_option.lower()
+            if val in ("y", "yes", "t", "true", "on", "1"):
+                return -1
+            elif val in ("n", "no", "f", "false", "off", "0"):
+                return 0
+        return 0
+
+    def format(self, record):
+        if "\n" in record.message:
+            if hasattr(record, "auto_indent"):
+                auto_indent = self._get_auto_indent(record.auto_indent)
+            else:
+                auto_indent = self._auto_indent
+            if auto_indent:
+                lines = record.message.splitlines()
+                formatted = self._fmt % {**record.__dict__, "message": lines[0]}
+                if auto_indent < 0:
+                    indentation = _remove_ansi_escape_sequences(formatted).find(
+                        lines[0]
+                    )
+                else:
+                    indentation = auto_indent
+                lines[0] = formatted
+                return ("\n" + " " * indentation).join(lines)
+        return self._fmt % record.__dict__
