@@ -95,6 +95,10 @@ pub struct Session {
     /// --doctest-ignore-import-errors, etc.), for collector-tree hook synthesis.
     /// Each entry is (nodeid, reason, location) where location is "file:line".
     pub skipped_modules: Vec<(String, String, String)>,
+    /// Files skipped by a conftest/plugin `pytest_collect_file` hook that raised
+    /// `pytest.skip()`. Their parent Dir collectreport should be "skipped".
+    /// Each entry is (nodeid, reason).
+    pub collect_file_skips: Vec<(String, String)>,
     /// Set when --maxfail/-x stopped the run, with the failure count, for
     /// the "stopping after N failures" banner.
     pub stopped_after: Option<usize>,
@@ -141,6 +145,7 @@ impl Session {
             deselected_items: Vec::new(),
             collect_errors: Vec::new(),
             skipped_modules: Vec::new(),
+            collect_file_skips: Vec::new(),
             stopped_after: None,
             shouldfail: None,
             custom_reporter: None,

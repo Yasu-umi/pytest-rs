@@ -511,3 +511,40 @@ pub fn next_value<'py>(
         .getattr("call")?
         .call1((next_fn, generator))
 }
+
+/// Snapshot the shim pluginmanager's plugin list so a nested run's conftest
+/// registrations can be rolled back. Returns a guard that restores the
+/// original list on drop.
+pub(crate) fn snapshot_pluginmanager(py: Python<'_>) -> PyResult<PluginManagerGuard> {
+    let pm = py
+        .import("pytest._pluginmanager")?
+        .getattr("pluginmanager")?;
+    let plugins: Py<PyAny> = pm.getattr("_plugins")?.call_method0("copy")?.unbind();
+    let conftest_plugins: Py<PyAny> = pm
+        .getattr("_conftest_plugins")?
+        .call_method0("copy")?
+        .unbind();
+    Ok(PluginManagerGuard {
+        plugins,
+        conftest_plugins,
+    })
+}
+
+pub(crate) struct PluginManagerGuard {
+    plugins: Py<PyAny>,
+    conftest_plugins: Py<PyAny>,
+}
+
+impl Drop for PluginManagerGuard {
+    fn drop(&mut self) {
+        Python::try_attach(|py| {
+            if let Ok(pm) = py
+                .import("pytest._pluginmanager")
+                .and_then(|m| m.getattr("pluginmanager"))
+            {
+                let _ = pm.setattr("_plugins", self.plugins.bind(py));
+                let _ = pm.setattr("_conftest_plugins", self.conftest_plugins.bind(py));
+            }
+        });
+    }
+}

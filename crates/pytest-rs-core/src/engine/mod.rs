@@ -952,6 +952,9 @@ impl Engine {
         // config, so getini/getoption read the nested run's tox.ini/options
         // instead of the cached outer singleton. Dropped when the run ends.
         let _config_proxy = python::push_nested_config_proxy(py, &self.config).ok();
+        // Snapshot the pluginmanager so conftest registrations from this nested
+        // run don't leak into subsequent runs (guard restores on drop).
+        let _pm_guard = python::snapshot_pluginmanager(py).ok();
         // The nested config may declare its own pythonpath ini entries.
         for rel in self.config.get_ini_lines("pythonpath") {
             let abs = self.config.rootdir.join(rel);

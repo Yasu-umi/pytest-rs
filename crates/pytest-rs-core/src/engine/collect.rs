@@ -960,13 +960,21 @@ impl Engine {
             );
             self.session.py_hooks = hooks;
             match result {
-                Ok(_skipped_files) => {
-                    // pytest_collect_file raises pytest.skip to mean "don't
-                    // collect this file for my plugin" — not a module-level
-                    // skip.  Real pytest emits no Module collectreport in this
-                    // case (the Dir's collect call itself would raise Skipped),
-                    // so we don't record these in skipped_modules or as test
-                    // reports.
+                Ok(skipped_files) => {
+                    if !skipped_files.is_empty() {
+                        let skipped_set: std::collections::HashSet<&PathBuf> =
+                            skipped_files.iter().map(|(p, _)| p).collect();
+                        self.session
+                            .items
+                            .retain(|item| !skipped_set.contains(&item.path));
+                        self.session.collect_file_skips.extend(
+                            skipped_files
+                                .into_iter()
+                                .map(|(p, reason)| {
+                                    (crate::collect::file_nodeid(rootdir, &p), reason)
+                                }),
+                        );
+                    }
                 }
                 Err(err) => {
                     errors.push((rootdir.to_path_buf(), python::format_exception(py, &err)));

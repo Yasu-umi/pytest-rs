@@ -352,10 +352,30 @@ impl Engine {
             .map(|(nodeid, reason, loc)| (nodeid.as_str(), reason.as_str(), loc.as_str()))
             .collect();
 
+        // Files skipped by pytest_collect_file hooks (conftest/plugin).
+        // Their parent directory may need a "skipped" collectreport.
+        let collect_file_skips: Vec<(String, &str)> = self
+            .session
+            .collect_file_skips
+            .iter()
+            .map(|(nodeid, reason)| {
+                let dir = match std::path::Path::new(nodeid.as_str()).parent() {
+                    Some(p) if p.as_os_str().is_empty() => ".".to_string(),
+                    Some(p) => p.to_string_lossy().into_owned(),
+                    None => ".".to_string(),
+                };
+                (dir, reason.as_str())
+            })
+            .collect();
+
         // Unique directories (parent of each module file; "" → ".").
+        // Always include "." (rootdir) — real pytest always emits a Dir
+        // collectreport for the root even when no files are collected.
         let mut dirs: Vec<String> = Vec::new();
         {
             let mut seen: std::collections::HashSet<String> = Default::default();
+            seen.insert(".".to_string());
+            dirs.push(".".to_string());
             let all_files = passing_modules
                 .iter()
                 .map(|s| s.as_str())
@@ -371,7 +391,40 @@ impl Engine {
                     dirs.push(dir);
                 }
             }
+            for (dir, _) in &collect_file_skips {
+                if seen.insert(dir.clone()) {
+                    dirs.push(dir.clone());
+                }
+            }
         }
+        // Dirs where every file was skipped by pytest_collect_file (and none
+        // passed/failed) should get a "skipped" collectreport like real pytest.
+        let skipped_dirs: std::collections::HashMap<String, String> = {
+            let mut dir_has_items: std::collections::HashSet<String> = Default::default();
+            for file in &passing_modules {
+                let dir = match std::path::Path::new(file.as_str()).parent() {
+                    Some(p) if p.as_os_str().is_empty() => ".".to_string(),
+                    Some(p) => p.to_string_lossy().into_owned(),
+                    None => ".".to_string(),
+                };
+                dir_has_items.insert(dir);
+            }
+            for nodeid in &failing_modules {
+                let dir = match std::path::Path::new(*nodeid).parent() {
+                    Some(p) if p.as_os_str().is_empty() => ".".to_string(),
+                    Some(p) => p.to_string_lossy().into_owned(),
+                    None => ".".to_string(),
+                };
+                dir_has_items.insert(dir);
+            }
+            let mut skip_map: std::collections::HashMap<String, String> = Default::default();
+            for (dir, reason) in &collect_file_skips {
+                if !dir_has_items.contains(dir.as_str()) {
+                    skip_map.entry(dir.clone()).or_insert_with(|| reason.to_string());
+                }
+            }
+            skip_map
+        };
 
         // Unique class nodeids ("file::ClassName") for items inside a class.
         let mut classes: Vec<String> = Vec::new();
@@ -425,7 +478,11 @@ impl Engine {
             emit_skipped(nodeid, reason, location)?;
         }
         for dir in &dirs {
-            emit_passed(dir.as_str())?;
+            if let Some(reason) = skipped_dirs.get(dir.as_str()) {
+                emit_skipped(dir.as_str(), reason, dir.as_str())?;
+            } else {
+                emit_passed(dir.as_str())?;
+            }
         }
 
         Ok(())
