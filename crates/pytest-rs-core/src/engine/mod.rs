@@ -995,6 +995,13 @@ impl Engine {
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
             return exit_code::INTERNAL_ERROR;
         }
+        if self.config.get_flag("runxfail") {
+            let _ = py.run(
+                c"import pytest\npytest.xfail = lambda reason='': None\n",
+                None,
+                None,
+            );
+        }
         // Warning capture: install with the nested config's filterwarnings/W
         // options. The caller saves/restores the outer warning state; this
         // arms the capture for the inner session's own filter specs.

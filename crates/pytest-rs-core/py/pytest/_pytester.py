@@ -609,6 +609,10 @@ class Pytester:
         cwd_before = os.getcwd()
         env_before = dict(os.environ)
 
+        # --runxfail monkeypatches pytest.xfail; save/restore so it doesn't
+        # leak between nested and outer runs.
+        old_xfail = pytest.xfail
+
         # Per-session global state the native engine mutates lives in shim
         # module singletons; a nested run would leak it to the outer session
         # (e.g. an inner `-x` run setting session.shouldstop, or reconfiguring
@@ -693,6 +697,7 @@ class Pytester:
             _capture.state = old_capstate
             reprec.finish_recording()
             # Restore the session-state singletons swapped in above.
+            pytest.xfail = old_xfail
             _node._session_state = old_session_state
             _node._added_marks[:] = old_added_marks
             for key, value in old_mark_state.items():
