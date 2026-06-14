@@ -148,7 +148,11 @@ def _format_assert(op, left, right):
     pytest's assertrepr_compare explanation (saferepr'd summary + op-specific
     diff lines), truncated like pytest's callbinrepr unless -vv/CI/ini opt
     out."""
-    fallback = f"{left!r} {op} {right!r}"
+    try:
+        from _pytest._io.saferepr import saferepr
+        fallback = f"{saferepr(left)} {op} {saferepr(right)}"
+    except Exception:
+        fallback = f"{left!r} {op} {right!r}"
     try:
         from _pytest import outcomes
         from _pytest.assertion import truncate, util
