@@ -266,6 +266,7 @@ class PluginManager:
         self._specs: dict[str, dict[str, Any]] = {
             "pytest_report_teststatus": {"firstresult": True},
             "pytest_runtest_makereport": {"firstresult": True},
+            "pytest_collect_directory": {"firstresult": True},
         }
         # (before, after) callbacks fired around every hook call (HookRecorder
         # registers itself here to record calls; see add_hookcall_monitoring).

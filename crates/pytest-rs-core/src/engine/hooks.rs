@@ -420,7 +420,9 @@ impl Engine {
             let mut skip_map: std::collections::HashMap<String, String> = Default::default();
             for (dir, reason) in &collect_file_skips {
                 if !dir_has_items.contains(dir.as_str()) {
-                    skip_map.entry(dir.clone()).or_insert_with(|| reason.to_string());
+                    skip_map
+                        .entry(dir.clone())
+                        .or_insert_with(|| reason.to_string());
                 }
             }
             skip_map

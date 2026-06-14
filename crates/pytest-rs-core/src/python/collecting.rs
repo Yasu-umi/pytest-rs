@@ -106,6 +106,76 @@ pub fn async_flags(py: Python<'_>, func: &Bound<'_, PyAny>) -> PyResult<AsyncFla
 
 /// Import one test module and introspect it: append discovered test items
 /// and fixture definitions (objects carrying recorded shim metadata).
+/// True when a `pytest_collect_directory` hook exists in conftest hooks or on a
+/// pluginmanager plugin. The default implementation in `_pytest.python` always
+/// exists; this checks for CONFTEST overrides that can filter/replace dirs.
+pub fn has_collect_directory_hook(_py: Python<'_>, hooks: &[crate::session::PyHook]) -> bool {
+    hooks.iter().any(|h| h.name == "pytest_collect_directory")
+}
+
+/// Fire the `pytest_collect_directory` hook via the pluginmanager relay.
+/// Returns `false` if the hook returned `None` (directory should be skipped).
+pub fn call_collect_directory_hook(py: Python<'_>, dir: &Path, rootdir: &Path) -> bool {
+    let pm = match py
+        .import("pytest._pluginmanager")
+        .and_then(|m| m.getattr("pluginmanager"))
+    {
+        Ok(pm) => pm,
+        Err(_) => return true,
+    };
+    let hook_relay = match pm
+        .getattr("hook")
+        .and_then(|h| h.getattr("pytest_collect_directory"))
+    {
+        Ok(h) => h,
+        Err(_) => return true,
+    };
+    let pathlib = match py.import("pathlib").and_then(|m| m.getattr("Path")) {
+        Ok(p) => p,
+        Err(_) => return true,
+    };
+    let py_path = match pathlib.call1((dir.to_string_lossy().as_ref(),)) {
+        Ok(p) => p,
+        Err(_) => return true,
+    };
+    let config = crate::python::proxies::existing_py_config(py).map(|c| c.into_bound(py));
+    let node_mod = match py.import("pytest._node") {
+        Ok(m) => m,
+        Err(_) => return true,
+    };
+    let collector_cls = match node_mod.getattr("Collector") {
+        Ok(c) => c,
+        Err(_) => return true,
+    };
+    let parent = {
+        let kw = pyo3::types::PyDict::new(py);
+        let _ = kw.set_item("config", config.as_ref().map(|c| c.as_any()));
+        let root_path = pathlib.call1((rootdir.to_string_lossy().as_ref(),)).ok();
+        let _ = kw.set_item("path", root_path.as_ref());
+        let _ = kw.set_item("nodeid", "");
+        let _ = kw.set_item("name", "");
+        let session_proxy = config.as_ref().and_then(|c| {
+            node_mod
+                .getattr("_NodeSession")
+                .ok()?
+                .call1((c.as_any(),))
+                .ok()
+        });
+        let _ = kw.set_item("session", session_proxy.as_ref());
+        match collector_cls.call((), Some(&kw)) {
+            Ok(p) => p,
+            Err(_) => return true,
+        }
+    };
+    let kwargs = pyo3::types::PyDict::new(py);
+    let _ = kwargs.set_item("path", &py_path);
+    let _ = kwargs.set_item("parent", &parent);
+    match hook_relay.call((), Some(&kwargs)) {
+        Ok(result) => !result.is_none(),
+        Err(_) => true,
+    }
+}
+
 /// Custom collectors: fire `pytest_collect_file(file_path, parent)` for each
 /// candidate file; a plugin (pytest-ruff/pytest-mypy) may return a
 /// `pytest.File` whose `.collect()` yields `pytest.Item`s. Each item becomes a
