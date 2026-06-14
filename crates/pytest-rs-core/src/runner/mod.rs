@@ -170,7 +170,19 @@ impl Engine {
                     );
                 }
                 file_dur = std::time::Duration::ZERO;
-                line = format!("{file} ");
+                // Display the file path like pytest's write_fspath_result:
+                // bestrelpath(startpath, rootdir / nodeid_file_part).
+                // For files inside rootdir this is simply the invocation-dir-
+                // relative path.  For files outside rootdir pytest builds a
+                // "virtual" path by prepending rootdir to the invocation-dir-
+                // relative file name, yielding e.g. "root/test_foo.py" when
+                // rootdir=…/root and the file lives one level above it.
+                let display_file = crate::collect::display_file_path(
+                    &config.rootdir,
+                    &config.invocation_dir,
+                    &item.path,
+                );
+                line = format!("{display_file} ");
                 print!("{line}");
                 let _ = std::io::stdout().flush();
                 current_file = file;

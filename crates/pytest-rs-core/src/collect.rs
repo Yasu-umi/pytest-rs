@@ -544,3 +544,61 @@ pub fn file_nodeid(rootdir: &Path, path: &Path) -> String {
         Err(_) => path.to_string_lossy().replace('\\', "/"),
     }
 }
+
+/// Display path for a test file in the progress output, matching pytest's
+/// `write_fspath_result`: `bestrelpath(invocation_dir, rootdir / nodeid_file_part)`.
+///
+/// Real pytest builds nodeids for outside-rootdir files relative to the initial
+/// collection path (typically the invocation dir), so
+/// `rootdir / nodeid_file_part` produces a path under the rootdir even though
+/// the actual file lives elsewhere.  `bestrelpath(invocation_dir, ...)` then
+/// gives a tidy relative display.  We replicate that by computing
+/// `rootdir / strip_prefix(invocation_dir, path)` when the file is outside the
+/// rootdir but inside the invocation dir, with a plain `bestrelpath` fallback.
+pub fn display_file_path(rootdir: &Path, invocation_dir: &Path, path: &Path) -> String {
+    // Fast path: file is inside rootdir — display is invocation-dir-relative.
+    if path.starts_with(rootdir) {
+        return file_nodeid(invocation_dir, path);
+    }
+    // File is outside rootdir: mimic pytest's write_fspath_result.
+    // pytest nodeid for such a file = path.relative_to(initial_collection_path)
+    // (usually the invocation dir).  Then display = bestrelpath(invocation_dir,
+    // rootdir / nodeid_part).
+    if let Ok(rel_to_inv) = path.strip_prefix(invocation_dir) {
+        let virtual_path = rootdir.join(rel_to_inv);
+        return bestrelpath(invocation_dir, &virtual_path);
+    }
+    // Last resort: plain relative path from invocation dir.
+    bestrelpath(invocation_dir, path)
+}
+
+/// Rust equivalent of pytest's `bestrelpath(directory, dest)`: returns a
+/// relative path string from `directory` to `dest`.  Falls back to the
+/// absolute path string when the two share no common ancestor.
+fn bestrelpath(directory: &Path, dest: &Path) -> String {
+    // Find the longest common prefix component-by-component.
+    let dir_parts: Vec<_> = directory.components().collect();
+    let dest_parts: Vec<_> = dest.components().collect();
+    let common_len = dir_parts
+        .iter()
+        .zip(dest_parts.iter())
+        .take_while(|(a, b)| a == b)
+        .count();
+    if common_len == 0 {
+        return dest.to_string_lossy().replace('\\', "/");
+    }
+    let up = dir_parts.len() - common_len;
+    let down = &dest_parts[common_len..];
+    let mut parts: Vec<std::borrow::Cow<str>> = Vec::new();
+    for _ in 0..up {
+        parts.push("..".into());
+    }
+    for c in down {
+        parts.push(c.as_os_str().to_string_lossy());
+    }
+    if parts.is_empty() {
+        ".".to_string()
+    } else {
+        parts.join("/")
+    }
+}
