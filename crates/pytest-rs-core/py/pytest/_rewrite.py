@@ -17,7 +17,7 @@ import types
 # tag, so it can never be confused with CPython's own (non-rewritten) bytecode
 # for the same file. Bump _CACHE_VERSION whenever _AssertRewriter's output
 # changes, to invalidate any stale rewritten pyc left on disk.
-_CACHE_VERSION = 1
+_CACHE_VERSION = 2
 _PYC_TAIL = f".{sys.implementation.cache_tag}-pytestrs{_CACHE_VERSION}.pyc"
 
 _OPS = {
@@ -260,6 +260,41 @@ class _AssertRewriter(ast.NodeTransformer):
             ast.Constant("assert "),
             ast.FormattedValue(value=explain, conversion=-1, format_spec=None),
         ]
+        _TRIVIAL = (ast.Name, ast.Constant, ast.Dict, ast.List, ast.Set, ast.Tuple,
+                    ast.JoinedStr, ast.FormattedValue)
+        left_trivial = isinstance(test.left, _TRIVIAL)
+        right_trivial = isinstance(test.comparators[0], _TRIVIAL)
+        if not left_trivial:
+            try:
+                src = ast.unparse(test.left)
+            except Exception:
+                src = None
+            if src:
+                values.extend([
+                    ast.Constant("\n +  where "),
+                    ast.FormattedValue(
+                        value=ast.Name(id=left_name, ctx=ast.Load()),
+                        conversion=114,
+                        format_spec=None,
+                    ),
+                    ast.Constant(f" = {src}"),
+                ])
+        if not right_trivial:
+            try:
+                src = ast.unparse(test.comparators[0])
+            except Exception:
+                src = None
+            if src:
+                label = "and   " if not left_trivial else "where "
+                values.extend([
+                    ast.Constant(f"\n +  {label}"),
+                    ast.FormattedValue(
+                        value=ast.Name(id=right_name, ctx=ast.Load()),
+                        conversion=114,
+                        format_spec=None,
+                    ),
+                    ast.Constant(f" = {src}"),
+                ])
         message = ast.JoinedStr(values=values)
         raise_stmt = ast.Raise(
             exc=ast.Call(

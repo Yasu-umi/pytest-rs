@@ -78,6 +78,11 @@ if _RUNNER_PYTHONPATH:
 # even start — on linux a cleared LD_LIBRARY_PATH makes it fail to load.
 _LIBPATH_VARS = ("LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH", "DYLD_FALLBACK_LIBRARY_PATH")
 _RUNNER_LIBPATH = {v: os.environ[v] for v in _LIBPATH_VARS if v in os.environ}
+# Capture original COLUMNS at module load (before monkeypatch): plugins
+# capture terminal width at import time (e.g. pytest-icdiff's COLS), and
+# the child subprocess must see the pre-monkeypatch width to match
+# upstream's in-process pytester where module import precedes monkeypatch.
+_RUNNER_COLUMNS = os.environ.get("COLUMNS")
 
 _OUTCOME_RE = re.compile(
     r"(\d+) (passed|failed|skipped|xfailed|xpassed|errors?|warnings?|deselected|rerun)"
@@ -283,6 +288,13 @@ class Pytester:
         # if the test cleared the environment (setdefault keeps a test's own).
         for _var, _value in _RUNNER_LIBPATH.items():
             env.setdefault(_var, _value)
+        # Restore pre-monkeypatch COLUMNS so plugins that capture terminal
+        # width at import time (e.g. pytest-icdiff) see the original width,
+        # matching upstream's in-process pytester where imports precede tests.
+        if _RUNNER_COLUMNS is not None:
+            env["COLUMNS"] = _RUNNER_COLUMNS
+        else:
+            env.pop("COLUMNS", None)
         # Keep installed plugins importable even when the test cleared the
         # environment (upstream's in-process pytester shares the parent's
         # sys.path); fall back to the PYTHONPATH captured at fixture setup.
