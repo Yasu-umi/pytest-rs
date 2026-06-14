@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -41,14 +45,14 @@ jobs:
         run: cargo test --workspace
 
       - name: build
-        run: cargo build
+        run: cargo build --release
 
       - name: upload binary
         if: matrix.python-version == '3.13'
         uses: actions/upload-artifact@v7
         with:
           name: pytest-rs-bin
-          path: target/debug/pytest-rs-bin
+          path: target/release/pytest-rs-bin
           retention-days: 1
 
   conformance:
