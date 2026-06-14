@@ -552,7 +552,7 @@ impl Config {
         "worker",          // hidden: this process is a -n worker (IPC on stdin/stdout)
         "runxfail",        // report xfail-marked tests as if unmarked
         "setup-only",      // run fixtures, skip the tests
-        "setup-plan",      // like --setup-only (fixtures do execute here)
+        "setup-plan",      // show setup/teardown plan without executing fixtures
         "setup-show",      // run tests, narrating fixture setup/teardown
         "traceconfig",     // accepted-but-inert: plugin trace header not implemented
         "keep-duplicates", // collect the same file once per duplicated arg

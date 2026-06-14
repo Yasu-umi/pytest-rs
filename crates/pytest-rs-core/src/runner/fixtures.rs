@@ -389,37 +389,46 @@ pub(crate) fn resolve_fixture_def(
     } else {
         None
     };
-    let (value, finalizer) = match claimed {
-        Some(fixture_value) => (fixture_value.value, fixture_value.finalizer),
-        None => {
-            if def.is_coroutine || def.is_async_gen {
-                // pytest 8.4 parity: an unhandled async fixture resolves to
-                // its raw coroutine/async-generator and warns (this becomes
-                // an error in pytest 9.1).
-                let test_name = item.nodeid.rsplit("::").next().unwrap_or(&item.nodeid);
-                python::warn_explicit_at(
-                    py,
-                    "PytestRemovedIn9Warning",
-                    &format!(
-                        "'{test_name}' requested an async fixture '{}', with no plugin or \
-                         hook that handled it. This is usually an error, as pytest does not \
-                         natively support it. This will turn into an error in pytest 9.\n  \
-                         See: https://docs.pytest.org/en/stable/deprecations.html\
-                         #sync-test-depending-on-async-fixture",
-                        def.name
-                    ),
-                    "_pytest/fixtures.py",
-                    1188,
-                )?;
-                let value = python::call_fixture(py, &def.func, fixture_instance, &kwargs)?;
-                (value.unbind(), None)
-            } else if def.is_generator {
-                let generator = python::call_fixture(py, &def.func, fixture_instance, &kwargs)?;
-                let value = python::next_value(py, &generator)?;
-                (value.unbind(), Some(Finalizer::GenNext(generator.unbind())))
-            } else {
-                let value = python::call_fixture(py, &def.func, fixture_instance, &kwargs)?;
-                (value.unbind(), None)
+    let (value, finalizer) = if config.get_flag("setup-plan") {
+        // --setup-plan: resolve the dependency graph for narration but do not
+        // execute any fixture functions (upstream pytest behaviour).
+        (py.None().into_pyobject(py)?.unbind(), None)
+    } else {
+        match claimed {
+            Some(fixture_value) => (fixture_value.value, fixture_value.finalizer),
+            None => {
+                if def.is_coroutine || def.is_async_gen {
+                    // pytest 8.4 parity: an unhandled async fixture resolves to
+                    // its raw coroutine/async-generator and warns (this becomes
+                    // an error in pytest 9.1).
+                    let test_name = item.nodeid.rsplit("::").next().unwrap_or(&item.nodeid);
+                    python::warn_explicit_at(
+                        py,
+                        "PytestRemovedIn9Warning",
+                        &format!(
+                            "'{test_name}' requested an async fixture '{}', with no plugin or \
+                             hook that handled it. This is usually an error, as pytest does not \
+                             natively support it. This will turn into an error in pytest 9.\n  \
+                             See: https://docs.pytest.org/en/stable/deprecations.html\
+                             #sync-test-depending-on-async-fixture",
+                            def.name
+                        ),
+                        "_pytest/fixtures.py",
+                        1188,
+                    )?;
+                    let value =
+                        python::call_fixture(py, &def.func, fixture_instance, &kwargs)?;
+                    (value.unbind(), None)
+                } else if def.is_generator {
+                    let generator =
+                        python::call_fixture(py, &def.func, fixture_instance, &kwargs)?;
+                    let value = python::next_value(py, &generator)?;
+                    (value.unbind(), Some(Finalizer::GenNext(generator.unbind())))
+                } else {
+                    let value =
+                        python::call_fixture(py, &def.func, fixture_instance, &kwargs)?;
+                    (value.unbind(), None)
+                }
             }
         }
     };

@@ -617,6 +617,7 @@ pub(crate) fn introspect_namespace(
             marks,
             module,
             generate_hook.as_ref(),
+            registry,
         )?;
     }
     Ok(())
@@ -864,6 +865,7 @@ pub(crate) fn collect_class(
             marks,
             module,
             generate_hook,
+            registry,
         )?;
     }
     // Fire pytest_pycollect_makeitem hooks so plugins can set extra_keyword_matches.
@@ -900,6 +902,7 @@ pub(crate) fn push_test_items(
     marks: Vec<MarkData>,
     module: &Bound<'_, PyModule>,
     generate_hook: Option<&Bound<'_, PyAny>>,
+    registry: &FixtureRegistry,
 ) -> PyResult<()> {
     let flags = async_flags(py, func)?;
     let mut fixture_names = param_names(py, func)?;
@@ -934,9 +937,27 @@ pub(crate) fn push_test_items(
         for m in &marks {
             mark_objs.append(m.obj.bind(py))?;
         }
+        // Pass the transitive fixture closure (not just direct params) so
+        // generate hooks that check `if "x" in metafunc.fixturenames` see
+        // indirect dependencies too (issue519: test_one → fix2 → fix1 → arg1).
+        let test_nodeid = format!("{nodeid_prefix}::{name}");
+        let mut closure_names: Vec<String> = fixture_names.clone();
+        let mut seen: std::collections::HashSet<String> =
+            closure_names.iter().cloned().collect();
+        let mut i = 0;
+        while i < closure_names.len() {
+            if let Some(def) = registry.lookup(&closure_names[i], &test_nodeid) {
+                for dep in &def.param_names {
+                    if dep != "request" && seen.insert(dep.clone()) {
+                        closure_names.push(dep.clone());
+                    }
+                }
+            }
+            i += 1;
+        }
         let metafunc = py.import("pytest._metafunc")?.getattr("Metafunc")?.call1((
             func,
-            fixture_names.clone(),
+            closure_names,
             module,
             cls.map(|c| c.clone().unbind()),
             config,
