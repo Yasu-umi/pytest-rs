@@ -96,11 +96,11 @@
     },
     {
       "file": "sklearn/metrics/tests/test_classification.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 250,
       "failed": 0,
-      "skipped": 0,
+      "skipped": 18,
       "errors": 0
     },
     {
@@ -123,11 +123,11 @@
     },
     {
       "file": "sklearn/metrics/tests/test_pairwise.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 284,
       "failed": 0,
-      "skipped": 0,
+      "skipped": 302,
       "errors": 0
     },
     {
@@ -429,11 +429,11 @@
     },
     {
       "file": "sklearn/utils/tests/test_parallel.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 15,
       "failed": 0,
-      "skipped": 0,
+      "skipped": 2,
       "errors": 0
     },
     {
@@ -654,10 +654,10 @@
     },
     {
       "file": "sklearn/linear_model/tests/test_coordinate_descent.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
-      "failed": 0,
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 286,
+      "failed": 3,
       "skipped": 0,
       "errors": 0
     },
@@ -762,9 +762,9 @@
     },
     {
       "file": "sklearn/linear_model/tests/test_sgd.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 267,
       "failed": 0,
       "skipped": 0,
       "errors": 0
@@ -780,9 +780,9 @@
     },
     {
       "file": "sklearn/linear_model/tests/test_theil_sen.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 16,
       "failed": 0,
       "skipped": 0,
       "errors": 0
