@@ -799,7 +799,19 @@ impl Engine {
         };
 
         if let Err(err) = self.fire_sessionfinish(py, code) {
-            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+            if let Some(exit_code) = python::session_abort_code(py, &err) {
+                let exit_msg = err
+                    .value(py)
+                    .getattr("msg")
+                    .and_then(|m| m.extract::<String>())
+                    .unwrap_or_default();
+                if !exit_msg.is_empty() {
+                    eprintln!("Exit: {exit_msg}");
+                }
+                code = exit_code;
+            } else {
+                eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+            }
         }
         // Stop the session-wide capture (errors surface on stderr).
         python::capture_session_end(py);
