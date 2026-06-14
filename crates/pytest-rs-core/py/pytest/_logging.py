@@ -13,6 +13,7 @@ import io
 import logging
 import os
 import pickle
+import re as _re
 import sys
 import types
 
@@ -140,8 +141,14 @@ class DatetimeFormatter(logging.Formatter):
 
     def formatTime(self, record, datefmt=None):
         if datefmt and "%f" in datefmt:
-            ct = datetime.datetime.fromtimestamp(record.created).astimezone()
-            return ct.strftime(datefmt)
+            ct = self.converter(record.created)
+            tz = datetime.timezone(
+                datetime.timedelta(seconds=ct.tm_gmtoff), ct.tm_zone
+            )
+            dt = datetime.datetime(
+                *ct[0:6], microsecond=int(record.msecs * 1000), tzinfo=tz
+            )
+            return dt.strftime(datefmt)
         return super().formatTime(record, datefmt)
 
 
@@ -501,27 +508,11 @@ def caplog():
     capture._finalize()
 
 
-import re as _re
-
 _ANSI_ESCAPE_SEQ = _re.compile(r"\x1b\[[\d;]+m")
 
 
 def _remove_ansi_escape_sequences(text):
     return _ANSI_ESCAPE_SEQ.sub("", text)
-
-
-class DatetimeFormatter(logging.Formatter):
-    def formatTime(self, record, datefmt=None):
-        if datefmt and "%f" in datefmt:
-            ct = self.converter(record.created)
-            tz = datetime.timezone(
-                datetime.timedelta(seconds=ct.tm_gmtoff), ct.tm_zone
-            )
-            dt = datetime.datetime(
-                *ct[0:6], microsecond=int(record.msecs * 1000), tzinfo=tz
-            )
-            return dt.strftime(datefmt)
-        return super().formatTime(record, datefmt)
 
 
 class ColoredLevelFormatter(DatetimeFormatter):
