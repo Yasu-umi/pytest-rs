@@ -69,6 +69,7 @@ jobs:
             suites: "pytest-asyncio,pytest-mock,pytest-cov,pytest-xdist,pytest-split,pytest-benchmark,pytest-timeout,pytest-mypy,pytest-ruff,pytest-subtests,pytest-bdd,pytest-metadata,pytest-snapshot,pytest-icdiff,pytest-socket,pytest-order,pytest-repeat,pytest-instafail,pytest-env,pytest-rerunfailures,pytest-randomly,pytest-django"
           - group: libs
             suites: "anyio,click,jinja,marshmallow,rich,httpx,starlette,attrs,more-itertools,werkzeug,fastapi,packaging,httpx2"
+            jobs: 1
           - group: pandas
             suites: "pandas"
           - group: scikit-learn-1
@@ -107,7 +108,7 @@ jobs:
           rm -f conformance/scoreboard/linux/*.json
           export LD_LIBRARY_PATH="$(python -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR"))'):${LD_LIBRARY_PATH:-}"
           export PYTHONUNBUFFERED=1
-          python conformance/runner.py --suite "${{ matrix.suites }}" --check --skip-docs
+          python conformance/runner.py --suite "${{ matrix.suites }}" --check --skip-docs ${{ matrix.jobs && format('--jobs {0}', matrix.jobs) || '' }}
 
       - name: upload scoreboard
         if: always()

@@ -352,7 +352,7 @@ slow_files = [
     "tests/client/test_event_hooks.py",
     "tests/test_utils.py",
 ]
-slow_timeout_multiplier = 8
+slow_timeout_multiplier = 5
 
 [httpx2]
 repo = "https://github.com/pydantic/httpx2"
@@ -438,7 +438,7 @@ use_src = false
 category = "real-world"
 enabled = true
 slow_files = ["tests/middleware/test_http_proxy.py", "tests/test_serving.py"]
-slow_timeout_multiplier = 8
+slow_timeout_multiplier = 5
 
 [fastapi]
 repo = "https://github.com/fastapi/fastapi"
