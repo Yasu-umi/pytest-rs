@@ -297,6 +297,20 @@ impl Engine {
         let mut initial: Vec<Option<WorkerProc>> = (0..workers).map(|_| None).collect();
 
         let worker_chdirs = self.config.tx_worker_chdirs();
+        // Pre-assign all batches round-robin so scheduling order is
+        // deterministic: batch 0→gw0, batch 1→gw1, batch 2→gw0, …
+        // This matches CPython xdist's loadscope/loadfile schedulers
+        // which push work to specific workers, not a shared queue.
+        let mut per_worker: Vec<VecDeque<Vec<String>>> =
+            (0..workers).map(|_| VecDeque::new()).collect();
+        {
+            let mut state = queue.state.lock().expect("work queue lock poisoned");
+            let mut idx = 0;
+            while let Some(batch) = state.queue.pop_front() {
+                per_worker[idx % workers].push_back(batch);
+                idx += 1;
+            }
+        }
         let mut handles = Vec::new();
         for (index, slot) in initial.iter_mut().enumerate().take(workers) {
             let owner = WorkerOwner {
@@ -313,6 +327,7 @@ impl Engine {
                     .and_then(|chdirs| chdirs.get(index).cloned())
                     .flatten(),
                 initial: slot.take(),
+                assigned: std::mem::take(&mut per_worker[index]),
             };
             handles.push(std::thread::spawn(move || owner.run()));
         }
@@ -816,6 +831,9 @@ struct WorkerOwner {
     /// A pre-forked worker for this slot; replacements (after a crash)
     /// always spawn — re-forking is unsafe once threads exist.
     initial: Option<WorkerProc>,
+    /// Batches pre-assigned to this worker by round-robin so scheduling
+    /// order is deterministic (batch 0→gw0, batch 1→gw1, batch 2→gw0, …).
+    assigned: VecDeque<Vec<String>>,
 }
 
 impl WorkerOwner {
@@ -933,7 +951,7 @@ impl WorkerOwner {
         };
 
         'work: loop {
-            let Some(batch) = self.queue.next() else {
+            let Some(batch) = self.assigned.pop_front().or_else(|| self.queue.next()) else {
                 let msg = serde_json::to_string(&ParentMsg::Shutdown).expect("shutdown serializes");
                 let _ = writeln!(proc.stdin, "{msg}");
                 let _ = proc.stdin.flush();
