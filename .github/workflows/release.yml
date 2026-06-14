@@ -195,7 +195,7 @@ jobs:
           EOF
           ../smokevenv/bin/pytest-rs test_smoke.py
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: wheel-${{ matrix.platform.name }}-py${{ matrix.python-version }}
           path: dist/*.whl
@@ -212,7 +212,7 @@ jobs:
           command: sdist
           args: -o dist
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: sdist
           path: dist/*.tar.gz

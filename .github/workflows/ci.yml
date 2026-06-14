@@ -45,7 +45,7 @@ jobs:
 
       - name: upload binary
         if: matrix.python-version == '3.13'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: pytest-rs-bin
           path: target/debug/pytest-rs-bin
@@ -84,7 +84,7 @@ jobs:
 
       - uses: astral-sh/setup-uv@v7
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           name: pytest-rs-bin
           path: target/debug
@@ -93,7 +93,7 @@ jobs:
         run: chmod +x target/debug/pytest-rs-bin
 
       - name: cache conformance checkouts + deps
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .tmp/conformance
           key: conformance-${{ matrix.group }}-${{ runner.os }}-${{ hashFiles('conformance/suites.toml') }}
@@ -109,7 +109,7 @@ jobs:
 
       - name: upload scoreboard
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: scoreboard-${{ matrix.group }}
           path: conformance/scoreboard/linux/
@@ -131,7 +131,7 @@ jobs:
 
       - uses: astral-sh/setup-uv@v7
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           name: pytest-rs-bin
           path: target/debug
@@ -140,7 +140,7 @@ jobs:
         run: chmod +x target/debug/pytest-rs-bin
 
       - name: download all scoreboards
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: scoreboard-*
           path: conformance/scoreboard/linux/
@@ -158,7 +158,7 @@ jobs:
           "
 
       - name: cache plugin smoke deps
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .tmp/conformance
           key: plugin-smoke-${{ runner.os }}-${{ hashFiles('conformance/plugin_smoke.py') }}
