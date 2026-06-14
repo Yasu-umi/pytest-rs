@@ -410,6 +410,7 @@ deps = ["werkzeug==3.1.3", "cryptography==45.0.4", "watchdog==6.0.0", "markupsaf
 use_src = false
 category = "real-world"
 enabled = true
+slow_files = ["tests/middleware/test_http_proxy.py", "tests/test_serving.py"]
 
 [fastapi]
 repo = "https://github.com/fastapi/fastapi"
@@ -455,6 +456,14 @@ testpaths = ["sklearn/metrics", "sklearn/utils", "sklearn/linear_model"]
 deps = ["hypothesis>=6.116.0"]
 category = "real-world"
 enabled = true
+slow_files = [
+    "sklearn/metrics/tests/test_classification.py",
+    "sklearn/metrics/tests/test_pairwise.py",
+    "sklearn/utils/tests/test_parallel.py",
+    "sklearn/linear_model/tests/test_coordinate_descent.py",
+    "sklearn/linear_model/tests/test_sgd.py",
+    "sklearn/linear_model/tests/test_theil_sen.py",
+]
 
 [scikit-learn-2]
 tag = "1.9.0"
@@ -463,6 +472,18 @@ testpaths = ["sklearn/tests", "sklearn/ensemble", "sklearn/model_selection", "sk
 deps = ["hypothesis>=6.116.0"]
 category = "real-world"
 enabled = true
+slow_files = [
+    "sklearn/ensemble/tests/test_bagging.py",
+    "sklearn/ensemble/tests/test_forest.py",
+    "sklearn/ensemble/tests/test_voting.py",
+    "sklearn/model_selection/tests/test_search.py",
+    "sklearn/model_selection/tests/test_validation.py",
+    "sklearn/tests/test_calibration.py",
+    "sklearn/tests/test_common.py",
+    "sklearn/tests/test_config.py",
+    "sklearn/tests/test_multioutput.py",
+    "sklearn/tests/test_pipeline.py",
+]
 
 [scikit-learn-3]
 tag = "1.9.0"
@@ -494,4 +515,21 @@ testpaths = [
 deps = ["hypothesis>=6.116.0"]
 category = "real-world"
 enabled = true
+slow_files = [
+    "sklearn/callback/tests/test_callback_context.py",
+    "sklearn/callback/tests/test_callback_support.py",
+    "sklearn/callback/tests/test_scoring_monitor.py",
+    "sklearn/cluster/tests/test_mean_shift.py",
+    "sklearn/compose/tests/test_column_transformer.py",
+    "sklearn/decomposition/tests/test_dict_learning.py",
+    "sklearn/decomposition/tests/test_online_lda.py",
+    "sklearn/decomposition/tests/test_sparse_pca.py",
+    "sklearn/feature_selection/tests/test_mutual_info.py",
+    "sklearn/feature_selection/tests/test_rfe.py",
+    "sklearn/gaussian_process/tests/test_gpc.py",
+    "sklearn/inspection/tests/test_permutation_importance.py",
+    "sklearn/manifold/tests/test_mds.py",
+    "sklearn/neighbors/tests/test_kd_tree.py",
+    "sklearn/neighbors/tests/test_neighbors.py",
+]
 
