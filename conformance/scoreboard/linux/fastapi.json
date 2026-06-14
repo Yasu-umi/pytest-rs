@@ -2679,9 +2679,9 @@
     },
     {
       "file": "tests/test_tutorial/test_websockets/test_tutorial003.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 2,
+      "status": "timeout",
+      "exit_code": null,
+      "passed": 0,
       "failed": 0,
       "skipped": 0,
       "errors": 0
