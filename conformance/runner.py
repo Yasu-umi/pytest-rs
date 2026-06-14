@@ -249,9 +249,11 @@ def load_suites(only: str | None) -> list[Suite]:
     config = tomllib.loads((ROOT / "conformance" / "suites.toml").read_text())
     suites = [Suite(name, c) for name, c in config.items()]
     if only is not None:
-        suites = [s for s in suites if s.name == only]
-        if not suites:
-            sys.exit(f"unknown suite: {only}")
+        names = [n.strip() for n in only.split(",")]
+        suites = [s for s in suites if s.name in names]
+        missing = set(names) - {s.name for s in suites}
+        if missing:
+            sys.exit(f"unknown suite(s): {', '.join(sorted(missing))}")
         return suites
     return [s for s in suites if s.enabled]
 
@@ -589,6 +591,11 @@ def main() -> None:
         default=os.cpu_count() or 4,
         help="test files run in parallel (each is its own pytest-rs process)",
     )
+    parser.add_argument(
+        "--skip-docs",
+        action="store_true",
+        help="skip RESULTS.md/README regeneration (for parallel CI shards)",
+    )
     args = parser.parse_args()
 
     if not BINARY.exists():
@@ -601,12 +608,10 @@ def main() -> None:
         if args.check:
             violations.extend(check_suite(suite, results))
 
-    # Rewrite the human-readable results doc and README table from the
-    # committed scoreboards plus this run's update. CI auto-commits the
-    # refreshed linux results on main; regressions below still hard-fail.
-    all_suites = load_suites(None)
-    RESULTS_DOC.write_text(render_results_doc(all_suites))
-    update_readme_table(all_suites)
+    if not args.skip_docs:
+        all_suites = load_suites(None)
+        RESULTS_DOC.write_text(render_results_doc(all_suites))
+        update_readme_table(all_suites)
 
     if len(summaries) > 1:
         print("\n==== summary " + "=" * 67)

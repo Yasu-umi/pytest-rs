@@ -9,12 +9,9 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  rust:
-    name: rust (python ${{ matrix.python-version }})
+  build:
+    name: build (python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
-    permissions:
-      # The conformance step auto-commits refreshed linux results on main.
-      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -25,9 +22,6 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
-
-      # The conformance runner installs suite deps via `uv pip install`.
-      - uses: astral-sh/setup-uv@v7
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -49,54 +43,149 @@ jobs:
       - name: build
         run: cargo build
 
-      - name: cache conformance checkouts + deps
-        # Suite clones and `uv pip --target` dep installs are pure network
-        # cost; the runner skips both when the cache restores (.deps.txt
-        # markers gate per-suite reinstalls on suites.toml changes).
+      - name: upload binary
         if: matrix.python-version == '3.13'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-rs-bin
+          path: target/debug/pytest-rs-bin
+          retention-days: 1
+
+  conformance:
+    name: conformance (${{ matrix.group }})
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: pytest
+            suites: "pytest"
+          - group: plugins-1
+            suites: "pytest-asyncio,pytest-mock,pytest-cov,pytest-xdist,pytest-split,pytest-benchmark,pytest-timeout,pytest-mypy,pytest-ruff,pytest-subtests,pytest-bdd"
+          - group: plugins-2
+            suites: "pytest-metadata,pytest-snapshot,pytest-icdiff,pytest-socket,pytest-order,pytest-repeat,pytest-instafail,pytest-env,pytest-rerunfailures,pytest-randomly,pytest-django"
+          - group: libs-small
+            suites: "anyio,click,jinja,marshmallow,rich,httpx,starlette,attrs,more-itertools,werkzeug"
+          - group: libs-large
+            suites: "fastapi,packaging"
+          - group: pandas
+            suites: "pandas"
+          - group: scikit-learn
+            suites: "scikit-learn"
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - uses: astral-sh/setup-uv@v7
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: pytest-rs-bin
+          path: target/debug
+
+      - name: make binary executable
+        run: chmod +x target/debug/pytest-rs-bin
+
+      - name: cache conformance checkouts + deps
         uses: actions/cache@v4
         with:
           path: .tmp/conformance
-          key: conformance-${{ runner.os }}-${{ hashFiles('conformance/suites.toml', 'conformance/plugin_smoke.py') }}
+          key: conformance-${{ matrix.group }}-${{ runner.os }}-${{ hashFiles('conformance/suites.toml') }}
           restore-keys: |
-            conformance-${{ runner.os }}-
+            conformance-${{ matrix.group }}-${{ runner.os }}-
 
-      - name: conformance (upstream test suites)
-        # One canonical environment for the committed results: linux on a
-        # single python version. Regressions against expected/*.toml fail here.
-        if: matrix.python-version == '3.13'
+      - name: run suites
         run: |
           export LD_LIBRARY_PATH="$(python -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR"))'):${LD_LIBRARY_PATH:-}"
           export PYTHONUNBUFFERED=1
-          python conformance/runner.py --check
+          python conformance/runner.py --suite "${{ matrix.suites }}" --check --skip-docs
+
+      - name: upload scoreboard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scoreboard-${{ matrix.group }}
+          path: conformance/scoreboard/linux/
+          retention-days: 1
+
+  conformance-finish:
+    name: conformance results
+    needs: conformance
+    runs-on: ubuntu-latest
+    if: always()
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - uses: astral-sh/setup-uv@v7
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: pytest-rs-bin
+          path: target/debug
+
+      - name: make binary executable
+        run: chmod +x target/debug/pytest-rs-bin
+
+      - name: download all scoreboards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: scoreboard-*
+          path: conformance/scoreboard/linux/
+          merge-multiple: true
+
+      - name: regenerate docs
+        run: |
+          export LD_LIBRARY_PATH="$(python -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR"))'):${LD_LIBRARY_PATH:-}"
+          python -c "
+          import sys; sys.path.insert(0, 'conformance')
+          from runner import load_suites, render_results_doc, update_readme_table, RESULTS_DOC
+          all_suites = load_suites(None)
+          RESULTS_DOC.write_text(render_results_doc(all_suites))
+          update_readme_table(all_suites)
+          "
+
+      - name: cache plugin smoke deps
+        uses: actions/cache@v4
+        with:
+          path: .tmp/conformance
+          key: plugin-smoke-${{ runner.os }}-${{ hashFiles('conformance/plugin_smoke.py') }}
+          restore-keys: |
+            plugin-smoke-${{ runner.os }}-
 
       - name: plugin smoke (sugar/pretty byte-diff, fixture plugins)
-        # Third-party plugins running through the shim: reporter
-        # replacements diff byte-for-byte against real pytest; fixture
-        # providers run functional demos. See conformance/plugin_smoke.py.
-        if: matrix.python-version == '3.13'
         run: |
           export LD_LIBRARY_PATH="$(python -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR"))'):${LD_LIBRARY_PATH:-}"
           python conformance/plugin_smoke.py
 
       - name: commit refreshed conformance results
-        # The runner rewrites scoreboard/RESULTS.md/README on every run; on
-        # main the bot commits whatever changed (GITHUB_TOKEN pushes do not
-        # retrigger workflows).
-        if: matrix.python-version == '3.13' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           if ! git diff --quiet conformance/scoreboard conformance/RESULTS.md README.md; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add conformance/scoreboard conformance/RESULTS.md README.md
             git commit -m "conformance: refresh linux results"
-            # Main may have moved while the suites ran; rebase the refresh
-            # commit (our regenerated results win any overlap) and retry.
             for _ in 1 2 3; do
               git push && break
               git pull --rebase -X theirs origin main
             done
           fi
+
+      - name: check all shards passed
+        if: needs.conformance.result != 'success'
+        run: |
+          echo "One or more conformance shards failed"
+          exit 1
 
   python-lint:
     name: python lint (ruff + mypy)
@@ -107,8 +196,6 @@ jobs:
       - uses: astral-sh/setup-uv@v7
 
       - name: uv sync
-        # Lint only needs the dev group; the project itself is a maturin
-        # package whose build needs a Rust toolchain this job doesn't have.
         run: uv sync --no-install-project
 
       - name: ruff check
@@ -118,8 +205,6 @@ jobs:
         run: uv run --no-sync ruff format --check crates conformance
 
       - name: mypy
-        # The plugin py/ trees reuse top-level module names (helper.py), so
-        # each gets its own invocation (config covers core + conformance).
         run: |
           uv run --no-sync mypy
           for tree in crates/pytest-rs-asyncio crates/pytest-rs-anyio crates/pytest-rs-benchmark crates/pytest-rs-cov crates/pytest-rs-mock; do
