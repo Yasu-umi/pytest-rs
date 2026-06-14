@@ -322,7 +322,7 @@ def run_custom_item(item):
     of (when, outcome, longrepr) tuples for the engine. Failures get their
     longrepr from Item.repr_failure plus any pytest_exception_interact hook
     (pytest-ruff sets the ruff error message there)."""
-    from pytest._outcomes import Skipped
+    from pytest._outcomes import Skipped, XFailed
 
     def _excinfo(exc):
         class _ExcInfo:
@@ -373,6 +373,10 @@ def run_custom_item(item):
         reports.append(("setup", "skipped", str(getattr(exc, "msg", exc) or exc)))
         reports.append(("teardown", "passed", None))
         return reports
+    except XFailed as exc:
+        reports.append(("call", "xfailed", str(getattr(exc, "msg", exc) or exc)))
+        reports.append(("teardown", "passed", None))
+        return reports
     except BaseException as exc:  # noqa: BLE001 - protocol boundary
         reports.append(("setup", "failed", _failrepr("setup", exc)))
         try:
@@ -387,6 +391,8 @@ def run_custom_item(item):
         reports.append(_custom_item_pass_report(item))
     except Skipped as exc:
         reports.append(("call", "skipped", str(getattr(exc, "msg", exc) or exc)))
+    except XFailed as exc:
+        reports.append(("call", "xfailed", str(getattr(exc, "msg", exc) or exc)))
     except BaseException as exc:  # noqa: BLE001
         xfail = _custom_item_xfail(item, exc)
         if xfail is not None:
