@@ -19,7 +19,7 @@ import tempfile
 import time
 
 from pytest._fixtures import fixture
-from pytest._outcomes import fail
+from pytest._outcomes import fail, importorskip, skip
 
 # Split-out modules; re-exported so pytest._pytester.<name> keeps resolving
 # for pytest/__init__.py and Pytester's internal references.
@@ -1355,6 +1355,38 @@ class Pytester:
             proc.stderr.splitlines(),
             duration,
         )
+
+    def spawn_pytest(self, string, expect_timeout=10.0):
+        basetemp = self.path / "temp-pexpect"
+        basetemp.mkdir(mode=0o700, exist_ok=True)
+        exe = os.environ.get("PYTEST_RS_EXE") or _RUNNER_EXE
+        if exe is None:
+            fail("PYTEST_RS_EXE is not set; pytester cannot spawn the runner")
+        cmd = f"{exe} --basetemp={basetemp} {string}"
+        return self.spawn(cmd, expect_timeout=expect_timeout)
+
+    def spawn(self, cmd, expect_timeout=10.0):
+        import platform as _platform
+
+        pexpect = importorskip("pexpect", "3.0")
+        if hasattr(sys, "pypy_version_info") and "64" in _platform.machine():
+            skip("pypy-64 bit not supported")
+        if not hasattr(pexpect, "spawn"):
+            skip("pexpect.spawn not available")
+        logfile = self.path.joinpath("spawn.out").open("wb")
+        env = os.environ.copy()
+        for _var, _value in _RUNNER_LIBPATH.items():
+            env.setdefault(_var, _value)
+        if _RUNNER_PYTHONPATH:
+            env.setdefault("PYTHONPATH", _RUNNER_PYTHONPATH)
+        env["TERM"] = "dumb"
+        env.pop("NO_COLOR", None)
+        child = pexpect.spawn(
+            cmd, logfile=logfile, timeout=expect_timeout,
+            cwd=str(self.path), env=env,
+        )
+        self._request.addfinalizer(logfile.close)
+        return child
 
 
 class Testdir(Pytester):

@@ -611,7 +611,10 @@ class TerminalReporter:
         else:
             # Piped -v shows upstream's collection-start "collecting ... "
             # prefix on the same line (pytest_collection writes it unflushed).
-            if final and self.verbosity >= 1:
+            # Skip the prefix when errors occurred: instafail's
+            # pytest_collectreport already printed the error traceback,
+            # breaking the visual continuity.
+            if final and self.verbosity >= 1 and not self.stats.get("error"):
                 self.write("collecting ... ", bold=True)
             self.write_line(line)
 

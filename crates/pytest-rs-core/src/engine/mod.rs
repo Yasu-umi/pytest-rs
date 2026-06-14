@@ -510,6 +510,13 @@ impl Engine {
                 // like pytest's terminal-summary block (the count line and the
                 // Interrupted banner still show).
                 let no_summary = self.config.get_flag("no-summary");
+                if self.session.custom_reporter.is_some() {
+                    let _ = self.apply_selection(py);
+                    let n_items = self.session.items.len();
+                    let deselected = self.session.deselected_items.len();
+                    let collected = n_items + deselected;
+                    python::reporter_collection_finish(py, &self.config, collected);
+                }
                 if !self.config.no_terminal() {
                     #[cfg(feature = "xdist")]
                     if let Some(workers) = dist_workers {

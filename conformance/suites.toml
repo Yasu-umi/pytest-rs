@@ -229,7 +229,7 @@ repo = "https://github.com/pytest-dev/pytest-instafail"
 tag = "v0.5.0"
 testpaths = ["test_instafail.py"]
 # Flat layout; installed for the pytest11 entry point, checkout shadows.
-deps = ["pytest-instafail==0.5.0"]
+deps = ["pytest-instafail==0.5.0", "pexpect==4.9.0"]
 pythonpath = ["."]
 category = "third-party"
 enabled = true

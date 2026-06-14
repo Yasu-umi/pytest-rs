@@ -73,6 +73,11 @@ class pytestPDB:
             _pytest_capman = capman
             _continued = False
 
+            def precmd(self, line):
+                if "\x04" in line:
+                    return "EOF"
+                return super().precmd(line)
+
             def do_continue(self, arg):
                 ret = super().do_continue(arg)
                 if cls._recursive_debug == 0:
@@ -104,6 +109,7 @@ class pytestPDB:
 
             do_q = do_quit
             do_exit = do_quit
+            do_EOF = do_quit
 
         return PytestPdbWrapper
 
@@ -143,6 +149,7 @@ class pytestPDB:
             )
 
         _pdb = cls._import_pdb_cls(capman)(**kwargs)
+        _pdb.use_rawinput = False
         return _pdb
 
     @classmethod
@@ -308,7 +315,15 @@ def maybe_interact(item_proxy, exc, longrepr="") -> None:
 
     try:
         pm.hook.pytest_exception_interact(node=item_proxy, call=call, report=report)
-    except Exception:
+    except SystemExit:
+        raise
+    except Exception as e:
+        from pytest._outcomes import Exit
+
+        if isinstance(e, Exit):
+            import os
+
+            os._exit(e.returncode if e.returncode is not None else 1)
         pass
 
 

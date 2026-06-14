@@ -6,10 +6,10 @@
   "files": [
     {
       "file": "test_instafail.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 48,
-      "failed": 15,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 63,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     }
