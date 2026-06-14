@@ -62,8 +62,8 @@
       "file": "testing/test_cacheprovider.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 39,
-      "failed": 18,
+      "passed": 40,
+      "failed": 17,
       "skipped": 0,
       "errors": 0
     },
@@ -107,8 +107,8 @@
       "file": "testing/test_config.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 164,
-      "failed": 50,
+      "passed": 165,
+      "failed": 49,
       "skipped": 1,
       "errors": 0
     },
@@ -119,7 +119,7 @@
       "passed": 46,
       "failed": 7,
       "skipped": 1,
-      "errors": 1
+      "errors": 0
     },
     {
       "file": "testing/test_debug_session.py",
@@ -132,10 +132,10 @@
     },
     {
       "file": "testing/test_doctest.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 138,
-      "failed": 1,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 139,
+      "failed": 0,
       "skipped": 1,
       "errors": 0
     },
@@ -161,10 +161,10 @@
       "file": "testing/test_helpconfig.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 5,
-      "failed": 7,
+      "passed": 6,
+      "failed": 6,
       "skipped": 0,
-      "errors": 4
+      "errors": 0
     },
     {
       "file": "testing/test_junitxml.py",
@@ -198,7 +198,7 @@
       "status": "failed",
       "exit_code": 1,
       "passed": 104,
-      "failed": 1,
+      "failed": 2,
       "skipped": 0,
       "errors": 0
     },
@@ -321,10 +321,10 @@
     },
     {
       "file": "testing/test_stepwise.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 16,
-      "failed": 2,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 18,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },
@@ -332,8 +332,8 @@
       "file": "testing/test_subtests.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 22,
-      "failed": 12,
+      "passed": 13,
+      "failed": 21,
       "skipped": 0,
       "errors": 0
     },
@@ -395,8 +395,8 @@
       "file": "testing/acceptance_test.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 33,
-      "failed": 58,
+      "passed": 40,
+      "failed": 51,
       "skipped": 2,
       "errors": 0
     },
