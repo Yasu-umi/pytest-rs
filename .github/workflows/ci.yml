@@ -75,6 +75,8 @@ jobs:
             suites: "scikit-learn-1"
           - group: scikit-learn-2
             suites: "scikit-learn-2"
+          - group: scikit-learn-3
+            suites: "scikit-learn-3"
     steps:
       - uses: actions/checkout@v5
 

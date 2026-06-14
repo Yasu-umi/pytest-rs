@@ -454,6 +454,14 @@ enabled = true
 [scikit-learn-2]
 tag = "1.9.0"
 package = "scikit-learn==1.9.0"
+testpaths = ["sklearn/tests", "sklearn/ensemble", "sklearn/model_selection", "sklearn/preprocessing"]
+deps = ["hypothesis>=6.116.0"]
+category = "real-world"
+enabled = true
+
+[scikit-learn-3]
+tag = "1.9.0"
+package = "scikit-learn==1.9.0"
 testpaths = [
     "sklearn/_loss",
     "sklearn/callback",
@@ -463,7 +471,6 @@ testpaths = [
     "sklearn/cross_decomposition",
     "sklearn/datasets",
     "sklearn/decomposition",
-    "sklearn/ensemble",
     "sklearn/experimental",
     "sklearn/feature_extraction",
     "sklearn/feature_selection",
@@ -473,13 +480,10 @@ testpaths = [
     "sklearn/inspection",
     "sklearn/manifold",
     "sklearn/mixture",
-    "sklearn/model_selection",
     "sklearn/neighbors",
     "sklearn/neural_network",
-    "sklearn/preprocessing",
     "sklearn/semi_supervised",
     "sklearn/svm",
-    "sklearn/tests",
     "sklearn/tree",
 ]
 deps = ["hypothesis>=6.116.0"]
