@@ -53,7 +53,7 @@ pub(crate) fn run_one(
             if err.is_instance_of::<pyo3::exceptions::PyException>(py) {
                 let is_usage = (|| -> PyResult<bool> {
                     let cls = py.import("pytest")?.getattr("UsageError")?;
-                    Ok(err.is_instance(py, cls.downcast()?))
+                    Ok(err.is_instance(py, cls.cast()?))
                 })()
                 .unwrap_or(false);
                 if is_usage {

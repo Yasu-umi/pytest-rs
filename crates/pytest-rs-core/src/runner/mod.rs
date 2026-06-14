@@ -224,7 +224,14 @@ impl Engine {
             last_nodeid = Some(item.nodeid.clone());
             let mut item_failed = false;
             for (i, report) in reports.into_iter().enumerate() {
-                fire_logreport_hooks(py, session, &report, Some(item.lineno), Some(item), delegated);
+                fire_logreport_hooks(
+                    py,
+                    session,
+                    &report,
+                    Some(item.lineno),
+                    Some(item),
+                    delegated,
+                );
                 // A "rerun" report is a retried attempt: shown as 'R', never
                 // counted as a failure or charged against --maxfail.
                 if report.outcome == Outcome::Failed && !report.rerun {
