@@ -61,14 +61,10 @@ jobs:
         include:
           - group: pytest
             suites: "pytest"
-          - group: plugins-1
-            suites: "pytest-asyncio,pytest-mock,pytest-cov,pytest-xdist,pytest-split,pytest-benchmark,pytest-timeout,pytest-mypy,pytest-ruff,pytest-subtests,pytest-bdd"
-          - group: plugins-2
-            suites: "pytest-metadata,pytest-snapshot,pytest-icdiff,pytest-socket,pytest-order,pytest-repeat,pytest-instafail,pytest-env,pytest-rerunfailures,pytest-randomly,pytest-django"
-          - group: libs-small
-            suites: "anyio,click,jinja,marshmallow,rich,httpx,starlette,attrs,more-itertools,werkzeug"
-          - group: libs-large
-            suites: "fastapi,packaging,httpx2"
+          - group: plugins
+            suites: "pytest-asyncio,pytest-mock,pytest-cov,pytest-xdist,pytest-split,pytest-benchmark,pytest-timeout,pytest-mypy,pytest-ruff,pytest-subtests,pytest-bdd,pytest-metadata,pytest-snapshot,pytest-icdiff,pytest-socket,pytest-order,pytest-repeat,pytest-instafail,pytest-env,pytest-rerunfailures,pytest-randomly,pytest-django"
+          - group: libs
+            suites: "anyio,click,jinja,marshmallow,rich,httpx,starlette,attrs,more-itertools,werkzeug,fastapi,packaging,httpx2"
           - group: pandas
             suites: "pandas"
           - group: scikit-learn-1
