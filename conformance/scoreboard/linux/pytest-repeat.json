@@ -6,10 +6,10 @@
   "files": [
     {
       "file": "test_repeat.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 11,
-      "failed": 5,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 16,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     }

@@ -8,8 +8,8 @@
       "file": "tests/test_pytest_mypy.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 72,
-      "failed": 6,
+      "passed": 75,
+      "failed": 3,
       "skipped": 0,
       "errors": 0
     }
