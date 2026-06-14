@@ -136,6 +136,7 @@ def setup(config: Any) -> None:
     fires pytest_configure into Python plugins)."""
     global _default
     if _default is not None:
+        _default.__init__(config)
         return
     pluginmanager.register(_CoreHeader(), "_core_report_header")
     pluginmanager.register(_CoreTestStatus(), "_core_teststatus")

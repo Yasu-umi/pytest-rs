@@ -252,18 +252,25 @@ pub(crate) fn resolve_fixture_def(
         )));
     }
 
-    let instance = match def.scope {
-        Scope::Function => item.nodeid.clone(),
-        Scope::Class => item.class_instance(),
-        Scope::Module | Scope::Package => item.module_instance(),
-        Scope::Session => String::new(),
-    };
     // Parametrized fixtures cache per param index.
     let fixture_param: Option<(usize, Py<PyAny>)> = item
         .fixture_params
         .iter()
         .find(|(fixture, _, _)| fixture == &def.name)
         .map(|(_, index, value)| (*index, value.clone_ref(py)));
+    let instance = match def.scope {
+        Scope::Function => item.nodeid.clone(),
+        Scope::Class => item.class_instance(),
+        Scope::Module | Scope::Package => item.module_instance(),
+        // Parametrized session-scope fixtures use a per-param instance key so
+        // they can be torn down when the last test using that param finishes,
+        // rather than batched at session end.  Non-parametrized session
+        // fixtures still use the shared "" key (one instance per session).
+        Scope::Session => match &fixture_param {
+            Some((idx, _)) => format!("\x00session_param:{}:{}", def.name, idx),
+            None => String::new(),
+        },
+    };
     // firstresult: plugins may discriminate the key further (asyncio
     // loop-factory variants recreate loop-bound fixtures per variant).
     let keyed_name = {

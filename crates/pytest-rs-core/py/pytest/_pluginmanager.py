@@ -345,11 +345,21 @@ class PluginManager:
             from pytest import _capture
 
             return _capture.manager
+        if name == "terminalreporter":
+            return self._get_terminalreporter()
         if name in self._CORE_PLUGIN_NAMES:
             return True  # sentinel: plugin exists but has no Python object
         return None
 
     get_plugin = getplugin
+
+    def _get_terminalreporter(self):
+        config = getattr(self, "_config", None)
+        if config is None:
+            return None
+        from _pytest.terminal import TerminalReporter
+
+        return TerminalReporter(config)
 
     def list_plugin_distinfo(self):
         """(plugin, dist) pairs for registered plugins backed by a

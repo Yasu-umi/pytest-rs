@@ -296,6 +296,33 @@ impl Engine {
                     break;
                 }
             }
+            // Parametrized session-scope fixture boundary: when the next item
+            // does not use the same (fixture, param_index) as the current one,
+            // the parametrized session-scope variant is exhausted and should be
+            // torn down before the next test sets up the new variant.
+            {
+                let nextitem = items.get(idx + 1);
+                for (fixture_name, param_idx, _) in &item.fixture_params {
+                    if let Some(def) = session.registry.lookup(fixture_name, &item.nodeid) {
+                        if def.scope == Scope::Session {
+                            let next_uses_same = nextitem
+                                .map(|next| {
+                                    next.fixture_params.iter().any(|(n, i, _)| {
+                                        n == fixture_name && i == param_idx
+                                    })
+                                })
+                                .unwrap_or(false);
+                            if !next_uses_same {
+                                let instance = format!(
+                                    "\x00session_param:{}:{}",
+                                    fixture_name, param_idx
+                                );
+                                report_scope_teardown!(Scope::Session, &instance, item);
+                            }
+                        }
+                    }
+                }
+            }
             // Plugin-set session.shouldfail (pytest-timeout's session
             // deadline) aborts the run with its message banner.
             if let Some(msg) = python::session_shouldfail(py) {

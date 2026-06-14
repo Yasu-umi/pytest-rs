@@ -167,6 +167,12 @@ fn build_py_config(
     if let Some(confcutdir) = config.get_value("confcutdir") {
         option_ns.setattr("confcutdir", confcutdir.to_owned())?;
     }
+    // -p plugin specs (config.option.plugins in upstream pytest).
+    let plugins_list = pyo3::types::PyList::empty(py);
+    for p in &config.plugin_opts {
+        plugins_list.append(p)?;
+    }
+    option_ns.setattr("plugins", plugins_list)?;
     let option = option_ns.unbind();
     let inipath = config
         .config_file_name
@@ -203,6 +209,7 @@ fn build_py_config(
     let confcutdir_path = pathlib.getattr("Path")?.call1((confcutdir_str,))?;
     let pm = bound.getattr("pluginmanager")?;
     pm.setattr("_confcutdir", confcutdir_path)?;
+    pm.setattr("_config", &proxy)?;
     Ok(proxy)
 }
 

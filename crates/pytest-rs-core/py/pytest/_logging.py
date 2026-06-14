@@ -145,6 +145,17 @@ class DatetimeFormatter(logging.Formatter):
         return super().formatTime(record, datefmt)
 
 
+class _NullCliHandler(logging.NullHandler):
+    """Placeholder when live CLI logging is disabled (pytest parity:
+    LoggingPlugin.log_cli_handler is always non-None)."""
+
+    def reset(self):
+        pass
+
+    def set_when(self, when):
+        pass
+
+
 def _parse_level(value):
     """An int log level from an int-ish or name string, else None."""
     if value is None:
@@ -236,6 +247,8 @@ class LoggingState:
             if effective is not None:
                 explicit_levels.append(effective)
             sys.stdout.flush()
+        else:
+            self.log_cli_handler = _NullCliHandler()
 
         # An explicit level lowers the root logger so records reach the
         # session handlers; without one the root default (WARNING) stands.
