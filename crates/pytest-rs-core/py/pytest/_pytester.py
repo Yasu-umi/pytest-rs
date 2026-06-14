@@ -756,7 +756,9 @@ class Pytester:
         reprec.ret = ret
         # Carry the captured output for tests reaching past the HookRecorder
         # API (e.g. result.stdout / .outlines like the old InlineRunResult).
-        reprec._result = RunResult(ret, outlines, errlines, 0.0)
+        result = RunResult(ret, outlines, errlines, 0.0)
+        result.reprec = reprec
+        reprec._result = result
         reprec.outlines = outlines
         reprec.errlines = errlines
         return reprec
