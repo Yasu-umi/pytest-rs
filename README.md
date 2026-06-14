@@ -128,7 +128,7 @@ _linux (CI-verified)_
 | pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-snapshot | v0.9.0 | 100 | 7 | 0 | 0 | 107 | 93.5% | 0 | 3 | 0 |
 | pytest-icdiff | 0.5 | 10 | 2 | 0 | 0 | 12 | 83.3% | 0 | 1 | 0 |
-| pytest-socket | 0.7.0 | 40 | 3 | 0 | 0 | 43 | 93.0% | 2 | 6 | 0 |
+| pytest-socket | 0.7.0 | 59 | 6 | 0 | 0 | 65 | 90.8% | 2 | 6 | 0 |
 | pytest-order | v1.4.0 | 115 | 19 | 0 | 0 | 134 | 85.8% | 7 | 16 | 0 |
 | pytest-repeat | v0.9.4 | 16 | 0 | 0 | 0 | 16 | 100.0% | 1 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
@@ -146,7 +146,7 @@ _linux (CI-verified)_
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
 | rich | v14.2.0 | 855 | 0 | 0 | 25 | 880 | 100.0% | 60 | 62 | 0 |
-| httpx | 0.28.1 | 1333 | 9 | 0 | 1 | 1343 | 99.3% | 25 | 31 | 0 |
+| httpx | 0.28.1 | 1404 | 13 | 0 | 1 | 1418 | 99.1% | 26 | 31 | 0 |
 | httpx2 | v2.4.0 | 1426 | 0 | 0 | 1 | 1427 | 100.0% | 31 | 31 | 0 |
 | starlette | 0.46.2 | 902 | 0 | 1 | 0 | 903 | 99.9% | 27 | 28 | 0 |
 | attrs | 25.3.0 | 1339 | 2 | 0 | 4 | 1345 | 99.9% | 20 | 24 | 0 |
@@ -157,7 +157,7 @@ _linux (CI-verified)_
 | pandas | v3.0.3 | 160650 | 39 | 371 | 25459 | 186519 | 99.8% | 860 | 964 | 0 |
 | scikit-learn-1 | 1.9.0 | 8109 | 16 | 193 | 6617 | 14935 | 98.6% | 73 | 87 | 0 |
 | scikit-learn-2 | 1.9.0 | 4915 | 0 | 2 | 1888 | 6805 | 100.0% | 50 | 58 | 0 |
-| scikit-learn-3 | 1.9.0 | 9211 | 7 | 0 | 2530 | 11748 | 99.9% | 100 | 114 | 0 |
+| scikit-learn-3 | 1.9.0 | 9240 | 7 | 0 | 2530 | 11777 | 99.9% | 101 | 114 | 0 |
 <!-- conformance-results:end -->
 
 The suites are included as **shallow git submodules** under `conformance/suites/` at the pinned release tags. Initialize them once after cloning:
