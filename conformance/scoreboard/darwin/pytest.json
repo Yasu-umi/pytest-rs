@@ -72,8 +72,8 @@
       "status": "failed",
       "exit_code": 1,
       "passed": 128,
-      "failed": 3,
-      "skipped": 1,
+      "failed": 2,
+      "skipped": 2,
       "errors": 0
     },
     {
@@ -234,8 +234,8 @@
       "status": "failed",
       "exit_code": 1,
       "passed": 47,
-      "failed": 5,
-      "skipped": 0,
+      "failed": 4,
+      "skipped": 1,
       "errors": 0
     },
     {
@@ -342,8 +342,8 @@
       "status": "failed",
       "exit_code": 1,
       "passed": 186,
-      "failed": 39,
-      "skipped": 2,
+      "failed": 37,
+      "skipped": 4,
       "errors": 0
     },
     {

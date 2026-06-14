@@ -1536,12 +1536,12 @@
     },
     {
       "file": "tests/test_tutorial/test_custom_docs_ui/test_tutorial002.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 4,
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 3,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 1
     },
     {
       "file": "tests/test_tutorial/test_custom_request_and_route/test_tutorial001.py",
