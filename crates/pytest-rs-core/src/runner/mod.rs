@@ -67,6 +67,12 @@ impl Engine {
             .get_ini("verbosity_subtests")
             .map(|v| v.trim() == "0")
             .unwrap_or(config.verbose == 0);
+        // With -s (no capture) and non-verbose mode, subtest progress chars
+        // must be printed inline from Python's __exit__ so they interleave
+        // with the test's own stdout (upstream fires logreport inline).
+        let inline_sub_chars =
+            !config.no_terminal() && tc <= 0 && !session.live_logging && config.capture_disabled();
+        python::set_subtest_inline_chars(py, inline_sub_chars);
         // Collection errors (--continue-on-collection-errors) already count
         // toward the --maxfail budget, like pytest's session.testsfailed.
         let mut failed = session
@@ -195,6 +201,19 @@ impl Engine {
             session.live_printed = 0;
             session.streamed_chars = 0;
             let reports = run_one(py, plugins, session, config, item, items.get(idx + 1));
+            if inline_sub_chars {
+                let inline = python::pop_subtest_inline_count(py);
+                if inline > 0 {
+                    session.streamed_chars = reports
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, r)| r.subtest_desc.is_some())
+                        .take(inline)
+                        .last()
+                        .map(|(i, _)| i + 1)
+                        .unwrap_or(0);
+                }
+            }
             // A delegated pytest_runtest_protocol drove the shim TerminalReporter
             // (via ihook), which already rendered; here we only count.
             let delegated = session.delegated_render;

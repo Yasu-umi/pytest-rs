@@ -19,12 +19,37 @@ _results: list[dict[str, Any]] = []
 # stops, matching upstream's session.shouldfail check in __exit__.
 _fail_budget: int | None = None
 
+# When True, __exit__ writes the progress char to stdout immediately
+# (needed with -s so chars interleave with test output).
+_inline_chars: bool = False
+_inline_count: int = 0
+
+_PROGRESS_CHARS = {
+    "passed": ",",
+    "failed": "u",
+    "skipped": "-",
+    "xfailed": "y",
+}
+
 
 def set_fail_budget(budget: int | None) -> None:
     """Called by the runner before each item; also drops stale records."""
-    global _fail_budget
+    global _fail_budget, _inline_count
     _fail_budget = budget
+    _inline_count = 0
     _results.clear()
+
+
+def set_inline_chars(enabled: bool) -> None:
+    global _inline_chars
+    _inline_chars = enabled
+
+
+def pop_inline_count() -> int:
+    global _inline_count
+    n = _inline_count
+    _inline_count = 0
+    return n
 
 
 def _saferepr(obj: Any) -> str:
@@ -135,16 +160,20 @@ class _SubTestContextManager:
         __tracebackhide__ = True
         self._start = time.perf_counter()
         from pytest._capture import state as _capture_state
+        from pytest._logging import state as _log_state
 
         _capture_state.subtest_enter()
+        _log_state.subtest_enter()
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
         __tracebackhide__ = True
         duration = time.perf_counter() - self._start
         from pytest._capture import state as _capture_state
+        from pytest._logging import state as _log_state
         from pytest._outcomes import Exit, Skipped, XFailed
 
         sections = _capture_state.subtest_exit()
+        sections.extend(_log_state.subtest_exit())
 
         record: dict[str, Any] = {
             "desc": _description(self.msg, self.kwargs),
@@ -168,6 +197,16 @@ class _SubTestContextManager:
             record["outcome"] = "failed"
             record["exc"] = exc_val
         _results.append(record)
+
+        if _inline_chars:
+            import sys
+
+            c = _PROGRESS_CHARS.get(record["outcome"])
+            if c is not None:
+                global _inline_count
+                sys.stdout.write(c)
+                sys.stdout.flush()
+                _inline_count += 1
 
         if exc_val is not None and isinstance(exc_val, (KeyboardInterrupt, SystemExit, Exit)):
             return False

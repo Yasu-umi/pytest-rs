@@ -701,7 +701,7 @@ class CaptureState:
 
     def subtest_exit(self):
         if not self._installed or self._capture is None:
-            return [], []
+            return []
         if self.fixture is not None:
             self.fixture._pop_to_orig()
         out, err = self._capture.readouterr()

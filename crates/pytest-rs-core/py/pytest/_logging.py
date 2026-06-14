@@ -173,6 +173,7 @@ class LoggingState:
         self.sections = []  # finished (when, text) pairs for the current item
         self.when = None
         self._root_level_restore = None
+        self._subtest_parent_log = []
         # Session-wide handlers, wired by configure().
         self.log_cli_enabled = False
         self.log_cli_handler = None
@@ -308,14 +309,34 @@ class LoggingState:
     def finish_item(self):
         self.end_phase()
         self.sections = []
+        self._subtest_parent_log.clear()
+
+    def subtest_enter(self):
+        if self.when is None:
+            return
+        text = self.report_handler.stream.getvalue().strip()
+        if text:
+            self._subtest_parent_log.append(text)
+        self.report_handler.reset()
+
+    def subtest_exit(self):
+        if self.when is None:
+            return []
+        text = self.report_handler.stream.getvalue().strip()
+        self.report_handler.reset()
+        if text:
+            return [(f"Captured log {self.when}", text)]
+        return []
 
     def failure_sections(self):
         """pytest-style (title, text) report sections for a failing report."""
         out = [(f"Captured log {when}", text) for when, text in self.sections]
         if self.when is not None:
+            parent_log = "\n".join(self._subtest_parent_log)
             text = self.report_handler.stream.getvalue().strip()
-            if text:
-                out.append((f"Captured log {self.when}", text))
+            combined = "\n".join(filter(None, [parent_log, text]))
+            if combined:
+                out.append((f"Captured log {self.when}", combined))
         return out
 
 

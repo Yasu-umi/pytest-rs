@@ -70,6 +70,25 @@ pub fn set_subtest_fail_budget(py: Python<'_>, budget: Option<usize>) {
     })();
 }
 
+/// Enable/disable inline progress char printing from subtest __exit__.
+pub fn set_subtest_inline_chars(py: Python<'_>, enabled: bool) {
+    let _ = (|| -> PyResult<()> {
+        py.import("pytest._subtests")?
+            .getattr("set_inline_chars")?
+            .call1((enabled,))?;
+        Ok(())
+    })();
+}
+
+/// How many progress chars the subtest __exit__ already printed inline.
+pub fn pop_subtest_inline_count(py: Python<'_>) -> usize {
+    py.import("pytest._subtests")
+        .and_then(|m| m.getattr("pop_inline_count"))
+        .and_then(|f| f.call0())
+        .and_then(|r| r.extract())
+        .unwrap_or(0)
+}
+
 /// Drain the subtests fixture accumulator into reports for this item.
 /// Quiet subtest verbosity (the default) keeps only failed subtests,
 /// matching upstream's pytest_report_teststatus filtering. The second
