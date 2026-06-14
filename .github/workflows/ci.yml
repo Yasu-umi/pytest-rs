@@ -17,7 +17,7 @@ jobs:
       matrix:
         python-version: ["3.13", "3.14"]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - uses: actions/setup-python@v6
         with:
@@ -45,7 +45,7 @@ jobs:
 
       - name: upload binary
         if: matrix.python-version == '3.13'
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: pytest-rs-bin
           path: target/debug/pytest-rs-bin
@@ -78,15 +78,15 @@ jobs:
           - group: scikit-learn-3
             suites: "scikit-learn-3"
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
 
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@v8
 
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           name: pytest-rs-bin
           path: target/debug
@@ -111,7 +111,7 @@ jobs:
 
       - name: upload scoreboard
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: scoreboard-${{ matrix.group }}
           path: conformance/scoreboard/linux/
@@ -125,15 +125,15 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
 
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@v8
 
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           name: pytest-rs-bin
           path: target/debug
@@ -142,7 +142,7 @@ jobs:
         run: chmod +x target/debug/pytest-rs-bin
 
       - name: download all scoreboards
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           pattern: scoreboard-*
           path: conformance/scoreboard/linux/
@@ -196,9 +196,9 @@ jobs:
     name: python lint (ruff + mypy)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@v8
 
       - name: uv sync
         run: uv sync --no-install-project

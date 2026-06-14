@@ -13,7 +13,7 @@ jobs:
     name: tag matches pyproject version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: check
         if: github.event_name == 'push'
@@ -31,7 +31,7 @@ jobs:
     permissions:
       actions: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 20
 
@@ -75,13 +75,13 @@ jobs:
     name: conformance gate (expected pins)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
 
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@v8
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -117,7 +117,7 @@ jobs:
           - { name: linux-aarch64, runner: ubuntu-24.04-arm, manylinux: "2_28" }
           - { name: macos-aarch64, runner: macos-latest, manylinux: auto }
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - uses: actions/setup-python@v6
         with:
@@ -172,7 +172,7 @@ jobs:
             *) echo "engine must reference libpython3.X by leaf name"; exit 1 ;;
           esac
 
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@v8
 
       - name: smoke test (install wheel into a fresh venv and run it)
         run: |
@@ -195,7 +195,7 @@ jobs:
           EOF
           ../smokevenv/bin/pytest-rs test_smoke.py
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: wheel-${{ matrix.platform.name }}-py${{ matrix.python-version }}
           path: dist/*.whl
@@ -205,14 +205,14 @@ jobs:
     needs: check-version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - uses: PyO3/maturin-action@v1
         with:
           command: sdist
           args: -o dist
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: sdist
           path: dist/*.tar.gz
@@ -227,7 +227,7 @@ jobs:
       # PyPI Trusted Publishing (OIDC).
       id-token: write
     steps:
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
@@ -243,12 +243,12 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           path: repo
 
