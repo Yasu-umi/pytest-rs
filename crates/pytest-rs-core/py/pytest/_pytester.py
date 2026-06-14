@@ -643,7 +643,16 @@ class Pytester:
         os.dup2(out_f.fileno(), 1)
         os.dup2(err_f.fileno(), 2)
         try:
-            ret = pytest._native_inline_run(run_args)
+            try:
+                ret = pytest._native_inline_run(run_args)
+            except SystemExit as exc:
+                ret = int(exc.code) if exc.code is not None else 0
+            except Exception as exc:
+                if type(exc).__name__ == "UsageError":
+                    sys.stderr.write(f"ERROR: {exc}\n")
+                    ret = 4
+                else:
+                    raise
         finally:
             sys.stdout.flush()
             sys.stderr.flush()

@@ -110,16 +110,6 @@ impl Engine {
         } else {
             DebugGuard(None)
         };
-        if let Some(report) = self.config.get_value("doctest-report") {
-            const CHOICES: &[&str] = &["none", "cdiff", "udiff", "ndiff", "only_first_failure"];
-            if !CHOICES.iter().any(|c| c.eq_ignore_ascii_case(report)) {
-                eprintln!(
-                    "error: argument --doctest-report: invalid choice: '{report}' (choose from {})",
-                    CHOICES.join(", ")
-                );
-                return exit_code::USAGE_ERROR;
-            }
-        }
         let ini_filters: Vec<String> = self
             .config
             .get_ini_lines("filterwarnings")
@@ -278,6 +268,17 @@ impl Engine {
             }
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
             return exit_code::INTERNAL_ERROR;
+        }
+
+        if let Some(report) = self.config.get_value("doctest-report") {
+            const CHOICES: &[&str] = &["none", "cdiff", "udiff", "ndiff", "only_first_failure"];
+            if !CHOICES.iter().any(|c| c.eq_ignore_ascii_case(report)) {
+                eprintln!(
+                    "error: argument --doctest-report: invalid choice: '{report}' (choose from {})",
+                    CHOICES.join(", ")
+                );
+                return exit_code::USAGE_ERROR;
+            }
         }
 
         // -n worker mode: this process is driven over stdin/stdout; it
@@ -975,6 +976,15 @@ impl Engine {
             python::setenv(py, "PYTEST_VERSION", &version);
         }
         python::configure_debugging(py);
+        if let Err(err) = python::configure_mark_generator(
+            py,
+            &self.config,
+            self.strict_markers(),
+            self.strict_parametrization_ids(),
+        ) {
+            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+            return exit_code::INTERNAL_ERROR;
+        }
         self.run_session(py, started)
     }
 }
