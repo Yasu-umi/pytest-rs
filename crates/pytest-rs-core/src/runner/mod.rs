@@ -50,9 +50,6 @@ impl Engine {
         let mut prev_class: Option<String> = None;
         let mut current_file = String::new();
         let mut line = String::new();
-        // --setup-only prints no progress chars at all; pytest then also
-        // omits the closing "[100%]" fill on the narration line.
-        let mut any_char = false;
         let maxfail = config.maxfail();
         // --stepwise stops after the first failing item (--stepwise-skip
         // ignores the first one); the resume point persists via the cache.
@@ -243,9 +240,6 @@ impl Engine {
                 if report.phase == Phase::Call {
                     file_dur += report.duration;
                 }
-                if report.progress_char().is_some() {
-                    any_char = true;
-                }
                 let is_quiet_sub = quiet_subtests
                     && report.subtest_desc.is_some()
                     && report.outcome != Outcome::Failed;
@@ -350,7 +344,7 @@ impl Engine {
             && !config.no_terminal()
             && !session.live_logging
             && !line.is_empty()
-            && (!setup_show_active(config) || any_char)
+            && !setup_show_active(config)
         {
             let msg = progress_message(pkind, done, total, file_dur);
             println!(
