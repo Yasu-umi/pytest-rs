@@ -297,20 +297,20 @@ impl Engine {
             {
                 let nextitem = items.get(idx + 1);
                 for (fixture_name, param_idx, _) in &item.fixture_params {
-                    if let Some(def) = session.registry.lookup(fixture_name, &item.nodeid) {
-                        if def.scope == Scope::Session {
-                            let next_uses_same = nextitem
-                                .map(|next| {
-                                    next.fixture_params
-                                        .iter()
-                                        .any(|(n, i, _)| n == fixture_name && i == param_idx)
-                                })
-                                .unwrap_or(false);
-                            if !next_uses_same {
-                                let instance =
-                                    format!("\x00session_param:{}:{}", fixture_name, param_idx);
-                                report_scope_teardown!(Scope::Session, &instance, item);
-                            }
+                    if let Some(def) = session.registry.lookup(fixture_name, &item.nodeid)
+                        && def.scope == Scope::Session
+                    {
+                        let next_uses_same = nextitem
+                            .map(|next| {
+                                next.fixture_params
+                                    .iter()
+                                    .any(|(n, i, _)| n == fixture_name && i == param_idx)
+                            })
+                            .unwrap_or(false);
+                        if !next_uses_same {
+                            let instance =
+                                format!("\x00session_param:{}:{}", fixture_name, param_idx);
+                            report_scope_teardown!(Scope::Session, &instance, item);
                         }
                     }
                 }
