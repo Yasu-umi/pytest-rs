@@ -99,7 +99,7 @@
       "status": "failed",
       "exit_code": 1,
       "passed": 0,
-      "failed": 14,
+      "failed": 28,
       "skipped": 0,
       "errors": 0
     },
