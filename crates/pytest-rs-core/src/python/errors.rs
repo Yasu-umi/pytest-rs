@@ -136,11 +136,13 @@ pub fn exit_returncode(py: Python<'_>, err: &PyErr) -> Option<Option<i32>> {
     if !err_matches_shim(py, err, "Exit") {
         return None;
     }
-    let code = err
-        .value(py)
-        .getattr("returncode")
-        .ok()
-        .and_then(|v| if v.is_none() { None } else { v.extract::<i32>().ok() });
+    let code = err.value(py).getattr("returncode").ok().and_then(|v| {
+        if v.is_none() {
+            None
+        } else {
+            v.extract::<i32>().ok()
+        }
+    });
     Some(code)
 }
 

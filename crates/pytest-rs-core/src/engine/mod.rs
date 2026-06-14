@@ -1085,8 +1085,7 @@ impl Engine {
             let _ = python::install_warning_capture(py, &ini_filters, &self.config.w_options);
         }
         let outer_color = crate::tw::enabled();
-        let nested_color =
-            crate::tw::should_colorize(self.config.get_value("color"));
+        let nested_color = crate::tw::should_colorize(self.config.get_value("color"));
         crate::tw::set_enabled(nested_color);
         python::set_tb_color(py, nested_color);
         python::set_showlocals(

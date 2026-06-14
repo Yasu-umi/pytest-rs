@@ -416,17 +416,14 @@ pub(crate) fn resolve_fixture_def(
                         "_pytest/fixtures.py",
                         1188,
                     )?;
-                    let value =
-                        python::call_fixture(py, &def.func, fixture_instance, &kwargs)?;
+                    let value = python::call_fixture(py, &def.func, fixture_instance, &kwargs)?;
                     (value.unbind(), None)
                 } else if def.is_generator {
-                    let generator =
-                        python::call_fixture(py, &def.func, fixture_instance, &kwargs)?;
+                    let generator = python::call_fixture(py, &def.func, fixture_instance, &kwargs)?;
                     let value = python::next_value(py, &generator)?;
                     (value.unbind(), Some(Finalizer::GenNext(generator.unbind())))
                 } else {
-                    let value =
-                        python::call_fixture(py, &def.func, fixture_instance, &kwargs)?;
+                    let value = python::call_fixture(py, &def.func, fixture_instance, &kwargs)?;
                     (value.unbind(), None)
                 }
             }

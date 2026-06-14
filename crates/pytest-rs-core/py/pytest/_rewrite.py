@@ -117,9 +117,10 @@ class _RewriteConfig:
         if not source or not self.hasmarkup:
             return source
         try:
+            import os
+
             from pygments import highlight as pygments_highlight
             from pygments.formatters.terminal import TerminalFormatter
-            import os
 
             if lexer == "diff":
                 from pygments.lexers.diff import DiffLexer

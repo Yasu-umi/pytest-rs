@@ -942,8 +942,7 @@ pub(crate) fn push_test_items(
         // indirect dependencies too (issue519: test_one → fix2 → fix1 → arg1).
         let test_nodeid = format!("{nodeid_prefix}::{name}");
         let mut closure_names: Vec<String> = fixture_names.clone();
-        let mut seen: std::collections::HashSet<String> =
-            closure_names.iter().cloned().collect();
+        let mut seen: std::collections::HashSet<String> = closure_names.iter().cloned().collect();
         let mut i = 0;
         while i < closure_names.len() {
             if let Some(def) = registry.lookup(&closure_names[i], &test_nodeid) {
