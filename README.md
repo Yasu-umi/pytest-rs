@@ -108,14 +108,14 @@ _linux (CI-verified)_
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 1663 | 562 | 3 | 28 | 2256 | 75.0% | 9 | 45 | 63 |
+| pytest | 9.0.3 | 1787 | 438 | 3 | 28 | 2256 | 80.5% | 12 | 45 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 20 | 0 | 3 | 209 | 90.4% | 0 | 1 | 0 |
 | pytest-xdist | v3.8.0 | 91 | 6 | 0 | 1 | 98 | 93.9% | 0 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 91 | 31 | 0 | 1 | 123 | 74.8% | 4 | 7 | 6 |
-| anyio | 4.13.0 | 3119 | 1 | 0 | 42 | 3162 | 100.0% | 25 | 26 | 0 |
+| anyio | 4.13.0 | 3120 | 0 | 0 | 42 | 3162 | 100.0% | 26 | 26 | 0 |
 
 **Third-party plugins** (not reimplemented — their own upstream test suites run under pytest-rs, loaded via the `pytest11` entry-point shim):
 
@@ -135,7 +135,7 @@ _linux (CI-verified)_
 | pytest-env | 1.6.0 | 67 | 8 | 0 | 0 | 75 | 89.3% | 2 | 3 | 0 |
 | pytest-rerunfailures | 9.1.1 | 37 | 10 | 0 | 1 | 48 | 79.2% | 0 | 1 | 0 |
 | pytest-randomly | 4.1.0 | 32 | 5 | 0 | 0 | 37 | 86.5% | 0 | 1 | 0 |
-| pytest-bdd | 8.1.0 | 89 | 63 | 0 | 1 | 153 | 58.8% | 18 | 35 | 0 |
+| pytest-bdd | 8.1.0 | 89 | 49 | 0 | 1 | 139 | 64.7% | 18 | 35 | 0 |
 | pytest-django | v4.9.0 | 147 | 68 | 0 | 1 | 216 | 68.5% | 2 | 13 | 0 |
 
 **Real-world projects** (their suites run unchanged, as drop-in evidence):
@@ -155,7 +155,7 @@ _linux (CI-verified)_
 | fastapi | 0.115.12 | 2209 | 9 | 115 | 130 | 2463 | 95.0% | 296 | 310 | 0 |
 | packaging | 25.0 | 26948 | 0 | 0 | 0 | 26948 | 100.0% | 12 | 12 | 0 |
 | pandas | v3.0.3 | 160650 | 39 | 371 | 25459 | 186519 | 99.8% | 860 | 964 | 0 |
-| scikit-learn-1 | 1.9.0 | 8109 | 16 | 193 | 6617 | 14935 | 98.6% | 73 | 87 | 0 |
+| scikit-learn-1 | 1.9.0 | 8301 | 16 | 1 | 6617 | 14935 | 99.9% | 74 | 87 | 0 |
 | scikit-learn-2 | 1.9.0 | 4915 | 0 | 2 | 1888 | 6805 | 100.0% | 50 | 58 | 0 |
 | scikit-learn-3 | 1.9.0 | 9240 | 7 | 0 | 2530 | 11777 | 99.9% | 101 | 114 | 0 |
 <!-- conformance-results:end -->
