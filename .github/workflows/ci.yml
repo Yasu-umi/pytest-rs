@@ -68,7 +68,7 @@ jobs:
           - group: libs-small
             suites: "anyio,click,jinja,marshmallow,rich,httpx,starlette,attrs,more-itertools,werkzeug"
           - group: libs-large
-            suites: "fastapi,packaging"
+            suites: "fastapi,packaging,httpx2"
           - group: pandas
             suites: "pandas"
           - group: scikit-learn-1
