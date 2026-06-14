@@ -1338,10 +1338,10 @@
     },
     {
       "file": "tests/test_tutorial/test_background_tasks/test_tutorial001.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 1,
-      "failed": 0,
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 0,
+      "failed": 1,
       "skipped": 0,
       "errors": 0
     },

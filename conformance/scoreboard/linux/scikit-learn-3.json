@@ -24,18 +24,18 @@
     },
     {
       "file": "sklearn/callback/tests/test_callback_context.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 29,
       "failed": 0,
       "skipped": 0,
       "errors": 0
     },
     {
       "file": "sklearn/callback/tests/test_callback_support.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 20,
       "failed": 0,
       "skipped": 0,
       "errors": 0
@@ -60,11 +60,11 @@
     },
     {
       "file": "sklearn/callback/tests/test_scoring_monitor.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 26,
       "failed": 0,
-      "skipped": 0,
+      "skipped": 17,
       "errors": 0
     },
     {
@@ -159,11 +159,11 @@
     },
     {
       "file": "sklearn/cluster/tests/test_mean_shift.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 14,
       "failed": 0,
-      "skipped": 0,
+      "skipped": 8,
       "errors": 0
     },
     {
@@ -186,11 +186,11 @@
     },
     {
       "file": "sklearn/compose/tests/test_column_transformer.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 105,
       "failed": 0,
-      "skipped": 0,
+      "skipped": 135,
       "errors": 0
     },
     {
@@ -366,9 +366,9 @@
     },
     {
       "file": "sklearn/decomposition/tests/test_dict_learning.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 199,
       "failed": 0,
       "skipped": 0,
       "errors": 0
@@ -420,11 +420,11 @@
     },
     {
       "file": "sklearn/decomposition/tests/test_online_lda.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 55,
       "failed": 0,
-      "skipped": 0,
+      "skipped": 2,
       "errors": 0
     },
     {
@@ -438,9 +438,9 @@
     },
     {
       "file": "sklearn/decomposition/tests/test_sparse_pca.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 40,
       "failed": 0,
       "skipped": 0,
       "errors": 0
@@ -555,19 +555,19 @@
     },
     {
       "file": "sklearn/feature_selection/tests/test_mutual_info.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 14,
       "failed": 0,
-      "skipped": 0,
+      "skipped": 8,
       "errors": 0
     },
     {
       "file": "sklearn/feature_selection/tests/test_rfe.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
-      "failed": 0,
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 58,
+      "failed": 1,
       "skipped": 0,
       "errors": 0
     },
@@ -600,9 +600,9 @@
     },
     {
       "file": "sklearn/gaussian_process/tests/test_gpc.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 39,
       "failed": 0,
       "skipped": 0,
       "errors": 0
@@ -699,11 +699,11 @@
     },
     {
       "file": "sklearn/inspection/tests/test_permutation_importance.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 24,
       "failed": 0,
-      "skipped": 0,
+      "skipped": 12,
       "errors": 0
     },
     {
@@ -735,9 +735,9 @@
     },
     {
       "file": "sklearn/manifold/tests/test_mds.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 27,
       "failed": 0,
       "skipped": 0,
       "errors": 0
@@ -807,9 +807,9 @@
     },
     {
       "file": "sklearn/neighbors/tests/test_kd_tree.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 13,
       "failed": 0,
       "skipped": 0,
       "errors": 0
@@ -852,11 +852,11 @@
     },
     {
       "file": "sklearn/neighbors/tests/test_neighbors.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 594,
       "failed": 0,
-      "skipped": 0,
+      "skipped": 433,
       "errors": 0
     },
     {

@@ -24,11 +24,11 @@
     },
     {
       "file": "sklearn/tests/test_calibration.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 97,
       "failed": 0,
-      "skipped": 0,
+      "skipped": 137,
       "errors": 0
     },
     {
@@ -42,8 +42,8 @@
     },
     {
       "file": "sklearn/tests/test_common.py",
-      "status": "timeout",
-      "exit_code": null,
+      "status": "no-tests",
+      "exit_code": 0,
       "passed": 0,
       "failed": 0,
       "skipped": 0,
@@ -51,9 +51,9 @@
     },
     {
       "file": "sklearn/tests/test_config.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 8,
       "failed": 0,
       "skipped": 0,
       "errors": 0
@@ -186,9 +186,9 @@
     },
     {
       "file": "sklearn/tests/test_multioutput.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 72,
       "failed": 0,
       "skipped": 0,
       "errors": 0
@@ -204,11 +204,11 @@
     },
     {
       "file": "sklearn/tests/test_pipeline.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 154,
       "failed": 0,
-      "skipped": 0,
+      "skipped": 27,
       "errors": 0
     },
     {
@@ -312,9 +312,9 @@
     },
     {
       "file": "sklearn/ensemble/tests/test_bagging.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 126,
       "failed": 0,
       "skipped": 0,
       "errors": 0
@@ -348,9 +348,9 @@
     },
     {
       "file": "sklearn/ensemble/tests/test_forest.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 332,
       "failed": 0,
       "skipped": 0,
       "errors": 0
@@ -384,9 +384,9 @@
     },
     {
       "file": "sklearn/ensemble/tests/test_voting.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 41,
       "failed": 0,
       "skipped": 0,
       "errors": 0
@@ -420,11 +420,11 @@
     },
     {
       "file": "sklearn/model_selection/tests/test_search.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 140,
       "failed": 0,
-      "skipped": 0,
+      "skipped": 31,
       "errors": 0
     },
     {
@@ -447,11 +447,11 @@
     },
     {
       "file": "sklearn/model_selection/tests/test_validation.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 121,
       "failed": 0,
-      "skipped": 0,
+      "skipped": 90,
       "errors": 0
     },
     {
