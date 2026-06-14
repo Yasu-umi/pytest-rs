@@ -116,6 +116,7 @@ class Suite:
         """Install a PyPI wheel into the checkout dir (for suites whose tests
         live inside a compiled package — the wheel provides .so files)."""
         marker = self.checkout / ".installed.txt"
+        assert self.package is not None
         all_pkgs = [self.package] + self.deps
         wanted = "\n".join(sorted(all_pkgs))
         if marker.exists() and marker.read_text() == wanted:

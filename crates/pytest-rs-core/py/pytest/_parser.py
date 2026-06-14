@@ -443,6 +443,7 @@ def apply_cli_args(namespace: Any, tokens: list[str]) -> tuple[list[str], list[s
             for val in check_vals:
                 if val not in choices:
                     from pytest import UsageError
+
                     choices_str = ", ".join(repr(c) for c in choices)
                     raise UsageError(
                         f"error: argument {name}: invalid choice: {val!r} (choose from {choices_str})"

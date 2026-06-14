@@ -1078,10 +1078,10 @@ impl Config {
                 // Always consume the first non-flag token: most plugin
                 // options take exactly one value, and that value may be a
                 // path (e.g. `--metadata-from-json-file /path/to/f.json`).
-                if let Some((_, next)) = tokens.peek() {
-                    if !next.starts_with('-') {
-                        plugin_args.push(tokens.next().expect("peeked").1);
-                    }
+                if let Some((_, next)) = tokens.peek()
+                    && !next.starts_with('-')
+                {
+                    plugin_args.push(tokens.next().expect("peeked").1);
                 }
                 // Continue consuming non-flag, non-path tokens for nargs>1
                 // options (e.g. `--metadata key value`).

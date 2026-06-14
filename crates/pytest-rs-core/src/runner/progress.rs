@@ -307,7 +307,14 @@ pub fn summary_line(
     elapsed: Duration,
     verbosity: i32,
 ) -> String {
-    summary_line_with_extras(reports, deselected, warning_count, elapsed, verbosity, &Default::default())
+    summary_line_with_extras(
+        reports,
+        deselected,
+        warning_count,
+        elapsed,
+        verbosity,
+        &Default::default(),
+    )
 }
 
 pub fn summary_line_with_extras(
@@ -388,13 +395,19 @@ pub fn summary_line_with_extras(
     let plugin_subtests_xpassed = *extra_stats.get("subtests xpassed").unwrap_or(&0);
     let total_subtests_passed = subtests_passed + plugin_subtests_passed;
     if total_subtests_passed > 0 {
-        parts.push((format!("{total_subtests_passed} subtests passed"), tw::GREEN));
+        parts.push((
+            format!("{total_subtests_passed} subtests passed"),
+            tw::GREEN,
+        ));
     }
     if plugin_subtests_failed > 0 {
         parts.push((format!("{plugin_subtests_failed} subtests failed"), tw::RED));
     }
     if plugin_subtests_skipped > 0 {
-        parts.push((format!("{plugin_subtests_skipped} subtests skipped"), tw::YELLOW));
+        parts.push((
+            format!("{plugin_subtests_skipped} subtests skipped"),
+            tw::YELLOW,
+        ));
     }
     if deselected > 0 {
         parts.push((format!("{deselected} deselected"), tw::YELLOW));
@@ -410,7 +423,10 @@ pub fn summary_line_with_extras(
         parts.push((format!("{total_xfailed} {label}"), tw::YELLOW));
     }
     if xpassed + plugin_subtests_xpassed > 0 {
-        parts.push((format!("{} xpassed", xpassed + plugin_subtests_xpassed), tw::YELLOW));
+        parts.push((
+            format!("{} xpassed", xpassed + plugin_subtests_xpassed),
+            tw::YELLOW,
+        ));
     }
     if rerun > 0 {
         parts.push((format!("{rerun} rerun"), tw::YELLOW));

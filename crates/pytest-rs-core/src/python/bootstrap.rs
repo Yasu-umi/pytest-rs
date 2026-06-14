@@ -164,7 +164,10 @@ _pm.pluginmanager.register(_MakeReportPlugin(), '_pytest.runner')
             let py = args.py();
             let report = args.get_item(0)?;
             let captured = crate::runner::capture_logreport(py, &report)?;
-            Ok(pyo3::types::PyBool::new(py, captured).to_owned().into_any().unbind())
+            Ok(pyo3::types::PyBool::new(py, captured)
+                .to_owned()
+                .into_any()
+                .unbind())
         },
     )?;
     let runner_mod = py.import("_pytest.runner")?;

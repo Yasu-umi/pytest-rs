@@ -230,7 +230,9 @@ impl Engine {
                     // Quiet subtest: counted in the summary but not displayed.
                 } else if tc >= 1 {
                     python::reporter_ensure_newline(py);
-                    print_verbose_report_line(py, config, session, item, &report, done, total, tc, pkind);
+                    print_verbose_report_line(
+                        py, config, session, item, &report, done, total, tc, pkind,
+                    );
                 } else if session.live_logging && !config.quiet {
                     // log_cli: outcome words print via live_flush (between
                     // the call phase and teardown logs).

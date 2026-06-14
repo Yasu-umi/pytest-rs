@@ -1,8 +1,9 @@
 from pytest._debugging import (  # noqa: F401
     PdbInvoke,
     PdbTrace,
+    post_mortem,
     pytestPDB,
     wrap_pytest_function_for_tracing,
-    post_mortem,
 )
-from _pytest._stub import __getattr__  # noqa: E402, F401
+
+from _pytest._stub import __getattr__  # noqa: F401

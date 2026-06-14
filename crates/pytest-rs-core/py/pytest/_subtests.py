@@ -135,13 +135,15 @@ class _SubTestContextManager:
         __tracebackhide__ = True
         self._start = time.perf_counter()
         from pytest._capture import state as _capture_state
+
         _capture_state.subtest_enter()
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
         __tracebackhide__ = True
         duration = time.perf_counter() - self._start
-        from pytest._outcomes import Exit, Skipped, XFailed
         from pytest._capture import state as _capture_state
+        from pytest._outcomes import Exit, Skipped, XFailed
+
         sections = _capture_state.subtest_exit()
 
         record: dict[str, Any] = {

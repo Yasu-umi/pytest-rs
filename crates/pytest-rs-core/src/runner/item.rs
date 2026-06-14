@@ -832,8 +832,7 @@ fn run_item_body(
                         if let Some(code) = python::session_abort_code(py, &err) {
                             session.exit_code_override = Some(code);
                             session.abort_banner = python::session_abort_banner(py, &err);
-                            let (sub_reports, _) =
-                                python::pop_subtest_reports(py, config, item);
+                            let (sub_reports, _) = python::pop_subtest_reports(py, config, item);
                             reports.extend(sub_reports);
                             return xfail;
                         }
@@ -896,10 +895,9 @@ fn run_item_body(
     };
     if report.outcome == Outcome::Failed
         && config.get_flag("pdb")
+        && let Some(err) = &call_err
     {
-        if let Some(err) = &call_err {
-            python::maybe_pdb_interact(py, item, err);
-        }
+        python::maybe_pdb_interact(py, item, err);
     }
     // Subtests recorded during the call report individually before the
     // test's own report (the main test stays PASSED; failed subtest reports

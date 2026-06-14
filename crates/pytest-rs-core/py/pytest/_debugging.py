@@ -12,7 +12,6 @@ from __future__ import annotations
 import functools
 import os
 import sys
-import types
 from typing import Any
 
 
@@ -37,6 +36,7 @@ class pytestPDB:
     def _import_pdb_cls(cls, capman=None):
         if not cls._config:
             import pdb
+
             return pdb.Pdb
 
         usepdb_cls = getattr(cls._config.option, "usepdb_cls", None)
@@ -55,11 +55,10 @@ class pytestPDB:
                     pdb_cls = getattr(pdb_cls, part)
             except Exception as exc:
                 value = ":".join((modname, classname))
-                raise RuntimeError(
-                    f"--pdbcls: could not import {value!r}: {exc}"
-                ) from exc
+                raise RuntimeError(f"--pdbcls: could not import {value!r}: {exc}") from exc
         else:
             import pdb
+
             pdb_cls = pdb.Pdb
 
         wrapped_cls = cls._get_pdb_wrapper_class(pdb_cls, capman)
@@ -111,12 +110,14 @@ class pytestPDB:
     @classmethod
     def _init_pdb(cls, method, *args, **kwargs):
         from pytest._capture import manager as capman
+
         capman.suspend_global_capture(in_=True)
 
         _raw_write("\n")
         capturing = True
         try:
             from pytest._capture import state
+
             capturing = state._installed and state._capture is not None
         except Exception:
             pass
@@ -154,7 +155,9 @@ class pytestPDB:
 class PdbInvoke:
     def pytest_exception_interact(self, node, call, report) -> None:
         import unittest
+
         from pytest._capture import manager as capman
+
         capman.suspend_global_capture(in_=True)
         out, err = capman.read_global_capture()
         _raw_write(out)
@@ -213,14 +216,12 @@ def _enter_pdb(node, excinfo, rep):
                 content = content[:-1]
             _raw_write(content + "\n")
 
-    _raw_write(
-        ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> traceback "
-        ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n"
-    )
+    _raw_write(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> traceback >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
     longrepr = getattr(rep, "longrepr", None)
     if longrepr:
         if hasattr(longrepr, "toterminal"):
             import io
+
             buf = io.StringIO()
 
             class _FakeWriter:
@@ -241,10 +242,7 @@ def _enter_pdb(node, excinfo, rep):
         else:
             _raw_write(str(longrepr) + "\n")
 
-    _raw_write(
-        ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> entering PDB "
-        ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n"
-    )
+    _raw_write(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> entering PDB >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
 
     tb_or_exc = _postmortem_traceback(excinfo)
     rep._pdbshown = True
@@ -253,16 +251,12 @@ def _enter_pdb(node, excinfo, rep):
 
 def _postmortem_traceback(excinfo):
     exc_val = getattr(excinfo, "value", excinfo)
-    if sys.version_info >= (3, 13):
-        return exc_val
-    tb = getattr(excinfo, "tb", None) or getattr(exc_val, "__traceback__", None)
-    if hasattr(excinfo, "_excinfo") and excinfo._excinfo is not None:
-        return excinfo._excinfo[2]
-    return tb
+    return exc_val
 
 
 def post_mortem(tb_or_exc):
     from pytest._outcomes import exit as pytest_exit
+
     p = pytestPDB._init_pdb("post_mortem")
     p.reset()
     p.interaction(None, tb_or_exc)
@@ -279,11 +273,11 @@ def maybe_interact(item_proxy, exc, longrepr="") -> None:
         return
 
     import bdb
+
     from pytest._outcomes import Skipped
+
     if isinstance(exc, (Skipped, bdb.BdbQuit)):
         return
-
-    from pytest._raises import ExceptionInfo
 
     class _ExcInfo:
         def __init__(self, e):
@@ -311,16 +305,16 @@ def maybe_interact(item_proxy, exc, longrepr="") -> None:
     report = _Report()
 
     from pytest._pluginmanager import pluginmanager as pm
+
     try:
-        pm.hook.pytest_exception_interact(
-            node=item_proxy, call=call, report=report
-        )
+        pm.hook.pytest_exception_interact(node=item_proxy, call=call, report=report)
     except Exception:
         pass
 
 
 def configure(config) -> None:
     import pdb
+
     from pytest._pluginmanager import pluginmanager as pm
 
     usepdb = getattr(config.option, "usepdb", False)
@@ -332,8 +326,6 @@ def configure(config) -> None:
     if usepdb and not pm.get_plugin("pdbinvoke"):
         pm.register(PdbInvoke(), "pdbinvoke")
 
-    pytestPDB._saved.append(
-        (pdb.set_trace, pytestPDB._config)
-    )
+    pytestPDB._saved.append((pdb.set_trace, pytestPDB._config))
     pdb.set_trace = pytestPDB.set_trace
     pytestPDB._config = config

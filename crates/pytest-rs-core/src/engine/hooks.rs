@@ -86,7 +86,10 @@ impl Engine {
         // Plugins registered at configure time via pluginmanager.register()
         // (e.g. pytest-order's OrderingPlugin) live in pluginmanager._plugins,
         // not session.py_hooks — include their impls too.
-        hook_funcs.extend(python::instance_hook_funcs(py, "pytest_collection_modifyitems"));
+        hook_funcs.extend(python::instance_hook_funcs(
+            py,
+            "pytest_collection_modifyitems",
+        ));
         let itemcollected_funcs = hook_for("pytest_itemcollected");
         let collectstart_funcs = hook_for("pytest_collectstart");
         let recording = crate::engine::inprocess::recording();

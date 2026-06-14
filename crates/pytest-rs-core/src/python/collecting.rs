@@ -1168,7 +1168,10 @@ pub(crate) fn expand_parametrize(
                 &indirect_names,
             )?);
         }
-        dims.push(Dim { sets, scope: dim_scope });
+        dims.push(Dim {
+            sets,
+            scope: dim_scope,
+        });
     }
 
     if dims.is_empty() {

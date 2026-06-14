@@ -18,7 +18,17 @@ class CallInfo:
     """Result/exception of a single phase call (upstream runner.CallInfo):
     `result` is set only on success, `excinfo` only on failure."""
 
-    def __init__(self, result=None, excinfo=None, *, start=0, stop=0, duration=0, when="call", _ispytest=False):
+    def __init__(
+        self,
+        result=None,
+        excinfo=None,
+        *,
+        start=0,
+        stop=0,
+        duration=0,
+        when="call",
+        _ispytest=False,
+    ):
         self.when = when
         self.excinfo = excinfo
         self.start = start
@@ -30,6 +40,7 @@ class CallInfo:
     @classmethod
     def from_call(cls, func, when, reraise=None):
         import time
+
         excinfo = None
         result = None
         start = time.time()
@@ -317,6 +328,7 @@ def pytest_runtest_makereport(item, call):
 def check_interactive_exception(call, report):
     """Check whether the call raised an exception that should be reported as interactive."""
     import bdb
+
     if call.excinfo is None:
         return False
     if hasattr(report, "wasxfail"):

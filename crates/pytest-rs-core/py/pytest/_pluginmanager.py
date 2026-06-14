@@ -452,6 +452,7 @@ class PluginManager:
         addhooks = getattr(plugin, "pytest_addhooks", None)
         if callable(addhooks):
             from _pytest._stub import _Unsupported
+
             if not isinstance(addhooks, _Unsupported):
                 addhooks(**_accepted_kwargs(addhooks, {"pluginmanager": self}))
         return plugin

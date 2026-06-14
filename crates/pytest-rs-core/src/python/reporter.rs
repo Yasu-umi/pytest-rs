@@ -147,15 +147,14 @@ pub fn reporter_ensure_newline(py: Python<'_>) {
 /// These are reports that plugins logged via `ihook.pytest_runtest_logreport`
 /// during normal (non-delegated) runs. Returns Rust `TestReport`s for the
 /// engine to count and include in the session.
-pub fn drain_plugin_reports(
-    py: Python<'_>,
-) -> Vec<crate::report::TestReport> {
+pub fn drain_plugin_reports(py: Python<'_>) -> Vec<crate::report::TestReport> {
     let result = (|| -> PyResult<Vec<crate::report::TestReport>> {
         let sink = py.import("_pytest.runner")?.getattr("_logreport_sink")?;
-        let reports: Vec<Bound<'_, PyAny>> = sink.call_method0("drain_plugin_reports")?.extract()?;
+        let reports: Vec<Bound<'_, PyAny>> =
+            sink.call_method0("drain_plugin_reports")?.extract()?;
         let mut out = Vec::new();
         for report in &reports {
-            match crate::runner::report_from_proxy(py, &report) {
+            match crate::runner::report_from_proxy(py, report) {
                 Ok(r) => out.push(r),
                 Err(err) => {
                     eprintln!("INTERNAL ERROR: {}", format_exception(py, &err));

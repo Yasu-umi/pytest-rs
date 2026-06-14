@@ -1105,10 +1105,13 @@ impl Engine {
 /// frequently.  For `parametrize(scope='session')`, all items sharing
 /// parameter value 0 run before any item with value 1.  For module/class
 /// scope the grouping respects module/class boundaries.
-fn reorder_items_by_param_scope(items: &mut Vec<crate::collect::TestItem>) {
+fn reorder_items_by_param_scope(items: &mut [crate::collect::TestItem]) {
     use crate::fixture::Scope;
 
-    if items.iter().all(|item| item.max_param_scope == Scope::Function) {
+    if items
+        .iter()
+        .all(|item| item.max_param_scope == Scope::Function)
+    {
         return;
     }
 

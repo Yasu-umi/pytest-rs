@@ -793,7 +793,11 @@ class _GlobalCaptureManager:
 
     @contextlib.contextmanager
     def global_and_fixture_disabled(self):
-        do_fixture = state.fixture is not None and state.fixture._capture is not None and state.fixture._capture.is_started()
+        do_fixture = (
+            state.fixture is not None
+            and state.fixture._capture is not None
+            and state.fixture._capture.is_started()
+        )
         if do_fixture:
             state.fixture._suspend()
         do_global = state._installed and state._capture is not None and state._capture.is_started()
