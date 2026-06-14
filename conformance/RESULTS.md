@@ -2461,7 +2461,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | packaging | 25.0 | 26947 | 0 | 0 | 1 | 26948 | 100.0% | 12 | 12 | 0 |
 | pandas | v3.0.3 | 161707 | 39 | 371 | 25466 | 187583 | 99.8% | 860 | 964 | 0 |
 | scikit-learn-1 | 1.9.0 | 8109 | 16 | 193 | 6617 | 14935 | 98.6% | 73 | 87 | 0 |
-| scikit-learn-2 | 1.9.0 | 4843 | 0 | 2 | 1888 | 6733 | 100.0% | 49 | 58 | 0 |
+| scikit-learn-2 | 1.9.0 | 4915 | 0 | 2 | 1888 | 6805 | 100.0% | 50 | 58 | 0 |
 | scikit-learn-3 | 1.9.0 | 9227 | 7 | 0 | 2543 | 11777 | 99.9% | 101 | 114 | 0 |
 
 ### pytest @ 9.0.3
@@ -4661,7 +4661,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | sklearn/tests/test_metaestimators_metadata_routing.py | passed | 271 | 0 | 0 | 0 |
 | sklearn/tests/test_min_dependencies_readme.py | passed | 6 | 0 | 0 | 2 |
 | sklearn/tests/test_multiclass.py | passed | 59 | 0 | 0 | 0 |
-| sklearn/tests/test_multioutput.py | timeout | 0 | 0 | 0 | 0 |
+| sklearn/tests/test_multioutput.py | passed | 72 | 0 | 0 | 0 |
 | sklearn/tests/test_naive_bayes.py | passed | 86 | 0 | 0 | 61 |
 | sklearn/tests/test_pipeline.py | passed | 154 | 0 | 0 | 27 |
 | sklearn/tests/test_public_functions.py | passed | 220 | 0 | 0 | 0 |
