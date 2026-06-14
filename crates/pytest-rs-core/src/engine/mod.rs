@@ -206,7 +206,11 @@ impl Engine {
         if !self.config.plugin_disabled("threadexception") {
             python::threadexception_configure(py);
         }
-        python::set_assertion_verbosity(py, self.config.verbose);
+        python::set_assertion_verbosity(
+            py,
+            self.config.verbose,
+            self.config.verbosity_for("verbosity_assertions"),
+        );
         python::set_assertion_rewrite(py, self.config.get_value("assert"));
         python::set_assertion_truncation(
             py,
@@ -1042,6 +1046,16 @@ impl Engine {
             python::setenv(py, "PYTEST_VERSION", &version);
         }
         python::configure_debugging(py);
+        python::set_assertion_verbosity(
+            py,
+            self.config.verbose,
+            self.config.verbosity_for("verbosity_assertions"),
+        );
+        python::set_assertion_truncation(
+            py,
+            self.config.get_ini("truncation_limit_lines"),
+            self.config.get_ini("truncation_limit_chars"),
+        );
         if let Err(err) = python::configure_mark_generator(
             py,
             &self.config,

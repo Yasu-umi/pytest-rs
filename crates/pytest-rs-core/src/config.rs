@@ -1334,7 +1334,7 @@ impl Config {
     /// The verbosity for a fine-grained type (pytest's `get_verbosity`):
     /// the `verbosity_<type>` ini if set to an int, else the global level.
     /// The ini's "auto" default defers to the global level.
-    fn verbosity_for(&self, ini_name: &str) -> i32 {
+    pub fn verbosity_for(&self, ini_name: &str) -> i32 {
         match self.get_ini(ini_name) {
             Some(value) if value.trim() != "auto" => value
                 .trim()

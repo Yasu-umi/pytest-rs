@@ -288,6 +288,7 @@ def format_exception(exc, style="long"):
     # like pytest) and the exception name.
     for index, (frame, lineno) in enumerate(frames):
         last = index == len(frames) - 1
+        lines.append("")
         block, fail_indent = _source_block(frame, lineno)
         lines.extend(block)
         if last:
@@ -304,6 +305,5 @@ def format_exception(exc, style="long"):
         suffix = type(exc).__name__ if last else ""
         lines.append(_location_line(frame.f_code, lineno, suffix))
         if not last:
-            lines.append("_ " * 20)
-            lines.append("")
+            lines.append("_ " * 40)
     return "\n".join(lines)

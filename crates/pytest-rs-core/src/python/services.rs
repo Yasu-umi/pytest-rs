@@ -659,10 +659,10 @@ pub fn threadexception_session_cleanup(py: Python<'_>) -> PyResult<()> {
 
 /// Tell the assert-rewrite explainer the -v level (full iterable diffs
 /// need -v, identical dict items unfold at -vv, like pytest).
-pub fn set_assertion_verbosity(py: Python<'_>, level: u8) {
+pub fn set_assertion_verbosity(py: Python<'_>, global_level: u8, assertion_level: i32) {
     let _ = py
         .import("pytest._rewrite")
-        .and_then(|m| m.call_method1("set_verbosity", (level,)));
+        .and_then(|m| m.call_method1("set_verbosity", (global_level, assertion_level)));
 }
 
 /// --assert=plain disables assertion rewriting entirely (failed asserts

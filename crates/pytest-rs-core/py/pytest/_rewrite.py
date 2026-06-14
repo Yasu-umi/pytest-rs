@@ -61,6 +61,7 @@ def _is_rewrite_target(origin):
 # verbose >= 1, "Omitting N identical items" folds below 2 (pytest gates
 # its explanations on config verbosity the same way).
 _verbosity = 0
+_assertion_verbosity = None
 
 # truncation_limit_lines / truncation_limit_chars ini values, set by the
 # engine at startup (None means "use pytest's defaults": 8 lines, 640 chars).
@@ -72,9 +73,10 @@ _truncation_chars = None
 _rewrite_enabled = True
 
 
-def set_verbosity(level):
-    global _verbosity
+def set_verbosity(level, assertion_level=None):
+    global _verbosity, _assertion_verbosity
     _verbosity = level
+    _assertion_verbosity = assertion_level
 
 
 def set_enabled(flag):
@@ -94,6 +96,8 @@ class _RewriteConfig:
     config.get_terminal_writer().hasmarkup)."""
 
     def get_verbosity(self, verbosity_type=None):
+        if verbosity_type == "assertions" and _assertion_verbosity is not None:
+            return _assertion_verbosity
         return _verbosity
 
     def get_terminal_writer(self):
@@ -105,8 +109,35 @@ class _RewriteConfig:
 
         return _tb._color
 
+    @property
+    def code_highlight(self):
+        return self.hasmarkup
+
     def _highlight(self, source, lexer="python"):
-        return source
+        if not source or not self.hasmarkup:
+            return source
+        try:
+            from pygments import highlight as pygments_highlight
+            from pygments.formatters.terminal import TerminalFormatter
+            import os
+
+            if lexer == "diff":
+                from pygments.lexers.diff import DiffLexer
+                pygments_lexer = DiffLexer()
+            else:
+                from pygments.lexers.python import PythonLexer
+                pygments_lexer = PythonLexer()
+
+            mode = os.getenv("PYTEST_THEME_MODE", "dark")
+            style = os.getenv("PYTEST_THEME")
+            highlighted = pygments_highlight(
+                source, pygments_lexer, TerminalFormatter(bg=mode, style=style)
+            )
+            if highlighted.endswith("\n") and not source.endswith("\n"):
+                highlighted = highlighted[:-1]
+            return "\x1b[0m" + highlighted
+        except Exception:
+            return source
 
 
 def _format_assert(op, left, right):
@@ -148,8 +179,9 @@ def _format_assert(op, left, right):
         max_chars = int(
             _truncation_chars if _truncation_chars is not None else truncate.DEFAULT_MAX_CHARS
         )
+        assert_verbose = _assertion_verbosity if _assertion_verbosity is not None else _verbosity
         should_truncate = (
-            _verbosity < 2 and not running_on_ci() and (max_lines > 0 or max_chars > 0)
+            assert_verbose < 2 and not running_on_ci() and (max_lines > 0 or max_chars > 0)
         )
         if should_truncate:
             expl = truncate._truncate_explanation(expl, max_lines=max_lines, max_chars=max_chars)
