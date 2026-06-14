@@ -22,7 +22,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 20 | 0 | 3 | 209 | 90.4% | 0 | 1 | 0 |
-| pytest-xdist | v3.8.0 | 92 | 5 | 0 | 1 | 98 | 94.9% | 0 | 1 | 6 |
+| pytest-xdist | v3.8.0 | 89 | 8 | 0 | 1 | 98 | 91.8% | 0 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 91 | 31 | 0 | 1 | 123 | 74.8% | 4 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 41 | 100.0% | 1 | 1 | 0 |
@@ -45,7 +45,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
 | rich | v14.2.0 | 855 | 0 | 0 | 25 | 880 | 100.0% | 60 | 62 | 0 |
 | pytest-bdd | 8.1.0 | 89 | 49 | 0 | 1 | 139 | 64.7% | 18 | 35 | 0 |
-| httpx | 0.28.1 | 1333 | 9 | 0 | 1 | 1343 | 99.3% | 25 | 31 | 0 |
+| httpx | 0.28.1 | 1373 | 9 | 0 | 1 | 1383 | 99.3% | 26 | 31 | 0 |
 | httpx2 | v2.4.0 | 1426 | 0 | 0 | 1 | 1427 | 100.0% | 31 | 31 | 0 |
 | starlette | 0.46.2 | 902 | 0 | 1 | 0 | 903 | 99.9% | 27 | 28 | 0 |
 | attrs | 25.3.0 | 1339 | 2 | 0 | 4 | 1345 | 99.9% | 20 | 24 | 0 |
@@ -178,7 +178,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| testing/acceptance_test.py | failed | 92 | 5 | 0 | 1 |
+| testing/acceptance_test.py | failed | 89 | 8 | 0 | 1 |
 
 </details>
 
@@ -638,7 +638,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_multipart.py | passed | 38 | 0 | 0 | 0 |
 | tests/test_status_codes.py | passed | 6 | 0 | 0 | 0 |
 | tests/test_timeouts.py | failed | 9 | 1 | 0 | 0 |
-| tests/test_utils.py | timeout | 0 | 0 | 0 | 0 |
+| tests/test_utils.py | passed | 40 | 0 | 0 | 0 |
 | tests/test_wsgi.py | passed | 12 | 0 | 0 | 0 |
 
 </details>
