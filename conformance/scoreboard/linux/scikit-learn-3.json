@@ -24,9 +24,9 @@
     },
     {
       "file": "sklearn/callback/tests/test_callback_context.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 29,
+      "status": "timeout",
+      "exit_code": null,
+      "passed": 0,
       "failed": 0,
       "skipped": 0,
       "errors": 0

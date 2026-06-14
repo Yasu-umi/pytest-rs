@@ -33,7 +33,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-snapshot | v0.9.0 | 100 | 7 | 0 | 0 | 107 | 93.5% | 0 | 3 | 0 |
 | pytest-icdiff | 0.5 | 10 | 2 | 0 | 0 | 12 | 83.3% | 0 | 1 | 0 |
-| pytest-socket | 0.7.0 | 59 | 6 | 0 | 0 | 65 | 90.8% | 2 | 6 | 0 |
+| pytest-socket | 0.7.0 | 40 | 3 | 0 | 0 | 43 | 93.0% | 2 | 6 | 0 |
 | pytest-order | v1.4.0 | 115 | 19 | 0 | 0 | 134 | 85.8% | 7 | 16 | 0 |
 | pytest-repeat | v0.9.4 | 16 | 0 | 0 | 0 | 16 | 100.0% | 1 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
@@ -52,12 +52,12 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 671 | 100.0% | 2 | 2 | 0 |
 | pytest-django | v4.9.0 | 147 | 68 | 0 | 1 | 216 | 68.5% | 2 | 13 | 0 |
 | werkzeug | 3.1.3 | 897 | 1 | 1 | 0 | 899 | 99.8% | 21 | 25 | 0 |
-| fastapi | 0.115.12 | 2207 | 9 | 115 | 130 | 2461 | 95.0% | 295 | 310 | 0 |
+| fastapi | 0.115.12 | 2209 | 9 | 115 | 130 | 2463 | 95.0% | 296 | 310 | 0 |
 | packaging | 25.0 | 26948 | 0 | 0 | 0 | 26948 | 100.0% | 12 | 12 | 0 |
 | pandas | v3.0.3 | 160650 | 39 | 371 | 25459 | 186519 | 99.8% | 860 | 964 | 0 |
 | scikit-learn-1 | 1.9.0 | 8109 | 16 | 193 | 6617 | 14935 | 98.6% | 73 | 87 | 0 |
 | scikit-learn-2 | 1.9.0 | 4915 | 0 | 2 | 1888 | 6805 | 100.0% | 50 | 58 | 0 |
-| scikit-learn-3 | 1.9.0 | 9240 | 7 | 0 | 2530 | 11777 | 99.9% | 101 | 114 | 0 |
+| scikit-learn-3 | 1.9.0 | 9211 | 7 | 0 | 2530 | 11748 | 99.9% | 100 | 114 | 0 |
 
 ### pytest @ 9.0.3
 
@@ -326,7 +326,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_doctest.py | passed | 1 | 0 | 0 | 0 |
 | tests/test_precedence.py | passed | 10 | 0 | 0 | 0 |
 | tests/test_restrict_hosts.py | failed | 27 | 1 | 0 | 0 |
-| tests/test_socket.py | failed | 19 | 3 | 0 | 0 |
+| tests/test_socket.py | timeout | 0 | 0 | 0 | 0 |
 
 </details>
 
@@ -1123,7 +1123,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_tutorial/test_testing_dependencies/test_tutorial001.py | passed | 35 | 0 | 0 | 0 |
 | tests/test_tutorial/test_websockets/test_tutorial001.py | passed | 2 | 0 | 0 | 0 |
 | tests/test_tutorial/test_websockets/test_tutorial002.py | passed | 30 | 0 | 0 | 0 |
-| tests/test_tutorial/test_websockets/test_tutorial003.py | timeout | 0 | 0 | 0 | 0 |
+| tests/test_tutorial/test_websockets/test_tutorial003.py | passed | 2 | 0 | 0 | 0 |
 | tests/test_tutorial/test_websockets/test_tutorial003_py39.py | passed | 2 | 0 | 0 | 0 |
 | tests/test_tutorial/test_wsgi/test_tutorial001.py | error | 0 | 0 | 1 | 0 |
 | tests/test_typing_python39.py | passed | 1 | 0 | 0 | 0 |
@@ -2304,7 +2304,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 |---|---|---:|---:|---:|---:|
 | sklearn/_loss/tests/test_link.py | passed | 18 | 0 | 0 | 75 |
 | sklearn/_loss/tests/test_loss.py | failed | 1831 | 3 | 0 | 379 |
-| sklearn/callback/tests/test_callback_context.py | passed | 29 | 0 | 0 | 0 |
+| sklearn/callback/tests/test_callback_context.py | timeout | 0 | 0 | 0 | 0 |
 | sklearn/callback/tests/test_callback_support.py | passed | 20 | 0 | 0 | 0 |
 | sklearn/callback/tests/test_pickle.py | passed | 2 | 0 | 0 | 4 |
 | sklearn/callback/tests/test_progressbar.py | passed | 1 | 0 | 0 | 47 |
