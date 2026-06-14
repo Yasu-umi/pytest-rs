@@ -372,7 +372,16 @@ fn print_verbose_report_line(
         report_teststatus(py, config, session, report, Some(item.lineno))
     };
     let (word, reason) = match &status {
-        Some(s) => (s.word.clone(), None),
+        Some(s) => {
+            let reason = match report.outcome {
+                Outcome::Skipped | Outcome::XFailed | Outcome::XPassed => report
+                    .longrepr
+                    .clone()
+                    .filter(|r| !r.is_empty() && !r.contains('\n')),
+                _ => None,
+            };
+            (s.word.clone(), reason)
+        }
         None => verbose_outcome(report),
     };
     let codes = status
