@@ -973,6 +973,7 @@ fn running_on_ci() -> bool {
 /// ellipsis would not fit (so the caller drops the message entirely).
 fn format_trimmed(prefix: &str, msg: &str, available: usize) -> Option<String> {
     const ELLIPSIS: &str = "...";
+    let msg = msg.split('\n').next().unwrap_or(msg);
     let format_width = prefix.chars().count();
     if format_width + ELLIPSIS.len() > available {
         return None;

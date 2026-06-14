@@ -117,10 +117,9 @@ def _relpath(path):
     return rel if not rel.startswith("..") else path
 
 
-def _exception_lines(exc):
-    # pytest's exconly: traceback.format_exception_only, which qualifies
-    # non-builtin exception types with their module (upstream classes pin
-    # __module__, e.g. "pytest.PytestUnraisableExceptionWarning").
+def _exconly(exc):
+    """Full exconly(tryshort=True) text, matching CPython pytest's
+    ExceptionInfo.exconly(tryshort=True)."""
     text = "".join(traceback.format_exception_only(type(exc), exc)).rstrip("\n")
     try:
         # pytest's exconly(tryshort=True) quirk: the prefix is stripped only
@@ -139,9 +138,12 @@ def _exception_lines(exc):
     except Exception:
         tryshort = False
     if tryshort:
-        # pytest's exconly(tryshort=True): only rewritten-assert explanations
-        # drop the type name; raised AssertionErrors keep it.
         text = str(exc)
+    return text
+
+
+def _exception_lines(exc):
+    text = _exconly(exc)
     return text.splitlines() or [type(exc).__name__]
 
 
@@ -215,9 +217,10 @@ def raise_location(exc):
 
 
 def crash_message(exc):
-    """Return the short crash message for an exception (reprcrash.message
-    equivalent), used for the short test summary regardless of --tb style."""
-    return _exception_lines(exc)[0]
+    """Return the crash message for an exception (reprcrash.message
+    equivalent): the full exconly(tryshort=True) text including where-lines.
+    The short summary truncates it to the first line when needed."""
+    return _exconly(exc)
 
 
 def format_exception(exc, style="long"):
