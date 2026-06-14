@@ -1,6 +1,6 @@
 # Upstream pytest-mypy tests that must keep passing under pytest-rs.
 #
-# tests (~73/78): the custom-collector subsystem runs pytest-mypy's
+# tests (~76/78): the custom-collector subsystem runs pytest-mypy's
 # MypyFile/MypyFileItem/MypyStatusItem (registered via pluginmanager at
 # configure under the "mypy" entry-point name so conftests can patch it).
 # session.items is published incrementally during collection so the

@@ -1382,8 +1382,11 @@ class Pytester:
         env["TERM"] = "dumb"
         env.pop("NO_COLOR", None)
         child = pexpect.spawn(
-            cmd, logfile=logfile, timeout=expect_timeout,
-            cwd=str(self.path), env=env,
+            cmd,
+            logfile=logfile,
+            timeout=expect_timeout,
+            cwd=str(self.path),
+            env=env,
         )
         self._request.addfinalizer(logfile.close)
         return child

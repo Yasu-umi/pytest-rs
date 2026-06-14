@@ -269,6 +269,8 @@ class _AssertRewriter(ast.NodeTransformer):
             ast.Tuple,
             ast.JoinedStr,
             ast.FormattedValue,
+            ast.Subscript,
+            ast.Attribute,
         )
         left_trivial = isinstance(test.left, _TRIVIAL)
         right_trivial = isinstance(test.comparators[0], _TRIVIAL)

@@ -132,7 +132,10 @@ def _exception_lines(exc):
         tryshort = (
             isinstance(exc, AssertionError)
             and str(exc).startswith("assert")
-            and repr(exc).startswith("AssertionError('assert ")
+            and (
+                repr(exc).startswith("AssertionError('assert ")
+                or repr(exc).startswith('AssertionError("assert ')
+            )
         )
     except Exception:
         tryshort = False
