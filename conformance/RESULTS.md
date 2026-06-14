@@ -33,7 +33,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-snapshot | v0.9.0 | 100 | 7 | 0 | 0 | 107 | 93.5% | 0 | 3 | 0 |
 | pytest-icdiff | 0.5 | 8 | 4 | 0 | 0 | 12 | 66.7% | 0 | 1 | 0 |
-| pytest-socket | 0.7.0 | 59 | 6 | 0 | 0 | 65 | 90.8% | 2 | 6 | 0 |
+| pytest-socket | 0.7.0 | 40 | 3 | 0 | 0 | 43 | 93.0% | 2 | 6 | 0 |
 | pytest-order | v1.4.0 | 115 | 19 | 0 | 0 | 134 | 85.8% | 7 | 16 | 0 |
 | pytest-repeat | v0.9.4 | 16 | 0 | 0 | 0 | 16 | 100.0% | 1 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 48 | 15 | 0 | 0 | 63 | 76.2% | 0 | 1 | 0 |
@@ -45,7 +45,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
 | rich | v14.2.0 | 855 | 0 | 0 | 25 | 880 | 100.0% | 60 | 62 | 0 |
 | pytest-bdd | 8.1.0 | 89 | 49 | 0 | 1 | 139 | 64.7% | 18 | 35 | 0 |
-| httpx | 0.28.1 | 1324 | 9 | 0 | 1 | 1334 | 99.3% | 24 | 31 | 0 |
+| httpx | 0.28.1 | 1364 | 9 | 0 | 1 | 1374 | 99.3% | 25 | 31 | 0 |
 | starlette | 0.46.2 | 902 | 0 | 1 | 0 | 903 | 99.9% | 27 | 28 | 0 |
 | attrs | 25.3.0 | 1339 | 2 | 0 | 4 | 1345 | 99.9% | 20 | 24 | 0 |
 | more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 671 | 100.0% | 2 | 2 | 0 |
@@ -323,7 +323,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_doctest.py | passed | 1 | 0 | 0 | 0 |
 | tests/test_precedence.py | passed | 10 | 0 | 0 | 0 |
 | tests/test_restrict_hosts.py | failed | 27 | 1 | 0 | 0 |
-| tests/test_socket.py | failed | 19 | 3 | 0 | 0 |
+| tests/test_socket.py | timeout | 0 | 0 | 0 | 0 |
 
 </details>
 
