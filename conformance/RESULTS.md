@@ -18,7 +18,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 1919 | 306 | 3 | 28 | 2256 | 86.3% | 12 | 45 | 63 |
+| pytest | 9.0.3 | 2203 | 575 | 3 | 52 | 2833 | 79.6% | 12 | 52 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 20 | 0 | 3 | 209 | 90.4% | 0 | 1 | 0 |
@@ -31,7 +31,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-subtests | v0.14.2 | 25 | 7 | 0 | 0 | 32 | 78.1% | 0 | 1 | 0 |
 | pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
-| pytest-snapshot | v0.9.0 | 100 | 7 | 0 | 0 | 107 | 93.5% | 0 | 3 | 0 |
+| pytest-snapshot | v0.9.0 | 101 | 6 | 0 | 0 | 107 | 94.4% | 0 | 3 | 0 |
 | pytest-icdiff | 0.5 | 10 | 2 | 0 | 0 | 12 | 83.3% | 0 | 1 | 0 |
 | pytest-socket | 0.7.0 | 59 | 6 | 0 | 0 | 65 | 90.8% | 2 | 6 | 0 |
 | pytest-order | v1.4.0 | 115 | 19 | 0 | 0 | 134 | 85.8% | 7 | 16 | 0 |
@@ -61,10 +61,18 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 ### pytest @ 9.0.3
 
-<details><summary>per-file detail (45 files)</summary>
+<details><summary>per-file detail (52 files)</summary>
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
+| testing/python/approx.py | failed | 37 | 38 | 0 | 18 |
+| testing/python/collect.py | failed | 47 | 35 | 0 | 0 |
+| testing/python/fixtures.py | failed | 90 | 118 | 0 | 2 |
+| testing/python/integration.py | failed | 8 | 8 | 0 | 4 |
+| testing/python/metafunc.py | failed | 63 | 49 | 0 | 0 |
+| testing/python/raises.py | failed | 13 | 18 | 0 | 0 |
+| testing/python/raises_group.py | failed | 26 | 3 | 0 | 0 |
+| testing/python/show_fixtures_per_test.py | failed | 0 | 8 | 0 | 0 |
 | testing/examples/test_issue519.py | failed | 0 | 1 | 0 | 0 |
 | testing/freeze/tests/test_trivial.py | passed | 2 | 0 | 0 | 0 |
 | testing/logging/test_fixture.py | failed | 26 | 1 | 0 | 0 |
@@ -109,7 +117,6 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_warnings.py | failed | 35 | 8 | 0 | 1 |
 | testing/acceptance_test.py | failed | 43 | 48 | 0 | 2 |
 | testing/deprecated_test.py | failed | 10 | 5 | 0 | 0 |
-| testing/python/show_fixtures_per_test.py | failed | 0 | 8 | 0 | 0 |
 
 </details>
 
@@ -301,7 +308,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 |---|---|---:|---:|---:|---:|
 | tests/test_assert_match.py | failed | 34 | 4 | 0 | 0 |
 | tests/test_assert_match_dir.py | failed | 27 | 1 | 0 | 0 |
-| tests/test_misc.py | failed | 39 | 2 | 0 | 0 |
+| tests/test_misc.py | failed | 40 | 1 | 0 | 0 |
 
 </details>
 

@@ -5,6 +5,78 @@
   "excluded_files": 63,
   "files": [
     {
+      "file": "testing/python/approx.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 37,
+      "failed": 38,
+      "skipped": 18,
+      "errors": 0
+    },
+    {
+      "file": "testing/python/collect.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 47,
+      "failed": 35,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/python/fixtures.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 90,
+      "failed": 118,
+      "skipped": 2,
+      "errors": 0
+    },
+    {
+      "file": "testing/python/integration.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 8,
+      "failed": 8,
+      "skipped": 4,
+      "errors": 0
+    },
+    {
+      "file": "testing/python/metafunc.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 63,
+      "failed": 49,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/python/raises.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 13,
+      "failed": 18,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/python/raises_group.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 26,
+      "failed": 3,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/python/show_fixtures_per_test.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 0,
+      "failed": 8,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
       "file": "testing/examples/test_issue519.py",
       "status": "failed",
       "exit_code": 1,
@@ -397,15 +469,6 @@
       "exit_code": 1,
       "passed": 10,
       "failed": 5,
-      "skipped": 0,
-      "errors": 0
-    },
-    {
-      "file": "testing/python/show_fixtures_per_test.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 0,
-      "failed": 8,
       "skipped": 0,
       "errors": 0
     }
