@@ -25,7 +25,13 @@ class FixtureDef(_Subscriptable):
 
 
 class FixtureManager(_Subscriptable):
-    """Annotation/typing stand-in for _pytest.fixtures.FixtureManager."""
+    """Annotation/typing stand-in for _pytest.fixtures.FixtureManager.
+    Accepts a session so test scaffolding (Session._fixturemanager =
+    FixtureManager(session)) constructs without error."""
+
+    def __init__(self, session=None):
+        self.session = session
+        self.config = getattr(session, "config", None)
 
 
 def call_fixture_func(fixturefunc, request, kwargs):

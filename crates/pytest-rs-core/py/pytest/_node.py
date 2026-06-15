@@ -1035,6 +1035,25 @@ class Function(Node):
     """Test-function node; the engine builds these for collected test items
     (conftest hooks isinstance-check pytest.Function)."""
 
+    def __init__(self, *args, callobj=None, originalname=None, **kwargs):
+        if callobj is not None and kwargs.get("function") is None and len(args) < 5:
+            kwargs["function"] = callobj
+        super().__init__(*args, **kwargs)
+        if callobj is not None:
+            self.obj = callobj
+            self.function = callobj
+        # originalname is the function's name without the parametrization id
+        # (pytester.getitems / test_function_originalname): "test_func[1]" ->
+        # "test_func".
+        if originalname is not None:
+            self.originalname = originalname
+        else:
+            name = getattr(self, "name", None)
+            self.originalname = name.split("[")[0] if name else name
+
+    def __repr__(self):
+        return f"<Function {getattr(self, 'name', '')}>"
+
     def listchain(self):
         """The collector chain to this item ([module, item]); pytester.getitems
         attaches `_module_collector` so SetupState can set up module scope."""
