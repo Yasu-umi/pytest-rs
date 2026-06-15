@@ -248,18 +248,27 @@ pub fn has_collect_file_hook(py: Python<'_>, hooks: &[crate::session::PyHook]) -
         .unwrap_or(false)
 }
 
+/// Result of custom file collection.
+pub struct CustomCollectResult {
+    pub skipped: Vec<(PathBuf, String)>,
+    pub errors: Vec<(PathBuf, String)>,
+}
+
 /// Collect items via pytest_collect_file hooks.
-/// Returns `(file, skip_reason)` pairs for files that were skipped via pytest.skip().
 pub fn collect_custom_files(
     py: Python<'_>,
     rootdir: &Path,
     files: &[PathBuf],
     _hooks: &[crate::session::PyHook],
     items: &mut Vec<TestItem>,
-) -> PyResult<Vec<(PathBuf, String)>> {
+) -> PyResult<CustomCollectResult> {
     let mut skipped: Vec<(PathBuf, String)> = Vec::new();
+    let mut collect_errors: Vec<(PathBuf, String)> = Vec::new();
     let Some(config) = crate::python::proxies::existing_py_config(py) else {
-        return Ok(skipped);
+        return Ok(CustomCollectResult {
+            skipped,
+            errors: collect_errors,
+        });
     };
     let config = config.bind(py);
     // pytest_collect_file impls live on the shim pluginmanager (autoloaded
@@ -353,7 +362,25 @@ pub fn collect_custom_files(
             // directly as a single leaf item without calling .collect().
             let item_iter: Box<dyn Iterator<Item = PyResult<Bound<'_, PyAny>>>> =
                 if collector.hasattr("collect")? {
-                    Box::new(collector.call_method0("collect")?.try_iter()?)
+                    match collector.call_method0("collect") {
+                        Ok(iter) => Box::new(iter.try_iter()?),
+                        Err(err) => {
+                            // Build ExceptionInfo and call repr_failure for custom formatting.
+                            let longrepr = (|| -> PyResult<String> {
+                                let excinfo_cls = py
+                                    .import("_pytest._code")?
+                                    .getattr("ExceptionInfo")?;
+                                let exc_value = err.value(py);
+                                let ei = excinfo_cls
+                                    .call_method1("from_exception", (exc_value,))?;
+                                let repr = collector.call_method1("repr_failure", (&ei,))?;
+                                repr.str()?.extract()
+                            })()
+                            .unwrap_or_else(|_| format_exception(py, &err));
+                            collect_errors.push((file.clone(), longrepr));
+                            continue;
+                        }
+                    }
                 } else {
                     Box::new(std::iter::once(Ok(collector.clone())))
                 };
@@ -400,7 +427,10 @@ pub fn collect_custom_files(
             }
         }
     }
-    Ok(skipped)
+    Ok(CustomCollectResult {
+        skipped,
+        errors: collect_errors,
+    })
 }
 
 pub fn collect_module(

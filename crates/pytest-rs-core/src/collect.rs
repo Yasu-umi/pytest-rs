@@ -477,6 +477,63 @@ fn collect_all_py_dir(
     }
 }
 
+/// Gather ALL files (any extension) from search paths for `pytest_collect_file` hooks.
+pub fn collect_all_files(
+    invocation_dir: &Path,
+    paths: &[String],
+    collect_in_virtualenv: bool,
+) -> Vec<PathBuf> {
+    let args: Vec<String> = if paths.is_empty() {
+        vec![".".to_string()]
+    } else {
+        paths.to_vec()
+    };
+    let mut files = Vec::new();
+    for arg in &args {
+        let arg = arg.split("::").next().unwrap_or(arg);
+        let path = invocation_dir.join(arg);
+        let path = std::fs::canonicalize(&path).unwrap_or(path);
+        if path.is_dir() {
+            collect_all_files_dir(&path, &mut files, collect_in_virtualenv);
+        } else if path.is_file() && !files.contains(&path) {
+            files.push(path);
+        }
+    }
+    files
+}
+
+fn collect_all_files_dir(dir: &Path, files: &mut Vec<PathBuf>, collect_in_virtualenv: bool) {
+    const NORECURSE: &[&str] = &[
+        ".git",
+        ".venv",
+        "venv",
+        "node_modules",
+        "__pycache__",
+        ".tox",
+        ".eggs",
+        "build",
+        "dist",
+    ];
+    let Ok(read_dir) = std::fs::read_dir(dir) else {
+        return;
+    };
+    let mut entries: Vec<_> = read_dir.filter_map(Result::ok).map(|e| e.path()).collect();
+    entries.sort();
+    for path in entries {
+        if path.is_dir() {
+            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if !NORECURSE.contains(&name)
+                && !name.starts_with('.')
+                && (collect_in_virtualenv || !in_venv(&path))
+            {
+                collect_all_files_dir(&path, files, collect_in_virtualenv);
+            }
+        } else if path.is_file() && !files.contains(&path) {
+            files.push(path);
+        }
+    }
+}
+
 /// Gather non-Python files from the search paths for --doctest-glob matching.
 /// Walks the same directories as collect_test_files but collects all non-Python files.
 pub fn collect_doctest_textfiles(invocation_dir: &Path, paths: &[String]) -> Vec<PathBuf> {

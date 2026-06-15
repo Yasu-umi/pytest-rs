@@ -995,13 +995,10 @@ impl Engine {
         // non-test files via pytest_collect_file -> pytest.File.collect().
         // Only walk the (broader) candidate file set when such a hook exists.
         if python::has_collect_file_hook(py, &self.session.py_hooks) {
-            let candidate = crate::collect::collect_all_python_files_ext(
+            let candidate = crate::collect::collect_all_files(
                 &self.config.invocation_dir,
                 paths,
                 self.config.get_flag("collect-in-virtualenv"),
-                &[],
-                // pytest-mypy's pytest_collect_file also handles .pyi stubs.
-                true,
             );
             let hooks = std::mem::take(&mut self.session.py_hooks);
             let result = python::collect_custom_files(
@@ -1013,18 +1010,21 @@ impl Engine {
             );
             self.session.py_hooks = hooks;
             match result {
-                Ok(skipped_files) => {
-                    if !skipped_files.is_empty() {
+                Ok(collect_result) => {
+                    if !collect_result.skipped.is_empty() {
                         let skipped_set: std::collections::HashSet<&PathBuf> =
-                            skipped_files.iter().map(|(p, _)| p).collect();
+                            collect_result.skipped.iter().map(|(p, _)| p).collect();
                         self.session
                             .items
                             .retain(|item| !skipped_set.contains(&item.path));
                         self.session.collect_file_skips.extend(
-                            skipped_files.into_iter().map(|(p, reason)| {
+                            collect_result.skipped.into_iter().map(|(p, reason)| {
                                 (crate::collect::file_nodeid(rootdir, &p), reason)
                             }),
                         );
+                    }
+                    for (path, longrepr) in collect_result.errors {
+                        errors.push((path, longrepr));
                     }
                 }
                 Err(err) => {
