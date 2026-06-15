@@ -16,7 +16,8 @@ from collections import Counter, defaultdict
 from _pytest._io.saferepr import saferepr
 from _pytest.compat import NOTSET, ascii_escaped
 from _pytest.outcomes import fail
-from pytest._marks import HIDDEN_PARAM, _HiddenParam
+
+from pytest._marks import HIDDEN_PARAM
 from pytest._node import Collector
 
 
@@ -57,9 +58,7 @@ class IdMaker:
                 parametersets = ", ".join(
                     [saferepr(list(param.values)) for param in self.parametersets]
                 )
-                ids = ", ".join(
-                    id if id is not HIDDEN_PARAM else "<hidden>" for id in resolved_ids
-                )
+                ids = ", ".join(id if id is not HIDDEN_PARAM else "<hidden>" for id in resolved_ids)
                 duplicates = ", ".join(
                     id if id is not HIDDEN_PARAM else "<hidden>"
                     for id, count in id_counts.items()
@@ -170,7 +169,7 @@ class IdMaker:
         elif isinstance(val, enum.Enum):
             return str(val)
         elif isinstance(getattr(val, "__name__", None), str):
-            return getattr(val, "__name__")
+            return val.__name__
         return None
 
     def _idval_from_value_required(self, val, idx):

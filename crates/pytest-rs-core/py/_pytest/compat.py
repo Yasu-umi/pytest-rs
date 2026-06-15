@@ -57,9 +57,7 @@ LEGACY_PATH = None  # py.path.local itself is not bundled
 _non_printable_ascii_translate_table = {
     i: f"\\x{i:02x}" for i in range(128) if i not in range(32, 127)
 }
-_non_printable_ascii_translate_table.update(
-    {ord("\t"): "\\t", ord("\r"): "\\r", ord("\n"): "\\n"}
-)
+_non_printable_ascii_translate_table.update({ord("\t"): "\\t", ord("\r"): "\\r", ord("\n"): "\\n"})
 
 
 def ascii_escaped(val):
@@ -86,8 +84,7 @@ def num_mock_patch_args(function) -> int:
         [
             p
             for p in patchings
-            if not p.attribute_name
-            and (p.new is mock_sentinel or p.new is ut_mock_sentinel)
+            if not p.attribute_name and (p.new is mock_sentinel or p.new is ut_mock_sentinel)
         ]
     )
 
