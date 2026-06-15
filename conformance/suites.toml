@@ -11,6 +11,9 @@ repo = "https://github.com/pytest-dev/pytest"
 tag = "9.0.3"
 testpaths = ["testing"]
 exclude = ["example_scripts"]
+# Mirror pytest's own python_files ini so testing/python/*.py (collect.py,
+# fixtures.py, metafunc.py, ...) are measured like upstream collects them.
+python_files = ["test_*.py", "*_test.py", "testing/python/*.py"]
 local = "conformance/suites/pytest"
 deps = ["packaging==26.2", "iniconfig==2.3.0", "pluggy==1.6.0", "xmlschema==4.3.1", "setuptools==82.0.1", "pygments==2.20.0", "attrs==26.1.0"]
 # Files that intermittently time out under full-parallel load; give them the

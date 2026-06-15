@@ -59,6 +59,11 @@ class Suite:
         self.repo = config.get("repo", "")
         self.tag = config["tag"]
         self.testpaths = config["testpaths"]
+        # Filename/path globs that count as test files, mirroring the suite's
+        # own `python_files` ini setting. Patterns with a "/" are resolved
+        # relative to the checkout root; bare patterns are matched recursively
+        # under each testpath by basename. Defaults to pytest's stock globs.
+        self.python_files: list[str] = config.get("python_files", ["test_*.py", "*_test.py"])
         self.enabled = config.get("enabled", False)
         self.local = config.get("local")
         # Some src-layout packages generate their version module at build time
@@ -169,14 +174,28 @@ class Suite:
     def test_files(self) -> tuple[list[Path], int]:
         """(files to run, number excluded by configuration)."""
         files: list[Path] = []
+        seen: set[Path] = set()
+
+        def add(found):
+            for p in sorted(found):
+                if p not in seen and p.is_file():
+                    seen.add(p)
+                    files.append(p)
+
+        # Path-glob patterns (containing "/") are resolved once against the
+        # checkout root; bare patterns are matched recursively per testpath.
+        path_patterns = [pat for pat in self.python_files if "/" in pat]
+        name_patterns = [pat for pat in self.python_files if "/" not in pat]
+        for pat in path_patterns:
+            add(self.checkout.glob(pat))
         for testpath in self.testpaths:
             base = self.checkout / testpath
             # Flat-layout suites point straight at a test file.
             if base.is_file():
-                files.append(base)
+                add([base])
                 continue
-            files.extend(sorted(base.rglob("test_*.py")))
-            files.extend(sorted(p for p in base.rglob("*_test.py") if p not in files))
+            for pat in name_patterns:
+                add(base.rglob(pat))
         kept = [f for f in files if not any(part in self.exclude for part in f.parts)]
         return kept, len(files) - len(kept)
 
