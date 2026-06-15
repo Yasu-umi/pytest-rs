@@ -9,3 +9,28 @@ from pytest._junitxml import record_testsuite_property as record_testsuite_prope
 from pytest._junitxml import record_xml_attribute as record_xml_attribute
 
 from _pytest._stub import __getattr__  # noqa: E402, F401
+from _pytest.stash import StashKey
+
+xml_key = StashKey["LogXML"]()
+
+
+def pytest_configure(config):
+    xmlpath = config.option.xmlpath
+    if xmlpath and not hasattr(config, "workerinput"):
+        config.stash[xml_key] = LogXML(
+            xmlpath,
+            config.option.junitprefix,
+            config.getini("junit_suite_name"),
+            config.getini("junit_logging"),
+            config.getini("junit_duration_report"),
+            config.getini("junit_family"),
+            config.getini("junit_log_passing_tests"),
+        )
+        config.pluginmanager.register(config.stash[xml_key])
+
+
+def pytest_unconfigure(config):
+    xml = config.stash.get(xml_key, None)
+    if xml:
+        del config.stash[xml_key]
+        config.pluginmanager.unregister(xml)

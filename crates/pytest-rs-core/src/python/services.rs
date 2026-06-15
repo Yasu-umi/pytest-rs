@@ -459,6 +459,12 @@ pub fn junit_configure(
     Ok(())
 }
 
+pub fn junit_reset(py: Python<'_>) {
+    let _ = py
+        .import("pytest._junitxml")
+        .and_then(|m| m.call_method0("reset"));
+}
+
 /// Stream every report through the junit LogXML and write the file;
 /// returns its absolute path for the "generated xml file" line.
 pub fn junit_write(py: Python<'_>, session: &crate::session::Session) -> PyResult<String> {

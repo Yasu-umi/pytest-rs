@@ -609,6 +609,11 @@ def finish():
     return state.finish()
 
 
+def reset():
+    state.log_xml = None
+    state.item_properties = {}
+
+
 def _warn_incompatibility_with_xunit2(request, fixture_name):
     """PytestWarning (at the item's location) when the fixture is used
     under junit_family=xunit2."""

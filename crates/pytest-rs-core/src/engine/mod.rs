@@ -1045,6 +1045,19 @@ impl Engine {
         if let Ok(version) = python::pytest_version(py) {
             python::setenv(py, "PYTEST_VERSION", &version);
         }
+        // --junitxml: arm the XML writer for this nested run (same as run()).
+        if let Some(path) = self.config.get_value("junit-xml").map(str::to_string)
+            && !self.config.is_worker()
+        {
+            if std::path::Path::new(&path).is_dir() {
+                eprintln!("ERROR: --junitxml must be a filename, given: {path}");
+                return exit_code::USAGE_ERROR;
+            }
+            if let Err(err) = python::junit_configure(py, &self.config, &path) {
+                eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+                return exit_code::INTERNAL_ERROR;
+            }
+        }
         python::configure_debugging(py);
         python::set_assertion_verbosity(
             py,
@@ -1093,6 +1106,9 @@ impl Engine {
             self.config.get_flag("showlocals") && !self.config.get_flag("no-showlocals"),
         );
         let result = self.run_session(py, started);
+        // Reset the junit state so the next nested run (or the outer run)
+        // doesn't see a stale LogXML instance from this run.
+        python::junit_reset(py);
         crate::tw::set_enabled(outer_color);
         python::set_tb_color(py, outer_color);
         result
