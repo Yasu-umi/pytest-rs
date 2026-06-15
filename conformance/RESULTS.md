@@ -2423,7 +2423,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 1933 | 293 | 3 | 28 | 2257 | 86.9% | 14 | 46 | 63 |
+| pytest | 9.0.3 | 1940 | 286 | 3 | 28 | 2257 | 87.2% | 14 | 46 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 19 | 0 | 4 | 209 | 90.9% | 0 | 1 | 0 |
@@ -2510,10 +2510,10 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_terminal.py | failed | 211 | 12 | 0 | 4 |
 | testing/test_threadexception.py | failed | 1 | 7 | 0 | 0 |
 | testing/test_tmpdir.py | passed | 39 | 0 | 0 | 1 |
-| testing/test_unittest.py | failed | 57 | 13 | 0 | 9 |
+| testing/test_unittest.py | failed | 63 | 7 | 0 | 9 |
 | testing/test_unraisableexception.py | failed | 5 | 6 | 0 | 0 |
 | testing/test_warnings.py | failed | 36 | 7 | 0 | 1 |
-| testing/acceptance_test.py | failed | 41 | 50 | 0 | 2 |
+| testing/acceptance_test.py | failed | 42 | 49 | 0 | 2 |
 | testing/deprecated_test.py | failed | 10 | 5 | 0 | 0 |
 | testing/python/show_fixtures_per_test.py | failed | 0 | 8 | 0 | 0 |
 

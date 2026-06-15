@@ -368,8 +368,8 @@
       "file": "testing/test_unittest.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 57,
-      "failed": 13,
+      "passed": 63,
+      "failed": 7,
       "skipped": 9,
       "errors": 0
     },
@@ -395,8 +395,8 @@
       "file": "testing/acceptance_test.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 41,
-      "failed": 50,
+      "passed": 42,
+      "failed": 49,
       "skipped": 2,
       "errors": 0
     },
