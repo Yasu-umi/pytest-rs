@@ -2423,7 +2423,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2043 | 386 | 5 | 50 | 2484 | 84.3% | 13 | 52 | 63 |
+| pytest | 9.0.3 | 2195 | 583 | 3 | 52 | 2833 | 79.3% | 13 | 52 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 19 | 0 | 4 | 209 | 90.9% | 0 | 1 | 0 |
@@ -2472,11 +2472,11 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 |---|---|---:|---:|---:|---:|
 | testing/python/approx.py | failed | 30 | 45 | 0 | 18 |
 | testing/python/collect.py | failed | 47 | 35 | 0 | 0 |
-| testing/python/fixtures.py | error | 0 | 0 | 0 | 0 |
+| testing/python/fixtures.py | failed | 85 | 123 | 0 | 2 |
 | testing/python/integration.py | failed | 6 | 10 | 0 | 4 |
-| testing/python/metafunc.py | error | 0 | 0 | 1 | 0 |
+| testing/python/metafunc.py | failed | 41 | 71 | 0 | 0 |
 | testing/python/raises.py | failed | 13 | 18 | 0 | 0 |
-| testing/python/raises_group.py | error | 0 | 0 | 1 | 0 |
+| testing/python/raises_group.py | failed | 26 | 3 | 0 | 0 |
 | testing/python/show_fixtures_per_test.py | failed | 0 | 8 | 0 | 0 |
 | testing/examples/test_issue519.py | failed | 0 | 1 | 0 | 0 |
 | testing/freeze/tests/test_trivial.py | passed | 2 | 0 | 0 | 0 |
