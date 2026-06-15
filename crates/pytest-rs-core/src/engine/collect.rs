@@ -56,22 +56,47 @@ impl Engine {
                 .flat_map(|v| v.split_whitespace().map(str::to_string))
                 .collect();
             if !entries.is_empty() {
-                let globbed = python::glob_testpaths(py, rootdir, &entries)
-                    .map_err(|err| python::format_exception(py, &err))?;
-                if globbed.is_empty() {
-                    let _ = python::warn_explicit_at(
-                        py,
-                        "PytestConfigWarning",
-                        "No files were found in testpaths; consider removing or adjusting \
-                         your testpaths configuration. Searching recursively from the \
-                         current directory instead.",
-                        &rootdir.to_string_lossy(),
-                        0,
-                    );
+                if self.config.get_flag("pyargs") {
+                    // --pyargs: testpaths are module names, not filesystem globs.
+                    paths = entries;
                 } else {
-                    paths = globbed;
+                    let globbed = python::glob_testpaths(py, rootdir, &entries)
+                        .map_err(|err| python::format_exception(py, &err))?;
+                    if globbed.is_empty() {
+                        let _ = python::warn_explicit_at(
+                            py,
+                            "PytestConfigWarning",
+                            "No files were found in testpaths; consider removing or adjusting \
+                             your testpaths configuration. Searching recursively from the \
+                             current directory instead.",
+                            &rootdir.to_string_lossy(),
+                            0,
+                        );
+                    } else {
+                        paths = globbed;
+                    }
                 }
             }
+        }
+        // --pyargs: resolve dotted module names to filesystem paths.
+        if self.config.get_flag("pyargs") {
+            let mut resolved = Vec::with_capacity(paths.len());
+            for arg in &paths {
+                let path_part = arg.split("::").next().unwrap_or(arg);
+                let rest = if arg.contains("::") {
+                    &arg[path_part.len()..]
+                } else {
+                    ""
+                };
+                if let Some(fs_path) = python::resolve_pyarg(py, path_part) {
+                    resolved.push(format!("{}{rest}", fs_path.display()));
+                } else {
+                    return Err(format!(
+                        "module or package not found: {arg} (missing __init__.py?)"
+                    ));
+                }
+            }
+            paths = resolved;
         }
         // Relative CLI paths (and bare collection) resolve against the
         // invocation dir; rootdir only anchors node ids.

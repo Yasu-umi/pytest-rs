@@ -105,6 +105,34 @@ pub fn async_flags(py: Python<'_>, func: &Bound<'_, PyAny>) -> PyResult<AsyncFla
 }
 
 /// Import one test module and introspect it: append discovered test items
+/// Resolve a dotted module name to a filesystem path via `importlib.util.find_spec`.
+/// Returns `Some(path)` for a module file or package directory, `None` if not found.
+pub fn resolve_pyarg(py: Python<'_>, module_name: &str) -> Option<PathBuf> {
+    let find_spec = py
+        .import("importlib.util")
+        .ok()?
+        .getattr("find_spec")
+        .ok()?;
+    let spec = find_spec.call1((module_name,)).ok()?;
+    if spec.is_none() {
+        return None;
+    }
+    let sub_locs = spec.getattr("submodule_search_locations").ok()?;
+    if sub_locs.is_none() || sub_locs.len().unwrap_or(0) == 0 {
+        let origin = spec.getattr("origin").ok()?;
+        if origin.is_none() {
+            return None;
+        }
+        return origin.extract::<String>().ok().map(PathBuf::from);
+    }
+    let origin = spec.getattr("origin").ok()?;
+    if origin.is_none() {
+        return None;
+    }
+    let origin_str: String = origin.extract().ok()?;
+    PathBuf::from(&origin_str).parent().map(|p| p.to_path_buf())
+}
+
 /// and fixture definitions (objects carrying recorded shim metadata).
 /// True when a `pytest_collect_directory` hook exists in conftest hooks or on a
 /// pluginmanager plugin. The default implementation in `_pytest.python` always
