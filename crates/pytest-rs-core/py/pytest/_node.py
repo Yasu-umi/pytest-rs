@@ -511,6 +511,18 @@ class Class(Collector):
         super().__init__(**kwargs)
         self.obj = obj
 
+    def reportinfo(self):
+        """(path, 0-based lineno, class name) — mirrors pytest's Class.reportinfo.
+        inspect.getsourcelines returns the 1-based def line, so subtract 1."""
+        import inspect
+
+        obj = self.obj
+        try:
+            lineno0 = inspect.getsourcelines(obj)[1] - 1
+        except (OSError, TypeError):
+            lineno0 = 0
+        return (self.path, lineno0, self.name)
+
 
 class Item(_NodeBase):
     """Base test item for custom collectors. Subclasses override runtest()
@@ -1041,6 +1053,13 @@ class Function(Node):
             mod_stem = pathlib.Path(parts[0]).stem
             path_parts = [mod_stem] + parts[1:]
         return ".".join(path_parts)
+
+    def reportinfo(self):
+        """(path, 0-based lineno, modpath) — mirrors pytest's Function.reportinfo.
+        self.lineno stores the 1-based co_firstlineno, so the line is lineno-1."""
+        lineno = self.lineno
+        lineno0 = (lineno - 1) if lineno else 0
+        return (self.path, lineno0, self.getmodpath())
 
     def setup(self):
         if self.module is not None:

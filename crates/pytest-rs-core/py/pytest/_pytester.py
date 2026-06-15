@@ -1082,6 +1082,8 @@ class Pytester:
         # getparent(pytest.Module) finds it (Module is aliased to File).
         mod_node = File(name=path.name, path=path, config=config, parent=parent_collector)
         mod_node.own_markers = list(module_marks)
+        # getparent(pytest.Module).obj is the imported module (test_getmodulecollector).
+        mod_node.obj = module
 
         items = []
         for name, obj in vars(module).items():
@@ -1139,7 +1141,7 @@ class Pytester:
         """An in-process Module collector for the source. Supports .collect()
         (returns Class + Function children) and .module/.cls/.instance attrs."""
         from pytest._marks import get_unpacked_marks
-        from pytest._node import Class, File, Function, _ModuleCollector, _NodeSession
+        from pytest._node import Class, File, Function, Session, _ModuleCollector, _NodeSession
 
         if withinit:
             (self.path / "__init__.py").touch()
@@ -1162,6 +1164,12 @@ class Pytester:
         session = _NodeSession(config)
         module_collector = _ModuleCollector(mod, session, path) if mod is not None else None
         module_marks = get_unpacked_marks(mod) if mod is not None else []
+        # A real Session backs modcol.session.perform_collect (test_modulecol_roundtrip).
+        # Resolve collection args relative to the module's own directory, not the
+        # outer invocation rootdir (the pytester file lives in a tmp dir).
+        real_session = Session.from_config(config) if config is not None else None
+        if real_session is not None:
+            real_session.path = path.parent
 
         class _IPModule(File):
             """In-process Module collector returned by getmodulecol."""
@@ -1169,8 +1177,10 @@ class Pytester:
             def __init__(self):
                 super().__init__(name=path.name, config=config, path=path, nodeid=path.name)
                 self.module = mod
+                self.obj = mod
                 self.cls = None
                 self.instance = None
+                self.session = real_session
                 self._children = None
 
             def collect(self):
@@ -1211,7 +1221,9 @@ class Pytester:
             """In-process Class collector returned by collect_by_name on a Module."""
 
             def __init__(self, name, cls_obj, parent_module):
-                super().__init__(name=name, config=config, path=path, nodeid=f"{path.name}::{name}")
+                super().__init__(
+                    name=name, config=config, path=path, nodeid=f"{path.name}::{name}", obj=cls_obj
+                )
                 self.parent = parent_module
                 self._cls_obj = cls_obj
                 self.module = mod
