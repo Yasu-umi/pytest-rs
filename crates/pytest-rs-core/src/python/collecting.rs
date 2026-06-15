@@ -5,7 +5,7 @@ use super::*;
 use crate::collect::{MarkData, TestItem, file_nodeid, module_name_for};
 use crate::fixture::FixtureRegistry;
 use pyo3::types::{PyList, PyModule};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// The 1-based first line of a callable's definition (0 if unknown).
 pub(crate) fn first_lineno(py: Python<'_>, func: &Bound<'_, PyAny>) -> u32 {
@@ -113,39 +113,53 @@ pub fn has_collect_directory_hook(_py: Python<'_>, hooks: &[crate::session::PyHo
     hooks.iter().any(|h| h.name == "pytest_collect_directory")
 }
 
+/// Result of firing `pytest_collect_directory`.
+pub enum CollectDirResult {
+    /// Hook returned None: skip the directory entirely.
+    Skip,
+    /// Hook returned the default Dir or a custom collector: let Rust handle
+    /// the files in this directory (custom directory collection requires
+    /// a Python-side `pytest_collect_file` implementation which is not yet
+    /// available).
+    Default,
+}
+
 /// Fire the `pytest_collect_directory` hook via the pluginmanager relay.
-/// Returns `false` if the hook returned `None` (directory should be skipped).
-pub fn call_collect_directory_hook(py: Python<'_>, dir: &Path, rootdir: &Path) -> bool {
+pub fn call_collect_directory_hook(
+    py: Python<'_>,
+    dir: &Path,
+    rootdir: &Path,
+) -> CollectDirResult {
     let pm = match py
         .import("pytest._pluginmanager")
         .and_then(|m| m.getattr("pluginmanager"))
     {
         Ok(pm) => pm,
-        Err(_) => return true,
+        Err(_) => return CollectDirResult::Default,
     };
     let hook_relay = match pm
         .getattr("hook")
         .and_then(|h| h.getattr("pytest_collect_directory"))
     {
         Ok(h) => h,
-        Err(_) => return true,
+        Err(_) => return CollectDirResult::Default,
     };
     let pathlib = match py.import("pathlib").and_then(|m| m.getattr("Path")) {
         Ok(p) => p,
-        Err(_) => return true,
+        Err(_) => return CollectDirResult::Default,
     };
     let py_path = match pathlib.call1((dir.to_string_lossy().as_ref(),)) {
         Ok(p) => p,
-        Err(_) => return true,
+        Err(_) => return CollectDirResult::Default,
     };
     let config = crate::python::proxies::existing_py_config(py).map(|c| c.into_bound(py));
     let node_mod = match py.import("pytest._node") {
         Ok(m) => m,
-        Err(_) => return true,
+        Err(_) => return CollectDirResult::Default,
     };
     let collector_cls = match node_mod.getattr("Collector") {
         Ok(c) => c,
-        Err(_) => return true,
+        Err(_) => return CollectDirResult::Default,
     };
     let parent = {
         let kw = pyo3::types::PyDict::new(py);
@@ -164,16 +178,20 @@ pub fn call_collect_directory_hook(py: Python<'_>, dir: &Path, rootdir: &Path) -
         let _ = kw.set_item("session", session_proxy.as_ref());
         match collector_cls.call((), Some(&kw)) {
             Ok(p) => p,
-            Err(_) => return true,
+            Err(_) => return CollectDirResult::Default,
         }
     };
     let kwargs = pyo3::types::PyDict::new(py);
     let _ = kwargs.set_item("path", &py_path);
     let _ = kwargs.set_item("parent", &parent);
-    match hook_relay.call((), Some(&kwargs)) {
-        Ok(result) => !result.is_none(),
-        Err(_) => true,
+    let result = match hook_relay.call((), Some(&kwargs)) {
+        Ok(r) => r,
+        Err(_) => return CollectDirResult::Default,
+    };
+    if result.is_none() {
+        return CollectDirResult::Skip;
     }
+    CollectDirResult::Default
 }
 
 /// Custom collectors: fire `pytest_collect_file(file_path, parent)` for each

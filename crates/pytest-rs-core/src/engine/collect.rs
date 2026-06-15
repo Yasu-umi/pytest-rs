@@ -653,10 +653,12 @@ impl Engine {
                 for file in files {
                     if let Some(parent) = file.parent() {
                         let dir = parent.to_path_buf();
-                        if checked.insert(dir.clone())
-                            && !python::call_collect_directory_hook(py, &dir, rootdir)
-                        {
-                            rejected.insert(dir);
+                        if checked.insert(dir.clone()) {
+                            if let python::CollectDirResult::Skip =
+                                python::call_collect_directory_hook(py, &dir, rootdir)
+                            {
+                                rejected.insert(dir);
+                            }
                         }
                     }
                 }
