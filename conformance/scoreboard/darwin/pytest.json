@@ -62,8 +62,8 @@
       "file": "testing/test_cacheprovider.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 53,
-      "failed": 4,
+      "passed": 54,
+      "failed": 3,
       "skipped": 0,
       "errors": 0
     },
@@ -89,8 +89,8 @@
       "file": "testing/test_collection.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 99,
-      "failed": 14,
+      "passed": 100,
+      "failed": 13,
       "skipped": 3,
       "errors": 0
     },

@@ -360,30 +360,29 @@ pub fn collect_custom_files(
                 .collect();
             // If the hook returned a bare Item (not a Collector), treat it
             // directly as a single leaf item without calling .collect().
-            let item_iter: Box<dyn Iterator<Item = PyResult<Bound<'_, PyAny>>>> =
-                if collector.hasattr("collect")? {
-                    match collector.call_method0("collect") {
-                        Ok(iter) => Box::new(iter.try_iter()?),
-                        Err(err) => {
-                            // Build ExceptionInfo and call repr_failure for custom formatting.
-                            let longrepr = (|| -> PyResult<String> {
-                                let excinfo_cls = py
-                                    .import("_pytest._code")?
-                                    .getattr("ExceptionInfo")?;
-                                let exc_value = err.value(py);
-                                let ei = excinfo_cls
-                                    .call_method1("from_exception", (exc_value,))?;
-                                let repr = collector.call_method1("repr_failure", (&ei,))?;
-                                repr.str()?.extract()
-                            })()
-                            .unwrap_or_else(|_| format_exception(py, &err));
-                            collect_errors.push((file.clone(), longrepr));
-                            continue;
-                        }
+            let item_iter: Box<dyn Iterator<Item = PyResult<Bound<'_, PyAny>>>> = if collector
+                .hasattr("collect")?
+            {
+                match collector.call_method0("collect") {
+                    Ok(iter) => Box::new(iter.try_iter()?),
+                    Err(err) => {
+                        // Build ExceptionInfo and call repr_failure for custom formatting.
+                        let longrepr = (|| -> PyResult<String> {
+                            let excinfo_cls =
+                                py.import("_pytest._code")?.getattr("ExceptionInfo")?;
+                            let exc_value = err.value(py);
+                            let ei = excinfo_cls.call_method1("from_exception", (exc_value,))?;
+                            let repr = collector.call_method1("repr_failure", (&ei,))?;
+                            repr.str()?.extract()
+                        })()
+                        .unwrap_or_else(|_| format_exception(py, &err));
+                        collect_errors.push((file.clone(), longrepr));
+                        continue;
                     }
-                } else {
-                    Box::new(std::iter::once(Ok(collector.clone())))
-                };
+                }
+            } else {
+                Box::new(std::iter::once(Ok(collector.clone())))
+            };
             for item_obj in item_iter {
                 let item_obj = item_obj?;
                 // Publish to session.items immediately so a later file's

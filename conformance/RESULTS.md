@@ -2423,7 +2423,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 1946 | 280 | 3 | 28 | 2257 | 87.5% | 14 | 46 | 63 |
+| pytest | 9.0.3 | 1948 | 278 | 3 | 28 | 2257 | 87.5% | 14 | 46 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 19 | 0 | 4 | 209 | 90.9% | 0 | 1 | 0 |
@@ -2476,10 +2476,10 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/logging/test_formatter.py | passed | 4 | 0 | 0 | 0 |
 | testing/logging/test_reporting.py | failed | 15 | 37 | 0 | 0 |
 | testing/test_assertion.py | failed | 148 | 12 | 0 | 0 |
-| testing/test_cacheprovider.py | failed | 53 | 4 | 0 | 0 |
+| testing/test_cacheprovider.py | failed | 54 | 3 | 0 | 0 |
 | testing/test_capture.py | failed | 128 | 2 | 0 | 2 |
 | testing/test_collect_imported_tests.py | failed | 2 | 1 | 0 | 0 |
-| testing/test_collection.py | failed | 99 | 14 | 0 | 3 |
+| testing/test_collection.py | failed | 100 | 13 | 0 | 3 |
 | testing/test_compat.py | passed | 10 | 0 | 0 | 0 |
 | testing/test_config.py | failed | 177 | 37 | 0 | 1 |
 | testing/test_conftest.py | failed | 47 | 6 | 0 | 1 |
