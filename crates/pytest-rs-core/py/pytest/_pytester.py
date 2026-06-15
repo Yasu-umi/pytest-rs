@@ -389,7 +389,12 @@ class Pytester:
         subprocess backend like runpytest().
         """
         if os.environ.get("PYTEST_RS_INLINE_INPROCESS"):
-            return self.inline_run(*args)
+            reprec = self.inline_run(*args)
+            result = getattr(reprec, "_result", None)
+            if result is not None:
+                result.reprec = reprec
+                return result
+            return reprec
         return self.runpytest(*args, timeout=timeout)
 
     def make_hook_recorder(self, pluginmanager):
