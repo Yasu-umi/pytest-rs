@@ -89,8 +89,8 @@
       "file": "testing/test_collection.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 98,
-      "failed": 15,
+      "passed": 99,
+      "failed": 14,
       "skipped": 3,
       "errors": 0
     },
@@ -107,8 +107,8 @@
       "file": "testing/test_config.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 176,
-      "failed": 38,
+      "passed": 177,
+      "failed": 37,
       "skipped": 1,
       "errors": 0
     },
@@ -116,8 +116,8 @@
       "file": "testing/test_conftest.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 46,
-      "failed": 7,
+      "passed": 47,
+      "failed": 6,
       "skipped": 1,
       "errors": 0
     },
@@ -395,8 +395,8 @@
       "file": "testing/acceptance_test.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 42,
-      "failed": 49,
+      "passed": 45,
+      "failed": 46,
       "skipped": 2,
       "errors": 0
     },
