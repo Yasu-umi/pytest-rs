@@ -2423,11 +2423,11 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 1818 | 408 | 3 | 28 | 2257 | 81.8% | 14 | 46 | 63 |
+| pytest | 9.0.3 | 1933 | 293 | 3 | 28 | 2257 | 86.9% | 14 | 46 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 19 | 0 | 4 | 209 | 90.9% | 0 | 1 | 0 |
-| pytest-xdist | v3.8.0 | 8 | 1 | 0 | 0 | 9 | 88.9% | 0 | 1 | 6 |
+| pytest-xdist | v3.8.0 | 10 | 1 | 0 | 0 | 11 | 90.9% | 0 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 91 | 31 | 0 | 1 | 123 | 74.8% | 4 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 41 | 100.0% | 1 | 1 | 0 |
@@ -2449,20 +2449,20 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
 | rich | v14.2.0 | 855 | 0 | 0 | 25 | 880 | 100.0% | 60 | 62 | 0 |
-| pytest-bdd | 8.1.0 | 89 | 63 | 0 | 1 | 153 | 58.8% | 18 | 35 | 0 |
-| httpx | 0.28.1 | 1364 | 9 | 0 | 1 | 1374 | 99.3% | 25 | 31 | 0 |
+| pytest-bdd | 8.1.0 | 89 | 49 | 0 | 1 | 139 | 64.7% | 18 | 35 | 0 |
+| httpx | 0.28.1 | 1333 | 9 | 0 | 1 | 1343 | 99.3% | 25 | 31 | 0 |
 | httpx2 | v2.4.0 | 1426 | 0 | 0 | 1 | 1427 | 100.0% | 31 | 31 | 0 |
 | starlette | 0.46.2 | 907 | 0 | 0 | 0 | 907 | 100.0% | 28 | 28 | 0 |
 | attrs | 25.3.0 | 1340 | 2 | 0 | 3 | 1345 | 99.9% | 21 | 24 | 0 |
 | more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 671 | 100.0% | 2 | 2 | 0 |
 | pytest-django | v4.9.0 | 147 | 68 | 0 | 1 | 216 | 68.5% | 2 | 13 | 0 |
 | werkzeug | 3.1.3 | 897 | 1 | 1 | 0 | 899 | 99.8% | 21 | 25 | 0 |
-| fastapi | 0.115.12 | 2209 | 9 | 115 | 130 | 2463 | 95.0% | 296 | 310 | 0 |
+| fastapi | 0.115.12 | 2209 | 9 | 116 | 130 | 2464 | 94.9% | 295 | 310 | 0 |
 | packaging | 25.0 | 26947 | 0 | 0 | 1 | 26948 | 100.0% | 12 | 12 | 0 |
 | pandas | v3.0.3 | 161707 | 39 | 371 | 25466 | 187583 | 99.8% | 860 | 964 | 0 |
-| scikit-learn-1 | 1.9.0 | 8109 | 16 | 193 | 6617 | 14935 | 98.6% | 73 | 87 | 0 |
+| scikit-learn-1 | 1.9.0 | 8301 | 16 | 1 | 6617 | 14935 | 99.9% | 74 | 87 | 0 |
 | scikit-learn-2 | 1.9.0 | 4915 | 0 | 2 | 1888 | 6805 | 100.0% | 50 | 58 | 0 |
-| scikit-learn-3 | 1.9.0 | 8834 | 7 | 0 | 2505 | 11346 | 99.9% | 100 | 114 | 0 |
+| scikit-learn-3 | 1.9.0 | 9227 | 7 | 0 | 2543 | 11777 | 99.9% | 101 | 114 | 0 |
 
 ### pytest @ 9.0.3
 
@@ -2475,7 +2475,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/logging/test_fixture.py | failed | 26 | 1 | 0 | 0 |
 | testing/logging/test_formatter.py | passed | 4 | 0 | 0 | 0 |
 | testing/logging/test_reporting.py | failed | 15 | 37 | 0 | 0 |
-| testing/test_assertion.py | failed | 150 | 10 | 0 | 0 |
+| testing/test_assertion.py | failed | 148 | 12 | 0 | 0 |
 | testing/test_cacheprovider.py | failed | 53 | 4 | 0 | 0 |
 | testing/test_capture.py | failed | 128 | 2 | 0 | 2 |
 | testing/test_collect_imported_tests.py | failed | 2 | 1 | 0 | 0 |
@@ -2488,7 +2488,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 |
 | testing/test_faulthandler.py | failed | 5 | 7 | 0 | 0 |
 | testing/test_helpconfig.py | failed | 6 | 6 | 0 | 0 |
-| testing/test_junitxml.py | failed | 17 | 120 | 0 | 0 |
+| testing/test_junitxml.py | failed | 132 | 5 | 0 | 0 |
 | testing/test_link_resolve.py | failed | 0 | 1 | 0 | 0 |
 | testing/test_main.py | failed | 20 | 4 | 0 | 0 |
 | testing/test_mark.py | failed | 105 | 1 | 0 | 0 |
@@ -2501,13 +2501,13 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_runner.py | failed | 63 | 3 | 0 | 0 |
 | testing/test_runner_xunit.py | passed | 13 | 0 | 0 | 0 |
 | testing/test_scope.py | passed | 4 | 0 | 0 | 0 |
-| testing/test_session.py | failed | 20 | 6 | 0 | 0 |
+| testing/test_session.py | failed | 23 | 3 | 0 | 0 |
 | testing/test_setuponly.py | passed | 26 | 0 | 0 | 0 |
 | testing/test_setupplan.py | passed | 3 | 0 | 0 | 0 |
 | testing/test_skipping.py | failed | 91 | 1 | 0 | 0 |
 | testing/test_stepwise.py | passed | 18 | 0 | 0 | 0 |
 | testing/test_subtests.py | failed | 12 | 22 | 0 | 0 |
-| testing/test_terminal.py | failed | 212 | 11 | 0 | 4 |
+| testing/test_terminal.py | failed | 211 | 12 | 0 | 4 |
 | testing/test_threadexception.py | failed | 1 | 7 | 0 | 0 |
 | testing/test_tmpdir.py | passed | 39 | 0 | 0 | 1 |
 | testing/test_unittest.py | failed | 57 | 13 | 0 | 9 |
@@ -2584,7 +2584,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| testing/acceptance_test.py | failed | 8 | 1 | 0 | 0 |
+| testing/acceptance_test.py | failed | 10 | 1 | 0 | 0 |
 
 </details>
 
@@ -2981,7 +2981,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/feature/test_cucumber_json.py | failed | 0 | 1 | 0 | 0 |
 | tests/feature/test_description.py | passed | 1 | 0 | 0 | 0 |
 | tests/feature/test_feature_base_dir.py | passed | 7 | 0 | 0 | 0 |
-| tests/feature/test_gherkin_terminal_reporter.py | failed | 0 | 28 | 0 | 0 |
+| tests/feature/test_gherkin_terminal_reporter.py | failed | 0 | 14 | 0 | 0 |
 | tests/feature/test_no_scenario.py | passed | 1 | 0 | 0 | 0 |
 | tests/feature/test_outline.py | failed | 2 | 5 | 0 | 0 |
 | tests/feature/test_outline_empty_values.py | failed | 0 | 1 | 0 | 0 |
@@ -3019,7 +3019,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/client/test_auth.py | passed | 79 | 0 | 0 | 1 |
 | tests/client/test_client.py | timeout | 0 | 0 | 0 | 0 |
 | tests/client/test_cookies.py | passed | 7 | 0 | 0 | 0 |
-| tests/client/test_event_hooks.py | timeout | 0 | 0 | 0 | 0 |
+| tests/client/test_event_hooks.py | passed | 9 | 0 | 0 | 0 |
 | tests/client/test_headers.py | passed | 17 | 0 | 0 | 0 |
 | tests/client/test_properties.py | passed | 8 | 0 | 0 | 0 |
 | tests/client/test_proxies.py | passed | 69 | 0 | 0 | 0 |
@@ -3044,7 +3044,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_multipart.py | passed | 38 | 0 | 0 | 0 |
 | tests/test_status_codes.py | passed | 6 | 0 | 0 | 0 |
 | tests/test_timeouts.py | failed | 9 | 1 | 0 | 0 |
-| tests/test_utils.py | passed | 40 | 0 | 0 | 0 |
+| tests/test_utils.py | timeout | 0 | 0 | 0 | 0 |
 | tests/test_wsgi.py | passed | 12 | 0 | 0 | 0 |
 
 </details>
@@ -3402,7 +3402,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_tutorial/test_cookie_params/test_tutorial001.py | passed | 25 | 0 | 0 | 0 |
 | tests/test_tutorial/test_cors/test_tutorial001.py | passed | 1 | 0 | 0 | 0 |
 | tests/test_tutorial/test_custom_docs_ui/test_tutorial001.py | passed | 4 | 0 | 0 | 0 |
-| tests/test_tutorial/test_custom_docs_ui/test_tutorial002.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_tutorial/test_custom_docs_ui/test_tutorial002.py | failed | 4 | 0 | 1 | 0 |
 | tests/test_tutorial/test_custom_request_and_route/test_tutorial001.py | passed | 3 | 0 | 0 | 0 |
 | tests/test_tutorial/test_custom_request_and_route/test_tutorial002.py | failed | 1 | 1 | 0 | 0 |
 | tests/test_tutorial/test_custom_request_and_route/test_tutorial003.py | passed | 2 | 0 | 0 | 0 |
@@ -4613,7 +4613,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | sklearn/utils/tests/test_user_interface.py | passed | 23 | 0 | 0 | 0 |
 | sklearn/utils/tests/test_validation.py | passed | 258 | 0 | 0 | 259 |
 | sklearn/utils/tests/test_weight_vector.py | passed | 2 | 0 | 0 | 0 |
-| sklearn/linear_model/_glm/tests/test_glm.py | failed | 82 | 0 | 192 | 45 |
+| sklearn/linear_model/_glm/tests/test_glm.py | passed | 274 | 0 | 0 | 45 |
 | sklearn/linear_model/tests/test_base.py | passed | 76 | 0 | 0 | 2 |
 | sklearn/linear_model/tests/test_bayes.py | passed | 24 | 0 | 0 | 1 |
 | sklearn/linear_model/tests/test_common.py | failed | 0 | 0 | 0 | 0 |
@@ -4783,7 +4783,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | sklearn/impute/tests/test_knn.py | passed | 47 | 0 | 0 | 0 |
 | sklearn/inspection/_plot/tests/test_boundary_decision_display.py | passed | 10 | 0 | 0 | 142 |
 | sklearn/inspection/_plot/tests/test_plot_partial_dependence.py | no-tests | 0 | 0 | 0 | 137 |
-| sklearn/inspection/tests/test_partial_dependence.py | timeout | 0 | 0 | 0 | 0 |
+| sklearn/inspection/tests/test_partial_dependence.py | passed | 393 | 0 | 0 | 38 |
 | sklearn/inspection/tests/test_pd_utils.py | passed | 10 | 0 | 0 | 1 |
 | sklearn/inspection/tests/test_permutation_importance.py | passed | 24 | 0 | 0 | 12 |
 | sklearn/manifold/tests/test_classical_mds.py | passed | 4 | 0 | 0 | 0 |

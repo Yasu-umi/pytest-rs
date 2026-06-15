@@ -618,12 +618,12 @@
     },
     {
       "file": "sklearn/linear_model/_glm/tests/test_glm.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 82,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 274,
       "failed": 0,
       "skipped": 45,
-      "errors": 192
+      "errors": 0
     },
     {
       "file": "sklearn/linear_model/tests/test_base.py",

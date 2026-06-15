@@ -681,11 +681,11 @@
     },
     {
       "file": "sklearn/inspection/tests/test_partial_dependence.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 393,
       "failed": 0,
-      "skipped": 0,
+      "skipped": 38,
       "errors": 0
     },
     {
