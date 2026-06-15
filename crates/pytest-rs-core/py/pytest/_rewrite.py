@@ -150,6 +150,7 @@ def _format_assert(op, left, right):
     out."""
     try:
         from _pytest._io.saferepr import saferepr
+
         fallback = f"{saferepr(left)} {op} {saferepr(right)}"
     except Exception:
         fallback = f"{left!r} {op} {right!r}"
