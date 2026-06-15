@@ -161,8 +161,8 @@
       "file": "testing/test_junitxml.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 17,
-      "failed": 120,
+      "passed": 132,
+      "failed": 5,
       "skipped": 0,
       "errors": 0
     },
