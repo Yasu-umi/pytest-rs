@@ -5,6 +5,78 @@
   "excluded_files": 63,
   "files": [
     {
+      "file": "testing/python/approx.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 30,
+      "failed": 45,
+      "skipped": 18,
+      "errors": 0
+    },
+    {
+      "file": "testing/python/collect.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 47,
+      "failed": 35,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/python/fixtures.py",
+      "status": "error",
+      "exit_code": 4,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/python/integration.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 6,
+      "failed": 10,
+      "skipped": 4,
+      "errors": 0
+    },
+    {
+      "file": "testing/python/metafunc.py",
+      "status": "error",
+      "exit_code": 2,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 1
+    },
+    {
+      "file": "testing/python/raises.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 13,
+      "failed": 18,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "testing/python/raises_group.py",
+      "status": "error",
+      "exit_code": 2,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 1
+    },
+    {
+      "file": "testing/python/show_fixtures_per_test.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 0,
+      "failed": 8,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
       "file": "testing/examples/test_issue519.py",
       "status": "failed",
       "exit_code": 1,
@@ -119,15 +191,6 @@
       "passed": 47,
       "failed": 6,
       "skipped": 1,
-      "errors": 0
-    },
-    {
-      "file": "testing/test_debug_session.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 1,
-      "failed": 0,
-      "skipped": 0,
       "errors": 0
     },
     {
@@ -406,15 +469,6 @@
       "exit_code": 1,
       "passed": 10,
       "failed": 5,
-      "skipped": 0,
-      "errors": 0
-    },
-    {
-      "file": "testing/python/show_fixtures_per_test.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 0,
-      "failed": 8,
       "skipped": 0,
       "errors": 0
     }
