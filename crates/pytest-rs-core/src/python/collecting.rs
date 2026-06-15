@@ -107,6 +107,7 @@ pub fn async_flags(py: Python<'_>, func: &Bound<'_, PyAny>) -> PyResult<AsyncFla
 /// Import one test module and introspect it: append discovered test items
 /// Resolve a dotted module name to a filesystem path via `importlib.util.find_spec`.
 /// Returns `Some(path)` for a module file or package directory, `None` if not found.
+/// Handles regular packages (`__init__.py`) and namespace packages (PEP 420).
 pub fn resolve_pyarg(py: Python<'_>, module_name: &str) -> Option<PathBuf> {
     let find_spec = py
         .import("importlib.util")
@@ -119,18 +120,23 @@ pub fn resolve_pyarg(py: Python<'_>, module_name: &str) -> Option<PathBuf> {
     }
     let sub_locs = spec.getattr("submodule_search_locations").ok()?;
     if sub_locs.is_none() || sub_locs.len().unwrap_or(0) == 0 {
+        // Simple module (not a package).
         let origin = spec.getattr("origin").ok()?;
         if origin.is_none() {
             return None;
         }
         return origin.extract::<String>().ok().map(PathBuf::from);
     }
+    // Package: try origin first (regular package with __init__.py),
+    // fall back to submodule_search_locations[0] (namespace package).
     let origin = spec.getattr("origin").ok()?;
-    if origin.is_none() {
-        return None;
+    if !origin.is_none() {
+        let origin_str: String = origin.extract().ok()?;
+        return PathBuf::from(&origin_str).parent().map(|p| p.to_path_buf());
     }
-    let origin_str: String = origin.extract().ok()?;
-    PathBuf::from(&origin_str).parent().map(|p| p.to_path_buf())
+    // Namespace package: no __init__.py, use search location directly.
+    let loc: String = sub_locs.get_item(0).ok()?.extract().ok()?;
+    Some(PathBuf::from(loc))
 }
 
 /// and fixture definitions (objects carrying recorded shim metadata).
@@ -153,11 +159,7 @@ pub enum CollectDirResult {
 }
 
 /// Fire the `pytest_collect_directory` hook via the pluginmanager relay.
-pub fn call_collect_directory_hook(
-    py: Python<'_>,
-    dir: &Path,
-    rootdir: &Path,
-) -> CollectDirResult {
+pub fn call_collect_directory_hook(py: Python<'_>, dir: &Path, rootdir: &Path) -> CollectDirResult {
     let pm = match py
         .import("pytest._pluginmanager")
         .and_then(|m| m.getattr("pluginmanager"))
