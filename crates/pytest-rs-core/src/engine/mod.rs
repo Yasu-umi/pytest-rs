@@ -9,7 +9,7 @@ use crate::report::{Outcome, Phase, exit_code};
 use crate::session::Session;
 
 /// Marks owned by the core or bundled plugins.
-pub(crate) const BUILTIN_MARKS: [&str; 13] = [
+pub(crate) const BUILTIN_MARKS: [&str; 14] = [
     "skip",
     "skipif",
     "xfail",
@@ -23,6 +23,8 @@ pub(crate) const BUILTIN_MARKS: [&str; 13] = [
     "benchmark",
     "no_cover",
     "xdist_group",
+    // Registered by the bundled pytester plugin (pytest.mark.pytester_example_path).
+    "pytester_example_path",
 ];
 
 pub struct Engine {

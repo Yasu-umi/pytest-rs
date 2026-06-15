@@ -15,7 +15,7 @@ exclude = ["example_scripts"]
 # fixtures.py, metafunc.py, ...) are measured like upstream collects them.
 python_files = ["test_*.py", "*_test.py", "testing/python/*.py"]
 local = "conformance/suites/pytest"
-deps = ["packaging==26.2", "iniconfig==2.3.0", "pluggy==1.6.0", "xmlschema==4.3.1", "setuptools==82.0.1", "pygments==2.20.0", "attrs==26.1.0"]
+deps = ["packaging==26.2", "iniconfig==2.3.0", "pluggy==1.6.0", "xmlschema==4.3.1", "setuptools==82.0.1", "pygments==2.20.0", "attrs==26.1.0", "hypothesis==6.155.1"]
 # Files that intermittently time out under full-parallel load; give them the
 # 3x slow-file timeout so the scoreboard/CI stay stable.
 slow_files = [
