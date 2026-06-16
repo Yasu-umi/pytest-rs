@@ -54,19 +54,31 @@ crates/
 
 ```
 src/
-  config/      # pytest.ini / pyproject / setup.cfg + CLI (clap behind an OptionParser facade)
-  collect/     # collection tree (arena), node IDs, AST pre-scan filter
-  fixture/     # FixtureDef registry, dependency DAG resolution, scope cache, finalizer stack
-  runner/      # setup/call/teardown protocol -> TestReport
-  mark/        # marker model, -k / -m expression evaluator (small Pratt parser, no eval)
-  assertion/   # Rust AST assert-rewrite -> regenerated source -> CPython compile()
-  report/      # terminal (pytest-parity output), junitxml, exit codes 0-5
-  python/      # the ONLY module allowed to touch Python<'py>/Bound. interp, shim loader,
-               #   meta_path importer, introspection, traceback formatting
-  hooks.rs     # Plugin trait, HookContext, RuntestGuard
-  manager.rs   # PluginManager + Engine (disjoint borrows: plugins vs session)
-  py/          # embedded `pytest` Python shim sources (include_str!)
+  config.rs    # pytest.ini / pyproject / setup.cfg + CLI (clap behind an OptionParser facade)
+  collect.rs   # collection: dir walk, AST pre-scan filter (ruff), node IDs, TestItem list
+  fixture.rs   # FixtureDef registry, dependency resolution, scope cache, finalizer stack
+  request.rs   # FixtureRequest
+  engine/      # Engine driver: run/run_session, collection orchestration (collect.rs),
+               #   -k/-m selection, in-process nested runs (inprocess.rs), terminal
+               #   rendering (terminal.rs), collector-tree collectstart/collectreport (hooks.rs)
+  runner/      # setup/call/teardown protocol -> TestReport (item, marks, teardown, protocol)
+  report.rs    # TestReport / CollectReport model, exit codes 0-5
+  python/      # the ONLY modules allowed to touch Python<'py>/Bound: interp bootstrap,
+               #   shim loader, collection, fixtures, reporter, proxies, services, tracebacks
+  hooks.rs     # Plugin trait, HookContext, PluginManager
+  dist.rs      # work distribution over -n workers (--dist modes, work-stealing queue)
+  worker.rs    # hidden --worker mode (fork/spawn)
+  ipc.rs       # newline-delimited JSON IPC between controller and workers
+  cache.rs     # --lf/--ff lastfailed persistence
+  session.rs   # Session state (items, collect errors, shouldstop/shouldfail)
+  tw.rs        # terminal writer (color, width)
+py/            # embedded `pytest` + `_pytest` Python shim packages (build.rs embeds them at
+               #   compile time; written to a per-run temp dir on sys.path at startup)
 ```
+
+(Marker model and the `-k`/`-m` evaluator live partly in the shim — `pytest._marks`,
+`pytest._expression` — and partly in `engine/selection.rs`; assertion rewriting is a
+Python meta-path transform in the shim's `pytest/_rewrite.py`, not a Rust module.)
 
 Key structural rules:
 
@@ -263,24 +275,42 @@ Key structural rules:
   (3 internal-API files excluded), pytest-benchmark test_normal/test_sample green
   (storage/cli internals excluded), pytest-cov 28/209 (the rest is branch coverage, xdist,
   and html/json reports — deferred by design).
+- **Post-v1 — conformance-driven hardening** *(ongoing)*: work since M6 is steered by running
+  ever more of the upstream suites. Landmark pieces: entry-point autoload of third-party
+  `pytest11` plugins (16 plugin suites now run their own tests under pytest-rs — pytest-mypy,
+  -ruff, -subtests, -snapshot, -bdd, …); an in-process `pytester` backend (live `HookRecorder`
+  hook-call monitoring, `getitem`/`getmodulecol` returning real collector nodes, nested-run
+  global-state isolation); the collector-tree `pytest_collect_file`/`collect_directory`/
+  `collectstart`/`collectreport` hook surface; `--pyargs`, `--junitxml` in nested runs; and a
+  growing set of real-world suites (httpx, starlette, fastapi, werkzeug, pandas, scikit-learn)
+  as drop-in evidence.
 
 ## Conformance testing
 
 Compatibility is verified by running the **upstream test suites of the libraries being
-reproduced** under pytest-rs, as-is, in two categories:
+reproduced** under pytest-rs, as-is, in three categories:
 
 - *pytest & plugin ecosystem* (the APIs pytest-rs reimplements): pytest itself,
   pytest-asyncio, pytest-mock, pytest-cov, pytest-xdist, pytest-split, pytest-benchmark,
-  pytest-timeout, anyio.
+  and anyio.
+- *Third-party plugins* (not reimplemented — loaded as-is through the entry-point shim,
+  their own suites run under pytest-rs): pytest-timeout, pytest-mypy, pytest-ruff,
+  pytest-subtests, pytest-metadata, pytest-snapshot, pytest-icdiff, pytest-socket,
+  pytest-order, pytest-repeat, pytest-instafail, pytest-env, pytest-rerunfailures,
+  pytest-randomly, pytest-bdd, and a partial pytest-django.
 - *Real-world projects* (drop-in evidence — their suites run unchanged): click, jinja,
-  marshmallow, rich. jinja and marshmallow pass 100%.
+  marshmallow, rich, attrs, more-itertools, packaging, httpx, starlette, fastapi,
+  werkzeug, pandas, and scikit-learn (sharded). Many pass at or near 100%; see
+  `conformance/RESULTS.md` for the live per-suite numbers.
 
 Harness (`conformance/runner.py`):
 
 - `conformance/suites.toml` pins each upstream repo at a release tag; the runner clones the
   tag (or uses the submodule checkout with `--local`), installs suite deps into a `--target`
   dir (dist-info included, so a suite's own `pytest11` entry point autoloads — how anyio and
-  pytest-timeout exercise the autoload path), and runs file by file.
+  pytest-timeout exercise the autoload path), and runs file by file. File selection honors the
+  suite's own `python_files` ini (e.g. pytest collects `testing/python/*.py`), so the
+  scoreboard measures exactly what upstream collects rather than only `test_*.py`.
 - Results land in `conformance/scoreboard/<platform>/*.json` (linux = canonical, CI
   bot-refreshed on main pushes; darwin = dev) and regenerate `conformance/RESULTS.md` plus
   the README table.
@@ -291,8 +321,10 @@ Harness (`conformance/runner.py`):
 - `pytester` is supported (nested sessions run the pytest-rs binary as the sub-runner),
   which is what unlocked the bulk of upstream behavioral tests. Its in-process APIs largely
   landed too (`parseconfig(ure)`, `runitem`, `getnode`/`getitems`/`collect_by_name`, a real
-  `HookRecorder`); the main remaining gap is `spawn_pytest` (pexpect-driven interactive
-  sessions, e.g. `--pdb` debugger tests).
+  `HookRecorder`). `getitem`/`getmodulecol` return live collector nodes — `Module`/`Class`/
+  `Function` carrying `.obj`, a faithful `reportinfo()`, and a `Session.perform_collect()` that
+  round-trips — so collector-introspection tests work. The main remaining gap is `spawn_pytest`
+  (pexpect-driven interactive sessions, e.g. `--pdb` debugger tests).
 
 ## Risks
 
