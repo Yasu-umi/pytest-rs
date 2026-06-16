@@ -3,7 +3,7 @@
 Notable changes per release. The release workflow uses the matching section
 as the GitHub release notes (auto-generated notes are the fallback).
 
-## v0.0.5 (unreleased)
+## v0.0.5 (2026-06-16)
 
 ### Added
 
