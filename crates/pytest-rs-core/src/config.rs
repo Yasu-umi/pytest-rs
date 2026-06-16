@@ -1238,7 +1238,7 @@ impl Config {
 
         // minversion check: if the config requires a newer pytest than ours.
         // Compare against the pytest API version we track (9.0.3), not the
-        // pytest-rs package version (0.0.4), since minversion targets pytest.
+        // pytest-rs package version (0.0.5), since minversion targets pytest.
         {
             let required = ini_overrides
                 .get("minversion")

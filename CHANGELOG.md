@@ -3,6 +3,59 @@
 Notable changes per release. The release workflow uses the matching section
 as the GitHub release notes (auto-generated notes are the fallback).
 
+## v0.0.5 (unreleased)
+
+### Added
+
+- **Live collector-tree nodes** — `pytester.getitem` / `getmodulecol` now
+  return real `Module` / `Class` / `Function` collectors: the module node
+  carries `.obj`, `Function` / `Class` expose a faithful `reportinfo()`
+  (0-based lineno + modpath), `getmodulecol().session.perform_collect()`
+  round-trips, and `Function.originalname` / `callobj` / `<Function name>`
+  repr work. The real `Class` / `Function` / `Module` are re-exported from
+  `_pytest.python` so upstream `isinstance` checks pass.
+- **`--pyargs`** collection arguments (`pkg.mod::Test::case`), including
+  namespace-package resolution.
+- **`--junitxml` in nested (pytester) runs**, so upstream's `test_junitxml`
+  suite runs in-process.
+- **Ported internals for pytest's own tests**: `IdMaker` (parametrization ID
+  derivation), `getfuncargnames` / `num_mock_patch_args` / `ascii_escaped`
+  (`_pytest.compat`), `_recursive_sequence_map` (`_pytest.python_api`), and
+  an `_pytest.raises` shim (`RaisesExc` / `RaisesGroup` / `repr_callable`).
+- The bundled pytester plugin registers its `pytester_example_path` marker.
+
+### Changed
+
+- **Conformance fidelity** — the runner now honors each suite's
+  `python_files` ini. pytest's own `testing/python/*.py` (`collect.py`,
+  `fixtures.py`, `metafunc.py`, `raises.py`, `approx.py`, `integration.py`,
+  …) were silently unmeasured before; they are now collected like upstream
+  does. This adds previously-invisible tests to the denominator, so the
+  pytest headline conformance number drops while becoming honest.
+
+### Fixed
+
+- `pytest_collect_file` fires for every file (with `repr_failure` on
+  collection errors), `pytest_collect_file` skips are honored, and a
+  `pytest_collect_directory` hook can filter/skip directories.
+- Nested in-process (`pytester`) runs isolate more global state: `--basetemp`
+  validation, the `--runxfail` monkeypatch, warning-capture state, the
+  plugin-manager registry, and `pytest.exit()` in `sessionfinish` /
+  `UsageError` written to fd 2 so `result.stderr` captures them.
+- Terminal / assertion / traceback fidelity: file paths shown relative to the
+  invocation dir when rootdir differs, `saferepr` in the assertion fallback,
+  multi-line `reprcrash.message` matching, no spurious blank line before the
+  first traceback frame, and `--color` / `--showlocals` / fine-grained
+  verbosity propagated into nested runs.
+- `runpytest_inprocess` returns a `RunResult` (not a `HookRecorder`).
+
+### Conformance
+
+- pytest's own suite is now measured faithfully at **2231 / 2833** graded
+  tests after including `testing/python/*.py`; the previously reported number
+  excluded those files. `python/collect.py` 42 → 35 failures and
+  `python/metafunc.py` 71 → 49 from the live-node and `IdMaker` work.
+
 ## v0.0.4 (2026-06-11)
 
 ### Added
