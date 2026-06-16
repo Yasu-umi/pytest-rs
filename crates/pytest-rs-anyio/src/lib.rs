@@ -121,6 +121,7 @@ impl AnyioPlugin {
             .iter()
             .find(|(name, _, _)| name == "anyio_backend");
         let cache_key = (
+            def.scope,
             def.name.clone(),
             def.baseid.clone(),
             instance,

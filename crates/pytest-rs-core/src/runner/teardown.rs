@@ -279,9 +279,13 @@ pub(crate) fn teardown_scope(
             ));
         }
     }
+    // Evict only this scope's cached values: instance strings collide across
+    // scopes (a non-class test's class instance is the file, same as its
+    // module instance), so an instance-only retain would drop a still-live
+    // module fixture when a sibling class scope tears down.
     session
         .fixture_cache
-        .retain(|(_, _, inst, _), _| inst != instance);
+        .retain(|(s, _, _, inst, _), _| !(*s == scope && inst == instance));
     errors
 }
 

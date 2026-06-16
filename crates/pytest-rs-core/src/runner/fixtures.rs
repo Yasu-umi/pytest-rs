@@ -292,6 +292,7 @@ pub(crate) fn resolve_fixture_def(
         }
     };
     let cache_key = (
+        def.scope,
         keyed_name,
         def.baseid.clone(),
         instance.clone(),
