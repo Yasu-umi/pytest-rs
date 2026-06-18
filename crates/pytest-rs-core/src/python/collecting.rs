@@ -224,6 +224,73 @@ pub fn call_collect_directory_hook(py: Python<'_>, dir: &Path, rootdir: &Path) -
     CollectDirResult::Default
 }
 
+/// True when a `pytest_pycollect_makemodule` hook exists in conftest hooks.
+/// The default has no override; this checks for CONFTEST/plugin overrides that
+/// can replace the Module collector with a custom subclass.
+pub fn has_pycollect_makemodule_hook(_py: Python<'_>, hooks: &[crate::session::PyHook]) -> bool {
+    hooks
+        .iter()
+        .any(|h| h.name == "pytest_pycollect_makemodule")
+}
+
+/// Fire `pytest_pycollect_makemodule(module_path, parent)` via the pluginmanager
+/// relay (firstresult). Returns the returned collector node's class name when a
+/// custom node is produced and it differs from the default "Module", so the
+/// `--collect-only` tree can render e.g. `<MyModule xyz>`.
+pub fn call_pycollect_makemodule_hook(
+    py: Python<'_>,
+    path: &Path,
+    rootdir: &Path,
+) -> Option<String> {
+    let pm = py
+        .import("pytest._pluginmanager")
+        .and_then(|m| m.getattr("pluginmanager"))
+        .ok()?;
+    let hook_relay = pm
+        .getattr("hook")
+        .and_then(|h| h.getattr("pytest_pycollect_makemodule"))
+        .ok()?;
+    let pathlib = py.import("pathlib").and_then(|m| m.getattr("Path")).ok()?;
+    let module_path = pathlib.call1((path.to_string_lossy().as_ref(),)).ok()?;
+    let config = crate::python::proxies::existing_py_config(py).map(|c| c.into_bound(py));
+    let node_mod = py.import("pytest._node").ok()?;
+    let collector_cls = node_mod.getattr("Collector").ok()?;
+    let parent = {
+        let kw = pyo3::types::PyDict::new(py);
+        let _ = kw.set_item("config", config.as_ref().map(|c| c.as_any()));
+        let root_path = pathlib.call1((rootdir.to_string_lossy().as_ref(),)).ok();
+        let _ = kw.set_item("path", root_path.as_ref());
+        let _ = kw.set_item("nodeid", "");
+        let _ = kw.set_item("name", "");
+        let session_proxy = config.as_ref().and_then(|c| {
+            node_mod
+                .getattr("_NodeSession")
+                .ok()?
+                .call1((c.as_any(),))
+                .ok()
+        });
+        let _ = kw.set_item("session", session_proxy.as_ref());
+        collector_cls.call((), Some(&kw)).ok()?
+    };
+    let kwargs = pyo3::types::PyDict::new(py);
+    let _ = kwargs.set_item("module_path", &module_path);
+    let _ = kwargs.set_item("parent", &parent);
+    let result = hook_relay.call((), Some(&kwargs)).ok()?;
+    if result.is_none() {
+        return None;
+    }
+    let class_name: String = result
+        .getattr("__class__")
+        .and_then(|c| c.getattr("__name__"))
+        .and_then(|n| n.extract())
+        .ok()?;
+    if class_name == "Module" {
+        None
+    } else {
+        Some(class_name)
+    }
+}
+
 /// Custom collectors: fire `pytest_collect_file(file_path, parent)` for each
 /// candidate file; a plugin (pytest-ruff/pytest-mypy) may return a
 /// `pytest.File` whose `.collect()` yields `pytest.Item`s. Each item becomes a
@@ -453,6 +520,15 @@ pub fn collect_module(
         .filter(|hook| hook.name == "pytest_generate_tests")
         .map(|hook| hook.func.clone_ref(py))
         .collect();
+    // pytest_pycollect_makemodule: a conftest may return a custom Module
+    // subclass (e.g. `MyModule.from_parent(...)`) for this file. We honor the
+    // returned node's class name for the --collect-only tree label.
+    let custom_module_class = if has_pycollect_makemodule_hook(py, hooks) {
+        call_pycollect_makemodule_hook(py, path, rootdir)
+    } else {
+        None
+    };
+    let module_items_start = items.len();
     introspect_namespace(
         py,
         &module,
@@ -462,7 +538,13 @@ pub fn collect_module(
         items,
         registry,
         &extra_generate_hooks,
-    )
+    )?;
+    if let Some(class_name) = custom_module_class {
+        for item in items.iter_mut().skip(module_items_start) {
+            item.collector_class = class_name.clone();
+        }
+    }
+    Ok(())
 }
 
 /// Collect doctest items from an already-imported Python module.
