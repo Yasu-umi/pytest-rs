@@ -7,6 +7,58 @@ use crate::fixture::FixtureRegistry;
 use pyo3::types::{PyList, PyModule};
 use std::path::{Path, PathBuf};
 
+/// Test-discovery name filters from the `python_classes` / `python_functions`
+/// ini options. A name matches when it starts with a pattern, or (when the
+/// pattern contains glob chars) fnmatch-globs it — mirroring pytest's
+/// `PyCollector._matches_prefix_or_glob_option`.
+pub struct NameFilters {
+    pub classes: Vec<String>,
+    pub functions: Vec<String>,
+    /// Builtin attribute names ignored before pattern matching (pytest's
+    /// IGNORED_ATTRIBUTES); keeps `python_*=*` from collecting dunders.
+    pub ignored: std::collections::HashSet<String>,
+}
+
+impl NameFilters {
+    pub fn from_config(py: Python<'_>, config: &crate::config::Config) -> Self {
+        let ignored = py
+            .import("pytest._pycollect")
+            .and_then(|m| m.getattr("ignored_attributes"))
+            .and_then(|f| f.call0())
+            .and_then(|v| v.extract::<Vec<String>>())
+            .unwrap_or_default()
+            .into_iter()
+            .collect();
+        NameFilters {
+            classes: config.python_classes_patterns(),
+            functions: config.python_functions_patterns(),
+            ignored,
+        }
+    }
+
+    /// True when `name` is a builtin attribute pytest ignores before any
+    /// name-pattern matching (so it's never collected or warned about).
+    pub fn is_ignored(&self, name: &str) -> bool {
+        self.ignored.contains(name)
+    }
+
+    pub fn matches_class(&self, name: &str) -> bool {
+        Self::matches(&self.classes, name)
+    }
+
+    pub fn matches_function(&self, name: &str) -> bool {
+        Self::matches(&self.functions, name)
+    }
+
+    fn matches(patterns: &[String], name: &str) -> bool {
+        patterns.iter().any(|pattern| {
+            name.starts_with(pattern)
+                || (pattern.contains(['*', '?', '['])
+                    && crate::collect::wildcard_match(pattern, name))
+        })
+    }
+}
+
 /// The 1-based first line of a callable's definition (0 if unknown).
 pub(crate) fn first_lineno(py: Python<'_>, func: &Bound<'_, PyAny>) -> u32 {
     let _ = py;
@@ -606,6 +658,7 @@ pub fn collect_module(
     items: &mut Vec<TestItem>,
     registry: &mut FixtureRegistry,
     hooks: &mut Vec<crate::session::PyHook>,
+    filters: &NameFilters,
 ) -> PyResult<()> {
     let (basedir, module_name) = module_name_for(path);
     sys_path_prepend(py, &basedir)?;
@@ -640,6 +693,7 @@ pub fn collect_module(
         registry,
         &extra_generate_hooks,
         makeitem_hook,
+        filters,
     )?;
     if let Some(class_name) = custom_module_class {
         for item in items.iter_mut().skip(module_items_start) {
@@ -764,6 +818,7 @@ pub(crate) fn introspect_namespace(
     registry: &mut FixtureRegistry,
     extra_generate_hooks: &[Py<PyAny>],
     makeitem_hook: bool,
+    filters: &NameFilters,
 ) -> PyResult<()> {
     register_fixtures_from(py, module, &format!("{nodeid_base}::"), registry)?;
 
@@ -802,6 +857,11 @@ pub(crate) fn introspect_namespace(
         let Ok(name) = key.extract::<String>() else {
             continue;
         };
+        // Builtin attributes (dunders etc.) are ignored before any matching, so
+        // python_functions=* / python_classes=* don't collect or warn on them.
+        if filters.is_ignored(&name) {
+            continue;
+        }
         // pytest_pycollect_makeitem: a conftest may claim a namespace member
         // (even a non-`test`-named one) by returning a custom node, e.g.
         // `MyFunction.from_parent(name=name, parent=collector)`. Honor it so the
@@ -863,7 +923,7 @@ pub(crate) fn introspect_namespace(
                         registry,
                     )?;
                 }
-            } else if name.starts_with("Test") {
+            } else if filters.matches_class(&name) {
                 collect_class(
                     py,
                     &value,
@@ -876,15 +936,27 @@ pub(crate) fn introspect_namespace(
                     registry,
                     module,
                     generate_hook.as_ref(),
+                    filters,
                 )?;
             }
             continue;
         }
-        // pytest default python_functions = "test*"
-        if !name.starts_with("test")
+        // Test functions match the python_functions ini patterns (default
+        // prefix "test"); fixtures are never test functions.
+        if !filters.matches_function(&name)
             || !value.is_callable()
             || value.hasattr("_pytestfixturefunction").unwrap_or(false)
         {
+            continue;
+        }
+        // A test-named member that is callable but not a function (an instance
+        // with __call__) cannot be collected: pytest warns and skips it.
+        let skip_nonfunc: bool = py
+            .import("pytest._pycollect")?
+            .getattr("warn_uncollectable_function")?
+            .call1((&name, &value, path.to_string_lossy().as_ref()))?
+            .extract()?;
+        if skip_nonfunc {
             continue;
         }
         // Generator test functions fail collection (#12960).
@@ -1077,10 +1149,17 @@ pub(crate) fn collect_class(
     registry: &mut FixtureRegistry,
     module: &Bound<'_, PyModule>,
     generate_hook: Option<&Bound<'_, PyAny>>,
+    filters: &NameFilters,
 ) -> PyResult<()> {
-    // Classes with a custom __init__ are not collected (pytest behavior).
-    let cls_dict = cls.getattr("__dict__")?;
-    if cls_dict.contains("__init__")? {
+    // Test classes with a custom __init__/__new__ can't be instantiated for
+    // collection: pytest warns and skips them (handled in the Python shim so
+    // the PytestCollectionWarning is captured for the warnings summary).
+    let skip_class: bool = py
+        .import("pytest._pycollect")?
+        .getattr("warn_uncollectable_class")?
+        .call1((cls, nodeid_base))?
+        .extract()?;
+    if skip_class {
         return Ok(());
     }
     let class_nodeid = format!("{nodeid_base}::{cls_name}");
@@ -1099,6 +1178,11 @@ pub(crate) fn collect_class(
     let mut method_entries: Vec<(u32, String, Bound<'_, PyAny>, bool)> = Vec::new();
 
     for name in &dir_list {
+        // Skip builtin attributes (dunders) before matching, so
+        // python_functions=* doesn't collect every inherited method.
+        if filters.is_ignored(name) {
+            continue;
+        }
         let mut raw_opt: Option<Bound<'_, PyAny>> = None;
         for base in &mro {
             let base_dict = base.getattr("__dict__")?;
@@ -1140,7 +1224,7 @@ pub(crate) fn collect_class(
             )?;
             continue;
         }
-        if !name.starts_with("test") {
+        if !filters.matches_function(&name) {
             continue;
         }
         let mut marks = read_marks(py, &value)?;

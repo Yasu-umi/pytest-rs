@@ -745,6 +745,7 @@ impl Engine {
                 &mut self.session.items,
                 &mut self.session.registry,
                 &mut self.session.py_hooks,
+                &python::NameFilters::from_config(py, &self.config),
             );
             let collect_sections = python::capture_collect_end(py);
             let with_sections = |mut message: String| {

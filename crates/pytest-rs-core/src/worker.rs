@@ -500,6 +500,7 @@ impl Engine {
             &mut new_items,
             &mut self.session.registry,
             &mut self.session.py_hooks,
+            &python::NameFilters::from_config(py, &self.config),
         )
         .map_err(|err| python::format_exception(py, &err))?;
         {

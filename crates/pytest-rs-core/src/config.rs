@@ -1504,6 +1504,36 @@ impl Config {
         }
     }
 
+    /// python_classes ini patterns (default `Test`): a class name is a test
+    /// class when it starts with, or fnmatch-globs, any pattern.
+    pub fn python_classes_patterns(&self) -> Vec<String> {
+        let patterns: Vec<String> = self
+            .get_ini_lines("python_classes")
+            .into_iter()
+            .flat_map(|v| v.split_whitespace().map(str::to_string))
+            .collect();
+        if patterns.is_empty() {
+            vec!["Test".to_string()]
+        } else {
+            patterns
+        }
+    }
+
+    /// python_functions ini patterns (default `test`): a function/method name
+    /// is a test when it starts with, or fnmatch-globs, any pattern.
+    pub fn python_functions_patterns(&self) -> Vec<String> {
+        let patterns: Vec<String> = self
+            .get_ini_lines("python_functions")
+            .into_iter()
+            .flat_map(|v| v.split_whitespace().map(str::to_string))
+            .collect();
+        if patterns.is_empty() {
+            vec!["test".to_string()]
+        } else {
+            patterns
+        }
+    }
+
     /// norecursedirs ini patterns: directory basenames (fnmatch) skipped
     /// during collection recursion (pytest's defaults).
     pub fn norecursedirs_patterns(&self) -> Vec<String> {

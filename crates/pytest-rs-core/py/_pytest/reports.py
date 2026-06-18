@@ -170,6 +170,10 @@ def _set_report_attrs(report, kwargs):
 
 
 class TestReport(BaseReport):
+    # Prevent collection of an imported `TestReport` as a test class (it has a
+    # custom __init__); mirrors _pytest.reports.TestReport.__test__.
+    __test__ = False
+
     def __init__(self, **kwargs):
         _set_report_attrs(self, kwargs)
         if not hasattr(self, "sections"):
