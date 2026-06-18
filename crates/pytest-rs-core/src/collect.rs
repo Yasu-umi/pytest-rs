@@ -39,6 +39,10 @@ pub struct TestItem {
     /// Python collector class name for custom file collectors (e.g. "MyModule").
     /// Empty string means standard Module collection.
     pub collector_class: String,
+    /// Python class name for a custom function/item node produced by
+    /// `pytest_pycollect_makeitem` (e.g. "MyFunction"). Empty string means the
+    /// standard Function node, rendered as `<Function name>`.
+    pub func_class: String,
     /// Highest parametrize scope across all dimensions (for item reordering).
     pub max_param_scope: crate::fixture::Scope,
     /// For each non-function-scoped parametrize dimension, the 0-based set

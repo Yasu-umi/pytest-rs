@@ -62,7 +62,12 @@ impl Engine {
                 labels.push(format!("<Class {class}>"));
             }
             if let Some(function) = parts.last() {
-                labels.push(format!("<Function {function}>"));
+                let func_class = if item.func_class.is_empty() {
+                    "Function"
+                } else {
+                    &item.func_class
+                };
+                labels.push(format!("<{func_class} {function}>"));
             }
             // Print only the suffix that differs from the previous item.
             let shared = open

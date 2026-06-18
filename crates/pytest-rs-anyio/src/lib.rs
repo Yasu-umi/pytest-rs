@@ -465,6 +465,7 @@ impl Plugin for AnyioPlugin {
                         fixture_params,
                         lineno: item.lineno,
                         collector_class: item.collector_class.clone(),
+                        func_class: item.func_class.clone(),
                         max_param_scope: item.max_param_scope,
                         scope_sort_keys: item.scope_sort_keys.clone(),
                     });

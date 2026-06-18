@@ -291,6 +291,90 @@ pub fn call_pycollect_makemodule_hook(
     }
 }
 
+/// True when a `pytest_pycollect_makeitem` hook is registered (conftest/plugin),
+/// so introspection should consult it for custom function/item nodes.
+pub fn has_pycollect_makeitem_hook(_py: Python<'_>, hooks: &[crate::session::PyHook]) -> bool {
+    hooks.iter().any(|h| h.name == "pytest_pycollect_makeitem")
+}
+
+/// Fire `pytest_pycollect_makeitem(collector, name, obj)` for one namespace
+/// member via the pluginmanager relay (firstresult). When a conftest returns a
+/// custom node (or list of nodes) the result is `Some(vec![(class_name,
+/// node_name)])` so the engine collects each as a leaf item rendered with the
+/// custom class label (e.g. `<MyFunction some>`). `None` means no plugin claimed
+/// this member, so the default Rust collection path applies.
+pub fn fire_pycollect_makeitem(
+    py: Python<'_>,
+    nodeid_base: &str,
+    path: &Path,
+    name: &str,
+    obj: &Bound<'_, PyAny>,
+) -> Option<Vec<(String, String)>> {
+    let pm = py
+        .import("pytest._pluginmanager")
+        .and_then(|m| m.getattr("pluginmanager"))
+        .ok()?;
+    let hook_relay = pm
+        .getattr("hook")
+        .and_then(|h| h.getattr("pytest_pycollect_makeitem"))
+        .ok()?;
+    let pathlib = py.import("pathlib").and_then(|m| m.getattr("Path")).ok()?;
+    let config = crate::python::proxies::existing_py_config(py).map(|c| c.into_bound(py));
+    let node_mod = py.import("pytest._node").ok()?;
+    let collector_cls = node_mod.getattr("Collector").ok()?;
+    let collector = {
+        let kw = pyo3::types::PyDict::new(py);
+        let _ = kw.set_item("config", config.as_ref().map(|c| c.as_any()));
+        let _ = kw.set_item(
+            "path",
+            pathlib.call1((path.to_string_lossy().as_ref(),)).ok(),
+        );
+        let _ = kw.set_item("nodeid", nodeid_base);
+        let _ = kw.set_item("name", nodeid_base.rsplit('/').next().unwrap_or(""));
+        let session_proxy = config.as_ref().and_then(|c| {
+            node_mod
+                .getattr("_NodeSession")
+                .ok()?
+                .call1((c.as_any(),))
+                .ok()
+        });
+        let _ = kw.set_item("session", session_proxy.as_ref());
+        collector_cls.call((), Some(&kw)).ok()?
+    };
+    let kwargs = pyo3::types::PyDict::new(py);
+    let _ = kwargs.set_item("collector", &collector);
+    let _ = kwargs.set_item("name", name);
+    let _ = kwargs.set_item("obj", obj);
+    let result = hook_relay.call((), Some(&kwargs)).ok()?;
+    if result.is_none() {
+        return None;
+    }
+    // makeitem may return a single node or a list/tuple of nodes.
+    let nodes: Vec<Bound<'_, PyAny>> =
+        if result.try_iter().is_ok() && result.hasattr("__iter__").unwrap_or(false) {
+            result.try_iter().ok()?.collect::<PyResult<_>>().ok()?
+        } else {
+            vec![result]
+        };
+    let mut out = Vec::new();
+    for node in nodes {
+        if node.is_none() {
+            continue;
+        }
+        let class_name: String = node
+            .getattr("__class__")
+            .and_then(|c| c.getattr("__name__"))
+            .and_then(|n| n.extract())
+            .unwrap_or_else(|_| "Function".to_string());
+        let node_name: String = node
+            .getattr("name")
+            .and_then(|n| n.extract())
+            .unwrap_or_else(|_| name.to_string());
+        out.push((class_name, node_name));
+    }
+    if out.is_empty() { None } else { Some(out) }
+}
+
 /// Custom collectors: fire `pytest_collect_file(file_path, parent)` for each
 /// candidate file; a plugin (pytest-ruff/pytest-mypy) may return a
 /// `pytest.File` whose `.collect()` yields `pytest.Item`s. Each item becomes a
@@ -487,6 +571,7 @@ pub fn collect_custom_files(
                     fixture_params: Vec::new(),
                     lineno: 0,
                     collector_class: collector_class.clone(),
+                    func_class: String::new(),
                     max_param_scope: crate::fixture::Scope::Function,
                     scope_sort_keys: Vec::new(),
                 });
@@ -528,6 +613,7 @@ pub fn collect_module(
     } else {
         None
     };
+    let makeitem_hook = has_pycollect_makeitem_hook(py, hooks);
     let module_items_start = items.len();
     introspect_namespace(
         py,
@@ -538,6 +624,7 @@ pub fn collect_module(
         items,
         registry,
         &extra_generate_hooks,
+        makeitem_hook,
     )?;
     if let Some(class_name) = custom_module_class {
         for item in items.iter_mut().skip(module_items_start) {
@@ -589,6 +676,7 @@ pub fn collect_doctests_from_module(
             fixture_params: vec![],
             lineno,
             collector_class: String::new(),
+            func_class: String::new(),
             max_param_scope: crate::fixture::Scope::Function,
             scope_sort_keys: Vec::new(),
         });
@@ -633,6 +721,7 @@ pub fn collect_doctests_from_textfile(
             fixture_params: vec![],
             lineno,
             collector_class: String::new(),
+            func_class: String::new(),
             max_param_scope: crate::fixture::Scope::Function,
             scope_sort_keys: Vec::new(),
         });
@@ -659,6 +748,7 @@ pub(crate) fn introspect_namespace(
     items: &mut Vec<TestItem>,
     registry: &mut FixtureRegistry,
     extra_generate_hooks: &[Py<PyAny>],
+    makeitem_hook: bool,
 ) -> PyResult<()> {
     register_fixtures_from(py, module, &format!("{nodeid_base}::"), registry)?;
 
@@ -697,6 +787,38 @@ pub(crate) fn introspect_namespace(
         let Ok(name) = key.extract::<String>() else {
             continue;
         };
+        // pytest_pycollect_makeitem: a conftest may claim a namespace member
+        // (even a non-`test`-named one) by returning a custom node, e.g.
+        // `MyFunction.from_parent(name=name, parent=collector)`. Honor it so the
+        // tree renders `<MyFunction some>`; otherwise fall through to the
+        // default Rust collection path.
+        if makeitem_hook
+            && let Some(custom) = fire_pycollect_makeitem(py, nodeid_base, path, &name, &value)
+        {
+            for (class_name, node_name) in custom {
+                items.push(TestItem {
+                    nodeid: format!("{nodeid_base}::{node_name}"),
+                    path: path.to_path_buf(),
+                    module_name: module_name.to_string(),
+                    func_name: node_name,
+                    func: value.clone().unbind(),
+                    cls: None,
+                    is_coroutine: false,
+                    is_doctest: false,
+                    fixture_names: Vec::new(),
+                    extra_fixture_names: Vec::new(),
+                    marks: Vec::new(),
+                    callspec: Vec::new(),
+                    fixture_params: Vec::new(),
+                    lineno: 0,
+                    collector_class: String::new(),
+                    func_class: class_name,
+                    max_param_scope: crate::fixture::Scope::Function,
+                    scope_sort_keys: Vec::new(),
+                });
+            }
+            continue;
+        }
         // Wrap isclass in try-catch: objects with __class__ = property(raises)
         // cause inspect.isclass → isinstance(obj, type) to raise (#4266).
         let is_class = isclass
@@ -918,6 +1040,7 @@ pub(crate) fn collect_testcase(
             fixture_params: Vec::new(),
             lineno: first_lineno(py, &method),
             collector_class: String::new(),
+            func_class: String::new(),
             max_param_scope: crate::fixture::Scope::Function,
             scope_sort_keys: Vec::new(),
         });
@@ -1169,6 +1292,7 @@ pub(crate) fn push_test_items(
             fixture_params: variant.indirect_params,
             lineno: first_lineno(py, func),
             collector_class: String::new(),
+            func_class: String::new(),
             max_param_scope: variant.max_param_scope,
             scope_sort_keys: variant.scope_sort_keys,
         });
