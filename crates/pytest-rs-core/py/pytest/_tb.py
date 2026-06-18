@@ -28,6 +28,16 @@ def set_showlocals(on):
     _showlocals = on
 
 
+# Set by the engine for --full-trace: render every frame (no __tracebackhide__
+# cutting) in long style, matching pytest's fulltrace behaviour.
+_fulltrace = False
+
+
+def set_fulltrace(on):
+    global _fulltrace
+    _fulltrace = on
+
+
 def _format_locals(frame, indent):
     """pytest's repr_locals: "<name:<10> = <saferepr>" per local, sorted,
     skipping assertion-rewrite temporaries (names starting with "@")."""
@@ -103,7 +113,7 @@ def _visible_frames(exc):
     while tb is not None:
         frame = tb.tb_frame
         hidden = frame.f_locals.get("__tracebackhide__") or frame.f_globals.get("__tracebackhide__")
-        if not hidden:
+        if _fulltrace or not hidden:
             frames.append((frame, tb.tb_lineno))
         tb = tb.tb_next
     return frames
@@ -155,10 +165,17 @@ def _source_block(frame, lineno):
     Returns (lines, fail_indent): fail_indent is the displayed indentation
     of the failing line — pytest aligns the E lines under it."""
     code = frame.f_code
-    try:
-        source, start = inspect.getsourcelines(code)
-    except (OSError, TypeError):
-        source, start = [], None
+    if code.co_name == "<module>":
+        # inspect.getsourcelines on a module code object stops after the first
+        # statement (getblock); a module "block" is the whole file up to the
+        # failing line, so read it directly (start=1, the file's first line).
+        source = linecache.getlines(code.co_filename)
+        start = 1 if source else None
+    else:
+        try:
+            source, start = inspect.getsourcelines(code)
+        except (OSError, TypeError):
+            source, start = [], None
     prefixes = []
     contents = []
     fail_indent = 4
@@ -226,6 +243,10 @@ def crash_message(exc):
 def format_exception(exc, style="long"):
     if style == "no":
         return ""
+    # --full-trace forces the long style (full source per frame), regardless of
+    # the configured --tb (collection errors otherwise default to short).
+    if _fulltrace and style not in ("native", "line"):
+        style = "long"
     # pytest.fail(..., pytrace=False): no traceback, message only (with the
     # original exception's text when raised from an except block). --tb=line
     # still renders the one-line "path:lineno: Type: msg" form, so it falls

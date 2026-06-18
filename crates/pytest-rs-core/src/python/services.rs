@@ -565,6 +565,13 @@ pub fn set_showlocals(py: Python<'_>, on: bool) {
         .and_then(|m| m.call_method1("set_showlocals", (on,)));
 }
 
+/// --full-trace: render every frame (no __tracebackhide__ cutting) in long style.
+pub fn set_fulltrace(py: Python<'_>, on: bool) {
+    let _ = py
+        .import("pytest._tb")
+        .and_then(|m| m.call_method1("set_fulltrace", (on,)));
+}
+
 /// Toggle the cyclic garbage collector. Collection imports thousands of test
 /// modules and their app dependencies, and those allocations trigger gc runs
 /// that scan the ever-growing set of just-imported objects for cycles —

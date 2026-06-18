@@ -158,6 +158,7 @@ impl Engine {
             py,
             self.config.get_flag("showlocals") && !self.config.get_flag("no-showlocals"),
         );
+        python::set_fulltrace(py, self.config.get_flag("full-trace"));
         if let Some(message) = python::invalid_theme_message(py) {
             eprintln!("ERROR: {message}");
             return exit_code::USAGE_ERROR;
@@ -1107,6 +1108,7 @@ impl Engine {
             py,
             self.config.get_flag("showlocals") && !self.config.get_flag("no-showlocals"),
         );
+        python::set_fulltrace(py, self.config.get_flag("full-trace"));
         let result = self.run_session(py, started);
         // Reset the junit state so the next nested run (or the outer run)
         // doesn't see a stale LogXML instance from this run.

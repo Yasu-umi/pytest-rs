@@ -848,6 +848,7 @@ impl Config {
         for flag in Self::CORE_FLAGS.into_iter().chain([
             "capture-disable",
             "showlocals",
+            "full-trace",
             "lf",
             "ff",
             "nf",
