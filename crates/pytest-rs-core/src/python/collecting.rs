@@ -241,6 +241,7 @@ pub fn call_pycollect_makemodule_hook(
     py: Python<'_>,
     path: &Path,
     rootdir: &Path,
+    module: &Bound<'_, PyAny>,
 ) -> Option<String> {
     let pm = py
         .import("pytest._pluginmanager")
@@ -270,13 +271,27 @@ pub fn call_pycollect_makemodule_hook(
                 .ok()
         });
         let _ = kw.set_item("session", session_proxy.as_ref());
-        collector_cls.call((), Some(&kw)).ok()?
+        let collector = collector_cls.call((), Some(&kw)).ok()?;
+        // The default makemodule impl reads `parent._rs_module` so the live
+        // Module node it returns wraps the real imported module — a conftest
+        // hookwrapper can then mutate `mod.obj` (issue #205) on that module.
+        let _ = collector.setattr("_rs_module", module);
+        collector
     };
     let kwargs = pyo3::types::PyDict::new(py);
     let _ = kwargs.set_item("module_path", &module_path);
     let _ = kwargs.set_item("parent", &parent);
     let result = hook_relay.call((), Some(&kwargs)).ok()?;
     if result.is_none() {
+        return None;
+    }
+    // The core default node carries `_rs_default_makemodule`; treat it (and a
+    // plain pytest.Module) as the default collector so no custom label is set.
+    let is_default = result
+        .getattr("_rs_default_makemodule")
+        .map(|v| v.is_truthy().unwrap_or(false))
+        .unwrap_or(false);
+    if is_default {
         return None;
     }
     let class_name: String = result
@@ -609,7 +624,7 @@ pub fn collect_module(
     // subclass (e.g. `MyModule.from_parent(...)`) for this file. We honor the
     // returned node's class name for the --collect-only tree label.
     let custom_module_class = if has_pycollect_makemodule_hook(py, hooks) {
-        call_pycollect_makemodule_hook(py, path, rootdir)
+        call_pycollect_makemodule_hook(py, path, rootdir, module.as_any())
     } else {
         None
     };

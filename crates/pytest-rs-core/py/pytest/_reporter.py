@@ -91,6 +91,26 @@ class _CoreTestStatus:
         return _default_teststatus(report)
 
 
+class _CorePyCollectMakeModule:
+    """The default pytest_pycollect_makemodule impl upstream's _pytest.python
+    provides: return a live Module collector node whose `.obj` is the imported
+    module. Registered as a plain trylast impl so conftest hookwrappers
+    (@pytest.hookimpl(wrapper=True)) surround it — a wrapper that mutates
+    `mod.obj` (issue #205) thus mutates the real module the test functions read
+    their globals from. The native engine fires this relay only when a conftest
+    actually provides a makemodule hook, so default collection is unchanged."""
+
+    @staticmethod
+    @_trylast
+    def pytest_pycollect_makemodule(module_path: Any, parent: Any) -> Any:
+        from pytest._node import File
+
+        node: Any = File(name=module_path.name, path=module_path, parent=parent)
+        node.obj = getattr(parent, "_rs_module", None)
+        node._rs_default_makemodule = True
+        return node
+
+
 class _CallInfo:
     """Minimal _pytest.runner.CallInfo stand-in for pytest_runtest_makereport
     consumers (pytest-bdd reads only item/report; others may read when)."""
@@ -141,6 +161,7 @@ def setup(config: Any) -> None:
     pluginmanager.register(_CoreHeader(), "_core_report_header")
     pluginmanager.register(_CoreTestStatus(), "_core_teststatus")
     pluginmanager.register(_CoreMakeReport(), "_core_makereport")
+    pluginmanager.register(_CorePyCollectMakeModule(), "_core_pycollect_makemodule")
     _default = TerminalReporter(config)
     pluginmanager.register(_default, "terminalreporter")
 
