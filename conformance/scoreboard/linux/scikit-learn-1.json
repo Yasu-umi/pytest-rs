@@ -314,7 +314,7 @@
       "file": "sklearn/utils/tests/test_estimator_checks.py",
       "status": "passed",
       "exit_code": 0,
-      "passed": 47,
+      "passed": 45,
       "failed": 0,
       "skipped": 6,
       "errors": 0
@@ -573,12 +573,12 @@
     },
     {
       "file": "sklearn/utils/tests/test_typedefs.py",
-      "status": "failed",
-      "exit_code": 1,
+      "status": "passed",
+      "exit_code": 0,
       "passed": 9,
       "failed": 0,
       "skipped": 0,
-      "errors": 1
+      "errors": 0
     },
     {
       "file": "sklearn/utils/tests/test_unique.py",

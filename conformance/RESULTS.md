@@ -18,7 +18,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2205 | 573 | 3 | 52 | 2833 | 79.7% | 12 | 52 | 63 |
+| pytest | 9.0.3 | 2223 | 555 | 3 | 52 | 2833 | 80.3% | 12 | 52 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 20 | 0 | 3 | 209 | 90.4% | 0 | 1 | 0 |
@@ -39,7 +39,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
 | pytest-env | 1.6.0 | 67 | 8 | 0 | 0 | 75 | 89.3% | 2 | 3 | 0 |
 | pytest-rerunfailures | 9.1.1 | 37 | 10 | 0 | 1 | 48 | 79.2% | 0 | 1 | 0 |
-| pytest-randomly | 4.1.0 | 32 | 5 | 0 | 0 | 37 | 86.5% | 0 | 1 | 0 |
+| pytest-randomly | 4.1.0 | 33 | 4 | 0 | 0 | 37 | 89.2% | 0 | 1 | 0 |
 | click | 8.3.1 | 1314 | 0 | 0 | 21 | 1335 | 100.0% | 20 | 20 | 0 |
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
@@ -55,7 +55,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | fastapi | 0.115.12 | 2209 | 9 | 115 | 130 | 2463 | 95.0% | 296 | 310 | 0 |
 | packaging | 25.0 | 26948 | 0 | 0 | 0 | 26948 | 100.0% | 12 | 12 | 0 |
 | pandas | v3.0.3 | 160650 | 39 | 371 | 25459 | 186519 | 99.8% | 860 | 964 | 0 |
-| scikit-learn-1 | 1.9.0 | 8301 | 16 | 1 | 6617 | 14935 | 99.9% | 74 | 87 | 0 |
+| scikit-learn-1 | 1.9.0 | 8299 | 16 | 0 | 6617 | 14932 | 99.9% | 75 | 87 | 0 |
 | scikit-learn-2 | 1.9.0 | 4915 | 0 | 2 | 1888 | 6805 | 100.0% | 50 | 58 | 0 |
 | scikit-learn-3 | 1.9.0 | 9240 | 7 | 0 | 2530 | 11777 | 99.9% | 101 | 114 | 0 |
 
@@ -66,10 +66,10 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
 | testing/python/approx.py | failed | 37 | 38 | 0 | 18 |
-| testing/python/collect.py | failed | 47 | 35 | 0 | 0 |
+| testing/python/collect.py | failed | 64 | 18 | 0 | 0 |
 | testing/python/fixtures.py | failed | 92 | 116 | 0 | 2 |
 | testing/python/integration.py | failed | 8 | 8 | 0 | 4 |
-| testing/python/metafunc.py | failed | 63 | 49 | 0 | 0 |
+| testing/python/metafunc.py | failed | 64 | 48 | 0 | 0 |
 | testing/python/raises.py | failed | 13 | 18 | 0 | 0 |
 | testing/python/raises_group.py | failed | 26 | 3 | 0 | 0 |
 | testing/python/show_fixtures_per_test.py | failed | 0 | 8 | 0 | 0 |
@@ -410,7 +410,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| tests/test_pytest_randomly.py | failed | 32 | 5 | 0 | 0 |
+| tests/test_pytest_randomly.py | failed | 33 | 4 | 0 | 0 |
 
 </details>
 
@@ -2180,7 +2180,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | sklearn/utils/tests/test_dataframe.py | passed | 3 | 0 | 0 | 10 |
 | sklearn/utils/tests/test_deprecation.py | passed | 4 | 0 | 0 | 0 |
 | sklearn/utils/tests/test_encode.py | passed | 38 | 0 | 0 | 0 |
-| sklearn/utils/tests/test_estimator_checks.py | passed | 47 | 0 | 0 | 6 |
+| sklearn/utils/tests/test_estimator_checks.py | passed | 45 | 0 | 0 | 6 |
 | sklearn/utils/tests/test_extmath.py | passed | 260 | 0 | 0 | 45 |
 | sklearn/utils/tests/test_fast_dict.py | passed | 3 | 0 | 0 | 0 |
 | sklearn/utils/tests/test_fixes.py | passed | 39 | 0 | 0 | 0 |
@@ -2209,7 +2209,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | sklearn/utils/tests/test_stats.py | failed | 79 | 8 | 0 | 111 |
 | sklearn/utils/tests/test_tags.py | passed | 8 | 0 | 0 | 0 |
 | sklearn/utils/tests/test_testing.py | passed | 81 | 0 | 0 | 43 |
-| sklearn/utils/tests/test_typedefs.py | failed | 9 | 0 | 1 | 0 |
+| sklearn/utils/tests/test_typedefs.py | passed | 9 | 0 | 0 | 0 |
 | sklearn/utils/tests/test_unique.py | passed | 6 | 0 | 0 | 0 |
 | sklearn/utils/tests/test_user_interface.py | passed | 23 | 0 | 0 | 0 |
 | sklearn/utils/tests/test_validation.py | passed | 258 | 0 | 0 | 259 |
