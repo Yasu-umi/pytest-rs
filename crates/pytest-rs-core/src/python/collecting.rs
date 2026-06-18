@@ -1170,49 +1170,46 @@ pub(crate) fn collect_class(
     let staticmethod_type = builtins.getattr("staticmethod")?;
     let classmethod_type = builtins.getattr("classmethod")?;
 
-    // Use dir(cls) instead of cls.__dict__ so inherited test methods are collected.
-    // Walk the MRO to find the raw descriptor for each name (detects staticmethod/classmethod).
-    let dir_list: Vec<String> = builtins.getattr("dir")?.call1((cls,))?.extract()?;
+    // Definition order, matching pytest's PyCollector.collect: walk the MRO
+    // (most-derived first), gather each class's own __dict__ in definition
+    // order (deduped by name across the MRO), then concatenate in reverse-MRO
+    // order so inherited methods precede the subclass's own. This is stable
+    // even when a method is aliased from a base (e.g. `test_bar = Base.test_bar`),
+    // where the function's own lineno would otherwise flip the order.
     let mro: Vec<Bound<'_, PyAny>> = cls.getattr("__mro__")?.extract()?;
-
-    let mut method_entries: Vec<(u32, String, Bound<'_, PyAny>, bool)> = Vec::new();
-
-    for name in &dir_list {
-        // Skip builtin attributes (dunders) before matching, so
-        // python_functions=* doesn't collect every inherited method.
-        if filters.is_ignored(name) {
-            continue;
-        }
-        let mut raw_opt: Option<Bound<'_, PyAny>> = None;
-        for base in &mro {
-            let base_dict = base.getattr("__dict__")?;
-            if base_dict.contains(name.as_str())? {
-                raw_opt = Some(base_dict.get_item(name.as_str())?);
-                break;
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut per_class: Vec<Vec<(String, Bound<'_, PyAny>, bool)>> = Vec::new();
+    for base in &mro {
+        let base_dict = base.getattr("__dict__")?;
+        let mut values: Vec<(String, Bound<'_, PyAny>, bool)> = Vec::new();
+        for pair in base_dict.call_method0("items")?.try_iter()? {
+            let (key, raw): (Bound<'_, PyAny>, Bound<'_, PyAny>) = pair?.extract()?;
+            let Ok(name) = key.extract::<String>() else {
+                continue;
+            };
+            // Builtin attributes (dunders) are ignored before matching, so
+            // python_functions=* doesn't collect every inherited method.
+            if filters.is_ignored(&name) || seen.contains(&name) {
+                continue;
             }
+            seen.insert(name.clone());
+
+            let is_static = raw.is_instance(&staticmethod_type)?;
+            let is_classmethod = raw.is_instance(&classmethod_type)?;
+            let value = if is_static || is_classmethod {
+                raw.getattr("__func__")?
+            } else {
+                raw
+            };
+            if !value.is_callable() {
+                continue;
+            }
+            values.push((name, value, is_static));
         }
-        let Some(raw) = raw_opt else { continue };
-
-        let is_static = raw.is_instance(&staticmethod_type)?;
-        let is_classmethod = raw.is_instance(&classmethod_type)?;
-        let value = if is_static || is_classmethod {
-            raw.getattr("__func__")?
-        } else {
-            raw
-        };
-
-        if !value.is_callable() {
-            continue;
-        }
-
-        let lineno = first_lineno(py, &value);
-        method_entries.push((lineno, name.clone(), value, is_static));
+        per_class.push(values);
     }
 
-    // Sort by source line for deterministic definition-order traversal.
-    method_entries.sort_by_key(|(ln, name, ..)| (*ln, name.clone()));
-
-    for (_, name, value, is_static) in method_entries {
+    for (name, value, is_static) in per_class.into_iter().rev().flatten() {
         if value.hasattr("_pytestfixturefunction")? {
             register_fixture_def(
                 py,
