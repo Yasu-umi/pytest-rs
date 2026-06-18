@@ -1171,23 +1171,35 @@ class Pytester:
         """An in-process Module collector for the source. Supports .collect()
         (returns Class + Function children) and .module/.cls/.instance attrs."""
         from pytest._marks import get_unpacked_marks
-        from pytest._node import Class, File, Function, Session, _ModuleCollector, _NodeSession
+        from pytest._node import (
+            Class,
+            Collector,
+            File,
+            Function,
+            Session,
+            _ModuleCollector,
+            _NodeSession,
+        )
 
         if withinit:
             (self.path / "__init__.py").touch()
         path = pathlib.Path(str(self.makepyfile(source)))
         config = self._request.config if self._request is not None else None
 
-        # Import the module in-process
+        # Import the module in-process. A failed import (ImportError, syntax
+        # error, …) is captured so the live node's collect()/obj surface it the
+        # way pytest does (Collector.CollectError / the original exception).
         module_name = path.stem
+        import_error: BaseException | None = None
         spec = importlib.util.spec_from_file_location(module_name, path)
         if spec is not None and spec.loader is not None:
             mod = importlib.util.module_from_spec(spec)
             sys.modules[module_name] = mod
             try:
                 spec.loader.exec_module(mod)
-            except Exception:
+            except BaseException as exc:  # noqa: BLE001 - re-surfaced on access
                 mod = None
+                import_error = exc
         else:
             mod = None
 
@@ -1207,16 +1219,31 @@ class Pytester:
             def __init__(self):
                 super().__init__(name=path.name, config=config, path=path, nodeid=path.name)
                 self.module = mod
-                self.obj = mod
                 self.cls = None
                 self.instance = None
                 self.session = real_session
                 self._children = None
 
+            @property
+            def obj(self):
+                # Accessing .obj surfaces an import failure (test_failing_import)
+                # and validates module-level pytest_plugins, raising ImportError
+                # for a missing plugin (test_module_considers_pluginmanager_at_import).
+                if import_error is not None:
+                    raise import_error
+                plugins = getattr(mod, "pytest_plugins", None)
+                if plugins is not None:
+                    names = [plugins] if isinstance(plugins, str) else list(plugins)
+                    for name in names:
+                        importlib.import_module(name)
+                return mod
+
             def collect(self):
                 if self._children is not None:
                     return list(self._children)
                 if mod is None:
+                    if import_error is not None:
+                        raise Collector.CollectError(str(import_error)) from import_error
                     self._children = []
                     return []
                 children = []
