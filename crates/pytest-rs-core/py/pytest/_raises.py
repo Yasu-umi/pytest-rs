@@ -45,6 +45,14 @@ class ExceptionInfo[E: BaseException]:
     def typename(self):
         return self.type.__name__ if self.type else None
 
+    @property
+    def traceback(self):
+        """The captured exception's traceback as a _pytest._code.Traceback
+        (a list of TracebackEntry), for navigation/filtering by upstream tests."""
+        from _pytest._code.code import Traceback
+
+        return Traceback(self.tb)
+
     def errisinstance(self, exc):
         """Whether the captured exception is an instance of exc (or any in a
         tuple) — upstream ExceptionInfo.errisinstance."""

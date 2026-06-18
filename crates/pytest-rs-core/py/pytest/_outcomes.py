@@ -27,11 +27,21 @@ class XFailed(Failed):
     pass
 
 
-def skip(reason="", allow_module_level=False):
-    __tracebackhide__ = True
-    exc = Skipped(msg=reason)
-    exc.allow_module_level = allow_module_level
-    raise exc
+class _Skip:
+    """pytest.skip implemented as a callable class so the frame that raises
+    Skipped is `_Skip.__call__` (upstream introspects co_qualname and expects
+    the frame to be __tracebackhide__-hidden — test_skip_simple)."""
+
+    Exception = Skipped
+
+    def __call__(self, reason="", allow_module_level=False):
+        __tracebackhide__ = True
+        exc = Skipped(msg=reason)
+        exc.allow_module_level = allow_module_level
+        raise exc
+
+
+skip = _Skip()
 
 
 def fail(reason="", pytrace=True):
@@ -101,8 +111,8 @@ def importorskip(modname, minversion=None, reason=None, *, exc_type=None):
 
 
 # pytest parity: the raising helpers expose their exception type
-# (`with pytest.raises(pytest.fail.Exception): ...`).
-skip.Exception = Skipped  # type: ignore[attr-defined]
+# (`with pytest.raises(pytest.fail.Exception): ...`). skip exposes it as a
+# class attribute on _Skip; fail/xfail are functions so set it here.
 fail.Exception = Failed  # type: ignore[attr-defined]
 xfail.Exception = XFailed  # type: ignore[attr-defined]
 exit.Exception = Exit  # type: ignore[attr-defined]

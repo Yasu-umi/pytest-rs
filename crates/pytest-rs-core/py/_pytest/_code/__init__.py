@@ -3,6 +3,12 @@ import textwrap
 
 from pytest._raises import ExceptionInfo as ExceptionInfo  # noqa: F401
 
+from _pytest._code.code import Code as Code  # noqa: F401
+from _pytest._code.code import Frame as Frame  # noqa: F401
+from _pytest._code.code import Traceback as Traceback  # noqa: F401
+from _pytest._code.code import TracebackEntry as TracebackEntry  # noqa: F401
+from _pytest._code.code import filter_traceback as filter_traceback  # noqa: F401
+from _pytest._code.code import getrawcode as getrawcode  # noqa: F401
 from _pytest._stub import __getattr__  # noqa: F401
 
 
