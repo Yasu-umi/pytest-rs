@@ -17,8 +17,8 @@
       "file": "testing/python/collect.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 47,
-      "failed": 35,
+      "passed": 50,
+      "failed": 32,
       "skipped": 0,
       "errors": 0
     },
@@ -44,8 +44,8 @@
       "file": "testing/python/metafunc.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 63,
-      "failed": 49,
+      "passed": 64,
+      "failed": 48,
       "skipped": 0,
       "errors": 0
     },
@@ -191,6 +191,15 @@
       "passed": 47,
       "failed": 6,
       "skipped": 1,
+      "errors": 0
+    },
+    {
+      "file": "testing/test_debug_session.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
       "errors": 0
     },
     {

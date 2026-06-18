@@ -936,6 +936,64 @@ class Pytester:
                 items.extend(_doctest_items(p))
         return items, reprec
 
+    @staticmethod
+    def _param_id(val):
+        """A node-ID fragment for a single parametrize value (str(val), with
+        None spelled out). Faithful enough for the int/string/explicit-id cases
+        the in-process collection helpers exercise."""
+        if val is None:
+            return "None"
+        return str(val)
+
+    @staticmethod
+    def _expand_params(source_marks, module_marks, base_name, make_fn):
+        """Expand the parametrize marks in source_marks into one node per
+        combination, building each via make_fn(param_name, all_marks).
+
+        source_marks are the marks that may carry parametrize (the function's
+        own marks followed by any class marks); module_marks are folded into
+        every node's mark list. pytest.param(..., marks=...) contributes its
+        per-param marks only to the combinations that use it, and pytest.param
+        ids / the ``ids=`` kwarg override the value-derived fragment."""
+        from pytest._marks import ParamSpec, get_unpacked_marks  # noqa: F401
+
+        param_marks = [m for m in source_marks if m.name == "parametrize"]
+        base_marks = [m for m in source_marks if m.name != "parametrize"]
+        base_marks = [*base_marks, *module_marks]
+
+        if not param_marks:
+            return [make_fn(base_name, base_marks)]
+
+        levels = []  # each level: list of (id_fragment, [per_param_marks])
+        for pm in param_marks:
+            argvalues = list(pm.args[1]) if len(pm.args) > 1 else []
+            ids_kwarg = pm.kwargs.get("ids", None)
+            level = []
+            for i, val in enumerate(argvalues):
+                if isinstance(val, ParamSpec):
+                    pvalues, pmarks, pid = val.values, list(val.marks), val.id
+                else:
+                    pvalues, pmarks, pid = (val,), [], None
+                if pid is not None and isinstance(pid, str):
+                    frag = pid
+                elif ids_kwarg is not None and i < len(ids_kwarg) and ids_kwarg[i] is not None:
+                    frag = str(ids_kwarg[i])
+                else:
+                    frag = "-".join(Pytester._param_id(v) for v in pvalues)
+                level.append((frag, pmarks))
+            if level:
+                levels.append(level)
+
+        if not levels:
+            return [make_fn(base_name, base_marks)]
+
+        items = []
+        for combo in itertools.product(*levels):
+            suffix = "-".join(frag for frag, _ in combo)
+            combo_marks = [mk for _, marks in combo for mk in marks]
+            items.append(make_fn(f"{base_name}[{suffix}]", [*base_marks, *combo_marks]))
+        return items
+
     def _collect_items_from_path(self, path, parent_collector=None):
         """In-process collection of Function items from an existing .py file.
 
@@ -1021,11 +1079,6 @@ class Pytester:
                 return name.startswith("Test")
             return any(name.startswith(p) or fnmatch.fnmatch(name, p) for p in _class_patterns)
 
-        def _param_id(val):
-            if val is None:
-                return "None"
-            return str(val)
-
         def make_item(func, nodeid_name, all_marks, cls=None, parent=None):
             lineno = getattr(getattr(func, "__code__", None), "co_firstlineno", 0)
             node = Function(
@@ -1045,39 +1098,6 @@ class Pytester:
                 node.config = config
             return node
 
-        def expand_parametrize(func, base_name, extra_marks, cls=None, parent=None):
-            """Return one item per parametrize combination, or one item if none."""
-            func_marks = get_unpacked_marks(func)
-            param_marks = [m for m in func_marks if m.name == "parametrize"]
-            non_param_marks = [m for m in func_marks if m.name != "parametrize"]
-            all_marks = [*non_param_marks, *extra_marks, *module_marks]
-
-            if not param_marks:
-                return [make_item(func, base_name, all_marks, cls, parent)]
-
-            all_id_lists = []
-            for pm in param_marks:
-                argvalues = list(pm.args[1]) if len(pm.args) > 1 else []
-                ids_kwarg = pm.kwargs.get("ids", None)
-                level_ids = [
-                    str(ids_kwarg[i])
-                    if ids_kwarg is not None and i < len(ids_kwarg)
-                    else _param_id(val)
-                    for i, val in enumerate(argvalues)
-                ]
-                if level_ids:
-                    all_id_lists.append(level_ids)
-
-            if not all_id_lists:
-                return [make_item(func, base_name, all_marks, cls, parent)]
-
-            items = []
-            for combo in itertools.product(*all_id_lists):
-                suffix = "-".join(combo)
-                param_name = f"{base_name}[{suffix}]"
-                items.append(make_item(func, param_name, all_marks, cls, parent))
-            return items
-
         # Module-level node for parent chain (getparent/keywords); use File so
         # getparent(pytest.Module) finds it (Module is aliased to File).
         mod_node = File(name=path.name, path=path, config=config, parent=parent_collector)
@@ -1088,7 +1108,12 @@ class Pytester:
         items = []
         for name, obj in vars(module).items():
             if _is_test_func(name) and callable(obj) and not isinstance(obj, type):
-                sub = expand_parametrize(obj, name, [], parent=mod_node)
+                sub = Pytester._expand_params(
+                    get_unpacked_marks(obj),
+                    module_marks,
+                    name,
+                    lambda nm, mks, _obj=obj: make_item(_obj, nm, mks, parent=mod_node),
+                )
                 items.extend(sub)
             elif _is_test_class(name) and isinstance(obj, type):
                 class_marks = get_unpacked_marks(obj)
@@ -1108,8 +1133,13 @@ class Pytester:
                         lineno = getattr(getattr(func, "__code__", None), "co_firstlineno", 0)
                         methods.append((lineno, mname, func))
                 for _ln, mname, func in sorted(methods):
-                    sub = expand_parametrize(
-                        func, f"{name}::{mname}", class_marks, cls=obj, parent=cls_node
+                    sub = Pytester._expand_params(
+                        [*get_unpacked_marks(func), *class_marks],
+                        module_marks,
+                        f"{name}::{mname}",
+                        lambda nm, mks, _f=func, _cls=obj, _cn=cls_node: make_item(
+                            _f, nm, mks, cls=_cls, parent=_cn
+                        ),
                     )
                     for item in sub:
                         item.instance = obj
@@ -1192,25 +1222,34 @@ class Pytester:
                 children = []
                 for name, obj in vars(mod).items():
                     if name.startswith("test") and callable(obj) and not isinstance(obj, type):
-                        marks = [*get_unpacked_marks(obj), *module_marks]
-                        lineno = getattr(getattr(obj, "__code__", None), "co_firstlineno", 0)
-                        fn = Function(
-                            f"{path.name}::{name}",
-                            name,
-                            marks,
-                            [],
-                            obj,
-                            str(path),
-                            lineno,
+
+                        def _mk(nm, mks, _obj=obj):
+                            lineno = getattr(
+                                getattr(_obj, "__code__", None), "co_firstlineno", 0
+                            )
+                            fn = Function(
+                                f"{path.name}::{nm}",
+                                nm.rsplit("::", 1)[-1],
+                                mks,
+                                [],
+                                _obj,
+                                str(path),
+                                lineno,
+                            )
+                            fn.module = mod
+                            fn.cls = None
+                            fn.parent = self
+                            if module_collector is not None:
+                                fn._module_collector = module_collector
+                            if config is not None:
+                                fn.config = config
+                            return fn
+
+                        children.extend(
+                            Pytester._expand_params(
+                                get_unpacked_marks(obj), module_marks, name, _mk
+                            )
                         )
-                        fn.module = mod
-                        fn.cls = None
-                        fn.parent = self
-                        if module_collector is not None:
-                            fn._module_collector = module_collector
-                        if config is not None:
-                            fn.config = config
-                        children.append(fn)
                     elif name.startswith("Test") and isinstance(obj, type):
                         cls_node = _IPClass(name, obj, self)
                         children.append(cls_node)
@@ -1250,26 +1289,33 @@ class Pytester:
                         lineno = getattr(getattr(func, "__code__", None), "co_firstlineno", 0)
                         methods.append((lineno, mname, func))
                 for _ln, mname, func in sorted(methods):
-                    marks = [*get_unpacked_marks(func), *class_marks, *module_marks]
-                    lineno = getattr(getattr(func, "__code__", None), "co_firstlineno", 0)
-                    fn = Function(
-                        f"{path.name}::{self.name}::{mname}",
-                        mname,
-                        marks,
-                        [],
-                        func,
-                        str(path),
-                        lineno,
+
+                    def _mk(nm, mks, _f=func):
+                        lineno = getattr(getattr(_f, "__code__", None), "co_firstlineno", 0)
+                        fn = Function(
+                            f"{path.name}::{self.name}::{nm}",
+                            nm.rsplit("::", 1)[-1],
+                            mks,
+                            [],
+                            _f,
+                            str(path),
+                            lineno,
+                        )
+                        fn.module = mod
+                        fn.cls = self._cls_obj
+                        fn.instance = self._cls_obj
+                        fn.parent = self
+                        if module_collector is not None:
+                            fn._module_collector = module_collector
+                        if config is not None:
+                            fn.config = config
+                        return fn
+
+                    children.extend(
+                        Pytester._expand_params(
+                            [*get_unpacked_marks(func), *class_marks], module_marks, mname, _mk
+                        )
                     )
-                    fn.module = mod
-                    fn.cls = self._cls_obj
-                    fn.instance = self._cls_obj
-                    fn.parent = self
-                    if module_collector is not None:
-                        fn._module_collector = module_collector
-                    if config is not None:
-                        fn.config = config
-                    children.append(fn)
                 self._children = children
                 return list(children)
 

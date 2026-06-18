@@ -2430,7 +2430,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2233 | 545 | 3 | 52 | 2833 | 80.7% | 13 | 52 | 63 |
+| pytest | 9.0.3 | 2238 | 541 | 3 | 52 | 2834 | 80.8% | 14 | 53 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 19 | 0 | 4 | 209 | 90.9% | 0 | 1 | 0 |
@@ -2473,15 +2473,15 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 ### pytest @ 9.0.3
 
-<details><summary>per-file detail (52 files)</summary>
+<details><summary>per-file detail (53 files)</summary>
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
 | testing/python/approx.py | failed | 37 | 38 | 0 | 18 |
-| testing/python/collect.py | failed | 47 | 35 | 0 | 0 |
+| testing/python/collect.py | failed | 50 | 32 | 0 | 0 |
 | testing/python/fixtures.py | failed | 92 | 116 | 0 | 2 |
 | testing/python/integration.py | failed | 8 | 8 | 0 | 4 |
-| testing/python/metafunc.py | failed | 63 | 49 | 0 | 0 |
+| testing/python/metafunc.py | failed | 64 | 48 | 0 | 0 |
 | testing/python/raises.py | failed | 13 | 18 | 0 | 0 |
 | testing/python/raises_group.py | failed | 26 | 3 | 0 | 0 |
 | testing/python/show_fixtures_per_test.py | failed | 0 | 8 | 0 | 0 |
@@ -2498,6 +2498,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_compat.py | passed | 10 | 0 | 0 | 0 |
 | testing/test_config.py | failed | 177 | 37 | 0 | 1 |
 | testing/test_conftest.py | failed | 47 | 6 | 0 | 1 |
+| testing/test_debug_session.py | passed | 1 | 0 | 0 | 0 |
 | testing/test_doctest.py | passed | 139 | 0 | 0 | 1 |
 | testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 |
 | testing/test_faulthandler.py | failed | 5 | 7 | 0 | 0 |
