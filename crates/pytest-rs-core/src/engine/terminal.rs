@@ -881,7 +881,10 @@ impl Engine {
         let verbose = self.config.global_verbosity();
         let text: String = py
             .import("pytest._showfixtures")?
-            .call_method1("show_fixtures", (defs, invocation.as_ref(), verbose))?
+            .call_method1(
+                "show_fixtures",
+                (defs, invocation.as_ref(), verbose, crate::tw::enabled()),
+            )?
             .extract()?;
         if !text.is_empty() {
             println!("{text}");
@@ -915,7 +918,7 @@ impl Engine {
             .import("pytest._showfixtures")?
             .call_method1(
                 "show_fixtures_per_test",
-                (items_data, invocation.as_ref(), verbose),
+                (items_data, invocation.as_ref(), verbose, crate::tw::enabled()),
             )?
             .extract()?;
         if !text.is_empty() {

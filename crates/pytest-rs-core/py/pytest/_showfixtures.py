@@ -107,20 +107,31 @@ def _write_docstring(out: list[str], doc: str, indent: str = "    ") -> None:
         out.append(indent + line)
 
 
-def _write_fixture(out: list[str], argname, scope, func, invocation_dir, verbose, *, show_scope):
+def _markup(text: str, code: int, color: bool) -> str:
+    """Wrap `text` in an SGR escape + reset when color is on, matching
+    TerminalWriter.write(text, <color>=True) (each segment its own escape)."""
+    if not color:
+        return text
+    return f"\x1b[{code}m{text}\x1b[0m"
+
+
+def _write_fixture(
+    out: list[str], argname, scope, func, invocation_dir, verbose, *, show_scope, color=False
+):
     prettypath = _pretty_fixture_path(invocation_dir, func)
-    head = argname
+    # pytest colors the name green, the scope cyan, and the location yellow.
+    head = _markup(argname, 32, color)
     if show_scope and scope != "function":
-        head += f" [{scope} scope]"
-    out.append(f"{head} -- {prettypath}")
+        head += _markup(f" [{scope} scope]", 36, color)
+    out.append(head + _markup(f" -- {prettypath}", 33, color))
     doc = inspect.getdoc(func)
     if doc:
         _write_docstring(out, doc.split("\n\n", maxsplit=1)[0] if verbose <= 0 else doc)
     else:
-        out.append("    no docstring available")
+        out.append(_markup("    no docstring available", 31, color))
 
 
-def show_fixtures(defs, invocation_dir: str, verbose: int) -> str:
+def show_fixtures(defs, invocation_dir: str, verbose: int, color: bool = False) -> str:
     """`--fixtures`: list every registered fixture, grouped by defining module.
 
     `defs` is an iterable of (argname, scope, baseid, func) from the registry,
@@ -161,12 +172,16 @@ def show_fixtures(defs, invocation_dir: str, verbose: int) -> str:
             currentmodule = module
         if verbose <= 0 and argname.startswith("_"):
             continue
-        _write_fixture(out, argname, scope, func, invocation_dir, verbose, show_scope=True)
+        _write_fixture(
+            out, argname, scope, func, invocation_dir, verbose, show_scope=True, color=color
+        )
         out.append("")
     return "\n".join(out)
 
 
-def show_fixtures_per_test(items, invocation_dir: str, verbose: int) -> str:
+def show_fixtures_per_test(
+    items, invocation_dir: str, verbose: int, color: bool = False
+) -> str:
     """`--fixtures-per-test`: per test item, list the fixtures it uses.
 
     `items` is an iterable of (item_name, item_func, closure) where closure is
@@ -186,5 +201,7 @@ def show_fixtures_per_test(items, invocation_dir: str, verbose: int) -> str:
         for argname, scope, _baseid, func in sorted(closure, key=lambda t: t[0]):
             if verbose <= 0 and argname.startswith("_"):
                 continue
-            _write_fixture(out, argname, scope, func, invocation_dir, verbose, show_scope=False)
+            _write_fixture(
+                out, argname, scope, func, invocation_dir, verbose, show_scope=False, color=color
+            )
     return "\n".join(out)

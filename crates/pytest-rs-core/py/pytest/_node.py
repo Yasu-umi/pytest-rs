@@ -575,7 +575,9 @@ class DoctestNode:
         self.fixturenames = list(fixturenames or [])
         self.function = function
         self.obj = function
-        self.path = path
+        # Normalize to pathlib.Path like _NodeBase/File so item.path matches a
+        # collector's .path (upstream Node.path is always a Path).
+        self.path = pathlib.Path(str(path)) if path is not None else None
         self.lineno = lineno
         # The Python module/class this item was collected from. Reordering
         # plugins (pytest-randomly, pytest-order) shuffle by
@@ -947,7 +949,9 @@ class Node(Item):
         self.fixturenames = list(fixturenames or [])
         self.function = function
         self.obj = function
-        self.path = path
+        # Normalize to pathlib.Path like _NodeBase/File so item.path matches a
+        # collector's .path (upstream Node.path is always a Path).
+        self.path = pathlib.Path(str(path)) if path is not None else None
         self.lineno = lineno
         # The Python module/class this item was collected from. Reordering
         # plugins (pytest-randomly, pytest-order) shuffle by

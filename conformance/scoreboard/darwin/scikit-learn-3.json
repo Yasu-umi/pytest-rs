@@ -24,9 +24,9 @@
     },
     {
       "file": "sklearn/callback/tests/test_callback_context.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 29,
+      "status": "timeout",
+      "exit_code": null,
+      "passed": 0,
       "failed": 0,
       "skipped": 0,
       "errors": 0
@@ -681,11 +681,11 @@
     },
     {
       "file": "sklearn/inspection/tests/test_partial_dependence.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 393,
       "failed": 0,
-      "skipped": 0,
+      "skipped": 38,
       "errors": 0
     },
     {
@@ -753,11 +753,11 @@
     },
     {
       "file": "sklearn/manifold/tests/test_t_sne.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 77,
       "failed": 0,
-      "skipped": 0,
+      "skipped": 1,
       "errors": 0
     },
     {

@@ -2466,10 +2466,10 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | werkzeug | 3.1.3 | 897 | 1 | 1 | 0 | 899 | 99.8% | 21 | 25 | 0 |
 | fastapi | 0.115.12 | 2324 | 8 | 1 | 130 | 2463 | 99.6% | 298 | 310 | 0 |
 | packaging | 25.0 | 26895 | 51 | 110 | 1 | 27057 | 99.4% | 11 | 12 | 0 |
-| pandas | v3.0.3 | 161707 | 39 | 371 | 25466 | 187583 | 99.8% | 860 | 964 | 0 |
+| pandas | v3.0.3 | 161807 | 39 | 371 | 25466 | 187683 | 99.8% | 863 | 964 | 0 |
 | scikit-learn-1 | 1.9.0 | 8299 | 16 | 0 | 6617 | 14932 | 99.9% | 75 | 87 | 0 |
 | scikit-learn-2 | 1.9.0 | 4915 | 0 | 2 | 1888 | 6805 | 100.0% | 50 | 58 | 0 |
-| scikit-learn-3 | 1.9.0 | 8757 | 7 | 0 | 2504 | 11268 | 99.9% | 99 | 114 | 0 |
+| scikit-learn-3 | 1.9.0 | 9198 | 7 | 0 | 2543 | 11748 | 99.9% | 100 | 114 | 0 |
 
 ### pytest @ 9.0.3
 
@@ -4059,7 +4059,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pandas/tests/indexes/string/test_astype.py | passed | 1 | 0 | 0 | 0 |
 | pandas/tests/indexes/string/test_indexing.py | passed | 135 | 0 | 0 | 90 |
 | pandas/tests/indexes/test_any_index.py | passed | 691 | 0 | 0 | 2 |
-| pandas/tests/indexes/test_base.py | failed | 1494 | 0 | 0 | 22 |
+| pandas/tests/indexes/test_base.py | passed | 1526 | 0 | 0 | 22 |
 | pandas/tests/indexes/test_common.py | passed | 875 | 0 | 0 | 21 |
 | pandas/tests/indexes/test_datetimelike.py | passed | 40 | 0 | 0 | 0 |
 | pandas/tests/indexes/test_engines.py | passed | 41 | 0 | 0 | 0 |
@@ -4068,7 +4068,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pandas/tests/indexes/test_indexing.py | passed | 473 | 0 | 0 | 4 |
 | pandas/tests/indexes/test_numpy_compat.py | passed | 958 | 0 | 0 | 2 |
 | pandas/tests/indexes/test_old_base.py | passed | 940 | 0 | 0 | 109 |
-| pandas/tests/indexes/test_setops.py | failed | 1928 | 0 | 0 | 31 |
+| pandas/tests/indexes/test_setops.py | passed | 1954 | 0 | 0 | 31 |
 | pandas/tests/indexes/test_subclass.py | passed | 1 | 0 | 0 | 0 |
 | pandas/tests/indexes/timedeltas/methods/test_astype.py | passed | 15 | 0 | 0 | 0 |
 | pandas/tests/indexes/timedeltas/methods/test_factorize.py | passed | 2 | 0 | 0 | 0 |
@@ -4107,7 +4107,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pandas/tests/indexing/test_categorical.py | passed | 115 | 0 | 0 | 1 |
 | pandas/tests/indexing/test_chaining_and_caching.py | passed | 25 | 0 | 0 | 0 |
 | pandas/tests/indexing/test_check_indexer.py | passed | 24 | 0 | 0 | 1 |
-| pandas/tests/indexing/test_coercion.py | failed | 361 | 0 | 0 | 0 |
+| pandas/tests/indexing/test_coercion.py | passed | 403 | 0 | 0 | 0 |
 | pandas/tests/indexing/test_datetime.py | passed | 9 | 0 | 0 | 2 |
 | pandas/tests/indexing/test_floats.py | passed | 143 | 0 | 0 | 0 |
 | pandas/tests/indexing/test_iat.py | passed | 3 | 0 | 0 | 0 |
@@ -4724,7 +4724,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 |---|---|---:|---:|---:|---:|
 | sklearn/_loss/tests/test_link.py | passed | 18 | 0 | 0 | 75 |
 | sklearn/_loss/tests/test_loss.py | failed | 1831 | 3 | 0 | 379 |
-| sklearn/callback/tests/test_callback_context.py | passed | 29 | 0 | 0 | 0 |
+| sklearn/callback/tests/test_callback_context.py | timeout | 0 | 0 | 0 | 0 |
 | sklearn/callback/tests/test_callback_support.py | passed | 20 | 0 | 0 | 0 |
 | sklearn/callback/tests/test_pickle.py | passed | 2 | 0 | 0 | 4 |
 | sklearn/callback/tests/test_progressbar.py | passed | 1 | 0 | 0 | 47 |
@@ -4797,7 +4797,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | sklearn/impute/tests/test_knn.py | passed | 47 | 0 | 0 | 0 |
 | sklearn/inspection/_plot/tests/test_boundary_decision_display.py | passed | 10 | 0 | 0 | 142 |
 | sklearn/inspection/_plot/tests/test_plot_partial_dependence.py | no-tests | 0 | 0 | 0 | 137 |
-| sklearn/inspection/tests/test_partial_dependence.py | timeout | 0 | 0 | 0 | 0 |
+| sklearn/inspection/tests/test_partial_dependence.py | passed | 393 | 0 | 0 | 38 |
 | sklearn/inspection/tests/test_pd_utils.py | passed | 10 | 0 | 0 | 1 |
 | sklearn/inspection/tests/test_permutation_importance.py | passed | 24 | 0 | 0 | 12 |
 | sklearn/manifold/tests/test_classical_mds.py | passed | 4 | 0 | 0 | 0 |
@@ -4805,7 +4805,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | sklearn/manifold/tests/test_locally_linear.py | passed | 14 | 0 | 0 | 10 |
 | sklearn/manifold/tests/test_mds.py | passed | 27 | 0 | 0 | 0 |
 | sklearn/manifold/tests/test_spectral_embedding.py | passed | 38 | 0 | 0 | 19 |
-| sklearn/manifold/tests/test_t_sne.py | timeout | 0 | 0 | 0 | 0 |
+| sklearn/manifold/tests/test_t_sne.py | passed | 77 | 0 | 0 | 1 |
 | sklearn/mixture/tests/test_bayesian_mixture.py | passed | 17 | 0 | 0 | 0 |
 | sklearn/mixture/tests/test_gaussian_mixture.py | passed | 56 | 0 | 0 | 291 |
 | sklearn/mixture/tests/test_mixture.py | passed | 4 | 0 | 0 | 0 |
