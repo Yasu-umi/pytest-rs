@@ -2464,7 +2464,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 671 | 100.0% | 2 | 2 | 0 |
 | pytest-django | v4.9.0 | 147 | 68 | 0 | 1 | 216 | 68.5% | 2 | 13 | 0 |
 | werkzeug | 3.1.3 | 897 | 1 | 1 | 0 | 899 | 99.8% | 21 | 25 | 0 |
-| fastapi | 0.115.12 | 2209 | 9 | 116 | 130 | 2464 | 94.9% | 295 | 310 | 0 |
+| fastapi | 0.115.12 | 2324 | 8 | 1 | 130 | 2463 | 99.6% | 298 | 310 | 0 |
 | packaging | 25.0 | 26947 | 0 | 0 | 1 | 26948 | 100.0% | 12 | 12 | 0 |
 | pandas | v3.0.3 | 161707 | 39 | 371 | 25466 | 187583 | 99.8% | 860 | 964 | 0 |
 | scikit-learn-1 | 1.9.0 | 8301 | 16 | 1 | 6617 | 14935 | 99.9% | 74 | 87 | 0 |
@@ -3282,7 +3282,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_duplicate_models_openapi.py | passed | 2 | 0 | 0 | 0 |
 | tests/test_empty_router.py | passed | 2 | 0 | 0 | 0 |
 | tests/test_enforce_once_required_parameter.py | passed | 3 | 0 | 0 | 0 |
-| tests/test_exception_handlers.py | failed | 4 | 1 | 0 | 0 |
+| tests/test_exception_handlers.py | passed | 5 | 0 | 0 | 0 |
 | tests/test_extra_routes.py | passed | 8 | 0 | 0 | 0 |
 | tests/test_fastapi_cli.py | failed | 1 | 1 | 0 | 0 |
 | tests/test_filter_pydantic_sub_model/test_filter_pydantic_sub_model_pv1.py | no-tests | 0 | 0 | 0 | 3 |
@@ -3416,7 +3416,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_tutorial/test_cookie_params/test_tutorial001.py | passed | 25 | 0 | 0 | 0 |
 | tests/test_tutorial/test_cors/test_tutorial001.py | passed | 1 | 0 | 0 | 0 |
 | tests/test_tutorial/test_custom_docs_ui/test_tutorial001.py | passed | 4 | 0 | 0 | 0 |
-| tests/test_tutorial/test_custom_docs_ui/test_tutorial002.py | failed | 4 | 0 | 1 | 0 |
+| tests/test_tutorial/test_custom_docs_ui/test_tutorial002.py | passed | 4 | 0 | 0 | 0 |
 | tests/test_tutorial/test_custom_request_and_route/test_tutorial001.py | passed | 3 | 0 | 0 | 0 |
 | tests/test_tutorial/test_custom_request_and_route/test_tutorial002.py | failed | 1 | 1 | 0 | 0 |
 | tests/test_tutorial/test_custom_request_and_route/test_tutorial003.py | passed | 2 | 0 | 0 | 0 |
@@ -3524,7 +3524,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_tutorial/test_schema_extra_example/test_tutorial005.py | passed | 10 | 0 | 0 | 0 |
 | tests/test_tutorial/test_security/test_tutorial001.py | passed | 12 | 0 | 0 | 0 |
 | tests/test_tutorial/test_security/test_tutorial003.py | passed | 45 | 0 | 0 | 0 |
-| tests/test_tutorial/test_security/test_tutorial005.py | failed | 0 | 0 | 114 | 0 |
+| tests/test_tutorial/test_security/test_tutorial005.py | passed | 114 | 0 | 0 | 0 |
 | tests/test_tutorial/test_security/test_tutorial006.py | passed | 15 | 0 | 0 | 0 |
 | tests/test_tutorial/test_separate_openapi_schemas/test_tutorial001.py | passed | 9 | 0 | 0 | 0 |
 | tests/test_tutorial/test_separate_openapi_schemas/test_tutorial002.py | passed | 9 | 0 | 0 | 0 |

@@ -330,10 +330,10 @@
     },
     {
       "file": "tests/test_exception_handlers.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 4,
-      "failed": 1,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 5,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },
@@ -1536,12 +1536,12 @@
     },
     {
       "file": "tests/test_tutorial/test_custom_docs_ui/test_tutorial002.py",
-      "status": "failed",
-      "exit_code": 1,
+      "status": "passed",
+      "exit_code": 0,
       "passed": 4,
       "failed": 0,
       "skipped": 0,
-      "errors": 1
+      "errors": 0
     },
     {
       "file": "tests/test_tutorial/test_custom_request_and_route/test_tutorial001.py",
@@ -2508,12 +2508,12 @@
     },
     {
       "file": "tests/test_tutorial/test_security/test_tutorial005.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 114,
       "failed": 0,
       "skipped": 0,
-      "errors": 114
+      "errors": 0
     },
     {
       "file": "tests/test_tutorial/test_security/test_tutorial006.py",

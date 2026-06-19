@@ -459,6 +459,11 @@ deps = [
     "orjson==3.10.18",
     "ujson==5.10.0",
     "a2wsgi==1.10.8",
+    "PyJWT==2.8.0",
+    "passlib[bcrypt]==1.7.4",
+    # passlib 1.7.4's bcrypt backend detection breaks on bcrypt >=4.1 (it reads
+    # the removed bcrypt.__about__), so pin the last compatible bcrypt.
+    "bcrypt==4.0.1",
 ]
 use_src = false
 category = "real-world"
