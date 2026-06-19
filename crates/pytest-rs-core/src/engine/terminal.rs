@@ -864,6 +864,66 @@ impl Engine {
         Ok(())
     }
 
+    /// `--fixtures`: list every registered fixture (grouped by defining
+    /// module), then exit. Rendering lives in the `pytest._showfixtures` shim,
+    /// which derives location/docstring/module from each fixture's callable.
+    pub(crate) fn show_fixtures(&mut self, py: Python<'_>) -> PyResult<()> {
+        let defs = pyo3::types::PyList::empty(py);
+        for def in self.session.registry.all_defs() {
+            defs.append((
+                def.name.as_str(),
+                def.scope.as_str(),
+                def.baseid.as_str(),
+                def.func.clone_ref(py),
+            ))?;
+        }
+        let invocation = self.config.invocation_dir.to_string_lossy();
+        let verbose = self.config.global_verbosity();
+        let text: String = py
+            .import("pytest._showfixtures")?
+            .call_method1("show_fixtures", (defs, invocation.as_ref(), verbose))?
+            .extract()?;
+        if !text.is_empty() {
+            println!("{text}");
+        }
+        Ok(())
+    }
+
+    /// `--fixtures-per-test`: for each collected item, list the fixtures in its
+    /// closure, then exit.
+    pub(crate) fn show_fixtures_per_test(&mut self, py: Python<'_>) -> PyResult<()> {
+        let items_data = pyo3::types::PyList::empty(py);
+        for item in &self.session.items {
+            let mut direct: Vec<String> = item.fixture_names.clone();
+            direct.extend(item.extra_fixture_names.iter().cloned());
+            let closure = self.session.registry.closure_for(&item.nodeid, &direct);
+            let closure_list = pyo3::types::PyList::empty(py);
+            for def in &closure {
+                closure_list.append((
+                    def.name.as_str(),
+                    def.scope.as_str(),
+                    def.baseid.as_str(),
+                    def.func.clone_ref(py),
+                ))?;
+            }
+            let name = item.nodeid.rsplit("::").next().unwrap_or(&item.nodeid);
+            items_data.append((name, item.func.clone_ref(py), closure_list))?;
+        }
+        let invocation = self.config.invocation_dir.to_string_lossy();
+        let verbose = self.config.global_verbosity();
+        let text: String = py
+            .import("pytest._showfixtures")?
+            .call_method1(
+                "show_fixtures_per_test",
+                (items_data, invocation.as_ref(), verbose),
+            )?
+            .extract()?;
+        if !text.is_empty() {
+            println!("{text}");
+        }
+        Ok(())
+    }
+
     /// pytest_report_header py hooks: each returns a str or list of str,
     /// printed under the session header.
     pub(crate) fn print_py_report_header(&mut self, py: Python<'_>) -> PyResult<()> {

@@ -528,14 +528,16 @@ impl Config {
     // Core pytest options parsed into flags/values (queried via
     // get_flag/get_value); some are still inert and gain behavior as
     // features land.
-    const CORE_FLAGS: [&str; 31] = [
-        "loadscope-reorder", // xdist: reorder loadscope work units by size (default on)
+    const CORE_FLAGS: [&str; 33] = [
+        "fixtures",             // list available fixtures and exit (a la --collect-only)
+        "fixtures-per-test",    // list fixtures used by each test and exit
+        "loadscope-reorder",    // xdist: reorder loadscope work units by size (default on)
         "no-loadscope-reorder", // xdist: keep collection order for loadscope work units
-        "force-short-summary", // truncate short-summary messages even at -vv
-        "no-fold-skipped",   // list each skipped test in the short summary
-        "xfail-tb",          // show tracebacks for xfailed tests in XFAILURES
-        "no-showlocals",     // overrides an addopts --showlocals / -l
-        "markers",           // list registered markers (ini + plugin-registered) and exit
+        "force-short-summary",  // truncate short-summary messages even at -vv
+        "no-fold-skipped",      // list each skipped test in the short summary
+        "xfail-tb",             // show tracebacks for xfailed tests in XFAILURES
+        "no-showlocals",        // overrides an addopts --showlocals / -l
+        "markers",              // list registered markers (ini + plugin-registered) and exit
         "strict-config",
         "strict-markers",
         "strict",

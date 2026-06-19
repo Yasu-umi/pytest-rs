@@ -5,6 +5,7 @@
 "testing/freeze/tests/test_trivial.py" = "passed"
 "testing/test_doctest.py" = "passed"
 "testing/test_monkeypatch.py" = "passed"
+"testing/python/show_fixtures_per_test.py" = "passed"
 "testing/test_recwarn.py" = "passed"
 "testing/test_stepwise.py" = "passed"
 "testing/test_tmpdir.py" = "passed"

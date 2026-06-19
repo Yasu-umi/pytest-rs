@@ -431,6 +431,23 @@ impl Engine {
             .count();
         self.print_collection_count(py, collected, n_collect_errors, n_collect_skips, n_items);
 
+        // --fixtures / --fixtures-per-test: like --collect-only, collect then
+        // print (fixtures rather than the item tree) and exit without running.
+        if self.config.get_flag("fixtures") {
+            if let Err(err) = self.show_fixtures(py) {
+                eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+            }
+            let _ = self.fire_py_hooks_simple(py, "pytest_unconfigure");
+            return exit_code::OK;
+        }
+        if self.config.get_flag("fixtures-per-test") {
+            if let Err(err) = self.show_fixtures_per_test(py) {
+                eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+            }
+            let _ = self.fire_py_hooks_simple(py, "pytest_unconfigure");
+            return exit_code::OK;
+        }
+
         if self.config.collect_only {
             return self.run_collect_only(py, started, n_collect_errors, n_items);
         }
