@@ -651,6 +651,22 @@ impl PyRequest {
         self.node.clone_ref(py)
     }
 
+    /// The scope string of the fixture being requested ("function", "module",
+    /// ...), matching pytest's `request.scope`.
+    #[getter]
+    fn scope(&self) -> &'static str {
+        self.scope.as_str()
+    }
+
+    /// pytest's `request._pyfuncitem`: the underlying test Function item.
+    /// Conftests reach for it to drive the fixture manager. For the common
+    /// function-scoped request this is `request.node`; higher-scope requests
+    /// expose their collector as `node` but the shim keeps the same handle.
+    #[getter]
+    fn _pyfuncitem(&self, py: Python<'_>) -> Py<PyAny> {
+        self.node.clone_ref(py)
+    }
+
     /// Names of all fixtures visible to this request's item.
     #[getter]
     fn fixturenames(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
