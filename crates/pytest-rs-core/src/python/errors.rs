@@ -61,6 +61,38 @@ pub fn format_test_failure(py: Python<'_>, err: &PyErr, style: &str) -> String {
     result.unwrap_or_else(|_| format_exception(py, err))
 }
 
+/// Re-import a failed test module through `_pytest.pathlib.import_path` so the
+/// resulting traceback carries pytest's own framework frames (`_pytest/...`),
+/// which pytest shows only at high verbosity (`-vv`). We import test modules
+/// with a plain `py.import`, whose traceback has only user frames; this surfaces
+/// the framework frames faithfully. Returns the "short"-style formatted
+/// traceback, or None if import_path is unavailable or the re-import
+/// unexpectedly succeeds. Only used on an already-failing collection at -vv.
+pub fn format_import_traceback_verbose(
+    py: Python<'_>,
+    rootdir: &std::path::Path,
+    file: &std::path::Path,
+) -> Option<String> {
+    let pathlib = py.import("pathlib").ok()?;
+    let path_cls = pathlib.getattr("Path").ok()?;
+    let path_obj = path_cls.call1((file.to_string_lossy().as_ref(),)).ok()?;
+    let root_obj = path_cls.call1((rootdir.to_string_lossy().as_ref(),)).ok()?;
+    let import_path = py
+        .import("_pytest.pathlib")
+        .ok()?
+        .getattr("import_path")
+        .ok()?;
+    let kwargs = pyo3::types::PyDict::new(py);
+    kwargs.set_item("mode", "prepend").ok()?;
+    kwargs.set_item("root", root_obj).ok()?;
+    kwargs.set_item("consider_namespace_packages", false).ok()?;
+    match import_path.call((path_obj,), Some(&kwargs)) {
+        // Unexpectedly succeeded on re-import: fall back to the original error.
+        Ok(_) => None,
+        Err(err) => Some(format_test_failure(py, &err, "short")),
+    }
+}
+
 /// An explicit "file.py:line" the raiser attached to a Skipped exception
 /// (`_location`), overriding traceback-derived skip locations.
 pub fn skip_location_override(py: Python<'_>, err: &PyErr) -> Option<String> {

@@ -811,8 +811,20 @@ impl Engine {
                                     // A test module that fails to import gets
                                     // pytest's wrapped CollectError header
                                     // (importtestmodule), with a short-style
-                                    // traceback.
-                                    let tb = python::format_test_failure(py, &err, "short");
+                                    // traceback. At -vv (verbosity >= 2) pytest
+                                    // keeps its own framework frames in the
+                                    // traceback; below that it filters them out.
+                                    // We import via py.import (user frames only),
+                                    // so re-import through import_path at -vv to
+                                    // surface the `_pytest` frames faithfully.
+                                    let tb = if self.config.global_verbosity() >= 2 {
+                                        python::format_import_traceback_verbose(py, rootdir, file)
+                                            .unwrap_or_else(|| {
+                                                python::format_test_failure(py, &err, "short")
+                                            })
+                                    } else {
+                                        python::format_test_failure(py, &err, "short")
+                                    };
                                     let message = format!(
                                         "ImportError while importing test module '{}'.\n\
                                          Hint: make sure your test modules/packages have valid Python names.\n\
