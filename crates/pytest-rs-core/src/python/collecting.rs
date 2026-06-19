@@ -1473,10 +1473,9 @@ pub(crate) struct ParamVariant {
     extra_marks: Vec<MarkData>,
     /// Highest parametrize scope across all dimensions (for item reordering).
     max_param_scope: crate::fixture::Scope,
-    /// For each dimension with non-function scope, the 0-based set index
-    /// within that dimension.  Used as a stable-sort key so items sharing
-    /// the same high-scope parameter value stay grouped.
-    scope_sort_keys: Vec<(crate::fixture::Scope, usize)>,
+    /// Per non-function-scoped dimension: (argname, scope, 0-based set index).
+    /// Feeds `reorder_items` so items sharing a high-scope param value group.
+    scope_sort_keys: Vec<(String, crate::fixture::Scope, usize)>,
 }
 
 /// One parameter set (one `pytest.param`/value row) within a single
@@ -1763,11 +1762,16 @@ fn cartesian_param_variants(py: Python<'_>, dims: &[Dim]) -> Vec<ParamVariant> {
             .map(|d| d.scope)
             .max()
             .unwrap_or(crate::fixture::Scope::Function);
-        let scope_sort_keys: Vec<(crate::fixture::Scope, usize)> = dims
+        let scope_sort_keys: Vec<(String, crate::fixture::Scope, usize)> = dims
             .iter()
             .zip(indices.iter())
             .filter(|(d, _)| d.scope > crate::fixture::Scope::Function)
-            .map(|(d, &idx)| (d.scope, idx))
+            .map(|(d, &idx)| {
+                let set = &d.sets[idx];
+                let mut names: Vec<&str> = set.params.iter().map(|(n, _)| n.as_str()).collect();
+                names.extend(set.indirect_params.iter().map(|(n, _, _)| n.as_str()));
+                (names.join(","), d.scope, idx)
+            })
             .collect();
         variants.push(ParamVariant {
             // All-hidden variants keep the bare test name (no brackets).

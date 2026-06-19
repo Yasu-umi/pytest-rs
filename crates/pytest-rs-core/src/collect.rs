@@ -45,10 +45,10 @@ pub struct TestItem {
     pub func_class: String,
     /// Highest parametrize scope across all dimensions (for item reordering).
     pub max_param_scope: crate::fixture::Scope,
-    /// For each non-function-scoped parametrize dimension, the 0-based set
-    /// index within that dimension.  Used as a stable-sort key so items
-    /// sharing the same high-scope parameter value stay grouped.
-    pub scope_sort_keys: Vec<(crate::fixture::Scope, usize)>,
+    /// Per non-function-scoped parametrized arg: (argname, scope, 0-based set
+    /// index). `reorder_items` groups items sharing a high-scope param value
+    /// (same argname + index + scope boundary), matching pytest.
+    pub scope_sort_keys: Vec<(String, crate::fixture::Scope, usize)>,
 }
 
 impl TestItem {

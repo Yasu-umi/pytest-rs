@@ -1173,12 +1173,44 @@ impl Engine {
     }
 }
 
-/// Reorder items so that higher-scoped parametrize values change less
-/// frequently.  For `parametrize(scope='session')`, all items sharing
-/// parameter value 0 run before any item with value 1.  For module/class
-/// scope the grouping respects module/class boundaries.
-fn reorder_items_by_param_scope(items: &mut [crate::collect::TestItem]) {
+/// A high-scope parametrization identity: items sharing one are grouped so
+/// the fixture set up for that value is reused. Mirrors pytest's ParamArgKey
+/// (argname, param_index, scoped_path/cls) — the boundary string folds the
+/// path/class component.
+type ParamArgKey = (String, usize, String);
+
+/// High scopes, outermost first (pytest's HIGH_SCOPES).
+const HIGH_SCOPES: [crate::fixture::Scope; 4] = [
+    crate::fixture::Scope::Session,
+    crate::fixture::Scope::Package,
+    crate::fixture::Scope::Module,
+    crate::fixture::Scope::Class,
+];
+
+fn next_lower_scope(scope: crate::fixture::Scope) -> crate::fixture::Scope {
     use crate::fixture::Scope;
+    match scope {
+        Scope::Session => Scope::Package,
+        Scope::Package => Scope::Module,
+        Scope::Module => Scope::Class,
+        _ => Scope::Function,
+    }
+}
+
+/// Order-preserving dedup (pytest's `dict.fromkeys`).
+fn dedup_keys(keys: Vec<ParamArgKey>) -> Vec<ParamArgKey> {
+    let mut seen = std::collections::HashSet::new();
+    keys.into_iter()
+        .filter(|k| seen.insert(k.clone()))
+        .collect()
+}
+
+/// Reorder items so higher-scoped parametrized fixtures change as
+/// infrequently as possible — a faithful port of pytest's `reorder_items`,
+/// recursively grouping by Session→Package→Module→Class param values.
+fn reorder_items_by_param_scope(items: &mut Vec<crate::collect::TestItem>) {
+    use crate::fixture::Scope;
+    use std::collections::HashMap;
 
     if items
         .iter()
@@ -1187,26 +1219,144 @@ fn reorder_items_by_param_scope(items: &mut [crate::collect::TestItem]) {
         return;
     }
 
-    // Stable sort by a composite key: (scope_boundary, param_index).
-    // scope_boundary is "" for session (all items share it), the module
-    // nodeid prefix for module scope, or the class prefix for class scope.
-    // This ensures items from different modules/classes never intermix.
-    items.sort_by(|a, b| {
-        let a_keys = &a.scope_sort_keys;
-        let b_keys = &b.scope_sort_keys;
-        for (ak, bk) in a_keys.iter().zip(b_keys.iter()) {
-            if ak.0 != bk.0 {
-                return std::cmp::Ordering::Equal;
-            }
-            let a_boundary = scope_boundary(&a.nodeid, ak.0);
-            let b_boundary = scope_boundary(&b.nodeid, bk.0);
-            let cmp = a_boundary.cmp(&b_boundary).then(ak.1.cmp(&bk.1));
-            if cmp != std::cmp::Ordering::Equal {
-                return cmp;
+    // Per scope: each item's ParamArgKeys, and items grouped by argkey (in
+    // item order). `items_by_argkey` is mutated during reordering to keep
+    // lower-scope grouping consistent with higher-scope decisions.
+    let mut argkeys_by_item: HashMap<Scope, HashMap<usize, Vec<ParamArgKey>>> = HashMap::new();
+    let mut items_by_argkey: HashMap<Scope, HashMap<ParamArgKey, Vec<usize>>> = HashMap::new();
+    for &scope in &HIGH_SCOPES {
+        let mut abi: HashMap<usize, Vec<ParamArgKey>> = HashMap::new();
+        let mut iba: HashMap<ParamArgKey, Vec<usize>> = HashMap::new();
+        for (idx, item) in items.iter().enumerate() {
+            let keys = dedup_keys(
+                item.scope_sort_keys
+                    .iter()
+                    .filter(|(_, s, _)| *s == scope)
+                    .map(|(arg, _, i)| (arg.clone(), *i, scope_boundary(&item.nodeid, scope)))
+                    .collect(),
+            );
+            if !keys.is_empty() {
+                for k in &keys {
+                    iba.entry(k.clone()).or_default().push(idx);
+                }
+                abi.insert(idx, keys);
             }
         }
-        std::cmp::Ordering::Equal
-    });
+        argkeys_by_item.insert(scope, abi);
+        items_by_argkey.insert(scope, iba);
+    }
+
+    let initial: Vec<usize> = (0..items.len()).collect();
+    let ordered = reorder_items_atscope(
+        &initial,
+        &argkeys_by_item,
+        &mut items_by_argkey,
+        Scope::Session,
+    );
+    // Safety: only apply a full permutation (every item exactly once).
+    if ordered.len() != items.len() {
+        return;
+    }
+    let mut taken: Vec<Option<crate::collect::TestItem>> = items.drain(..).map(Some).collect();
+    *items = ordered
+        .into_iter()
+        .map(|i| taken[i].take().expect("each index used once"))
+        .collect();
+}
+
+fn reorder_items_atscope(
+    items: &[usize],
+    argkeys_by_item: &std::collections::HashMap<
+        crate::fixture::Scope,
+        std::collections::HashMap<usize, Vec<ParamArgKey>>,
+    >,
+    items_by_argkey: &mut std::collections::HashMap<
+        crate::fixture::Scope,
+        std::collections::HashMap<ParamArgKey, Vec<usize>>,
+    >,
+    scope: crate::fixture::Scope,
+) -> Vec<usize> {
+    use crate::fixture::Scope;
+    use std::collections::{HashSet, VecDeque};
+
+    if scope == Scope::Function || items.len() < 3 {
+        return items.to_vec();
+    }
+    let items_set: HashSet<usize> = items.iter().copied().collect();
+    let mut ignore: HashSet<ParamArgKey> = HashSet::new();
+    let mut deque: VecDeque<usize> = items.iter().copied().collect();
+    let mut items_done: Vec<usize> = Vec::new();
+    let mut done_set: HashSet<usize> = HashSet::new();
+
+    while !deque.is_empty() {
+        let mut no_argkey_items: Vec<usize> = Vec::new();
+        let mut no_argkey_set: HashSet<usize> = HashSet::new();
+        let mut slicing_argkey: Option<ParamArgKey> = None;
+        while let Some(item) = deque.pop_front() {
+            if done_set.contains(&item) || no_argkey_set.contains(&item) {
+                continue;
+            }
+            let argkeys = dedup_keys(
+                argkeys_by_item[&scope]
+                    .get(&item)
+                    .map(|ks| {
+                        ks.iter()
+                            .filter(|k| !ignore.contains(*k))
+                            .cloned()
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+            );
+            if argkeys.is_empty() {
+                no_argkey_items.push(item);
+                no_argkey_set.insert(item);
+            } else {
+                // pytest's popitem() pops the last key.
+                let sk = argkeys.last().cloned().expect("non-empty");
+                slicing_argkey = Some(sk.clone());
+                let matching: Vec<usize> = items_by_argkey[&scope][&sk]
+                    .iter()
+                    .copied()
+                    .filter(|i| items_set.contains(i))
+                    .collect();
+                for &i in matching.iter().rev() {
+                    deque.push_front(i);
+                    // Move i to the front of every argkey list it belongs to,
+                    // across all high scopes (pytest's move_to_end last=False).
+                    for &other_scope in &HIGH_SCOPES {
+                        if let Some(keys) = argkeys_by_item[&other_scope].get(&i) {
+                            let keys = keys.clone();
+                            let scoped = items_by_argkey.get_mut(&other_scope).expect("scope");
+                            for argkey in &keys {
+                                if let Some(v) = scoped.get_mut(argkey) {
+                                    v.retain(|&x| x != i);
+                                    v.insert(0, i);
+                                }
+                            }
+                        }
+                    }
+                }
+                break;
+            }
+        }
+        if !no_argkey_items.is_empty() {
+            let reordered = reorder_items_atscope(
+                &no_argkey_items,
+                argkeys_by_item,
+                items_by_argkey,
+                next_lower_scope(scope),
+            );
+            for i in reordered {
+                if done_set.insert(i) {
+                    items_done.push(i);
+                }
+            }
+        }
+        if let Some(sk) = slicing_argkey {
+            ignore.insert(sk);
+        }
+    }
+    items_done
 }
 
 /// Extract the scope boundary key from a nodeid.
@@ -1216,12 +1366,15 @@ fn reorder_items_by_param_scope(items: &mut [crate::collect::TestItem]) {
 ///        a class, otherwise the module)
 fn scope_boundary(nodeid: &str, scope: crate::fixture::Scope) -> String {
     use crate::fixture::Scope;
+    let module_path = || nodeid.split_once("::").map(|(m, _)| m).unwrap_or(nodeid);
     match scope {
-        Scope::Session | Scope::Package => String::new(),
-        Scope::Module => nodeid
-            .split_once("::")
-            .map(|(m, _)| m.to_string())
+        Scope::Session => String::new(),
+        // Package scope groups by the module's directory.
+        Scope::Package => module_path()
+            .rsplit_once('/')
+            .map(|(dir, _)| dir.to_string())
             .unwrap_or_default(),
+        Scope::Module => module_path().to_string(),
         Scope::Class => {
             // file.py::Class::func[params] → "file.py::Class"
             // file.py::func[params] → "file.py" (no class)

@@ -474,25 +474,25 @@ pub fn expand_fixture_params(
             // their scope keys lead the item's own (metafunc) keys. This lets
             // the item reorder group tests sharing a high-scoped fixture param
             // value, matching pytest's reorder_items.
-            let fixture_keys: Vec<(Scope, usize)> = assignments
+            let fixture_keys: Vec<(String, Scope, usize)> = assignments
                 .iter()
                 .filter_map(|(name, index, _)| {
                     parametrized
                         .iter()
                         .find(|def| &def.name == name)
                         .filter(|def| def.scope > Scope::Function)
-                        .map(|def| (def.scope, *index))
+                        .map(|def| (name.clone(), def.scope, *index))
                 })
                 .collect();
             for item in &group {
-                let scope_sort_keys: Vec<(Scope, usize)> = fixture_keys
+                let scope_sort_keys: Vec<(String, Scope, usize)> = fixture_keys
                     .iter()
                     .cloned()
                     .chain(item.scope_sort_keys.iter().cloned())
                     .collect();
                 let max_param_scope = scope_sort_keys
                     .iter()
-                    .map(|(s, _)| *s)
+                    .map(|(_, s, _)| *s)
                     .chain(std::iter::once(item.max_param_scope))
                     .max()
                     .unwrap_or(Scope::Function);
