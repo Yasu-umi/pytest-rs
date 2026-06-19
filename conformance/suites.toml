@@ -262,6 +262,11 @@ deps = ["pytest-rerunfailures==9.1.1", "setuptools<81", "py==1.11.0"]
 pythonpath = ["."]
 category = "third-party"
 enabled = true
+# The --reruns-delay tests monkeypatch time.sleep in the *parent* process and
+# assert it was called; that mock is only visible when the nested pytester run
+# executes in-process (a subprocess child can't see it). Same accommodation as
+# the pytest / asyncio / bdd suites whose pytester tests need in-process runs.
+env = { PYTEST_RS_INLINE_INPROCESS = "1" }
 
 [pytest-randomly]
 repo = "https://github.com/pytest-dev/pytest-randomly"
