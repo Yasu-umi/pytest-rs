@@ -616,18 +616,42 @@ impl PyRequest {
     /// at the owning fixture's teardown so finalizers added late (factory
     /// fixtures calling addfinalizer during the test) are included.
     fn _drain_finalizers(&self, py: Python<'_>) -> PyResult<()> {
-        let mut first_err: Option<PyErr> = None;
+        // Run every finalizer (LIFO) even if some raise, collecting failures.
+        // pytest re-raises a lone failure as-is, but groups multiple into a
+        // BaseExceptionGroup so none are lost (#2440).
+        let mut errors: Vec<PyErr> = Vec::new();
         for finalizer in self.take_finalizers().into_iter().rev() {
-            if let Err(err) = finalizer.bind(py).call0()
-                && first_err.is_none()
-            {
-                first_err = Some(err);
+            if let Err(err) = finalizer.bind(py).call0() {
+                errors.push(err);
             }
         }
-        match first_err {
-            Some(err) => Err(err),
-            None => Ok(()),
+        if errors.len() <= 1 {
+            return match errors.pop() {
+                Some(err) => Err(err),
+                None => Ok(()),
+            };
         }
+        let argname = self.fixturename.clone().unwrap_or_default();
+        let node = self
+            .node
+            .bind(py)
+            .str()
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+        let msg = format!("errors while tearing down fixture \"{argname}\" of {node}");
+        // pytest passes exceptions[::-1]: the finalizers run LIFO, so reversing
+        // restores registration order in the reported group.
+        let exc_values: Vec<Py<PyAny>> = errors
+            .iter()
+            .rev()
+            .map(|err| err.value(py).clone().into_any().unbind())
+            .collect();
+        let exc_list = pyo3::types::PyList::new(py, exc_values)?;
+        let group = py
+            .import("builtins")?
+            .getattr("BaseExceptionGroup")?
+            .call1((msg, exc_list))?;
+        Err(PyErr::from_value(group))
     }
 
     /// The current parameter for parametrized fixtures. AttributeError when
