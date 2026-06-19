@@ -470,7 +470,32 @@ pub fn expand_fixture_params(
         // vary slower than the direct-parametrize axis (upstream parametrizes
         // fixtures before the function's own parametrize marks).
         for (id, assignments, variant_marks) in variants {
+            // Fixture params are the outer (slower-varying) reorder axis, so
+            // their scope keys lead the item's own (metafunc) keys. This lets
+            // the item reorder group tests sharing a high-scoped fixture param
+            // value, matching pytest's reorder_items.
+            let fixture_keys: Vec<(Scope, usize)> = assignments
+                .iter()
+                .filter_map(|(name, index, _)| {
+                    parametrized
+                        .iter()
+                        .find(|def| &def.name == name)
+                        .filter(|def| def.scope > Scope::Function)
+                        .map(|def| (def.scope, *index))
+                })
+                .collect();
             for item in &group {
+                let scope_sort_keys: Vec<(Scope, usize)> = fixture_keys
+                    .iter()
+                    .cloned()
+                    .chain(item.scope_sort_keys.iter().cloned())
+                    .collect();
+                let max_param_scope = scope_sort_keys
+                    .iter()
+                    .map(|(s, _)| *s)
+                    .chain(std::iter::once(item.max_param_scope))
+                    .max()
+                    .unwrap_or(Scope::Function);
                 let nodeid = match item.nodeid.find('[') {
                     Some(pos) => {
                         format!("{}[{id}-{}", &item.nodeid[..pos], &item.nodeid[pos + 1..])
@@ -512,8 +537,8 @@ pub fn expand_fixture_params(
                         .collect(),
                     collector_class: item.collector_class.clone(),
                     func_class: item.func_class.clone(),
-                    max_param_scope: item.max_param_scope,
-                    scope_sort_keys: item.scope_sort_keys.clone(),
+                    max_param_scope,
+                    scope_sort_keys: scope_sort_keys.clone(),
                 });
             }
         }
