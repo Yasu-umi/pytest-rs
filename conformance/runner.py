@@ -16,7 +16,7 @@ import re
 import subprocess
 import sys
 import tomllib
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -386,21 +386,18 @@ def run_suites(
     slots: list[list[FileResult | None]] = [
         [None] * len(files) for _, (files, _) in zip(suites, prepared)
     ]
-    with ThreadPoolExecutor(max_workers=jobs) as pool:
-        futures = {
-            pool.submit(suite.run_file, path): (suite_index, file_index)
-            for suite_index, file_index, suite, path in work
-        }
-        for future in futures:
-            suite_index, file_index = futures[future]
-            slots[suite_index][file_index] = future.result()
 
-    out: list[tuple[Suite, list[FileResult], str]] = []
-    for suite_index, (suite, (_, excluded)) in enumerate(zip(suites, prepared)):
+    out_by_index: list[tuple[Suite, list[FileResult], str] | None] = [None] * len(suites)
+    remaining = [len(files) for _, (files, _) in zip(suites, prepared)]
+
+    def finish_suite(suite_index: int) -> None:
+        """Emit (and persist) one suite's results the moment its last file
+        lands, so progress streams instead of dumping only at the very end."""
+        suite, (_, excluded) = suites[suite_index], prepared[suite_index]
         results = [r for r in slots[suite_index] if r is not None]
         summary = suite_summary(results, excluded)
-        print(f"{suite.name} @ {suite.tag}")
-        print(f"  {summary}")
+        print(f"{suite.name} @ {suite.tag}", flush=True)
+        print(f"  {summary}", flush=True)
 
         for result in results:
             if result.status == "error" and (result.stdout or result.stderr):
@@ -410,7 +407,7 @@ def run_suites(
                 if result.stderr:
                     print("  [stderr]")
                     print(result.stderr.rstrip())
-                print(f"  --- end: {result.file} ---")
+                print(f"  --- end: {result.file} ---", flush=True)
 
         (SCOREBOARD / PLATFORM).mkdir(parents=True, exist_ok=True)
         (SCOREBOARD / PLATFORM / f"{suite.name}.json").write_text(
@@ -429,8 +426,25 @@ def run_suites(
             )
             + "\n"
         )
-        out.append((suite, results, summary))
-    return out
+        out_by_index[suite_index] = (suite, results, summary)
+
+    with ThreadPoolExecutor(max_workers=jobs) as pool:
+        futures = {
+            pool.submit(suite.run_file, path): (suite_index, file_index)
+            for suite_index, file_index, suite, path in work
+        }
+        for future in as_completed(futures):
+            suite_index, file_index = futures[future]
+            slots[suite_index][file_index] = future.result()
+            remaining[suite_index] -= 1
+            if remaining[suite_index] == 0:
+                finish_suite(suite_index)
+
+    # Suites with no collected files never had a future to complete; flush them.
+    for suite_index in range(len(suites)):
+        if out_by_index[suite_index] is None:
+            finish_suite(suite_index)
+    return [entry for entry in out_by_index if entry is not None]
 
 
 def load_scoreboards(suites: list[Suite], platform: str) -> list[dict]:
