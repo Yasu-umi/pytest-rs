@@ -34,6 +34,46 @@ class FixtureManager(_Subscriptable):
         self.config = getattr(session, "config", None)
 
 
+def deduplicate_names(*seqs):
+    """De-duplicate the sequence of names while keeping the original order."""
+    return tuple(dict.fromkeys(name for seq in seqs for name in seq))
+
+
+class TopRequest:
+    """Minimal stand-in for `_pytest.fixtures.TopRequest`: wraps a collected
+    Function node so tests can inspect `request.fixturenames` / `.path` from a
+    statically-collected item (e.g. inline_genitems) without a live run."""
+
+    def __init__(self, pyfuncitem, *, _ispytest=False):
+        self._pyfuncitem = pyfuncitem
+        self._fixture_defs = {}
+
+    @property
+    def node(self):
+        return self._pyfuncitem
+
+    @property
+    def fixturenames(self):
+        result = list(self._pyfuncitem.fixturenames)
+        result.extend(set(self._fixture_defs).difference(result))
+        return result
+
+    @property
+    def path(self):
+        return self._pyfuncitem.path
+
+    @property
+    def module(self):
+        return getattr(self._pyfuncitem, "module", None)
+
+    @property
+    def cls(self):
+        return getattr(self._pyfuncitem, "cls", None)
+
+    def __repr__(self):
+        return f"<FixtureRequest for {self._pyfuncitem!r}>"
+
+
 def call_fixture_func(fixturefunc, request, kwargs):
     """Call a fixture-style function, honoring a single `yield` for teardown
     (pytest-bdd runs step functions through this so steps may yield). Mirrors

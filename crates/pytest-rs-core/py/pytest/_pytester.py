@@ -801,8 +801,15 @@ class Pytester:
             )
 
         path_args = [a for a in args if _is_path_arg(a)]
-        if not path_args:
-            # Use relay items as the authoritative source
+        if path_args:
+            collect_args = path_args
+        else:
+            # No path given: collect the pytester rootdir in-process so callers
+            # get live Function nodes (isinstance checks, TopRequest(item)) rather
+            # than relay stubs. Fall back to relay items if it yields nothing.
+            inproc, _ = self._genitems_from_dir(self.path, args)
+            if inproc:
+                return inproc, reprec
             items = []
             for event in hook_events:
                 if event.get("hook") == "pytest_collection_finish":
@@ -1000,8 +1007,62 @@ class Pytester:
         Returns items with full mark data (own_markers, get_closest_marker,
         keywords) — the same objects getitems() returns, but without needing
         source text."""
+        from _pytest.compat import getfuncargnames
+
         from pytest._marks import get_unpacked_marks
         from pytest._node import Class, File, Function, _ModuleCollector, _NodeSession
+
+        # Scope-sorted fixture closure (request.fixturenames) for the collected
+        # Function nodes, mirroring getfixtureclosure: autouse + requested seed,
+        # transitive deps, then a stable sort by scope. Covers module- and
+        # class-defined fixtures (conftest/package fixtures are not gathered).
+        _scope_order = {"session": 0, "package": 1, "module": 2, "class": 3, "function": 4}
+
+        def _gather_fixturedefs(namespace, owning_cls=None):
+            defs, autouse = {}, []
+            for nm, ob in namespace:
+                marker = getattr(ob, "_pytestfixturefunction", None)
+                if marker is None:
+                    continue
+                fname = getattr(marker, "name", None) or nm
+                scope = getattr(marker, "scope", "function")
+                if not isinstance(scope, str):
+                    scope = "function"
+                try:
+                    real = ob.__wrapped__ if hasattr(ob, "__wrapped__") else ob
+                    # A class-defined fixture's first parameter binds to the
+                    # class/instance (cls/self) — drop it like pytest does.
+                    anames = list(getfuncargnames(real, name=nm, cls=owning_cls))
+                except Exception:
+                    anames = []
+                defs[fname] = (scope, anames)
+                if getattr(marker, "autouse", False):
+                    autouse.append(fname)
+            return defs, autouse
+
+        def _closure_for(requested, cls):
+            fdefs = dict(_mod_fdefs)
+            autouse = list(_mod_autouse)
+            if cls is not None:
+                cdefs, cau = _gather_fixturedefs(
+                    [(n, getattr(cls, n, None)) for n in dir(cls)], owning_cls=cls
+                )
+                fdefs.update(cdefs)
+                autouse += [a for a in cau if a not in autouse]
+            names, seen = [], set()
+            for n in [*autouse, *requested]:
+                if n not in seen:
+                    seen.add(n)
+                    names.append(n)
+            i = 0
+            while i < len(names):
+                for dep in fdefs.get(names[i], ("function", []))[1]:
+                    if dep != "request" and dep not in seen:
+                        seen.add(dep)
+                        names.append(dep)
+                i += 1
+            names.sort(key=lambda n: _scope_order.get(fdefs.get(n, ("function", []))[0], 4))
+            return names
 
         path = pathlib.Path(str(path))
         if not path.is_absolute():
@@ -1026,6 +1087,8 @@ class Pytester:
             spec.loader.exec_module(module)
         except Exception:
             return []
+
+        _mod_fdefs, _mod_autouse = _gather_fixturedefs(vars(module).items())
 
         config = self._request.config if self._request is not None else None
         module_marks = get_unpacked_marks(module)
@@ -1096,6 +1159,11 @@ class Pytester:
             node._module_collector = module_collector
             if config is not None:
                 node.config = config
+            try:
+                requested = list(getfuncargnames(func, name=node.name, cls=cls))
+            except Exception:
+                requested = []
+            node.fixturenames = _closure_for(requested, cls)
             return node
 
         # Module-level node for parent chain (getparent/keywords); use File so
@@ -1145,6 +1213,30 @@ class Pytester:
                         item.instance = obj
                     items.extend(sub)
         return items
+
+    def _genitems_from_dir(self, directory, args):
+        """In-process collection of every python_files-matching test module
+        under `directory` (recursive). Returns (items, None). Used by
+        inline_genitems() with no path args so callers get live Function nodes."""
+        config = self._request.config if self._request is not None else None
+        python_files = (
+            config.getini("python_files")
+            if config is not None and hasattr(config, "getini")
+            else "test_*.py"
+        )
+        patterns = python_files.split() if isinstance(python_files, str) else list(python_files)
+        directory = pathlib.Path(str(directory))
+        seen_files: set = set()
+        items = []
+        for pat in patterns:
+            for py_file in sorted(directory.rglob(pat)):
+                if not py_file.is_file() or py_file in seen_files:
+                    continue
+                if any(part.startswith((".", "__pycache__")) for part in py_file.parts):
+                    continue
+                seen_files.add(py_file)
+                items.extend(self._collect_items_from_path(py_file))
+        return items, None
 
     def getitems(self, source):
         """Collect Function item nodes from the source in-process (a light
