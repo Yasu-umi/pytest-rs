@@ -54,6 +54,7 @@ def _bestrelpath(directory: Path, dest: Path) -> str:
 
 # The bundled _pytest dir; builtin fixtures defined there get the ".../_pytest"
 # prefix pytest shows instead of an absolute path.
+_PYTEST_DIR: Path | None
 try:
     import _pytest
 
@@ -95,9 +96,7 @@ def _write_fixture(out: list[str], argname, scope, func, invocation_dir, verbose
     out.append(f"{head} -- {prettypath}")
     doc = inspect.getdoc(func)
     if doc:
-        _write_docstring(
-            out, doc.split("\n\n", maxsplit=1)[0] if verbose <= 0 else doc
-        )
+        _write_docstring(out, doc.split("\n\n", maxsplit=1)[0] if verbose <= 0 else doc)
     else:
         out.append("    no docstring available")
 
@@ -121,8 +120,16 @@ def show_fixtures(defs, invocation_dir: str, verbose: int) -> str:
         # "fixtures defined from" separator, and sorted ahead of user modules.
         is_builtin = module.startswith(("_pytest.", "pytest._", "_pytest_rs"))
         available.append(
-            (len(baseid), 0 if is_builtin else 1, module,
-             _pretty_fixture_path(invocation_dir, func), argname, scope, func, is_builtin)
+            (
+                len(baseid),
+                0 if is_builtin else 1,
+                module,
+                _pretty_fixture_path(invocation_dir, func),
+                argname,
+                scope,
+                func,
+                is_builtin,
+            )
         )
     available.sort(key=lambda t: (t[0], t[1], t[2], t[3], t[4]))
 
@@ -135,9 +142,7 @@ def show_fixtures(defs, invocation_dir: str, verbose: int) -> str:
             currentmodule = module
         if verbose <= 0 and argname.startswith("_"):
             continue
-        _write_fixture(
-            out, argname, scope, func, invocation_dir, verbose, show_scope=True
-        )
+        _write_fixture(out, argname, scope, func, invocation_dir, verbose, show_scope=True)
         out.append("")
     return "\n".join(out)
 
@@ -162,7 +167,5 @@ def show_fixtures_per_test(items, invocation_dir: str, verbose: int) -> str:
         for argname, scope, _baseid, func in sorted(closure, key=lambda t: t[0]):
             if verbose <= 0 and argname.startswith("_"):
                 continue
-            _write_fixture(
-                out, argname, scope, func, invocation_dir, verbose, show_scope=False
-            )
+            _write_fixture(out, argname, scope, func, invocation_dir, verbose, show_scope=False)
     return "\n".join(out)
