@@ -6,10 +6,10 @@
   "files": [
     {
       "file": "test_pytest_rerunfailures.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 46,
-      "failed": 1,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 47,
+      "failed": 0,
       "skipped": 1,
       "errors": 0
     }

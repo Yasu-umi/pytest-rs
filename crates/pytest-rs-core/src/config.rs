@@ -467,6 +467,15 @@ fn looks_like_path(s: &str) -> bool {
         || s.starts_with('.') // ./relative or ../up
 }
 
+/// A token that is a negative number (e.g. `-1`, `-2.5`), not a flag — so it
+/// can be consumed as a deferred plugin option's value (`--reruns-delay -1`)
+/// rather than mistaken for an option and rejected by clap.
+fn is_negative_number(s: &str) -> bool {
+    s.strip_prefix('-').is_some_and(|rest| {
+        !rest.is_empty() && rest.chars().all(|c| c.is_ascii_digit() || c == '.')
+    })
+}
+
 fn shlex_split(input: &str) -> Vec<String> {
     let mut parts = Vec::new();
     let mut current = String::new();
@@ -1086,14 +1095,15 @@ impl Config {
                 // options take exactly one value, and that value may be a
                 // path (e.g. `--metadata-from-json-file /path/to/f.json`).
                 if let Some((_, next)) = tokens.peek()
-                    && !next.starts_with('-')
+                    && (!next.starts_with('-') || is_negative_number(next))
                 {
                     plugin_args.push(tokens.next().expect("peeked").1);
                 }
                 // Continue consuming non-flag, non-path tokens for nargs>1
                 // options (e.g. `--metadata key value`).
                 while let Some((_, next)) = tokens.peek() {
-                    if next.starts_with('-') || looks_like_path(next) {
+                    if (next.starts_with('-') && !is_negative_number(next)) || looks_like_path(next)
+                    {
                         break;
                     }
                     plugin_args.push(tokens.next().expect("peeked").1);
