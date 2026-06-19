@@ -66,6 +66,14 @@ pub(crate) fn run_item_phases(py: Python<'_>) -> PyResult<Py<PyAny>> {
         state.classes.clear();
         state.modules.clear();
     }
+    // A fixture whose setup raised cached its exception so sibling items
+    // re-raise it; but a rerun must re-execute that fixture (the plugin's
+    // _remove_cached_results_from_failed_fixtures). Drop only the error-cached
+    // entries — successfully-cached wider-scope fixtures stay put so they are
+    // not needlessly re-run on the retry.
+    session
+        .fixture_cache
+        .retain(|_, cached| cached.error.is_none());
     let reports = super::run_one_body(py, plugins, session, config, item);
     let proxies = pyo3::types::PyList::empty(py);
     for report in &reports {
