@@ -17,8 +17,8 @@
       "file": "testing/python/collect.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 50,
-      "failed": 32,
+      "passed": 71,
+      "failed": 11,
       "skipped": 0,
       "errors": 0
     },
@@ -125,8 +125,8 @@
       "file": "testing/test_assertion.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 148,
-      "failed": 12,
+      "passed": 149,
+      "failed": 11,
       "skipped": 0,
       "errors": 0
     },
@@ -413,8 +413,8 @@
       "file": "testing/test_terminal.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 211,
-      "failed": 12,
+      "passed": 212,
+      "failed": 11,
       "skipped": 4,
       "errors": 0
     },
@@ -467,8 +467,8 @@
       "file": "testing/acceptance_test.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 45,
-      "failed": 46,
+      "passed": 44,
+      "failed": 47,
       "skipped": 2,
       "errors": 0
     },

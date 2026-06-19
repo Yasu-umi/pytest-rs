@@ -651,6 +651,68 @@ pub fn collect_custom_files(
     })
 }
 
+/// Mirror pytest's import_path ImportPathMismatchError: after importing a test
+/// module by dotted name, the cached module's `__file__` must point at the file
+/// we are collecting. A mismatch means two test files share a basename, which
+/// pytest reports as a collection error rather than silently re-collecting the
+/// first one. Reference: _pytest/pathlib.py:import_path / python.py:importtestmodule.
+fn check_import_path_mismatch(
+    py: Python<'_>,
+    module: &Bound<'_, PyAny>,
+    module_name: &str,
+    path: &Path,
+) -> PyResult<()> {
+    // __init__.py packages are exempt, as is PY_IGNORE_IMPORTMISMATCH=1.
+    if path.file_name().and_then(|n| n.to_str()) == Some("__init__.py") {
+        return Ok(());
+    }
+    if std::env::var("PY_IGNORE_IMPORTMISMATCH").as_deref() == Ok("1") {
+        return Ok(());
+    }
+    let module_file: Option<String> = module
+        .getattr("__file__")
+        .ok()
+        .and_then(|f| f.extract::<String>().ok());
+    // Normalize like pytest: .pyc/.pyo -> source, and a package's __init__.py
+    // collapses to its directory before comparison.
+    let normalized = module_file.as_ref().map(|mf| {
+        let mut mf = mf.clone();
+        if mf.ends_with(".pyc") || mf.ends_with(".pyo") {
+            mf.pop();
+        }
+        let init_suffix = format!("{}__init__.py", std::path::MAIN_SEPARATOR);
+        if let Some(stripped) = mf.strip_suffix(&init_suffix) {
+            mf = stripped.to_string();
+        }
+        mf
+    });
+    let is_same = match &normalized {
+        // os.path.samefile(path, module_file); a missing file is not the same.
+        Some(mf) => py
+            .import("os")
+            .and_then(|os| os.getattr("path"))
+            .and_then(|p| p.call_method1("samefile", (path, mf.as_str())))
+            .and_then(|r| r.extract::<bool>())
+            .unwrap_or(false),
+        None => false,
+    };
+    if is_same {
+        return Ok(());
+    }
+    // ImportPathMismatchError carries the normalized __file__ in its args.
+    let message = format!(
+        "import file mismatch:\n\
+         imported module '{module_name}' has this __file__ attribute:\n  \
+         {}\n\
+         which is not the same as the test file we want to collect:\n  \
+         {}\n\
+         HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules",
+        normalized.unwrap_or_default(),
+        path.display(),
+    );
+    Err(collect_error(py, &message))
+}
+
 pub fn collect_module(
     py: Python<'_>,
     rootdir: &Path,
@@ -663,6 +725,11 @@ pub fn collect_module(
     let (basedir, module_name) = module_name_for(path);
     sys_path_prepend(py, &basedir)?;
     let module = py.import(module_name.as_str())?;
+    // pytest's import_path raises ImportPathMismatchError when a module of the
+    // same dotted name was already imported from a different file (e.g. two
+    // test files sharing a basename in different dirs). We import by name and
+    // get the cached module back, so mirror that check explicitly.
+    check_import_path_mismatch(py, &module, &module_name, path)?;
     let nodeid_base = file_nodeid(rootdir, path);
 
     register_pytest_plugins(py, &module, registry, hooks)?;
