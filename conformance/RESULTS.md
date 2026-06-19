@@ -2430,7 +2430,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2311 | 468 | 3 | 52 | 2834 | 83.4% | 16 | 53 | 63 |
+| pytest | 9.0.3 | 2323 | 456 | 3 | 52 | 2834 | 83.8% | 16 | 53 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 19 | 0 | 4 | 209 | 90.9% | 0 | 1 | 0 |
@@ -2479,9 +2479,9 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 |---|---|---:|---:|---:|---:|
 | testing/python/approx.py | failed | 37 | 38 | 0 | 18 |
 | testing/python/collect.py | failed | 71 | 11 | 0 | 0 |
-| testing/python/fixtures.py | failed | 135 | 73 | 0 | 2 |
+| testing/python/fixtures.py | failed | 138 | 70 | 0 | 2 |
 | testing/python/integration.py | failed | 8 | 8 | 0 | 4 |
-| testing/python/metafunc.py | failed | 64 | 48 | 0 | 0 |
+| testing/python/metafunc.py | failed | 65 | 47 | 0 | 0 |
 | testing/python/raises.py | failed | 13 | 18 | 0 | 0 |
 | testing/python/raises_group.py | failed | 26 | 3 | 0 | 0 |
 | testing/python/show_fixtures_per_test.py | passed | 8 | 0 | 0 | 0 |
@@ -2496,7 +2496,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_collect_imported_tests.py | failed | 2 | 1 | 0 | 0 |
 | testing/test_collection.py | failed | 99 | 14 | 0 | 3 |
 | testing/test_compat.py | passed | 10 | 0 | 0 | 0 |
-| testing/test_config.py | failed | 177 | 37 | 0 | 1 |
+| testing/test_config.py | failed | 182 | 32 | 0 | 1 |
 | testing/test_conftest.py | failed | 47 | 6 | 0 | 1 |
 | testing/test_debug_session.py | passed | 1 | 0 | 0 | 0 |
 | testing/test_doctest.py | passed | 139 | 0 | 0 | 1 |
@@ -2521,14 +2521,14 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_setupplan.py | passed | 3 | 0 | 0 | 0 |
 | testing/test_skipping.py | failed | 91 | 1 | 0 | 0 |
 | testing/test_stepwise.py | passed | 18 | 0 | 0 | 0 |
-| testing/test_subtests.py | failed | 12 | 22 | 0 | 0 |
+| testing/test_subtests.py | failed | 13 | 21 | 0 | 0 |
 | testing/test_terminal.py | failed | 212 | 11 | 0 | 4 |
 | testing/test_threadexception.py | failed | 1 | 7 | 0 | 0 |
 | testing/test_tmpdir.py | passed | 39 | 0 | 0 | 1 |
-| testing/test_unittest.py | failed | 63 | 7 | 0 | 9 |
+| testing/test_unittest.py | failed | 64 | 6 | 0 | 9 |
 | testing/test_unraisableexception.py | failed | 5 | 6 | 0 | 0 |
 | testing/test_warnings.py | failed | 36 | 7 | 0 | 1 |
-| testing/acceptance_test.py | failed | 44 | 47 | 0 | 2 |
+| testing/acceptance_test.py | failed | 45 | 46 | 0 | 2 |
 | testing/deprecated_test.py | failed | 10 | 5 | 0 | 0 |
 
 </details>

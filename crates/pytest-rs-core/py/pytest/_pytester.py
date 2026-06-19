@@ -691,6 +691,28 @@ class Pytester:
         saved_err = os.dup(2)
         os.dup2(out_f.fileno(), 1)
         os.dup2(err_f.fileno(), 2)
+        # When capture is disabled (-s/--capture=no) the engine leaves the
+        # Python-level streams alone, so the inner test's print() output flows
+        # to whatever sys.stdout points at — which is the OUTER session's
+        # capture object, not the redirected fd. Point sys.stdout/err at the
+        # redirected fds so that output lands in out_f/err_f (and thus
+        # result.outlines). With capture enabled the engine installs its own
+        # fd-level capture, so leave the Python streams untouched to avoid
+        # bypassing it.
+        _args_str = [str(a) for a in run_args]
+        capture_disabled = (
+            "-s" in _args_str
+            or "--capture=no" in _args_str
+            or any(
+                _args_str[i] == "--capture" and i + 1 < len(_args_str) and _args_str[i + 1] == "no"
+                for i in range(len(_args_str))
+            )
+        )
+        saved_sys_out = saved_sys_err = None
+        if capture_disabled:
+            saved_sys_out, saved_sys_err = sys.stdout, sys.stderr
+            sys.stdout = os.fdopen(os.dup(1), "w", buffering=1, errors="replace")
+            sys.stderr = os.fdopen(os.dup(2), "w", buffering=1, errors="replace")
         try:
             try:
                 ret = pytest._native_inline_run(run_args)
@@ -705,6 +727,16 @@ class Pytester:
         finally:
             sys.stdout.flush()
             sys.stderr.flush()
+            # Restore the Python streams (and close our fd wrappers while fd
+            # 1/2 still point at out_f/err_f) before reverting the fds.
+            if saved_sys_out is not None:
+                for _wrapper, _orig in ((sys.stdout, saved_sys_out), (sys.stderr, saved_sys_err)):
+                    try:
+                        _wrapper.close()
+                    except Exception:
+                        pass
+                sys.stdout = saved_sys_out
+                sys.stderr = saved_sys_err
             os.dup2(saved_out, 1)
             os.dup2(saved_err, 2)
             os.close(saved_out)
