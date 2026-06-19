@@ -83,18 +83,9 @@ impl Engine {
         let mut last_nodeid: Option<String> = None;
         // A failing deferred teardown becomes an ERROR report: count it
         // toward --maxfail and join its E to the previous progress chars.
-        macro_rules! report_scope_teardown {
-            ($scope:expr, $prev:expr, $item:expr) => {
-                if let Some(report) = teardown_scope_reported(
-                    py,
-                    plugins,
-                    session,
-                    config,
-                    $scope,
-                    $prev,
-                    $item,
-                    last_nodeid.as_deref(),
-                ) {
+        macro_rules! handle_teardown_report {
+            ($report:expr) => {
+                if let Some(report) = $report {
                     if report.outcome == Outcome::Failed {
                         fire_logreport_hooks(py, session, &report, None, None, false);
                         failed += 1;
@@ -125,6 +116,38 @@ impl Engine {
                 }
             };
         }
+        macro_rules! report_scope_teardown {
+            ($scope:expr, $prev:expr, $item:expr) => {
+                handle_teardown_report!(teardown_scope_reported(
+                    py,
+                    plugins,
+                    session,
+                    config,
+                    $scope,
+                    $prev,
+                    $item,
+                    last_nodeid.as_deref(),
+                ))
+            };
+        }
+        // A non-function-scope parametrization moved to its next value within
+        // the same scope-instance: tear down (LIFO) the fixtures depending on
+        // it before the next item sets the new value up.
+        macro_rules! report_param_teardown {
+            ($ended:expr, $item:expr) => {{
+                let ended = $ended;
+                if !ended.is_empty() {
+                    let report_nodeid = last_nodeid.clone().unwrap_or_else(|| $item.nodeid.clone());
+                    handle_teardown_report!(teardown_ended_params_reported(
+                        py,
+                        session,
+                        config,
+                        &ended,
+                        &report_nodeid,
+                    ));
+                }
+            }};
+        }
 
         for idx in 0..items.len() {
             let item = &items[idx];
@@ -139,20 +162,32 @@ impl Engine {
             }
 
             let class_instance = item.class_instance();
-            if let Some(prev) = &prev_class
-                && prev != &class_instance
-            {
-                report_scope_teardown!(Scope::Class, prev, item);
+            if let Some(prev) = &prev_class {
+                if prev != &class_instance {
+                    report_scope_teardown!(Scope::Class, prev, item);
+                } else if idx > 0 {
+                    // Same class node, but a class-scoped param advanced.
+                    report_param_teardown!(
+                        items[idx - 1].ended_param_bindings(item, &[Scope::Class]),
+                        item
+                    );
+                }
             }
             prev_class = Some(class_instance);
 
             let module_instance = item.module_instance();
-            if let Some(prev) = &prev_module
-                && prev != &module_instance
-            {
-                report_scope_teardown!(Scope::Module, prev, item);
-                // Package-scoped fixtures are keyed per module instance.
-                report_scope_teardown!(Scope::Package, prev, item);
+            if let Some(prev) = &prev_module {
+                if prev != &module_instance {
+                    report_scope_teardown!(Scope::Module, prev, item);
+                    // Package-scoped fixtures are keyed per module instance.
+                    report_scope_teardown!(Scope::Package, prev, item);
+                } else if idx > 0 {
+                    // Same module node, but a module/package-scoped param advanced.
+                    report_param_teardown!(
+                        items[idx - 1].ended_param_bindings(item, &[Scope::Module, Scope::Package]),
+                        item
+                    );
+                }
             }
             prev_module = Some(module_instance);
 

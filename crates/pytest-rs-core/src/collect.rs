@@ -72,6 +72,49 @@ impl TestItem {
             .map(|(prefix, _)| prefix.to_string())
             .unwrap_or_else(|| self.nodeid.clone())
     }
+
+    /// The scope-instance string a fixture of `scope` is cached/torn down
+    /// under for this item (the instance the scope stays constant within).
+    pub fn instance_at(&self, scope: crate::fixture::Scope) -> String {
+        use crate::fixture::Scope;
+        match scope {
+            Scope::Function => self.nodeid.clone(),
+            Scope::Class => self.class_instance(),
+            Scope::Module | Scope::Package | Scope::Session => self.module_instance(),
+        }
+    }
+
+    /// Parametrization bindings of `self` (the previous item) in one of `scopes`
+    /// whose value-group ends as the run moves on to `next` within the same
+    /// scope-instance: the param either advances to a new index or is no longer
+    /// requested. A node-boundary change (different scope-instance) is excluded
+    /// — the deferred scope teardown covers it. Fixtures carrying these bindings
+    /// must be torn down before `next` sets the new value up.
+    pub fn ended_param_bindings(
+        &self,
+        next: &TestItem,
+        scopes: &[crate::fixture::Scope],
+    ) -> Vec<crate::session::Binding> {
+        self.scope_sort_keys
+            .iter()
+            .filter(|(_, scope, _)| scopes.contains(scope))
+            .filter_map(|(argname, scope, idx)| {
+                let group = self.instance_at(*scope);
+                if next.instance_at(*scope) != group {
+                    return None;
+                }
+                let next_idx = next
+                    .scope_sort_keys
+                    .iter()
+                    .find(|(a, _, _)| a == argname)
+                    .map(|(_, _, i)| *i);
+                if next_idx == Some(*idx) {
+                    return None;
+                }
+                Some((*scope, group, argname.clone(), *idx))
+            })
+            .collect()
+    }
 }
 
 /// --ignore / --ignore-glob filters, pruned during collection traversal

@@ -289,6 +289,109 @@ pub(crate) fn teardown_scope(
     errors
 }
 
+/// A non-function-scope parametrization moved to its next value while its
+/// scope-instance stayed the same (e.g. a class `params=` fixture between class
+/// param sets). Tear down — LIFO, under a capture phase — every pending
+/// finalizer carrying one of `ended` and evict the matching cached values, so
+/// the next value sets up fresh. Mirrors pytest finishing a differently-
+/// parametrized cached FixtureDef in `execute` before computing its new value.
+/// A failure becomes a deferred teardown ERROR attributed to `report_nodeid`.
+pub(crate) fn teardown_ended_params_reported(
+    py: Python<'_>,
+    session: &mut Session,
+    config: &Config,
+    ended: &[crate::session::Binding],
+    report_nodeid: &str,
+) -> Option<TestReport> {
+    let has_finalizers = session
+        .finalizers
+        .iter()
+        .any(|pf| pf.bindings.iter().any(|b| ended.contains(b)));
+    if has_finalizers {
+        python::capture_scope_teardown_begin(py);
+    }
+    let started = Instant::now();
+    let errors = teardown_ended_params(py, session, config, ended);
+    if !has_finalizers {
+        // Nothing ran, but the param transition still evicted any cached
+        // values that depended on it (above) — no report to emit.
+        return None;
+    }
+    let sections = python::log_failure_sections(py);
+    python::log_finish_item(py);
+    if errors.is_empty() {
+        if sections.is_empty() {
+            return None;
+        }
+        return Some(TestReport {
+            nodeid: report_nodeid.to_string(),
+            phase: Phase::Teardown,
+            outcome: Outcome::Passed,
+            duration: started.elapsed(),
+            longrepr: None,
+            location: None,
+            subtest_desc: None,
+            sections,
+            rerun: false,
+            xfail_longrepr: None,
+            reprcrash_message: None,
+            head_line: None,
+        });
+    }
+    Some(TestReport {
+        nodeid: report_nodeid.to_string(),
+        phase: Phase::Teardown,
+        outcome: Outcome::Failed,
+        duration: started.elapsed(),
+        longrepr: Some(errors.join("\n")),
+        location: None,
+        subtest_desc: None,
+        sections,
+        rerun: false,
+        xfail_longrepr: None,
+        reprcrash_message: None,
+        head_line: None,
+    })
+}
+
+/// Run (LIFO) and remove every pending finalizer carrying one of the `ended`
+/// bindings, evicting the matching cached values. Returns formatted errors.
+fn teardown_ended_params(
+    py: Python<'_>,
+    session: &mut Session,
+    config: &Config,
+    ended: &[crate::session::Binding],
+) -> Vec<String> {
+    let mut errors = Vec::new();
+    let mut idx = session.finalizers.len();
+    while idx > 0 {
+        idx -= 1;
+        let matches = session.finalizers[idx]
+            .bindings
+            .iter()
+            .any(|b| ended.contains(b));
+        if !matches {
+            continue;
+        }
+        let pf = session.finalizers.remove(idx);
+        let result = match &pf.finalizer {
+            Finalizer::Callable(callable) => callable.bind(py).call0().map(|_| ()),
+            Finalizer::GenNext(generator) => python::finalize_generator(py, generator),
+        };
+        if let Err(err) = result {
+            errors.push(python::format_test_failure(
+                py,
+                &err,
+                config.get_value("tb").unwrap_or("long"),
+            ));
+        }
+    }
+    session
+        .fixture_cache
+        .retain(|_, cached| !cached.bindings.iter().any(|b| ended.contains(b)));
+    errors
+}
+
 pub(crate) fn setup_show_active(config: &Config) -> bool {
     config.get_flag("setup-only") || config.get_flag("setup-plan") || config.get_flag("setup-show")
 }

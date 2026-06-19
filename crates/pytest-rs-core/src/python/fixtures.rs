@@ -120,6 +120,7 @@ pub fn ensure_xunit_setup(
                     scope: Scope::Module,
                     instance: module_instance.clone(),
                     finalizer: crate::session::Finalizer::Callable(finalizer.unbind()),
+                    bindings: Vec::new(),
                 });
             }
         }
@@ -150,6 +151,7 @@ pub fn ensure_xunit_setup(
                             scope: Scope::Class,
                             instance: item.class_instance(),
                             finalizer: crate::session::Finalizer::Callable(finalizer.unbind()),
+                            bindings: Vec::new(),
                         });
                     }
                 }
@@ -166,6 +168,7 @@ pub fn ensure_xunit_setup(
                     scope: Scope::Function,
                     instance: item.nodeid.clone(),
                     finalizer: crate::session::Finalizer::Callable(finalizer.unbind()),
+                    bindings: Vec::new(),
                 });
             }
         }
@@ -179,6 +182,7 @@ pub fn ensure_xunit_setup(
                     scope: Scope::Function,
                     instance: item.nodeid.clone(),
                     finalizer: crate::session::Finalizer::Callable(finalizer.unbind()),
+                    bindings: Vec::new(),
                 });
             }
         }

@@ -271,6 +271,22 @@ pub(crate) fn resolve_fixture_def(
             None => String::new(),
         },
     };
+    // Non-function-scope parametrizations this fixture transitively depends
+    // on. When one such param moves to its next value while its scope-instance
+    // stays the same (e.g. a class `params=` fixture between class param sets),
+    // every fixture carrying that binding is torn down and evicted before the
+    // next value is set up — mirroring pytest's per-FixtureDef finish on a
+    // differently-parametrized cached value.
+    let bindings: Vec<crate::session::Binding> = {
+        let closure = session.registry.transitive_argnames(&item.nodeid, &def);
+        item.scope_sort_keys
+            .iter()
+            .filter(|(argname, scope, _)| {
+                !matches!(scope, Scope::Session) && closure.contains(argname)
+            })
+            .map(|(argname, scope, idx)| (*scope, item.instance_at(*scope), argname.clone(), *idx))
+            .collect()
+    };
     // firstresult: plugins may discriminate the key further (asyncio
     // loop-factory variants recreate loop-bound fixtures per variant).
     let keyed_name = {
@@ -299,7 +315,7 @@ pub(crate) fn resolve_fixture_def(
         fixture_param.as_ref().map(|(index, _)| *index),
     );
     if let Some(cached) = session.fixture_cache.get(&cache_key) {
-        return Ok(cached.clone_ref(py));
+        return Ok(cached.value.clone_ref(py));
     }
 
     stack.push(def.clone());
@@ -481,6 +497,7 @@ pub(crate) fn resolve_fixture_def(
                 scope: def.scope,
                 instance: instance.clone(),
                 finalizer: Finalizer::Callable(printer.unbind()),
+                bindings: bindings.clone(),
             });
         }
     }
@@ -496,6 +513,7 @@ pub(crate) fn resolve_fixture_def(
             scope: def.scope,
             instance: instance.clone(),
             finalizer: Finalizer::Callable(drainer.unbind()),
+            bindings: bindings.clone(),
         });
     }
     if let Some(finalizer) = finalizer {
@@ -503,8 +521,15 @@ pub(crate) fn resolve_fixture_def(
             scope: def.scope,
             instance: instance.clone(),
             finalizer,
+            bindings: bindings.clone(),
         });
     }
-    session.fixture_cache.insert(cache_key, value.clone_ref(py));
+    session.fixture_cache.insert(
+        cache_key,
+        crate::session::CachedFixture {
+            value: value.clone_ref(py),
+            bindings,
+        },
+    );
     Ok(value)
 }

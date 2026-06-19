@@ -146,6 +146,28 @@ impl FixtureRegistry {
         ordered
     }
 
+    /// Every argname `def` transitively requests, as visible from `nodeid`,
+    /// including `def`'s own name. Non-fixture leaf names (direct parametrize
+    /// args like `item`) are kept — they identify the param a dependent
+    /// fixture is keyed by. `request` is skipped.
+    pub fn transitive_argnames(&self, nodeid: &str, def: &Arc<FixtureDef>) -> HashSet<String> {
+        let mut seen: HashSet<String> = HashSet::new();
+        seen.insert(def.name.clone());
+        let mut queue: Vec<String> = def.param_names.clone();
+        while let Some(name) = queue.pop() {
+            if name == "request" || !seen.insert(name.clone()) {
+                continue;
+            }
+            // A fixture requesting its own name overrides a less-specific
+            // def; the override's deps are reached through that less-specific
+            // def, not by re-walking the same name.
+            if let Some(dep) = self.lookup(&name, nodeid) {
+                queue.extend(dep.param_names.iter().cloned());
+            }
+        }
+        seen
+    }
+
     /// Autouse fixtures visible from `nodeid`, most general first.
     pub fn autouse_for(&self, nodeid: &str) -> Vec<Arc<FixtureDef>> {
         let mut found: Vec<Arc<FixtureDef>> = self

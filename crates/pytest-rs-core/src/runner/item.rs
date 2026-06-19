@@ -949,6 +949,7 @@ fn run_item_body(
                 scope: Scope::Function,
                 instance: item.nodeid.clone(),
                 finalizer: Finalizer::Callable(finalizer),
+                bindings: Vec::new(),
             });
         }
     }

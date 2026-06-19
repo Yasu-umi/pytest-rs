@@ -128,7 +128,7 @@ impl AnyioPlugin {
             param.map(|(_, index, _)| *index),
         );
         if let Some(cached) = ctx.session.fixture_cache.get(&cache_key) {
-            return Some(cached.clone_ref(py));
+            return Some(cached.value.clone_ref(py));
         }
         param.map(|(_, _, value)| value.clone_ref(py))
     }

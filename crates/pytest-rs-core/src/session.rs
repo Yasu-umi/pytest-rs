@@ -17,6 +17,22 @@ use crate::report::TestReport;
 /// teardown must evict only the matching scope.
 pub type CacheKey = (Scope, String, String, String, Option<usize>);
 
+/// One non-function-scope parametrization a fixture's value transitively
+/// depends on: (param scope, the scope-instance the param is constant within,
+/// argname, 0-based set index). When such a param's value changes while its
+/// scope-instance stays the same (e.g. a class-scoped `params=` fixture moving
+/// to its next value within the same class node), every fixture carrying that
+/// binding must be torn down before the next value is set up — pytest's
+/// `FixtureDef.execute` finishing a differently-parametrized cached instance.
+pub type Binding = (Scope, String, String, usize);
+
+/// A cached fixture value plus the parametrization bindings it depends on
+/// (used to evict it on a mid-node param transition).
+pub struct CachedFixture {
+    pub value: Py<PyAny>,
+    pub bindings: Vec<Binding>,
+}
+
 /// Teardown work registered during fixture setup, run LIFO when the owning
 /// scope finishes.
 pub enum Finalizer {
@@ -31,6 +47,11 @@ pub struct PendingFinalizer {
     pub scope: Scope,
     pub instance: String,
     pub finalizer: Finalizer,
+    /// Parametrization bindings this finalizer's fixture depends on; lets a
+    /// mid-node param transition run it (LIFO) ahead of the deferred scope
+    /// teardown. Empty for finalizers that don't depend on any higher-scope
+    /// parametrization.
+    pub bindings: Vec<Binding>,
 }
 
 /// A pytest_* hook function defined in a conftest.py.
@@ -49,7 +70,7 @@ pub struct Session {
     pub items: Vec<TestItem>,
     pub registry: FixtureRegistry,
     /// Cached fixture values, GIL-independent handles.
-    pub fixture_cache: HashMap<CacheKey, Py<PyAny>>,
+    pub fixture_cache: HashMap<CacheKey, CachedFixture>,
     /// LIFO stack of pending finalizers across all scopes.
     pub finalizers: Vec<PendingFinalizer>,
     pub reports: Vec<TestReport>,
