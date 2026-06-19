@@ -724,10 +724,28 @@ impl PyRequest {
         crate::runner::current_resolve_instance(py).unwrap_or_else(|| py.None())
     }
 
-    /// The module containing the test, or None for doctests.
+    /// The module containing the test, or None for doctests. A session-scoped
+    /// request has no single item, so pytest raises AttributeError here.
     #[getter]
-    fn module(&self, py: Python<'_>) -> Py<PyAny> {
-        py.None()
+    fn module(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        if self.scope == crate::fixture::Scope::Session {
+            return Err(pyo3::exceptions::PyAttributeError::new_err(
+                "module not available in session-scoped context",
+            ));
+        }
+        Ok(py.None())
+    }
+
+    /// The filesystem path of the test's module. As with `module`, a
+    /// session-scoped request has no single item and pytest raises here.
+    #[getter]
+    fn path(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        if self.scope == crate::fixture::Scope::Session {
+            return Err(pyo3::exceptions::PyAttributeError::new_err(
+                "path not available in session-scoped context",
+            ));
+        }
+        Ok(self.node.bind(py).getattr("path")?.unbind())
     }
 
     /// Dynamically resolve (and cache) a fixture by name, like pytest's
