@@ -702,6 +702,14 @@ impl PyRequest {
     /// Returns None for doctest items (they have no user-visible test function).
     #[getter]
     fn function(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        // Only a function-scoped request maps to a single test function;
+        // wider scopes raise AttributeError like pytest.
+        if self.scope > crate::fixture::Scope::Function {
+            return Err(pyo3::exceptions::PyAttributeError::new_err(format!(
+                "function not available in {}-scoped context",
+                self.scope.as_str()
+            )));
+        }
         let node = self.node.bind(py);
         if node
             .getattr("_pytest_doctest_item")
@@ -714,12 +722,20 @@ impl PyRequest {
         Ok(node.getattr("function")?.unbind())
     }
 
-    /// The class containing the test, or None for functions/doctests.
+    /// The class containing the test, or None for functions/doctests. A
+    /// request scoped wider than class (module/package/session) has no single
+    /// class, so pytest raises AttributeError.
     #[getter]
-    fn cls(&self, py: Python<'_>) -> Py<PyAny> {
-        crate::runner::current_resolve_instance(py)
+    fn cls(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        if self.scope > crate::fixture::Scope::Class {
+            return Err(pyo3::exceptions::PyAttributeError::new_err(format!(
+                "cls not available in {}-scoped context",
+                self.scope.as_str()
+            )));
+        }
+        Ok(crate::runner::current_resolve_instance(py)
             .map(|instance| instance.bind(py).get_type().unbind().into_any())
-            .unwrap_or_else(|| py.None())
+            .unwrap_or_else(|| py.None()))
     }
 
     /// The test instance the item runs on (a fresh Test class instance, or
