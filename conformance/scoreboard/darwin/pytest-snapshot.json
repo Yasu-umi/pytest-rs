@@ -26,8 +26,8 @@
       "file": "tests/test_misc.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 39,
-      "failed": 2,
+      "passed": 40,
+      "failed": 1,
       "skipped": 0,
       "errors": 0
     }

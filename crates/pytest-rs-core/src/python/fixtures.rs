@@ -406,8 +406,40 @@ pub fn expand_fixture_params(
                 requested.push(name.clone());
             }
         }
-        let parametrized: Vec<_> = registry
-            .closure_for(&item.nodeid, &requested)
+        // Override-reuse (#1953): a fixture that depends on its own name
+        // reuses the overridden (super) definition. If a super is
+        // parametrized, its params propagate to this item even though the
+        // override itself isn't parametrized — so walk each override chain and
+        // pull the supers into the parametrize closure.
+        let mut closure_defs = registry.closure_for(&item.nodeid, &requested);
+        let mut supers: Vec<std::sync::Arc<crate::fixture::FixtureDef>> = Vec::new();
+        for def in &closure_defs {
+            // Only a non-parametrized override propagates a super's params; an
+            // override with its own params wins outright (the super is bound to
+            // the override's param value, not an extra axis).
+            if def.params.is_some() || !def.param_names.iter().any(|d| d == &def.name) {
+                continue;
+            }
+            let mut cur = def.clone();
+            while let Some(sup) = registry.lookup_overridden(&def.name, &item.nodeid, &cur) {
+                if sup.params.is_some() {
+                    // Nearest parametrized ancestor supplies the axis; stop.
+                    if !supers.iter().any(|s| std::sync::Arc::ptr_eq(s, &sup)) {
+                        supers.push(sup.clone());
+                    }
+                    break;
+                }
+                // A non-parametrized ancestor that itself reuses a higher def:
+                // keep walking up the override chain.
+                if sup.param_names.iter().any(|d| d == &def.name) {
+                    cur = sup;
+                } else {
+                    break;
+                }
+            }
+        }
+        closure_defs.extend(supers);
+        let parametrized: Vec<_> = closure_defs
             .into_iter()
             .filter(|def| def.params.is_some())
             // indirect parametrize already assigned this fixture's param,
@@ -561,9 +593,18 @@ pub fn expand_fixture_params(
                         .iter()
                         .map(|(n, v)| (n.clone(), v.clone_ref(py)))
                         .collect(),
-                    fixture_params: assignments
+                    // Preserve the item's existing fixture params (e.g. an
+                    // indirect-parametrize binding) and add this variant's
+                    // fixture-axis assignments on top.
+                    fixture_params: item
+                        .fixture_params
                         .iter()
                         .map(|(n, i, v)| (n.clone(), *i, v.clone_ref(py)))
+                        .chain(
+                            assignments
+                                .iter()
+                                .map(|(n, i, v)| (n.clone(), *i, v.clone_ref(py))),
+                        )
                         .collect(),
                     collector_class: item.collector_class.clone(),
                     func_class: item.func_class.clone(),
