@@ -26,8 +26,8 @@
       "file": "testing/python/fixtures.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 92,
-      "failed": 116,
+      "passed": 103,
+      "failed": 105,
       "skipped": 2,
       "errors": 0
     },
@@ -69,10 +69,10 @@
     },
     {
       "file": "testing/python/show_fixtures_per_test.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 0,
-      "failed": 8,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 8,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },
@@ -96,10 +96,10 @@
     },
     {
       "file": "testing/logging/test_fixture.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 26,
-      "failed": 1,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 27,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },
