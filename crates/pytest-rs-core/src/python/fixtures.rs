@@ -82,6 +82,24 @@ pub fn ensure_xunit_setup(
     let xunit = py.import("pytest._xunit")?;
     let call_optional = xunit.getattr("call_optional")?;
     let bind = xunit.getattr("bind")?;
+    let first_non_fixture = xunit.getattr("first_non_fixture")?;
+    // The first attribute among `names` on `obj` that is not a @pytest.fixture
+    // (pytest's _get_first_non_fixture_func): a fixture-decorated function named
+    // like an xunit hook must not also run as that hook.
+    let lookup = |obj: &Bound<'_, PyAny>, names: &[&str]| -> Option<Bound<'_, PyAny>> {
+        let mut args: Vec<Py<PyAny>> = Vec::with_capacity(names.len() + 1);
+        args.push(obj.clone().unbind().into_any());
+        for name in names {
+            args.push(pyo3::types::PyString::new(py, name).into_any().unbind());
+        }
+        let tuple = pyo3::types::PyTuple::new(py, args).ok()?;
+        let meth = first_non_fixture.call1(&tuple).ok()?;
+        if meth.is_none() {
+            None
+        } else {
+            Some(meth)
+        }
+    };
     let module = py.import(item.module_name.as_str())?;
     let module_instance = item.module_instance();
 
@@ -98,9 +116,7 @@ pub fn ensure_xunit_setup(
         None => {
             // unittest's module-level aliases take priority (upstream's
             // ("setUpModule", "setup_module") first-non-fixture lookup).
-            let setup_fn = ["setUpModule", "setup_module"]
-                .iter()
-                .find_map(|name| module.getattr(name).ok());
+            let setup_fn = lookup(module.as_any(), &["setUpModule", "setup_module"]);
             let setup_result: PyResult<()> = match setup_fn {
                 Some(setup) => call_optional.call1((setup, &module)).map(|_| ()),
                 None => Ok(()),
@@ -111,9 +127,7 @@ pub fn ensure_xunit_setup(
                 return Err(err);
             }
             xunit_record(py, session, false, module_instance.clone(), None);
-            let teardown_fn = ["tearDownModule", "teardown_module"]
-                .iter()
-                .find_map(|name| module.getattr(name).ok());
+            let teardown_fn = lookup(module.as_any(), &["tearDownModule", "teardown_module"]);
             if let Some(teardown) = teardown_fn {
                 let finalizer = bind.call1((teardown, &module))?;
                 session.finalizers.push(crate::session::PendingFinalizer {
@@ -136,16 +150,16 @@ pub fn ensure_xunit_setup(
                 }
                 Some(None) => {}
                 None => {
-                    let setup_result: PyResult<()> = match cls.getattr("setup_class") {
-                        Ok(setup) => call_optional.call1((setup, cls)).map(|_| ()),
-                        Err(_) => Ok(()),
+                    let setup_result: PyResult<()> = match lookup(cls, &["setup_class"]) {
+                        Some(setup) => call_optional.call1((setup, cls)).map(|_| ()),
+                        None => Ok(()),
                     };
                     if let Err(err) = setup_result {
                         xunit_record(py, session, true, class_key, Some(&err));
                         return Err(err);
                     }
                     xunit_record(py, session, true, class_key, None);
-                    if let Ok(teardown) = cls.getattr("teardown_class") {
+                    if let Some(teardown) = lookup(cls, &["teardown_class"]) {
                         let finalizer = bind.call1((teardown, cls))?;
                         session.finalizers.push(crate::session::PendingFinalizer {
                             scope: Scope::Class,
@@ -159,10 +173,10 @@ pub fn ensure_xunit_setup(
             let instance = instance.bind(py);
             // pytest passes the *bound* method object to setup/teardown_method.
             let bound_method = instance.getattr(item.func_name.as_str())?;
-            if let Ok(setup) = instance.getattr("setup_method") {
+            if let Some(setup) = lookup(instance, &["setup_method"]) {
                 call_optional.call1((setup, &bound_method))?;
             }
-            if let Ok(teardown) = instance.getattr("teardown_method") {
+            if let Some(teardown) = lookup(instance, &["teardown_method"]) {
                 let finalizer = bind.call1((teardown, &bound_method))?;
                 session.finalizers.push(crate::session::PendingFinalizer {
                     scope: Scope::Function,
@@ -173,10 +187,10 @@ pub fn ensure_xunit_setup(
             }
         }
         _ => {
-            if let Ok(setup) = module.getattr("setup_function") {
+            if let Some(setup) = lookup(module.as_any(), &["setup_function"]) {
                 call_optional.call1((setup, item.func.bind(py)))?;
             }
-            if let Ok(teardown) = module.getattr("teardown_function") {
+            if let Some(teardown) = lookup(module.as_any(), &["teardown_function"]) {
                 let finalizer = bind.call1((teardown, item.func.bind(py)))?;
                 session.finalizers.push(crate::session::PendingFinalizer {
                     scope: Scope::Function,

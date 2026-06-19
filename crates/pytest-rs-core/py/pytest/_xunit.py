@@ -7,6 +7,19 @@ callables and pushed onto the session finalizer stack.
 import inspect
 
 
+def first_non_fixture(obj, *names):
+    """Return the first attribute named in `names` that exists on `obj` and is
+    not a pytest fixture, mirroring _pytest.python._get_first_non_fixture_func.
+
+    A function decorated with @pytest.fixture but named like an xunit hook
+    (e.g. `setup_module`) must not also run as the xunit hook (#517)."""
+    for name in names:
+        meth = getattr(obj, name, None)
+        if meth is not None and not hasattr(meth, "_pytestfixturefunction"):
+            return meth
+    return None
+
+
 def call_optional(func, arg):
     """Call with `arg` if the function accepts a (non-defaulted) positional
     parameter, else without — pytest's optional-argument protocol."""
