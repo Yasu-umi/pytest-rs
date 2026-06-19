@@ -241,6 +241,7 @@ class TempPathFactory:
 
 @fixture(scope="session")
 def tmp_path_factory():
+    """Return a :class:`pytest.TempPathFactory` instance for the test session."""
     factory = TempPathFactory(
         given_basetemp=_given_basetemp,
         retention_count=_retention_count,
@@ -263,6 +264,12 @@ def tmp_path_factory():
 
 @fixture
 def tmp_path(tmp_path_factory, request):
+    """Return a temporary directory (as :class:`pathlib.Path` object)
+    which is unique to each test function invocation.
+    The temporary directory is created as a subdirectory
+    of the base temporary directory, with configurable retention,
+    as discussed in :ref:`temporary directory location and retention`.
+    """
     name = re.sub(r"\W", "_", request.node.name)[:30]
     path = tmp_path_factory.mktemp(name, numbered=True)
     yield path
