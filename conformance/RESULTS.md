@@ -2430,7 +2430,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2323 | 456 | 3 | 52 | 2834 | 83.8% | 16 | 53 | 63 |
+| pytest | 9.0.3 | 2324 | 455 | 3 | 52 | 2834 | 83.8% | 16 | 53 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 19 | 0 | 4 | 209 | 90.9% | 0 | 1 | 0 |
@@ -2456,7 +2456,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
 | rich | v14.2.0 | 855 | 0 | 0 | 25 | 880 | 100.0% | 60 | 62 | 0 |
-| pytest-bdd | 8.1.0 | 89 | 49 | 0 | 1 | 139 | 64.7% | 18 | 35 | 0 |
+| pytest-bdd | 8.1.0 | 112 | 26 | 0 | 1 | 139 | 81.3% | 27 | 35 | 0 |
 | httpx | 0.28.1 | 1333 | 9 | 0 | 1 | 1343 | 99.3% | 25 | 31 | 0 |
 | httpx2 | v2.4.0 | 1426 | 0 | 0 | 1 | 1427 | 100.0% | 31 | 31 | 0 |
 | starlette | 0.46.2 | 907 | 0 | 0 | 0 | 907 | 100.0% | 28 | 28 | 0 |
@@ -2479,7 +2479,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 |---|---|---:|---:|---:|---:|
 | testing/python/approx.py | failed | 37 | 38 | 0 | 18 |
 | testing/python/collect.py | failed | 71 | 11 | 0 | 0 |
-| testing/python/fixtures.py | failed | 138 | 70 | 0 | 2 |
+| testing/python/fixtures.py | failed | 139 | 69 | 0 | 2 |
 | testing/python/integration.py | failed | 8 | 8 | 0 | 4 |
 | testing/python/metafunc.py | failed | 65 | 47 | 0 | 0 |
 | testing/python/raises.py | failed | 13 | 18 | 0 | 0 |
@@ -2988,8 +2988,8 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/args/cfparse/test_args.py | passed | 2 | 0 | 0 | 0 |
 | tests/args/parse/test_args.py | passed | 2 | 0 | 0 | 0 |
 | tests/args/regex/test_args.py | passed | 3 | 0 | 0 | 0 |
-| tests/args/test_common.py | failed | 0 | 2 | 0 | 0 |
-| tests/datatable/test_datatable.py | failed | 3 | 1 | 0 | 0 |
+| tests/args/test_common.py | passed | 2 | 0 | 0 | 0 |
+| tests/datatable/test_datatable.py | passed | 4 | 0 | 0 | 0 |
 | tests/feature/test_alias.py | passed | 1 | 0 | 0 | 0 |
 | tests/feature/test_background.py | passed | 2 | 0 | 0 | 0 |
 | tests/feature/test_cucumber_json.py | failed | 0 | 1 | 0 | 0 |
@@ -2997,29 +2997,29 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/feature/test_feature_base_dir.py | passed | 7 | 0 | 0 | 0 |
 | tests/feature/test_gherkin_terminal_reporter.py | failed | 0 | 14 | 0 | 0 |
 | tests/feature/test_no_scenario.py | passed | 1 | 0 | 0 | 0 |
-| tests/feature/test_outline.py | failed | 2 | 5 | 0 | 0 |
-| tests/feature/test_outline_empty_values.py | failed | 0 | 1 | 0 | 0 |
+| tests/feature/test_outline.py | passed | 7 | 0 | 0 | 0 |
+| tests/feature/test_outline_empty_values.py | passed | 1 | 0 | 0 | 0 |
 | tests/feature/test_report.py | failed | 0 | 1 | 0 | 1 |
-| tests/feature/test_rule_example_format.py | failed | 0 | 1 | 0 | 0 |
+| tests/feature/test_rule_example_format.py | passed | 1 | 0 | 0 | 0 |
 | tests/feature/test_same_function_name.py | passed | 1 | 0 | 0 | 0 |
-| tests/feature/test_scenario.py | failed | 15 | 3 | 0 | 0 |
+| tests/feature/test_scenario.py | passed | 18 | 0 | 0 | 0 |
 | tests/feature/test_scenarios.py | failed | 4 | 4 | 0 | 0 |
-| tests/feature/test_steps.py | failed | 12 | 1 | 0 | 0 |
+| tests/feature/test_steps.py | passed | 13 | 0 | 0 | 0 |
 | tests/feature/test_tags.py | passed | 5 | 0 | 0 | 0 |
 | tests/feature/test_wrong.py | passed | 1 | 0 | 0 | 0 |
 | tests/generation/test_generate_missing.py | failed | 1 | 2 | 0 | 0 |
-| tests/library/test_parent.py | failed | 3 | 2 | 0 | 0 |
+| tests/library/test_parent.py | passed | 5 | 0 | 0 | 0 |
 | tests/parser/test_errors.py | passed | 7 | 0 | 0 | 0 |
 | tests/parser/test_parser.py | passed | 1 | 0 | 0 | 0 |
 | tests/scripts/test_generate.py | failed | 1 | 2 | 0 | 0 |
 | tests/scripts/test_main.py | passed | 2 | 0 | 0 | 0 |
 | tests/scripts/test_migrate.py | passed | 1 | 0 | 0 | 0 |
-| tests/steps/test_common.py | failed | 3 | 5 | 0 | 0 |
-| tests/steps/test_docstring.py | failed | 3 | 1 | 0 | 0 |
+| tests/steps/test_common.py | failed | 7 | 1 | 0 | 0 |
+| tests/steps/test_docstring.py | passed | 4 | 0 | 0 | 0 |
 | tests/steps/test_given.py | passed | 1 | 0 | 0 | 0 |
 | tests/steps/test_keyword.py | passed | 1 | 0 | 0 | 0 |
 | tests/steps/test_unicode.py | passed | 2 | 0 | 0 | 0 |
-| tests/test_hooks.py | failed | 1 | 3 | 0 | 0 |
+| tests/test_hooks.py | failed | 3 | 1 | 0 | 0 |
 
 </details>
 

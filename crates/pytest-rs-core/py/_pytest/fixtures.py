@@ -90,15 +90,34 @@ def call_fixture_func(fixturefunc, request, kwargs):
     return value
 
 
+def _fail_multi_yield(generator):
+    """Report a yield fixture that yielded twice, mirroring upstream's
+    fail_fixturefunc: the message carries the fixture's location and there is
+    no traceback (pytrace=False)."""
+    from _pytest.outcomes import fail
+
+    msg = "fixture function has more than one 'yield'"
+    code = getattr(generator, "gi_code", None)
+    if code is None:
+        fail(msg, pytrace=False)
+    location = f"{code.co_filename}:{code.co_firstlineno}"
+    fail(f"{msg}:\n\n{location}", pytrace=False)
+
+
+def finalize_generator(generator):
+    """Advance a yield fixture's generator at teardown; a second yield is an
+    error reported like upstream (message + location, no traceback)."""
+    try:
+        next(generator)
+    except StopIteration:
+        return
+    _fail_multi_yield(generator)
+
+
 def _teardown_yield_fixture(fixturefunc, it):
     """Drain the rest of a yield fixture's generator at teardown; a second
     yield is an error, like upstream."""
-    try:
-        next(it)
-    except StopIteration:
-        pass
-    else:
-        raise ValueError(f"fixture function has more than one 'yield': {fixturefunc!r}")
+    finalize_generator(it)
 
 
 class FixtureFunctionDefinition:

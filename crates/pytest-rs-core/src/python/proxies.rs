@@ -496,15 +496,16 @@ pub fn end_item_context(py: Python<'_>) {
 /// Resume a suspended sync generator fixture, expecting StopIteration.
 /// Runs in the item context so contextvar tokens reset cleanly.
 pub fn finalize_generator(py: Python<'_>, generator: &Py<PyAny>) -> PyResult<()> {
-    let next_fn = py.import("builtins")?.getattr("next")?;
+    // _pytest.fixtures.finalize_generator advances the generator and, on a
+    // second yield, reports it like upstream's fail_fixturefunc (message +
+    // location, no traceback). Run it in the item context so contextvar
+    // tokens set before the yield reset cleanly.
+    let finalize = py
+        .import("_pytest.fixtures")?
+        .getattr("finalize_generator")?;
     let call = py.import("pytest._ctx")?.getattr("call")?;
-    match call.call1((next_fn, generator.bind(py))) {
-        Ok(_) => Err(pyo3::exceptions::PyRuntimeError::new_err(
-            "fixture generator yielded more than once",
-        )),
-        Err(err) if err.is_instance_of::<pyo3::exceptions::PyStopIteration>(py) => Ok(()),
-        Err(err) => Err(err),
-    }
+    call.call1((finalize, generator.bind(py)))?;
+    Ok(())
 }
 
 /// Advance a generator fixture to its first yield, returning the value.
