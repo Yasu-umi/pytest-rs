@@ -30,6 +30,11 @@ thread_local! {
     /// less-specific definition rather than recursing into itself.
     static EXECUTING: std::cell::RefCell<Vec<std::sync::Arc<crate::fixture::FixtureDef>>> =
         const { std::cell::RefCell::new(Vec::new()) };
+    /// Per-item-run names requested dynamically via `request.getfixturevalue()`.
+    /// pytest appends these to the item's `fixturenames`, so `request.fixturenames`
+    /// reflects fixtures pulled in at runtime (#3057). One frame per resolve ctx.
+    static DYNAMIC_NAMES: std::cell::RefCell<Vec<Vec<String>>> =
+        const { std::cell::RefCell::new(Vec::new()) };
     /// The running item's node proxy, shared by every `request.node` and the
     /// logreport/makereport report so attributes a plugin sets during the
     /// test (pytest-bdd's `__scenario_report__`) survive to makereport.
@@ -61,6 +66,9 @@ impl Drop for ResolveCtxGuard {
         RESOLVE_CTX.with(|stack| {
             stack.borrow_mut().pop();
         });
+        DYNAMIC_NAMES.with(|stack| {
+            stack.borrow_mut().pop();
+        });
     }
 }
 
@@ -79,6 +87,7 @@ pub(crate) fn push_resolve_ctx(
             class_instance: None,
         });
     });
+    DYNAMIC_NAMES.with(|stack| stack.borrow_mut().push(Vec::new()));
     // New item run: drop the previous item's cached node so request.node and
     // the report node for this item share a fresh object.
     ITEM_NODE.with(|cell| *cell.borrow_mut() = None);
@@ -141,6 +150,17 @@ pub(crate) fn getfixturevalue(py: Python<'_>, name: &str) -> PyResult<Py<PyAny>>
             err_type.call1((format!("fixture '{name}' not found"),))?,
         ));
     }
+    // Record a dynamically requested fixture so it surfaces in
+    // request.fixturenames, like pytest appending to the item's closure (#3057).
+    if session.registry.lookup(name, &item.nodeid).is_some() {
+        DYNAMIC_NAMES.with(|stack| {
+            if let Some(frame) = stack.borrow_mut().last_mut()
+                && !frame.iter().any(|n| n == name)
+            {
+                frame.push(name.to_string());
+            }
+        });
+    }
     let mut stack = Vec::new();
     // Override-reuse via getfixturevalue: if `name` matches a fixture currently
     // executing on this thread, an override is asking for its own name — resolve
@@ -187,22 +207,58 @@ pub(crate) fn current_fixturenames(py: Python<'_>) -> Option<Vec<String>> {
     // Safety: same invariant as getfixturevalue — the run_one frame below us
     // owns these pointers and is suspended in the Python call that reached here.
     let (session, item) = unsafe { (&*ptrs.0, &*ptrs.1) };
-    let mut names: Vec<String> = session
-        .registry
-        .closure_for(&item.nodeid, &item.fixture_names)
-        .iter()
-        .map(|def| def.name.clone())
-        .collect();
-    // `request` is its own pseudo-fixture: present when the item (or a fixture
-    // in its closure) requested it — the closure builder skips it otherwise.
-    if item.fixture_names.iter().any(|n| n == "request") && !names.iter().any(|n| n == "request") {
-        names.push("request".to_string());
+    // Build the closure the way pytest's getfixtureclosure does for the runtime
+    // `request.fixturenames` view: autouse first, then the test's directly
+    // requested args *in order* (keeping `request` in its declared position,
+    // unlike `closure_for` which drops it for setup), BFS-expand dependencies,
+    // then stable-sort by scope (higher scope first).
+    let registry = &session.registry;
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut names: Vec<String> = Vec::new();
+    for def in registry.autouse_for(&item.nodeid) {
+        if seen.insert(def.name.clone()) {
+            names.push(def.name.clone());
+        }
     }
+    for n in &item.fixture_names {
+        if seen.insert(n.clone()) {
+            names.push(n.clone());
+        }
+    }
+    let mut i = 0;
+    while i < names.len() {
+        if let Some(def) = registry.lookup(&names[i], &item.nodeid) {
+            for dep in &def.param_names {
+                if seen.insert(dep.clone()) {
+                    names.push(dep.clone());
+                }
+            }
+        }
+        i += 1;
+    }
+    names.sort_by_key(|n| {
+        std::cmp::Reverse(
+            registry
+                .lookup(n, &item.nodeid)
+                .map(|d| d.scope)
+                .unwrap_or(Scope::Function),
+        )
+    });
     for extra in &item.extra_fixture_names {
-        if !names.contains(extra) {
+        if seen.insert(extra.clone()) {
             names.push(extra.clone());
         }
     }
+    // Fixtures pulled in at runtime via request.getfixturevalue() (#3057).
+    DYNAMIC_NAMES.with(|stack| {
+        if let Some(frame) = stack.borrow().last() {
+            for n in frame {
+                if seen.insert(n.clone()) {
+                    names.push(n.clone());
+                }
+            }
+        }
+    });
     let _ = py;
     Some(names)
 }
