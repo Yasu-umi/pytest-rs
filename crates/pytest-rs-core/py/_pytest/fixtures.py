@@ -120,6 +120,44 @@ def _teardown_yield_fixture(fixturefunc, it):
     finalize_generator(it)
 
 
+def fail_subrequest_no_param(nodeid, fixturefunc, argname, rootpath):
+    """Report request.getfixturevalue() of a parametrized fixture that has no
+    parameter bound for this test, mirroring upstream's message: the test
+    nodeid, the fixture's definition location, and the call site. Run from the
+    engine's resolver; the engine's Rust frames are invisible to Python, so the
+    Python frame directly below this helper is the requesting code."""
+    import sys
+    from pathlib import Path
+
+    from _pytest.outcomes import fail
+
+    def _loc(filename, lineno):
+        p = Path(filename)
+        try:
+            p = p.relative_to(rootpath)
+        except ValueError:
+            pass
+        return f"{p}:{lineno}"
+
+    real = getattr(fixturefunc, "__wrapped__", fixturefunc)
+    code = real.__code__
+    # getlocation() reports co_firstlineno + 1 (the def line for a singly
+    # decorated fixture).
+    fixture_loc = _loc(code.co_filename, code.co_firstlineno + 1)
+    frame = sys._getframe(1)
+    here_loc = _loc(frame.f_code.co_filename, frame.f_lineno)
+
+    fail(
+        "The requested fixture has no parameter defined for test:\n"
+        f"    {nodeid}\n\n"
+        f"Requested fixture '{argname}' defined in:\n"
+        f"{fixture_loc}\n\n"
+        "Requested here:\n"
+        f"{here_loc}",
+        pytrace=False,
+    )
+
+
 class FixtureFunctionDefinition:
     """pytest 8.4+ wraps @pytest.fixture functions in this. pytest-rs marks
     fixtures with recorded metadata instead, so nothing is ever an instance —

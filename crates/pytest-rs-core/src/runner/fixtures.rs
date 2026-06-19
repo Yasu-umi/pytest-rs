@@ -309,6 +309,36 @@ fn scope_mismatch_error(
     fail_no_trace(py, &msg)
 }
 
+/// Build pytest's "no parameter defined for test" error for a parametrized
+/// fixture requested via `getfixturevalue()` without a bound param. The Python
+/// helper captures the call-site frame (the engine's Rust frames are invisible
+/// to Python) and raises a `Failed` with `pytrace=False`.
+fn no_parameter_error(
+    py: Python<'_>,
+    config: &Config,
+    def: &crate::fixture::FixtureDef,
+    nodeid: &str,
+) -> PyErr {
+    let rootpath = config.rootdir.to_string_lossy();
+    match py
+        .import("_pytest.fixtures")
+        .and_then(|m| m.getattr("fail_subrequest_no_param"))
+        .and_then(|f| {
+            f.call1((
+                nodeid,
+                def.func.bind(py),
+                def.name.as_str(),
+                rootpath.as_ref(),
+            ))
+        }) {
+        // The helper always raises; reaching Ok means it did not.
+        Ok(_) => {
+            pyo3::exceptions::PyRuntimeError::new_err("fixture has no parameter defined for test")
+        }
+        Err(err) => err,
+    }
+}
+
 /// Resolve a specific fixture definition (override-aware entry point).
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn resolve_fixture_def(
@@ -354,6 +384,16 @@ pub(crate) fn resolve_fixture_def(
         .iter()
         .find(|(fixture, _, _)| fixture == &def.name)
         .map(|(_, index, value)| (*index, value.clone_ref(py)));
+    // A parametrized fixture resolved without a bound param. The parametrize
+    // machinery always binds a param for fixtures in a test's closure, so this
+    // is only reachable via request.getfixturevalue() of a fixture the test
+    // never parametrized. Report pytest's dedicated error.
+    if def.params.is_some()
+        && fixture_param.is_none()
+        && !item.callspec.iter().any(|(param, _)| param == &def.name)
+    {
+        return Err(no_parameter_error(py, config, &def, &item.nodeid));
+    }
     let instance = match def.scope {
         Scope::Function => item.nodeid.clone(),
         Scope::Class => item.class_instance(),
