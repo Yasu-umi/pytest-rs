@@ -24,9 +24,9 @@
     },
     {
       "file": "sklearn/callback/tests/test_callback_context.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 29,
       "failed": 0,
       "skipped": 0,
       "errors": 0
@@ -753,11 +753,11 @@
     },
     {
       "file": "sklearn/manifold/tests/test_t_sne.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 77,
+      "status": "timeout",
+      "exit_code": null,
+      "passed": 0,
       "failed": 0,
-      "skipped": 1,
+      "skipped": 0,
       "errors": 0
     },
     {

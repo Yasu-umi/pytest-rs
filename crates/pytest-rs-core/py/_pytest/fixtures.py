@@ -47,6 +47,16 @@ class TopRequest:
     def __init__(self, pyfuncitem, *, _ispytest=False):
         self._pyfuncitem = pyfuncitem
         self._fixture_defs = {}
+        # Full fixturedef map (name -> (scope, argnames, func, owning_cls)) for
+        # in-process resolution; empty for statically-collected items that only
+        # expose closure/metadata.
+        self._fixturedefs_full = getattr(pyfuncitem, "_fixturedefs_full", {}) or {}
+        self._fixture_values = {}
+        self._finalizers = []
+
+    # The fixture this (sub)request resolves for; TopRequest is the test's own
+    # request, so there is none. call_fixture_func only reads it for an error.
+    fixturename = None
 
     @property
     def node(self):
@@ -98,6 +108,62 @@ class TopRequest:
                 continue
             result[name] = [_ShimArgFixtureDef(name)]
         return result
+
+    def _resolve(self, name):
+        """Resolve a fixture by name in-process, caching its value. Recurses
+        into dependencies; `request` resolves to this request."""
+        if name == "request":
+            return self
+        if name in self._fixture_values:
+            return self._fixture_values[name]
+        info = self._fixturedefs_full.get(name)
+        if info is None:
+            from pytest._fixtures import FixtureLookupError
+
+            raise FixtureLookupError(f"fixture {name!r} not found")
+        _scope, argnames, func, owning_cls = info
+        kwargs = {dep: self._resolve(dep) for dep in argnames}
+        if owning_cls is not None:
+            instance = getattr(self._pyfuncitem, "instance", None)
+            if instance is None or isinstance(instance, type):
+                try:
+                    instance = owning_cls()
+                except Exception:
+                    instance = owning_cls
+            func = func.__get__(instance, owning_cls)
+        value = call_fixture_func(func, self, kwargs)
+        self._fixture_values[name] = value
+        return value
+
+    def getfixturevalue(self, argname):
+        """Dynamically resolve a fixture (pytest's request.getfixturevalue)."""
+        return self._resolve(argname)
+
+    def _fillfixtures(self):
+        """Populate item.funcargs with the test's fixture closure + request,
+        mirroring pytest's Function.setup -> request._fillfixtures."""
+        funcargs = getattr(self._pyfuncitem, "funcargs", None)
+        if funcargs is None:
+            funcargs = {}
+            self._pyfuncitem.funcargs = funcargs
+        for name in self._pyfuncitem.fixturenames:
+            if name == "request":
+                continue
+            if name in self._fixturedefs_full:
+                funcargs[name] = self._resolve(name)
+        funcargs["request"] = self
+
+    def addfinalizer(self, finalizer):
+        """Register a teardown callback. Routes to the item's SetupState when
+        the item has been set up (so SetupState.teardown_exact drains it),
+        else keeps it locally."""
+        item = self._pyfuncitem
+        session = getattr(item, "session", None)
+        setupstate = getattr(session, "_setupstate", None) if session is not None else None
+        if setupstate is not None and item in getattr(setupstate, "stack", {}):
+            setupstate.addfinalizer(finalizer, item)
+        else:
+            self._finalizers.append(finalizer)
 
     def __repr__(self):
         return f"<FixtureRequest for {self._pyfuncitem!r}>"

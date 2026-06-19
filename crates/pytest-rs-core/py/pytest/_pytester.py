@@ -1084,7 +1084,12 @@ class Pytester:
                     anames = list(getfuncargnames(real, name=nm, cls=owning_cls))
                 except Exception:
                     anames = []
-                defs[fname] = (scope, anames)
+                    real = ob
+                # The 4-tuple carries the callable and owning class so an
+                # in-process request can actually execute the fixture
+                # (_fillfixtures / getfixturevalue); _closure_for only reads
+                # [0]=scope and [1]=argnames, so the extra fields are inert there.
+                defs[fname] = (scope, anames, real, owning_cls)
                 if getattr(marker, "autouse", False):
                     autouse.append(fname)
             return defs, autouse
@@ -1245,6 +1250,21 @@ class Pytester:
             except Exception:
                 requested = []
             node.fixturenames = _closure_for(requested, cls)
+            # The full fixturedef map (conftest+module, plus this item's class
+            # fixtures) so the item's request can resolve and execute fixtures
+            # in-process (item.session._setupstate.setup → _fillfixtures).
+            full = dict(_mod_fdefs)
+            if cls is not None:
+                cdefs, _ = _gather_fixturedefs(
+                    [(n, getattr(cls, n, None)) for n in dir(cls)], owning_cls=cls
+                )
+                full.update(cdefs)
+            node._fixturedefs_full = full
+            # A single, stable session per item so its _setupstate persists
+            # across item.session accesses (test_request_addfinalizer registers
+            # finalizers on it in setup and drains them later).
+            node._session_obj = session
+            node.funcargs = {}
             from _pytest.fixtures import TopRequest
 
             node._request = TopRequest(node, _ispytest=True)

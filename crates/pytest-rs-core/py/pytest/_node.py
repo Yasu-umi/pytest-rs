@@ -970,7 +970,14 @@ class Node(Item):
     @property
     def session(self):
         """item.session shim: enough for plugins reaching
-        item.session.config (e.g. pytest-timeout's session deadline)."""
+        item.session.config (e.g. pytest-timeout's session deadline).
+
+        In-process collection (pytester) pins a single `_session_obj` per node
+        so item.session — and hence item.session._setupstate — is stable across
+        accesses; the engine path leaves it unset and gets a fresh stand-in."""
+        pinned = getattr(self, "_session_obj", None)
+        if pinned is not None:
+            return pinned
         return _NodeSession(getattr(self, "config", None))
 
     @property
@@ -1087,8 +1094,14 @@ class Function(Node):
     def setup(self):
         if self.module is not None:
             fn = getattr(self.module, "setup_function", None)
-            if fn is not None:
+            if fn is not None and not hasattr(fn, "_pytestfixturefunction"):
                 _call_optional_arg(fn, self.function)
+        # Resolve the item's fixtures in-process, like pytest's Function.setup
+        # (only the pytester-collected nodes carry a resolving request).
+        request = getattr(self, "_request", None)
+        fill = getattr(request, "_fillfixtures", None)
+        if fill is not None:
+            fill()
 
     def teardown(self):
         if self.module is not None:

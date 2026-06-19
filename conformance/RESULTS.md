@@ -2430,7 +2430,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2345 | 434 | 3 | 52 | 2834 | 84.6% | 16 | 53 | 63 |
+| pytest | 9.0.3 | 2352 | 427 | 3 | 52 | 2834 | 84.8% | 16 | 53 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 185 | 20 | 0 | 4 | 209 | 90.4% | 0 | 1 | 0 |
@@ -2462,14 +2462,14 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | starlette | 0.46.2 | 907 | 0 | 0 | 0 | 907 | 100.0% | 28 | 28 | 0 |
 | attrs | 25.3.0 | 1340 | 2 | 0 | 3 | 1345 | 99.9% | 21 | 24 | 0 |
 | more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 671 | 100.0% | 2 | 2 | 0 |
-| pytest-django | v4.9.0 | 147 | 68 | 0 | 1 | 216 | 68.5% | 2 | 13 | 0 |
+| pytest-django | v4.9.0 | 141 | 68 | 6 | 1 | 216 | 65.7% | 2 | 13 | 0 |
 | werkzeug | 3.1.3 | 897 | 1 | 1 | 0 | 899 | 99.8% | 21 | 25 | 0 |
 | fastapi | 0.115.12 | 2324 | 8 | 1 | 130 | 2463 | 99.6% | 298 | 310 | 0 |
 | packaging | 25.0 | 26895 | 51 | 110 | 1 | 27057 | 99.4% | 11 | 12 | 0 |
 | pandas | v3.0.3 | 161807 | 39 | 371 | 25466 | 187683 | 99.8% | 863 | 964 | 0 |
 | scikit-learn-1 | 1.9.0 | 8299 | 16 | 0 | 6617 | 14932 | 99.9% | 75 | 87 | 0 |
 | scikit-learn-2 | 1.9.0 | 4915 | 0 | 2 | 1888 | 6805 | 100.0% | 50 | 58 | 0 |
-| scikit-learn-3 | 1.9.0 | 9198 | 7 | 0 | 2543 | 11748 | 99.9% | 100 | 114 | 0 |
+| scikit-learn-3 | 1.9.0 | 9150 | 7 | 0 | 2542 | 11699 | 99.9% | 100 | 114 | 0 |
 
 ### pytest @ 9.0.3
 
@@ -2478,8 +2478,8 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
 | testing/python/approx.py | failed | 37 | 38 | 0 | 18 |
-| testing/python/collect.py | failed | 71 | 11 | 0 | 0 |
-| testing/python/fixtures.py | failed | 159 | 49 | 0 | 2 |
+| testing/python/collect.py | failed | 72 | 10 | 0 | 0 |
+| testing/python/fixtures.py | failed | 165 | 43 | 0 | 2 |
 | testing/python/integration.py | failed | 9 | 7 | 0 | 4 |
 | testing/python/metafunc.py | failed | 65 | 47 | 0 | 0 |
 | testing/python/raises.py | failed | 13 | 18 | 0 | 0 |
@@ -3191,7 +3191,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
 | tests/test_asserts.py | passed | 2 | 0 | 0 | 0 |
-| tests/test_database.py | failed | 56 | 5 | 0 | 0 |
+| tests/test_database.py | failed | 50 | 5 | 6 | 0 |
 | tests/test_db_access_in_repr.py | failed | 0 | 1 | 0 | 0 |
 | tests/test_db_setup.py | failed | 0 | 14 | 0 | 0 |
 | tests/test_django_configurations.py | no-tests | 0 | 0 | 0 | 1 |
@@ -4724,7 +4724,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 |---|---|---:|---:|---:|---:|
 | sklearn/_loss/tests/test_link.py | passed | 18 | 0 | 0 | 75 |
 | sklearn/_loss/tests/test_loss.py | failed | 1831 | 3 | 0 | 379 |
-| sklearn/callback/tests/test_callback_context.py | timeout | 0 | 0 | 0 | 0 |
+| sklearn/callback/tests/test_callback_context.py | passed | 29 | 0 | 0 | 0 |
 | sklearn/callback/tests/test_callback_support.py | passed | 20 | 0 | 0 | 0 |
 | sklearn/callback/tests/test_pickle.py | passed | 2 | 0 | 0 | 4 |
 | sklearn/callback/tests/test_progressbar.py | passed | 1 | 0 | 0 | 47 |
@@ -4805,7 +4805,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | sklearn/manifold/tests/test_locally_linear.py | passed | 14 | 0 | 0 | 10 |
 | sklearn/manifold/tests/test_mds.py | passed | 27 | 0 | 0 | 0 |
 | sklearn/manifold/tests/test_spectral_embedding.py | passed | 38 | 0 | 0 | 19 |
-| sklearn/manifold/tests/test_t_sne.py | passed | 77 | 0 | 0 | 1 |
+| sklearn/manifold/tests/test_t_sne.py | timeout | 0 | 0 | 0 | 0 |
 | sklearn/mixture/tests/test_bayesian_mixture.py | passed | 17 | 0 | 0 | 0 |
 | sklearn/mixture/tests/test_gaussian_mixture.py | passed | 56 | 0 | 0 | 291 |
 | sklearn/mixture/tests/test_mixture.py | passed | 4 | 0 | 0 | 0 |
