@@ -1,5 +1,6 @@
 """The @pytest.fixture decorator: records metadata, resolved by the engine."""
 
+import inspect
 import warnings
 
 
@@ -16,6 +17,16 @@ class FixtureFunctionMarker:
         self.name = name
 
     def __call__(self, function):
+        # Upstream rejects fixtures applied to a class and double-decoration
+        # (@fixture returns a FixtureFunctionDefinition that the next @fixture
+        # would re-wrap); mirror both guards (#fixture_disallow_twice).
+        if inspect.isclass(function):
+            raise ValueError("class fixtures not supported (maybe in the future)")
+        if getattr(function, "_pytestfixturefunction", False):
+            raise ValueError(
+                "@pytest.fixture is being applied more than once to the same "
+                f"function {getattr(function, '__name__', function)!r}"
+            )
         if hasattr(function, "pytestmark"):
             # Marks below the @fixture decorator are inert (#3364).
             from _pytest.deprecated import MARKED_FIXTURE

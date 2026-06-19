@@ -357,6 +357,8 @@ CORE_OPTION_DEFAULTS: dict[str, Any] = {
     # core flags plugins read off a parse_known_args namespace (pytest-django).
     "version": 0,
     "help": False,
+    # --fixtures / --funcargs dest; the engine sets it true when either is given.
+    "showfixtures": False,
 }
 
 

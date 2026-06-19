@@ -697,12 +697,15 @@ impl Config {
             if !has_xdist && Self::xdist_only(flag) {
                 continue;
             }
-            cmd = cmd.arg(
-                clap::Arg::new(flag)
-                    .long(flag)
-                    .action(clap::ArgAction::SetTrue)
-                    .hide(true),
-            );
+            let mut arg = clap::Arg::new(flag)
+                .long(flag)
+                .action(clap::ArgAction::SetTrue)
+                .hide(true);
+            // --funcargs is upstream's deprecated alias for --fixtures.
+            if flag == "fixtures" {
+                arg = arg.alias("funcargs");
+            }
+            cmd = cmd.arg(arg);
         }
         if has_xdist {
             // xdist's `-d`: distribute with the default load scheduler.

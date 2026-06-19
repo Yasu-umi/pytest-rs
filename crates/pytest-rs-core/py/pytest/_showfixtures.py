@@ -145,6 +145,11 @@ def show_fixtures(defs, invocation_dir: str, verbose: int, color: bool = False) 
             continue
         seen.add((argname, loc))
         module = getattr(_get_real_func(func), "__module__", "") or ""
+        # A conftest re-imported under a unique alias (conftest@<hash>) when its
+        # plain name was already taken should still display as "conftest" in the
+        # "fixtures defined from" header (pytest uses the node baseid, not the
+        # mangled import name).
+        module = module.split("@", 1)[0]
         # pytest's builtins live in `_pytest.*`; pytest-rs ships them as `pytest._*`
         # (plus internal `_pytest_rs*` plugins). Treat both like pytest does: no
         # "fixtures defined from" separator, and sorted ahead of user modules.

@@ -135,6 +135,8 @@ fn build_py_config(
     )?;
     option_ns.setattr("color", config.get_value("color").unwrap_or("auto"))?;
     option_ns.setattr("collectonly", config.collect_only)?;
+    // --fixtures / --funcargs both set config.option.showfixtures (upstream dest).
+    option_ns.setattr("showfixtures", config.get_flag("fixtures"))?;
     if let Some(chars) = config.get_value("report-chars") {
         option_ns.setattr("reportchars", chars)?;
     }
