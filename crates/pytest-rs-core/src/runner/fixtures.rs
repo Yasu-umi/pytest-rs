@@ -24,6 +24,12 @@ pub(crate) struct ResolveCtx {
 thread_local! {
     static RESOLVE_CTX: std::cell::RefCell<Vec<ResolveCtx>> =
         const { std::cell::RefCell::new(Vec::new()) };
+    /// The fixture defs whose functions are currently executing on this thread,
+    /// innermost last. `request.getfixturevalue(<own name>)` consults this so an
+    /// override fixture asking for its own name resolves to the next
+    /// less-specific definition rather than recursing into itself.
+    static EXECUTING: std::cell::RefCell<Vec<std::sync::Arc<crate::fixture::FixtureDef>>> =
+        const { std::cell::RefCell::new(Vec::new()) };
     /// The running item's node proxy, shared by every `request.node` and the
     /// logreport/makereport report so attributes a plugin sets during the
     /// test (pytest-bdd's `__scenario_report__`) survive to makereport.
@@ -136,6 +142,28 @@ pub(crate) fn getfixturevalue(py: Python<'_>, name: &str) -> PyResult<Py<PyAny>>
         ));
     }
     let mut stack = Vec::new();
+    // Override-reuse via getfixturevalue: if `name` matches a fixture currently
+    // executing on this thread, an override is asking for its own name — resolve
+    // to the next less-specific definition instead of recursing into itself
+    // (pytest's _getnextfixturedef on the subrequest). #1953.
+    let executing =
+        EXECUTING.with(|s| s.borrow().iter().rev().find(|d| d.name == name).cloned());
+    if let Some(current) = executing
+        && let Some(parent) = session
+            .registry
+            .lookup_overridden(name, &item.nodeid, &current)
+    {
+        return resolve_fixture_def(
+            py,
+            plugins,
+            session,
+            config,
+            parent,
+            item,
+            instance.as_ref(),
+            &mut stack,
+        );
+    }
     resolve_fixture(
         py,
         plugins,
@@ -600,6 +628,9 @@ pub(crate) fn resolve_fixture_def(
     } else {
         None
     };
+    // Track this def as executing so a fixture body calling
+    // request.getfixturevalue(<own name>) resolves to the overridden super.
+    EXECUTING.with(|s| s.borrow_mut().push(def.clone()));
     let call_result: PyResult<(Py<PyAny>, Option<Finalizer>)> = if config.get_flag("setup-plan") {
         // --setup-plan: resolve the dependency graph for narration but do not
         // execute any fixture functions (upstream pytest behaviour).
@@ -640,6 +671,9 @@ pub(crate) fn resolve_fixture_def(
             })(),
         }
     };
+    EXECUTING.with(|s| {
+        s.borrow_mut().pop();
+    });
     let (value, finalizer) = match call_result {
         Ok(value_finalizer) => value_finalizer,
         Err(err) => {
