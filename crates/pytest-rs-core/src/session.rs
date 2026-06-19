@@ -26,10 +26,18 @@ pub type CacheKey = (Scope, String, String, String, Option<usize>);
 /// `FixtureDef.execute` finishing a differently-parametrized cached instance.
 pub type Binding = (Scope, String, String, usize);
 
-/// A cached fixture value plus the parametrization bindings it depends on
-/// (used to evict it on a mid-node param transition).
+/// A cached fixture outcome plus the parametrization bindings it depends on
+/// (used to evict it on a mid-node param transition). pytest caches a fixture's
+/// raised exception alongside its value, so a setup that fails is not re-run for
+/// sibling items in the same scope — the cached exception is re-raised instead.
 pub struct CachedFixture {
+    /// The fixture value (`None` placeholder when setup raised).
     pub value: Py<PyAny>,
+    /// The exception the fixture raised during setup, re-raised on cache hit.
+    pub error: Option<Py<PyAny>>,
+    /// The traceback captured when `error` was raised; restored on each
+    /// re-raise so the cached traceback does not grow per sibling item (#12204).
+    pub error_tb: Option<Py<PyAny>>,
     pub bindings: Vec<Binding>,
 }
 

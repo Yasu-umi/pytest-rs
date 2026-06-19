@@ -380,6 +380,17 @@ pub(crate) fn resolve_fixture_def(
         fixture_param.as_ref().map(|(index, _)| *index),
     );
     if let Some(cached) = session.fixture_cache.get(&cache_key) {
+        // A cached setup failure re-raises (pytest re-raises the cached
+        // exception) — the fixture body is not run again for this scope. The
+        // traceback is reset to the one captured at the original raise so it
+        // doesn't accumulate frames across sibling items (#12204).
+        if let Some(err) = &cached.error {
+            let exc = err.bind(py).clone();
+            if let Some(tb) = &cached.error_tb {
+                let _ = exc.setattr("__traceback__", tb.bind(py));
+            }
+            return Err(PyErr::from_value(exc));
+        }
         return Ok(cached.value.clone_ref(py));
     }
 
@@ -471,14 +482,14 @@ pub(crate) fn resolve_fixture_def(
     } else {
         None
     };
-    let (value, finalizer) = if config.get_flag("setup-plan") {
+    let call_result: PyResult<(Py<PyAny>, Option<Finalizer>)> = if config.get_flag("setup-plan") {
         // --setup-plan: resolve the dependency graph for narration but do not
         // execute any fixture functions (upstream pytest behaviour).
-        (py.None().into_pyobject(py)?.unbind(), None)
+        Ok((py.None().into_pyobject(py)?.unbind(), None))
     } else {
         match claimed {
-            Some(fixture_value) => (fixture_value.value, fixture_value.finalizer),
-            None => {
+            Some(fixture_value) => Ok((fixture_value.value, fixture_value.finalizer)),
+            None => (|| {
                 if def.is_coroutine || def.is_async_gen {
                     // pytest 8.4 parity: an unhandled async fixture resolves to
                     // its raw coroutine/async-generator and warns (this becomes
@@ -499,16 +510,48 @@ pub(crate) fn resolve_fixture_def(
                         1188,
                     )?;
                     let value = python::call_fixture(py, &def.func, fixture_instance, &kwargs)?;
-                    (value.unbind(), None)
+                    Ok((value.unbind(), None))
                 } else if def.is_generator {
                     let generator = python::call_fixture(py, &def.func, fixture_instance, &kwargs)?;
                     let value = python::next_value(py, &generator)?;
-                    (value.unbind(), Some(Finalizer::GenNext(generator.unbind())))
+                    Ok((value.unbind(), Some(Finalizer::GenNext(generator.unbind()))))
                 } else {
                     let value = python::call_fixture(py, &def.func, fixture_instance, &kwargs)?;
-                    (value.unbind(), None)
+                    Ok((value.unbind(), None))
                 }
+            })(),
+        }
+    };
+    let (value, finalizer) = match call_result {
+        Ok(value_finalizer) => value_finalizer,
+        Err(err) => {
+            // A setup failure is cached so sibling items in this scope re-raise
+            // it without re-running the body (pytest's cached_result). Any
+            // finalizers the fixture registered via request.addfinalizer before
+            // raising must still run at scope teardown (pytest schedules the
+            // finalizer in a `finally`), so drain them once here.
+            if let Some(request) = &request
+                && let Ok(drainer) = request.bind(py).as_any().getattr("_drain_finalizers")
+            {
+                session.finalizers.push(PendingFinalizer {
+                    scope: def.scope,
+                    instance: instance.clone(),
+                    finalizer: Finalizer::Callable(drainer.unbind()),
+                    bindings: bindings.clone(),
+                });
             }
+            let exc = err.value(py).clone().into_any().unbind();
+            let exc_tb = err.traceback(py).map(|tb| tb.into_any().unbind());
+            session.fixture_cache.insert(
+                cache_key,
+                crate::session::CachedFixture {
+                    value: py.None(),
+                    error: Some(exc),
+                    error_tb: exc_tb,
+                    bindings,
+                },
+            );
+            return Err(err);
         }
     };
 
@@ -593,6 +636,8 @@ pub(crate) fn resolve_fixture_def(
         cache_key,
         crate::session::CachedFixture {
             value: value.clone_ref(py),
+            error: None,
+            error_tb: None,
             bindings,
         },
     );
