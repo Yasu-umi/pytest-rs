@@ -187,4 +187,9 @@ def pytest_addoption(parser):
     )
 
 
+def get_public_names(values):
+    """Only return names from iterator values without a leading underscore."""
+    return [x for x in values if x[0] != "_"]
+
+
 from _pytest._stub import __getattr__  # noqa: E402, F401

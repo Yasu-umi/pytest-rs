@@ -148,6 +148,37 @@ pub(crate) fn getfixturevalue(py: Python<'_>, name: &str) -> PyResult<Py<PyAny>>
     )
 }
 
+/// `request.fixturenames`: the running item's full fixture closure, in
+/// pytest's scope-sorted order (`getfixtureclosure`), plus `request` and any
+/// pseudo-fixture names. Returns `None` when no item is running (the caller
+/// falls back to the node proxy's static list).
+#[allow(unsafe_code)]
+pub(crate) fn current_fixturenames(py: Python<'_>) -> Option<Vec<String>> {
+    let ptrs =
+        RESOLVE_CTX.with(|stack| stack.borrow().last().map(|ctx| (ctx.session, ctx.item)))?;
+    // Safety: same invariant as getfixturevalue — the run_one frame below us
+    // owns these pointers and is suspended in the Python call that reached here.
+    let (session, item) = unsafe { (&*ptrs.0, &*ptrs.1) };
+    let mut names: Vec<String> = session
+        .registry
+        .closure_for(&item.nodeid, &item.fixture_names)
+        .iter()
+        .map(|def| def.name.clone())
+        .collect();
+    // `request` is its own pseudo-fixture: present when the item (or a fixture
+    // in its closure) requested it — the closure builder skips it otherwise.
+    if item.fixture_names.iter().any(|n| n == "request") && !names.iter().any(|n| n == "request") {
+        names.push("request".to_string());
+    }
+    for extra in &item.extra_fixture_names {
+        if !names.contains(extra) {
+            names.push(extra.clone());
+        }
+    }
+    let _ = py;
+    Some(names)
+}
+
 /// Build a pytest-bdd-compatible FixtureManager view of the running item's
 /// fixture registry: `_arg2fixturedefs` seeded with a ShimFixtureDef per
 /// registered definition (carrying its func/baseid so pytest-bdd can match

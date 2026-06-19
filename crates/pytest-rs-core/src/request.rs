@@ -667,9 +667,14 @@ impl PyRequest {
         self.node.clone_ref(py)
     }
 
-    /// Names of all fixtures visible to this request's item.
+    /// Names of all fixtures visible to this request's item, in pytest's
+    /// scope-sorted closure order. Falls back to the node proxy's static list
+    /// when no item is running (e.g. a request built outside a test run).
     #[getter]
     fn fixturenames(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        if let Some(names) = crate::runner::current_fixturenames(py) {
+            return Ok(pyo3::types::PyList::new(py, names)?.into_any().unbind());
+        }
         Ok(self.node.bind(py).getattr("fixturenames")?.unbind())
     }
 
