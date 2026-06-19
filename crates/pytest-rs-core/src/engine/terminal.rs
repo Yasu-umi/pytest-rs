@@ -305,6 +305,9 @@ impl Engine {
         if self.session.collect_errors.is_empty() && phase_errors.is_empty() {
             return;
         }
+        // Blank line separating the section from the preceding "collected N
+        // items / M errors" line (or the test-progress output).
+        println!();
         println!("{}", center_banner("ERRORS"));
         for (nodeid, err) in &self.session.collect_errors {
             println!(

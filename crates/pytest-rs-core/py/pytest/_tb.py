@@ -328,4 +328,6 @@ def format_exception(exc, style="long"):
         lines.append(_location_line(frame.f_code, lineno, suffix))
         if not last:
             lines.append("_ " * 40)
-    return "\n".join(lines)
+    # The long repr opens with a blank line, separating it from the section
+    # header (pytest's "FAILURES"/"ERRORS" entry banners).
+    return "\n" + "\n".join(lines)
