@@ -17,8 +17,8 @@
       "file": "testing/python/collect.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 72,
-      "failed": 10,
+      "passed": 71,
+      "failed": 11,
       "skipped": 0,
       "errors": 0
     },
@@ -26,8 +26,8 @@
       "file": "testing/python/fixtures.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 126,
-      "failed": 82,
+      "passed": 133,
+      "failed": 75,
       "skipped": 2,
       "errors": 0
     },
@@ -161,8 +161,8 @@
       "file": "testing/test_collection.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 100,
-      "failed": 13,
+      "passed": 99,
+      "failed": 14,
       "skipped": 3,
       "errors": 0
     },
