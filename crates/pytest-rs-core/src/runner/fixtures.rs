@@ -230,6 +230,54 @@ pub(crate) fn resolve_fixture(
     )
 }
 
+/// Raise pytest's `Failed` outcome with `pytrace=False`, so the message is the
+/// whole longrepr (no traceback) — pytest's `fail(msg, pytrace=False)`.
+fn fail_no_trace(py: Python<'_>, msg: &str) -> PyErr {
+    match py
+        .import("pytest._outcomes")
+        .and_then(|m| m.getattr("Failed"))
+        .and_then(|failed| failed.call1((msg,)))
+    {
+        Ok(exc) => {
+            let _ = exc.setattr("pytrace", false);
+            PyErr::from_value(exc)
+        }
+        Err(_) => pyo3::exceptions::PyRuntimeError::new_err(msg.to_string()),
+    }
+}
+
+/// Build the ScopeMismatch error for a fixture (the top of `stack`) requesting
+/// the narrower-scoped `requested`. Mirrors pytest's message: a `Failed`
+/// outcome with `pytrace=False`, listing the requesting fixture stack and the
+/// requested fixture, each as `path:lineno:  def name(sig)`.
+fn scope_mismatch_error(
+    py: Python<'_>,
+    config: &Config,
+    stack: &[std::sync::Arc<crate::fixture::FixtureDef>],
+    requested: &crate::fixture::FixtureDef,
+) -> PyErr {
+    let requesting_scope = stack.last().map(|d| d.scope).unwrap_or(Scope::Function);
+    let rootdir = config.rootdir.to_string_lossy();
+    let line = |def: &crate::fixture::FixtureDef| -> String {
+        py.import("pytest._showfixtures")
+            .and_then(|m| m.getattr("fixturedef_line"))
+            .and_then(|f| f.call1((def.func.bind(py), rootdir.as_ref())))
+            .and_then(|s| s.extract::<String>())
+            .unwrap_or_else(|_| format!("  def {}()", def.name))
+    };
+    let fixture_stack = stack.iter().map(|d| line(d)).collect::<Vec<_>>().join("\n");
+    let msg = format!(
+        "ScopeMismatch: You tried to access the {} scoped fixture {} with a {} scoped \
+         request object. Requesting fixture stack:\n{}\nRequested fixture:\n{}",
+        requested.scope.as_str(),
+        requested.name,
+        requesting_scope.as_str(),
+        fixture_stack,
+        line(requested),
+    );
+    fail_no_trace(py, &msg)
+}
+
 /// Resolve a specific fixture definition (override-aware entry point).
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn resolve_fixture_def(
@@ -250,6 +298,23 @@ pub(crate) fn resolve_fixture_def(
             "recursive fixture dependency involving '{}'",
             def.name
         )));
+    }
+
+    // An invalid declared scope (e.g. scope="functions") fails when the fixture
+    // is requested, with pytest's "unexpected scope value" message.
+    if let Some(msg) = &def.scope_error {
+        return Err(fail_no_trace(py, msg));
+    }
+
+    // ScopeMismatch: a fixture must not request a narrower-scoped fixture than
+    // its own (pytest's FixtureRequest._check_scope). The requesting fixture is
+    // the one whose dependencies we are resolving — the top of the stack. The
+    // check precedes the cache lookup because pytest reports the mismatch even
+    // when the narrower fixture's value is already cached.
+    if let Some(parent) = stack.last()
+        && parent.scope > def.scope
+    {
+        return Err(scope_mismatch_error(py, config, stack, &def));
     }
 
     // Parametrized fixtures cache per param index.

@@ -1251,9 +1251,7 @@ class Pytester:
                     if name.startswith("test") and callable(obj) and not isinstance(obj, type):
 
                         def _mk(nm, mks, _obj=obj):
-                            lineno = getattr(
-                                getattr(_obj, "__code__", None), "co_firstlineno", 0
-                            )
+                            lineno = getattr(getattr(_obj, "__code__", None), "co_firstlineno", 0)
                             fn = Function(
                                 f"{path.name}::{nm}",
                                 nm.rsplit("::", 1)[-1],

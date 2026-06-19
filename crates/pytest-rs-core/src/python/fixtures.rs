@@ -249,7 +249,32 @@ pub(crate) fn register_fixture_def(
         return Ok(());
     };
     let scope_str: String = scope_str;
-    let scope = Scope::parse(&scope_str).unwrap_or(Scope::Function);
+    // An invalid scope name (e.g. scope="functions") fails in pytest's
+    // Scope.from_user at FixtureDef construction. We keep a placeholder scope
+    // and defer the failure to resolution (so collection still proceeds),
+    // matching pytest's message: "Fixture 'NAME' from WHERE got an unexpected
+    // scope value 'SCOPE'".
+    let (scope, scope_error) = match Scope::parse(&scope_str) {
+        Some(scope) => (scope, None),
+        None => {
+            let func_name = value
+                .getattr("__name__")
+                .and_then(|n| n.extract::<String>())
+                .unwrap_or_else(|_| attr_name.to_string());
+            let where_ = baseid.trim_end_matches("::");
+            let from = if where_.is_empty() {
+                String::new()
+            } else {
+                format!("from {where_} ")
+            };
+            (
+                Scope::Function,
+                Some(format!(
+                    "Fixture '{func_name}' {from}got an unexpected scope value '{scope_str}'"
+                )),
+            )
+        }
+    };
     // autouse is used for its truthiness (pytest accepts e.g. autouse="True").
     let autouse: bool = marker.getattr("autouse")?.is_truthy()?;
     let explicit_name: Option<String> = marker.getattr("name")?.extract()?;
@@ -284,6 +309,7 @@ pub(crate) fn register_fixture_def(
         needs_instance,
         params,
         ids,
+        scope_error,
     });
     Ok(())
 }

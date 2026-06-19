@@ -94,9 +94,7 @@ def warn_uncollectable_function(name: str, obj: Any, filename: str) -> bool:
     code = getattr(call, "__code__", None)
     lineno = getattr(code, "co_firstlineno", 1)
     warnings.warn_explicit(
-        message=PytestCollectionWarning(
-            f"cannot collect {name!r} because it is not a function."
-        ),
+        message=PytestCollectionWarning(f"cannot collect {name!r} because it is not a function."),
         category=None,
         filename=str(filename),
         lineno=lineno,

@@ -63,6 +63,25 @@ except Exception:  # pragma: no cover - _pytest always importable in practice
     _PYTEST_DIR = None
 
 
+def fixturedef_line(func, rootdir: str) -> str:
+    """`{relpath}:{lineno}:  def {name}{signature}` for a fixture factory,
+    matching `FixtureRequest._format_fixturedef_line` (the lines a ScopeMismatch
+    prints). `lineno` is the factory's `co_firstlineno` (pytest's getfslineno is
+    0-based and the formatter adds 1), i.e. the decorator line."""
+    real = _get_real_func(func)
+    try:
+        path = Path(inspect.getfile(real))
+        relpath = _bestrelpath(Path(rootdir), path)
+    except TypeError:
+        relpath = repr(real)
+    lineno = getattr(getattr(real, "__code__", None), "co_firstlineno", 0)
+    try:
+        sig = str(inspect.signature(real))
+    except (ValueError, TypeError):
+        sig = "(...)"
+    return f"{relpath}:{lineno}:  def {getattr(real, '__name__', '<fixture>')}{sig}"
+
+
 def _pretty_fixture_path(invocation_dir: str, func) -> str:
     loc = Path(_getlocation(func, invocation_dir))
     if _PYTEST_DIR is not None:

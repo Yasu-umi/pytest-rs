@@ -59,6 +59,11 @@ pub struct FixtureDef {
     /// @pytest.fixture(ids=...): a list of ids or a callable deriving one
     /// per param value (nodeid suffixes and --setup-show display).
     pub ids: Option<Py<PyAny>>,
+    /// Set when the declared scope is not a valid scope name (e.g.
+    /// `scope="functions"`): the pytest message to fail with when the fixture
+    /// is requested. pytest raises this from `Scope.from_user` at FixtureDef
+    /// construction; we defer it to resolution so collection still proceeds.
+    pub scope_error: Option<String>,
 }
 
 /// All fixture definitions visible in this session, name -> defs ordered
