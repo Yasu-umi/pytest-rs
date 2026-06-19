@@ -70,8 +70,45 @@ class TopRequest:
     def cls(self):
         return getattr(self._pyfuncitem, "cls", None)
 
+    @property
+    def function(self):
+        return getattr(self._pyfuncitem, "obj", None)
+
+    @property
+    def instance(self):
+        return getattr(self._pyfuncitem, "instance", None)
+
+    @property
+    def keywords(self):
+        return self._pyfuncitem.keywords
+
+    @property
+    def config(self):
+        return getattr(self._pyfuncitem, "config", None)
+
+    @property
+    def _arg2fixturedefs(self):
+        """Map each requested fixture name (excluding the builtin `request`) to
+        a single-element list of a fixturedef-like object carrying `.argname`,
+        mirroring _pytest.fixtures.FixtureRequest._arg2fixturedefs for a
+        statically collected item."""
+        result = {}
+        for name in self._pyfuncitem.fixturenames:
+            if name == "request":
+                continue
+            result[name] = [_ShimArgFixtureDef(name)]
+        return result
+
     def __repr__(self):
         return f"<FixtureRequest for {self._pyfuncitem!r}>"
+
+
+class _ShimArgFixtureDef:
+    """A minimal fixturedef stand-in exposing `.argname`, returned by
+    TopRequest._arg2fixturedefs for statically collected items."""
+
+    def __init__(self, argname):
+        self.argname = argname
 
 
 def call_fixture_func(fixturefunc, request, kwargs):

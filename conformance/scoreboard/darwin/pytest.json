@@ -26,8 +26,8 @@
       "file": "testing/python/fixtures.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 142,
-      "failed": 66,
+      "passed": 145,
+      "failed": 63,
       "skipped": 2,
       "errors": 0
     },
@@ -35,8 +35,8 @@
       "file": "testing/python/integration.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 8,
-      "failed": 8,
+      "passed": 9,
+      "failed": 7,
       "skipped": 4,
       "errors": 0
     },

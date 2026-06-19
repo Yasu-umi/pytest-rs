@@ -1245,6 +1245,9 @@ class Pytester:
             except Exception:
                 requested = []
             node.fixturenames = _closure_for(requested, cls)
+            from _pytest.fixtures import TopRequest
+
+            node._request = TopRequest(node, _ispytest=True)
             return node
 
         # Module-level node for parent chain (getparent/keywords); use File so
@@ -1290,8 +1293,15 @@ class Pytester:
                             _f, nm, mks, cls=_cls, parent=_cn
                         ),
                     )
+                    # item.instance is an instance of the test class (pytest
+                    # instantiates per item); fall back to the class if it
+                    # cannot be constructed without arguments.
+                    try:
+                        instance = obj()
+                    except Exception:
+                        instance = obj
                     for item in sub:
-                        item.instance = obj
+                        item.instance = instance
                     items.extend(sub)
         return items
 
@@ -1507,6 +1517,16 @@ class Pytester:
                             fn._module_collector = module_collector
                         if config is not None:
                             fn.config = config
+                        from _pytest.compat import getfuncargnames
+                        from _pytest.fixtures import TopRequest
+
+                        try:
+                            fn.fixturenames = list(
+                                getfuncargnames(_f, name=fn.name, cls=self._cls_obj)
+                            )
+                        except Exception:
+                            fn.fixturenames = []
+                        fn._request = TopRequest(fn, _ispytest=True)
                         return fn
 
                     children.extend(
@@ -1518,6 +1538,29 @@ class Pytester:
                 return list(children)
 
         return _IPModule()
+
+    def genitems(self, colitems):
+        """Recursively collect the Item nodes from the given collectors
+        (upstream Pytester.genitems): walk each collector's .collect() until a
+        Function (leaf Item) is reached."""
+        from pytest._node import Function
+
+        items = []
+
+        def _rec(col):
+            if isinstance(col, Function):
+                items.append(col)
+                return
+            collect = getattr(col, "collect", None)
+            if collect is None:
+                items.append(col)
+                return
+            for child in collect():
+                _rec(child)
+
+        for col in colitems:
+            _rec(col)
+        return items
 
     def collect_by_name(self, modcol, name):
         """Return the first child of modcol whose .name == name, or None.
