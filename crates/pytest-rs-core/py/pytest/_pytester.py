@@ -545,6 +545,23 @@ class Pytester:
         except Exception:
             return None
 
+    @staticmethod
+    def _import_conftest_module(path):
+        """Import a conftest.py under a path-derived unique module name so that
+        multiple conftests along a package chain don't clobber one another."""
+        path = pathlib.Path(str(path)).resolve()
+        mod_name = "_pytester_conftest_" + str(abs(hash(str(path))))
+        try:
+            spec = importlib.util.spec_from_file_location(mod_name, path)
+            if spec is None or spec.loader is None:
+                return None
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[mod_name] = mod
+            spec.loader.exec_module(mod)
+            return mod
+        except Exception:
+            return None
+
     def parseconfigure(self, *args):
         """Like parseconfig, but also runs the pytest_configure step."""
         config = self.parseconfig(*args)
@@ -1089,6 +1106,38 @@ class Pytester:
             return []
 
         _mod_fdefs, _mod_autouse = _gather_fixturedefs(vars(module).items())
+
+        # Walk conftest.py files from the rootdir down to the source file's
+        # directory (root-first), gathering their fixturedefs. Same-scope
+        # autouse fixtures defined closer to the root must sort first, which
+        # the stable scope-sort below preserves given root-to-leaf seed order.
+        def _walk_conftest_fixturedefs(src_path):
+            root = self.path.resolve()
+            dirs, d = [], src_path.parent
+            while True:
+                dirs.append(d)
+                if d == root or d.parent == d:
+                    break
+                d = d.parent
+            dirs.reverse()  # root-first
+            fdefs, autouse = {}, []
+            for d in dirs:
+                cf = d / "conftest.py"
+                if not cf.is_file():
+                    continue
+                mod = Pytester._import_conftest_module(cf)
+                if mod is None:
+                    continue
+                cdefs, cau = _gather_fixturedefs(vars(mod).items())
+                fdefs.update(cdefs)
+                autouse += [a for a in cau if a not in autouse]
+            return fdefs, autouse
+
+        _cf_fdefs, _cf_autouse = _walk_conftest_fixturedefs(path)
+        # conftest fixtures come first (root-to-leaf); module fixtures override
+        # same-named conftest fixtures and their autouse follows the conftests'.
+        _mod_fdefs = {**_cf_fdefs, **_mod_fdefs}
+        _mod_autouse = _cf_autouse + [a for a in _mod_autouse if a not in _cf_autouse]
 
         config = self._request.config if self._request is not None else None
         module_marks = get_unpacked_marks(module)
