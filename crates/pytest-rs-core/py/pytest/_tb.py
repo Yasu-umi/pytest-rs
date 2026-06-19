@@ -243,6 +243,18 @@ def crash_message(exc):
 def format_exception(exc, style="long"):
     if style == "no":
         return ""
+    # A rich fixture-lookup error (unknown fixture requested by a test or
+    # fixture): render the requesting def line(s), then the error string with
+    # E/> markers, like upstream's FixtureLookupErrorRepr. No traceback frames.
+    deflines = getattr(exc, "_fixture_lookup_deflines", None)
+    if deflines is not None and style not in ("native", "line"):
+        out = list(deflines)
+        out.append("")
+        errlines = getattr(exc, "_fixture_lookup_errstring", "").split("\n")
+        if errlines:
+            out.append(f"E       {errlines[0]}")
+            out.extend(f">       {line}" for line in errlines[1:])
+        return "\n".join(out)
     # --full-trace forces the long style (full source per frame), regardless of
     # the configured --tb (collection errors otherwise default to short).
     if _fulltrace and style not in ("native", "line"):

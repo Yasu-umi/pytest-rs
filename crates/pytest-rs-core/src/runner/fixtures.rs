@@ -245,9 +245,17 @@ pub(crate) fn resolve_fixture(
         if name == "pytestconfig" {
             return python::make_py_config(py, config);
         }
-        return Err(pyo3::exceptions::PyLookupError::new_err(format!(
-            "fixture '{name}' not found"
-        )));
+        // A name reappearing in the active resolution stack with no
+        // less-specific definition to override is a dependency cycle, not a
+        // missing fixture (e.g. fix1 -> fix2 -> fix1). pytest reports it as a
+        // recursive dependency rather than "not found".
+        if stack.iter().any(|d| d.name == name) {
+            return Err(fail_no_trace(
+                py,
+                &format!("recursive dependency involving fixture '{name}' detected"),
+            ));
+        }
+        return Err(fixture_not_found_error(py, session, item, name, stack));
     };
     resolve_fixture_def(
         py,
@@ -337,6 +345,45 @@ fn no_parameter_error(
         }
         Err(err) => err,
     }
+}
+
+/// Build pytest's rich "fixture not found" error: the requesting function's
+/// def line(s), the message, the sorted available-fixtures list, and the
+/// --fixtures help line. The requesting function is the innermost fixture on
+/// the resolution stack, or the test function for a directly requested name.
+fn fixture_not_found_error(
+    py: Python<'_>,
+    session: &Session,
+    item: &TestItem,
+    name: &str,
+    stack: &[std::sync::Arc<crate::fixture::FixtureDef>],
+) -> PyErr {
+    let requesting_func: Py<PyAny> = match stack.last() {
+        Some(def) => def.func.clone_ref(py),
+        None => crate::runner::item_node(py, item)
+            .and_then(|node| Ok(node.bind(py).getattr("function")?.unbind()))
+            .unwrap_or_else(|_| py.None()),
+    };
+    // Fixture names visible to this item, de-duplicated and sorted.
+    let mut names: Vec<String> = session
+        .registry
+        .all_defs()
+        .filter(|d| session.registry.lookup(&d.name, &item.nodeid).is_some())
+        .map(|d| d.name.clone())
+        .collect();
+    names.sort();
+    names.dedup();
+    let result = (|| {
+        let avail = pyo3::types::PyList::new(py, &names)?;
+        let exc = py
+            .import("_pytest.fixtures")?
+            .getattr("fixture_lookup_error")?
+            .call1((name, requesting_func, avail))?;
+        Ok::<_, PyErr>(PyErr::from_value(exc))
+    })();
+    result.unwrap_or_else(|_| {
+        pyo3::exceptions::PyLookupError::new_err(format!("fixture '{name}' not found"))
+    })
 }
 
 /// Resolve a specific fixture definition (override-aware entry point).

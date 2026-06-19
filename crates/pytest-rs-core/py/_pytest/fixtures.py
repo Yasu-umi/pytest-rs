@@ -157,6 +157,35 @@ def _teardown_yield_fixture(fixturefunc, it):
     finalize_generator(it)
 
 
+def fixture_lookup_error(argname, requesting_func, available):
+    """Build a rich FixtureLookupError for an unknown fixture, mirroring
+    upstream's FixtureLookupErrorRepr: the requesting function's def line(s),
+    "fixture 'X' not found", the sorted available-fixtures list, and the
+    --fixtures help line. pytest._tb.format_exception renders the attached
+    metadata."""
+    from pytest._fixtures import FixtureLookupError
+
+    try:
+        lines, _ = inspect.getsourcelines(requesting_func)
+    except (OSError, TypeError, IndexError):
+        lines = [f"def {getattr(requesting_func, '__name__', '?')}(...):\n"]
+    deflines = []
+    for raw in lines:
+        stripped = raw.rstrip()
+        deflines.append("  " + stripped)
+        if "):" in stripped or stripped.endswith(":"):
+            break
+    errstring = (
+        f"fixture '{argname}' not found\n"
+        f"available fixtures: {', '.join(available)}\n"
+        "use 'pytest --fixtures [testpath]' for help on them."
+    )
+    err = FixtureLookupError(errstring)
+    err._fixture_lookup_deflines = deflines
+    err._fixture_lookup_errstring = errstring
+    return err
+
+
 def fail_subrequest_no_param(nodeid, fixturefunc, argname, rootpath):
     """Report request.getfixturevalue() of a parametrized fixture that has no
     parameter bound for this test, mirroring upstream's message: the test
