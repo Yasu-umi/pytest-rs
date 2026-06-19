@@ -1095,7 +1095,15 @@ impl Engine {
         for item in &mut self.session.items {
             let mut direct: Vec<String> = item.fixture_names.clone();
             direct.extend(item.extra_fixture_names.iter().cloned());
-            let closure = self.session.registry.closure_for(&item.nodeid, &direct);
+            // Directly-parametrized argnames shadow a same-named fixture
+            // (PseudoFixtureDef): keep them in the closure but don't expand
+            // their dependencies.
+            let ignore: std::collections::HashSet<String> =
+                item.callspec.iter().map(|(name, _)| name.clone()).collect();
+            let closure = self
+                .session
+                .registry
+                .closure_for(&item.nodeid, &direct, &ignore);
             for def in closure {
                 if !item.fixture_names.contains(&def.name)
                     && !item.extra_fixture_names.contains(&def.name)

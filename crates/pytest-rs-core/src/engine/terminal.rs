@@ -899,7 +899,12 @@ impl Engine {
         for item in &self.session.items {
             let mut direct: Vec<String> = item.fixture_names.clone();
             direct.extend(item.extra_fixture_names.iter().cloned());
-            let closure = self.session.registry.closure_for(&item.nodeid, &direct);
+            let ignore: std::collections::HashSet<String> =
+                item.callspec.iter().map(|(name, _)| name.clone()).collect();
+            let closure = self
+                .session
+                .registry
+                .closure_for(&item.nodeid, &direct, &ignore);
             let closure_list = pyo3::types::PyList::empty(py);
             for def in &closure {
                 closure_list.append((
@@ -918,7 +923,12 @@ impl Engine {
             .import("pytest._showfixtures")?
             .call_method1(
                 "show_fixtures_per_test",
-                (items_data, invocation.as_ref(), verbose, crate::tw::enabled()),
+                (
+                    items_data,
+                    invocation.as_ref(),
+                    verbose,
+                    crate::tw::enabled(),
+                ),
             )?
             .extract()?;
         if !text.is_empty() {

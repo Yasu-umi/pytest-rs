@@ -94,11 +94,7 @@ pub fn ensure_xunit_setup(
         }
         let tuple = pyo3::types::PyTuple::new(py, args).ok()?;
         let meth = first_non_fixture.call1(&tuple).ok()?;
-        if meth.is_none() {
-            None
-        } else {
-            Some(meth)
-        }
+        if meth.is_none() { None } else { Some(meth) }
     };
     let module = py.import(item.module_name.as_str())?;
     let module_instance = item.module_instance();
@@ -425,7 +421,8 @@ pub fn expand_fixture_params(
         // parametrized, its params propagate to this item even though the
         // override itself isn't parametrized — so walk each override chain and
         // pull the supers into the parametrize closure.
-        let mut closure_defs = registry.closure_for(&item.nodeid, &requested);
+        let mut closure_defs =
+            registry.closure_for(&item.nodeid, &requested, &std::collections::HashSet::new());
         let mut supers: Vec<std::sync::Arc<crate::fixture::FixtureDef>> = Vec::new();
         for def in &closure_defs {
             // Only a non-parametrized override propagates a super's params; an

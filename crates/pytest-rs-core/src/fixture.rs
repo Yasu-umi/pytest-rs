@@ -121,7 +121,25 @@ impl FixtureRegistry {
     /// each fixture's own dependencies append at the end as discovered,
     /// then a stable sort puts higher-scoped fixtures first. Parametrized
     /// fixtures expand as ID/axis order from this.
-    pub fn closure_for(&self, nodeid: &str, requested: &[String]) -> Vec<Arc<FixtureDef>> {
+    pub fn closure_for(
+        &self,
+        nodeid: &str,
+        requested: &[String],
+        ignore_args: &HashSet<String>,
+    ) -> Vec<Arc<FixtureDef>> {
+        let initialnames = self.initial_names(nodeid, requested);
+        let names = self.getfixtureclosure(nodeid, &initialnames, ignore_args);
+        // Keep only real, visible fixtures (drops `request` and unknown names);
+        // each resolves to its most-specific definition for setup.
+        names
+            .iter()
+            .filter_map(|n| self.lookup(n, nodeid))
+            .collect()
+    }
+
+    /// Seed names for a closure: autouse fixtures (most general first) followed
+    /// by the directly requested names (deduplicated, order preserved).
+    pub fn initial_names(&self, nodeid: &str, requested: &[String]) -> Vec<String> {
         let mut seen: HashSet<String> = HashSet::new();
         let mut names: Vec<String> = Vec::new();
         for def in self.autouse_for(nodeid) {
@@ -130,25 +148,119 @@ impl FixtureRegistry {
             }
         }
         for name in requested {
-            if name != "request" && seen.insert(name.clone()) {
+            if seen.insert(name.clone()) {
                 names.push(name.clone());
             }
         }
-        let mut ordered: Vec<Arc<FixtureDef>> = Vec::new();
-        let mut i = 0;
-        while i < names.len() {
-            if let Some(def) = self.lookup(&names[i], nodeid) {
-                for dep in &def.param_names {
-                    if dep != "request" && seen.insert(dep.clone()) {
-                        names.push(dep.clone());
-                    }
+        names
+    }
+
+    /// Visible definitions of `name` from `nodeid`, ordered least→most specific
+    /// (the last is the most-specific override), like pytest's getfixturedefs.
+    pub fn getfixturedefs(&self, name: &str, nodeid: &str) -> Vec<Arc<FixtureDef>> {
+        self.by_name
+            .get(name)
+            .map(|defs| {
+                defs.iter()
+                    .filter(|def| nodeid.starts_with(&def.baseid))
+                    .cloned()
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// pytest's FixtureManager.getfixtureclosure: the transitive fixture-name
+    /// closure for `initialnames` (already including autouse), expanding through
+    /// override chains — a fixture reusing its own name (`app(app)`) reaches the
+    /// overridden super's dependencies — then stable-sorted by scope (highest
+    /// first). Names in `ignore_args` are kept but their deps are not expanded
+    /// (a direct parametrize that shadows a fixture). Includes `request` and
+    /// other non-fixture names (appended, never expanded).
+    pub fn getfixtureclosure(
+        &self,
+        nodeid: &str,
+        initialnames: &[String],
+        ignore_args: &HashSet<String>,
+    ) -> Vec<String> {
+        let mut closure: Vec<String> = Vec::new();
+        {
+            let mut seen: HashSet<String> = HashSet::new();
+            for n in initialnames {
+                if seen.insert(n.clone()) {
+                    closure.push(n.clone());
                 }
-                ordered.push(def);
             }
-            i += 1;
         }
-        ordered.sort_by_key(|def| std::cmp::Reverse(def.scope));
-        ordered
+        let mut arg2defs: HashMap<String, Vec<Arc<FixtureDef>>> = HashMap::new();
+        let mut current_indices: HashMap<String, i32> = HashMap::new();
+        for name in initialnames {
+            self.process_argname(
+                nodeid,
+                name,
+                ignore_args,
+                &mut closure,
+                &mut arg2defs,
+                &mut current_indices,
+            );
+        }
+        // Stable sort by the most-specific def's scope (highest first); names
+        // with no fixturedef (request, parametrize-only) sort as Function.
+        closure.sort_by_key(|n| {
+            std::cmp::Reverse(
+                arg2defs
+                    .get(n)
+                    .and_then(|defs| defs.last())
+                    .map(|d| d.scope)
+                    .unwrap_or(Scope::Function),
+            )
+        });
+        closure
+    }
+
+    /// One step of getfixtureclosure's DFS, tracking the override-stack index
+    /// per name (negative: -1 most specific) so a fixture reusing its own name
+    /// descends to the next less-specific definition.
+    #[allow(clippy::only_used_in_recursion)]
+    fn process_argname(
+        &self,
+        nodeid: &str,
+        argname: &str,
+        ignore_args: &HashSet<String>,
+        closure: &mut Vec<String>,
+        arg2defs: &mut HashMap<String, Vec<Arc<FixtureDef>>>,
+        current_indices: &mut HashMap<String, i32>,
+    ) {
+        // Already fully processed at the most-specific level.
+        if current_indices.get(argname) == Some(&-1) {
+            return;
+        }
+        if !closure.iter().any(|n| n == argname) {
+            closure.push(argname.to_string());
+        }
+        if ignore_args.contains(argname) {
+            return;
+        }
+        if !arg2defs.contains_key(argname) {
+            let defs = self.getfixturedefs(argname, nodeid);
+            if defs.is_empty() {
+                return;
+            }
+            arg2defs.insert(argname.to_string(), defs);
+        }
+        let index = *current_indices.get(argname).unwrap_or(&-1);
+        let len = arg2defs[argname].len();
+        if (-index) as usize > len {
+            // Exhausted the override chain (errors at runtime, not here).
+            return;
+        }
+        let dep_names: Vec<String> = arg2defs[argname][(len as i32 + index) as usize]
+            .param_names
+            .clone();
+        current_indices.insert(argname.to_string(), index - 1);
+        for dep in &dep_names {
+            self.process_argname(nodeid, dep, ignore_args, closure, arg2defs, current_indices);
+        }
+        current_indices.insert(argname.to_string(), index);
     }
 
     /// Every argname `def` transitively requests, as visible from `nodeid`,

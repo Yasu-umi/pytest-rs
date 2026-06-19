@@ -166,8 +166,7 @@ pub(crate) fn getfixturevalue(py: Python<'_>, name: &str) -> PyResult<Py<PyAny>>
     // executing on this thread, an override is asking for its own name — resolve
     // to the next less-specific definition instead of recursing into itself
     // (pytest's _getnextfixturedef on the subrequest). #1953.
-    let executing =
-        EXECUTING.with(|s| s.borrow().iter().rev().find(|d| d.name == name).cloned());
+    let executing = EXECUTING.with(|s| s.borrow().iter().rev().find(|d| d.name == name).cloned());
     if let Some(current) = executing
         && let Some(parent) = session
             .registry
@@ -213,37 +212,14 @@ pub(crate) fn current_fixturenames(py: Python<'_>) -> Option<Vec<String>> {
     // unlike `closure_for` which drops it for setup), BFS-expand dependencies,
     // then stable-sort by scope (higher scope first).
     let registry = &session.registry;
-    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-    let mut names: Vec<String> = Vec::new();
-    for def in registry.autouse_for(&item.nodeid) {
-        if seen.insert(def.name.clone()) {
-            names.push(def.name.clone());
-        }
-    }
-    for n in &item.fixture_names {
-        if seen.insert(n.clone()) {
-            names.push(n.clone());
-        }
-    }
-    let mut i = 0;
-    while i < names.len() {
-        if let Some(def) = registry.lookup(&names[i], &item.nodeid) {
-            for dep in &def.param_names {
-                if seen.insert(dep.clone()) {
-                    names.push(dep.clone());
-                }
-            }
-        }
-        i += 1;
-    }
-    names.sort_by_key(|n| {
-        std::cmp::Reverse(
-            registry
-                .lookup(n, &item.nodeid)
-                .map(|d| d.scope)
-                .unwrap_or(Scope::Function),
-        )
-    });
+    // The closure pytest's getfixtureclosure builds: autouse + the test's
+    // directly-requested args (request kept inline), expanded through override
+    // chains and scope-sorted.
+    let initialnames = registry.initial_names(&item.nodeid, &item.fixture_names);
+    let ignore: std::collections::HashSet<String> =
+        item.callspec.iter().map(|(name, _)| name.clone()).collect();
+    let mut names = registry.getfixtureclosure(&item.nodeid, &initialnames, &ignore);
+    let mut seen: std::collections::HashSet<String> = names.iter().cloned().collect();
     for extra in &item.extra_fixture_names {
         if seen.insert(extra.clone()) {
             names.push(extra.clone());
