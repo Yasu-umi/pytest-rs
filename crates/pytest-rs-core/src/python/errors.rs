@@ -52,6 +52,15 @@ pub fn crash_message(py: Python<'_>, err: &PyErr) -> Option<String> {
         .ok()
 }
 
+/// Like `crash_message` but keeps the exception-type prefix (subtests' SUBFAIL
+/// lines show "AssertionError: assert ...", not the tryshort-stripped form).
+pub fn crash_message_with_type(py: Python<'_>, err: &PyErr) -> Option<String> {
+    py.import("pytest._tb")
+        .and_then(|m| m.call_method1("crash_message_with_type", (err.value(py),)))
+        .and_then(|v| v.extract())
+        .ok()
+}
+
 pub fn format_test_failure(py: Python<'_>, err: &PyErr, style: &str) -> String {
     let result: PyResult<String> = (|| {
         py.import("pytest._tb")?

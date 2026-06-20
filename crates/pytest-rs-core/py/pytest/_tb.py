@@ -240,6 +240,14 @@ def crash_message(exc):
     return _exconly(exc)
 
 
+def crash_message_with_type(exc):
+    """Like crash_message but never strips the exception-type prefix: a
+    rewritten AssertionError reads "AssertionError: assert 4 < 4", not just
+    "assert 4 < 4" (pytest-subtests keeps the type in SUBFAIL lines)."""
+    text = "".join(traceback.format_exception_only(type(exc), exc)).rstrip("\n")
+    return text or type(exc).__name__
+
+
 def format_exception(exc, style="long"):
     if style == "no":
         return ""

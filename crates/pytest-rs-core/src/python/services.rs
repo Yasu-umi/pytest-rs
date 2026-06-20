@@ -116,12 +116,20 @@ pub fn pop_subtest_reports(
                 .call_method1("get", ("unittest", false))?
                 .extract()
                 .unwrap_or(false);
+            let mut reprcrash_message = None;
             let (outcome, longrepr) = match outcome_str.as_str() {
                 "failed" => {
                     let exc = record.get_item("exc")?;
                     let err = PyErr::from_value(exc);
                     if !from_unittest {
                         failed_fixture_subs += 1;
+                    }
+                    // A unittest subtest's SUBFAIL short-summary line keeps the
+                    // exception type ("AssertionError: assert 4 < 4"); the
+                    // `subtests` fixture path uses the tryshort form (just
+                    // "assert False"), which the longrepr fallback already gives.
+                    if from_unittest {
+                        reprcrash_message = crate::python::crash_message_with_type(py, &err);
                     }
                     (
                         crate::report::Outcome::Failed,
@@ -147,7 +155,7 @@ pub fn pop_subtest_reports(
                 sections,
                 rerun: false,
                 xfail_longrepr: None,
-                reprcrash_message: None,
+                reprcrash_message,
                 head_line: None,
             });
         }

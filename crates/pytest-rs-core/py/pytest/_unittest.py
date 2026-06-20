@@ -1,6 +1,5 @@
 """unittest.TestCase integration: build zero-arg runners per test method."""
 
-import sys
 import unittest
 
 from pytest._outcomes import Skipped
@@ -62,13 +61,31 @@ class _SubtestRecorder:
     def addSkip(self, test, reason) -> None:
         # Only subtest-level skips arrive here (main-body SkipTest
         # propagates out of the direct method call instead).
-        location = None
-        tb = sys.exc_info()[2]
-        if tb is not None:
-            while tb.tb_next is not None:
-                tb = tb.tb_next
-            location = f"{tb.tb_frame.f_code.co_filename}:{tb.tb_lineno}"
-        self._record(self._subtest_desc(test), "skipped", reason=str(reason), location=location)
+        # pytest reports a subtest skip at the test item's location (the test
+        # method's def line), not the skipTest() call site inside unittest's
+        # case.py — mirror that (path relative to the invocation dir).
+        self._record(
+            self._subtest_desc(test),
+            "skipped",
+            reason=str(reason),
+            location=self._case_location(),
+        )
+
+    def _case_location(self):
+        import os
+
+        method = getattr(type(self._case), getattr(self._case, "_testMethodName", ""), None)
+        code = getattr(method, "__code__", None)
+        if code is None:
+            return None
+        filename = code.co_filename
+        try:
+            rel = os.path.relpath(filename)
+            if not rel.startswith(".."):
+                filename = rel
+        except ValueError:
+            pass
+        return f"{filename}:{code.co_firstlineno}"
 
     def addError(self, test, exc_info) -> None:  # pragma: no cover - safety net
         pass
@@ -251,7 +268,9 @@ def make_runner(cls, method_name):
                 try:
                     method()
                 except unittest.SkipTest as e:
-                    raise Skipped(msg=str(e)) from None
+                    # A whole-test skipTest() reports at the test method's def
+                    # line (pytest's item location), not unittest/case.py.
+                    raise _skipped_at(str(e), method) from None
                 except _ShouldStop:
                     # subTest aborts the body once an expected failure is seen
                     # (TestCase.run catches this in its outer part executor).
