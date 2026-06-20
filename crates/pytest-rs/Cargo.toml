@@ -36,6 +36,7 @@ pytest-rs-mock = { workspace = true, optional = true }
 pytest-rs-cov = { workspace = true, optional = true }
 pytest-rs-split = { workspace = true, optional = true }
 pytest-rs-benchmark = { workspace = true, optional = true }
+libc = { workspace = true }
 
 [lints]
 workspace = true

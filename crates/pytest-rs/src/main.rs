@@ -43,6 +43,8 @@ fn preinitialize_python() {
     }
 }
 
+// libc::_exit below is the one unsafe call; see the comment at the exit site.
+#[allow(unsafe_code)]
 fn main() {
     preinitialize_python();
     // Explicit interpreter startup (no pyo3 auto-initialize): required so the
@@ -87,12 +89,28 @@ fn main() {
 
     let mut engine = Engine::new(plugins, config);
     let code = Python::attach(|py| engine.run(py));
-    // Run Python atexit handlers before std::process::exit, because
-    // std::process::exit bypasses Python's own cleanup (including atexit).
+    // Run Python atexit handlers (coverage writes its data here, etc.) and flush
+    // the Python streams, then terminate with libc::_exit. We deliberately skip
+    // C-level atexit / C++ static destructors: some native extension modules
+    // (e.g. duckdb) crash in those destructors under our embedded interpreter,
+    // which never runs Py_Finalize. _exit avoids them and the OS reclaims the
+    // process anyway. std::process::exit would run them and segfault.
     Python::attach(|py| {
         if let Ok(m) = py.import("atexit") {
             let _ = m.call_method0("_run_exitfuncs");
         }
+        if let Ok(sys) = py.import("sys") {
+            for stream in ["stdout", "stderr"] {
+                if let Ok(s) = sys.getattr(stream) {
+                    let _ = s.call_method0("flush");
+                }
+            }
+        }
     });
-    std::process::exit(code);
+    use std::io::Write as _;
+    let _ = std::io::stdout().flush();
+    let _ = std::io::stderr().flush();
+    // SAFETY: _exit just terminates the process; it is async-signal-safe and
+    // takes no action that can be unsound here.
+    unsafe { libc::_exit(code) }
 }

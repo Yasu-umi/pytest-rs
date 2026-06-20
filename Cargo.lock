@@ -527,6 +527,7 @@ dependencies = [
 name = "pytest-rs"
 version = "0.0.6"
 dependencies = [
+ "libc",
  "pytest-rs-anyio",
  "pytest-rs-asyncio",
  "pytest-rs-benchmark",
