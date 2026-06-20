@@ -1352,8 +1352,15 @@ class Pytester:
     def getitems(self, source):
         """Collect Function item nodes from the source in-process (a light
         collection: module import + test functions/Test-class methods with
-        merged marks — enough for the mark-evaluation tests; no fixtures)."""
-        path = pathlib.Path(str(self.makepyfile(source)))
+        merged marks — enough for the mark-evaluation tests; no fixtures).
+
+        `source` may be a Path to an already-present file (e.g. after
+        copy_example()), in which case it is collected directly rather than
+        written out as source text (upstream getmodulecol special-cases Path)."""
+        if isinstance(source, pathlib.Path):
+            path = source if source.is_absolute() else (self.path / source)
+        else:
+            path = pathlib.Path(str(self.makepyfile(source)))
         return self._collect_items_from_path(path)
 
     def getitem(self, source, funcname="test_func"):
