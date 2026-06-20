@@ -11,7 +11,14 @@ from pathlib import Path
 from types import TracebackType
 from typing import Any
 
-import pluggy
+try:
+    import pluggy
+except ModuleNotFoundError:
+    # The shim is self-contained (pytest-rs ships its own pluginmanager), so
+    # real pluggy may be absent — e.g. the standalone binary's embedded
+    # interpreter in CI. filter_traceback then simply has no pluggy frames to
+    # hide; it still filters them when pluggy IS importable (conformance runs).
+    pluggy = None
 
 import _pytest
 from _pytest._stub import __getattr__  # noqa: F401
@@ -249,10 +256,14 @@ class Traceback(list):
             super().__init__(tb)
 
 
-_PLUGGY_DIR = Path(pluggy.__file__.rstrip("oc"))
-# pluggy is either a package or a single module.
-if _PLUGGY_DIR.name == "__init__.py":
-    _PLUGGY_DIR = _PLUGGY_DIR.parent
+if pluggy is not None:
+    _pluggy_dir = Path(pluggy.__file__.rstrip("oc"))
+    # pluggy is either a package or a single module.
+    if _pluggy_dir.name == "__init__.py":
+        _pluggy_dir = _pluggy_dir.parent
+    _PLUGGY_DIR: Path | None = _pluggy_dir
+else:
+    _PLUGGY_DIR = None
 _PYTEST_DIR = Path(_pytest.__file__).parent
 
 
@@ -266,7 +277,7 @@ def filter_traceback(entry: TracebackEntry) -> bool:
     # entry.path may be a str for a non-existing file (#1133); Path() still works.
     p = Path(entry.path)
     parents = p.parents
-    if _PLUGGY_DIR in parents:
+    if _PLUGGY_DIR is not None and _PLUGGY_DIR in parents:
         return False
     if _PYTEST_DIR in parents:
         return False

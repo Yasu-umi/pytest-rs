@@ -184,9 +184,7 @@ def show_fixtures(defs, invocation_dir: str, verbose: int, color: bool = False) 
     return "\n".join(out)
 
 
-def show_fixtures_per_test(
-    items, invocation_dir: str, verbose: int, color: bool = False
-) -> str:
+def show_fixtures_per_test(items, invocation_dir: str, verbose: int, color: bool = False) -> str:
     """`--fixtures-per-test`: per test item, list the fixtures it uses.
 
     `items` is an iterable of (item_name, item_func, closure) where closure is
