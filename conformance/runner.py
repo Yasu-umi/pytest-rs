@@ -630,14 +630,45 @@ def main() -> None:
         action="store_true",
         help="skip RESULTS.md/README regeneration (for parallel CI shards)",
     )
+    parser.add_argument(
+        "--pinned",
+        action="store_true",
+        help="only suites that have an expected/<name>.toml pin (the --check gate set)",
+    )
+    parser.add_argument(
+        "--shard",
+        default=None,
+        metavar="i/n",
+        help="run shard i of n: round-robin the selected suites across n shards",
+    )
     args = parser.parse_args()
 
     if not BINARY.exists():
         sys.exit("build first: cargo build")
 
+    suites = load_suites(args.suite)
+    if args.pinned:
+        suites = [
+            s for s in suites if (ROOT / "conformance" / "expected" / f"{s.name}.toml").exists()
+        ]
+    if args.shard:
+        shard_i, shard_n = (int(x) for x in args.shard.split("/"))
+        # Greedy bin-pack the suites across n shards by weight (committed test
+        # count from the linux scoreboard) so the two heaviest — pytest and anyio
+        # — don't land together. Heaviest first, each to the lightest shard.
+        # Name-sorted tiebreak keeps the partition deterministic.
+        weight = {s.name: max(sum(expected_costs(s).values()), 1) for s in suites}
+        buckets: list[list[Suite]] = [[] for _ in range(shard_n)]
+        loads = [0] * shard_n
+        for s in sorted(suites, key=lambda s: (-weight[s.name], s.name)):
+            j = loads.index(min(loads))
+            buckets[j].append(s)
+            loads[j] += weight[s.name]
+        suites = buckets[shard_i - 1]
+
     violations: list[str] = []
     summaries: list[tuple[str, str]] = []
-    for suite, results, summary in run_suites(load_suites(args.suite), args.local, args.jobs):
+    for suite, results, summary in run_suites(suites, args.local, args.jobs):
         summaries.append((suite.name, summary))
         if args.check:
             violations.extend(check_suite(suite, results))

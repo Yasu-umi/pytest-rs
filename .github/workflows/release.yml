@@ -72,8 +72,12 @@ jobs:
           echo "timed out waiting for CI"; exit 1
 
   conformance-clean:
-    name: conformance gate (expected pins)
+    name: conformance gate ${{ matrix.shard }}/4
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v6
 
@@ -95,14 +99,15 @@ jobs:
       - name: conformance (expected pins must pass)
         run: |
           export LD_LIBRARY_PATH="$(python -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR"))'):${LD_LIBRARY_PATH:-}"
-          python conformance/runner.py --check
-          # Gate on the expected/*.toml pins only — the real no-regression
-          # guarantee. We do NOT diff the regenerated scoreboard/RESULTS here:
-          # a few suites are legitimately nondeterministic run-to-run (e.g.
-          # pytest-xdist's acceptance_test.py worker-scheduling tests land
-          # 89–91/98), so an exact-match gate would block releases on dashboard
-          # noise, not on real regressions. The scoreboard is refreshed and
-          # committed by the main-branch CI run, not gated here.
+          # Gate on the expected/*.toml pins only (--pinned skips the large
+          # informational suites like pandas/scikit-learn that have no pin),
+          # sharded 4 ways so the gate finishes in a fraction of the time.
+          python conformance/runner.py --check --pinned --shard ${{ matrix.shard }}/4 --skip-docs
+          # We do NOT diff the regenerated scoreboard/RESULTS here: a few suites
+          # are legitimately nondeterministic run-to-run (e.g. pytest-xdist's
+          # acceptance_test.py worker-scheduling tests land 89–91/98), so an
+          # exact-match gate would block releases on dashboard noise, not on real
+          # regressions. The scoreboard is refreshed and committed by main CI.
 
   wheels:
     name: wheel ${{ matrix.platform.name }} py${{ matrix.python-version }}
