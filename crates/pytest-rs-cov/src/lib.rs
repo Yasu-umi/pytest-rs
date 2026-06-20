@@ -736,15 +736,23 @@ impl CovPlugin {
             // union then keeps the numerator inside the denominator when
             // the analysis disagrees with CPython's actual events.
             let fold = |line: u32| analysis.multiline.get(&line).copied().unwrap_or(line);
-            let covered: BTreeSet<u32> = hits
-                .map(|lines| {
+            // A file the analyzer found statement-free (an empty module, or one
+            // with only comments / a docstring / `...` stubs) has zero
+            // statements — coverage.py reports it as 0/0 = 100%. Don't let an
+            // import-time phantom LINE event (e.g. an empty module's RESUME)
+            // invent a statement via the union below.
+            let covered: BTreeSet<u32> = if analysis.executable.is_empty() {
+                BTreeSet::new()
+            } else {
+                hits.map(|lines| {
                     lines
                         .iter()
                         .map(|line| fold(*line))
                         .filter(|line| !analysis.excluded.contains(line))
                         .collect()
                 })
-                .unwrap_or_default();
+                .unwrap_or_default()
+            };
             let mut executable = analysis.executable;
             executable.extend(covered.iter().copied());
             // Branch mode: reconcile executed bytecode arcs against the

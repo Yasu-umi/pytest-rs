@@ -477,4 +477,15 @@ class Base:
             vec![4]
         );
     }
+
+    #[test]
+    fn statement_free_files_have_no_executable_lines() {
+        // The lib.rs covered-union keys on an empty `executable` to report
+        // such files as 0/0 (matching coverage.py) instead of letting an
+        // import-time phantom LINE event invent a statement.
+        assert!(executable("").is_empty());
+        assert!(executable("# just a comment\n").is_empty());
+        assert!(executable("\"\"\"Only a module docstring.\"\"\"\n").is_empty());
+        assert!(executable("def f() -> int: ...\n").is_empty());
+    }
 }
