@@ -4263,9 +4263,9 @@
     },
     {
       "file": "pandas/tests/indexes/test_base.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 1494,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1526,
       "failed": 0,
       "skipped": 22,
       "errors": 0
@@ -4344,9 +4344,9 @@
     },
     {
       "file": "pandas/tests/indexes/test_setops.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 1928,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1954,
       "failed": 0,
       "skipped": 31,
       "errors": 0
@@ -4695,9 +4695,9 @@
     },
     {
       "file": "pandas/tests/indexing/test_coercion.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 361,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 403,
       "failed": 0,
       "skipped": 0,
       "errors": 0
