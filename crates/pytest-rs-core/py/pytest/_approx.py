@@ -1,16 +1,28 @@
 """pytest.approx (numeric subset; sequences/dicts of numbers)."""
 
 
+def _isnan(x):
+    # NaN is the only value that is unequal to itself; avoids importing `math`
+    # at module top, which runs too early in the shim bootstrap.
+    return x != x
+
+
 class _Approx:
     DEFAULT_REL = 1e-6
     DEFAULT_ABS = 1e-12
 
-    def __init__(self, expected, rel=None, abs=None):
+    def __init__(self, expected, rel=None, abs=None, nan_ok=False):
         self.expected = expected
         self.rel = rel
         self.abs = abs
+        self.nan_ok = nan_ok
 
     def _eq_scalar(self, actual, expected):
+        # NaN never compares equal to anything; pytest treats NaN == NaN as a
+        # match only when nan_ok=True (and both sides are NaN).
+        a_nan, e_nan = _isnan(actual), _isnan(expected)
+        if a_nan or e_nan:
+            return self.nan_ok and a_nan and e_nan
         if expected == actual:
             return True
         abs_tol = self.abs if self.abs is not None else self.DEFAULT_ABS
@@ -39,4 +51,4 @@ class _Approx:
 
 
 def approx(expected, rel=None, abs=None, nan_ok=False):
-    return _Approx(expected, rel=rel, abs=abs)
+    return _Approx(expected, rel=rel, abs=abs, nan_ok=nan_ok)
