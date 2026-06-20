@@ -518,11 +518,18 @@ pub(crate) fn resolve_fixture_def(
     // its own (pytest's FixtureRequest._check_scope). The requesting fixture is
     // the one whose dependencies we are resolving — the top of the stack. The
     // check precedes the cache lookup because pytest reports the mismatch even
-    // when the narrower fixture's value is already cached.
-    if let Some(parent) = stack.last()
+    // when the narrower fixture's value is already cached. When resolving via
+    // request.getfixturevalue() the stack starts empty, so fall back to the
+    // fixture currently executing on this thread (the one that called it).
+    let requesting: Vec<std::sync::Arc<crate::fixture::FixtureDef>> = if stack.is_empty() {
+        EXECUTING.with(|s| s.borrow().clone())
+    } else {
+        stack.to_vec()
+    };
+    if let Some(parent) = requesting.last()
         && parent.scope > scope
     {
-        return Err(scope_mismatch_error(py, config, stack, &def));
+        return Err(scope_mismatch_error(py, config, &requesting, &def));
     }
 
     // Parametrized fixtures cache per param index.
