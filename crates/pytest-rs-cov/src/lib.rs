@@ -284,11 +284,20 @@ impl CovPlugin {
         as_path
     }
 
-    /// All .py files under a source root (for 0%-covered files that were
-    /// never imported).
+    /// All importable .py files under a source root (for 0%-covered files that
+    /// were never imported). Mirrors coverage.py's `find_python_files`: only
+    /// basenames matching `^[^.#~!$@%^&*()+=,]+\.pyw?$` count, so dotted or
+    /// special-char side-files (`run.local.py`, `foo.bak.py`) — which aren't
+    /// importable as modules — are skipped rather than dragging the rate down.
     fn walk_py_files(root: &Path, files: &mut BTreeSet<PathBuf>) {
+        static PY_FILE_RE: std::sync::LazyLock<regex::Regex> =
+            std::sync::LazyLock::new(|| regex::Regex::new(r"^[^.#~!$@%^&*()+=,]+\.pyw?$").unwrap());
+        let is_python_file = |name: &str| PY_FILE_RE.is_match(name) && name != "__pycache__";
         if root.is_file() {
-            if root.extension().is_some_and(|ext| ext == "py") {
+            if root
+                .file_name()
+                .is_some_and(|n| is_python_file(&n.to_string_lossy()))
+            {
                 files.insert(root.to_path_buf());
             }
             return;
@@ -305,7 +314,7 @@ impl CovPlugin {
             }
             if path.is_dir() {
                 Self::walk_py_files(&path, files);
-            } else if path.extension().is_some_and(|ext| ext == "py") {
+            } else if is_python_file(&name) {
                 files.insert(path);
             }
         }
@@ -1416,5 +1425,36 @@ mod run_option_tests {
         )
         .unwrap();
         assert!(super::CovPlugin::run_option_enabled(&dir, None, "branch"));
+    }
+
+    #[test]
+    fn walk_py_files_skips_dotted_sidefiles() {
+        use std::collections::BTreeSet;
+        let dir = std::env::temp_dir().join("ptrs-walkpy-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        for name in [
+            "__init__.py",
+            "normal.py",
+            "run.local.py",
+            "foo.bak.py",
+            "mod.pyw",
+        ] {
+            std::fs::write(dir.join(name), "X = 1\n").unwrap();
+        }
+        let mut files = BTreeSet::new();
+        super::CovPlugin::walk_py_files(&dir, &mut files);
+        let names: BTreeSet<String> = files
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
+            .collect();
+        // Importable module names only — dotted side-files are excluded,
+        // matching coverage.py's find_python_files filter.
+        assert!(names.contains("__init__.py"));
+        assert!(names.contains("normal.py"));
+        assert!(names.contains("mod.pyw"));
+        assert!(!names.contains("run.local.py"));
+        assert!(!names.contains("foo.bak.py"));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
