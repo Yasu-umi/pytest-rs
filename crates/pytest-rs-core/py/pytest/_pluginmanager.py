@@ -93,6 +93,16 @@ def _accepted_kwargs(func: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
     return {name: value for name, value in kwargs.items() if name in params}
 
 
+def fire_fixture_hooks(funcs, fixturedef, request) -> None:
+    """Call each fixture-lifecycle hook impl (pytest_fixture_setup /
+    pytest_fixture_post_finalizer) with the kwargs it declares. The engine
+    fires setup hooks directly and schedules post_finalizer hooks (via a
+    functools.partial) as a fixture finalizer."""
+    kwargs = {"fixturedef": fixturedef, "request": request}
+    for func in funcs:
+        func(**_accepted_kwargs(func, kwargs))
+
+
 class _HookImpl:
     """pluggy HookImpl shim: function + wrapper/hookwrapper/tryfirst/trylast."""
 

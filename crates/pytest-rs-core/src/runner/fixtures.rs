@@ -345,6 +345,74 @@ fn fail_no_trace(py: Python<'_>, msg: &str) -> PyErr {
     }
 }
 
+/// Fire the conftest `pytest_fixture_setup` hooks for a just-created fixture
+/// and schedule its `pytest_fixture_post_finalizer` hooks as a finalizer (so
+/// they run at the fixture's scope teardown). Conftest impls are ordered
+/// most-specific first (pluggy LIFO). Each receives `fixturedef`/`request`.
+#[allow(clippy::too_many_arguments)]
+fn fire_fixture_lifecycle_hooks(
+    py: Python<'_>,
+    session: &mut Session,
+    item: &TestItem,
+    def: &crate::fixture::FixtureDef,
+    scope: Scope,
+    instance: &str,
+    bindings: &[crate::session::Binding],
+) -> PyResult<()> {
+    let collect = |name: &str| -> Vec<Py<PyAny>> {
+        let mut hooks: Vec<(usize, Py<PyAny>)> = session
+            .py_hooks
+            .iter()
+            .filter(|h| h.name == name && item.nodeid.starts_with(h.baseid.as_str()))
+            .map(|h| (h.baseid.len(), h.func.clone_ref(py)))
+            .collect();
+        hooks.sort_by_key(|h| std::cmp::Reverse(h.0));
+        hooks.into_iter().map(|(_, f)| f).collect()
+    };
+    let setup_funcs = collect("pytest_fixture_setup");
+    let final_funcs = collect("pytest_fixture_post_finalizer");
+    if setup_funcs.is_empty() && final_funcs.is_empty() {
+        return Ok(());
+    }
+    let node = item_node(py, item)?;
+    let request = Py::new(
+        py,
+        crate::request::PyRequest::new(None, node, Some(def.name.clone()), scope),
+    )?;
+    let fixturedef = py
+        .import("pytest._fixturemanager")?
+        .getattr("ShimFixtureDef")?
+        .call1((
+            def.name.as_str(),
+            def.func.bind(py),
+            def.baseid.as_str(),
+            scope.as_str(),
+        ))?;
+    let fire = py
+        .import("pytest._pluginmanager")?
+        .getattr("fire_fixture_hooks")?;
+    if !setup_funcs.is_empty() {
+        let funcs = pyo3::types::PyList::new(py, setup_funcs.iter().map(|f| f.bind(py)))?;
+        fire.call1((funcs, &fixturedef, request.bind(py)))?;
+    }
+    if !final_funcs.is_empty() {
+        let funcs = pyo3::types::PyList::new(py, final_funcs.iter().map(|f| f.bind(py)))?;
+        let partial = py.import("functools")?.getattr("partial")?.call1((
+            fire,
+            funcs,
+            &fixturedef,
+            request.bind(py),
+        ))?;
+        session.finalizers.push(PendingFinalizer {
+            scope,
+            instance: instance.to_string(),
+            finalizer: Finalizer::Callable(partial.unbind()),
+            bindings: bindings.to_vec(),
+        });
+    }
+    Ok(())
+}
+
 /// Build the ScopeMismatch error for a fixture (the top of `stack`) requesting
 /// the narrower-scoped `requested`. Mirrors pytest's message: a `Failed`
 /// outcome with `pytrace=False`, listing the requesting fixture stack and the
@@ -863,6 +931,8 @@ pub(crate) fn resolve_fixture_def(
             bindings: bindings.clone(),
         });
     }
+    // Conftest pytest_fixture_setup / pytest_fixture_post_finalizer hooks.
+    fire_fixture_lifecycle_hooks(py, session, item, &def, scope, &instance, &bindings)?;
     session.fixture_cache.insert(
         cache_key,
         crate::session::CachedFixture {
