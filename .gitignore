@@ -8,3 +8,7 @@ __pycache__/
 /target-py314
 /target-prof
 /target-iter
+
+# Local darwin conformance scoreboards (CI only maintains linux; these
+# change on every local run and are not authoritative).
+/conformance/scoreboard/darwin/
