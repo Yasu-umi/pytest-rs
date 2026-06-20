@@ -2,9 +2,11 @@
 
 
 def _isnan(x):
-    # NaN is the only value that is unequal to itself; avoids importing `math`
-    # at module top, which runs too early in the shim bootstrap.
-    return x != x
+    # Only floats can be NaN, and NaN is the only float unequal to itself. Guard
+    # on isinstance so we never call `!=` on an arbitrary object (e.g. a nested
+    # approx), which would recurse back into this comparison. (isinstance avoids
+    # importing `math`, which runs too early in the shim bootstrap.)
+    return isinstance(x, float) and x != x
 
 
 class _Approx:
