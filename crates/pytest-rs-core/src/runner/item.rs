@@ -236,11 +236,32 @@ fn build_test_setup(
         return Err(PyErr::from_value(failed));
     }
 
+    let mut stack = Vec::new();
+    // Higher-scoped autouse fixtures (session/package/module/class) set up
+    // before the xunit hooks, so e.g. a session autouse fixture is available to
+    // setup_module/setup_method — pytest orders by scope, with those fixtures
+    // preceding the module/class/function xunit setups.
+    for def in session.registry.autouse_for(&item.nodeid) {
+        if def.scope == crate::fixture::Scope::Function {
+            continue;
+        }
+        resolve_fixture(
+            py,
+            plugins,
+            session,
+            config,
+            &def.name,
+            item,
+            instance.as_ref(),
+            &mut stack,
+        )?;
+    }
+
     // xunit-style setup_module/setup_class/setup_method/setup_function.
     python::ensure_xunit_setup(py, session, item, instance.as_ref())?;
 
-    // autouse fixtures run first, then the requested ones.
-    let mut stack = Vec::new();
+    // The remaining (function-scoped) autouse fixtures; higher-scoped ones
+    // above are now cache hits.
     for def in session.registry.autouse_for(&item.nodeid) {
         resolve_fixture(
             py,
