@@ -3,6 +3,66 @@
 Notable changes per release. The release workflow uses the matching section
 as the GitHub release notes (auto-generated notes are the fallback).
 
+## v0.0.6 (2026-06-21)
+
+### Added
+
+- **Fixture request object on statically collected items** — `TopRequest`
+  now exposes faithful `getfixturevalue` / `_fillfixtures` / `addfinalizer`
+  / `applymarker`, scope-gated `request.cls` / `request.function`, and
+  `request.fixturenames` reflecting the running item's scope-sorted closure
+  (including dynamically requested fixtures). Pytester-collected items
+  resolve their fixtures in-process.
+- **Dynamic fixture scope** — `@pytest.fixture(scope=<callable>)` is
+  evaluated at resolution time (#1781).
+- **`--fixtures` / `--fixtures-per-test` / `--funcargs`**, with colored
+  output and conftest-aware headers.
+- **`pytest_fixture_setup` / `pytest_fixture_post_finalizer` hooks** fire
+  for conftest plugins (most-specific baseid first).
+- **Fixtures from plugin instances** registered during `pytest_configure`
+  are now discovered (#2270).
+- Collection honors **`python_classes` / `python_functions`** ini options
+  and custom nodes from `pytest_pycollect_makeitem` / `makemodule`.
+- **`--fulltrace`** in traceback rendering; `Pytester.getitem` / `getitems`
+  accept a `Path`.
+
+### Changed
+
+- **Coverage statement counting aligned with coverage.py** (#1) — file
+  discovery skips dotted/special-character names, `...`-only stub bodies and
+  module/class docstrings are excluded, bare constant expressions are
+  counted, statement-free files report 0 statements, and bare annotations
+  are counted scope-aware (PEP 563/649). Verified to match coverage.py 7.x
+  statement-for-statement on large real-world projects.
+- **Fixtures set up in scope-sorted closure order** (true execution order),
+  with the closure following override chains and honoring
+  parametrize-ignored arguments; super-fixture parametrization propagates
+  through override-reuse.
+- Class methods are collected in definition order across the MRO.
+- `pytest-rerunfailures` runs in-process (now 48/48) and `pytest-subtests`
+  improves to 28/32 (unittest subtest skip location and SUBFAIL message).
+
+### Fixed
+
+- **Fixture scope errors** — `ScopeMismatch` (including via
+  `request.getfixturevalue` from a fixture) and invalid scope values are
+  detected and reported like upstream; fixture cache keys are scope-qualified
+  so class teardown no longer evicts module fixtures.
+- **Fixture setup exceptions are cached** so they aren't re-run per item,
+  and finalizer teardown errors are grouped into a `BaseExceptionGroup`.
+- `getfixturevalue(<own-name>)` resolves to the overridden super fixture;
+  `getfixturevalue` of a parametrized fixture without a bound param is
+  reported clearly; double-yield fixtures fail like `fail_fixturefunc`.
+- Rich repr for fixture-not-found (full request chain) and recursive
+  dependency errors; double `@pytest.fixture` and a fixture named `request`
+  are rejected at collection.
+- `@pytest.fixture`-decorated functions are skipped in xunit setup/teardown
+  lookup; higher-scoped autouse fixtures run before xunit setup hooks.
+- `-s` / `--capture=no` output is collected into inline `runpytest` results;
+  import errors and import-file-mismatch surface from live collector nodes.
+- A fixture discovery no longer errors on an evil `__getattr__` (#214); the
+  `pluggy` import in `_pytest._code` is optional.
+
 ## v0.0.5 (2026-06-16)
 
 ### Added

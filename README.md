@@ -65,7 +65,7 @@ A plugin that fails to import (e.g. it reaches into pytest/pluggy internals the 
 
 Startup, collection, fixture orchestration, coverage measurement, and parallel workers are native Rust code. The main wins:
 
-- **`--cov` runs** — coverage is collected via `sys.monitoring` (Python 3.12+ low-overhead instrumentation) instead of `coverage.py`'s tracing hooks. Typically **1.5–1.7x faster** on medium suites, and the gap widens with suite size.
+- **`--cov` runs** — coverage is collected via `sys.monitoring` (Python 3.12+ low-overhead instrumentation) instead of `coverage.py`'s tracing hooks. Typically **1.5–1.9x faster** on medium suites, and the gap widens with suite size.
 - **`-n` parallel runs** — workers are forked (not spawned), so each worker inherits a warm interpreter with all imports already done. Startup per worker drops from seconds to milliseconds.
 - **Large collections** — fixture resolution and parametrize expansion run in Rust; suites with thousands of tests see faster collection.
 
@@ -73,14 +73,14 @@ Benchmarks on open-source projects (macOS arm64, release build, median of 3 warm
 
 | suite (tests) | mode | pytest | pytest-rs | speedup |
 |---|---|---:|---:|---|
-| pydantic (5 761) | `--cov` | 9.35 s | 5.81 s | **1.6x** |
-| pydantic (5 761) | `-n 3 --cov` | n/a ¹ | 3.41 s | — |
-| marshmallow (1 119) | `--cov` | 0.96 s | 0.58 s | **1.7x** |
-| marshmallow (1 119) | `-n 3 --cov` | 1.45 s | 0.63 s | **2.3x** |
-| click (1 335) | `--cov` | 2.20 s | 1.45 s | **1.5x** |
-| click (1 335) | `-n 3 --cov` | 1.71 s | 1.11 s | **1.5x** |
+| pydantic (12 750) | `--cov` | 3.64 s | 1.90 s | **1.9x** |
+| pydantic (12 750) | `--parallel-threads 3 --cov` ¹ | 3.82 s | 1.97 s | **1.9x** |
+| marshmallow (1 119) | `--cov` | 1.65 s | 1.07 s | **1.5x** |
+| marshmallow (1 119) | `-n 3 --cov` | 1.79 s | 0.81 s | **2.2x** |
+| click (1 336) | `--cov` | 3.46 s | 2.19 s | **1.6x** |
+| click (1 336) | `-n 3 --cov` | 3.66 s | 2.35 s | **1.6x** |
 
-¹ `pytest -n 3` fails on pydantic with a "different tests collected" xdist error; pytest-rs's fork-based workers avoid this class of issue.
+¹ pydantic's suite runs under `pytest-run-parallel` (`--parallel-threads`), so both runners are measured with it. Plain `pytest -n 3` (xdist) fails on pydantic with a "different tests collected" error; pytest-rs's fork-based workers avoid this class of issue.
 
 For small, CPU-bound suites without coverage or parallelism the test bodies dominate and both runners perform similarly. Try it on your own suite:
 
