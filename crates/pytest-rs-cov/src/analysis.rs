@@ -68,6 +68,7 @@ pub fn analyze(source: &str, excludes: &[regex::Regex]) -> Option<FileAnalysis> 
         multiline: BTreeMap::new(),
         stub_excluded: BTreeSet::new(),
     };
+    walker.exclude_leading_docstring(&parsed.syntax().body);
     walker.visit_body(&parsed.syntax().body, EXIT);
 
     let mut excluded: BTreeSet<u32> = walker.stub_excluded.clone();
@@ -112,6 +113,23 @@ impl Walker<'_> {
             start: self.line(stmt.range().start()),
             end: self.line(stmt.range().end()),
         });
+    }
+
+    /// Exclude a body's leading docstring. coverage.py never counts a
+    /// module/class/function docstring as a statement. A *function* docstring
+    /// compiles to no bytecode (it lives in co_consts) and is already absent
+    /// from the denominator, but a *module*- or *class*-level docstring
+    /// compiles to a `__doc__ =` store that emits a runtime LINE event, which
+    /// the covered-union (lib.rs) would otherwise re-add. Excluding its lines
+    /// keeps all three out, matching coverage.py.
+    fn exclude_leading_docstring(&mut self, body: &[Stmt]) {
+        if let Some(Stmt::Expr(e)) = body.first()
+            && matches!(&*e.value, Expr::StringLiteral(_))
+        {
+            let first = self.line(e.range().start());
+            let last = self.line(e.range().end());
+            self.stub_excluded.extend(first..=last);
+        }
     }
 
     fn visit_body(&mut self, body: &[Stmt], after: i64) {
@@ -201,6 +219,7 @@ impl Walker<'_> {
                 // The `def` line (its name token), not the first decorator.
                 self.mark(def.name.range().start());
                 self.record_span(stmt, def.name.range().start());
+                self.exclude_leading_docstring(&def.body);
                 self.visit_body(&def.body, EXIT);
             }
             Stmt::ClassDef(def) => {
@@ -209,6 +228,7 @@ impl Walker<'_> {
                 }
                 self.mark(def.name.range().start());
                 self.record_span(stmt, def.name.range().start());
+                self.exclude_leading_docstring(&def.body);
                 self.visit_body(&def.body, EXIT);
             }
             Stmt::If(if_stmt) => {
@@ -421,5 +441,40 @@ class Base:
     #[test]
     fn body_with_real_statement_is_not_a_stub() {
         assert_eq!(executable("def f():\n    return 1\n"), vec![1, 2]);
+    }
+
+    #[test]
+    fn module_docstring_is_excluded() {
+        // coverage.py counts only `X = 1`, not the module docstring.
+        assert_eq!(
+            executable("\"\"\"Module docstring.\"\"\"\nX = 1\n"),
+            vec![2]
+        );
+    }
+
+    #[test]
+    fn class_docstring_is_excluded() {
+        // `class C:` and `Y = 1` count; the class docstring does not.
+        assert_eq!(
+            executable("class C:\n    \"\"\"Class docstring.\"\"\"\n    Y = 1\n"),
+            vec![1, 3]
+        );
+    }
+
+    #[test]
+    fn function_docstring_is_excluded() {
+        // `def g():` and `return 1` count; the function docstring does not.
+        assert_eq!(
+            executable("def g():\n    \"\"\"Function docstring.\"\"\"\n    return 1\n"),
+            vec![1, 3]
+        );
+    }
+
+    #[test]
+    fn multiline_module_docstring_is_excluded() {
+        assert_eq!(
+            executable("\"\"\"line one\nline two\n\"\"\"\nX = 1\n"),
+            vec![4]
+        );
     }
 }
