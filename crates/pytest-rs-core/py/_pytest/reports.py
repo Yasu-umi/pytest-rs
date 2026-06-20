@@ -150,12 +150,16 @@ class BaseReport:
         """Write longrepr to a TerminalWriter (upstream delegates to the
         repr object tree; the shim's longrepr is a formatted string).
         Upstream's first traceback entry opens with a blank line after the
-        failure banner."""
+        failure banner; the shim's longrepr already carries that leading
+        blank, so only synthesize one when it is absent (otherwise a
+        delegated reporter — pytest-pretty, sugar — renders a double blank)."""
         longrepr = getattr(self, "longrepr", None)
         if longrepr is None:
             return
-        tw.line("")
-        for line in str(longrepr).split("\n"):
+        text = str(longrepr)
+        if not text.startswith("\n"):
+            tw.line("")
+        for line in text.split("\n"):
             markup = (
                 {"red": True, "bold": True} if line.startswith(("E ", "E\t")) or line == "E" else {}
             )
