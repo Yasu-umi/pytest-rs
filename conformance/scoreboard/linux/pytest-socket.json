@@ -51,10 +51,10 @@
     },
     {
       "file": "tests/test_socket.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
-      "failed": 0,
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 19,
+      "failed": 3,
       "skipped": 0,
       "errors": 0
     }
