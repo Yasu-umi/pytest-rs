@@ -272,11 +272,15 @@ impl CovPlugin {
         patterns
     }
 
-    /// Resolve a --cov=VALUE entry: a path relative to rootdir, or a dotted
-    /// module name that maps onto a directory. Canonicalized so prefix
+    /// Resolve a --cov=VALUE entry the way coverage.py does: VALUE is either a
+    /// filesystem path or an importable package/module name. We try a rootdir-
+    /// relative path first (and the dotted-name-as-subdir spelling), then fall
+    /// back to locating the package via the import system — the common case when
+    /// the package is installed (editable or not) or in a src/ layout, so its
+    /// source does not sit directly under rootdir. Canonicalized so prefix
     /// matching agrees with co_filename (which sees through symlinks like
     /// macOS /tmp).
-    fn resolve_source(rootdir: &Path, value: &str) -> PathBuf {
+    fn resolve_source(py: Python<'_>, rootdir: &Path, value: &str) -> PathBuf {
         let as_path = rootdir.join(value);
         if as_path.exists() {
             return as_path.canonicalize().unwrap_or(as_path);
@@ -285,7 +289,41 @@ impl CovPlugin {
         if as_module.exists() {
             return as_module.canonicalize().unwrap_or(as_module);
         }
+        if let Some(path) = Self::resolve_import_source(py, value) {
+            return path.canonicalize().unwrap_or(path);
+        }
         as_path
+    }
+
+    /// Locate an importable package/module's source via `importlib.util.find_spec`
+    /// (a package maps to its directory, a plain module to its `.py` file).
+    /// Returns `None` if `value` is not importable in the current environment.
+    fn resolve_import_source(py: Python<'_>, value: &str) -> Option<PathBuf> {
+        let spec = py
+            .import("importlib.util")
+            .ok()?
+            .call_method1("find_spec", (value,))
+            .ok()?;
+        if spec.is_none() {
+            return None;
+        }
+        // A package exposes submodule_search_locations; its first entry is the
+        // package directory (coverage measures the whole tree under it).
+        if let Ok(locs) = spec.getattr("submodule_search_locations")
+            && !locs.is_none()
+            && let Ok(first) = locs.get_item(0)
+            && let Ok(dir) = first.extract::<String>()
+        {
+            return Some(PathBuf::from(dir));
+        }
+        // A plain module maps to its source file.
+        if let Ok(origin) = spec.getattr("origin")
+            && let Ok(path) = origin.extract::<String>()
+            && path.ends_with(".py")
+        {
+            return Some(PathBuf::from(path));
+        }
+        None
     }
 
     /// All importable .py files under a source root (for 0%-covered files that
@@ -998,7 +1036,7 @@ impl Plugin for CovPlugin {
         self.sources = cov_values
             .iter()
             .filter(|value| !value.is_empty())
-            .map(|value| Self::resolve_source(&rootdir, value))
+            .map(|value| Self::resolve_source(py, &rootdir, value))
             .collect();
         self.reports = Self::parse_reports(py, ctx.config.get_values("cov-report"))?;
         let cov_config = ctx.config.get_value("cov-config");
