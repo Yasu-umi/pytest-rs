@@ -302,10 +302,40 @@ fn build_test_setup(
             &mut stack,
         )?;
     }
+    // Set up the test's fixtures in pytest's scope-sorted closure order
+    // (getfixtureclosure: highest scope first, dependencies resolved on demand),
+    // so the *execution* order matches upstream even when it differs from the
+    // test's argument order — e.g. a dependency runs right before its dependent
+    // rather than at the dependent's argument position. Autouse/usefixtures
+    // already set up above reappear here as cache hits.
+    let ignore: std::collections::HashSet<String> =
+        item.callspec.iter().map(|(name, _)| name.clone()).collect();
+    let initialnames = session
+        .registry
+        .initial_names(&item.nodeid, &item.fixture_names);
+    let closure = session
+        .registry
+        .getfixtureclosure(&item.nodeid, &initialnames, &ignore);
+    for name in &closure {
+        if name == "request" || ignore.contains(name) {
+            continue;
+        }
+        resolve_fixture(
+            py,
+            plugins,
+            session,
+            config,
+            name,
+            item,
+            instance.as_ref(),
+            &mut stack,
+        )?;
+    }
+    // The values passed to the test, in its signature order (now cached).
     let mut kwargs = Vec::new();
     let mut test_request: Option<Py<crate::request::PyRequest>> = None;
     for name in &item.fixture_names {
-        if item.callspec.iter().any(|(param, _)| param == name) {
+        if ignore.contains(name) {
             continue;
         }
         if name == "request" {
