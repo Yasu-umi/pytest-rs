@@ -44,6 +44,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
 | rich | v14.2.0 | 855 | 0 | 0 | 25 | 880 | 100.0% | 60 | 62 | 0 |
+| sqlglot | v30.11.0 | 1120 | 0 | 0 | 0 | 1120 | 100.0% | 52 | 54 | 0 |
 | pytest-bdd | 8.1.0 | 112 | 26 | 0 | 1 | 139 | 81.3% | 27 | 35 | 0 |
 | httpx | 0.28.1 | 1404 | 13 | 0 | 1 | 1418 | 99.1% | 26 | 31 | 0 |
 | httpx2 | v2.4.0 | 1426 | 0 | 0 | 1 | 1427 | 100.0% | 31 | 31 | 0 |
@@ -563,6 +564,69 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_tree.py | passed | 7 | 0 | 0 | 2 |
 | tests/test_win32_console.py | no-tests | 0 | 0 | 0 | 0 |
 | tests/test_windows_renderer.py | no-tests | 0 | 0 | 0 | 17 |
+
+</details>
+
+### sqlglot @ v30.11.0
+
+<details><summary>per-file detail (54 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/dialects/test_athena.py | passed | 8 | 0 | 0 | 0 |
+| tests/dialects/test_bigquery.py | passed | 58 | 0 | 0 | 0 |
+| tests/dialects/test_clickhouse.py | passed | 31 | 0 | 0 | 0 |
+| tests/dialects/test_databricks.py | passed | 19 | 0 | 0 | 0 |
+| tests/dialects/test_dialect.py | passed | 98 | 0 | 0 | 0 |
+| tests/dialects/test_doris.py | passed | 12 | 0 | 0 | 0 |
+| tests/dialects/test_dremio.py | passed | 21 | 0 | 0 | 0 |
+| tests/dialects/test_drill.py | passed | 2 | 0 | 0 | 0 |
+| tests/dialects/test_druid.py | passed | 1 | 0 | 0 | 0 |
+| tests/dialects/test_duckdb.py | passed | 44 | 0 | 0 | 0 |
+| tests/dialects/test_dune.py | passed | 1 | 0 | 0 | 0 |
+| tests/dialects/test_exasol.py | passed | 20 | 0 | 0 | 0 |
+| tests/dialects/test_fabric.py | passed | 6 | 0 | 0 | 0 |
+| tests/dialects/test_hive.py | passed | 14 | 0 | 0 | 0 |
+| tests/dialects/test_materialize.py | passed | 1 | 0 | 0 | 0 |
+| tests/dialects/test_mysql.py | passed | 51 | 0 | 0 | 0 |
+| tests/dialects/test_oracle.py | passed | 25 | 0 | 0 | 0 |
+| tests/dialects/test_pipe_syntax.py | passed | 11 | 0 | 0 | 0 |
+| tests/dialects/test_postgres.py | passed | 26 | 0 | 0 | 0 |
+| tests/dialects/test_presto.py | passed | 20 | 0 | 0 | 0 |
+| tests/dialects/test_prql.py | passed | 1 | 0 | 0 | 0 |
+| tests/dialects/test_redshift.py | passed | 17 | 0 | 0 | 0 |
+| tests/dialects/test_risingwave.py | passed | 2 | 0 | 0 | 0 |
+| tests/dialects/test_singlestore.py | passed | 26 | 0 | 0 | 0 |
+| tests/dialects/test_snowflake.py | passed | 95 | 0 | 0 | 0 |
+| tests/dialects/test_solr.py | passed | 1 | 0 | 0 | 0 |
+| tests/dialects/test_spark.py | passed | 22 | 0 | 0 | 0 |
+| tests/dialects/test_sqlite.py | passed | 11 | 0 | 0 | 0 |
+| tests/dialects/test_starrocks.py | passed | 12 | 0 | 0 | 0 |
+| tests/dialects/test_tableau.py | passed | 1 | 0 | 0 | 0 |
+| tests/dialects/test_teradata.py | passed | 15 | 0 | 0 | 0 |
+| tests/dialects/test_trino.py | passed | 7 | 0 | 0 | 0 |
+| tests/dialects/test_tsql.py | passed | 55 | 0 | 0 | 0 |
+| tests/test_build.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_dialect_entry_points.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_dialect_imports.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_diff.py | passed | 13 | 0 | 0 | 0 |
+| tests/test_docs.py | no-tests | 0 | 0 | 0 | 0 |
+| tests/test_errors.py | passed | 13 | 0 | 0 | 0 |
+| tests/test_executor.py | passed | 21 | 0 | 0 | 0 |
+| tests/test_expressions.py | passed | 70 | 0 | 0 | 0 |
+| tests/test_generator.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_helper.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_integration_loader.py | no-tests | 0 | 0 | 0 | 0 |
+| tests/test_jsonpath.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_lineage.py | passed | 43 | 0 | 0 | 0 |
+| tests/test_optimizer.py | passed | 79 | 0 | 0 | 0 |
+| tests/test_parser.py | passed | 66 | 0 | 0 | 0 |
+| tests/test_schema.py | passed | 9 | 0 | 0 | 0 |
+| tests/test_serde.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_time.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_tokens.py | passed | 10 | 0 | 0 | 0 |
+| tests/test_transforms.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_transpile.py | passed | 28 | 0 | 0 | 0 |
 
 </details>
 
