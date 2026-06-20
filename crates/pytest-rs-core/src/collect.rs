@@ -64,13 +64,18 @@ impl TestItem {
             .unwrap_or_else(|| self.nodeid.clone())
     }
 
-    /// The class-scope cache/teardown key: everything before the final
-    /// "::" ("file.py::TestClass" for methods, the file for plain tests).
+    /// The class-scope cache/teardown key. For a method it is everything
+    /// before the final "::" ("file.py::TestClass"). For a plain module-level
+    /// test there is no enclosing class, so — mirroring pytest's
+    /// `FixtureRequest.node` fallback (`get_scope_node` returns None for class
+    /// scope, falling back to the function item) — the key is the full nodeid,
+    /// making class-scoped fixtures cache and tear down per-item rather than
+    /// being shared across the file.
     pub fn class_instance(&self) -> String {
-        self.nodeid
-            .rsplit_once("::")
-            .map(|(prefix, _)| prefix.to_string())
-            .unwrap_or_else(|| self.nodeid.clone())
+        match self.nodeid.rsplit_once("::") {
+            Some((prefix, _)) if prefix.contains("::") => prefix.to_string(),
+            _ => self.nodeid.clone(),
+        }
     }
 
     /// The scope-instance string a fixture of `scope` is cached/torn down
