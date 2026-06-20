@@ -321,6 +321,16 @@ pythonpath = ["."]
 category = "real-world"
 enabled = true
 
+[sqlglot]
+repo = "https://github.com/tobymao/sqlglot"
+tag = "v30.11.0"
+testpaths = ["tests"]
+deps = ["duckdb==1.5.4", "pandas==3.0.3", "python-dateutil==2.9.0.post0", "pytz==2026.2"]
+# Flat package layout: the checkout root is the import path.
+pythonpath = ["."]
+category = "real-world"
+enabled = true
+
 [pytest-bdd]
 repo = "https://github.com/pytest-dev/pytest-bdd"
 tag = "8.1.0"
