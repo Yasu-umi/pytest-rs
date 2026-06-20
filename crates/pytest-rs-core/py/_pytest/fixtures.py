@@ -223,24 +223,28 @@ def _teardown_yield_fixture(fixturefunc, it):
     finalize_generator(it)
 
 
-def fixture_lookup_error(argname, requesting_func, available):
+def fixture_lookup_error(argname, requesting_funcs, available):
     """Build a rich FixtureLookupError for an unknown fixture, mirroring
-    upstream's FixtureLookupErrorRepr: the requesting function's def line(s),
-    "fixture 'X' not found", the sorted available-fixtures list, and the
-    --fixtures help line. pytest._tb.format_exception renders the attached
-    metadata."""
+    upstream's FixtureLookupErrorRepr: the def line(s) of every fixture in the
+    request chain (outermost first), "fixture 'X' not found", the sorted
+    available-fixtures list, and the --fixtures help line. pytest._tb.
+    format_exception renders the attached metadata."""
     from pytest._fixtures import FixtureLookupError
 
-    try:
-        lines, _ = inspect.getsourcelines(requesting_func)
-    except (OSError, TypeError, IndexError):
-        lines = [f"def {getattr(requesting_func, '__name__', '?')}(...):\n"]
+    # Accept a single callable or a chain of them (the resolution stack).
+    if not isinstance(requesting_funcs, (list, tuple)):
+        requesting_funcs = [requesting_funcs]
     deflines = []
-    for raw in lines:
-        stripped = raw.rstrip()
-        deflines.append("  " + stripped)
-        if "):" in stripped or stripped.endswith(":"):
-            break
+    for func in requesting_funcs:
+        try:
+            lines, _ = inspect.getsourcelines(func)
+        except (OSError, TypeError, IndexError):
+            lines = [f"def {getattr(func, '__name__', '?')}(...):\n"]
+        for raw in lines:
+            stripped = raw.rstrip()
+            deflines.append("  " + stripped)
+            if "):" in stripped or stripped.endswith(":"):
+                break
     errstring = (
         f"fixture '{argname}' not found\n"
         f"available fixtures: {', '.join(available)}\n"

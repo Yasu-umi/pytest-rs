@@ -418,11 +418,16 @@ fn fixture_not_found_error(
     name: &str,
     stack: &[std::sync::Arc<crate::fixture::FixtureDef>],
 ) -> PyErr {
-    let requesting_func: Py<PyAny> = match stack.last() {
-        Some(def) => def.func.clone_ref(py),
-        None => crate::runner::item_node(py, item)
+    // The request chain that led here: each fixture currently resolving (test
+    // → call_fail → fail), outermost first, so the repr lists every requester's
+    // def line. Falls back to the test function for a directly requested name.
+    let chain: Vec<Py<PyAny>> = if stack.is_empty() {
+        crate::runner::item_node(py, item)
             .and_then(|node| Ok(node.bind(py).getattr("function")?.unbind()))
-            .unwrap_or_else(|_| py.None()),
+            .map(|f| vec![f])
+            .unwrap_or_else(|_| vec![py.None()])
+    } else {
+        stack.iter().map(|d| d.func.clone_ref(py)).collect()
     };
     // Fixture names visible to this item, de-duplicated and sorted.
     let mut names: Vec<String> = session
@@ -435,10 +440,11 @@ fn fixture_not_found_error(
     names.dedup();
     let result = (|| {
         let avail = pyo3::types::PyList::new(py, &names)?;
+        let funcs = pyo3::types::PyList::new(py, &chain)?;
         let exc = py
             .import("_pytest.fixtures")?
             .getattr("fixture_lookup_error")?
-            .call1((name, requesting_func, avail))?;
+            .call1((name, funcs, avail))?;
         Ok::<_, PyErr>(PyErr::from_value(exc))
     })();
     result.unwrap_or_else(|_| {
