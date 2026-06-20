@@ -5,6 +5,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{ExceptHandler, Expr, Stmt};
 use ruff_source_file::LineIndex;
 use ruff_text_size::{Ranged, TextSize};
@@ -14,6 +15,15 @@ struct Span {
     header: u32,
     start: u32,
     end: u32,
+}
+
+/// The immediate scope of the body being walked — it decides whether a bare
+/// annotation (`x: T`, no value) is a counted statement.
+#[derive(Clone, Copy, PartialEq)]
+enum BodyScope {
+    Module,
+    Class,
+    Function,
 }
 
 struct Walker<'a> {
@@ -33,16 +43,17 @@ struct Walker<'a> {
     /// `analyze` (a def whose `...` rides a bracketed return type like
     /// `]: ...` is *not* excluded, matching coverage.py).
     stub_candidates: Vec<(u32, u32, u32)>,
-    /// Whether the body currently being walked is a function body. A bare
-    /// annotation (`x: int`, no value) is a statement at module/class scope but
-    /// never inside a function (locals aren't annotated).
-    in_function: bool,
-    /// Whether the file has `from __future__ import annotations`. Only then
-    /// does a bare module/class annotation produce a statement: PEP 563 stores
-    /// the stringized annotation into `__annotations__` eagerly (bytecode on
-    /// that line), whereas under PEP 649 (Python 3.14 default, no future
-    /// import) annotations are lazy in a separate `__annotate__` object, so
-    /// coverage.py counts no line for them. Matches coverage.py on 3.14.
+    /// The immediate scope of the body being walked. Decides whether a bare
+    /// annotation (`x: T`, no value) counts: module-level always does;
+    /// function-level never does (locals aren't annotated); class-level depends
+    /// on `future_annotations` / a nested code object (see the AnnAssign arm).
+    scope: BodyScope,
+    /// Whether the file has `from __future__ import annotations`. Under PEP 563
+    /// a class annotation stores its stringized form into `__annotations__`
+    /// eagerly (bytecode on that line), so coverage.py counts it; under PEP 649
+    /// (Python 3.14 default, no future import) class annotations are lazy in a
+    /// separate `__annotate__` object and coverage.py counts a line only when
+    /// the annotation builds a nested code object (a lambda/generator).
     future_annotations: bool,
 }
 
@@ -97,7 +108,7 @@ pub fn analyze(source: &str, excludes: &[regex::Regex]) -> Option<FileAnalysis> 
         multiline: BTreeMap::new(),
         stub_excluded: BTreeSet::new(),
         stub_candidates: Vec::new(),
-        in_function: false,
+        scope: BodyScope::Module,
         future_annotations: module_has_future_annotations(&parsed.syntax().body),
     };
     walker.exclude_leading_docstring(&parsed.syntax().body);
@@ -274,10 +285,10 @@ impl Walker<'_> {
                 self.fold_multiline(def.name.range().start(), sig_end);
                 self.record_span(stmt, def.name.range().start());
                 self.exclude_leading_docstring(&def.body);
-                let prev = self.in_function;
-                self.in_function = true;
+                let prev = self.scope;
+                self.scope = BodyScope::Function;
                 self.visit_body(&def.body, EXIT);
-                self.in_function = prev;
+                self.scope = prev;
             }
             Stmt::ClassDef(def) => {
                 for decorator in &def.decorator_list {
@@ -286,12 +297,12 @@ impl Walker<'_> {
                 self.mark(def.name.range().start());
                 self.record_span(stmt, def.name.range().start());
                 self.exclude_leading_docstring(&def.body);
-                // A class body annotates into `__annotations__`, even nested in
-                // a function, so its bare annotations count.
-                let prev = self.in_function;
-                self.in_function = false;
+                // A class body is its own annotation scope, even nested in a
+                // function.
+                let prev = self.scope;
+                self.scope = BodyScope::Class;
                 self.visit_body(&def.body, EXIT);
-                self.in_function = prev;
+                self.scope = prev;
             }
             Stmt::If(if_stmt) => {
                 self.mark(start);
@@ -475,11 +486,25 @@ impl Walker<'_> {
             }
             // Compile-time directives: no bytecode, no events.
             Stmt::Global(_) | Stmt::Nonlocal(_) => {}
-            // A bare annotation (`x: int`, no value) counts as a statement at
-            // module/class scope only under `from __future__ import
-            // annotations` (eager string store); never inside a function.
+            // A bare annotation (`x: T`, no value). coverage.py counts it:
+            //  - at module scope: always;
+            //  - at class scope: under `from __future__ import annotations`
+            //    (eager string store), or when the annotation builds a nested
+            //    code object — a lambda/generator — whose line PEP 649's lazy
+            //    `__annotate__` still emits (a plain `x: int` does not);
+            //  - never inside a function (locals aren't annotated).
             Stmt::AnnAssign(ann) if ann.value.is_none() => {
-                if !self.in_function && self.future_annotations {
+                let counts = match self.scope {
+                    BodyScope::Module => true,
+                    BodyScope::Class => {
+                        self.future_annotations
+                            || any_over_expr(&ann.annotation, |e| {
+                                matches!(e, Expr::Lambda(_) | Expr::Generator(_))
+                            })
+                    }
+                    BodyScope::Function => false,
+                };
+                if counts {
                     self.mark(start);
                     self.record_span(stmt, start);
                     self.fold_multiline(start, stmt.range());
@@ -689,6 +714,35 @@ class C:
         assert_eq!(executable(src), vec![1, 2, 3, 4]);
         // A bare module-level `...` is excluded; the assignment around it counts.
         assert_eq!(executable("A = 1\n...\nB = 2\n"), vec![1, 3]);
+    }
+
+    #[test]
+    fn bare_annotation_counts_by_scope_without_future() {
+        // No `from __future__ import annotations` (PEP 649 lazy). coverage.py:
+        // module annotation counts; class annotation counts only if it builds
+        // a nested code object (lambda/generator); function-local never counts.
+        let src = "\
+module_ann: int
+module_lambda: Annotated[int, lambda v: v]
+
+
+class C:
+    class_ann: int
+    class_lambda: Annotated[int, lambda v: v]
+    class_with_val: int = 1
+
+
+def f() -> None:
+    local_ann: int
+";
+        assert_eq!(executable(src), vec![1, 2, 5, 7, 8, 11]);
+    }
+
+    #[test]
+    fn bare_class_annotation_counts_under_future_import() {
+        // PEP 563: class annotations are stored eagerly, so they count.
+        let src = "from __future__ import annotations\n\n\nclass C:\n    a: int\n    b: str\n";
+        assert_eq!(executable(src), vec![1, 4, 5, 6]);
     }
 
     #[test]
