@@ -165,6 +165,22 @@ class TopRequest:
         else:
             self._finalizers.append(finalizer)
 
+    def applymarker(self, marker):
+        """Apply a marker to the underlying test item (pytest's
+        request.applymarker → node.add_marker): validate it and make it visible
+        in item.keywords. Append straight to own_markers rather than going
+        through Node.add_marker, whose global add-marks recording would leak the
+        mark onto the live test that built this static item."""
+        from pytest._marks import Mark, MarkDecorator
+
+        if isinstance(marker, str):
+            marker = Mark(marker)
+        elif isinstance(marker, MarkDecorator):
+            marker = marker.mark
+        else:
+            raise ValueError(f"{marker!r} is not a Mark or MarkDecorator")
+        self._pyfuncitem.own_markers.append(marker)
+
     def __repr__(self):
         return f"<FixtureRequest for {self._pyfuncitem!r}>"
 
