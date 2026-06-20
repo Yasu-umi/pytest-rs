@@ -23,12 +23,25 @@ struct Walker<'a> {
     branches: BTreeMap<u32, Vec<i64>>,
     loops: BTreeSet<u32>,
     multiline: BTreeMap<u32, u32>,
-    /// Lines of `...`-only stub defs. coverage.py excludes these entirely;
-    /// they are merged into `excluded` so the def line — which *does* run at
-    /// import and would otherwise be re-added by the runtime-covered union —
-    /// stays out of the denominator.
+    /// Lines coverage.py excludes via AST rather than a pragma: leading
+    /// docstrings (module/class/function). Merged into `excluded` so an
+    /// import-time `__doc__ =` event can't re-add them via the covered union.
     stub_excluded: BTreeSet<u32>,
+    /// `...`-body defs as `(ellipsis_line, first_line, end_line)`. coverage.py
+    /// excludes the whole def (decorators..body) only when the source line of
+    /// the `...` matches its stub regex — resolved against the source in
+    /// `analyze` (a def whose `...` rides a bracketed return type like
+    /// `]: ...` is *not* excluded, matching coverage.py).
+    stub_candidates: Vec<(u32, u32, u32)>,
 }
+
+/// coverage.py's default stub exclusion (one of its DEFAULT_EXCLUDE entries):
+/// a line that is `...`, optionally prefixed by a one-line def signature whose
+/// parameter list closes with `)` on that same line. Matches `def f(): ...`,
+/// `) -> int: ...`, and a bare `...`; does NOT match `]: ...`.
+static STUB_LINE_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+    regex::Regex::new(r"^\s*(((async )?def .*?)?\)(\s*->.*?)?:\s*)?\.\.\.\s*(#|$)").unwrap()
+});
 
 /// Branch destination for "control leaves the enclosing scope".
 pub const EXIT: i64 = -1;
@@ -67,11 +80,25 @@ pub fn analyze(source: &str, excludes: &[regex::Regex]) -> Option<FileAnalysis> 
         loops: BTreeSet::new(),
         multiline: BTreeMap::new(),
         stub_excluded: BTreeSet::new(),
+        stub_candidates: Vec::new(),
     };
     walker.exclude_leading_docstring(&parsed.syntax().body);
     walker.visit_body(&parsed.syntax().body, EXIT);
 
+    let source_lines: Vec<&str> = source.lines().collect();
+    let line_text = |lineno: u32| source_lines.get(lineno as usize - 1).copied().unwrap_or("");
+
     let mut excluded: BTreeSet<u32> = walker.stub_excluded.clone();
+    // A `...`-body def is excluded (decorators through body) only when the
+    // source line of its `...` matches coverage.py's stub regex, mirroring
+    // coverage.py exactly: `def f(): ...`, `) -> int: ...` and a bare `...`
+    // exclude the whole def, but a bracketed return type ending `]: ...` does
+    // not, so that def stays counted.
+    for (ellipsis_line, first, end) in &walker.stub_candidates {
+        if STUB_LINE_RE.is_match(line_text(*ellipsis_line)) {
+            excluded.extend(*first..=*end);
+        }
+    }
     for (lineno, line) in source.lines().enumerate() {
         if excludes.iter().any(|pattern| pattern.is_match(line)) {
             let line_number = (lineno + 1) as u32;
@@ -147,9 +174,6 @@ impl Walker<'_> {
                 Stmt::Expr(e) if is_constant_literal(&e.value) => continue,
                 Stmt::Global(_) | Stmt::Nonlocal(_) => continue,
                 Stmt::AnnAssign(a) if a.value.is_none() => continue,
-                // A `...`-only stub produces no event (excluded), so it is
-                // not a branch destination — skip to the next statement.
-                Stmt::FunctionDef(def) if is_stub_body(&def.body) => continue,
                 Stmt::FunctionDef(def) => {
                     let offset = def
                         .decorator_list
@@ -198,26 +222,38 @@ impl Walker<'_> {
         let start = stmt.range().start();
         match stmt {
             Stmt::FunctionDef(def) => {
-                // A `...`-only stub (overload/abstractmethod/Protocol/plain):
-                // coverage.py excludes the whole def from the statement count.
-                // Record every line it spans (decorators through body) as
-                // excluded so the import-time `def` event can't re-add it.
-                if is_stub_body(&def.body) {
+                // A `...`-body stub (overload/abstractmethod/Protocol/plain):
+                // record it as a candidate. Whether coverage.py excludes the
+                // whole def depends on the `...`'s source line (resolved in
+                // `analyze`), so mark the def normally here — the exclusion, if
+                // any, removes it afterward; otherwise it stays counted.
+                if let Some(ellipsis) = stub_ellipsis(&def.body) {
                     let start_offset = def
                         .decorator_list
                         .first()
                         .map(|d| d.range().start())
                         .unwrap_or(start);
-                    let first = self.line(start_offset);
-                    let last = self.line(stmt.range().end());
-                    self.stub_excluded.extend(first..=last);
-                    return;
+                    self.stub_candidates.push((
+                        self.line(ellipsis.range().start()),
+                        self.line(start_offset),
+                        self.line(stmt.range().end()),
+                    ));
                 }
                 for decorator in &def.decorator_list {
                     self.mark(decorator.range().start());
                 }
                 // The `def` line (its name token), not the first decorator.
                 self.mark(def.name.range().start());
+                // Fold a multi-line signature onto the def line so runtime LINE
+                // events on its continuation lines (and an inline `...`/return
+                // riding the closing line) don't inflate the count — coverage.py
+                // folds multi-line statements the same way.
+                let sig_end = def
+                    .returns
+                    .as_ref()
+                    .map(|r| r.range())
+                    .unwrap_or_else(|| def.parameters.range());
+                self.fold_multiline(def.name.range().start(), sig_end);
                 self.record_span(stmt, def.name.range().start());
                 self.exclude_leading_docstring(&def.body);
                 self.visit_body(&def.body, EXIT);
@@ -358,13 +394,12 @@ impl Walker<'_> {
     }
 }
 
-/// A `def`/`async def` body coverage.py treats as a non-executable stub: a
-/// single `...` (Ellipsis) expression, optionally preceded by a docstring.
-/// `@overload`, `@abstractmethod`, `Protocol` methods and bare stubs all match,
-/// and coverage.py excludes the whole def (decorators, signature, body) from
-/// the statement count by default. A docstring-only or `pass` body does *not*
-/// match — only an explicit `...` does, matching coverage.py.
-fn is_stub_body(body: &[Stmt]) -> bool {
+/// The `...` (Ellipsis) expression of a stub body: a single `...` statement,
+/// optionally preceded by a docstring (overload/abstractmethod/Protocol/plain
+/// stubs). Returns None for any other body. The caller decides whether the def
+/// is excluded based on the `...`'s source line, matching coverage.py — a
+/// `pass` or real-statement body is never a stub.
+fn stub_ellipsis(body: &[Stmt]) -> Option<&Expr> {
     let mut stmts = body.iter();
     let mut current = stmts.next();
     // Skip a single leading docstring.
@@ -373,8 +408,16 @@ fn is_stub_body(body: &[Stmt]) -> bool {
     {
         current = stmts.next();
     }
-    matches!(current, Some(Stmt::Expr(e)) if matches!(&*e.value, Expr::EllipsisLiteral(_)))
-        && stmts.next().is_none()
+    // Anything beyond the (optional docstring +) one statement disqualifies it.
+    if stmts.next().is_some() {
+        return None;
+    }
+    match current {
+        Some(Stmt::Expr(e)) if matches!(&*e.value, Expr::EllipsisLiteral(_)) => {
+            Some(e.value.as_ref())
+        }
+        _ => None,
+    }
 }
 
 fn is_constant_literal(expr: &Expr) -> bool {
@@ -441,6 +484,43 @@ class Base:
     #[test]
     fn body_with_real_statement_is_not_a_stub() {
         assert_eq!(executable("def f():\n    return 1\n"), vec![1, 2]);
+    }
+
+    #[test]
+    fn bare_ellipsis_body_excludes_the_def() {
+        // `def b():` + a bare `...` on its own line: coverage.py excludes the
+        // whole def, so only `real`/`return` count.
+        let src = "def b():\n    ...\ndef real():\n    return 1\n";
+        assert_eq!(executable(src), vec![3, 4]);
+    }
+
+    #[test]
+    fn multiline_stub_excluded_only_when_ellipsis_line_matches() {
+        // `d` ends `) -> int: ...` (matches coverage.py's stub regex) -> the
+        // whole def is excluded. `e` ends `]: ...` (a bracketed return type,
+        // which does NOT match) -> the def line stays counted, like
+        // coverage.py. Only line 1 (import) and line 5 (`def e(`) count.
+        let src = "\
+from typing import overload
+
+
+def d(
+    x: int,
+) -> int: ...
+";
+        // Wrong indices below would catch a regression; `d` is fully excluded.
+        assert_eq!(executable(src), vec![1]);
+        let src_e = "\
+from typing import overload
+
+
+def e(
+    x: int,
+) -> tuple[
+    int,
+]: ...
+";
+        assert_eq!(executable(src_e), vec![1, 4]);
     }
 
     #[test]
