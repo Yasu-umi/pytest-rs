@@ -233,7 +233,11 @@ pub(crate) fn register_fixtures_from_skip(
         if skip_names.contains(&attr_name.as_str()) {
             continue;
         }
-        if !value.is_callable() || !value.hasattr("_pytestfixturefunction")? {
+        // A module-level object whose attribute access raises (an "evil"
+        // object with a throwing __getattr__, #214) is not a fixture; treat a
+        // failing probe as a miss rather than erroring collection (pytest's
+        // safe_getattr).
+        if !value.is_callable() || !value.hasattr("_pytestfixturefunction").unwrap_or(false) {
             continue;
         }
         register_fixture_def(py, &attr_name, &value, baseid, false, registry)?;
