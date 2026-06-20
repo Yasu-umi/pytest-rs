@@ -66,6 +66,42 @@ CARGO_TARGET_DIR=target-prof ... cargo build --profile profiling
 samply record -- target-prof/profiling/pytest-rs-bin tests --collect-only -q
 ```
 
+## 4. `suites.sh` — end-to-end suite benchmarks (the README perf table)
+
+Reproduces the numbers in the README **Performance** table by cloning real
+open-source suites at pinned tags, setting up a venv, and timing real pytest
+vs pytest-rs (median of N, real/rs interleaved so the ratio survives background
+load). The checkouts are disposable — no submodules; clone, measure, delete.
+
+```sh
+bench/suites.sh target/release/pytest-rs-bin /tmp/perf            # all suites
+bench/suites.sh target/release/pytest-rs-bin /tmp/perf click      # one suite
+rm -rf /tmp/perf                                                  # discard
+```
+
+| suite | tag | `--cov` target | parallel mode | test deps |
+|---|---|---|---|---|
+| marshmallow | 4.1.1 | `marshmallow` | `-n 3` (xdist) | `simplejson==4.1.1` |
+| click | 8.3.1 | `click` | `-n 3` (xdist) | — |
+| pydantic | v2.13.4 | `pydantic` | `--parallel-threads 3` | `hypothesis`, `pytest-run-parallel` |
+
+Gotchas baked into the script (why pinned/why these flags):
+
+- **Pin the versions, don't track latest.** The *latest* marshmallow/click
+  releases don't run clean out of the box — marshmallow's suite imports
+  `simplejson` (a test-only dep), and click's latest has collection errors —
+  so a naive run measures a near-empty/error run, not real work. The pinned
+  tags match the conformance submodules and pass under pytest-rs at 100%.
+- **pydantic is parallelized with `pytest-run-parallel`, not xdist.** Its
+  Makefile runs `pytest --parallel-threads N`; plain `pytest -n 3` (xdist)
+  fails on pydantic with a "different tests collected" error. pytest-rs loads
+  `pytest-run-parallel` too, so both runners are measured under
+  `--parallel-threads 3` for an apples-to-apples parallel comparison.
+- **Real baseline is pytest 9.0.3** (the version pytest-rs reproduces) for
+  marshmallow/click; pydantic keeps its own pinned pytest from `uv sync`.
+- Coverage is the interesting axis: pytest-rs uses `sys.monitoring`, real
+  pytest uses `coverage.py`'s trace hooks, so the gap is widest on `--cov`.
+
 ## Build/run constraints (see project memory)
 
 - The conformance runner uses `target/debug`; **don't `cargo build` (debug) while it runs**. Profiling builds go to a *separate* `CARGO_TARGET_DIR` (`target-prof`), which is safe to run in parallel.
