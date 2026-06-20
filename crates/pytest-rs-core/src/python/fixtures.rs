@@ -289,6 +289,27 @@ pub(crate) fn register_fixture_def(
     let autouse: bool = marker.getattr("autouse")?.is_truthy()?;
     let explicit_name: Option<String> = marker.getattr("name")?.extract()?;
     let name = explicit_name.unwrap_or_else(|| attr_name.to_string());
+    // "request" is reserved (it is the fixture-request pseudo-fixture); a
+    // fixture claiming that name fails collection (pytest's parsefactories),
+    // pointing at the offending factory's definition site.
+    if name == "request" {
+        let location = value
+            .getattr("__code__")
+            .and_then(|code| {
+                let file: String = code.getattr("co_filename")?.extract()?;
+                // pytest's getlocation reports co_firstlineno + 1 (the def line
+                // for a decorated factory, not the decorator line).
+                let lineno: u32 = code.getattr("co_firstlineno")?.extract()?;
+                Ok(format!("{file}:{}", lineno + 1))
+            })
+            .unwrap_or_else(|_: PyErr| name.clone());
+        let msg =
+            format!("'request' is a reserved word for fixtures, use another name:\n  {location}");
+        let failed = py.import("pytest._outcomes")?.getattr("Failed")?;
+        let exc = failed.call1((msg,))?;
+        exc.setattr("pytrace", false)?;
+        return Err(PyErr::from_value(exc));
+    }
     let flags = async_flags(py, value)?;
     let mut param_names = param_names(py, value)?;
     // Binding to the test instance consumes the first parameter whatever
