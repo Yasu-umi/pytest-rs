@@ -230,6 +230,10 @@ impl CovPlugin {
         if patterns.is_empty() {
             patterns.push(analysis::DEFAULT_EXCLUDE.to_string());
         }
+        // coverage.py keeps the `if TYPE_CHECKING:` default regardless of a
+        // custom exclude_lines (it ships as an always-on default), so apply it
+        // unconditionally.
+        patterns.push(analysis::DEFAULT_EXCLUDE_TYPE_CHECKING.to_string());
         patterns
             .iter()
             .filter_map(|pattern| regex::Regex::new(pattern).ok())

@@ -33,6 +33,17 @@ struct Walker<'a> {
     /// `analyze` (a def whose `...` rides a bracketed return type like
     /// `]: ...` is *not* excluded, matching coverage.py).
     stub_candidates: Vec<(u32, u32, u32)>,
+    /// Whether the body currently being walked is a function body. A bare
+    /// annotation (`x: int`, no value) is a statement at module/class scope but
+    /// never inside a function (locals aren't annotated).
+    in_function: bool,
+    /// Whether the file has `from __future__ import annotations`. Only then
+    /// does a bare module/class annotation produce a statement: PEP 563 stores
+    /// the stringized annotation into `__annotations__` eagerly (bytecode on
+    /// that line), whereas under PEP 649 (Python 3.14 default, no future
+    /// import) annotations are lazy in a separate `__annotate__` object, so
+    /// coverage.py counts no line for them. Matches coverage.py on 3.14.
+    future_annotations: bool,
 }
 
 /// coverage.py's default stub exclusion (one of its DEFAULT_EXCLUDE entries):
@@ -66,6 +77,11 @@ pub struct FileAnalysis {
 /// coverage.py's default exclude_lines regex (`# pragma: no cover`).
 pub const DEFAULT_EXCLUDE: &str = r"#\s*(pragma|PRAGMA)[:\s]?\s*(no|NO)\s*(cover|COVER)";
 
+/// coverage.py's other default exclusion: an `if TYPE_CHECKING:` block, whose
+/// body only runs under a type checker. (`...`-stub exclusion, the third
+/// default, is handled structurally in the AST walk instead of as a regex.)
+pub const DEFAULT_EXCLUDE_TYPE_CHECKING: &str = r"if (typing\.)?TYPE_CHECKING:";
+
 /// The executable lines of `source`, or None if it does not parse.
 /// `excludes` are the effective exclude_lines regexes: a match on a
 /// statement's header line excludes the whole statement.
@@ -81,6 +97,8 @@ pub fn analyze(source: &str, excludes: &[regex::Regex]) -> Option<FileAnalysis> 
         multiline: BTreeMap::new(),
         stub_excluded: BTreeSet::new(),
         stub_candidates: Vec::new(),
+        in_function: false,
+        future_annotations: module_has_future_annotations(&parsed.syntax().body),
     };
     walker.exclude_leading_docstring(&parsed.syntax().body);
     walker.visit_body(&parsed.syntax().body, EXIT);
@@ -256,7 +274,10 @@ impl Walker<'_> {
                 self.fold_multiline(def.name.range().start(), sig_end);
                 self.record_span(stmt, def.name.range().start());
                 self.exclude_leading_docstring(&def.body);
+                let prev = self.in_function;
+                self.in_function = true;
                 self.visit_body(&def.body, EXIT);
+                self.in_function = prev;
             }
             Stmt::ClassDef(def) => {
                 for decorator in &def.decorator_list {
@@ -265,11 +286,30 @@ impl Walker<'_> {
                 self.mark(def.name.range().start());
                 self.record_span(stmt, def.name.range().start());
                 self.exclude_leading_docstring(&def.body);
+                // A class body annotates into `__annotations__`, even nested in
+                // a function, so its bare annotations count.
+                let prev = self.in_function;
+                self.in_function = false;
                 self.visit_body(&def.body, EXIT);
+                self.in_function = prev;
             }
             Stmt::If(if_stmt) => {
                 self.mark(start);
-                self.record_span(stmt, start);
+                // An exclusion matching the `if` header (e.g. a `# pragma` or
+                // `if TYPE_CHECKING:`) drops the test and the if-body, but not
+                // any elif/else clauses — those still run. So the span ends at
+                // the if-body, not at the whole statement (which would swallow
+                // a runtime `else:`).
+                let if_body_end = if_stmt
+                    .body
+                    .last()
+                    .map(|s| self.line(s.range().end()))
+                    .unwrap_or_else(|| self.line(start));
+                self.spans.push(Span {
+                    header: self.line(start),
+                    start: self.line(start),
+                    end: if_body_end,
+                });
                 self.fold_multiline(start, if_stmt.test.range());
                 let line = self.line(start);
                 // Chain: each tested clause branches to its body or onward
@@ -279,16 +319,26 @@ impl Walker<'_> {
                     vec![(line, &if_stmt.test, &if_stmt.body)];
                 let mut bare_else: Option<&[Stmt]> = None;
                 for clause in &if_stmt.elif_else_clauses {
+                    // Each elif/else clause gets its own span, so a `# pragma`
+                    // on the clause line excludes that clause's body (the if's
+                    // own span covers only the if-body).
+                    let clause_line = self.line(clause.range.start());
+                    let clause_end = clause
+                        .body
+                        .last()
+                        .map(|s| self.line(s.range().end()))
+                        .unwrap_or(clause_line);
+                    self.spans.push(Span {
+                        header: clause_line,
+                        start: clause_line,
+                        end: clause_end,
+                    });
                     match &clause.test {
                         Some(test) => {
                             // elif: the test executes. (A bare else has no
                             // event.)
                             self.mark(clause.range.start());
-                            headers.push((
-                                self.line(clause.range.start()),
-                                test,
-                                clause.body.as_slice(),
-                            ));
+                            headers.push((clause_line, test, clause.body.as_slice()));
                         }
                         None => bare_else = Some(clause.body.as_slice()),
                     }
@@ -353,11 +403,36 @@ impl Walker<'_> {
             }
             Stmt::Try(try_stmt) => {
                 self.mark(start);
-                self.record_span(stmt, start);
+                // The try's own span covers only the try-body, so a `# pragma`
+                // on `try:` doesn't swallow the handlers/else/finally (which
+                // still run); each clause below gets its own span.
+                let try_body_end = try_stmt
+                    .body
+                    .last()
+                    .map(|s| self.line(s.range().end()))
+                    .unwrap_or_else(|| self.line(start));
+                self.spans.push(Span {
+                    header: self.line(start),
+                    start: self.line(start),
+                    end: try_body_end,
+                });
                 self.visit_body(&try_stmt.body, next);
                 for handler in &try_stmt.handlers {
                     let ExceptHandler::ExceptHandler(handler) = handler;
                     self.mark(handler.range().start());
+                    // Per-handler span: a `# pragma` on `except ...:` excludes
+                    // that handler's body.
+                    let h_line = self.line(handler.range().start());
+                    let h_end = handler
+                        .body
+                        .last()
+                        .map(|s| self.line(s.range().end()))
+                        .unwrap_or(h_line);
+                    self.spans.push(Span {
+                        header: h_line,
+                        start: h_line,
+                        end: h_end,
+                    });
                     self.visit_body(&handler.body, next);
                 }
                 self.visit_body(&try_stmt.orelse, next);
@@ -369,6 +444,19 @@ impl Walker<'_> {
                 self.fold_multiline(start, match_stmt.subject.range());
                 for case in &match_stmt.cases {
                     self.mark(case.range.start());
+                    // Per-case span: a `# pragma` on a `case ...:` line excludes
+                    // that case's body (e.g. `case _: assert_never(x)`).
+                    let case_line = self.line(case.range.start());
+                    let case_end = case
+                        .body
+                        .last()
+                        .map(|s| self.line(s.range().end()))
+                        .unwrap_or(case_line);
+                    self.spans.push(Span {
+                        header: case_line,
+                        start: case_line,
+                        end: case_end,
+                    });
                     self.visit_body(&case.body, next);
                 }
             }
@@ -387,8 +475,16 @@ impl Walker<'_> {
             }
             // Compile-time directives: no bytecode, no events.
             Stmt::Global(_) | Stmt::Nonlocal(_) => {}
-            // Annotation without value generates no code.
-            Stmt::AnnAssign(ann) if ann.value.is_none() => {}
+            // A bare annotation (`x: int`, no value) counts as a statement at
+            // module/class scope only under `from __future__ import
+            // annotations` (eager string store); never inside a function.
+            Stmt::AnnAssign(ann) if ann.value.is_none() => {
+                if !self.in_function && self.future_annotations {
+                    self.mark(start);
+                    self.record_span(stmt, start);
+                    self.fold_multiline(start, stmt.range());
+                }
+            }
             _ => {
                 self.mark(start);
                 self.record_span(stmt, start);
@@ -398,28 +494,42 @@ impl Walker<'_> {
     }
 }
 
-/// The `...` (Ellipsis) expression of a stub body: a single `...` statement,
-/// optionally preceded by a docstring (overload/abstractmethod/Protocol/plain
-/// stubs). Returns None for any other body. The caller decides whether the def
-/// is excluded based on the `...`'s source line, matching coverage.py — a
-/// `pass` or real-statement body is never a stub.
-fn stub_ellipsis(body: &[Stmt]) -> Option<&Expr> {
-    let mut stmts = body.iter();
-    let mut current = stmts.next();
-    // Skip a single leading docstring.
-    if let Some(Stmt::Expr(e)) = current
-        && matches!(&*e.value, Expr::StringLiteral(_))
-    {
-        current = stmts.next();
-    }
-    // Anything beyond the (optional docstring +) one statement disqualifies it.
-    if stmts.next().is_some() {
-        return None;
-    }
-    match current {
-        Some(Stmt::Expr(e)) if matches!(&*e.value, Expr::EllipsisLiteral(_)) => {
-            Some(e.value.as_ref())
+/// Whether the module begins with `from __future__ import annotations`
+/// (future imports must precede other code, so only the leading run of
+/// imports needs checking).
+fn module_has_future_annotations(body: &[Stmt]) -> bool {
+    for stmt in body {
+        match stmt {
+            // A leading module docstring is allowed before future imports.
+            Stmt::Expr(e) if matches!(&*e.value, Expr::StringLiteral(_)) => continue,
+            Stmt::ImportFrom(import) => {
+                if import
+                    .module
+                    .as_ref()
+                    .is_some_and(|m| m.as_str() == "__future__")
+                    && import
+                        .names
+                        .iter()
+                        .any(|n| n.name.as_str() == "annotations")
+                {
+                    return true;
+                }
+            }
+            // Future imports must come first; once real code starts, stop.
+            _ => break,
         }
+    }
+    false
+}
+
+/// The `...` expression of a stub body whose *sole* statement is `...`
+/// (overload/abstractmethod/Protocol/plain stubs). Returns None for any other
+/// body — including a docstring followed by `...`, which coverage.py counts
+/// (the def line stays a statement; only the `...` and docstring drop). The
+/// caller decides exclusion from the `...`'s source line.
+fn stub_ellipsis(body: &[Stmt]) -> Option<&Expr> {
+    match body {
+        [Stmt::Expr(e)] if matches!(&*e.value, Expr::EllipsisLiteral(_)) => Some(e.value.as_ref()),
         _ => None,
     }
 }
@@ -474,9 +584,11 @@ class Base:
     }
 
     #[test]
-    fn docstring_then_ellipsis_is_a_stub() {
+    fn docstring_then_ellipsis_keeps_the_def_line() {
+        // coverage.py excludes only a *sole* `...` body; a docstring before it
+        // keeps the def line counted (the docstring and `...` still drop).
         let src = "def f():\n    \"\"\"doc\"\"\"\n    ...\n";
-        assert!(executable(src).is_empty());
+        assert_eq!(executable(src), vec![1]);
     }
 
     #[test]
