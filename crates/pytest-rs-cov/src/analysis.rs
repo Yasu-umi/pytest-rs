@@ -373,9 +373,13 @@ impl Walker<'_> {
                 }
             }
             Stmt::Expr(expr_stmt) => {
-                // Constant expression statements (docstrings, bare literals)
-                // are optimized away by CPython and never produce events.
-                if !is_constant_literal(&expr_stmt.value) {
+                // coverage.py counts a bare expression statement, including a
+                // constant one (a PEP 257 attribute docstring, or a bare
+                // string/number/bool); CPython 3.13 and 3.14 both emit a line
+                // event for it. Only `...` is exempt (excluded via the stub
+                // regex), and a leading docstring is dropped separately by
+                // exclude_leading_docstring.
+                if !matches!(&*expr_stmt.value, Expr::EllipsisLiteral(_)) {
                     self.mark(start);
                     self.record_span(stmt, start);
                     self.fold_multiline(start, stmt.range());
@@ -556,6 +560,23 @@ def e(
             executable("\"\"\"line one\nline two\n\"\"\"\nX = 1\n"),
             vec![4]
         );
+    }
+
+    #[test]
+    fn bare_constant_statements_are_counted_except_ellipsis() {
+        // coverage.py counts a bare constant statement — a PEP 257 attribute
+        // docstring or a bare string/number/bool — on 3.13 and 3.14 alike;
+        // only `...` and a leading docstring are dropped.
+        let src = "\
+class C:
+    X = 1
+    \"\"\"attribute docstring\"\"\"
+    Y = 2
+";
+        // `class C`, `X = 1`, the attribute docstring, and `Y = 2` all count.
+        assert_eq!(executable(src), vec![1, 2, 3, 4]);
+        // A bare module-level `...` is excluded; the assignment around it counts.
+        assert_eq!(executable("A = 1\n...\nB = 2\n"), vec![1, 3]);
     }
 
     #[test]
