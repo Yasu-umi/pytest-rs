@@ -14,6 +14,28 @@ import warnings
 from typing import Any
 
 
+def plugin_instance_fixtures() -> list:
+    """(name, bound_method) for @pytest.fixture methods on non-module plugin
+    instances registered via config.pluginmanager.register() (#2270). The bound
+    method already carries `self`, so the engine can register it as a plain
+    global fixture. The engine still validates each marker, so non-fixture
+    callables that slip through are ignored."""
+    out = []
+    for plugin in pluginmanager._plugins:
+        if isinstance(plugin, types.ModuleType):
+            continue
+        for attr in dir(plugin):
+            if attr.startswith("__"):
+                continue
+            try:
+                member = getattr(plugin, attr)
+            except Exception:
+                continue
+            if callable(member) and getattr(member, "_pytestfixturefunction", None) is not None:
+                out.append((attr, member))
+    return out
+
+
 def instance_hook_impls(name: str) -> list:
     """Hook impls registered on non-module plugin objects (instances
     registered at configure time, e.g. pytest-run-parallel's runner).

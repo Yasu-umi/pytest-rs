@@ -423,6 +423,23 @@ impl Engine {
     /// reporter, fire pytest_configure / pytest_sessionstart, and print the
     /// session header. Returns `Ok(true)` when `--markers` short-circuits
     /// collection (the caller returns its accumulated errors immediately).
+    /// Register @pytest.fixture methods from plugin *instances* registered via
+    /// `config.pluginmanager.register()` in pytest_configure (#2270). The
+    /// bound method carries `self`, so each becomes a plain global fixture.
+    fn register_plugin_instance_fixtures(&mut self, py: Python<'_>) -> PyResult<()> {
+        let entries = py
+            .import("pytest._pluginmanager")?
+            .getattr("plugin_instance_fixtures")?
+            .call0()?;
+        for entry in entries.try_iter()? {
+            let entry = entry?;
+            let name: String = entry.get_item(0)?.extract()?;
+            let bound = entry.get_item(1)?;
+            python::register_fixture_def(py, &name, &bound, "", false, &mut self.session.registry)?;
+        }
+        Ok(())
+    }
+
     fn fire_configure_and_print_header(
         &mut self,
         py: Python<'_>,
@@ -464,6 +481,12 @@ impl Engine {
                 eprintln!("Exit: {exit_msg}");
                 return Err(format!("\x00EXIT\x00{code}"));
             }
+            errors.push((rootdir.to_path_buf(), python::format_exception(py, &err)));
+        }
+        // A plugin instance registered in pytest_configure (#2270) may define
+        // @pytest.fixture methods; register them as global fixtures bound to
+        // the instance, so tests can request them.
+        if let Err(err) = self.register_plugin_instance_fixtures(py) {
             errors.push((rootdir.to_path_buf(), python::format_exception(py, &err)));
         }
         // A plugin swapped in its own terminal reporter: suppress native
