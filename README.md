@@ -69,18 +69,18 @@ Startup, collection, fixture orchestration, coverage measurement, and parallel w
 - **`-n` parallel runs** — workers are forked (not spawned), so each worker inherits a warm interpreter with all imports already done. Startup per worker drops from seconds to milliseconds.
 - **Large collections** — fixture resolution and parametrize expansion run in Rust; suites with thousands of tests see faster collection.
 
-Benchmarks on open-source projects (macOS arm64, release build, median of 3 warm runs):
+Benchmarks on open-source projects (macOS arm64, median of 3 warm runs), reproducible with [`bench/suites.sh`](bench/README.md) — clones each suite at a pinned tag, installs pytest-rs into its venv, and times both runners. The plain (no-coverage) rows are the floor: test bodies dominate, so both runners are close; the win shows up under `--cov` (native `sys.monitoring` vs `coverage.py`) and `-n` parallelism.
 
+<!-- perf-results:start -->
 | suite (tests) | mode | pytest | pytest-rs | speedup |
 |---|---|---:|---:|---|
-| pydantic (12 750) | `--cov` | 3.64 s | 1.90 s | **1.9x** |
-| pydantic (12 750) | `--parallel-threads 3 --cov` ¹ | 3.82 s | 1.97 s | **1.9x** |
-| marshmallow (1 119) | `--cov` | 1.65 s | 1.07 s | **1.5x** |
-| marshmallow (1 119) | `-n 3 --cov` | 1.79 s | 0.81 s | **2.2x** |
-| click (1 336) | `--cov` | 3.46 s | 2.19 s | **1.6x** |
-| click (1 336) | `-n 3 --cov` | 3.66 s | 2.35 s | **1.6x** |
-
-¹ pydantic's suite runs under `pytest-run-parallel` (`--parallel-threads`), so both runners are measured with it. Plain `pytest -n 3` (xdist) fails on pydantic with a "different tests collected" error; pytest-rs's fork-based workers avoid this class of issue.
+| marshmallow (1119) | `(plain)` | 1.58 s | 1.69 s | **0.9x** |
+| marshmallow (1119) | `--cov` | 1.88 s | 1.06 s | **1.8x** |
+| marshmallow (1119) | `-n 3 --cov` | 1.84 s | 0.84 s | **2.2x** |
+| click (1336) | `(plain)` | 1.80 s | 1.86 s | **1.0x** |
+| click (1336) | `--cov` | 3.80 s | 2.19 s | **1.7x** |
+| click (1336) | `-n 3 --cov` | 3.98 s | 1.82 s | **2.2x** |
+<!-- perf-results:end -->
 
 For small, CPU-bound suites without coverage or parallelism the test bodies dominate and both runners perform similarly. Try it on your own suite:
 

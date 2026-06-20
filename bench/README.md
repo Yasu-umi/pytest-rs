@@ -69,36 +69,54 @@ samply record -- target-prof/profiling/pytest-rs-bin tests --collect-only -q
 ## 4. `suites.sh` — end-to-end suite benchmarks (the README perf table)
 
 Reproduces the numbers in the README **Performance** table by cloning real
-open-source suites at pinned tags, setting up a venv, and timing real pytest
-vs pytest-rs (median of N, real/rs interleaved so the ratio survives background
-load). The checkouts are disposable — no submodules; clone, measure, delete.
+open-source suites at pinned tags and timing real pytest vs pytest-rs (median of
+N, real/rs interleaved so the ratio survives background load). Three modes per
+suite: plain (no coverage), `--cov`, and the suite's parallel `--cov`. The
+checkouts are disposable — no submodules; clone, measure, delete.
 
 ```sh
-bench/suites.sh target/release/pytest-rs-bin /tmp/perf            # all suites
-bench/suites.sh target/release/pytest-rs-bin /tmp/perf click      # one suite
-rm -rf /tmp/perf                                                  # discard
+bench/suites.sh /tmp/perf                  # all suites, pytest-rs from PyPI
+bench/suites.sh /tmp/perf click            # one suite
+RS_SPEC=. bench/suites.sh /tmp/perf click  # measure a local dev build instead
+rm -rf /tmp/perf                           # discard
 ```
 
-| suite | tag | `--cov` target | parallel mode | test deps |
-|---|---|---|---|---|
-| marshmallow | 4.1.1 | `marshmallow` | `-n 3` (xdist) | `simplejson==4.1.1` |
-| click | 8.3.1 | `click` | `-n 3` (xdist) | — |
-| pydantic | v2.13.4 | `pydantic` | `--parallel-threads 3` | `hypothesis`, `pytest-run-parallel` |
+pytest-rs is **installed into each suite's venv** (the way a user runs it), so it
+self-locates and measures correctly — no external binary path, no `PYTHONHOME`,
+portable across machines and CI. `RS_SPEC` is what to `uv pip install` (default
+`pytest-rs` from PyPI; set to a repo path/wheel for a local build). `PYVER`
+(default 3.13) and `REPS` (default 5) round out the knobs.
 
-Gotchas baked into the script (why pinned/why these flags):
+To add a suite, append one line to `spec()` (`repo|tag|cov-source-path|parallel-flag|extra-deps`);
+it automatically gets all three modes. Pick suites with **several thousand fast
+unit tests** — that's where the framework layer is a real fraction of the wall
+clock. Avoid suites whose runtime is dominated by slow test bodies (property-based
+fuzzing, DB, network): the native engine can't speed up what runs inside a test.
+
+| suite | tag | `--cov` source path | parallel mode | test deps |
+|---|---|---|---|---|
+| marshmallow | 4.1.1 | `src/marshmallow` | `-n 3` (xdist) | `simplejson==4.1.1` |
+| click | 8.3.1 | `src/click` | `-n 3` (xdist) | — |
+
+These are mid-sized suites of fast unit tests, where the framework layer
+(startup, collection, coverage, parallel) is a real fraction of the wall clock.
+Suites dominated by slow test bodies make poor benchmarks: e.g. pydantic's full
+suite is `hypothesis` property-test bound (~40 s of fuzzing), so both runners
+land at ~1.0x — the native engine can't speed up what runs inside a test body.
+
+Gotchas baked into the script (why pinned / why these targets):
 
 - **Pin the versions, don't track latest.** The *latest* marshmallow/click
   releases don't run clean out of the box — marshmallow's suite imports
   `simplejson` (a test-only dep), and click's latest has collection errors —
   so a naive run measures a near-empty/error run, not real work. The pinned
   tags match the conformance submodules and pass under pytest-rs at 100%.
-- **pydantic is parallelized with `pytest-run-parallel`, not xdist.** Its
-  Makefile runs `pytest --parallel-threads N`; plain `pytest -n 3` (xdist)
-  fails on pydantic with a "different tests collected" error. pytest-rs loads
-  `pytest-run-parallel` too, so both runners are measured under
-  `--parallel-threads 3` for an apples-to-apples parallel comparison.
-- **Real baseline is pytest 9.0.3** (the version pytest-rs reproduces) for
-  marshmallow/click; pydantic keeps its own pinned pytest from `uv sync`.
+- **Give `--cov` the in-tree source path, not the package name.** The suites are
+  installed editable, so their source stays at `src/<pkg>`, and both runners
+  measure those files. Passing the path keeps the comparison robust across
+  pytest-rs versions; the script sanity-checks that pytest-rs reports a non-zero
+  statement count and skips the cov rows otherwise.
+- **Real baseline is pytest 9.0.3** — the version pytest-rs reproduces.
 - Coverage is the interesting axis: pytest-rs uses `sys.monitoring`, real
   pytest uses `coverage.py`'s trace hooks, so the gap is widest on `--cov`.
 
