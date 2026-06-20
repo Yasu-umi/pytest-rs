@@ -64,6 +64,11 @@ pub struct FixtureDef {
     /// is requested. pytest raises this from `Scope.from_user` at FixtureDef
     /// construction; we defer it to resolution so collection still proceeds.
     pub scope_error: Option<String>,
+    /// A dynamic scope: `@pytest.fixture(scope=<callable>)`. pytest evaluates
+    /// `callable(fixture_name=…, config=…)` to a scope name. We keep the
+    /// callable and evaluate it at resolution (where the config is available),
+    /// since `scope` above is only a placeholder until then.
+    pub scope_callable: Option<Py<PyAny>>,
 }
 
 /// All fixture definitions visible in this session, name -> defs ordered

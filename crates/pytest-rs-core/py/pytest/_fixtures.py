@@ -50,6 +50,28 @@ def fixture(
     return marker
 
 
+def eval_scope_callable(scope_callable, fixture_name, config):
+    """Evaluate a dynamic `@pytest.fixture(scope=<callable>)` to a scope name,
+    mirroring _pytest.fixtures._eval_scope_callable. The engine validates the
+    returned string. A non-str result fails like upstream."""
+    from _pytest.outcomes import fail
+
+    try:
+        result = scope_callable(fixture_name=fixture_name, config=config)
+    except Exception as e:
+        raise TypeError(
+            f"Error evaluating {scope_callable} while defining fixture '{fixture_name}'.\n"
+            "Expected a function with the signature (*, fixture_name, config)"
+        ) from e
+    if not isinstance(result, str):
+        fail(
+            f"Expected {scope_callable} to return a 'str' while defining fixture "
+            f"'{fixture_name}', but it returned:\n{result!r}",
+            pytrace=False,
+        )
+    return result
+
+
 def yield_fixture(
     fixture_function=None, *, scope="function", params=None, autouse=False, ids=None, name=None
 ):

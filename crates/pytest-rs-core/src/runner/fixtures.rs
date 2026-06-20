@@ -480,13 +480,47 @@ pub(crate) fn resolve_fixture_def(
         return Err(fail_no_trace(py, msg));
     }
 
+    // A dynamic scope (`scope=<callable>`): evaluate the callable now — the
+    // config it is passed is available here — to get the effective scope, like
+    // pytest's _eval_scope_callable + Scope.from_user. A bad return value is
+    // the same "unexpected scope value" failure as a bad literal scope.
+    let scope = match &def.scope_callable {
+        None => def.scope,
+        Some(callable) => {
+            let py_config = python::make_py_config(py, config)?;
+            let result: String = py
+                .import("pytest._fixtures")?
+                .getattr("eval_scope_callable")?
+                .call1((callable.bind(py), def.name.as_str(), py_config))?
+                .extract()?;
+            match Scope::parse(&result) {
+                Some(scope) => scope,
+                None => {
+                    let where_ = def.baseid.trim_end_matches("::");
+                    let from = if where_.is_empty() {
+                        String::new()
+                    } else {
+                        format!("from {where_} ")
+                    };
+                    return Err(fail_no_trace(
+                        py,
+                        &format!(
+                            "Fixture '{}' {from}got an unexpected scope value '{result}'",
+                            def.name
+                        ),
+                    ));
+                }
+            }
+        }
+    };
+
     // ScopeMismatch: a fixture must not request a narrower-scoped fixture than
     // its own (pytest's FixtureRequest._check_scope). The requesting fixture is
     // the one whose dependencies we are resolving — the top of the stack. The
     // check precedes the cache lookup because pytest reports the mismatch even
     // when the narrower fixture's value is already cached.
     if let Some(parent) = stack.last()
-        && parent.scope > def.scope
+        && parent.scope > scope
     {
         return Err(scope_mismatch_error(py, config, stack, &def));
     }
@@ -507,7 +541,7 @@ pub(crate) fn resolve_fixture_def(
     {
         return Err(no_parameter_error(py, config, &def, &item.nodeid));
     }
-    let instance = match def.scope {
+    let instance = match scope {
         Scope::Function => item.nodeid.clone(),
         Scope::Class => item.class_instance(),
         Scope::Module | Scope::Package => item.module_instance(),
@@ -557,7 +591,7 @@ pub(crate) fn resolve_fixture_def(
         }
     };
     let cache_key = (
-        def.scope,
+        scope,
         keyed_name,
         def.baseid.clone(),
         instance.clone(),
@@ -591,7 +625,7 @@ pub(crate) fn resolve_fixture_def(
                         fixture_param.as_ref().map(|(_, value)| value.clone_ref(py)),
                         node,
                         Some(def.name.clone()),
-                        def.scope,
+                        scope,
                     ),
                 )?;
                 kwargs.push((dep.clone(), req.clone_ref(py).into_any()));

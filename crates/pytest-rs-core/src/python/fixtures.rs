@@ -250,15 +250,32 @@ pub(crate) fn register_fixture_def(
     registry: &mut FixtureRegistry,
 ) -> PyResult<()> {
     let marker = value.getattr("_pytestfixturefunction")?;
-    // Defensive: objects faking the marker attribute (stubs, mocks) are
-    // skipped rather than failing collection.
-    let Ok(scope_str) = marker
-        .getattr("scope")
-        .and_then(|scope| scope.extract::<String>())
-    else {
+    // Only a genuine @pytest.fixture marker is a fixture. A callable that fakes
+    // `_pytestfixturefunction` via __getattr__ (e.g. an imported mock.call)
+    // otherwise looks like a fixture whose every attribute — including `scope` —
+    // is itself callable; skip it (pytest's parsefactories does likewise).
+    let marker_cls = py
+        .import("pytest._fixtures")?
+        .getattr("FixtureFunctionMarker")?;
+    if !marker.is_instance(&marker_cls)? {
         return Ok(());
+    }
+    let scope_obj = marker.getattr("scope")?;
+    // A dynamic scope (`scope=<callable>`, #1781): keep the callable and resolve
+    // the real scope at fixture-resolution time, where the config it is passed
+    // is available. `scope_str` is then just a placeholder.
+    let scope_callable: Option<Py<PyAny>> =
+        scope_obj.is_callable().then(|| scope_obj.clone().unbind());
+    let scope_str: String = if scope_callable.is_some() {
+        "function".to_string()
+    } else {
+        // Defensive: objects faking the marker attribute (stubs, mocks) are
+        // skipped rather than failing collection.
+        match scope_obj.extract::<String>() {
+            Ok(s) => s,
+            Err(_) => return Ok(()),
+        }
     };
-    let scope_str: String = scope_str;
     // An invalid scope name (e.g. scope="functions") fails in pytest's
     // Scope.from_user at FixtureDef construction. We keep a placeholder scope
     // and defer the failure to resolution (so collection still proceeds),
@@ -341,6 +358,7 @@ pub(crate) fn register_fixture_def(
         params,
         ids,
         scope_error,
+        scope_callable,
     });
     Ok(())
 }
