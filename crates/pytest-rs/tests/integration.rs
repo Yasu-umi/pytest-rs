@@ -984,3 +984,69 @@ class TestClassMark:
     assert_eq!(output.status.code(), Some(0), "out: {out}");
     assert!(out.contains("3 passed"), "out: {out}");
 }
+
+#[test]
+fn parametrize_trailing_comma_in_argnames() {
+    let suite = TempSuite::new("trailing-comma");
+    suite.write(
+        "test_tc.py",
+        r#"
+import pytest
+
+@pytest.mark.parametrize("a,b,", [(1, 2), (3, 4)])
+def test_trailing(a, b):
+    assert a + b in (3, 7)
+"#,
+    );
+    let output = suite.run(&["-v"]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(out.contains("2 passed"), "out: {out}");
+}
+
+#[test]
+fn class_method_non_self_first_arg() {
+    let suite = TempSuite::new("non-self");
+    suite.write(
+        "test_ns.py",
+        r#"
+class TestThing:
+    def test_normal(self):
+        assert True
+
+    def test_weird_name(sel):
+        assert True
+
+    def test_another(me):
+        assert True
+"#,
+    );
+    let output = suite.run(&["-v"]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(out.contains("3 passed"), "out: {out}");
+}
+
+#[test]
+fn mark_object_in_pytest_param() {
+    let suite = TempSuite::new("mark-param");
+    suite.write(
+        "test_mp.py",
+        r#"
+import pytest
+
+skip_mark = pytest.mark.skip(reason="raw Mark object")
+
+@pytest.mark.parametrize("x", [
+    pytest.param(1, marks=skip_mark.mark),
+    pytest.param(2),
+])
+def test_with_mark(x):
+    assert x == 2
+"#,
+    );
+    let output = suite.run(&["-v"]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(out.contains("1 passed, 1 skipped"), "out: {out}");
+}
