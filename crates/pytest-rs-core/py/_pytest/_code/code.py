@@ -207,6 +207,18 @@ class TracebackEntry:
     def __repr__(self) -> str:
         return f"<TracebackEntry {self.frame.code.path}:{self.lineno + 1}>"
 
+    def __str__(self) -> str:
+        name = self.frame.code.raw.co_name
+        try:
+            import linecache
+            path = self.frame.code.raw.co_filename
+            line = linecache.getline(path, self.lineno + 1).strip()
+            if not line:
+                line = "???"
+        except Exception:
+            line = "???"
+        return f"  File '{self.path}':{self.lineno + 1} in {name}\n  {line}\n"
+
     @property
     def path(self):
         """Path to the source code (a Path, or a str for generated/missing files)."""
