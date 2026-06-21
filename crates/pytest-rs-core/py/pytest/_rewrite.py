@@ -312,7 +312,9 @@ class _AssertRewriter(ast.NodeTransformer):
                 ast.copy_location(assign.targets[0], loc)
                 stmts.append(assign)
                 new_keywords.append(
-                    ast.keyword(arg=kw.arg, value=ast.copy_location(ast.Name(id=tmp, ctx=ast.Load()), loc))
+                    ast.keyword(
+                        arg=kw.arg, value=ast.copy_location(ast.Name(id=tmp, ctx=ast.Load()), loc)
+                    )
                 )
 
         new_expr = ast.copy_location(
@@ -440,14 +442,18 @@ class _AssertRewriter(ast.NodeTransformer):
         # inside the test) would see the asserted values kept alive.
         # Include any temp vars from sub-expression decomposition.
         decomp_tmp_names = [
-            assign.targets[0].id
-            for assign in left_decomp_stmts + right_decomp_stmts
+            assign.targets[0].id for assign in left_decomp_stmts + right_decomp_stmts
         ]
         all_tmp_names = decomp_tmp_names + [left_name, right_name]
-        clear = ast.Delete(
-            targets=[ast.Name(id=n, ctx=ast.Del()) for n in all_tmp_names]
-        )
-        statements = [*left_decomp_stmts, *right_decomp_stmts, assign_left, assign_right, check, clear]
+        clear = ast.Delete(targets=[ast.Name(id=n, ctx=ast.Del()) for n in all_tmp_names])
+        statements = [
+            *left_decomp_stmts,
+            *right_decomp_stmts,
+            assign_left,
+            assign_right,
+            check,
+            clear,
+        ]
         for statement in statements:
             for child in ast.walk(statement):
                 ast.copy_location(child, node)

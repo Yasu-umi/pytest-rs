@@ -211,6 +211,7 @@ class TracebackEntry:
         name = self.frame.code.raw.co_name
         try:
             import linecache
+
             path = self.frame.code.raw.co_filename
             line = linecache.getline(path, self.lineno + 1).strip()
             if not line:

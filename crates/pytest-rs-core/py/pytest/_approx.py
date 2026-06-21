@@ -62,7 +62,7 @@ class _Approx:
         # numpy array support: detect by `shape` attribute to avoid importing numpy
         # at module level (it may not be installed).
         try:
-            if hasattr(expected, 'shape') and hasattr(actual, 'shape'):
+            if hasattr(expected, "shape") and hasattr(actual, "shape"):
                 e_nd = len(expected.shape)
                 a_nd = len(actual.shape)
                 if e_nd == 0 and a_nd == 0:
@@ -73,13 +73,10 @@ class _Approx:
                     return all(self._eq_scalar(float(actual), e) for e in expected.flat)
                 if expected.shape != actual.shape:
                     return False
-                return all(
-                    self._eq_scalar(a, e)
-                    for a, e in zip(actual.flat, expected.flat)
-                )
-            if hasattr(expected, 'shape'):
+                return all(self._eq_scalar(a, e) for a, e in zip(actual.flat, expected.flat))
+            if hasattr(expected, "shape"):
                 return all(self._eq_scalar(actual, e) for e in expected.flat)
-            if hasattr(actual, 'shape'):
+            if hasattr(actual, "shape"):
                 return all(self._eq_scalar(a, expected) for a in actual.flat)
         except (TypeError, ValueError):
             pass
