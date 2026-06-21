@@ -17,7 +17,7 @@ import types
 # tag, so it can never be confused with CPython's own (non-rewritten) bytecode
 # for the same file. Bump _CACHE_VERSION whenever _AssertRewriter's output
 # changes, to invalidate any stale rewritten pyc left on disk.
-_CACHE_VERSION = 2
+_CACHE_VERSION = 3
 _PYC_TAIL = f".{sys.implementation.cache_tag}-pytestrs{_CACHE_VERSION}.pyc"
 
 _OPS = {
@@ -252,18 +252,90 @@ class _AssertRewriter(ast.NodeTransformer):
             ast.Constant("\n"),
         ]
 
+    def _decompose_expr(self, expr, loc):
+        """Recursively decompose Call arguments into temp-var assignments.
+
+        For each Call node, non-trivial arguments (and keyword values) are
+        extracted into their own temp assignments so that intermediate objects
+        stay alive across the whole assertion.  This mirrors real pytest's
+        behaviour and matters when object identity (and thus id()-based
+        __hash__) is relevant: without decomposition, a temporary created for
+        one argument can be freed before the next temporary is allocated,
+        allowing CPython to reuse the same memory address.
+
+        Returns (stmts, new_expr) where stmts is a (possibly empty) list of
+        ast.Assign nodes that must be emitted *before* the expression that
+        uses new_expr.
+        """
+        _SIMPLE = (ast.Name, ast.Constant, ast.Attribute, ast.Subscript)
+        if not isinstance(expr, ast.Call):
+            return [], expr
+
+        stmts = []
+
+        # Recursively decompose each positional argument.
+        new_args = []
+        for arg in expr.args:
+            # Starred (*args) cannot be assigned to a temp var.
+            if isinstance(arg, ast.Starred):
+                new_args.append(arg)
+                continue
+            sub_stmts, new_arg = self._decompose_expr(arg, loc)
+            stmts.extend(sub_stmts)
+            if isinstance(new_arg, _SIMPLE):
+                new_args.append(new_arg)
+            else:
+                tmp = self._temp()
+                assign = ast.Assign(
+                    targets=[ast.Name(id=tmp, ctx=ast.Store())],
+                    value=new_arg,
+                )
+                ast.copy_location(assign, loc)
+                ast.copy_location(assign.targets[0], loc)
+                stmts.append(assign)
+                new_args.append(ast.copy_location(ast.Name(id=tmp, ctx=ast.Load()), loc))
+
+        # Recursively decompose keyword values.
+        new_keywords = []
+        for kw in expr.keywords:
+            sub_stmts, new_val = self._decompose_expr(kw.value, loc)
+            stmts.extend(sub_stmts)
+            if isinstance(new_val, _SIMPLE):
+                new_keywords.append(ast.keyword(arg=kw.arg, value=new_val))
+            else:
+                tmp = self._temp()
+                assign = ast.Assign(
+                    targets=[ast.Name(id=tmp, ctx=ast.Store())],
+                    value=new_val,
+                )
+                ast.copy_location(assign, loc)
+                ast.copy_location(assign.targets[0], loc)
+                stmts.append(assign)
+                new_keywords.append(
+                    ast.keyword(arg=kw.arg, value=ast.copy_location(ast.Name(id=tmp, ctx=ast.Load()), loc))
+                )
+
+        new_expr = ast.copy_location(
+            ast.Call(func=expr.func, args=new_args, keywords=new_keywords), expr
+        )
+        return stmts, new_expr
+
     def _rewrite_compare(self, node):
         test = node.test
         op = _OPS.get(type(test.ops[0]))
         if op is None:
             return self._rewrite_generic(node)
 
+        # Decompose sub-expressions so intermediate objects stay alive.
+        left_decomp_stmts, left_expr = self._decompose_expr(test.left, node)
+        right_decomp_stmts, right_expr = self._decompose_expr(test.comparators[0], node)
+
         left_name = self._temp()
         right_name = self._temp()
-        assign_left = ast.Assign(targets=[ast.Name(id=left_name, ctx=ast.Store())], value=test.left)
+        assign_left = ast.Assign(targets=[ast.Name(id=left_name, ctx=ast.Store())], value=left_expr)
         assign_right = ast.Assign(
             targets=[ast.Name(id=right_name, ctx=ast.Store())],
-            value=test.comparators[0],
+            value=right_expr,
         )
         recomposed = ast.Compare(
             left=ast.Name(id=left_name, ctx=ast.Load()),
@@ -366,13 +438,16 @@ class _AssertRewriter(ast.NodeTransformer):
         # Upstream parity: clear the temporaries after a passing assert —
         # they live in the frame, and leak tests (weakref + gc.collect
         # inside the test) would see the asserted values kept alive.
+        # Include any temp vars from sub-expression decomposition.
+        decomp_tmp_names = [
+            assign.targets[0].id
+            for assign in left_decomp_stmts + right_decomp_stmts
+        ]
+        all_tmp_names = decomp_tmp_names + [left_name, right_name]
         clear = ast.Delete(
-            targets=[
-                ast.Name(id=left_name, ctx=ast.Del()),
-                ast.Name(id=right_name, ctx=ast.Del()),
-            ]
+            targets=[ast.Name(id=n, ctx=ast.Del()) for n in all_tmp_names]
         )
-        statements = [assign_left, assign_right, check, clear]
+        statements = [*left_decomp_stmts, *right_decomp_stmts, assign_left, assign_right, check, clear]
         for statement in statements:
             for child in ast.walk(statement):
                 ast.copy_location(child, node)
