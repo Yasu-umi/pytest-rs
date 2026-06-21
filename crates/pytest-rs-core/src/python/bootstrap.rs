@@ -84,6 +84,15 @@ if not hasattr(_main, '__file__'):
     // Expose the Rust-backed request type for `_pytest.fixtures` imports.
     let pytest_module = py.import("pytest")?;
     pytest_module.setattr("FixtureRequest", py.get_type::<crate::request::PyRequest>())?;
+    // Pre-import modules that teardown (finalize_generator) imports lazily.
+    // If a test replaces sys.implementation with a mock object that lacks
+    // `cache_tag`, any fresh module import during teardown will fail with
+    // AttributeError because the import machinery calls
+    // importlib._bootstrap_external.cache_from_source() → sys.implementation.cache_tag.
+    // _pytest.fixtures pulls in `inspect` which transitively imports `tokenize`
+    // (and linecache); forcing them here ensures they are in sys.modules before
+    // any test can monkey-patch sys.implementation.
+    py.import("_pytest.fixtures")?;
     // Register a minimal plugin that provides pytest_runtest_makereport
     // default through the hook relay (plugins like pytest-subtests call
     // item.ihook.pytest_runtest_makereport).
