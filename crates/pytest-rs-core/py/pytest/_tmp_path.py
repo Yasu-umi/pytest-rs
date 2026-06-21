@@ -398,3 +398,21 @@ class LocalPath:
 @fixture
 def tmpdir(tmp_path):
     return LocalPath(tmp_path)
+
+
+class TempdirFactory:
+    """Backward-compat wrapper around TempPathFactory (py.path.local)."""
+
+    def __init__(self, tmp_path_factory):
+        self._tmp_path_factory = tmp_path_factory
+
+    def mktemp(self, basename, numbered=True):
+        return LocalPath(self._tmp_path_factory.mktemp(basename, numbered=numbered))
+
+    def getbasetemp(self):
+        return LocalPath(self._tmp_path_factory.getbasetemp())
+
+
+@fixture(scope="session")
+def tmpdir_factory(tmp_path_factory):
+    return TempdirFactory(tmp_path_factory)

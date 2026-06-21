@@ -81,6 +81,7 @@ from pytest._tmp_path import TempPathFactory as TempPathFactory
 from pytest._tmp_path import tmp_path as tmp_path
 from pytest._tmp_path import tmp_path_factory as tmp_path_factory
 from pytest._tmp_path import tmpdir as tmpdir
+from pytest._tmp_path import tmpdir_factory as tmpdir_factory
 from pytest._warning_types import PytestAssertRewriteWarning as PytestAssertRewriteWarning
 from pytest._warning_types import PytestCacheWarning as PytestCacheWarning
 from pytest._warning_types import PytestCollectionWarning as PytestCollectionWarning

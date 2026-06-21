@@ -360,6 +360,7 @@ class PluginManager:
             "helpconfig",
             "junitxml",
             "tmpdir",
+            "tmpdir_factory",
             "cacheprovider",
             "doctest",
             "hookspec",
