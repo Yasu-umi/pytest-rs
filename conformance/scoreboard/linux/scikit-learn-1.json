@@ -141,10 +141,10 @@
     },
     {
       "file": "sklearn/metrics/tests/test_ranking.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 243,
-      "failed": 5,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 248,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },
@@ -546,10 +546,10 @@
     },
     {
       "file": "sklearn/utils/tests/test_stats.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 79,
-      "failed": 8,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 87,
+      "failed": 0,
       "skipped": 111,
       "errors": 0
     },
@@ -645,19 +645,19 @@
     },
     {
       "file": "sklearn/linear_model/tests/test_common.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 117,
       "failed": 0,
-      "skipped": 0,
+      "skipped": 7,
       "errors": 0
     },
     {
       "file": "sklearn/linear_model/tests/test_coordinate_descent.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 286,
-      "failed": 3,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 289,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },

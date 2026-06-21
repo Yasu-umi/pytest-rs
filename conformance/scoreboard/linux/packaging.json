@@ -87,12 +87,12 @@
     },
     {
       "file": "tests/test_tags.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 128,
-      "failed": 50,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 178,
+      "failed": 0,
       "skipped": 0,
-      "errors": 110
+      "errors": 0
     },
     {
       "file": "tests/test_utils.py",

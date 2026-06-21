@@ -294,12 +294,12 @@
     },
     {
       "file": "sklearn/ensemble/_hist_gradient_boosting/tests/test_splitting.py",
-      "status": "error",
-      "exit_code": 2,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 33,
       "failed": 0,
       "skipped": 0,
-      "errors": 1
+      "errors": 0
     },
     {
       "file": "sklearn/ensemble/_hist_gradient_boosting/tests/test_warm_start.py",
@@ -438,12 +438,12 @@
     },
     {
       "file": "sklearn/model_selection/tests/test_successive_halving.py",
-      "status": "error",
-      "exit_code": 2,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 98,
       "failed": 0,
-      "skipped": 0,
-      "errors": 1
+      "skipped": 4,
+      "errors": 0
     },
     {
       "file": "sklearn/model_selection/tests/test_validation.py",

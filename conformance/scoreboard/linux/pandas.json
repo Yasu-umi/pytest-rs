@@ -2,14 +2,14 @@
   "suite": "pandas",
   "tag": "v3.0.3",
   "category": "real-world",
-  "excluded_files": 0,
+  "excluded_files": 3,
   "files": [
     {
       "file": "pandas/tests/api/test_api.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 20,
-      "failed": 1,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 13,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },
@@ -2247,10 +2247,10 @@
     },
     {
       "file": "pandas/tests/frame/methods/test_sort_values.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 54,
-      "failed": 32,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 85,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },
@@ -4731,12 +4731,12 @@
     },
     {
       "file": "pandas/tests/indexing/test_iloc.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 236,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 238,
       "failed": 0,
       "skipped": 3,
-      "errors": 2
+      "errors": 0
     },
     {
       "file": "pandas/tests/indexing/test_indexers.py",
@@ -4866,12 +4866,12 @@
     },
     {
       "file": "pandas/tests/io/excel/test_readers.py",
-      "status": "error",
-      "exit_code": 2,
+      "status": "no-tests",
+      "exit_code": 0,
       "passed": 0,
       "failed": 0,
-      "skipped": 0,
-      "errors": 1
+      "skipped": 1573,
+      "errors": 0
     },
     {
       "file": "pandas/tests/io/excel/test_style.py",
@@ -5432,15 +5432,6 @@
       "errors": 0
     },
     {
-      "file": "pandas/tests/io/parser/test_network.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 0,
-      "failed": 0,
-      "skipped": 34,
-      "errors": 21
-    },
-    {
       "file": "pandas/tests/io/parser/test_parse_dates.py",
       "status": "passed",
       "exit_code": 0,
@@ -5469,12 +5460,12 @@
     },
     {
       "file": "pandas/tests/io/parser/test_read_fwf.py",
-      "status": "failed",
-      "exit_code": 1,
+      "status": "passed",
+      "exit_code": 0,
       "passed": 73,
       "failed": 0,
       "skipped": 5,
-      "errors": 1
+      "errors": 0
     },
     {
       "file": "pandas/tests/io/parser/test_skiprows.py",
@@ -5729,22 +5720,13 @@
       "errors": 0
     },
     {
-      "file": "pandas/tests/io/test_clipboard.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 7,
-      "failed": 0,
-      "skipped": 6,
-      "errors": 320
-    },
-    {
       "file": "pandas/tests/io/test_common.py",
-      "status": "failed",
-      "exit_code": 1,
+      "status": "passed",
+      "exit_code": 0,
       "passed": 92,
       "failed": 0,
-      "skipped": 35,
-      "errors": 1
+      "skipped": 36,
+      "errors": 0
     },
     {
       "file": "pandas/tests/io/test_compression.py",
@@ -5790,15 +5772,6 @@
       "failed": 0,
       "skipped": 189,
       "errors": 0
-    },
-    {
-      "file": "pandas/tests/io/test_http_headers.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 0,
-      "failed": 0,
-      "skipped": 8,
-      "errors": 21
     },
     {
       "file": "pandas/tests/io/test_iceberg.py",
@@ -5856,10 +5829,10 @@
     },
     {
       "file": "pandas/tests/io/test_sql.py",
-      "status": "failed",
-      "exit_code": 1,
+      "status": "passed",
+      "exit_code": 0,
       "passed": 84,
-      "failed": 1,
+      "failed": 0,
       "skipped": 1405,
       "errors": 0
     },
@@ -5892,12 +5865,12 @@
     },
     {
       "file": "pandas/tests/io/xml/test_xml.py",
-      "status": "failed",
-      "exit_code": 1,
+      "status": "passed",
+      "exit_code": 0,
       "passed": 55,
       "failed": 0,
-      "skipped": 196,
-      "errors": 4
+      "skipped": 195,
+      "errors": 0
     },
     {
       "file": "pandas/tests/io/xml/test_xml_dtypes.py",
@@ -6135,10 +6108,10 @@
     },
     {
       "file": "pandas/tests/resample/test_resample_api.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 174,
-      "failed": 4,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 178,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },

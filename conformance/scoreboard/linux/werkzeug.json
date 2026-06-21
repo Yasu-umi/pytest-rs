@@ -15,8 +15,8 @@
     },
     {
       "file": "tests/middleware/test_http_proxy.py",
-      "status": "timeout",
-      "exit_code": null,
+      "status": "no-tests",
+      "exit_code": 5,
       "passed": 0,
       "failed": 0,
       "skipped": 0,
@@ -96,12 +96,12 @@
     },
     {
       "file": "tests/test_debug.py",
-      "status": "error",
-      "exit_code": 2,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 19,
       "failed": 0,
       "skipped": 0,
-      "errors": 1
+      "errors": 0
     },
     {
       "file": "tests/test_exceptions.py",
@@ -177,11 +177,11 @@
     },
     {
       "file": "tests/test_serving.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 5,
       "failed": 0,
-      "skipped": 0,
+      "skipped": 1,
       "errors": 0
     },
     {
@@ -204,10 +204,10 @@
     },
     {
       "file": "tests/test_utils.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 35,
-      "failed": 1,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 36,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },
