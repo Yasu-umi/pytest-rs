@@ -72,6 +72,8 @@ jobs:
           - group: libs-2
             suites: "httpx,httpx2,starlette,attrs,werkzeug,fastapi,sqlglot"
             jobs: 1
+          - group: libs-3
+            suites: "networkx"
           - group: pandas
             suites: "pandas"
           - group: scikit-learn-1
