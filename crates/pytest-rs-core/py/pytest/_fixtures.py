@@ -1,5 +1,6 @@
 """The @pytest.fixture decorator: records metadata, resolved by the engine."""
 
+import functools
 import inspect
 import warnings
 
@@ -17,28 +18,63 @@ class FixtureFunctionMarker:
         self.name = name
 
     def __call__(self, function):
-        # Upstream rejects fixtures applied to a class and double-decoration
-        # (@fixture returns a FixtureFunctionDefinition that the next @fixture
-        # would re-wrap); mirror both guards (#fixture_disallow_twice).
         if inspect.isclass(function):
             raise ValueError("class fixtures not supported (maybe in the future)")
+        if isinstance(function, FixtureFunctionDefinition):
+            raise ValueError(
+                "@pytest.fixture is being applied more than once to the same "
+                f"function {function.__name__!r}"
+            )
         if getattr(function, "_pytestfixturefunction", False):
             raise ValueError(
                 "@pytest.fixture is being applied more than once to the same "
                 f"function {getattr(function, '__name__', function)!r}"
             )
         if hasattr(function, "pytestmark"):
-            # Marks below the @fixture decorator are inert (#3364).
             from _pytest.deprecated import MARKED_FIXTURE
-
             warnings.warn(MARKED_FIXTURE, stacklevel=2)
-        function._pytestfixturefunction = self
-        # Real pytest wraps fixtures in FixtureFunctionDefinition which has
-        # _get_wrapped_function(); replicate that on the plain function so
-        # get_real_func() tests can call it.
-        _fn = function
-        function._get_wrapped_function = lambda: _fn
-        return function
+        return FixtureFunctionDefinition(
+            function=function,
+            fixture_function_marker=self,
+        )
+
+
+class FixtureFunctionDefinition:
+    def __init__(self, *, function, fixture_function_marker, instance=None):
+        self.name = fixture_function_marker.name or function.__name__
+        self.__name__ = self.name
+        self._fixture_function_marker = fixture_function_marker
+        if instance is not None:
+            self._fixture_function = function.__get__(instance)
+        else:
+            self._fixture_function = function
+        self._pytestfixturefunction = fixture_function_marker
+        functools.update_wrapper(self, function)
+
+    def __repr__(self):
+        return f"<pytest_fixture({self._fixture_function})>"
+
+    def __get__(self, instance, owner=None):
+        if instance is None:
+            return self
+        return FixtureFunctionDefinition(
+            function=self._fixture_function,
+            fixture_function_marker=self._fixture_function_marker,
+            instance=instance,
+        )
+
+    def __call__(self, *args, **kwargs):
+        from _pytest.outcomes import fail
+        message = (
+            f'Fixture "{self.name}" called directly. Fixtures are not meant to be called directly,\n'
+            "but are created automatically when test functions request them as parameters.\n"
+            "See https://docs.pytest.org/en/stable/explanation/fixtures.html for more information about fixtures, and\n"
+            "https://docs.pytest.org/en/stable/deprecations.html#calling-fixtures-directly"
+        )
+        fail(message, pytrace=False)
+
+    def _get_wrapped_function(self):
+        return self._fixture_function
 
 
 def fixture(

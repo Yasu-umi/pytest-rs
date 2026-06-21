@@ -313,13 +313,16 @@ pub(crate) fn register_fixture_def(
     // "request" is reserved (it is the fixture-request pseudo-fixture); a
     // fixture claiming that name fails collection (pytest's parsefactories),
     // pointing at the offending factory's definition site.
+    // Unwrap FixtureFunctionDefinition to get the underlying callable so the
+    // engine can invoke it without triggering the "called directly" guard.
+    let unwrapped = value
+        .getattr("_fixture_function")
+        .unwrap_or_else(|_| value.clone());
     if name == "request" {
-        let location = value
+        let location = unwrapped
             .getattr("__code__")
             .and_then(|code| {
                 let file: String = code.getattr("co_filename")?.extract()?;
-                // pytest's getlocation reports co_firstlineno + 1 (the def line
-                // for a decorated factory, not the decorator line).
                 let lineno: u32 = code.getattr("co_firstlineno")?.extract()?;
                 Ok(format!("{file}:{}", lineno + 1))
             })
@@ -331,8 +334,8 @@ pub(crate) fn register_fixture_def(
         exc.setattr("pytrace", false)?;
         return Err(PyErr::from_value(exc));
     }
-    let flags = async_flags(py, value)?;
-    let mut param_names = param_names(py, value)?;
+    let flags = async_flags(py, &unwrapped)?;
+    let mut param_names = param_names(py, &unwrapped)?;
     // Binding to the test instance consumes the first parameter whatever
     // its name (upstream fixtures occasionally spell it `cls`).
     if needs_instance && !param_names.is_empty() {
@@ -350,7 +353,7 @@ pub(crate) fn register_fixture_def(
     };
     registry.register(FixtureDef {
         name,
-        func: value.clone().unbind(),
+        func: unwrapped.clone().unbind(),
         scope,
         autouse,
         is_coroutine: flags.is_coroutine,

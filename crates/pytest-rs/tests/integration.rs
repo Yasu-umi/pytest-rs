@@ -1212,3 +1212,29 @@ class TestNormal:
     assert!(!out.contains("test_skipped"), "function __test__=False should skip: {out}");
     assert!(!out.contains("TestSkipped"), "class __test__=False should skip: {out}");
 }
+
+#[test]
+fn fixture_called_directly_raises() {
+    let suite = TempSuite::new("fix-direct");
+    suite.write(
+        "test_fc.py",
+        r#"
+import pytest
+
+@pytest.fixture
+def fix():
+    return 42
+
+def test_direct_call():
+    with pytest.raises(pytest.fail.Exception, match="called directly"):
+        fix()
+
+def test_via_request(fix):
+    assert fix == 42
+"#,
+    );
+    let output = suite.run(&["-v"]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(out.contains("2 passed"), "out: {out}");
+}
