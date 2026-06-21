@@ -809,7 +809,16 @@ pub(crate) fn resolve_fixture_def(
                     Ok((value.unbind(), None))
                 } else if def.is_generator {
                     let generator = python::call_fixture(py, &def.func, fixture_instance, &kwargs)?;
-                    let value = python::next_value(py, &generator)?;
+                    let value = python::next_value(py, &generator).map_err(|e| {
+                        if e.is_instance_of::<pyo3::exceptions::PyStopIteration>(py) {
+                            pyo3::exceptions::PyValueError::new_err(format!(
+                                "{} did not yield a value",
+                                def.name
+                            ))
+                        } else {
+                            e
+                        }
+                    })?;
                     Ok((value.unbind(), Some(Finalizer::GenNext(generator.unbind()))))
                 } else {
                     let value = python::call_fixture(py, &def.func, fixture_instance, &kwargs)?;

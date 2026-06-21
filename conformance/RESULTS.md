@@ -18,7 +18,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2351 | 427 | 3 | 52 | 2833 | 84.8% | 14 | 52 | 63 |
+| pytest | 9.0.3 | 2350 | 428 | 3 | 52 | 2833 | 84.8% | 14 | 52 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 20 | 0 | 3 | 209 | 90.4% | 0 | 1 | 0 |
@@ -46,20 +46,20 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | rich | v14.2.0 | 855 | 0 | 0 | 25 | 880 | 100.0% | 60 | 62 | 0 |
 | sqlglot | v30.11.0 | 1120 | 0 | 0 | 0 | 1120 | 100.0% | 52 | 54 | 0 |
 | pytest-bdd | 8.1.0 | 112 | 26 | 0 | 1 | 139 | 81.3% | 27 | 35 | 0 |
-| httpx | 0.28.1 | 1410 | 0 | 0 | 1 | 1411 | 100.0% | 31 | 31 | 0 |
+| httpx | 0.28.1 | 1404 | 13 | 0 | 1 | 1418 | 99.1% | 26 | 31 | 0 |
 | httpx2 | v2.4.0 | 1426 | 0 | 0 | 1 | 1427 | 100.0% | 31 | 31 | 0 |
-| starlette | 0.46.2 | 907 | 0 | 0 | 0 | 907 | 100.0% | 28 | 28 | 0 |
-| attrs | 25.3.0 | 1341 | 0 | 0 | 4 | 1345 | 100.0% | 22 | 24 | 0 |
+| starlette | 0.46.2 | 902 | 0 | 1 | 0 | 903 | 99.9% | 27 | 28 | 0 |
+| attrs | 25.3.0 | 1340 | 1 | 0 | 4 | 1345 | 99.9% | 21 | 24 | 0 |
 | more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 671 | 100.0% | 2 | 2 | 0 |
 | pytest-django | v4.9.0 | 141 | 68 | 6 | 1 | 216 | 65.7% | 2 | 13 | 0 |
-| werkzeug | 3.1.3 | 922 | 0 | 0 | 1 | 923 | 100.0% | 24 | 25 | 0 |
-| fastapi | 0.115.12 | 2332 | 1 | 0 | 130 | 2463 | 100.0% | 303 | 310 | 0 |
-| packaging | 25.0 | 26947 | 0 | 0 | 0 | 26947 | 100.0% | 12 | 12 | 0 |
-| pandas | v3.0.3 | 160773 | 1 | 0 | 26984 | 187758 | 100.0% | 871 | 961 | 3 |
+| werkzeug | 3.1.3 | 897 | 1 | 1 | 0 | 899 | 99.8% | 21 | 25 | 0 |
+| fastapi | 0.115.12 | 2324 | 8 | 1 | 130 | 2463 | 99.6% | 298 | 310 | 0 |
+| packaging | 25.0 | 26897 | 50 | 110 | 0 | 27057 | 99.4% | 11 | 12 | 0 |
+| pandas | v3.0.3 | 160750 | 39 | 371 | 25459 | 186619 | 99.8% | 863 | 964 | 0 |
 | networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 6894 | 100.0% | 259 | 266 | 0 |
-| scikit-learn-1 | 1.9.0 | 8432 | 0 | 0 | 6624 | 15056 | 100.0% | 79 | 87 | 0 |
-| scikit-learn-2 | 1.9.0 | 5046 | 0 | 0 | 1892 | 6938 | 100.0% | 52 | 58 | 0 |
-| scikit-learn-3 | 1.9.0 | 9251 | 3 | 0 | 2530 | 11784 | 100.0% | 104 | 114 | 0 |
+| scikit-learn-1 | 1.9.0 | 8299 | 16 | 0 | 6617 | 14932 | 99.9% | 75 | 87 | 0 |
+| scikit-learn-2 | 1.9.0 | 4915 | 0 | 2 | 1888 | 6805 | 100.0% | 50 | 58 | 0 |
+| scikit-learn-3 | 1.9.0 | 9240 | 7 | 0 | 2530 | 11777 | 99.9% | 101 | 114 | 0 |
 
 ### pytest @ 9.0.3
 
@@ -69,9 +69,9 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 |---|---|---:|---:|---:|---:|
 | testing/python/approx.py | failed | 38 | 37 | 0 | 18 |
 | testing/python/collect.py | failed | 72 | 10 | 0 | 0 |
-| testing/python/fixtures.py | failed | 190 | 18 | 0 | 2 |
+| testing/python/fixtures.py | failed | 191 | 17 | 0 | 2 |
 | testing/python/integration.py | failed | 9 | 7 | 0 | 4 |
-| testing/python/metafunc.py | failed | 67 | 45 | 0 | 0 |
+| testing/python/metafunc.py | failed | 65 | 47 | 0 | 0 |
 | testing/python/raises.py | failed | 13 | 18 | 0 | 0 |
 | testing/python/raises_group.py | failed | 26 | 3 | 0 | 0 |
 | testing/python/show_fixtures_per_test.py | passed | 8 | 0 | 0 | 0 |
@@ -681,9 +681,9 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| tests/client/test_async_client.py | passed | 52 | 0 | 0 | 0 |
+| tests/client/test_async_client.py | failed | 48 | 4 | 0 | 0 |
 | tests/client/test_auth.py | passed | 79 | 0 | 0 | 1 |
-| tests/client/test_client.py | passed | 33 | 0 | 0 | 0 |
+| tests/client/test_client.py | failed | 31 | 4 | 0 | 0 |
 | tests/client/test_cookies.py | passed | 7 | 0 | 0 | 0 |
 | tests/client/test_event_hooks.py | passed | 9 | 0 | 0 | 0 |
 | tests/client/test_headers.py | passed | 17 | 0 | 0 | 0 |
@@ -695,7 +695,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/models/test_headers.py | passed | 27 | 0 | 0 | 0 |
 | tests/models/test_queryparams.py | passed | 14 | 0 | 0 | 0 |
 | tests/models/test_requests.py | passed | 24 | 0 | 0 | 0 |
-| tests/models/test_responses.py | passed | 104 | 0 | 0 | 0 |
+| tests/models/test_responses.py | failed | 104 | 2 | 0 | 0 |
 | tests/models/test_url.py | passed | 90 | 0 | 0 | 0 |
 | tests/models/test_whatwg.py | passed | 563 | 0 | 0 | 0 |
 | tests/test_api.py | passed | 12 | 0 | 0 | 0 |
@@ -703,13 +703,13 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_auth.py | passed | 8 | 0 | 0 | 0 |
 | tests/test_config.py | passed | 28 | 0 | 0 | 0 |
 | tests/test_content.py | passed | 43 | 0 | 0 | 0 |
-| tests/test_decoders.py | passed | 38 | 0 | 0 | 0 |
+| tests/test_decoders.py | failed | 38 | 2 | 0 | 0 |
 | tests/test_exceptions.py | passed | 3 | 0 | 0 | 0 |
 | tests/test_exported_members.py | passed | 1 | 0 | 0 | 0 |
 | tests/test_main.py | passed | 11 | 0 | 0 | 0 |
 | tests/test_multipart.py | passed | 38 | 0 | 0 | 0 |
 | tests/test_status_codes.py | passed | 6 | 0 | 0 | 0 |
-| tests/test_timeouts.py | passed | 9 | 0 | 0 | 0 |
+| tests/test_timeouts.py | failed | 9 | 1 | 0 | 0 |
 | tests/test_utils.py | passed | 40 | 0 | 0 | 0 |
 | tests/test_wsgi.py | passed | 12 | 0 | 0 | 0 |
 
@@ -775,7 +775,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_authentication.py | passed | 11 | 0 | 0 | 0 |
 | tests/test_background.py | passed | 8 | 0 | 0 | 0 |
 | tests/test_concurrency.py | passed | 6 | 0 | 0 | 0 |
-| tests/test_config.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_config.py | error | 0 | 0 | 1 | 0 |
 | tests/test_convertors.py | passed | 16 | 0 | 0 | 0 |
 | tests/test_datastructures.py | passed | 30 | 0 | 0 | 0 |
 | tests/test_endpoints.py | passed | 20 | 0 | 0 | 0 |
@@ -805,7 +805,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_compat.py | passed | 3 | 0 | 0 | 0 |
 | tests/test_config.py | passed | 4 | 0 | 0 | 0 |
 | tests/test_converters.py | passed | 38 | 0 | 0 | 0 |
-| tests/test_dunders.py | passed | 99 | 0 | 0 | 0 |
+| tests/test_dunders.py | failed | 98 | 1 | 0 | 0 |
 | tests/test_filters.py | passed | 33 | 0 | 0 | 0 |
 | tests/test_funcs.py | passed | 51 | 0 | 0 | 0 |
 | tests/test_functional.py | passed | 410 | 0 | 0 | 0 |
@@ -865,7 +865,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
 | tests/middleware/test_dispatcher.py | passed | 1 | 0 | 0 | 0 |
-| tests/middleware/test_http_proxy.py | no-tests | 0 | 0 | 0 | 0 |
+| tests/middleware/test_http_proxy.py | timeout | 0 | 0 | 0 | 0 |
 | tests/middleware/test_lint.py | passed | 9 | 0 | 0 | 0 |
 | tests/middleware/test_profiler.py | passed | 1 | 0 | 0 | 0 |
 | tests/middleware/test_proxy_fix.py | passed | 17 | 0 | 0 | 0 |
@@ -874,7 +874,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/sansio/test_request.py | passed | 9 | 0 | 0 | 0 |
 | tests/sansio/test_utils.py | passed | 24 | 0 | 0 | 0 |
 | tests/test_datastructures.py | passed | 123 | 0 | 0 | 0 |
-| tests/test_debug.py | passed | 19 | 0 | 0 | 0 |
+| tests/test_debug.py | error | 0 | 0 | 1 | 0 |
 | tests/test_exceptions.py | passed | 92 | 0 | 0 | 0 |
 | tests/test_formparser.py | passed | 27 | 0 | 0 | 0 |
 | tests/test_http.py | passed | 120 | 0 | 0 | 0 |
@@ -883,10 +883,10 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_routing.py | passed | 117 | 0 | 0 | 0 |
 | tests/test_security.py | passed | 12 | 0 | 0 | 0 |
 | tests/test_send_file.py | passed | 32 | 0 | 0 | 0 |
-| tests/test_serving.py | passed | 5 | 0 | 0 | 1 |
+| tests/test_serving.py | timeout | 0 | 0 | 0 | 0 |
 | tests/test_test.py | passed | 60 | 0 | 0 | 0 |
 | tests/test_urls.py | passed | 17 | 0 | 0 | 0 |
-| tests/test_utils.py | passed | 36 | 0 | 0 | 0 |
+| tests/test_utils.py | failed | 35 | 1 | 0 | 0 |
 | tests/test_wrappers.py | passed | 93 | 0 | 0 | 0 |
 | tests/test_wsgi.py | passed | 21 | 0 | 0 | 0 |
 
@@ -1059,7 +1059,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_tutorial/test_body_multiple_params/test_tutorial003.py | passed | 20 | 0 | 0 | 0 |
 | tests/test_tutorial/test_body_nested_models/test_tutorial009.py | passed | 6 | 0 | 0 | 0 |
 | tests/test_tutorial/test_body_updates/test_tutorial001.py | passed | 9 | 0 | 0 | 3 |
-| tests/test_tutorial/test_conditional_openapi/test_tutorial001.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_tutorial/test_conditional_openapi/test_tutorial001.py | failed | 0 | 3 | 0 | 0 |
 | tests/test_tutorial/test_configure_swagger_ui/test_tutorial001.py | passed | 2 | 0 | 0 | 0 |
 | tests/test_tutorial/test_configure_swagger_ui/test_tutorial002.py | passed | 2 | 0 | 0 | 0 |
 | tests/test_tutorial/test_configure_swagger_ui/test_tutorial003.py | passed | 2 | 0 | 0 | 0 |
@@ -1070,7 +1070,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_tutorial/test_custom_docs_ui/test_tutorial001.py | passed | 4 | 0 | 0 | 0 |
 | tests/test_tutorial/test_custom_docs_ui/test_tutorial002.py | passed | 4 | 0 | 0 | 0 |
 | tests/test_tutorial/test_custom_request_and_route/test_tutorial001.py | passed | 3 | 0 | 0 | 0 |
-| tests/test_tutorial/test_custom_request_and_route/test_tutorial002.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_tutorial/test_custom_request_and_route/test_tutorial002.py | failed | 1 | 1 | 0 | 0 |
 | tests/test_tutorial/test_custom_request_and_route/test_tutorial003.py | passed | 2 | 0 | 0 | 0 |
 | tests/test_tutorial/test_custom_response/test_tutorial001.py | passed | 2 | 0 | 0 | 0 |
 | tests/test_tutorial/test_custom_response/test_tutorial001b.py | passed | 2 | 0 | 0 | 0 |
@@ -1180,8 +1180,8 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_tutorial/test_security/test_tutorial006.py | passed | 15 | 0 | 0 | 0 |
 | tests/test_tutorial/test_separate_openapi_schemas/test_tutorial001.py | passed | 9 | 0 | 0 | 0 |
 | tests/test_tutorial/test_separate_openapi_schemas/test_tutorial002.py | passed | 9 | 0 | 0 | 0 |
-| tests/test_tutorial/test_settings/test_app02.py | passed | 2 | 0 | 0 | 0 |
-| tests/test_tutorial/test_settings/test_tutorial001.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_tutorial/test_settings/test_app02.py | failed | 0 | 2 | 0 | 0 |
+| tests/test_tutorial/test_settings/test_tutorial001.py | failed | 0 | 1 | 0 | 0 |
 | tests/test_tutorial/test_settings/test_tutorial001_pv1.py | no-tests | 0 | 0 | 0 | 1 |
 | tests/test_tutorial/test_sql_databases/test_tutorial001.py | passed | 12 | 0 | 0 | 0 |
 | tests/test_tutorial/test_sql_databases/test_tutorial002.py | passed | 12 | 0 | 0 | 0 |
@@ -1197,7 +1197,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_tutorial/test_websockets/test_tutorial002.py | passed | 30 | 0 | 0 | 0 |
 | tests/test_tutorial/test_websockets/test_tutorial003.py | passed | 2 | 0 | 0 | 0 |
 | tests/test_tutorial/test_websockets/test_tutorial003_py39.py | passed | 2 | 0 | 0 | 0 |
-| tests/test_tutorial/test_wsgi/test_tutorial001.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_wsgi/test_tutorial001.py | error | 0 | 0 | 1 | 0 |
 | tests/test_typing_python39.py | passed | 1 | 0 | 0 | 0 |
 | tests/test_union_body.py | passed | 3 | 0 | 0 | 0 |
 | tests/test_union_inherited_body.py | passed | 3 | 0 | 0 | 0 |
@@ -1226,7 +1226,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_requirements.py | passed | 5286 | 0 | 0 | 0 |
 | tests/test_specifiers.py | passed | 806 | 0 | 0 | 0 |
 | tests/test_structures.py | passed | 14 | 0 | 0 | 0 |
-| tests/test_tags.py | passed | 178 | 0 | 0 | 0 |
+| tests/test_tags.py | failed | 128 | 50 | 110 | 0 |
 | tests/test_utils.py | passed | 54 | 0 | 0 | 0 |
 | tests/test_version.py | passed | 18060 | 0 | 0 | 0 |
 
@@ -1234,11 +1234,11 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 ### pandas @ v3.0.3
 
-<details><summary>per-file detail (961 files)</summary>
+<details><summary>per-file detail (964 files)</summary>
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| pandas/tests/api/test_api.py | passed | 13 | 0 | 0 | 0 |
+| pandas/tests/api/test_api.py | failed | 20 | 1 | 0 | 0 |
 | pandas/tests/api/test_types.py | passed | 2 | 0 | 0 | 0 |
 | pandas/tests/apply/test_frame_apply.py | passed | 241 | 0 | 0 | 65 |
 | pandas/tests/apply/test_frame_apply_relabeling.py | passed | 5 | 0 | 0 | 0 |
@@ -1487,7 +1487,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pandas/tests/frame/methods/test_shift.py | passed | 100 | 0 | 0 | 0 |
 | pandas/tests/frame/methods/test_size.py | passed | 5 | 0 | 0 | 0 |
 | pandas/tests/frame/methods/test_sort_index.py | passed | 66 | 0 | 0 | 0 |
-| pandas/tests/frame/methods/test_sort_values.py | passed | 85 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_sort_values.py | failed | 54 | 32 | 0 | 0 |
 | pandas/tests/frame/methods/test_swaplevel.py | passed | 1 | 0 | 0 | 0 |
 | pandas/tests/frame/methods/test_to_csv.py | passed | 510 | 0 | 0 | 4 |
 | pandas/tests/frame/methods/test_to_dict.py | passed | 102 | 0 | 0 | 0 |
@@ -1763,7 +1763,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pandas/tests/indexing/test_datetime.py | passed | 9 | 0 | 0 | 2 |
 | pandas/tests/indexing/test_floats.py | passed | 143 | 0 | 0 | 0 |
 | pandas/tests/indexing/test_iat.py | passed | 3 | 0 | 0 | 0 |
-| pandas/tests/indexing/test_iloc.py | passed | 238 | 0 | 0 | 3 |
+| pandas/tests/indexing/test_iloc.py | failed | 236 | 0 | 2 | 3 |
 | pandas/tests/indexing/test_indexers.py | passed | 6 | 0 | 0 | 0 |
 | pandas/tests/indexing/test_indexing.py | passed | 1405 | 0 | 0 | 0 |
 | pandas/tests/indexing/test_loc.py | passed | 1104 | 0 | 0 | 17 |
@@ -1778,7 +1778,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pandas/tests/io/excel/test_odf.py | no-tests | 0 | 0 | 0 | 1 |
 | pandas/tests/io/excel/test_odswriter.py | no-tests | 0 | 0 | 0 | 1 |
 | pandas/tests/io/excel/test_openpyxl.py | no-tests | 0 | 0 | 0 | 1 |
-| pandas/tests/io/excel/test_readers.py | no-tests | 0 | 0 | 0 | 1573 |
+| pandas/tests/io/excel/test_readers.py | error | 0 | 0 | 1 | 0 |
 | pandas/tests/io/excel/test_style.py | no-tests | 0 | 0 | 0 | 1 |
 | pandas/tests/io/excel/test_writers.py | passed | 5 | 0 | 0 | 768 |
 | pandas/tests/io/excel/test_xlrd.py | no-tests | 0 | 0 | 0 | 1 |
@@ -1841,10 +1841,11 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pandas/tests/io/parser/test_mangle_dupes.py | passed | 42 | 0 | 0 | 14 |
 | pandas/tests/io/parser/test_multi_thread.py | passed | 6 | 0 | 0 | 2 |
 | pandas/tests/io/parser/test_na_values.py | passed | 189 | 0 | 0 | 63 |
+| pandas/tests/io/parser/test_network.py | failed | 0 | 0 | 21 | 34 |
 | pandas/tests/io/parser/test_parse_dates.py | passed | 175 | 0 | 0 | 57 |
 | pandas/tests/io/parser/test_python_parser_only.py | passed | 88 | 0 | 0 | 2 |
 | pandas/tests/io/parser/test_quoting.py | passed | 81 | 0 | 0 | 27 |
-| pandas/tests/io/parser/test_read_fwf.py | passed | 73 | 0 | 0 | 5 |
+| pandas/tests/io/parser/test_read_fwf.py | failed | 73 | 0 | 1 | 5 |
 | pandas/tests/io/parser/test_skiprows.py | passed | 65 | 0 | 0 | 22 |
 | pandas/tests/io/parser/test_textreader.py | passed | 34 | 0 | 0 | 4 |
 | pandas/tests/io/parser/test_unsupported.py | passed | 18 | 0 | 0 | 4 |
@@ -1873,23 +1874,25 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pandas/tests/io/sas/test_sas.py | passed | 2 | 0 | 0 | 1 |
 | pandas/tests/io/sas/test_sas7bdat.py | no-tests | 0 | 0 | 0 | 96 |
 | pandas/tests/io/sas/test_xport.py | no-tests | 0 | 0 | 0 | 8 |
-| pandas/tests/io/test_common.py | passed | 92 | 0 | 0 | 36 |
+| pandas/tests/io/test_clipboard.py | failed | 7 | 0 | 320 | 6 |
+| pandas/tests/io/test_common.py | failed | 92 | 0 | 1 | 35 |
 | pandas/tests/io/test_compression.py | failed | 117 | 1 | 0 | 18 |
 | pandas/tests/io/test_feather.py | no-tests | 0 | 0 | 0 | 1 |
 | pandas/tests/io/test_fsspec.py | passed | 1 | 0 | 0 | 31 |
 | pandas/tests/io/test_gcs.py | passed | 1 | 0 | 0 | 18 |
 | pandas/tests/io/test_html.py | passed | 4 | 0 | 0 | 189 |
+| pandas/tests/io/test_http_headers.py | failed | 0 | 0 | 21 | 8 |
 | pandas/tests/io/test_iceberg.py | no-tests | 0 | 0 | 0 | 1 |
 | pandas/tests/io/test_orc.py | no-tests | 0 | 0 | 0 | 1 |
 | pandas/tests/io/test_parquet.py | passed | 3 | 0 | 0 | 122 |
 | pandas/tests/io/test_pickle.py | passed | 741 | 0 | 0 | 12 |
 | pandas/tests/io/test_s3.py | no-tests | 0 | 0 | 0 | 4 |
 | pandas/tests/io/test_spss.py | no-tests | 0 | 0 | 0 | 1 |
-| pandas/tests/io/test_sql.py | passed | 84 | 0 | 0 | 1405 |
+| pandas/tests/io/test_sql.py | failed | 84 | 1 | 0 | 1405 |
 | pandas/tests/io/test_stata.py | passed | 351 | 0 | 0 | 338 |
 | pandas/tests/io/test_util.py | no-tests | 0 | 0 | 0 | 1 |
 | pandas/tests/io/xml/test_to_xml.py | passed | 50 | 0 | 0 | 88 |
-| pandas/tests/io/xml/test_xml.py | passed | 55 | 0 | 0 | 195 |
+| pandas/tests/io/xml/test_xml.py | failed | 55 | 0 | 4 | 196 |
 | pandas/tests/io/xml/test_xml_dtypes.py | passed | 12 | 0 | 0 | 32 |
 | pandas/tests/libs/test_hashtable.py | passed | 955 | 0 | 0 | 6 |
 | pandas/tests/libs/test_join.py | passed | 17 | 0 | 0 | 0 |
@@ -1916,7 +1919,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pandas/tests/resample/test_base.py | passed | 658 | 0 | 0 | 34 |
 | pandas/tests/resample/test_datetime_index.py | passed | 2104 | 0 | 0 | 11 |
 | pandas/tests/resample/test_period_index.py | passed | 467 | 0 | 0 | 0 |
-| pandas/tests/resample/test_resample_api.py | passed | 178 | 0 | 0 | 0 |
+| pandas/tests/resample/test_resample_api.py | failed | 174 | 4 | 0 | 0 |
 | pandas/tests/resample/test_resampler_grouper.py | passed | 53 | 0 | 0 | 5 |
 | pandas/tests/resample/test_time_grouper.py | passed | 49 | 0 | 0 | 0 |
 | pandas/tests/resample/test_timedelta.py | passed | 23 | 0 | 0 | 1 |
@@ -2498,6 +2501,2756 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | sklearn/metrics/tests/test_dist_metrics.py | passed | 268 | 0 | 0 | 0 |
 | sklearn/metrics/tests/test_pairwise.py | passed | 284 | 0 | 0 | 302 |
 | sklearn/metrics/tests/test_pairwise_distances_reduction.py | passed | 129 | 0 | 0 | 2 |
+| sklearn/metrics/tests/test_ranking.py | failed | 243 | 5 | 0 | 0 |
+| sklearn/metrics/tests/test_regression.py | passed | 27 | 0 | 0 | 0 |
+| sklearn/metrics/tests/test_score_objects.py | passed | 281 | 0 | 0 | 0 |
+| sklearn/utils/_repr_html/tests/test_attributes.py | passed | 7 | 0 | 0 | 2 |
+| sklearn/utils/_repr_html/tests/test_estimator.py | passed | 51 | 0 | 0 | 0 |
+| sklearn/utils/_repr_html/tests/test_features.py | passed | 12 | 0 | 0 | 3 |
+| sklearn/utils/_repr_html/tests/test_js.py | no-tests | 0 | 0 | 0 | 5 |
+| sklearn/utils/_repr_html/tests/test_params.py | passed | 11 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_arpack.py | passed | 100 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_array_api.py | passed | 8 | 0 | 0 | 1922 |
+| sklearn/utils/tests/test_arrayfuncs.py | passed | 18 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_bitset.py | passed | 4 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_bunch.py | passed | 1 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_chunking.py | passed | 9 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_class_weight.py | passed | 21 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_cython_blas.py | no-tests | 0 | 0 | 0 | 44 |
+| sklearn/utils/tests/test_dataframe.py | passed | 3 | 0 | 0 | 10 |
+| sklearn/utils/tests/test_deprecation.py | passed | 4 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_encode.py | passed | 38 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_estimator_checks.py | passed | 45 | 0 | 0 | 6 |
+| sklearn/utils/tests/test_extmath.py | passed | 260 | 0 | 0 | 45 |
+| sklearn/utils/tests/test_fast_dict.py | passed | 3 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_fixes.py | passed | 39 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_graph.py | passed | 5 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_indexing.py | passed | 129 | 0 | 0 | 430 |
+| sklearn/utils/tests/test_mask.py | passed | 2 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_metaestimators.py | passed | 4 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_missing.py | passed | 12 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_mocking.py | passed | 36 | 0 | 0 | 1 |
+| sklearn/utils/tests/test_multiclass.py | passed | 13 | 0 | 0 | 36 |
+| sklearn/utils/tests/test_murmurhash.py | passed | 6 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_optimize.py | passed | 5 | 0 | 0 | 15 |
+| sklearn/utils/tests/test_parallel.py | passed | 15 | 0 | 0 | 2 |
+| sklearn/utils/tests/test_param_validation.py | passed | 147 | 0 | 0 | 1 |
+| sklearn/utils/tests/test_plotting.py | passed | 80 | 0 | 0 | 28 |
+| sklearn/utils/tests/test_pprint.py | passed | 13 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_random.py | passed | 5 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_response.py | passed | 63 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_seq_dataset.py | passed | 20 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_set_output.py | passed | 16 | 0 | 0 | 8 |
+| sklearn/utils/tests/test_shortest_path.py | passed | 1 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_show_versions.py | passed | 3 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_sorting.py | passed | 4 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_sparse.py | passed | 16 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_sparsefuncs.py | passed | 360 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_stats.py | failed | 79 | 8 | 0 | 111 |
+| sklearn/utils/tests/test_tags.py | passed | 8 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_testing.py | passed | 81 | 0 | 0 | 43 |
+| sklearn/utils/tests/test_typedefs.py | passed | 9 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_unique.py | passed | 6 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_user_interface.py | passed | 23 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_validation.py | passed | 258 | 0 | 0 | 259 |
+| sklearn/utils/tests/test_weight_vector.py | passed | 2 | 0 | 0 | 0 |
+| sklearn/linear_model/_glm/tests/test_glm.py | passed | 274 | 0 | 0 | 45 |
+| sklearn/linear_model/tests/test_base.py | passed | 76 | 0 | 0 | 2 |
+| sklearn/linear_model/tests/test_bayes.py | passed | 24 | 0 | 0 | 1 |
+| sklearn/linear_model/tests/test_common.py | failed | 0 | 0 | 0 | 0 |
+| sklearn/linear_model/tests/test_coordinate_descent.py | failed | 286 | 3 | 0 | 0 |
+| sklearn/linear_model/tests/test_huber.py | passed | 12 | 0 | 0 | 0 |
+| sklearn/linear_model/tests/test_least_angle.py | passed | 62 | 0 | 0 | 0 |
+| sklearn/linear_model/tests/test_linear_loss.py | passed | 185 | 0 | 0 | 0 |
+| sklearn/linear_model/tests/test_logistic.py | passed | 295 | 0 | 0 | 393 |
+| sklearn/linear_model/tests/test_omp.py | passed | 23 | 0 | 0 | 0 |
+| sklearn/linear_model/tests/test_passive_aggressive.py | passed | 63 | 0 | 0 | 0 |
+| sklearn/linear_model/tests/test_perceptron.py | passed | 6 | 0 | 0 | 0 |
+| sklearn/linear_model/tests/test_quantile.py | passed | 54 | 0 | 0 | 5 |
+| sklearn/linear_model/tests/test_ransac.py | passed | 27 | 0 | 0 | 0 |
+| sklearn/linear_model/tests/test_ridge.py | passed | 1088 | 0 | 0 | 348 |
+| sklearn/linear_model/tests/test_sag.py | passed | 27 | 0 | 0 | 0 |
+| sklearn/linear_model/tests/test_sgd.py | passed | 267 | 0 | 0 | 0 |
+| sklearn/linear_model/tests/test_sparse_coordinate_descent.py | passed | 159 | 0 | 0 | 0 |
+| sklearn/linear_model/tests/test_theil_sen.py | passed | 16 | 0 | 0 | 0 |
+
+</details>
+
+### scikit-learn-2 @ 1.9.0
+
+<details><summary>per-file detail (58 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| sklearn/tests/test_base.py | passed | 103 | 0 | 0 | 6 |
+| sklearn/tests/test_build.py | passed | 2 | 0 | 0 | 0 |
+| sklearn/tests/test_calibration.py | passed | 97 | 0 | 0 | 137 |
+| sklearn/tests/test_check_build.py | passed | 1 | 0 | 0 | 0 |
+| sklearn/tests/test_common.py | no-tests | 0 | 0 | 0 | 0 |
+| sklearn/tests/test_config.py | passed | 8 | 0 | 0 | 0 |
+| sklearn/tests/test_discriminant_analysis.py | passed | 56 | 0 | 0 | 0 |
+| sklearn/tests/test_docstring_parameters.py | no-tests | 0 | 0 | 0 | 212 |
+| sklearn/tests/test_docstring_parameters_consistency.py | no-tests | 0 | 0 | 0 | 4 |
+| sklearn/tests/test_docstrings.py | no-tests | 0 | 0 | 0 | 1 |
+| sklearn/tests/test_dummy.py | passed | 60 | 0 | 0 | 1 |
+| sklearn/tests/test_init.py | passed | 1 | 0 | 0 | 0 |
+| sklearn/tests/test_isotonic.py | passed | 48 | 0 | 0 | 1 |
+| sklearn/tests/test_kernel_approximation.py | passed | 78 | 0 | 0 | 332 |
+| sklearn/tests/test_kernel_ridge.py | passed | 10 | 0 | 0 | 0 |
+| sklearn/tests/test_metadata_routing.py | passed | 100 | 0 | 0 | 0 |
+| sklearn/tests/test_metaestimators.py | passed | 31 | 0 | 0 | 0 |
+| sklearn/tests/test_metaestimators_metadata_routing.py | passed | 271 | 0 | 0 | 0 |
+| sklearn/tests/test_min_dependencies_readme.py | passed | 6 | 0 | 0 | 2 |
+| sklearn/tests/test_multiclass.py | passed | 59 | 0 | 0 | 0 |
+| sklearn/tests/test_multioutput.py | passed | 72 | 0 | 0 | 0 |
+| sklearn/tests/test_naive_bayes.py | passed | 86 | 0 | 0 | 61 |
+| sklearn/tests/test_pipeline.py | passed | 154 | 0 | 0 | 27 |
+| sklearn/tests/test_public_functions.py | passed | 220 | 0 | 0 | 0 |
+| sklearn/tests/test_random_projection.py | passed | 239 | 0 | 0 | 0 |
+| sklearn/ensemble/_hist_gradient_boosting/tests/test_binning.py | passed | 63 | 0 | 0 | 0 |
+| sklearn/ensemble/_hist_gradient_boosting/tests/test_compare_lightgbm.py | no-tests | 0 | 0 | 0 | 100 |
+| sklearn/ensemble/_hist_gradient_boosting/tests/test_gradient_boosting.py | passed | 146 | 0 | 0 | 16 |
+| sklearn/ensemble/_hist_gradient_boosting/tests/test_grower.py | passed | 45 | 0 | 0 | 0 |
+| sklearn/ensemble/_hist_gradient_boosting/tests/test_histogram.py | passed | 7 | 0 | 0 | 0 |
+| sklearn/ensemble/_hist_gradient_boosting/tests/test_monotonic_constraints.py | passed | 12 | 0 | 0 | 2 |
+| sklearn/ensemble/_hist_gradient_boosting/tests/test_predictor.py | passed | 10 | 0 | 0 | 0 |
+| sklearn/ensemble/_hist_gradient_boosting/tests/test_splitting.py | error | 0 | 0 | 1 | 0 |
+| sklearn/ensemble/_hist_gradient_boosting/tests/test_warm_start.py | passed | 20 | 0 | 0 | 0 |
+| sklearn/ensemble/tests/test_bagging.py | passed | 126 | 0 | 0 | 0 |
+| sklearn/ensemble/tests/test_base.py | passed | 2 | 0 | 0 | 0 |
+| sklearn/ensemble/tests/test_bootstrap.py | passed | 8 | 0 | 0 | 0 |
+| sklearn/ensemble/tests/test_common.py | passed | 19 | 0 | 0 | 0 |
+| sklearn/ensemble/tests/test_forest.py | passed | 332 | 0 | 0 | 0 |
+| sklearn/ensemble/tests/test_gradient_boosting.py | passed | 129 | 0 | 0 | 1 |
+| sklearn/ensemble/tests/test_iforest.py | passed | 32 | 0 | 0 | 1 |
+| sklearn/ensemble/tests/test_stacking.py | passed | 82 | 0 | 0 | 0 |
+| sklearn/ensemble/tests/test_voting.py | passed | 41 | 0 | 0 | 0 |
+| sklearn/ensemble/tests/test_weight_boosting.py | passed | 43 | 0 | 0 | 0 |
+| sklearn/model_selection/tests/test_classification_threshold.py | passed | 61 | 0 | 0 | 0 |
+| sklearn/model_selection/tests/test_plot.py | no-tests | 0 | 0 | 0 | 29 |
+| sklearn/model_selection/tests/test_search.py | passed | 140 | 0 | 0 | 31 |
+| sklearn/model_selection/tests/test_split.py | passed | 226 | 0 | 0 | 45 |
+| sklearn/model_selection/tests/test_successive_halving.py | error | 0 | 0 | 1 | 0 |
+| sklearn/model_selection/tests/test_validation.py | passed | 121 | 0 | 0 | 90 |
+| sklearn/preprocessing/tests/test_common.py | passed | 9 | 0 | 0 | 9 |
+| sklearn/preprocessing/tests/test_data.py | passed | 450 | 0 | 0 | 279 |
+| sklearn/preprocessing/tests/test_discretization.py | passed | 99 | 0 | 0 | 0 |
+| sklearn/preprocessing/tests/test_encoders.py | passed | 232 | 0 | 0 | 32 |
+| sklearn/preprocessing/tests/test_function_transformer.py | passed | 26 | 0 | 0 | 33 |
+| sklearn/preprocessing/tests/test_label.py | passed | 49 | 0 | 0 | 171 |
+| sklearn/preprocessing/tests/test_polynomial.py | passed | 628 | 0 | 0 | 255 |
+| sklearn/preprocessing/tests/test_target_encoder.py | passed | 55 | 0 | 0 | 10 |
+
+</details>
+
+### scikit-learn-3 @ 1.9.0
+
+<details><summary>per-file detail (114 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| sklearn/_loss/tests/test_link.py | passed | 18 | 0 | 0 | 75 |
+| sklearn/_loss/tests/test_loss.py | failed | 1831 | 3 | 0 | 379 |
+| sklearn/callback/tests/test_callback_context.py | passed | 29 | 0 | 0 | 0 |
+| sklearn/callback/tests/test_callback_support.py | passed | 20 | 0 | 0 | 0 |
+| sklearn/callback/tests/test_pickle.py | passed | 2 | 0 | 0 | 4 |
+| sklearn/callback/tests/test_progressbar.py | passed | 1 | 0 | 0 | 47 |
+| sklearn/callback/tests/test_scoring_monitor.py | passed | 26 | 0 | 0 | 17 |
+| sklearn/cluster/_hdbscan/tests/test_reachibility.py | passed | 8 | 0 | 0 | 0 |
+| sklearn/cluster/tests/test_affinity_propagation.py | passed | 23 | 0 | 0 | 11 |
+| sklearn/cluster/tests/test_bicluster.py | passed | 21 | 0 | 0 | 0 |
+| sklearn/cluster/tests/test_birch.py | passed | 14 | 0 | 0 | 9 |
+| sklearn/cluster/tests/test_bisect_k_means.py | passed | 22 | 0 | 0 | 3 |
+| sklearn/cluster/tests/test_dbscan.py | passed | 30 | 0 | 0 | 0 |
+| sklearn/cluster/tests/test_feature_agglomeration.py | passed | 2 | 0 | 0 | 0 |
+| sklearn/cluster/tests/test_hdbscan.py | passed | 148 | 0 | 0 | 0 |
+| sklearn/cluster/tests/test_hierarchical.py | passed | 72 | 0 | 0 | 0 |
+| sklearn/cluster/tests/test_k_means.py | passed | 264 | 0 | 0 | 18 |
+| sklearn/cluster/tests/test_mean_shift.py | passed | 14 | 0 | 0 | 8 |
+| sklearn/cluster/tests/test_optics.py | passed | 73 | 0 | 0 | 44 |
+| sklearn/cluster/tests/test_spectral.py | passed | 37 | 0 | 0 | 0 |
+| sklearn/compose/tests/test_column_transformer.py | passed | 105 | 0 | 0 | 135 |
+| sklearn/compose/tests/test_target.py | passed | 21 | 0 | 0 | 0 |
+| sklearn/covariance/tests/test_covariance.py | passed | 11 | 0 | 0 | 0 |
+| sklearn/covariance/tests/test_elliptic_envelope.py | passed | 2 | 0 | 0 | 0 |
+| sklearn/covariance/tests/test_graphical_lasso.py | passed | 17 | 0 | 0 | 0 |
+| sklearn/covariance/tests/test_robust_covariance.py | passed | 8 | 0 | 0 | 0 |
+| sklearn/cross_decomposition/tests/test_pls.py | passed | 62 | 0 | 0 | 4 |
+| sklearn/datasets/tests/test_20news.py | no-tests | 0 | 0 | 0 | 7 |
+| sklearn/datasets/tests/test_arff_parser.py | passed | 1 | 0 | 0 | 9 |
+| sklearn/datasets/tests/test_base.py | failed | 29 | 0 | 0 | 6 |
+| sklearn/datasets/tests/test_california_housing.py | no-tests | 0 | 0 | 0 | 3 |
+| sklearn/datasets/tests/test_common.py | passed | 12 | 0 | 0 | 25 |
+| sklearn/datasets/tests/test_covtype.py | no-tests | 0 | 0 | 0 | 3 |
+| sklearn/datasets/tests/test_kddcup99.py | no-tests | 0 | 0 | 0 | 15 |
+| sklearn/datasets/tests/test_lfw.py | passed | 2 | 0 | 0 | 4 |
+| sklearn/datasets/tests/test_olivetti_faces.py | no-tests | 0 | 0 | 0 | 1 |
+| sklearn/datasets/tests/test_openml.py | passed | 40 | 0 | 0 | 171 |
+| sklearn/datasets/tests/test_rcv1.py | no-tests | 0 | 0 | 0 | 1 |
+| sklearn/datasets/tests/test_samples_generator.py | passed | 59 | 0 | 0 | 0 |
+| sklearn/datasets/tests/test_svmlight_format.py | passed | 92 | 0 | 0 | 1 |
+| sklearn/decomposition/tests/test_dict_learning.py | passed | 199 | 0 | 0 | 0 |
+| sklearn/decomposition/tests/test_factor_analysis.py | passed | 1 | 0 | 0 | 0 |
+| sklearn/decomposition/tests/test_fastica.py | passed | 33 | 0 | 0 | 11 |
+| sklearn/decomposition/tests/test_incremental_pca.py | passed | 27 | 0 | 0 | 0 |
+| sklearn/decomposition/tests/test_kernel_pca.py | passed | 38 | 0 | 0 | 1 |
+| sklearn/decomposition/tests/test_nmf.py | passed | 284 | 0 | 0 | 0 |
+| sklearn/decomposition/tests/test_online_lda.py | passed | 55 | 0 | 0 | 2 |
+| sklearn/decomposition/tests/test_pca.py | passed | 386 | 0 | 0 | 220 |
+| sklearn/decomposition/tests/test_sparse_pca.py | passed | 40 | 0 | 0 | 0 |
+| sklearn/decomposition/tests/test_truncated_svd.py | passed | 46 | 0 | 0 | 0 |
+| sklearn/experimental/tests/test_enable_hist_gradient_boosting.py | failed | 0 | 1 | 0 | 0 |
+| sklearn/experimental/tests/test_enable_iterative_imputer.py | failed | 0 | 1 | 0 | 0 |
+| sklearn/experimental/tests/test_enable_successive_halving.py | failed | 0 | 1 | 0 | 0 |
+| sklearn/feature_extraction/tests/test_dict_vectorizer.py | passed | 38 | 0 | 0 | 0 |
+| sklearn/feature_extraction/tests/test_feature_hasher.py | passed | 13 | 0 | 0 | 0 |
+| sklearn/feature_extraction/tests/test_image.py | passed | 9 | 0 | 0 | 17 |
+| sklearn/feature_extraction/tests/test_text.py | passed | 131 | 0 | 0 | 0 |
+| sklearn/feature_selection/tests/test_base.py | passed | 7 | 0 | 0 | 1 |
+| sklearn/feature_selection/tests/test_chi2.py | passed | 8 | 0 | 0 | 0 |
+| sklearn/feature_selection/tests/test_feature_select.py | passed | 61 | 0 | 0 | 1 |
+| sklearn/feature_selection/tests/test_from_model.py | passed | 45 | 0 | 0 | 3 |
+| sklearn/feature_selection/tests/test_mutual_info.py | passed | 14 | 0 | 0 | 8 |
+| sklearn/feature_selection/tests/test_rfe.py | failed | 58 | 1 | 0 | 0 |
+| sklearn/feature_selection/tests/test_sequential.py | passed | 74 | 0 | 0 | 0 |
+| sklearn/feature_selection/tests/test_variance_threshold.py | passed | 25 | 0 | 0 | 0 |
+| sklearn/frozen/tests/test_frozen.py | passed | 46 | 0 | 0 | 0 |
+| sklearn/gaussian_process/tests/test_gpc.py | passed | 39 | 0 | 0 | 0 |
+| sklearn/gaussian_process/tests/test_gpr.py | passed | 130 | 0 | 0 | 0 |
+| sklearn/gaussian_process/tests/test_kernels.py | passed | 281 | 0 | 0 | 0 |
+| sklearn/impute/tests/test_base.py | passed | 5 | 0 | 0 | 1 |
+| sklearn/impute/tests/test_common.py | passed | 28 | 0 | 0 | 12 |
+| sklearn/impute/tests/test_impute.py | passed | 298 | 0 | 0 | 13 |
+| sklearn/impute/tests/test_knn.py | passed | 47 | 0 | 0 | 0 |
+| sklearn/inspection/_plot/tests/test_boundary_decision_display.py | passed | 10 | 0 | 0 | 142 |
+| sklearn/inspection/_plot/tests/test_plot_partial_dependence.py | no-tests | 0 | 0 | 0 | 137 |
+| sklearn/inspection/tests/test_partial_dependence.py | passed | 393 | 0 | 0 | 38 |
+| sklearn/inspection/tests/test_pd_utils.py | passed | 10 | 0 | 0 | 1 |
+| sklearn/inspection/tests/test_permutation_importance.py | passed | 24 | 0 | 0 | 12 |
+| sklearn/manifold/tests/test_classical_mds.py | passed | 4 | 0 | 0 | 0 |
+| sklearn/manifold/tests/test_isomap.py | passed | 72 | 0 | 0 | 67 |
+| sklearn/manifold/tests/test_locally_linear.py | passed | 14 | 0 | 0 | 10 |
+| sklearn/manifold/tests/test_mds.py | passed | 27 | 0 | 0 | 0 |
+| sklearn/manifold/tests/test_spectral_embedding.py | passed | 38 | 0 | 0 | 19 |
+| sklearn/manifold/tests/test_t_sne.py | passed | 77 | 0 | 0 | 1 |
+| sklearn/mixture/tests/test_bayesian_mixture.py | passed | 17 | 0 | 0 | 0 |
+| sklearn/mixture/tests/test_gaussian_mixture.py | passed | 56 | 0 | 0 | 291 |
+| sklearn/mixture/tests/test_mixture.py | passed | 4 | 0 | 0 | 0 |
+| sklearn/neighbors/tests/test_ball_tree.py | passed | 64 | 0 | 0 | 0 |
+| sklearn/neighbors/tests/test_graph.py | passed | 4 | 0 | 0 | 0 |
+| sklearn/neighbors/tests/test_kd_tree.py | passed | 13 | 0 | 0 | 0 |
+| sklearn/neighbors/tests/test_kde.py | passed | 57 | 0 | 0 | 0 |
+| sklearn/neighbors/tests/test_lof.py | passed | 91 | 0 | 0 | 24 |
+| sklearn/neighbors/tests/test_nca.py | passed | 217 | 0 | 0 | 0 |
+| sklearn/neighbors/tests/test_nearest_centroid.py | passed | 19 | 0 | 0 | 0 |
+| sklearn/neighbors/tests/test_neighbors.py | passed | 594 | 0 | 0 | 433 |
+| sklearn/neighbors/tests/test_neighbors_pipeline.py | passed | 8 | 0 | 0 | 0 |
+| sklearn/neighbors/tests/test_neighbors_tree.py | passed | 433 | 0 | 0 | 0 |
+| sklearn/neighbors/tests/test_quad_tree.py | passed | 11 | 0 | 0 | 0 |
+| sklearn/neural_network/tests/test_base.py | passed | 4 | 0 | 0 | 0 |
+| sklearn/neural_network/tests/test_mlp.py | passed | 57 | 0 | 0 | 2 |
+| sklearn/neural_network/tests/test_rbm.py | passed | 24 | 0 | 0 | 0 |
+| sklearn/neural_network/tests/test_stochastic_optimizers.py | passed | 6 | 0 | 0 | 0 |
+| sklearn/semi_supervised/tests/test_label_propagation.py | passed | 173 | 0 | 0 | 58 |
+| sklearn/semi_supervised/tests/test_self_training.py | passed | 30 | 0 | 0 | 0 |
+| sklearn/svm/tests/test_bounds.py | passed | 22 | 0 | 0 | 0 |
+| sklearn/svm/tests/test_sparse.py | passed | 158 | 0 | 0 | 0 |
+| sklearn/svm/tests/test_svm.py | passed | 128 | 0 | 0 | 0 |
+| sklearn/tree/tests/test_export.py | passed | 15 | 0 | 0 | 5 |
+| sklearn/tree/tests/test_fenwick.py | passed | 1 | 0 | 0 | 0 |
+| sklearn/tree/tests/test_monotonic_tree.py | passed | 224 | 0 | 0 | 0 |
+| sklearn/tree/tests/test_reingold_tilford.py | passed | 2 | 0 | 0 | 0 |
+| sklearn/tree/tests/test_split.py | passed | 30 | 0 | 0 | 0 |
+| sklearn/tree/tests/test_swap.py | passed | 2 | 0 | 0 | 0 |
+| sklearn/tree/tests/test_tree.py | passed | 525 | 0 | 0 | 0 |
+
+</details>
+
+## darwin (dev snapshot)
+
+| suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| pytest | 9.0.3 | 2398 | 381 | 3 | 52 | 2834 | 86.5% | 16 | 53 | 63 |
+| pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
+| pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
+| pytest-cov | v7.1.0 | 185 | 20 | 0 | 4 | 209 | 90.4% | 0 | 1 | 0 |
+| pytest-xdist | v3.8.0 | 91 | 6 | 0 | 1 | 98 | 93.9% | 0 | 1 | 6 |
+| pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
+| pytest-benchmark | v5.1.0 | 91 | 31 | 0 | 1 | 123 | 74.8% | 4 | 7 | 6 |
+| pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 41 | 100.0% | 1 | 1 | 0 |
+| anyio | 4.13.0 | 2860 | 0 | 0 | 302 | 3162 | 100.0% | 26 | 26 | 0 |
+| pytest-mypy | v1.0.1 | 76 | 2 | 0 | 0 | 78 | 97.4% | 0 | 1 | 0 |
+| pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
+| pytest-subtests | v0.14.2 | 28 | 4 | 0 | 0 | 32 | 87.5% | 0 | 1 | 0 |
+| pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
+| pytest-snapshot | v0.9.0 | 101 | 6 | 0 | 0 | 107 | 94.4% | 0 | 3 | 0 |
+| pytest-icdiff | 0.5 | 10 | 2 | 0 | 0 | 12 | 83.3% | 0 | 1 | 0 |
+| pytest-socket | 0.7.0 | 59 | 6 | 0 | 0 | 65 | 90.8% | 2 | 6 | 0 |
+| pytest-order | v1.4.0 | 115 | 19 | 0 | 0 | 134 | 85.8% | 7 | 16 | 0 |
+| pytest-repeat | v0.9.4 | 16 | 0 | 0 | 0 | 16 | 100.0% | 1 | 1 | 0 |
+| pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
+| pytest-env | 1.6.0 | 67 | 8 | 0 | 0 | 75 | 89.3% | 2 | 3 | 0 |
+| pytest-rerunfailures | 9.1.1 | 47 | 0 | 0 | 1 | 48 | 100.0% | 1 | 1 | 0 |
+| pytest-randomly | 4.1.0 | 33 | 4 | 0 | 0 | 37 | 89.2% | 0 | 1 | 0 |
+| click | 8.3.1 | 1313 | 0 | 0 | 22 | 1335 | 100.0% | 20 | 20 | 0 |
+| jinja | 3.1.6 | 909 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
+| marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
+| rich | v14.2.0 | 855 | 0 | 0 | 25 | 880 | 100.0% | 60 | 62 | 0 |
+| sqlglot | v30.11.0 | 1119 | 1 | 0 | 0 | 1120 | 99.9% | 51 | 54 | 0 |
+| pytest-bdd | 8.1.0 | 112 | 26 | 0 | 1 | 139 | 81.3% | 27 | 35 | 0 |
+| httpx | 0.28.1 | 1328 | 0 | 0 | 1 | 1329 | 100.0% | 28 | 31 | 0 |
+| httpx2 | v2.4.0 | 1426 | 0 | 0 | 1 | 1427 | 100.0% | 31 | 31 | 0 |
+| starlette | 0.46.2 | 907 | 0 | 0 | 0 | 907 | 100.0% | 28 | 28 | 0 |
+| attrs | 25.3.0 | 1342 | 0 | 0 | 3 | 1345 | 100.0% | 23 | 24 | 0 |
+| more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 671 | 100.0% | 2 | 2 | 0 |
+| pytest-django | v4.9.0 | 141 | 68 | 6 | 1 | 216 | 65.7% | 2 | 13 | 0 |
+| werkzeug | 3.1.3 | 922 | 0 | 0 | 1 | 923 | 100.0% | 24 | 25 | 0 |
+| fastapi | 0.115.12 | 2332 | 1 | 1 | 130 | 2464 | 99.9% | 302 | 310 | 0 |
+| packaging | 25.0 | 26946 | 0 | 0 | 1 | 26947 | 100.0% | 12 | 12 | 0 |
+| pandas | v3.0.3 | 161831 | 0 | 0 | 26991 | 188822 | 100.0% | 872 | 961 | 3 |
+| networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 6894 | 100.0% | 259 | 266 | 0 |
+| scikit-learn-1 | 1.9.0 | 8432 | 0 | 0 | 6624 | 15056 | 100.0% | 79 | 87 | 0 |
+| scikit-learn-2 | 1.9.0 | 4900 | 0 | 0 | 1876 | 6776 | 100.0% | 51 | 58 | 0 |
+| scikit-learn-3 | 1.9.0 | 8513 | 0 | 0 | 2480 | 10993 | 100.0% | 104 | 114 | 0 |
+
+### pytest @ 9.0.3
+
+<details><summary>per-file detail (53 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| testing/python/approx.py | failed | 38 | 37 | 0 | 18 |
+| testing/python/collect.py | failed | 72 | 10 | 0 | 0 |
+| testing/python/fixtures.py | failed | 191 | 17 | 0 | 2 |
+| testing/python/integration.py | failed | 9 | 7 | 0 | 4 |
+| testing/python/metafunc.py | failed | 67 | 45 | 0 | 0 |
+| testing/python/raises.py | failed | 30 | 1 | 0 | 0 |
+| testing/python/raises_group.py | failed | 26 | 3 | 0 | 0 |
+| testing/python/show_fixtures_per_test.py | passed | 8 | 0 | 0 | 0 |
+| testing/examples/test_issue519.py | failed | 0 | 1 | 0 | 0 |
+| testing/freeze/tests/test_trivial.py | passed | 2 | 0 | 0 | 0 |
+| testing/logging/test_fixture.py | passed | 27 | 0 | 0 | 0 |
+| testing/logging/test_formatter.py | passed | 4 | 0 | 0 | 0 |
+| testing/logging/test_reporting.py | failed | 15 | 37 | 0 | 0 |
+| testing/test_assertion.py | failed | 149 | 11 | 0 | 0 |
+| testing/test_cacheprovider.py | failed | 54 | 3 | 0 | 0 |
+| testing/test_capture.py | failed | 128 | 2 | 0 | 2 |
+| testing/test_collect_imported_tests.py | failed | 2 | 1 | 0 | 0 |
+| testing/test_collection.py | failed | 99 | 14 | 0 | 3 |
+| testing/test_compat.py | passed | 10 | 0 | 0 | 0 |
+| testing/test_config.py | failed | 182 | 32 | 0 | 1 |
+| testing/test_conftest.py | failed | 47 | 6 | 0 | 1 |
+| testing/test_debug_session.py | passed | 1 | 0 | 0 | 0 |
+| testing/test_doctest.py | passed | 139 | 0 | 0 | 1 |
+| testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 |
+| testing/test_faulthandler.py | failed | 5 | 7 | 0 | 0 |
+| testing/test_helpconfig.py | failed | 6 | 6 | 0 | 0 |
+| testing/test_junitxml.py | failed | 132 | 5 | 0 | 0 |
+| testing/test_link_resolve.py | failed | 0 | 1 | 0 | 0 |
+| testing/test_main.py | failed | 20 | 4 | 0 | 0 |
+| testing/test_mark.py | failed | 105 | 1 | 0 | 0 |
+| testing/test_monkeypatch.py | passed | 33 | 0 | 0 | 2 |
+| testing/test_nodes.py | failed | 6 | 2 | 0 | 0 |
+| testing/test_pastebin.py | failed | 0 | 5 | 3 | 0 |
+| testing/test_pytester.py | failed | 47 | 4 | 0 | 1 |
+| testing/test_python_path.py | failed | 3 | 3 | 0 | 0 |
+| testing/test_recwarn.py | passed | 63 | 0 | 0 | 0 |
+| testing/test_runner.py | failed | 63 | 3 | 0 | 0 |
+| testing/test_runner_xunit.py | passed | 13 | 0 | 0 | 0 |
+| testing/test_scope.py | passed | 4 | 0 | 0 | 0 |
+| testing/test_session.py | failed | 23 | 3 | 0 | 0 |
+| testing/test_setuponly.py | passed | 26 | 0 | 0 | 0 |
+| testing/test_setupplan.py | passed | 3 | 0 | 0 | 0 |
+| testing/test_skipping.py | failed | 91 | 1 | 0 | 0 |
+| testing/test_stepwise.py | passed | 18 | 0 | 0 | 0 |
+| testing/test_subtests.py | failed | 13 | 21 | 0 | 0 |
+| testing/test_terminal.py | failed | 212 | 11 | 0 | 4 |
+| testing/test_threadexception.py | failed | 1 | 7 | 0 | 0 |
+| testing/test_tmpdir.py | passed | 39 | 0 | 0 | 1 |
+| testing/test_unittest.py | failed | 64 | 6 | 0 | 9 |
+| testing/test_unraisableexception.py | failed | 5 | 6 | 0 | 0 |
+| testing/test_warnings.py | failed | 36 | 7 | 0 | 1 |
+| testing/acceptance_test.py | failed | 45 | 46 | 0 | 2 |
+| testing/deprecated_test.py | failed | 10 | 5 | 0 | 0 |
+
+</details>
+
+### pytest-asyncio @ v1.4.0
+
+<details><summary>per-file detail (30 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/async_fixtures/test_async_fixtures.py | passed | 2 | 0 | 0 | 0 |
+| tests/async_fixtures/test_async_fixtures_contextvars.py | passed | 10 | 0 | 0 | 0 |
+| tests/async_fixtures/test_nested.py | passed | 1 | 0 | 0 | 0 |
+| tests/async_fixtures/test_shared_module_fixture.py | passed | 1 | 0 | 0 | 0 |
+| tests/hypothesis/test_base.py | passed | 6 | 0 | 0 | 0 |
+| tests/markers/test_class_scope.py | passed | 10 | 0 | 0 | 0 |
+| tests/markers/test_function_scope.py | passed | 12 | 0 | 0 | 0 |
+| tests/markers/test_invalid_arguments.py | passed | 8 | 0 | 0 | 0 |
+| tests/markers/test_mixed_scope.py | passed | 1 | 0 | 0 | 0 |
+| tests/markers/test_module_scope.py | passed | 9 | 0 | 0 | 0 |
+| tests/markers/test_package_scope.py | passed | 8 | 0 | 0 | 0 |
+| tests/markers/test_session_scope.py | passed | 11 | 0 | 0 | 0 |
+| tests/modes/test_auto_mode.py | passed | 6 | 0 | 0 | 0 |
+| tests/modes/test_strict_mode.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_asyncio_debug.py | passed | 12 | 0 | 0 | 0 |
+| tests/test_asyncio_fixture.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_asyncio_mark.py | passed | 9 | 0 | 0 | 0 |
+| tests/test_doctest.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_event_loop_fixture.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_fixture_loop_scopes.py | passed | 11 | 0 | 0 | 0 |
+| tests/test_import.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_is_async_test.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_loop_factory_parametrization.py | passed | 40 | 0 | 0 | 0 |
+| tests/test_package.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_port_factories.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_set_event_loop.py | passed | 61 | 0 | 0 | 0 |
+| tests/test_simple.py | passed | 9 | 0 | 0 | 0 |
+| tests/test_skips.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_subprocess.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_task_cleanup.py | passed | 1 | 0 | 0 | 0 |
+
+</details>
+
+### pytest-mock @ v3.15.1
+
+<details><summary>per-file detail (1 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_pytest_mock.py | passed | 87 | 0 | 0 | 1 |
+
+</details>
+
+### pytest-cov @ v7.1.0
+
+<details><summary>per-file detail (1 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_pytest_cov.py | failed | 185 | 20 | 0 | 4 |
+
+</details>
+
+### pytest-xdist @ v3.8.0
+
+<details><summary>per-file detail (1 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| testing/acceptance_test.py | failed | 91 | 6 | 0 | 1 |
+
+</details>
+
+### pytest-split @ 0.9.0
+
+<details><summary>per-file detail (1 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_plugin.py | passed | 59 | 0 | 0 | 0 |
+
+</details>
+
+### pytest-benchmark @ v5.1.0
+
+<details><summary>per-file detail (7 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_benchmark.py | failed | 23 | 30 | 0 | 0 |
+| tests/test_calibration.py | passed | 34 | 0 | 0 | 0 |
+| tests/test_normal.py | passed | 10 | 0 | 0 | 0 |
+| tests/test_pedantic.py | passed | 19 | 0 | 0 | 0 |
+| tests/test_sample.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_skip.py | no-tests | 0 | 0 | 0 | 1 |
+| tests/test_with_testcase.py | failed | 1 | 1 | 0 | 0 |
+
+</details>
+
+### pytest-timeout @ 2.4.0
+
+<details><summary>per-file detail (1 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| test_pytest_timeout.py | passed | 40 | 0 | 0 | 1 |
+
+</details>
+
+### anyio @ 4.13.0
+
+<details><summary>per-file detail (26 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/streams/test_buffered.py | passed | 28 | 0 | 0 | 0 |
+| tests/streams/test_file.py | passed | 40 | 0 | 0 | 0 |
+| tests/streams/test_memory.py | passed | 109 | 0 | 0 | 0 |
+| tests/streams/test_stapled.py | passed | 24 | 0 | 0 | 0 |
+| tests/streams/test_text.py | passed | 24 | 0 | 0 | 0 |
+| tests/streams/test_tls.py | passed | 68 | 0 | 0 | 0 |
+| tests/test_all_attributes.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_contextmanagers.py | passed | 49 | 0 | 0 | 0 |
+| tests/test_debugging.py | passed | 31 | 0 | 0 | 1 |
+| tests/test_deprecations.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_eventloop.py | passed | 17 | 0 | 0 | 1 |
+| tests/test_fileio.py | passed | 248 | 0 | 0 | 18 |
+| tests/test_from_thread.py | passed | 195 | 0 | 0 | 4 |
+| tests/test_functools.py | passed | 132 | 0 | 0 | 0 |
+| tests/test_lowlevel.py | passed | 44 | 0 | 0 | 0 |
+| tests/test_pytest_plugin.py | passed | 35 | 0 | 0 | 0 |
+| tests/test_signals.py | passed | 12 | 0 | 0 | 0 |
+| tests/test_sockets.py | passed | 925 | 0 | 0 | 264 |
+| tests/test_subprocesses.py | passed | 76 | 0 | 0 | 4 |
+| tests/test_synchronization.py | passed | 235 | 0 | 0 | 0 |
+| tests/test_taskgroups.py | passed | 393 | 0 | 0 | 10 |
+| tests/test_tempfile.py | passed | 60 | 0 | 0 | 0 |
+| tests/test_to_interpreter.py | passed | 12 | 0 | 0 | 0 |
+| tests/test_to_process.py | passed | 36 | 0 | 0 | 0 |
+| tests/test_to_thread.py | passed | 64 | 0 | 0 | 0 |
+| tests/test_typedattr.py | passed | 1 | 0 | 0 | 0 |
+
+</details>
+
+### pytest-mypy @ v1.0.1
+
+<details><summary>per-file detail (1 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_pytest_mypy.py | failed | 76 | 2 | 0 | 0 |
+
+</details>
+
+### pytest-ruff @ v0.5
+
+<details><summary>per-file detail (1 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_plugin.py | passed | 10 | 0 | 0 | 0 |
+
+</details>
+
+### pytest-subtests @ v0.14.2
+
+<details><summary>per-file detail (1 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_subtests.py | failed | 28 | 4 | 0 | 0 |
+
+</details>
+
+### pytest-metadata @ v2.0.4
+
+<details><summary>per-file detail (1 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_metadata.py | passed | 10 | 0 | 0 | 0 |
+
+</details>
+
+### pytest-snapshot @ v0.9.0
+
+<details><summary>per-file detail (3 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_assert_match.py | failed | 34 | 4 | 0 | 0 |
+| tests/test_assert_match_dir.py | failed | 27 | 1 | 0 | 0 |
+| tests/test_misc.py | failed | 40 | 1 | 0 | 0 |
+
+</details>
+
+### pytest-icdiff @ 0.5
+
+<details><summary>per-file detail (1 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_pytest_icdiff.py | failed | 10 | 2 | 0 | 0 |
+
+</details>
+
+### pytest-socket @ 0.7.0
+
+<details><summary>per-file detail (6 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_async.py | failed | 1 | 1 | 0 | 0 |
+| tests/test_combinations.py | failed | 1 | 1 | 0 | 0 |
+| tests/test_doctest.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_precedence.py | passed | 10 | 0 | 0 | 0 |
+| tests/test_restrict_hosts.py | failed | 27 | 1 | 0 | 0 |
+| tests/test_socket.py | failed | 19 | 3 | 0 | 0 |
+
+</details>
+
+### pytest-order @ v1.4.0
+
+<details><summary>per-file detail (16 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_class_marks.py | passed | 9 | 0 | 0 | 0 |
+| tests/test_dependency.py | failed | 22 | 1 | 0 | 0 |
+| tests/test_marker_prefix.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_misc.py | failed | 3 | 1 | 0 | 0 |
+| tests/test_multiple_ordering.py | failed | 0 | 4 | 0 | 0 |
+| tests/test_order_group_scope.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_order_group_scope_dep.py | failed | 3 | 1 | 0 | 0 |
+| tests/test_order_group_scope_named_dep.py | failed | 3 | 1 | 0 | 0 |
+| tests/test_order_group_scope_relative.py | failed | 0 | 5 | 0 | 0 |
+| tests/test_order_scope.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_order_scope_level.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_ordering.py | passed | 19 | 0 | 0 | 0 |
+| tests/test_ordering_options.py | failed | 0 | 2 | 0 | 0 |
+| tests/test_relative_ordering.py | failed | 18 | 3 | 0 | 0 |
+| tests/test_sparse_ordinals.py | passed | 16 | 0 | 0 | 0 |
+| tests/test_xdist_handling.py | failed | 0 | 1 | 0 | 0 |
+
+</details>
+
+### pytest-repeat @ v0.9.4
+
+<details><summary>per-file detail (1 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| test_repeat.py | passed | 16 | 0 | 0 | 0 |
+
+</details>
+
+### pytest-instafail @ v0.5.0
+
+<details><summary>per-file detail (1 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| test_instafail.py | passed | 63 | 0 | 0 | 0 |
+
+</details>
+
+### pytest-env @ 1.6.0
+
+<details><summary>per-file detail (3 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_env.py | failed | 56 | 8 | 0 | 0 |
+| tests/test_verbose.py | passed | 10 | 0 | 0 | 0 |
+| tests/test_version.py | passed | 1 | 0 | 0 | 0 |
+
+</details>
+
+### pytest-rerunfailures @ 9.1.1
+
+<details><summary>per-file detail (1 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| test_pytest_rerunfailures.py | passed | 47 | 0 | 0 | 1 |
+
+</details>
+
+### pytest-randomly @ 4.1.0
+
+<details><summary>per-file detail (1 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_pytest_randomly.py | failed | 33 | 4 | 0 | 0 |
+
+</details>
+
+### click @ 8.3.1
+
+<details><summary>per-file detail (20 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_arguments.py | passed | 91 | 0 | 0 | 0 |
+| tests/test_basic.py | passed | 88 | 0 | 0 | 0 |
+| tests/test_chain.py | passed | 15 | 0 | 0 | 0 |
+| tests/test_command_decorators.py | passed | 9 | 0 | 0 | 0 |
+| tests/test_commands.py | passed | 79 | 0 | 0 | 0 |
+| tests/test_compat.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_context.py | passed | 30 | 0 | 0 | 0 |
+| tests/test_custom_classes.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_defaults.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_formatting.py | passed | 17 | 0 | 0 | 0 |
+| tests/test_imports.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_info_dict.py | passed | 22 | 0 | 0 | 0 |
+| tests/test_normalization.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_options.py | passed | 531 | 0 | 0 | 0 |
+| tests/test_parser.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_shell_completion.py | passed | 52 | 0 | 0 | 0 |
+| tests/test_termui.py | passed | 147 | 0 | 0 | 21 |
+| tests/test_testing.py | passed | 26 | 0 | 0 | 0 |
+| tests/test_types.py | passed | 39 | 0 | 0 | 1 |
+| tests/test_utils.py | passed | 143 | 0 | 0 | 0 |
+
+</details>
+
+### jinja @ 3.1.6
+
+<details><summary>per-file detail (22 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_api.py | passed | 34 | 0 | 0 | 0 |
+| tests/test_async.py | passed | 76 | 0 | 0 | 0 |
+| tests/test_async_filters.py | passed | 49 | 0 | 0 | 0 |
+| tests/test_bytecode_cache.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_compile.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_core_tags.py | passed | 63 | 0 | 0 | 0 |
+| tests/test_debug.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_ext.py | passed | 51 | 0 | 0 | 0 |
+| tests/test_filters.py | passed | 132 | 0 | 0 | 0 |
+| tests/test_idtracking.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_imports.py | passed | 15 | 0 | 0 | 0 |
+| tests/test_inheritance.py | passed | 22 | 0 | 0 | 0 |
+| tests/test_lexnparse.py | passed | 150 | 0 | 0 | 0 |
+| tests/test_loader.py | passed | 43 | 0 | 0 | 0 |
+| tests/test_nativetypes.py | passed | 27 | 0 | 0 | 0 |
+| tests/test_nodes.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_pickle.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_regression.py | passed | 54 | 0 | 0 | 0 |
+| tests/test_runtime.py | passed | 19 | 0 | 0 | 0 |
+| tests/test_security.py | passed | 17 | 0 | 0 | 0 |
+| tests/test_tests.py | passed | 106 | 0 | 0 | 0 |
+| tests/test_utils.py | passed | 28 | 0 | 0 | 0 |
+
+</details>
+
+### marshmallow @ 4.1.1
+
+<details><summary>per-file detail (12 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_context.py | passed | 12 | 0 | 0 | 0 |
+| tests/test_decorators.py | passed | 44 | 0 | 0 | 0 |
+| tests/test_deserialization.py | passed | 379 | 0 | 0 | 0 |
+| tests/test_error_store.py | passed | 29 | 0 | 0 | 0 |
+| tests/test_exceptions.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_fields.py | passed | 92 | 0 | 0 | 0 |
+| tests/test_options.py | passed | 10 | 0 | 0 | 0 |
+| tests/test_registry.py | passed | 10 | 0 | 0 | 0 |
+| tests/test_schema.py | passed | 201 | 0 | 0 | 0 |
+| tests/test_serialization.py | passed | 128 | 0 | 0 | 0 |
+| tests/test_utils.py | passed | 16 | 0 | 0 | 0 |
+| tests/test_validate.py | passed | 191 | 0 | 0 | 0 |
+
+</details>
+
+### rich @ v14.2.0
+
+<details><summary>per-file detail (62 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_align.py | passed | 16 | 0 | 0 | 0 |
+| tests/test_ansi.py | passed | 23 | 0 | 0 | 0 |
+| tests/test_bar.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_block_bar.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_box.py | passed | 8 | 0 | 0 | 0 |
+| tests/test_card.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_cells.py | passed | 8 | 0 | 0 | 0 |
+| tests/test_color.py | passed | 17 | 0 | 0 | 0 |
+| tests/test_color_triplet.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_columns.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_columns_align.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_console.py | passed | 99 | 0 | 0 | 0 |
+| tests/test_constrain.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_containers.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_control.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_emoji.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_file_proxy.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_filesize.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_getfileno.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_highlighter.py | passed | 83 | 0 | 0 | 0 |
+| tests/test_inspect.py | passed | 41 | 0 | 0 | 4 |
+| tests/test_json.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_jupyter.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_layout.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_live.py | passed | 10 | 0 | 0 | 0 |
+| tests/test_live_render.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_log.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_logging.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_markdown.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_markdown_no_hyperlinks.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_markup.py | passed | 21 | 0 | 0 | 0 |
+| tests/test_measure.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_null_file.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_padding.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_palette.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_panel.py | passed | 13 | 0 | 0 | 0 |
+| tests/test_pick.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_pretty.py | passed | 51 | 0 | 0 | 1 |
+| tests/test_progress.py | passed | 38 | 0 | 0 | 0 |
+| tests/test_prompt.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_protocol.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_ratio.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_repr.py | passed | 8 | 0 | 0 | 0 |
+| tests/test_rich_print.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_rule.py | passed | 16 | 0 | 0 | 0 |
+| tests/test_rule_in_table.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_screen.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_segment.py | passed | 59 | 0 | 0 | 0 |
+| tests/test_spinner.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_stack.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_status.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_style.py | passed | 27 | 0 | 0 | 0 |
+| tests/test_styled.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_syntax.py | passed | 25 | 0 | 0 | 0 |
+| tests/test_table.py | passed | 20 | 0 | 0 | 0 |
+| tests/test_text.py | passed | 109 | 0 | 0 | 0 |
+| tests/test_theme.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_tools.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_traceback.py | passed | 22 | 0 | 0 | 1 |
+| tests/test_tree.py | passed | 7 | 0 | 0 | 2 |
+| tests/test_win32_console.py | no-tests | 0 | 0 | 0 | 0 |
+| tests/test_windows_renderer.py | no-tests | 0 | 0 | 0 | 17 |
+
+</details>
+
+### sqlglot @ v30.11.0
+
+<details><summary>per-file detail (54 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/dialects/test_athena.py | passed | 8 | 0 | 0 | 0 |
+| tests/dialects/test_bigquery.py | passed | 58 | 0 | 0 | 0 |
+| tests/dialects/test_clickhouse.py | passed | 31 | 0 | 0 | 0 |
+| tests/dialects/test_databricks.py | passed | 19 | 0 | 0 | 0 |
+| tests/dialects/test_dialect.py | failed | 97 | 1 | 0 | 0 |
+| tests/dialects/test_doris.py | passed | 12 | 0 | 0 | 0 |
+| tests/dialects/test_dremio.py | passed | 21 | 0 | 0 | 0 |
+| tests/dialects/test_drill.py | passed | 2 | 0 | 0 | 0 |
+| tests/dialects/test_druid.py | passed | 1 | 0 | 0 | 0 |
+| tests/dialects/test_duckdb.py | passed | 44 | 0 | 0 | 0 |
+| tests/dialects/test_dune.py | passed | 1 | 0 | 0 | 0 |
+| tests/dialects/test_exasol.py | passed | 20 | 0 | 0 | 0 |
+| tests/dialects/test_fabric.py | passed | 6 | 0 | 0 | 0 |
+| tests/dialects/test_hive.py | passed | 14 | 0 | 0 | 0 |
+| tests/dialects/test_materialize.py | passed | 1 | 0 | 0 | 0 |
+| tests/dialects/test_mysql.py | passed | 51 | 0 | 0 | 0 |
+| tests/dialects/test_oracle.py | passed | 25 | 0 | 0 | 0 |
+| tests/dialects/test_pipe_syntax.py | passed | 11 | 0 | 0 | 0 |
+| tests/dialects/test_postgres.py | passed | 26 | 0 | 0 | 0 |
+| tests/dialects/test_presto.py | passed | 20 | 0 | 0 | 0 |
+| tests/dialects/test_prql.py | passed | 1 | 0 | 0 | 0 |
+| tests/dialects/test_redshift.py | passed | 17 | 0 | 0 | 0 |
+| tests/dialects/test_risingwave.py | passed | 2 | 0 | 0 | 0 |
+| tests/dialects/test_singlestore.py | passed | 26 | 0 | 0 | 0 |
+| tests/dialects/test_snowflake.py | passed | 95 | 0 | 0 | 0 |
+| tests/dialects/test_solr.py | passed | 1 | 0 | 0 | 0 |
+| tests/dialects/test_spark.py | passed | 22 | 0 | 0 | 0 |
+| tests/dialects/test_sqlite.py | passed | 11 | 0 | 0 | 0 |
+| tests/dialects/test_starrocks.py | passed | 12 | 0 | 0 | 0 |
+| tests/dialects/test_tableau.py | passed | 1 | 0 | 0 | 0 |
+| tests/dialects/test_teradata.py | passed | 15 | 0 | 0 | 0 |
+| tests/dialects/test_trino.py | passed | 7 | 0 | 0 | 0 |
+| tests/dialects/test_tsql.py | passed | 55 | 0 | 0 | 0 |
+| tests/test_build.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_dialect_entry_points.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_dialect_imports.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_diff.py | passed | 13 | 0 | 0 | 0 |
+| tests/test_docs.py | no-tests | 0 | 0 | 0 | 0 |
+| tests/test_errors.py | passed | 13 | 0 | 0 | 0 |
+| tests/test_executor.py | passed | 21 | 0 | 0 | 0 |
+| tests/test_expressions.py | passed | 70 | 0 | 0 | 0 |
+| tests/test_generator.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_helper.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_integration_loader.py | no-tests | 0 | 0 | 0 | 0 |
+| tests/test_jsonpath.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_lineage.py | passed | 43 | 0 | 0 | 0 |
+| tests/test_optimizer.py | passed | 79 | 0 | 0 | 0 |
+| tests/test_parser.py | passed | 66 | 0 | 0 | 0 |
+| tests/test_schema.py | passed | 9 | 0 | 0 | 0 |
+| tests/test_serde.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_time.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_tokens.py | passed | 10 | 0 | 0 | 0 |
+| tests/test_transforms.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_transpile.py | passed | 28 | 0 | 0 | 0 |
+
+</details>
+
+### pytest-bdd @ 8.1.0
+
+<details><summary>per-file detail (35 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/args/cfparse/test_args.py | passed | 2 | 0 | 0 | 0 |
+| tests/args/parse/test_args.py | passed | 2 | 0 | 0 | 0 |
+| tests/args/regex/test_args.py | passed | 3 | 0 | 0 | 0 |
+| tests/args/test_common.py | passed | 2 | 0 | 0 | 0 |
+| tests/datatable/test_datatable.py | passed | 4 | 0 | 0 | 0 |
+| tests/feature/test_alias.py | passed | 1 | 0 | 0 | 0 |
+| tests/feature/test_background.py | passed | 2 | 0 | 0 | 0 |
+| tests/feature/test_cucumber_json.py | failed | 0 | 1 | 0 | 0 |
+| tests/feature/test_description.py | passed | 1 | 0 | 0 | 0 |
+| tests/feature/test_feature_base_dir.py | passed | 7 | 0 | 0 | 0 |
+| tests/feature/test_gherkin_terminal_reporter.py | failed | 0 | 14 | 0 | 0 |
+| tests/feature/test_no_scenario.py | passed | 1 | 0 | 0 | 0 |
+| tests/feature/test_outline.py | passed | 7 | 0 | 0 | 0 |
+| tests/feature/test_outline_empty_values.py | passed | 1 | 0 | 0 | 0 |
+| tests/feature/test_report.py | failed | 0 | 1 | 0 | 1 |
+| tests/feature/test_rule_example_format.py | passed | 1 | 0 | 0 | 0 |
+| tests/feature/test_same_function_name.py | passed | 1 | 0 | 0 | 0 |
+| tests/feature/test_scenario.py | passed | 18 | 0 | 0 | 0 |
+| tests/feature/test_scenarios.py | failed | 4 | 4 | 0 | 0 |
+| tests/feature/test_steps.py | passed | 13 | 0 | 0 | 0 |
+| tests/feature/test_tags.py | passed | 5 | 0 | 0 | 0 |
+| tests/feature/test_wrong.py | passed | 1 | 0 | 0 | 0 |
+| tests/generation/test_generate_missing.py | failed | 1 | 2 | 0 | 0 |
+| tests/library/test_parent.py | passed | 5 | 0 | 0 | 0 |
+| tests/parser/test_errors.py | passed | 7 | 0 | 0 | 0 |
+| tests/parser/test_parser.py | passed | 1 | 0 | 0 | 0 |
+| tests/scripts/test_generate.py | failed | 1 | 2 | 0 | 0 |
+| tests/scripts/test_main.py | passed | 2 | 0 | 0 | 0 |
+| tests/scripts/test_migrate.py | passed | 1 | 0 | 0 | 0 |
+| tests/steps/test_common.py | failed | 7 | 1 | 0 | 0 |
+| tests/steps/test_docstring.py | passed | 4 | 0 | 0 | 0 |
+| tests/steps/test_given.py | passed | 1 | 0 | 0 | 0 |
+| tests/steps/test_keyword.py | passed | 1 | 0 | 0 | 0 |
+| tests/steps/test_unicode.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_hooks.py | failed | 3 | 1 | 0 | 0 |
+
+</details>
+
+### httpx @ 0.28.1
+
+<details><summary>per-file detail (31 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/client/test_async_client.py | passed | 52 | 0 | 0 | 0 |
+| tests/client/test_auth.py | passed | 79 | 0 | 0 | 1 |
+| tests/client/test_client.py | timeout | 0 | 0 | 0 | 0 |
+| tests/client/test_cookies.py | passed | 7 | 0 | 0 | 0 |
+| tests/client/test_event_hooks.py | timeout | 0 | 0 | 0 | 0 |
+| tests/client/test_headers.py | passed | 17 | 0 | 0 | 0 |
+| tests/client/test_properties.py | passed | 8 | 0 | 0 | 0 |
+| tests/client/test_proxies.py | passed | 69 | 0 | 0 | 0 |
+| tests/client/test_queryparams.py | passed | 3 | 0 | 0 | 0 |
+| tests/client/test_redirects.py | passed | 31 | 0 | 0 | 0 |
+| tests/models/test_cookies.py | passed | 7 | 0 | 0 | 0 |
+| tests/models/test_headers.py | passed | 27 | 0 | 0 | 0 |
+| tests/models/test_queryparams.py | passed | 14 | 0 | 0 | 0 |
+| tests/models/test_requests.py | passed | 24 | 0 | 0 | 0 |
+| tests/models/test_responses.py | passed | 104 | 0 | 0 | 0 |
+| tests/models/test_url.py | passed | 90 | 0 | 0 | 0 |
+| tests/models/test_whatwg.py | passed | 563 | 0 | 0 | 0 |
+| tests/test_api.py | passed | 12 | 0 | 0 | 0 |
+| tests/test_asgi.py | passed | 24 | 0 | 0 | 0 |
+| tests/test_auth.py | passed | 8 | 0 | 0 | 0 |
+| tests/test_config.py | passed | 28 | 0 | 0 | 0 |
+| tests/test_content.py | passed | 43 | 0 | 0 | 0 |
+| tests/test_decoders.py | passed | 38 | 0 | 0 | 0 |
+| tests/test_exceptions.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_exported_members.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_main.py | passed | 11 | 0 | 0 | 0 |
+| tests/test_multipart.py | passed | 38 | 0 | 0 | 0 |
+| tests/test_status_codes.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_timeouts.py | passed | 9 | 0 | 0 | 0 |
+| tests/test_utils.py | timeout | 0 | 0 | 0 | 0 |
+| tests/test_wsgi.py | passed | 12 | 0 | 0 | 0 |
+
+</details>
+
+### httpx2 @ v2.4.0
+
+<details><summary>per-file detail (31 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/httpx2/client/test_async_client.py | passed | 52 | 0 | 0 | 0 |
+| tests/httpx2/client/test_auth.py | passed | 79 | 0 | 0 | 1 |
+| tests/httpx2/client/test_client.py | passed | 35 | 0 | 0 | 0 |
+| tests/httpx2/client/test_cookies.py | passed | 7 | 0 | 0 | 0 |
+| tests/httpx2/client/test_event_hooks.py | passed | 9 | 0 | 0 | 0 |
+| tests/httpx2/client/test_headers.py | passed | 17 | 0 | 0 | 0 |
+| tests/httpx2/client/test_properties.py | passed | 8 | 0 | 0 | 0 |
+| tests/httpx2/client/test_proxies.py | passed | 69 | 0 | 0 | 0 |
+| tests/httpx2/client/test_queryparams.py | passed | 3 | 0 | 0 | 0 |
+| tests/httpx2/client/test_redirects.py | passed | 31 | 0 | 0 | 0 |
+| tests/httpx2/models/test_cookies.py | passed | 7 | 0 | 0 | 0 |
+| tests/httpx2/models/test_headers.py | passed | 27 | 0 | 0 | 0 |
+| tests/httpx2/models/test_queryparams.py | passed | 14 | 0 | 0 | 0 |
+| tests/httpx2/models/test_requests.py | passed | 24 | 0 | 0 | 0 |
+| tests/httpx2/models/test_responses.py | passed | 107 | 0 | 0 | 0 |
+| tests/httpx2/models/test_url.py | passed | 93 | 0 | 0 | 0 |
+| tests/httpx2/models/test_whatwg.py | passed | 563 | 0 | 0 | 0 |
+| tests/httpx2/test_api.py | passed | 12 | 0 | 0 | 0 |
+| tests/httpx2/test_asgi.py | passed | 24 | 0 | 0 | 0 |
+| tests/httpx2/test_auth.py | passed | 9 | 0 | 0 | 0 |
+| tests/httpx2/test_config.py | passed | 27 | 0 | 0 | 0 |
+| tests/httpx2/test_content.py | passed | 43 | 0 | 0 | 0 |
+| tests/httpx2/test_decoders.py | passed | 45 | 0 | 0 | 0 |
+| tests/httpx2/test_exceptions.py | passed | 3 | 0 | 0 | 0 |
+| tests/httpx2/test_exported_members.py | passed | 1 | 0 | 0 | 0 |
+| tests/httpx2/test_main.py | passed | 11 | 0 | 0 | 0 |
+| tests/httpx2/test_multipart.py | passed | 38 | 0 | 0 | 0 |
+| tests/httpx2/test_status_codes.py | passed | 6 | 0 | 0 | 0 |
+| tests/httpx2/test_timeouts.py | passed | 10 | 0 | 0 | 0 |
+| tests/httpx2/test_utils.py | passed | 40 | 0 | 0 | 0 |
+| tests/httpx2/test_wsgi.py | passed | 12 | 0 | 0 | 0 |
+
+</details>
+
+### starlette @ 0.46.2
+
+<details><summary>per-file detail (28 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/middleware/test_base.py | passed | 55 | 0 | 0 | 0 |
+| tests/middleware/test_cors.py | passed | 30 | 0 | 0 | 0 |
+| tests/middleware/test_errors.py | passed | 12 | 0 | 0 | 0 |
+| tests/middleware/test_gzip.py | passed | 14 | 0 | 0 | 0 |
+| tests/middleware/test_https_redirect.py | passed | 2 | 0 | 0 | 0 |
+| tests/middleware/test_middleware.py | passed | 2 | 0 | 0 | 0 |
+| tests/middleware/test_session.py | passed | 14 | 0 | 0 | 0 |
+| tests/middleware/test_trusted_host.py | passed | 5 | 0 | 0 | 0 |
+| tests/middleware/test_wsgi.py | passed | 10 | 0 | 0 | 0 |
+| tests/test__utils.py | passed | 10 | 0 | 0 | 0 |
+| tests/test_applications.py | passed | 54 | 0 | 0 | 0 |
+| tests/test_authentication.py | passed | 11 | 0 | 0 | 0 |
+| tests/test_background.py | passed | 8 | 0 | 0 | 0 |
+| tests/test_concurrency.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_config.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_convertors.py | passed | 16 | 0 | 0 | 0 |
+| tests/test_datastructures.py | passed | 30 | 0 | 0 | 0 |
+| tests/test_endpoints.py | passed | 20 | 0 | 0 | 0 |
+| tests/test_exceptions.py | passed | 20 | 0 | 0 | 0 |
+| tests/test_formparsers.py | passed | 76 | 0 | 0 | 0 |
+| tests/test_requests.py | passed | 85 | 0 | 0 | 0 |
+| tests/test_responses.py | passed | 111 | 0 | 0 | 0 |
+| tests/test_routing.py | passed | 91 | 0 | 0 | 0 |
+| tests/test_schemas.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_staticfiles.py | passed | 60 | 0 | 0 | 0 |
+| tests/test_templates.py | passed | 34 | 0 | 0 | 0 |
+| tests/test_testclient.py | passed | 48 | 0 | 0 | 0 |
+| tests/test_websockets.py | passed | 75 | 0 | 0 | 0 |
+
+</details>
+
+### attrs @ 25.3.0
+
+<details><summary>per-file detail (24 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_3rd_party.py | no-tests | 0 | 0 | 0 | 1 |
+| tests/test_abc.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_annotations.py | passed | 47 | 0 | 0 | 0 |
+| tests/test_cmp.py | passed | 78 | 0 | 0 | 0 |
+| tests/test_compat.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_config.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_converters.py | passed | 38 | 0 | 0 | 0 |
+| tests/test_dunders.py | passed | 99 | 0 | 0 | 0 |
+| tests/test_filters.py | passed | 33 | 0 | 0 | 0 |
+| tests/test_funcs.py | passed | 51 | 0 | 0 | 0 |
+| tests/test_functional.py | passed | 410 | 0 | 0 | 0 |
+| tests/test_hooks.py | passed | 14 | 0 | 0 | 0 |
+| tests/test_import.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_init_subclass.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_make.py | passed | 262 | 0 | 0 | 1 |
+| tests/test_next_gen.py | passed | 33 | 0 | 0 | 0 |
+| tests/test_packaging.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_pattern_matching.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_pyright.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_setattr.py | passed | 36 | 0 | 0 | 0 |
+| tests/test_slots.py | passed | 52 | 0 | 0 | 1 |
+| tests/test_utils.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_validators.py | passed | 153 | 0 | 0 | 0 |
+| tests/test_version_info.py | passed | 6 | 0 | 0 | 0 |
+
+</details>
+
+### more-itertools @ v10.7.0
+
+<details><summary>per-file detail (2 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_more.py | passed | 535 | 0 | 0 | 0 |
+| tests/test_recipes.py | passed | 135 | 0 | 0 | 1 |
+
+</details>
+
+### pytest-django @ v4.9.0
+
+<details><summary>per-file detail (13 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_asserts.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_database.py | failed | 50 | 5 | 6 | 0 |
+| tests/test_db_access_in_repr.py | failed | 0 | 1 | 0 | 0 |
+| tests/test_db_setup.py | failed | 0 | 14 | 0 | 0 |
+| tests/test_django_configurations.py | no-tests | 0 | 0 | 0 | 1 |
+| tests/test_django_settings_module.py | failed | 10 | 9 | 0 | 0 |
+| tests/test_environment.py | failed | 12 | 10 | 0 | 0 |
+| tests/test_fixtures.py | failed | 43 | 9 | 0 | 0 |
+| tests/test_initialization.py | failed | 0 | 1 | 0 | 0 |
+| tests/test_manage_py_scan.py | failed | 5 | 4 | 0 | 0 |
+| tests/test_unittest.py | failed | 10 | 13 | 0 | 0 |
+| tests/test_urls.py | failed | 2 | 2 | 0 | 0 |
+| tests/test_without_django_loaded.py | passed | 7 | 0 | 0 | 0 |
+
+</details>
+
+### werkzeug @ 3.1.3
+
+<details><summary>per-file detail (25 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/middleware/test_dispatcher.py | passed | 1 | 0 | 0 | 0 |
+| tests/middleware/test_http_proxy.py | no-tests | 0 | 0 | 0 | 0 |
+| tests/middleware/test_lint.py | passed | 9 | 0 | 0 | 0 |
+| tests/middleware/test_profiler.py | passed | 1 | 0 | 0 | 0 |
+| tests/middleware/test_proxy_fix.py | passed | 17 | 0 | 0 | 0 |
+| tests/middleware/test_shared_data.py | passed | 2 | 0 | 0 | 0 |
+| tests/sansio/test_multipart.py | passed | 21 | 0 | 0 | 0 |
+| tests/sansio/test_request.py | passed | 9 | 0 | 0 | 0 |
+| tests/sansio/test_utils.py | passed | 24 | 0 | 0 | 0 |
+| tests/test_datastructures.py | passed | 123 | 0 | 0 | 0 |
+| tests/test_debug.py | passed | 19 | 0 | 0 | 0 |
+| tests/test_exceptions.py | passed | 92 | 0 | 0 | 0 |
+| tests/test_formparser.py | passed | 27 | 0 | 0 | 0 |
+| tests/test_http.py | passed | 120 | 0 | 0 | 0 |
+| tests/test_internal.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_local.py | passed | 63 | 0 | 0 | 0 |
+| tests/test_routing.py | passed | 117 | 0 | 0 | 0 |
+| tests/test_security.py | passed | 12 | 0 | 0 | 0 |
+| tests/test_send_file.py | passed | 32 | 0 | 0 | 0 |
+| tests/test_serving.py | passed | 5 | 0 | 0 | 1 |
+| tests/test_test.py | passed | 60 | 0 | 0 | 0 |
+| tests/test_urls.py | passed | 17 | 0 | 0 | 0 |
+| tests/test_utils.py | passed | 36 | 0 | 0 | 0 |
+| tests/test_wrappers.py | passed | 93 | 0 | 0 | 0 |
+| tests/test_wsgi.py | passed | 21 | 0 | 0 | 0 |
+
+</details>
+
+### fastapi @ 0.115.12
+
+<details><summary>per-file detail (310 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_additional_properties.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_additional_properties_bool.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_additional_response_extra.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_additional_responses_bad.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_additional_responses_custom_model_in_callback.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_additional_responses_custom_validationerror.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_additional_responses_default_validationerror.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_additional_responses_response_class.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_additional_responses_router.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_allow_inf_nan_in_enforcing.py | passed | 24 | 0 | 0 | 0 |
+| tests/test_ambiguous_params.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_annotated.py | passed | 13 | 0 | 0 | 0 |
+| tests/test_application.py | passed | 8 | 0 | 0 | 0 |
+| tests/test_callable_endpoint.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_compat.py | passed | 7 | 0 | 0 | 2 |
+| tests/test_computed_fields.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_custom_middleware_exception.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_custom_route_class.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_custom_schema_fields.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_custom_swagger_ui_redirect.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_datastructures.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_datetime_custom_encoder.py | passed | 1 | 0 | 0 | 1 |
+| tests/test_default_response_class.py | passed | 14 | 0 | 0 | 0 |
+| tests/test_default_response_class_router.py | passed | 14 | 0 | 0 | 0 |
+| tests/test_dependency_cache.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_dependency_class.py | passed | 8 | 0 | 0 | 0 |
+| tests/test_dependency_contextmanager.py | passed | 22 | 0 | 0 | 0 |
+| tests/test_dependency_contextvars.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_dependency_duplicates.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_dependency_normal_exceptions.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_dependency_overrides.py | passed | 32 | 0 | 0 | 0 |
+| tests/test_dependency_security_overrides.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_deprecated_openapi_prefix.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_duplicate_models_openapi.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_empty_router.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_enforce_once_required_parameter.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_exception_handlers.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_extra_routes.py | passed | 8 | 0 | 0 | 0 |
+| tests/test_fastapi_cli.py | failed | 1 | 1 | 0 | 0 |
+| tests/test_filter_pydantic_sub_model/test_filter_pydantic_sub_model_pv1.py | no-tests | 0 | 0 | 0 | 3 |
+| tests/test_filter_pydantic_sub_model_pv2.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_forms_from_non_typing_sequences.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_forms_single_model.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_forms_single_param.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_generate_unique_id_function.py | passed | 8 | 0 | 0 | 0 |
+| tests/test_generic_parameterless_depends.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_get_request_body.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_http_connection_injection.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_include_route.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_include_router_defaults_overrides.py | passed | 43 | 0 | 0 | 0 |
+| tests/test_infer_param_optionality.py | passed | 9 | 0 | 0 | 0 |
+| tests/test_inherited_custom_class.py | passed | 1 | 0 | 0 | 1 |
+| tests/test_invalid_path_param.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_invalid_sequence_param.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_jsonable_encoder.py | passed | 18 | 0 | 0 | 3 |
+| tests/test_local_docs.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_modules_same_name_body/test_main.py | passed | 9 | 0 | 0 | 0 |
+| tests/test_multi_body_errors.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_multi_query_errors.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_multipart_installation.py | passed | 11 | 0 | 0 | 0 |
+| tests/test_no_swagger_ui_redirect.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_openapi_examples.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_openapi_query_parameter_extension.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_openapi_route_extensions.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_openapi_separate_input_output_schemas.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_openapi_servers.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_operations_signatures.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_orjson_response_class.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_param_class.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_param_in_path_and_dependency.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_param_include_in_schema.py | passed | 8 | 0 | 0 | 0 |
+| tests/test_params_repr.py | passed | 27 | 0 | 0 | 0 |
+| tests/test_path.py | passed | 75 | 0 | 0 | 0 |
+| tests/test_put_no_body.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_query.py | passed | 29 | 0 | 0 | 0 |
+| tests/test_read_with_orm_mode.py | passed | 1 | 0 | 0 | 1 |
+| tests/test_regex_deprecated_body.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_regex_deprecated_params.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_repeated_cookie_headers.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_repeated_dependency_schema.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_repeated_parameter_alias.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_reponse_set_reponse_code_empty.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_request_body_parameters_media_type.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_required_noneable.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_response_by_alias.py | passed | 10 | 0 | 0 | 0 |
+| tests/test_response_change_status_code.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_response_class_no_mediatype.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_response_code_no_body.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_response_model_as_return_annotation.py | passed | 38 | 0 | 0 | 0 |
+| tests/test_response_model_data_filter.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_response_model_data_filter_no_inheritance.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_response_model_include_exclude.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_response_model_invalid.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_response_model_sub_types.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_route_scope.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_router_events.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_router_prefix_with_template.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_router_redirect_slashes.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_schema_extra_examples.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_security_api_key_cookie.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_security_api_key_cookie_description.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_security_api_key_cookie_optional.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_security_api_key_header.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_security_api_key_header_description.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_security_api_key_header_optional.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_security_api_key_query.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_security_api_key_query_description.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_security_api_key_query_optional.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_security_http_base.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_security_http_base_description.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_security_http_base_optional.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_security_http_basic_optional.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_security_http_basic_realm.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_security_http_basic_realm_description.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_security_http_bearer.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_security_http_bearer_description.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_security_http_bearer_optional.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_security_http_digest.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_security_http_digest_description.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_security_http_digest_optional.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_security_oauth2.py | passed | 10 | 0 | 0 | 0 |
+| tests/test_security_oauth2_authorization_code_bearer.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_security_oauth2_authorization_code_bearer_description.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_security_oauth2_optional.py | passed | 10 | 0 | 0 | 0 |
+| tests/test_security_oauth2_optional_description.py | passed | 10 | 0 | 0 | 0 |
+| tests/test_security_oauth2_password_bearer_optional.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_security_oauth2_password_bearer_optional_description.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_security_openid_connect.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_security_openid_connect_description.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_security_openid_connect_optional.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_serialize_response.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_serialize_response_dataclass.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_serialize_response_model.py | passed | 8 | 0 | 0 | 0 |
+| tests/test_skip_defaults.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_starlette_exception.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_starlette_urlconvertors.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_sub_callbacks.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_swagger_ui_init_oauth.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tuples.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_tutorial/test_additional_responses/test_tutorial001.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_tutorial/test_additional_responses/test_tutorial002.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_tutorial/test_additional_responses/test_tutorial003.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_tutorial/test_additional_responses/test_tutorial004.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_tutorial/test_additional_status_codes/test_tutorial001.py | passed | 10 | 0 | 0 | 0 |
+| tests/test_tutorial/test_advanced_middleware/test_tutorial001.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_tutorial/test_advanced_middleware/test_tutorial002.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_tutorial/test_advanced_middleware/test_tutorial003.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_tutorial/test_async_tests/test_main.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_tutorial/test_background_tasks/test_tutorial001.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_tutorial/test_background_tasks/test_tutorial002.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_tutorial/test_behind_a_proxy/test_tutorial001.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_behind_a_proxy/test_tutorial002.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_behind_a_proxy/test_tutorial003.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_behind_a_proxy/test_tutorial004.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_bigger_applications/test_main.py | passed | 75 | 0 | 0 | 0 |
+| tests/test_tutorial/test_body/test_tutorial001.py | passed | 32 | 0 | 0 | 0 |
+| tests/test_tutorial/test_body_fields/test_tutorial001.py | passed | 20 | 0 | 0 | 0 |
+| tests/test_tutorial/test_body_multiple_params/test_tutorial001.py | passed | 25 | 0 | 0 | 0 |
+| tests/test_tutorial/test_body_multiple_params/test_tutorial003.py | passed | 20 | 0 | 0 | 0 |
+| tests/test_tutorial/test_body_nested_models/test_tutorial009.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_tutorial/test_body_updates/test_tutorial001.py | passed | 9 | 0 | 0 | 3 |
+| tests/test_tutorial/test_conditional_openapi/test_tutorial001.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_tutorial/test_configure_swagger_ui/test_tutorial001.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_configure_swagger_ui/test_tutorial002.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_configure_swagger_ui/test_tutorial003.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_cookie_param_models/test_tutorial001.py | passed | 25 | 0 | 0 | 0 |
+| tests/test_tutorial/test_cookie_param_models/test_tutorial002.py | passed | 25 | 0 | 0 | 25 |
+| tests/test_tutorial/test_cookie_params/test_tutorial001.py | passed | 25 | 0 | 0 | 0 |
+| tests/test_tutorial/test_cors/test_tutorial001.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_tutorial/test_custom_docs_ui/test_tutorial001.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_tutorial/test_custom_docs_ui/test_tutorial002.py | failed | 4 | 0 | 1 | 0 |
+| tests/test_tutorial/test_custom_request_and_route/test_tutorial001.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_tutorial/test_custom_request_and_route/test_tutorial002.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_tutorial/test_custom_request_and_route/test_tutorial003.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_custom_response/test_tutorial001.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_custom_response/test_tutorial001b.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_custom_response/test_tutorial004.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_custom_response/test_tutorial005.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_custom_response/test_tutorial006.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_custom_response/test_tutorial006b.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_custom_response/test_tutorial006c.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_custom_response/test_tutorial007.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_tutorial/test_custom_response/test_tutorial008.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_tutorial/test_custom_response/test_tutorial009.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_tutorial/test_custom_response/test_tutorial009b.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_tutorial/test_custom_response/test_tutorial009c.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_tutorial/test_dataclasses/test_tutorial001.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_tutorial/test_dataclasses/test_tutorial002.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_dataclasses/test_tutorial003.py | passed | 3 | 0 | 0 | 1 |
+| tests/test_tutorial/test_dependencies/test_tutorial001.py | passed | 30 | 0 | 0 | 0 |
+| tests/test_tutorial/test_dependencies/test_tutorial004.py | passed | 35 | 0 | 0 | 0 |
+| tests/test_tutorial/test_dependencies/test_tutorial006.py | passed | 15 | 0 | 0 | 0 |
+| tests/test_tutorial/test_dependencies/test_tutorial008b.py | passed | 9 | 0 | 0 | 0 |
+| tests/test_tutorial/test_dependencies/test_tutorial008c.py | passed | 12 | 0 | 0 | 0 |
+| tests/test_tutorial/test_dependencies/test_tutorial008d.py | passed | 12 | 0 | 0 | 0 |
+| tests/test_tutorial/test_dependencies/test_tutorial012.py | passed | 27 | 0 | 0 | 0 |
+| tests/test_tutorial/test_events/test_tutorial001.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_events/test_tutorial002.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_events/test_tutorial003.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_extending_openapi/test_tutorial001.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_extra_data_types/test_tutorial001.py | passed | 10 | 0 | 0 | 0 |
+| tests/test_tutorial/test_extra_models/test_tutorial003.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_tutorial/test_extra_models/test_tutorial004.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_tutorial/test_extra_models/test_tutorial005.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_tutorial/test_first_steps/test_tutorial001.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_tutorial/test_generate_clients/test_tutorial003.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_tutorial/test_handling_errors/test_tutorial001.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_tutorial/test_handling_errors/test_tutorial002.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_tutorial/test_handling_errors/test_tutorial003.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_tutorial/test_handling_errors/test_tutorial004.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_tutorial/test_handling_errors/test_tutorial005.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_tutorial/test_handling_errors/test_tutorial006.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_tutorial/test_header_param_models/test_tutorial001.py | passed | 30 | 0 | 0 | 0 |
+| tests/test_tutorial/test_header_param_models/test_tutorial002.py | passed | 25 | 0 | 0 | 25 |
+| tests/test_tutorial/test_header_param_models/test_tutorial003.py | passed | 36 | 0 | 0 | 0 |
+| tests/test_tutorial/test_header_params/test_tutorial001.py | passed | 16 | 0 | 0 | 0 |
+| tests/test_tutorial/test_header_params/test_tutorial002.py | passed | 25 | 0 | 0 | 0 |
+| tests/test_tutorial/test_header_params/test_tutorial003.py | passed | 15 | 0 | 0 | 0 |
+| tests/test_tutorial/test_metadata/test_tutorial001.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_metadata/test_tutorial001_1.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_metadata/test_tutorial004.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_openapi_callbacks/test_tutorial001.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_tutorial/test_openapi_webhooks/test_tutorial001.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_tutorial/test_path_operation_advanced_configurations/test_tutorial001.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_path_operation_advanced_configurations/test_tutorial002.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_path_operation_advanced_configurations/test_tutorial003.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_path_operation_advanced_configurations/test_tutorial004.py | passed | 2 | 0 | 0 | 1 |
+| tests/test_tutorial/test_path_operation_advanced_configurations/test_tutorial005.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_path_operation_advanced_configurations/test_tutorial006.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_path_operation_advanced_configurations/test_tutorial007.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_tutorial/test_path_operation_advanced_configurations/test_tutorial007_pv1.py | no-tests | 0 | 0 | 0 | 4 |
+| tests/test_tutorial/test_path_operation_configurations/test_tutorial002b.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_tutorial/test_path_operation_configurations/test_tutorial005.py | passed | 6 | 0 | 0 | 3 |
+| tests/test_tutorial/test_path_operation_configurations/test_tutorial006.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_tutorial/test_path_params/test_tutorial004.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_tutorial/test_path_params/test_tutorial005.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_tutorial/test_query_param_models/test_tutorial001.py | passed | 30 | 0 | 0 | 0 |
+| tests/test_tutorial/test_query_param_models/test_tutorial002.py | passed | 30 | 0 | 0 | 30 |
+| tests/test_tutorial/test_query_params/test_tutorial005.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_tutorial/test_query_params/test_tutorial006.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_tutorial/test_query_params_str_validations/test_tutorial010.py | passed | 25 | 0 | 0 | 0 |
+| tests/test_tutorial/test_query_params_str_validations/test_tutorial011.py | passed | 18 | 0 | 0 | 0 |
+| tests/test_tutorial/test_query_params_str_validations/test_tutorial012.py | passed | 12 | 0 | 0 | 0 |
+| tests/test_tutorial/test_query_params_str_validations/test_tutorial013.py | passed | 9 | 0 | 0 | 0 |
+| tests/test_tutorial/test_query_params_str_validations/test_tutorial014.py | passed | 15 | 0 | 0 | 0 |
+| tests/test_tutorial/test_query_params_str_validations/test_tutorial015.py | passed | 15 | 0 | 0 | 0 |
+| tests/test_tutorial/test_request_files/test_tutorial001.py | passed | 18 | 0 | 0 | 0 |
+| tests/test_tutorial/test_request_files/test_tutorial001_02.py | passed | 25 | 0 | 0 | 0 |
+| tests/test_tutorial/test_request_files/test_tutorial001_03.py | passed | 9 | 0 | 0 | 0 |
+| tests/test_tutorial/test_request_files/test_tutorial002.py | passed | 24 | 0 | 0 | 0 |
+| tests/test_tutorial/test_request_files/test_tutorial003.py | passed | 16 | 0 | 0 | 0 |
+| tests/test_tutorial/test_request_form_models/test_tutorial001.py | passed | 18 | 0 | 0 | 0 |
+| tests/test_tutorial/test_request_form_models/test_tutorial002.py | passed | 21 | 0 | 0 | 0 |
+| tests/test_tutorial/test_request_form_models/test_tutorial002_pv1.py | no-tests | 0 | 0 | 0 | 21 |
+| tests/test_tutorial/test_request_forms/test_tutorial001.py | passed | 18 | 0 | 0 | 0 |
+| tests/test_tutorial/test_request_forms_and_files/test_tutorial001.py | passed | 18 | 0 | 0 | 0 |
+| tests/test_tutorial/test_response_change_status_code/test_tutorial001.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_tutorial/test_response_cookies/test_tutorial001.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_tutorial/test_response_cookies/test_tutorial002.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_tutorial/test_response_headers/test_tutorial001.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_tutorial/test_response_headers/test_tutorial002.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_tutorial/test_response_model/test_tutorial003.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_response_model/test_tutorial003_01.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_tutorial/test_response_model/test_tutorial003_02.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_tutorial/test_response_model/test_tutorial003_03.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_response_model/test_tutorial003_04.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_tutorial/test_response_model/test_tutorial003_04_py310.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_tutorial/test_response_model/test_tutorial003_05.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_tutorial/test_response_model/test_tutorial003_py310.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_response_model/test_tutorial004.py | passed | 12 | 0 | 0 | 0 |
+| tests/test_tutorial/test_response_model/test_tutorial005.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_tutorial/test_response_model/test_tutorial006.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_tutorial/test_schema_extra_example/test_tutorial001.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_tutorial/test_schema_extra_example/test_tutorial001_pv1.py | no-tests | 0 | 0 | 0 | 4 |
+| tests/test_tutorial/test_schema_extra_example/test_tutorial004.py | passed | 10 | 0 | 0 | 0 |
+| tests/test_tutorial/test_schema_extra_example/test_tutorial005.py | passed | 10 | 0 | 0 | 0 |
+| tests/test_tutorial/test_security/test_tutorial001.py | passed | 12 | 0 | 0 | 0 |
+| tests/test_tutorial/test_security/test_tutorial003.py | passed | 45 | 0 | 0 | 0 |
+| tests/test_tutorial/test_security/test_tutorial005.py | passed | 114 | 0 | 0 | 0 |
+| tests/test_tutorial/test_security/test_tutorial006.py | passed | 15 | 0 | 0 | 0 |
+| tests/test_tutorial/test_separate_openapi_schemas/test_tutorial001.py | passed | 9 | 0 | 0 | 0 |
+| tests/test_tutorial/test_separate_openapi_schemas/test_tutorial002.py | passed | 9 | 0 | 0 | 0 |
+| tests/test_tutorial/test_settings/test_app02.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_settings/test_tutorial001.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_tutorial/test_settings/test_tutorial001_pv1.py | no-tests | 0 | 0 | 0 | 1 |
+| tests/test_tutorial/test_sql_databases/test_tutorial001.py | passed | 12 | 0 | 0 | 0 |
+| tests/test_tutorial/test_sql_databases/test_tutorial002.py | passed | 12 | 0 | 0 | 0 |
+| tests/test_tutorial/test_sub_applications/test_tutorial001.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_tutorial/test_templates/test_tutorial001.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_tutorial/test_testing/test_main.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_tutorial/test_testing/test_main_b.py | passed | 5 | 0 | 0 | 0 |
+| tests/test_tutorial/test_testing/test_tutorial001.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_tutorial/test_testing/test_tutorial002.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_tutorial/test_testing/test_tutorial003.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_tutorial/test_testing_dependencies/test_tutorial001.py | passed | 35 | 0 | 0 | 0 |
+| tests/test_tutorial/test_websockets/test_tutorial001.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_websockets/test_tutorial002.py | passed | 30 | 0 | 0 | 0 |
+| tests/test_tutorial/test_websockets/test_tutorial003.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_websockets/test_tutorial003_py39.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_tutorial/test_wsgi/test_tutorial001.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_typing_python39.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_union_body.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_union_inherited_body.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_validate_response.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_validate_response_dataclass.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_validate_response_recursive/test_validate_response_recursive_pv1.py | no-tests | 0 | 0 | 0 | 1 |
+| tests/test_validate_response_recursive/test_validate_response_recursive_pv2.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_webhooks_security.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_ws_dependencies.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_ws_router.py | passed | 12 | 0 | 0 | 0 |
+
+</details>
+
+### packaging @ 25.0
+
+<details><summary>per-file detail (12 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/test_elffile.py | passed | 15 | 0 | 0 | 0 |
+| tests/test_licenses.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_manylinux.py | passed | 31 | 0 | 0 | 1 |
+| tests/test_markers.py | passed | 2245 | 0 | 0 | 0 |
+| tests/test_metadata.py | passed | 245 | 0 | 0 | 0 |
+| tests/test_musllinux.py | passed | 10 | 0 | 0 | 0 |
+| tests/test_requirements.py | passed | 5286 | 0 | 0 | 0 |
+| tests/test_specifiers.py | passed | 806 | 0 | 0 | 0 |
+| tests/test_structures.py | passed | 14 | 0 | 0 | 0 |
+| tests/test_tags.py | passed | 178 | 0 | 0 | 0 |
+| tests/test_utils.py | passed | 54 | 0 | 0 | 0 |
+| tests/test_version.py | passed | 18060 | 0 | 0 | 0 |
+
+</details>
+
+### pandas @ v3.0.3
+
+<details><summary>per-file detail (961 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| pandas/tests/api/test_api.py | passed | 13 | 0 | 0 | 0 |
+| pandas/tests/api/test_types.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/apply/test_frame_apply.py | passed | 241 | 0 | 0 | 65 |
+| pandas/tests/apply/test_frame_apply_relabeling.py | passed | 5 | 0 | 0 | 0 |
+| pandas/tests/apply/test_frame_transform.py | passed | 86 | 0 | 0 | 9 |
+| pandas/tests/apply/test_invalid_arg.py | passed | 180 | 0 | 0 | 0 |
+| pandas/tests/apply/test_numba.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/apply/test_series_apply.py | passed | 130 | 0 | 0 | 0 |
+| pandas/tests/apply/test_series_apply_relabeling.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/apply/test_series_transform.py | passed | 12 | 0 | 0 | 0 |
+| pandas/tests/apply/test_str.py | passed | 227 | 0 | 0 | 0 |
+| pandas/tests/arithmetic/test_array_ops.py | passed | 26 | 0 | 0 | 0 |
+| pandas/tests/arithmetic/test_bool.py | passed | 4 | 0 | 0 | 0 |
+| pandas/tests/arithmetic/test_categorical.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/arithmetic/test_datetime64.py | passed | 12071 | 0 | 0 | 14 |
+| pandas/tests/arithmetic/test_interval.py | passed | 783 | 0 | 0 | 0 |
+| pandas/tests/arithmetic/test_numeric.py | passed | 3066 | 0 | 0 | 76 |
+| pandas/tests/arithmetic/test_object.py | passed | 98 | 0 | 0 | 1 |
+| pandas/tests/arithmetic/test_period.py | passed | 709 | 0 | 0 | 0 |
+| pandas/tests/arithmetic/test_string.py | passed | 178 | 0 | 0 | 221 |
+| pandas/tests/arithmetic/test_timedelta64.py | passed | 1781 | 0 | 0 | 64 |
+| pandas/tests/arrays/boolean/test_arithmetic.py | passed | 21 | 0 | 0 | 0 |
+| pandas/tests/arrays/boolean/test_astype.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/arrays/boolean/test_comparison.py | passed | 36 | 0 | 0 | 0 |
+| pandas/tests/arrays/boolean/test_construction.py | passed | 30 | 0 | 0 | 0 |
+| pandas/tests/arrays/boolean/test_function.py | passed | 11 | 0 | 0 | 0 |
+| pandas/tests/arrays/boolean/test_indexing.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/arrays/boolean/test_logical.py | passed | 89 | 0 | 0 | 0 |
+| pandas/tests/arrays/boolean/test_ops.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/arrays/boolean/test_reduction.py | passed | 36 | 0 | 0 | 0 |
+| pandas/tests/arrays/boolean/test_repr.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/arrays/categorical/test_algos.py | passed | 17 | 0 | 0 | 0 |
+| pandas/tests/arrays/categorical/test_analytics.py | passed | 58 | 0 | 0 | 0 |
+| pandas/tests/arrays/categorical/test_api.py | passed | 77 | 0 | 0 | 0 |
+| pandas/tests/arrays/categorical/test_astype.py | passed | 26 | 0 | 0 | 0 |
+| pandas/tests/arrays/categorical/test_constructors.py | passed | 126 | 0 | 0 | 0 |
+| pandas/tests/arrays/categorical/test_dtypes.py | passed | 47 | 0 | 0 | 0 |
+| pandas/tests/arrays/categorical/test_indexing.py | passed | 143 | 0 | 0 | 0 |
+| pandas/tests/arrays/categorical/test_map.py | passed | 28 | 0 | 0 | 0 |
+| pandas/tests/arrays/categorical/test_missing.py | passed | 14 | 0 | 0 | 0 |
+| pandas/tests/arrays/categorical/test_operators.py | passed | 38 | 0 | 0 | 0 |
+| pandas/tests/arrays/categorical/test_replace.py | passed | 9 | 0 | 0 | 0 |
+| pandas/tests/arrays/categorical/test_repr.py | passed | 25 | 0 | 0 | 2 |
+| pandas/tests/arrays/categorical/test_sorting.py | passed | 4 | 0 | 0 | 0 |
+| pandas/tests/arrays/categorical/test_subclass.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/arrays/categorical/test_take.py | passed | 16 | 0 | 0 | 0 |
+| pandas/tests/arrays/categorical/test_warnings.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/arrays/datetimes/test_constructors.py | passed | 15 | 0 | 0 | 14 |
+| pandas/tests/arrays/datetimes/test_cumulative.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/arrays/datetimes/test_reductions.py | passed | 159 | 0 | 0 | 0 |
+| pandas/tests/arrays/floating/test_arithmetic.py | passed | 70 | 0 | 0 | 0 |
+| pandas/tests/arrays/floating/test_astype.py | passed | 9 | 0 | 0 | 0 |
+| pandas/tests/arrays/floating/test_comparison.py | passed | 115 | 0 | 0 | 0 |
+| pandas/tests/arrays/floating/test_concat.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/arrays/floating/test_construction.py | passed | 38 | 0 | 0 | 0 |
+| pandas/tests/arrays/floating/test_contains.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/arrays/floating/test_function.py | passed | 61 | 0 | 0 | 0 |
+| pandas/tests/arrays/floating/test_repr.py | passed | 8 | 0 | 0 | 0 |
+| pandas/tests/arrays/floating/test_to_numpy.py | passed | 36 | 0 | 0 | 0 |
+| pandas/tests/arrays/integer/test_arithmetic.py | passed | 455 | 0 | 0 | 0 |
+| pandas/tests/arrays/integer/test_comparison.py | passed | 473 | 0 | 0 | 0 |
+| pandas/tests/arrays/integer/test_concat.py | passed | 18 | 0 | 0 | 0 |
+| pandas/tests/arrays/integer/test_construction.py | passed | 68 | 0 | 0 | 0 |
+| pandas/tests/arrays/integer/test_dtypes.py | passed | 122 | 0 | 0 | 0 |
+| pandas/tests/arrays/integer/test_function.py | passed | 133 | 0 | 0 | 0 |
+| pandas/tests/arrays/integer/test_indexing.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/arrays/integer/test_reduction.py | passed | 47 | 0 | 0 | 0 |
+| pandas/tests/arrays/integer/test_repr.py | passed | 26 | 0 | 0 | 0 |
+| pandas/tests/arrays/interval/test_astype.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/arrays/interval/test_formats.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/arrays/interval/test_interval.py | passed | 81 | 0 | 0 | 0 |
+| pandas/tests/arrays/interval/test_interval_pyarrow.py | no-tests | 0 | 0 | 0 | 9 |
+| pandas/tests/arrays/interval/test_overlaps.py | passed | 116 | 0 | 0 | 0 |
+| pandas/tests/arrays/masked/test_arithmetic.py | passed | 1105 | 0 | 0 | 10 |
+| pandas/tests/arrays/masked/test_arrow_compat.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/arrays/masked/test_function.py | passed | 21 | 0 | 0 | 0 |
+| pandas/tests/arrays/masked/test_indexing.py | passed | 119 | 0 | 0 | 12 |
+| pandas/tests/arrays/numpy_/test_indexing.py | passed | 37 | 0 | 0 | 0 |
+| pandas/tests/arrays/numpy_/test_numpy.py | passed | 104 | 0 | 0 | 0 |
+| pandas/tests/arrays/period/test_arrow_compat.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/arrays/period/test_astype.py | passed | 10 | 0 | 0 | 0 |
+| pandas/tests/arrays/period/test_constructors.py | passed | 20 | 0 | 0 | 0 |
+| pandas/tests/arrays/period/test_reductions.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/arrays/sparse/test_accessor.py | passed | 11 | 0 | 0 | 66 |
+| pandas/tests/arrays/sparse/test_arithmetics.py | passed | 892 | 0 | 0 | 0 |
+| pandas/tests/arrays/sparse/test_array.py | passed | 78 | 0 | 0 | 0 |
+| pandas/tests/arrays/sparse/test_astype.py | passed | 24 | 0 | 0 | 0 |
+| pandas/tests/arrays/sparse/test_combine_concat.py | passed | 10 | 0 | 0 | 0 |
+| pandas/tests/arrays/sparse/test_constructors.py | passed | 23 | 0 | 0 | 10 |
+| pandas/tests/arrays/sparse/test_dtype.py | passed | 56 | 0 | 0 | 0 |
+| pandas/tests/arrays/sparse/test_indexing.py | passed | 80 | 0 | 0 | 0 |
+| pandas/tests/arrays/sparse/test_libsparse.py | passed | 85 | 0 | 0 | 0 |
+| pandas/tests/arrays/sparse/test_reductions.py | passed | 71 | 0 | 0 | 0 |
+| pandas/tests/arrays/sparse/test_unary.py | passed | 9 | 0 | 0 | 0 |
+| pandas/tests/arrays/string_/test_concat.py | passed | 7 | 0 | 0 | 7 |
+| pandas/tests/arrays/string_/test_string.py | passed | 128 | 0 | 0 | 156 |
+| pandas/tests/arrays/string_/test_string_arrow.py | passed | 3 | 0 | 0 | 49 |
+| pandas/tests/arrays/test_array.py | passed | 92 | 0 | 0 | 0 |
+| pandas/tests/arrays/test_datetimelike.py | passed | 7619 | 0 | 0 | 291 |
+| pandas/tests/arrays/test_datetimes.py | passed | 1882 | 0 | 0 | 1 |
+| pandas/tests/arrays/test_ndarray_backed.py | passed | 5 | 0 | 0 | 0 |
+| pandas/tests/arrays/test_period.py | passed | 19 | 0 | 0 | 0 |
+| pandas/tests/arrays/test_timedeltas.py | passed | 139 | 0 | 0 | 0 |
+| pandas/tests/arrays/timedeltas/test_constructors.py | passed | 4 | 0 | 0 | 0 |
+| pandas/tests/arrays/timedeltas/test_cumulative.py | passed | 5 | 0 | 0 | 0 |
+| pandas/tests/arrays/timedeltas/test_reductions.py | passed | 26 | 0 | 0 | 0 |
+| pandas/tests/base/test_constructors.py | passed | 27 | 0 | 0 | 0 |
+| pandas/tests/base/test_conversion.py | passed | 345 | 0 | 0 | 0 |
+| pandas/tests/base/test_fillna.py | passed | 174 | 0 | 0 | 48 |
+| pandas/tests/base/test_misc.py | passed | 320 | 0 | 0 | 1 |
+| pandas/tests/base/test_transpose.py | passed | 228 | 0 | 0 | 0 |
+| pandas/tests/base/test_unique.py | passed | 453 | 0 | 0 | 143 |
+| pandas/tests/base/test_value_counts.py | passed | 207 | 0 | 0 | 48 |
+| pandas/tests/computation/test_compat.py | passed | 2 | 0 | 0 | 3 |
+| pandas/tests/computation/test_eval.py | passed | 101 | 0 | 0 | 11132 |
+| pandas/tests/config/test_config.py | passed | 26 | 0 | 0 | 0 |
+| pandas/tests/config/test_localization.py | passed | 29 | 0 | 0 | 0 |
+| pandas/tests/construction/test_extract_array.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/copy_view/index/test_datetimeindex.py | passed | 9 | 0 | 0 | 0 |
+| pandas/tests/copy_view/index/test_index.py | passed | 24 | 0 | 0 | 0 |
+| pandas/tests/copy_view/index/test_intervalindex.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/copy_view/index/test_periodindex.py | passed | 4 | 0 | 0 | 0 |
+| pandas/tests/copy_view/index/test_timedeltaindex.py | passed | 5 | 0 | 0 | 0 |
+| pandas/tests/copy_view/test_array.py | passed | 25 | 0 | 0 | 2 |
+| pandas/tests/copy_view/test_astype.py | passed | 26 | 0 | 0 | 8 |
+| pandas/tests/copy_view/test_chained_assignment_deprecation.py | passed | 29 | 0 | 0 | 0 |
+| pandas/tests/copy_view/test_clip.py | passed | 6 | 0 | 0 | 0 |
+| pandas/tests/copy_view/test_constructors.py | passed | 71 | 0 | 0 | 0 |
+| pandas/tests/copy_view/test_copy_deprecation.py | passed | 18 | 0 | 0 | 0 |
+| pandas/tests/copy_view/test_core_functionalities.py | passed | 6 | 0 | 0 | 0 |
+| pandas/tests/copy_view/test_functions.py | passed | 19 | 0 | 0 | 0 |
+| pandas/tests/copy_view/test_indexing.py | passed | 225 | 0 | 0 | 2 |
+| pandas/tests/copy_view/test_internals.py | passed | 18 | 0 | 0 | 0 |
+| pandas/tests/copy_view/test_interp_fillna.py | passed | 52 | 0 | 0 | 0 |
+| pandas/tests/copy_view/test_methods.py | passed | 236 | 0 | 0 | 0 |
+| pandas/tests/copy_view/test_replace.py | passed | 36 | 0 | 0 | 0 |
+| pandas/tests/copy_view/test_setitem.py | passed | 9 | 0 | 0 | 0 |
+| pandas/tests/copy_view/test_util.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/dtypes/cast/test_box_unbox.py | passed | 52 | 0 | 0 | 0 |
+| pandas/tests/dtypes/cast/test_can_hold_element.py | passed | 13 | 0 | 0 | 0 |
+| pandas/tests/dtypes/cast/test_construct_from_scalar.py | passed | 4 | 0 | 0 | 0 |
+| pandas/tests/dtypes/cast/test_construct_ndarray.py | passed | 7 | 0 | 0 | 0 |
+| pandas/tests/dtypes/cast/test_construct_object_arr.py | passed | 39 | 0 | 0 | 0 |
+| pandas/tests/dtypes/cast/test_dict_compat.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/dtypes/cast/test_downcast.py | passed | 16 | 0 | 0 | 0 |
+| pandas/tests/dtypes/cast/test_find_common_type.py | passed | 90 | 0 | 0 | 0 |
+| pandas/tests/dtypes/cast/test_infer_datetimelike.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/dtypes/cast/test_infer_dtype.py | passed | 68 | 0 | 0 | 0 |
+| pandas/tests/dtypes/cast/test_promote.py | passed | 2324 | 0 | 0 | 0 |
+| pandas/tests/dtypes/test_common.py | passed | 436 | 0 | 0 | 5 |
+| pandas/tests/dtypes/test_concat.py | passed | 4 | 0 | 0 | 0 |
+| pandas/tests/dtypes/test_dtypes.py | passed | 284 | 0 | 0 | 1 |
+| pandas/tests/dtypes/test_generic.py | passed | 452 | 0 | 0 | 0 |
+| pandas/tests/dtypes/test_inference.py | passed | 771 | 0 | 0 | 19 |
+| pandas/tests/dtypes/test_missing.py | passed | 304 | 0 | 0 | 0 |
+| pandas/tests/extension/array_with_attr/test_array_with_attr.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/extension/decimal/test_decimal.py | failed | 19 | 0 | 0 | 1 |
+| pandas/tests/extension/json/test_json.py | failed | 1 | 0 | 0 | 2 |
+| pandas/tests/extension/list/test_list.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/extension/test_arrow.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/extension/test_categorical.py | failed | 0 | 0 | 0 | 2 |
+| pandas/tests/extension/test_common.py | passed | 12 | 0 | 0 | 0 |
+| pandas/tests/extension/test_datetime.py | passed | 605 | 0 | 0 | 24 |
+| pandas/tests/extension/test_extension.py | passed | 14 | 0 | 0 | 0 |
+| pandas/tests/extension/test_interval.py | failed | 1 | 0 | 0 | 1 |
+| pandas/tests/extension/test_masked.py | passed | 6440 | 0 | 0 | 118 |
+| pandas/tests/extension/test_numpy.py | failed | 0 | 0 | 0 | 52 |
+| pandas/tests/extension/test_period.py | passed | 1206 | 0 | 0 | 56 |
+| pandas/tests/extension/test_sparse.py | failed | 1 | 0 | 0 | 2 |
+| pandas/tests/extension/test_string.py | failed | 8 | 0 | 0 | 2496 |
+| pandas/tests/extension/uuid/test_uuid.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/frame/constructors/test_from_dict.py | passed | 14 | 0 | 0 | 0 |
+| pandas/tests/frame/constructors/test_from_records.py | passed | 33 | 0 | 0 | 0 |
+| pandas/tests/frame/indexing/test_coercion.py | passed | 9 | 0 | 0 | 0 |
+| pandas/tests/frame/indexing/test_delitem.py | passed | 4 | 0 | 0 | 0 |
+| pandas/tests/frame/indexing/test_get.py | passed | 4 | 0 | 0 | 0 |
+| pandas/tests/frame/indexing/test_get_value.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/frame/indexing/test_getitem.py | passed | 40 | 0 | 0 | 0 |
+| pandas/tests/frame/indexing/test_indexing.py | passed | 864 | 0 | 0 | 0 |
+| pandas/tests/frame/indexing/test_insert.py | passed | 7 | 0 | 0 | 0 |
+| pandas/tests/frame/indexing/test_mask.py | passed | 11 | 0 | 0 | 0 |
+| pandas/tests/frame/indexing/test_set_value.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/frame/indexing/test_setitem.py | passed | 245 | 0 | 0 | 1 |
+| pandas/tests/frame/indexing/test_take.py | passed | 4 | 0 | 0 | 0 |
+| pandas/tests/frame/indexing/test_where.py | passed | 132 | 0 | 0 | 0 |
+| pandas/tests/frame/indexing/test_xs.py | passed | 33 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_add_prefix_suffix.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_align.py | passed | 21 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_asfreq.py | passed | 44 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_asof.py | passed | 10 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_assign.py | passed | 5 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_astype.py | passed | 401 | 0 | 0 | 19 |
+| pandas/tests/frame/methods/test_at_time.py | passed | 23 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_between_time.py | passed | 28 | 0 | 0 | 2 |
+| pandas/tests/frame/methods/test_clip.py | passed | 21 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_combine.py | passed | 6 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_combine_first.py | passed | 78 | 0 | 0 | 1 |
+| pandas/tests/frame/methods/test_compare.py | passed | 26 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_convert_dtypes.py | passed | 9 | 0 | 0 | 12 |
+| pandas/tests/frame/methods/test_copy.py | passed | 4 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_count.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_cov_corr.py | passed | 37 | 0 | 0 | 41 |
+| pandas/tests/frame/methods/test_describe.py | passed | 46 | 0 | 0 | 1 |
+| pandas/tests/frame/methods/test_diff.py | passed | 46 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_dot.py | passed | 16 | 0 | 0 | 6 |
+| pandas/tests/frame/methods/test_drop.py | passed | 75 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_drop_duplicates.py | passed | 38 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_droplevel.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_dropna.py | passed | 19 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_dtypes.py | passed | 8 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_duplicated.py | passed | 18 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_equals.py | passed | 4 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_explode.py | passed | 21 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_fillna.py | passed | 66 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_filter.py | passed | 9 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_first_valid_index.py | passed | 15 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_get_numeric_data.py | passed | 4 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_head_tail.py | passed | 68 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_infer_objects.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_info.py | passed | 38 | 0 | 0 | 1 |
+| pandas/tests/frame/methods/test_interpolate.py | passed | 62 | 0 | 0 | 13 |
+| pandas/tests/frame/methods/test_is_homogeneous_dtype.py | passed | 7 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_isetitem.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_isin.py | passed | 17 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_iterrows.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_join.py | passed | 29 | 0 | 0 | 1 |
+| pandas/tests/frame/methods/test_map.py | passed | 27 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_matmul.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_nlargest.py | passed | 276 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_pct_change.py | passed | 12 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_pipe.py | passed | 6 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_pop.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_quantile.py | passed | 127 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_rank.py | passed | 111 | 0 | 0 | 14 |
+| pandas/tests/frame/methods/test_reindex.py | passed | 139 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_reindex_like.py | passed | 5 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_rename.py | passed | 26 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_rename_axis.py | passed | 10 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_reorder_levels.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_replace.py | passed | 209 | 0 | 0 | 20 |
+| pandas/tests/frame/methods/test_reset_index.py | passed | 110 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_round.py | passed | 9 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_sample.py | passed | 64 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_select_dtypes.py | passed | 37 | 0 | 0 | 5 |
+| pandas/tests/frame/methods/test_set_axis.py | passed | 15 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_set_index.py | passed | 593 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_shift.py | passed | 100 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_size.py | passed | 5 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_sort_index.py | passed | 66 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_sort_values.py | passed | 85 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_swaplevel.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_to_csv.py | passed | 510 | 0 | 0 | 4 |
+| pandas/tests/frame/methods/test_to_dict.py | passed | 102 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_to_dict_of_blocks.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_to_numpy.py | passed | 5 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_to_period.py | passed | 72 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_to_records.py | passed | 35 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_to_timestamp.py | passed | 72 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_transpose.py | passed | 19 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_truncate.py | passed | 88 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_tz_convert.py | passed | 11 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_tz_localize.py | passed | 7 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_update.py | passed | 29 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_value_counts.py | passed | 33 | 0 | 0 | 0 |
+| pandas/tests/frame/methods/test_values.py | passed | 15 | 0 | 0 | 0 |
+| pandas/tests/frame/test_alter_axes.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/frame/test_api.py | passed | 34 | 0 | 0 | 2 |
+| pandas/tests/frame/test_arithmetic.py | passed | 760 | 0 | 0 | 8 |
+| pandas/tests/frame/test_arrow_interface.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/frame/test_block_internals.py | passed | 21 | 0 | 0 | 1 |
+| pandas/tests/frame/test_constructors.py | passed | 983 | 0 | 0 | 63 |
+| pandas/tests/frame/test_cumulative.py | passed | 15 | 0 | 0 | 0 |
+| pandas/tests/frame/test_iteration.py | passed | 20 | 0 | 0 | 0 |
+| pandas/tests/frame/test_logical_ops.py | passed | 17 | 0 | 0 | 0 |
+| pandas/tests/frame/test_nonunique_indexes.py | passed | 16 | 0 | 0 | 0 |
+| pandas/tests/frame/test_npfuncs.py | passed | 4 | 0 | 0 | 0 |
+| pandas/tests/frame/test_query_eval.py | passed | 139 | 0 | 0 | 222 |
+| pandas/tests/frame/test_reductions.py | passed | 2302 | 0 | 0 | 26 |
+| pandas/tests/frame/test_repr.py | passed | 58 | 0 | 0 | 6 |
+| pandas/tests/frame/test_stack_unstack.py | passed | 1024 | 0 | 0 | 0 |
+| pandas/tests/frame/test_subclass.py | passed | 52 | 0 | 0 | 1 |
+| pandas/tests/frame/test_ufunc.py | passed | 19 | 0 | 0 | 1 |
+| pandas/tests/frame/test_unary.py | passed | 18 | 0 | 0 | 0 |
+| pandas/tests/frame/test_validate.py | passed | 28 | 0 | 0 | 0 |
+| pandas/tests/generic/test_duplicate_labels.py | passed | 64 | 0 | 0 | 0 |
+| pandas/tests/generic/test_finalize.py | passed | 936 | 0 | 0 | 105 |
+| pandas/tests/generic/test_frame.py | passed | 15 | 0 | 0 | 0 |
+| pandas/tests/generic/test_generic.py | passed | 81 | 0 | 0 | 0 |
+| pandas/tests/generic/test_label_or_level_utils.py | passed | 71 | 0 | 0 | 0 |
+| pandas/tests/generic/test_series.py | passed | 16 | 0 | 0 | 0 |
+| pandas/tests/generic/test_to_xarray.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/groupby/aggregate/test_aggregate.py | passed | 430 | 0 | 0 | 7 |
+| pandas/tests/groupby/aggregate/test_cython.py | passed | 167 | 0 | 0 | 0 |
+| pandas/tests/groupby/aggregate/test_numba.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/groupby/aggregate/test_other.py | passed | 40 | 0 | 0 | 0 |
+| pandas/tests/groupby/methods/test_describe.py | passed | 25 | 0 | 0 | 0 |
+| pandas/tests/groupby/methods/test_groupby_shift_diff.py | passed | 48 | 0 | 0 | 0 |
+| pandas/tests/groupby/methods/test_is_monotonic.py | passed | 6 | 0 | 0 | 0 |
+| pandas/tests/groupby/methods/test_kurt.py | passed | 4 | 0 | 0 | 1 |
+| pandas/tests/groupby/methods/test_nlargest_nsmallest.py | passed | 43 | 0 | 0 | 0 |
+| pandas/tests/groupby/methods/test_nth.py | passed | 203 | 0 | 0 | 0 |
+| pandas/tests/groupby/methods/test_quantile.py | passed | 321 | 0 | 0 | 0 |
+| pandas/tests/groupby/methods/test_rank.py | passed | 1548 | 0 | 0 | 0 |
+| pandas/tests/groupby/methods/test_sample.py | passed | 14 | 0 | 0 | 0 |
+| pandas/tests/groupby/methods/test_size.py | passed | 20 | 0 | 0 | 2 |
+| pandas/tests/groupby/methods/test_skew.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/groupby/methods/test_value_counts.py | passed | 1708 | 0 | 0 | 12 |
+| pandas/tests/groupby/test_all_methods.py | passed | 196 | 0 | 0 | 6 |
+| pandas/tests/groupby/test_api.py | passed | 66 | 0 | 0 | 4 |
+| pandas/tests/groupby/test_apply.py | passed | 137 | 0 | 0 | 0 |
+| pandas/tests/groupby/test_bin_groupby.py | passed | 6 | 0 | 0 | 0 |
+| pandas/tests/groupby/test_categorical.py | passed | 1882 | 0 | 0 | 428 |
+| pandas/tests/groupby/test_counting.py | passed | 35 | 0 | 0 | 5 |
+| pandas/tests/groupby/test_cumulative.py | passed | 82 | 0 | 0 | 0 |
+| pandas/tests/groupby/test_filters.py | passed | 34 | 0 | 0 | 0 |
+| pandas/tests/groupby/test_groupby.py | passed | 2480 | 0 | 0 | 4 |
+| pandas/tests/groupby/test_groupby_dropna.py | passed | 1614 | 0 | 0 | 32 |
+| pandas/tests/groupby/test_groupby_subclass.py | passed | 71 | 0 | 0 | 1 |
+| pandas/tests/groupby/test_grouping.py | passed | 83 | 0 | 0 | 0 |
+| pandas/tests/groupby/test_index_as_string.py | passed | 18 | 0 | 0 | 0 |
+| pandas/tests/groupby/test_indexing.py | passed | 171 | 0 | 0 | 0 |
+| pandas/tests/groupby/test_libgroupby.py | passed | 38 | 0 | 0 | 0 |
+| pandas/tests/groupby/test_missing.py | passed | 21 | 0 | 0 | 0 |
+| pandas/tests/groupby/test_numba.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/groupby/test_numeric_only.py | passed | 334 | 0 | 0 | 0 |
+| pandas/tests/groupby/test_pipe.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/groupby/test_raises.py | passed | 10565 | 0 | 0 | 0 |
+| pandas/tests/groupby/test_reductions.py | passed | 927 | 0 | 0 | 357 |
+| pandas/tests/groupby/test_timegrouper.py | passed | 30 | 0 | 0 | 2 |
+| pandas/tests/groupby/transform/test_numba.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/groupby/transform/test_transform.py | passed | 685 | 0 | 0 | 0 |
+| pandas/tests/indexes/base_class/test_constructors.py | passed | 11 | 0 | 0 | 0 |
+| pandas/tests/indexes/base_class/test_formats.py | passed | 13 | 0 | 0 | 0 |
+| pandas/tests/indexes/base_class/test_indexing.py | passed | 13 | 0 | 0 | 0 |
+| pandas/tests/indexes/base_class/test_pickle.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/indexes/base_class/test_reshape.py | passed | 20 | 0 | 0 | 2 |
+| pandas/tests/indexes/base_class/test_setops.py | passed | 60 | 0 | 0 | 0 |
+| pandas/tests/indexes/base_class/test_where.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/indexes/categorical/test_append.py | passed | 7 | 0 | 0 | 0 |
+| pandas/tests/indexes/categorical/test_astype.py | passed | 11 | 0 | 0 | 0 |
+| pandas/tests/indexes/categorical/test_category.py | passed | 42 | 0 | 0 | 0 |
+| pandas/tests/indexes/categorical/test_constructors.py | passed | 5 | 0 | 0 | 0 |
+| pandas/tests/indexes/categorical/test_equals.py | passed | 7 | 0 | 0 | 2 |
+| pandas/tests/indexes/categorical/test_fillna.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/indexes/categorical/test_formats.py | passed | 12 | 0 | 0 | 0 |
+| pandas/tests/indexes/categorical/test_indexing.py | passed | 33 | 0 | 0 | 0 |
+| pandas/tests/indexes/categorical/test_map.py | passed | 21 | 0 | 0 | 0 |
+| pandas/tests/indexes/categorical/test_reindex.py | passed | 7 | 0 | 0 | 0 |
+| pandas/tests/indexes/categorical/test_setops.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimelike_/test_drop_duplicates.py | passed | 112 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimelike_/test_equals.py | passed | 21 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimelike_/test_indexing.py | passed | 16 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimelike_/test_is_monotonic.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimelike_/test_nat.py | passed | 4 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimelike_/test_sort_values.py | passed | 53 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimelike_/test_value_counts.py | passed | 34 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/methods/test_asof.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/methods/test_astype.py | passed | 32 | 0 | 0 | 1 |
+| pandas/tests/indexes/datetimes/methods/test_delete.py | passed | 23 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/methods/test_factorize.py | passed | 64 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/methods/test_fillna.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/methods/test_insert.py | passed | 177 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/methods/test_isocalendar.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/methods/test_map.py | passed | 5 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/methods/test_normalize.py | passed | 9 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/methods/test_repeat.py | passed | 255 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/methods/test_resolution.py | passed | 135 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/methods/test_round.py | passed | 174 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/methods/test_shift.py | passed | 120 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/methods/test_snap.py | passed | 24 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/methods/test_to_frame.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/methods/test_to_julian_date.py | passed | 5 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/methods/test_to_period.py | passed | 44 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/methods/test_to_pydatetime.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/methods/test_to_series.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/methods/test_tz_convert.py | passed | 31 | 0 | 0 | 1 |
+| pandas/tests/indexes/datetimes/methods/test_tz_localize.py | passed | 123 | 0 | 0 | 14 |
+| pandas/tests/indexes/datetimes/methods/test_unique.py | passed | 19 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/test_arithmetic.py | passed | 19 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/test_constructors.py | passed | 203 | 0 | 0 | 7 |
+| pandas/tests/indexes/datetimes/test_date_range.py | passed | 371 | 0 | 0 | 4 |
+| pandas/tests/indexes/datetimes/test_datetime.py | passed | 22 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/test_formats.py | passed | 33 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/test_freq_attr.py | passed | 26 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/test_indexing.py | passed | 297 | 0 | 0 | 2 |
+| pandas/tests/indexes/datetimes/test_iter.py | passed | 12 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/test_join.py | passed | 22 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/test_npfuncs.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/test_ops.py | passed | 16 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/test_partial_slicing.py | passed | 34 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/test_pickle.py | passed | 6 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/test_reindex.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/test_scalar_compat.py | passed | 343 | 0 | 0 | 0 |
+| pandas/tests/indexes/datetimes/test_setops.py | passed | 123 | 0 | 0 | 2 |
+| pandas/tests/indexes/datetimes/test_timezones.py | passed | 35 | 0 | 0 | 0 |
+| pandas/tests/indexes/interval/test_astype.py | passed | 159 | 0 | 0 | 0 |
+| pandas/tests/indexes/interval/test_constructors.py | passed | 479 | 0 | 0 | 27 |
+| pandas/tests/indexes/interval/test_equals.py | passed | 4 | 0 | 0 | 0 |
+| pandas/tests/indexes/interval/test_formats.py | passed | 10 | 0 | 0 | 0 |
+| pandas/tests/indexes/interval/test_indexing.py | passed | 285 | 0 | 0 | 0 |
+| pandas/tests/indexes/interval/test_interval.py | passed | 250 | 0 | 0 | 0 |
+| pandas/tests/indexes/interval/test_interval_range.py | passed | 158 | 0 | 0 | 0 |
+| pandas/tests/indexes/interval/test_interval_tree.py | passed | 212 | 0 | 0 | 0 |
+| pandas/tests/indexes/interval/test_join.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/indexes/interval/test_pickle.py | passed | 4 | 0 | 0 | 0 |
+| pandas/tests/indexes/interval/test_setops.py | passed | 81 | 0 | 0 | 0 |
+| pandas/tests/indexes/multi/test_analytics.py | passed | 38 | 0 | 0 | 0 |
+| pandas/tests/indexes/multi/test_astype.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/indexes/multi/test_compat.py | passed | 6 | 0 | 0 | 0 |
+| pandas/tests/indexes/multi/test_constructors.py | passed | 100 | 0 | 0 | 1 |
+| pandas/tests/indexes/multi/test_conversion.py | passed | 8 | 0 | 0 | 0 |
+| pandas/tests/indexes/multi/test_copy.py | passed | 10 | 0 | 0 | 0 |
+| pandas/tests/indexes/multi/test_drop.py | passed | 14 | 0 | 0 | 0 |
+| pandas/tests/indexes/multi/test_duplicates.py | passed | 51 | 0 | 0 | 0 |
+| pandas/tests/indexes/multi/test_equivalence.py | passed | 14 | 0 | 0 | 0 |
+| pandas/tests/indexes/multi/test_formats.py | passed | 10 | 0 | 0 | 0 |
+| pandas/tests/indexes/multi/test_get_level_values.py | passed | 8 | 0 | 0 | 0 |
+| pandas/tests/indexes/multi/test_get_set.py | passed | 19 | 0 | 0 | 0 |
+| pandas/tests/indexes/multi/test_indexing.py | passed | 141 | 0 | 0 | 0 |
+| pandas/tests/indexes/multi/test_integrity.py | passed | 17 | 0 | 0 | 0 |
+| pandas/tests/indexes/multi/test_isin.py | passed | 14 | 0 | 0 | 0 |
+| pandas/tests/indexes/multi/test_join.py | passed | 55 | 0 | 0 | 0 |
+| pandas/tests/indexes/multi/test_lexsort.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/indexes/multi/test_missing.py | passed | 5 | 0 | 0 | 0 |
+| pandas/tests/indexes/multi/test_monotonic.py | passed | 11 | 0 | 0 | 0 |
+| pandas/tests/indexes/multi/test_names.py | passed | 31 | 0 | 0 | 0 |
+| pandas/tests/indexes/multi/test_partial_indexing.py | passed | 5 | 0 | 0 | 0 |
+| pandas/tests/indexes/multi/test_pickle.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/indexes/multi/test_reindex.py | passed | 12 | 0 | 0 | 0 |
+| pandas/tests/indexes/multi/test_reshape.py | passed | 11 | 0 | 0 | 0 |
+| pandas/tests/indexes/multi/test_setops.py | passed | 273 | 0 | 0 | 3 |
+| pandas/tests/indexes/multi/test_sorting.py | passed | 27 | 0 | 0 | 0 |
+| pandas/tests/indexes/multi/test_take.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/indexes/multi/test_util.py | passed | 15 | 0 | 0 | 0 |
+| pandas/tests/indexes/numeric/test_astype.py | passed | 19 | 0 | 0 | 0 |
+| pandas/tests/indexes/numeric/test_indexing.py | passed | 185 | 0 | 0 | 2 |
+| pandas/tests/indexes/numeric/test_join.py | passed | 11 | 0 | 0 | 0 |
+| pandas/tests/indexes/numeric/test_numeric.py | passed | 116 | 0 | 0 | 0 |
+| pandas/tests/indexes/numeric/test_setops.py | passed | 20 | 0 | 0 | 0 |
+| pandas/tests/indexes/object/test_astype.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/indexes/object/test_indexing.py | passed | 695 | 0 | 0 | 0 |
+| pandas/tests/indexes/period/methods/test_asfreq.py | passed | 15 | 0 | 0 | 0 |
+| pandas/tests/indexes/period/methods/test_astype.py | passed | 13 | 0 | 0 | 0 |
+| pandas/tests/indexes/period/methods/test_factorize.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/indexes/period/methods/test_fillna.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/indexes/period/methods/test_insert.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/indexes/period/methods/test_is_full.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/indexes/period/methods/test_repeat.py | passed | 6 | 0 | 0 | 0 |
+| pandas/tests/indexes/period/methods/test_shift.py | passed | 6 | 0 | 0 | 0 |
+| pandas/tests/indexes/period/methods/test_to_timestamp.py | passed | 9 | 0 | 0 | 0 |
+| pandas/tests/indexes/period/test_constructors.py | passed | 105 | 0 | 0 | 0 |
+| pandas/tests/indexes/period/test_formats.py | passed | 5 | 0 | 0 | 0 |
+| pandas/tests/indexes/period/test_freq_attr.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/indexes/period/test_indexing.py | passed | 73 | 0 | 0 | 0 |
+| pandas/tests/indexes/period/test_join.py | passed | 11 | 0 | 0 | 0 |
+| pandas/tests/indexes/period/test_monotonic.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/indexes/period/test_partial_slicing.py | passed | 14 | 0 | 0 | 0 |
+| pandas/tests/indexes/period/test_period.py | passed | 132 | 0 | 0 | 0 |
+| pandas/tests/indexes/period/test_period_range.py | passed | 27 | 0 | 0 | 0 |
+| pandas/tests/indexes/period/test_pickle.py | passed | 4 | 0 | 0 | 0 |
+| pandas/tests/indexes/period/test_resolution.py | passed | 9 | 0 | 0 | 0 |
+| pandas/tests/indexes/period/test_scalar_compat.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/indexes/period/test_searchsorted.py | passed | 8 | 0 | 0 | 0 |
+| pandas/tests/indexes/period/test_setops.py | passed | 14 | 0 | 0 | 0 |
+| pandas/tests/indexes/period/test_tools.py | passed | 12 | 0 | 0 | 0 |
+| pandas/tests/indexes/ranges/test_constructors.py | passed | 29 | 0 | 0 | 0 |
+| pandas/tests/indexes/ranges/test_indexing.py | passed | 16 | 0 | 0 | 0 |
+| pandas/tests/indexes/ranges/test_join.py | passed | 42 | 0 | 0 | 0 |
+| pandas/tests/indexes/ranges/test_range.py | passed | 212 | 0 | 0 | 0 |
+| pandas/tests/indexes/ranges/test_setops.py | passed | 67 | 0 | 0 | 0 |
+| pandas/tests/indexes/string/test_astype.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/indexes/string/test_indexing.py | passed | 135 | 0 | 0 | 90 |
+| pandas/tests/indexes/test_any_index.py | passed | 691 | 0 | 0 | 2 |
+| pandas/tests/indexes/test_base.py | passed | 1526 | 0 | 0 | 22 |
+| pandas/tests/indexes/test_common.py | passed | 875 | 0 | 0 | 21 |
+| pandas/tests/indexes/test_datetimelike.py | passed | 40 | 0 | 0 | 0 |
+| pandas/tests/indexes/test_engines.py | passed | 41 | 0 | 0 | 0 |
+| pandas/tests/indexes/test_frozen.py | passed | 10 | 0 | 0 | 0 |
+| pandas/tests/indexes/test_index_new.py | passed | 156 | 0 | 0 | 4 |
+| pandas/tests/indexes/test_indexing.py | passed | 473 | 0 | 0 | 4 |
+| pandas/tests/indexes/test_numpy_compat.py | passed | 958 | 0 | 0 | 2 |
+| pandas/tests/indexes/test_old_base.py | passed | 940 | 0 | 0 | 109 |
+| pandas/tests/indexes/test_setops.py | passed | 1954 | 0 | 0 | 31 |
+| pandas/tests/indexes/test_subclass.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/indexes/timedeltas/methods/test_astype.py | passed | 15 | 0 | 0 | 0 |
+| pandas/tests/indexes/timedeltas/methods/test_factorize.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/indexes/timedeltas/methods/test_fillna.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/indexes/timedeltas/methods/test_insert.py | passed | 15 | 0 | 0 | 0 |
+| pandas/tests/indexes/timedeltas/methods/test_repeat.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/indexes/timedeltas/methods/test_shift.py | passed | 6 | 0 | 0 | 0 |
+| pandas/tests/indexes/timedeltas/test_arithmetic.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/indexes/timedeltas/test_constructors.py | passed | 24 | 0 | 0 | 0 |
+| pandas/tests/indexes/timedeltas/test_delete.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/indexes/timedeltas/test_formats.py | passed | 5 | 0 | 0 | 0 |
+| pandas/tests/indexes/timedeltas/test_freq_attr.py | passed | 11 | 0 | 0 | 0 |
+| pandas/tests/indexes/timedeltas/test_indexing.py | passed | 36 | 0 | 0 | 0 |
+| pandas/tests/indexes/timedeltas/test_join.py | passed | 7 | 0 | 0 | 0 |
+| pandas/tests/indexes/timedeltas/test_ops.py | passed | 10 | 0 | 0 | 0 |
+| pandas/tests/indexes/timedeltas/test_pickle.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/indexes/timedeltas/test_scalar_compat.py | passed | 8 | 0 | 0 | 0 |
+| pandas/tests/indexes/timedeltas/test_searchsorted.py | passed | 8 | 0 | 0 | 0 |
+| pandas/tests/indexes/timedeltas/test_setops.py | passed | 32 | 0 | 0 | 0 |
+| pandas/tests/indexes/timedeltas/test_timedelta.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/indexes/timedeltas/test_timedelta_range.py | passed | 38 | 0 | 0 | 0 |
+| pandas/tests/indexing/interval/test_interval.py | passed | 31 | 0 | 0 | 0 |
+| pandas/tests/indexing/interval/test_interval_new.py | passed | 21 | 0 | 0 | 0 |
+| pandas/tests/indexing/multiindex/test_chaining_and_caching.py | passed | 4 | 0 | 0 | 0 |
+| pandas/tests/indexing/multiindex/test_datetime.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/indexing/multiindex/test_getitem.py | passed | 77 | 0 | 0 | 0 |
+| pandas/tests/indexing/multiindex/test_iloc.py | passed | 16 | 0 | 0 | 0 |
+| pandas/tests/indexing/multiindex/test_indexing_slow.py | passed | 10 | 0 | 0 | 0 |
+| pandas/tests/indexing/multiindex/test_loc.py | passed | 143 | 0 | 0 | 0 |
+| pandas/tests/indexing/multiindex/test_multiindex.py | passed | 23 | 0 | 0 | 0 |
+| pandas/tests/indexing/multiindex/test_partial.py | passed | 13 | 0 | 0 | 0 |
+| pandas/tests/indexing/multiindex/test_setitem.py | passed | 29 | 0 | 0 | 0 |
+| pandas/tests/indexing/multiindex/test_slice.py | passed | 29 | 0 | 0 | 0 |
+| pandas/tests/indexing/multiindex/test_sorted.py | passed | 9 | 0 | 0 | 0 |
+| pandas/tests/indexing/test_at.py | passed | 35 | 0 | 0 | 0 |
+| pandas/tests/indexing/test_categorical.py | passed | 115 | 0 | 0 | 1 |
+| pandas/tests/indexing/test_chaining_and_caching.py | passed | 25 | 0 | 0 | 0 |
+| pandas/tests/indexing/test_check_indexer.py | passed | 24 | 0 | 0 | 1 |
+| pandas/tests/indexing/test_coercion.py | passed | 403 | 0 | 0 | 0 |
+| pandas/tests/indexing/test_datetime.py | passed | 9 | 0 | 0 | 2 |
+| pandas/tests/indexing/test_floats.py | passed | 143 | 0 | 0 | 0 |
+| pandas/tests/indexing/test_iat.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/indexing/test_iloc.py | passed | 238 | 0 | 0 | 3 |
+| pandas/tests/indexing/test_indexers.py | passed | 6 | 0 | 0 | 0 |
+| pandas/tests/indexing/test_indexing.py | passed | 1405 | 0 | 0 | 0 |
+| pandas/tests/indexing/test_loc.py | passed | 1104 | 0 | 0 | 17 |
+| pandas/tests/indexing/test_na_indexing.py | passed | 270 | 0 | 0 | 0 |
+| pandas/tests/indexing/test_partial.py | passed | 36 | 0 | 0 | 0 |
+| pandas/tests/indexing/test_scalar.py | passed | 38 | 0 | 0 | 0 |
+| pandas/tests/interchange/test_impl.py | passed | 34 | 0 | 0 | 49 |
+| pandas/tests/interchange/test_spec_conformance.py | passed | 16 | 0 | 0 | 0 |
+| pandas/tests/interchange/test_utils.py | passed | 16 | 0 | 0 | 31 |
+| pandas/tests/internals/test_api.py | passed | 14 | 0 | 0 | 0 |
+| pandas/tests/internals/test_internals.py | passed | 244 | 0 | 0 | 0 |
+| pandas/tests/io/excel/test_odf.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/io/excel/test_odswriter.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/io/excel/test_openpyxl.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/io/excel/test_readers.py | no-tests | 0 | 0 | 0 | 1573 |
+| pandas/tests/io/excel/test_style.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/io/excel/test_writers.py | passed | 5 | 0 | 0 | 768 |
+| pandas/tests/io/excel/test_xlrd.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/io/excel/test_xlsxwriter.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/io/formats/style/test_bar.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/io/formats/style/test_exceptions.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/io/formats/style/test_format.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/io/formats/style/test_highlight.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/io/formats/style/test_html.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/io/formats/style/test_matplotlib.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/io/formats/style/test_non_unique.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/io/formats/style/test_style.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/io/formats/style/test_to_latex.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/io/formats/style/test_to_string.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/io/formats/style/test_to_typst.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/io/formats/style/test_tooltip.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/io/formats/test_console.py | passed | 11 | 0 | 0 | 0 |
+| pandas/tests/io/formats/test_css.py | passed | 93 | 0 | 0 | 0 |
+| pandas/tests/io/formats/test_eng_formatting.py | passed | 7 | 0 | 0 | 0 |
+| pandas/tests/io/formats/test_format.py | passed | 173 | 0 | 0 | 14 |
+| pandas/tests/io/formats/test_ipython_compat.py | passed | 2 | 0 | 0 | 3 |
+| pandas/tests/io/formats/test_printing.py | passed | 17 | 0 | 0 | 0 |
+| pandas/tests/io/formats/test_to_csv.py | passed | 108 | 0 | 0 | 8 |
+| pandas/tests/io/formats/test_to_excel.py | passed | 416 | 0 | 0 | 1 |
+| pandas/tests/io/formats/test_to_html.py | passed | 57 | 0 | 0 | 319 |
+| pandas/tests/io/formats/test_to_latex.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/io/formats/test_to_markdown.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/io/formats/test_to_string.py | passed | 92 | 0 | 0 | 1 |
+| pandas/tests/io/json/test_compression.py | passed | 46 | 0 | 0 | 40 |
+| pandas/tests/io/json/test_deprecated_kwargs.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/io/json/test_json_table_schema.py | passed | 177 | 0 | 0 | 0 |
+| pandas/tests/io/json/test_json_table_schema_ext_dtype.py | passed | 20 | 0 | 0 | 0 |
+| pandas/tests/io/json/test_normalize.py | passed | 58 | 0 | 0 | 0 |
+| pandas/tests/io/json/test_pandas.py | failed | 433 | 0 | 0 | 59 |
+| pandas/tests/io/json/test_readlines.py | passed | 39 | 0 | 0 | 23 |
+| pandas/tests/io/json/test_ujson.py | passed | 217 | 0 | 0 | 1 |
+| pandas/tests/io/parser/common/test_chunksize.py | passed | 57 | 0 | 0 | 19 |
+| pandas/tests/io/parser/common/test_common_basic.py | passed | 189 | 0 | 0 | 77 |
+| pandas/tests/io/parser/common/test_data_list.py | passed | 12 | 0 | 0 | 4 |
+| pandas/tests/io/parser/common/test_decimal.py | passed | 9 | 0 | 0 | 3 |
+| pandas/tests/io/parser/common/test_file_buffer_url.py | passed | 96 | 0 | 0 | 60 |
+| pandas/tests/io/parser/common/test_float.py | passed | 206 | 0 | 0 | 30 |
+| pandas/tests/io/parser/common/test_index.py | passed | 45 | 0 | 0 | 19 |
+| pandas/tests/io/parser/common/test_inf.py | passed | 12 | 0 | 0 | 4 |
+| pandas/tests/io/parser/common/test_ints.py | passed | 66 | 0 | 0 | 22 |
+| pandas/tests/io/parser/common/test_iterator.py | passed | 24 | 0 | 0 | 8 |
+| pandas/tests/io/parser/common/test_read_errors.py | passed | 65 | 0 | 0 | 26 |
+| pandas/tests/io/parser/dtypes/test_categorical.py | passed | 84 | 0 | 0 | 36 |
+| pandas/tests/io/parser/dtypes/test_dtypes_basic.py | passed | 899 | 0 | 0 | 62 |
+| pandas/tests/io/parser/dtypes/test_empty.py | passed | 48 | 0 | 0 | 16 |
+| pandas/tests/io/parser/test_c_parser_only.py | passed | 126 | 0 | 0 | 6 |
+| pandas/tests/io/parser/test_comment.py | passed | 49 | 0 | 0 | 17 |
+| pandas/tests/io/parser/test_compression.py | passed | 15 | 0 | 0 | 229 |
+| pandas/tests/io/parser/test_concatenate_chunks.py | no-tests | 0 | 0 | 0 | 2 |
+| pandas/tests/io/parser/test_converters.py | passed | 36 | 0 | 0 | 12 |
+| pandas/tests/io/parser/test_dialect.py | passed | 81 | 0 | 0 | 27 |
+| pandas/tests/io/parser/test_encoding.py | passed | 236 | 0 | 0 | 97 |
+| pandas/tests/io/parser/test_header.py | passed | 162 | 0 | 0 | 55 |
+| pandas/tests/io/parser/test_index_col.py | passed | 99 | 0 | 0 | 33 |
+| pandas/tests/io/parser/test_mangle_dupes.py | passed | 42 | 0 | 0 | 14 |
+| pandas/tests/io/parser/test_multi_thread.py | passed | 6 | 0 | 0 | 2 |
+| pandas/tests/io/parser/test_na_values.py | passed | 189 | 0 | 0 | 63 |
+| pandas/tests/io/parser/test_parse_dates.py | passed | 175 | 0 | 0 | 57 |
+| pandas/tests/io/parser/test_python_parser_only.py | passed | 88 | 0 | 0 | 2 |
+| pandas/tests/io/parser/test_quoting.py | passed | 81 | 0 | 0 | 27 |
+| pandas/tests/io/parser/test_read_fwf.py | passed | 73 | 0 | 0 | 5 |
+| pandas/tests/io/parser/test_skiprows.py | passed | 65 | 0 | 0 | 22 |
+| pandas/tests/io/parser/test_textreader.py | passed | 34 | 0 | 0 | 4 |
+| pandas/tests/io/parser/test_unsupported.py | passed | 18 | 0 | 0 | 4 |
+| pandas/tests/io/parser/test_upcast.py | passed | 27 | 0 | 0 | 4 |
+| pandas/tests/io/parser/usecols/test_parse_dates.py | passed | 6 | 0 | 0 | 2 |
+| pandas/tests/io/parser/usecols/test_strings.py | passed | 15 | 0 | 0 | 5 |
+| pandas/tests/io/parser/usecols/test_usecols_basic.py | passed | 135 | 0 | 0 | 45 |
+| pandas/tests/io/pytables/test_append.py | error | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_categorical.py | error | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_compat.py | error | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_complex.py | error | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_errors.py | error | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_file_handling.py | error | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_keys.py | error | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_put.py | error | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_pytables_missing.py | error | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_read.py | error | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_retain_attributes.py | error | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_round_trip.py | error | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_select.py | error | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_store.py | error | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_subclass.py | error | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_time_series.py | error | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_timezones.py | error | 0 | 0 | 0 | 0 |
+| pandas/tests/io/sas/test_byteswap.py | passed | 10 | 0 | 0 | 0 |
+| pandas/tests/io/sas/test_sas.py | passed | 2 | 0 | 0 | 1 |
+| pandas/tests/io/sas/test_sas7bdat.py | no-tests | 0 | 0 | 0 | 96 |
+| pandas/tests/io/sas/test_xport.py | no-tests | 0 | 0 | 0 | 8 |
+| pandas/tests/io/test_common.py | passed | 92 | 0 | 0 | 36 |
+| pandas/tests/io/test_compression.py | passed | 118 | 0 | 0 | 18 |
+| pandas/tests/io/test_feather.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/io/test_fsspec.py | passed | 1 | 0 | 0 | 31 |
+| pandas/tests/io/test_gcs.py | passed | 1 | 0 | 0 | 18 |
+| pandas/tests/io/test_html.py | passed | 4 | 0 | 0 | 189 |
+| pandas/tests/io/test_iceberg.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/io/test_orc.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/io/test_parquet.py | passed | 3 | 0 | 0 | 122 |
+| pandas/tests/io/test_pickle.py | passed | 741 | 0 | 0 | 12 |
+| pandas/tests/io/test_s3.py | no-tests | 0 | 0 | 0 | 4 |
+| pandas/tests/io/test_spss.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/io/test_sql.py | passed | 84 | 0 | 0 | 1405 |
+| pandas/tests/io/test_stata.py | passed | 351 | 0 | 0 | 338 |
+| pandas/tests/io/test_util.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/io/xml/test_to_xml.py | passed | 50 | 0 | 0 | 88 |
+| pandas/tests/io/xml/test_xml.py | passed | 55 | 0 | 0 | 195 |
+| pandas/tests/io/xml/test_xml_dtypes.py | passed | 12 | 0 | 0 | 32 |
+| pandas/tests/libs/test_hashtable.py | passed | 955 | 0 | 0 | 6 |
+| pandas/tests/libs/test_join.py | passed | 17 | 0 | 0 | 0 |
+| pandas/tests/libs/test_lib.py | passed | 85 | 0 | 0 | 0 |
+| pandas/tests/libs/test_libalgos.py | passed | 8 | 0 | 0 | 0 |
+| pandas/tests/plotting/frame/test_frame.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/plotting/frame/test_frame_color.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/plotting/frame/test_frame_groupby.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/plotting/frame/test_frame_legend.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/plotting/frame/test_frame_subplots.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/plotting/frame/test_hist_box_by.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/plotting/test_backend.py | no-tests | 0 | 0 | 0 | 7 |
+| pandas/tests/plotting/test_boxplot_method.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/plotting/test_common.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/plotting/test_converter.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/plotting/test_datetimelike.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/plotting/test_groupby.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/plotting/test_hist_method.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/plotting/test_misc.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/plotting/test_series.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/plotting/test_style.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/reductions/test_reductions.py | passed | 428 | 0 | 0 | 6 |
+| pandas/tests/reductions/test_stat_reductions.py | passed | 72 | 0 | 0 | 2 |
+| pandas/tests/resample/test_base.py | passed | 658 | 0 | 0 | 34 |
+| pandas/tests/resample/test_datetime_index.py | passed | 2104 | 0 | 0 | 11 |
+| pandas/tests/resample/test_period_index.py | passed | 467 | 0 | 0 | 0 |
+| pandas/tests/resample/test_resample_api.py | passed | 178 | 0 | 0 | 0 |
+| pandas/tests/resample/test_resampler_grouper.py | passed | 53 | 0 | 0 | 5 |
+| pandas/tests/resample/test_time_grouper.py | passed | 49 | 0 | 0 | 0 |
+| pandas/tests/resample/test_timedelta.py | passed | 23 | 0 | 0 | 1 |
+| pandas/tests/reshape/concat/test_append.py | passed | 80 | 0 | 0 | 0 |
+| pandas/tests/reshape/concat/test_append_common.py | passed | 72 | 0 | 0 | 9 |
+| pandas/tests/reshape/concat/test_categorical.py | passed | 13 | 0 | 0 | 0 |
+| pandas/tests/reshape/concat/test_concat.py | passed | 104 | 0 | 0 | 0 |
+| pandas/tests/reshape/concat/test_dataframe.py | passed | 13 | 0 | 0 | 0 |
+| pandas/tests/reshape/concat/test_datetimes.py | passed | 108 | 0 | 0 | 0 |
+| pandas/tests/reshape/concat/test_empty.py | passed | 51 | 0 | 0 | 5 |
+| pandas/tests/reshape/concat/test_index.py | passed | 62 | 0 | 0 | 0 |
+| pandas/tests/reshape/concat/test_invalid.py | passed | 7 | 0 | 0 | 0 |
+| pandas/tests/reshape/concat/test_series.py | passed | 21 | 0 | 0 | 0 |
+| pandas/tests/reshape/concat/test_sort.py | passed | 10 | 0 | 0 | 0 |
+| pandas/tests/reshape/merge/test_join.py | passed | 93 | 0 | 0 | 2 |
+| pandas/tests/reshape/merge/test_merge.py | passed | 933 | 0 | 0 | 16 |
+| pandas/tests/reshape/merge/test_merge_antijoin.py | passed | 12 | 0 | 0 | 3 |
+| pandas/tests/reshape/merge/test_merge_asof.py | passed | 143 | 0 | 0 | 10 |
+| pandas/tests/reshape/merge/test_merge_cross.py | passed | 17 | 0 | 0 | 0 |
+| pandas/tests/reshape/merge/test_merge_index_as_string.py | passed | 80 | 0 | 0 | 0 |
+| pandas/tests/reshape/merge/test_merge_ordered.py | passed | 21 | 0 | 0 | 0 |
+| pandas/tests/reshape/merge/test_multi.py | passed | 40 | 0 | 0 | 2 |
+| pandas/tests/reshape/test_crosstab.py | passed | 37 | 0 | 0 | 0 |
+| pandas/tests/reshape/test_cut.py | passed | 137 | 0 | 0 | 0 |
+| pandas/tests/reshape/test_from_dummies.py | passed | 43 | 0 | 0 | 0 |
+| pandas/tests/reshape/test_get_dummies.py | passed | 153 | 0 | 0 | 7 |
+| pandas/tests/reshape/test_melt.py | passed | 63 | 0 | 0 | 3 |
+| pandas/tests/reshape/test_pivot.py | passed | 188 | 0 | 0 | 3 |
+| pandas/tests/reshape/test_pivot_multilevel.py | passed | 12 | 0 | 0 | 0 |
+| pandas/tests/reshape/test_qcut.py | passed | 112 | 0 | 0 | 1 |
+| pandas/tests/reshape/test_union_categoricals.py | passed | 41 | 0 | 0 | 0 |
+| pandas/tests/scalar/interval/test_arithmetic.py | passed | 44 | 0 | 0 | 0 |
+| pandas/tests/scalar/interval/test_constructors.py | passed | 9 | 0 | 0 | 0 |
+| pandas/tests/scalar/interval/test_contains.py | passed | 16 | 0 | 0 | 0 |
+| pandas/tests/scalar/interval/test_formats.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/scalar/interval/test_interval.py | passed | 44 | 0 | 0 | 0 |
+| pandas/tests/scalar/interval/test_overlaps.py | passed | 161 | 0 | 0 | 0 |
+| pandas/tests/scalar/period/test_arithmetic.py | passed | 80 | 0 | 0 | 0 |
+| pandas/tests/scalar/period/test_asfreq.py | passed | 23 | 0 | 0 | 0 |
+| pandas/tests/scalar/period/test_period.py | passed | 310 | 0 | 0 | 0 |
+| pandas/tests/scalar/test_na_scalar.py | passed | 271 | 0 | 0 | 6 |
+| pandas/tests/scalar/test_nat.py | passed | 349 | 0 | 0 | 2 |
+| pandas/tests/scalar/timedelta/methods/test_as_unit.py | passed | 4 | 0 | 0 | 0 |
+| pandas/tests/scalar/timedelta/methods/test_round.py | passed | 20 | 0 | 0 | 0 |
+| pandas/tests/scalar/timedelta/test_arithmetic.py | passed | 132 | 0 | 0 | 0 |
+| pandas/tests/scalar/timedelta/test_constructors.py | passed | 295 | 0 | 0 | 0 |
+| pandas/tests/scalar/timedelta/test_formats.py | passed | 14 | 0 | 0 | 0 |
+| pandas/tests/scalar/timedelta/test_timedelta.py | passed | 92 | 0 | 0 | 0 |
+| pandas/tests/scalar/timestamp/methods/test_as_unit.py | passed | 4 | 0 | 0 | 0 |
+| pandas/tests/scalar/timestamp/methods/test_normalize.py | passed | 122 | 0 | 0 | 0 |
+| pandas/tests/scalar/timestamp/methods/test_replace.py | passed | 99 | 0 | 0 | 1 |
+| pandas/tests/scalar/timestamp/methods/test_round.py | passed | 183 | 0 | 0 | 0 |
+| pandas/tests/scalar/timestamp/methods/test_timestamp_method.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/scalar/timestamp/methods/test_to_julian_date.py | passed | 5 | 0 | 0 | 0 |
+| pandas/tests/scalar/timestamp/methods/test_to_pydatetime.py | passed | 6 | 0 | 0 | 1 |
+| pandas/tests/scalar/timestamp/methods/test_tz_convert.py | passed | 59 | 0 | 0 | 0 |
+| pandas/tests/scalar/timestamp/methods/test_tz_localize.py | passed | 163 | 0 | 0 | 7 |
+| pandas/tests/scalar/timestamp/test_arithmetic.py | passed | 79 | 0 | 0 | 1 |
+| pandas/tests/scalar/timestamp/test_comparisons.py | passed | 28 | 0 | 0 | 0 |
+| pandas/tests/scalar/timestamp/test_constructors.py | passed | 130 | 0 | 0 | 2 |
+| pandas/tests/scalar/timestamp/test_formats.py | passed | 75 | 0 | 0 | 0 |
+| pandas/tests/scalar/timestamp/test_timestamp.py | passed | 906 | 0 | 0 | 0 |
+| pandas/tests/scalar/timestamp/test_timezones.py | passed | 15 | 0 | 0 | 0 |
+| pandas/tests/series/accessors/test_cat_accessor.py | passed | 19 | 0 | 0 | 0 |
+| pandas/tests/series/accessors/test_dt_accessor.py | passed | 376 | 0 | 0 | 0 |
+| pandas/tests/series/accessors/test_list_accessor.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/series/accessors/test_sparse_accessor.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/series/accessors/test_str_accessor.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/series/accessors/test_struct_accessor.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/series/indexing/test_datetime.py | passed | 16 | 0 | 0 | 1 |
+| pandas/tests/series/indexing/test_delitem.py | passed | 4 | 0 | 0 | 0 |
+| pandas/tests/series/indexing/test_get.py | passed | 12 | 0 | 0 | 0 |
+| pandas/tests/series/indexing/test_getitem.py | passed | 94 | 0 | 0 | 0 |
+| pandas/tests/series/indexing/test_indexing.py | passed | 731 | 0 | 0 | 0 |
+| pandas/tests/series/indexing/test_mask.py | passed | 4 | 0 | 0 | 0 |
+| pandas/tests/series/indexing/test_set_value.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/series/indexing/test_setitem.py | passed | 1519 | 0 | 0 | 414 |
+| pandas/tests/series/indexing/test_take.py | passed | 4 | 0 | 0 | 0 |
+| pandas/tests/series/indexing/test_where.py | passed | 194 | 0 | 0 | 0 |
+| pandas/tests/series/indexing/test_xs.py | passed | 6 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_add_prefix_suffix.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_align.py | passed | 45 | 0 | 0 | 2 |
+| pandas/tests/series/methods/test_argsort.py | passed | 10 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_asof.py | passed | 7 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_astype.py | passed | 179 | 0 | 0 | 12 |
+| pandas/tests/series/methods/test_autocorr.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_between.py | passed | 7 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_case_when.py | passed | 17 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_clip.py | passed | 21 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_combine.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_combine_first.py | passed | 30 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_compare.py | passed | 13 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_convert_dtypes.py | passed | 1544 | 0 | 0 | 6 |
+| pandas/tests/series/methods/test_copy.py | passed | 10 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_count.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_cov_corr.py | passed | 13 | 0 | 0 | 6 |
+| pandas/tests/series/methods/test_describe.py | passed | 49 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_diff.py | passed | 8 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_drop.py | passed | 29 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_drop_duplicates.py | passed | 349 | 0 | 0 | 8 |
+| pandas/tests/series/methods/test_dropna.py | passed | 11 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_dtypes.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_duplicated.py | passed | 18 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_equals.py | passed | 53 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_explode.py | passed | 16 | 0 | 0 | 6 |
+| pandas/tests/series/methods/test_fillna.py | passed | 146 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_get_numeric_data.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_head_tail.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_infer_objects.py | passed | 7 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_info.py | passed | 15 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_interpolate.py | passed | 128 | 0 | 0 | 71 |
+| pandas/tests/series/methods/test_is_monotonic.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_is_unique.py | passed | 8 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_isin.py | passed | 46 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_isna.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_item.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_map.py | passed | 109 | 0 | 0 | 4 |
+| pandas/tests/series/methods/test_matmul.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_nlargest.py | passed | 100 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_nunique.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_pct_change.py | passed | 9 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_pop.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_quantile.py | passed | 48 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_rank.py | passed | 509 | 0 | 0 | 490 |
+| pandas/tests/series/methods/test_reindex.py | passed | 38 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_reindex_like.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_rename.py | passed | 16 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_rename_axis.py | passed | 5 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_repeat.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_replace.py | passed | 89 | 0 | 0 | 2 |
+| pandas/tests/series/methods/test_reset_index.py | passed | 14 | 0 | 0 | 1 |
+| pandas/tests/series/methods/test_round.py | passed | 100 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_searchsorted.py | passed | 8 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_set_name.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_size.py | passed | 5 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_sort_index.py | passed | 46 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_sort_values.py | passed | 12 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_to_csv.py | passed | 31 | 0 | 0 | 4 |
+| pandas/tests/series/methods/test_to_dict.py | passed | 6 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_to_frame.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_to_numpy.py | passed | 4 | 0 | 0 | 1 |
+| pandas/tests/series/methods/test_tolist.py | passed | 10 | 0 | 0 | 3 |
+| pandas/tests/series/methods/test_truncate.py | passed | 4 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_tz_localize.py | passed | 44 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_unique.py | passed | 7 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_unstack.py | passed | 7 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_update.py | passed | 25 | 0 | 0 | 1 |
+| pandas/tests/series/methods/test_value_counts.py | passed | 19 | 0 | 0 | 0 |
+| pandas/tests/series/methods/test_values.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/series/test_api.py | passed | 175 | 0 | 0 | 0 |
+| pandas/tests/series/test_arithmetic.py | passed | 4796 | 0 | 0 | 0 |
+| pandas/tests/series/test_arrow_interface.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/series/test_constructors.py | passed | 428 | 0 | 0 | 1 |
+| pandas/tests/series/test_cumulative.py | passed | 106 | 0 | 0 | 64 |
+| pandas/tests/series/test_formats.py | passed | 51 | 0 | 0 | 3 |
+| pandas/tests/series/test_iteration.py | passed | 7 | 0 | 0 | 0 |
+| pandas/tests/series/test_logical_ops.py | passed | 27 | 0 | 0 | 0 |
+| pandas/tests/series/test_missing.py | passed | 4 | 0 | 0 | 0 |
+| pandas/tests/series/test_npfuncs.py | passed | 4 | 0 | 0 | 2 |
+| pandas/tests/series/test_reductions.py | passed | 39 | 0 | 0 | 1 |
+| pandas/tests/series/test_subclass.py | passed | 9 | 0 | 0 | 0 |
+| pandas/tests/series/test_ufunc.py | passed | 207 | 0 | 0 | 0 |
+| pandas/tests/series/test_unary.py | passed | 26 | 0 | 0 | 0 |
+| pandas/tests/series/test_validate.py | passed | 28 | 0 | 0 | 0 |
+| pandas/tests/strings/test_api.py | passed | 1922 | 0 | 0 | 164 |
+| pandas/tests/strings/test_case_justify.py | passed | 70 | 0 | 0 | 42 |
+| pandas/tests/strings/test_cat.py | passed | 66 | 0 | 0 | 18 |
+| pandas/tests/strings/test_extract.py | passed | 328 | 0 | 0 | 227 |
+| pandas/tests/strings/test_find_replace.py | passed | 538 | 0 | 0 | 342 |
+| pandas/tests/strings/test_get_dummies.py | passed | 46 | 0 | 0 | 75 |
+| pandas/tests/strings/test_split_partition.py | passed | 201 | 0 | 0 | 118 |
+| pandas/tests/strings/test_string_array.py | passed | 93 | 0 | 0 | 93 |
+| pandas/tests/strings/test_strings.py | passed | 319 | 0 | 0 | 165 |
+| pandas/tests/test_aggregation.py | passed | 8 | 0 | 0 | 0 |
+| pandas/tests/test_algos.py | passed | 487 | 0 | 0 | 2 |
+| pandas/tests/test_col.py | passed | 72 | 0 | 0 | 0 |
+| pandas/tests/test_common.py | passed | 145 | 0 | 0 | 0 |
+| pandas/tests/test_downstream.py | passed | 9 | 0 | 0 | 17 |
+| pandas/tests/test_errors.py | passed | 42 | 0 | 0 | 0 |
+| pandas/tests/test_expressions.py | no-tests | 0 | 0 | 0 | 251 |
+| pandas/tests/test_flags.py | passed | 5 | 0 | 0 | 0 |
+| pandas/tests/test_multilevel.py | passed | 21 | 0 | 0 | 1 |
+| pandas/tests/test_nanops.py | passed | 242 | 0 | 0 | 37 |
+| pandas/tests/test_optional_dependency.py | passed | 4 | 0 | 0 | 1 |
+| pandas/tests/test_register_accessor.py | passed | 10 | 0 | 0 | 0 |
+| pandas/tests/test_sorting.py | passed | 57 | 0 | 0 | 0 |
+| pandas/tests/test_take.py | passed | 82 | 0 | 0 | 0 |
+| pandas/tests/tools/test_to_datetime.py | passed | 902 | 0 | 0 | 33 |
+| pandas/tests/tools/test_to_numeric.py | passed | 360 | 0 | 0 | 22 |
+| pandas/tests/tools/test_to_time.py | passed | 11 | 0 | 0 | 0 |
+| pandas/tests/tools/test_to_timedelta.py | passed | 76 | 0 | 0 | 12 |
+| pandas/tests/tseries/frequencies/test_freq_code.py | passed | 19 | 0 | 0 | 0 |
+| pandas/tests/tseries/frequencies/test_frequencies.py | passed | 10 | 0 | 0 | 0 |
+| pandas/tests/tseries/frequencies/test_inference.py | passed | 1018 | 0 | 0 | 1 |
+| pandas/tests/tseries/holiday/test_calendar.py | passed | 8 | 0 | 0 | 0 |
+| pandas/tests/tseries/holiday/test_federal.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/tseries/holiday/test_holiday.py | passed | 54 | 0 | 0 | 0 |
+| pandas/tests/tseries/holiday/test_observance.py | passed | 33 | 0 | 0 | 0 |
+| pandas/tests/tseries/offsets/test_business_day.py | passed | 23 | 0 | 0 | 0 |
+| pandas/tests/tseries/offsets/test_business_halfyear.py | passed | 151 | 0 | 0 | 0 |
+| pandas/tests/tseries/offsets/test_business_hour.py | passed | 94 | 0 | 0 | 0 |
+| pandas/tests/tseries/offsets/test_business_month.py | passed | 21 | 0 | 0 | 0 |
+| pandas/tests/tseries/offsets/test_business_quarter.py | passed | 44 | 0 | 0 | 0 |
+| pandas/tests/tseries/offsets/test_business_year.py | passed | 19 | 0 | 0 | 0 |
+| pandas/tests/tseries/offsets/test_common.py | passed | 455 | 0 | 0 | 0 |
+| pandas/tests/tseries/offsets/test_custom_business_day.py | passed | 6 | 0 | 0 | 1 |
+| pandas/tests/tseries/offsets/test_custom_business_hour.py | passed | 28 | 0 | 0 | 0 |
+| pandas/tests/tseries/offsets/test_custom_business_month.py | passed | 52 | 0 | 0 | 0 |
+| pandas/tests/tseries/offsets/test_dst.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/tseries/offsets/test_easter.py | passed | 30 | 0 | 0 | 0 |
+| pandas/tests/tseries/offsets/test_fiscal.py | passed | 140 | 0 | 0 | 0 |
+| pandas/tests/tseries/offsets/test_halfyear.py | passed | 151 | 0 | 0 | 0 |
+| pandas/tests/tseries/offsets/test_index.py | passed | 24 | 0 | 0 | 0 |
+| pandas/tests/tseries/offsets/test_month.py | passed | 60 | 0 | 0 | 0 |
+| pandas/tests/tseries/offsets/test_offsets.py | passed | 3123 | 0 | 0 | 0 |
+| pandas/tests/tseries/offsets/test_offsets_properties.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/tseries/offsets/test_quarter.py | passed | 86 | 0 | 0 | 0 |
+| pandas/tests/tseries/offsets/test_ticks.py | passed | 101 | 0 | 0 | 0 |
+| pandas/tests/tseries/offsets/test_week.py | passed | 45 | 0 | 0 | 0 |
+| pandas/tests/tseries/offsets/test_year.py | passed | 33 | 0 | 0 | 0 |
+| pandas/tests/tslibs/test_api.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/tslibs/test_array_to_datetime.py | passed | 41 | 0 | 0 | 0 |
+| pandas/tests/tslibs/test_ccalendar.py | passed | 17 | 0 | 0 | 0 |
+| pandas/tests/tslibs/test_conversion.py | passed | 55 | 0 | 0 | 0 |
+| pandas/tests/tslibs/test_fields.py | passed | 4 | 0 | 0 | 0 |
+| pandas/tests/tslibs/test_libfrequencies.py | passed | 12 | 0 | 0 | 0 |
+| pandas/tests/tslibs/test_liboffsets.py | passed | 74 | 0 | 0 | 0 |
+| pandas/tests/tslibs/test_np_datetime.py | passed | 8 | 0 | 0 | 0 |
+| pandas/tests/tslibs/test_npy_units.py | passed | 2 | 0 | 0 | 0 |
+| pandas/tests/tslibs/test_parse_iso8601.py | passed | 51 | 0 | 0 | 0 |
+| pandas/tests/tslibs/test_parsing.py | passed | 88 | 0 | 0 | 44 |
+| pandas/tests/tslibs/test_period.py | passed | 39 | 0 | 0 | 0 |
+| pandas/tests/tslibs/test_resolution.py | passed | 14 | 0 | 0 | 0 |
+| pandas/tests/tslibs/test_strptime.py | passed | 7 | 0 | 0 | 0 |
+| pandas/tests/tslibs/test_timedeltas.py | passed | 25 | 0 | 0 | 0 |
+| pandas/tests/tslibs/test_timezones.py | passed | 40 | 0 | 0 | 6 |
+| pandas/tests/tslibs/test_to_offset.py | passed | 102 | 0 | 0 | 0 |
+| pandas/tests/tslibs/test_tzconversion.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/util/test_assert_almost_equal.py | passed | 165 | 0 | 0 | 0 |
+| pandas/tests/util/test_assert_attr_equal.py | passed | 42 | 0 | 0 | 0 |
+| pandas/tests/util/test_assert_categorical_equal.py | passed | 10 | 0 | 0 | 0 |
+| pandas/tests/util/test_assert_extension_array_equal.py | passed | 36 | 0 | 0 | 0 |
+| pandas/tests/util/test_assert_frame_equal.py | passed | 115 | 0 | 0 | 0 |
+| pandas/tests/util/test_assert_index_equal.py | passed | 65 | 0 | 0 | 0 |
+| pandas/tests/util/test_assert_interval_array_equal.py | passed | 8 | 0 | 0 | 0 |
+| pandas/tests/util/test_assert_numpy_array_equal.py | passed | 25 | 0 | 0 | 0 |
+| pandas/tests/util/test_assert_produces_warning.py | passed | 128 | 0 | 0 | 0 |
+| pandas/tests/util/test_assert_series_equal.py | passed | 120 | 0 | 0 | 0 |
+| pandas/tests/util/test_deprecate.py | passed | 3 | 0 | 0 | 0 |
+| pandas/tests/util/test_deprecate_kwarg.py | passed | 14 | 0 | 0 | 0 |
+| pandas/tests/util/test_deprecate_nonkeyword_arguments.py | passed | 20 | 0 | 0 | 0 |
+| pandas/tests/util/test_doc.py | passed | 4 | 0 | 0 | 0 |
+| pandas/tests/util/test_hashing.py | passed | 154 | 0 | 0 | 0 |
+| pandas/tests/util/test_numba.py | passed | 1 | 0 | 0 | 0 |
+| pandas/tests/util/test_rewrite_warning.py | passed | 10 | 0 | 0 | 0 |
+| pandas/tests/util/test_shares_memory.py | passed | 3 | 0 | 0 | 1 |
+| pandas/tests/util/test_show_versions.py | passed | 4 | 0 | 0 | 0 |
+| pandas/tests/util/test_util.py | passed | 5 | 0 | 0 | 2 |
+| pandas/tests/util/test_validate_args.py | passed | 6 | 0 | 0 | 0 |
+| pandas/tests/util/test_validate_args_and_kwargs.py | passed | 6 | 0 | 0 | 0 |
+| pandas/tests/util/test_validate_inclusive.py | passed | 11 | 0 | 0 | 0 |
+| pandas/tests/util/test_validate_kwargs.py | passed | 18 | 0 | 0 | 0 |
+| pandas/tests/window/moments/test_moments_consistency_ewm.py | passed | 1088 | 0 | 0 | 0 |
+| pandas/tests/window/moments/test_moments_consistency_expanding.py | passed | 366 | 0 | 0 | 0 |
+| pandas/tests/window/moments/test_moments_consistency_rolling.py | passed | 732 | 0 | 0 | 0 |
+| pandas/tests/window/test_api.py | passed | 930 | 0 | 0 | 0 |
+| pandas/tests/window/test_apply.py | passed | 72 | 0 | 0 | 8 |
+| pandas/tests/window/test_base_indexer.py | passed | 228 | 0 | 0 | 0 |
+| pandas/tests/window/test_cython_aggregations.py | passed | 78 | 0 | 0 | 0 |
+| pandas/tests/window/test_dtypes.py | passed | 2580 | 0 | 0 | 0 |
+| pandas/tests/window/test_ewm.py | passed | 294 | 0 | 0 | 28 |
+| pandas/tests/window/test_expanding.py | passed | 348 | 0 | 0 | 6 |
+| pandas/tests/window/test_groupby.py | passed | 124 | 0 | 0 | 0 |
+| pandas/tests/window/test_numba.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/window/test_online.py | no-tests | 0 | 0 | 0 | 1 |
+| pandas/tests/window/test_pairwise.py | passed | 314 | 0 | 0 | 0 |
+| pandas/tests/window/test_rolling.py | passed | 837 | 0 | 0 | 0 |
+| pandas/tests/window/test_rolling_functions.py | passed | 422 | 0 | 0 | 2 |
+| pandas/tests/window/test_rolling_quantile.py | passed | 185 | 0 | 0 | 0 |
+| pandas/tests/window/test_rolling_skew_kurt.py | passed | 56 | 0 | 0 | 14 |
+| pandas/tests/window/test_timeseries_window.py | passed | 85 | 0 | 0 | 1 |
+| pandas/tests/window/test_win_type.py | passed | 1 | 0 | 0 | 285 |
+
+</details>
+
+### networkx @ 3.6.1
+
+<details><summary>per-file detail (266 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| networkx/algorithms/approximation/tests/test_approx_clust_coeff.py | passed | 6 | 0 | 0 | 0 |
+| networkx/algorithms/approximation/tests/test_clique.py | passed | 8 | 0 | 0 | 0 |
+| networkx/algorithms/approximation/tests/test_connectivity.py | passed | 18 | 0 | 0 | 0 |
+| networkx/algorithms/approximation/tests/test_density.py | passed | 23 | 0 | 0 | 0 |
+| networkx/algorithms/approximation/tests/test_distance_measures.py | passed | 8 | 0 | 0 | 0 |
+| networkx/algorithms/approximation/tests/test_dominating_set.py | passed | 4 | 0 | 0 | 0 |
+| networkx/algorithms/approximation/tests/test_kcomponents.py | passed | 16 | 0 | 0 | 0 |
+| networkx/algorithms/approximation/tests/test_matching.py | passed | 1 | 0 | 0 | 0 |
+| networkx/algorithms/approximation/tests/test_maxcut.py | passed | 9 | 0 | 0 | 0 |
+| networkx/algorithms/approximation/tests/test_ramsey.py | passed | 1 | 0 | 0 | 0 |
+| networkx/algorithms/approximation/tests/test_steinertree.py | passed | 21 | 0 | 0 | 0 |
+| networkx/algorithms/approximation/tests/test_traveling_salesman.py | passed | 44 | 0 | 0 | 1 |
+| networkx/algorithms/approximation/tests/test_treewidth.py | passed | 14 | 0 | 0 | 0 |
+| networkx/algorithms/approximation/tests/test_vertex_cover.py | passed | 4 | 0 | 0 | 0 |
+| networkx/algorithms/assortativity/tests/test_connectivity.py | passed | 10 | 0 | 0 | 0 |
+| networkx/algorithms/assortativity/tests/test_correlation.py | passed | 21 | 0 | 0 | 0 |
+| networkx/algorithms/assortativity/tests/test_mixing.py | passed | 19 | 0 | 0 | 0 |
+| networkx/algorithms/assortativity/tests/test_neighbor_degree.py | passed | 6 | 0 | 0 | 0 |
+| networkx/algorithms/assortativity/tests/test_pairs.py | passed | 11 | 0 | 0 | 0 |
+| networkx/algorithms/bipartite/tests/test_basic.py | passed | 15 | 0 | 0 | 0 |
+| networkx/algorithms/bipartite/tests/test_centrality.py | passed | 7 | 0 | 0 | 0 |
+| networkx/algorithms/bipartite/tests/test_cluster.py | passed | 9 | 0 | 0 | 0 |
+| networkx/algorithms/bipartite/tests/test_covering.py | passed | 4 | 0 | 0 | 0 |
+| networkx/algorithms/bipartite/tests/test_edgelist.py | passed | 16 | 0 | 0 | 0 |
+| networkx/algorithms/bipartite/tests/test_extendability.py | passed | 12 | 0 | 0 | 0 |
+| networkx/algorithms/bipartite/tests/test_generators.py | passed | 16 | 0 | 0 | 0 |
+| networkx/algorithms/bipartite/tests/test_link_analysis.py | passed | 37 | 0 | 0 | 0 |
+| networkx/algorithms/bipartite/tests/test_matching.py | passed | 20 | 0 | 0 | 0 |
+| networkx/algorithms/bipartite/tests/test_matrix.py | passed | 49 | 0 | 0 | 0 |
+| networkx/algorithms/bipartite/tests/test_project.py | passed | 18 | 0 | 0 | 0 |
+| networkx/algorithms/bipartite/tests/test_redundancy.py | passed | 3 | 0 | 0 | 0 |
+| networkx/algorithms/bipartite/tests/test_spectral_bipartivity.py | passed | 3 | 0 | 0 | 0 |
+| networkx/algorithms/centrality/tests/test_betweenness_centrality.py | passed | 75 | 0 | 0 | 0 |
+| networkx/algorithms/centrality/tests/test_betweenness_centrality_subset.py | passed | 23 | 0 | 0 | 0 |
+| networkx/algorithms/centrality/tests/test_closeness_centrality.py | passed | 13 | 0 | 0 | 0 |
+| networkx/algorithms/centrality/tests/test_current_flow_betweenness_centrality.py | passed | 25 | 0 | 0 | 0 |
+| networkx/algorithms/centrality/tests/test_current_flow_betweenness_centrality_subset.py | passed | 9 | 0 | 0 | 0 |
+| networkx/algorithms/centrality/tests/test_current_flow_closeness.py | passed | 4 | 0 | 0 | 0 |
+| networkx/algorithms/centrality/tests/test_degree_centrality.py | passed | 7 | 0 | 0 | 0 |
+| networkx/algorithms/centrality/tests/test_dispersion.py | passed | 4 | 0 | 0 | 0 |
+| networkx/algorithms/centrality/tests/test_eigenvector_centrality.py | passed | 15 | 0 | 0 | 0 |
+| networkx/algorithms/centrality/tests/test_group.py | passed | 24 | 0 | 0 | 0 |
+| networkx/algorithms/centrality/tests/test_harmonic_centrality.py | passed | 14 | 0 | 0 | 0 |
+| networkx/algorithms/centrality/tests/test_katz_centrality.py | passed | 26 | 0 | 0 | 0 |
+| networkx/algorithms/centrality/tests/test_laplacian_centrality.py | passed | 11 | 0 | 0 | 0 |
+| networkx/algorithms/centrality/tests/test_load_centrality.py | passed | 18 | 0 | 0 | 0 |
+| networkx/algorithms/centrality/tests/test_percolation_centrality.py | passed | 4 | 0 | 0 | 0 |
+| networkx/algorithms/centrality/tests/test_reaching.py | passed | 19 | 0 | 0 | 0 |
+| networkx/algorithms/centrality/tests/test_second_order_centrality.py | passed | 8 | 0 | 0 | 0 |
+| networkx/algorithms/centrality/tests/test_subgraph.py | passed | 5 | 0 | 0 | 0 |
+| networkx/algorithms/centrality/tests/test_trophic.py | passed | 11 | 0 | 0 | 0 |
+| networkx/algorithms/centrality/tests/test_voterank.py | passed | 6 | 0 | 0 | 0 |
+| networkx/algorithms/coloring/tests/test_coloring.py | passed | 17 | 0 | 0 | 0 |
+| networkx/algorithms/community/tests/test_asyn_fluid.py | passed | 8 | 0 | 0 | 0 |
+| networkx/algorithms/community/tests/test_bipartitions.py | passed | 15 | 0 | 0 | 0 |
+| networkx/algorithms/community/tests/test_centrality.py | passed | 5 | 0 | 0 | 0 |
+| networkx/algorithms/community/tests/test_divisive.py | passed | 2 | 0 | 0 | 0 |
+| networkx/algorithms/community/tests/test_kclique.py | passed | 8 | 0 | 0 | 0 |
+| networkx/algorithms/community/tests/test_label_propagation.py | passed | 23 | 0 | 0 | 0 |
+| networkx/algorithms/community/tests/test_leiden.py | passed | 1 | 0 | 0 | 9 |
+| networkx/algorithms/community/tests/test_local.py | passed | 7 | 0 | 0 | 0 |
+| networkx/algorithms/community/tests/test_louvain.py | passed | 14 | 0 | 0 | 0 |
+| networkx/algorithms/community/tests/test_lukes.py | passed | 4 | 0 | 0 | 0 |
+| networkx/algorithms/community/tests/test_modularity_max.py | passed | 19 | 0 | 0 | 0 |
+| networkx/algorithms/community/tests/test_quality.py | passed | 7 | 0 | 0 | 0 |
+| networkx/algorithms/community/tests/test_utils.py | passed | 4 | 0 | 0 | 0 |
+| networkx/algorithms/components/tests/test_attracting.py | passed | 4 | 0 | 0 | 0 |
+| networkx/algorithms/components/tests/test_biconnected.py | passed | 13 | 0 | 0 | 0 |
+| networkx/algorithms/components/tests/test_connected.py | passed | 9 | 0 | 0 | 0 |
+| networkx/algorithms/components/tests/test_semiconnected.py | passed | 8 | 0 | 0 | 0 |
+| networkx/algorithms/components/tests/test_strongly_connected.py | passed | 12 | 0 | 0 | 0 |
+| networkx/algorithms/components/tests/test_weakly_connected.py | passed | 7 | 0 | 0 | 0 |
+| networkx/algorithms/connectivity/tests/test_connectivity.py | passed | 34 | 0 | 0 | 0 |
+| networkx/algorithms/connectivity/tests/test_cuts.py | passed | 21 | 0 | 0 | 0 |
+| networkx/algorithms/connectivity/tests/test_disjoint_paths.py | passed | 18 | 0 | 0 | 0 |
+| networkx/algorithms/connectivity/tests/test_edge_augmentation.py | passed | 20 | 0 | 0 | 0 |
+| networkx/algorithms/connectivity/tests/test_edge_kcomponents.py | passed | 21 | 0 | 0 | 0 |
+| networkx/algorithms/connectivity/tests/test_kcomponents.py | passed | 15 | 0 | 0 | 3 |
+| networkx/algorithms/connectivity/tests/test_kcutsets.py | passed | 15 | 0 | 0 | 11 |
+| networkx/algorithms/connectivity/tests/test_stoer_wagner.py | passed | 5 | 0 | 0 | 0 |
+| networkx/algorithms/flow/tests/test_gomory_hu.py | passed | 8 | 0 | 0 | 1 |
+| networkx/algorithms/flow/tests/test_maxflow.py | passed | 27 | 0 | 0 | 0 |
+| networkx/algorithms/flow/tests/test_maxflow_large_graph.py | passed | 5 | 0 | 0 | 1 |
+| networkx/algorithms/flow/tests/test_mincost.py | passed | 19 | 0 | 0 | 0 |
+| networkx/algorithms/flow/tests/test_networksimplex.py | passed | 31 | 0 | 0 | 0 |
+| networkx/algorithms/isomorphism/tests/test_ismags.py | passed | 87 | 0 | 0 | 0 |
+| networkx/algorithms/isomorphism/tests/test_isomorphism.py | passed | 10 | 0 | 0 | 0 |
+| networkx/algorithms/isomorphism/tests/test_isomorphvf2.py | passed | 34 | 0 | 0 | 0 |
+| networkx/algorithms/isomorphism/tests/test_match_helpers.py | passed | 2 | 0 | 0 | 0 |
+| networkx/algorithms/isomorphism/tests/test_temporalisomorphvf2.py | passed | 12 | 0 | 0 | 0 |
+| networkx/algorithms/isomorphism/tests/test_tree_isomorphism.py | passed | 28 | 0 | 0 | 0 |
+| networkx/algorithms/isomorphism/tests/test_vf2pp.py | passed | 47 | 0 | 0 | 0 |
+| networkx/algorithms/isomorphism/tests/test_vf2pp_helpers.py | passed | 45 | 0 | 0 | 0 |
+| networkx/algorithms/isomorphism/tests/test_vf2userfunc.py | passed | 28 | 0 | 0 | 0 |
+| networkx/algorithms/link_analysis/tests/test_hits.py | passed | 6 | 0 | 0 | 0 |
+| networkx/algorithms/link_analysis/tests/test_pagerank.py | passed | 50 | 0 | 0 | 0 |
+| networkx/algorithms/minors/tests/test_contraction.py | passed | 108 | 0 | 0 | 0 |
+| networkx/algorithms/operators/tests/test_all.py | passed | 19 | 0 | 0 | 0 |
+| networkx/algorithms/operators/tests/test_binary.py | passed | 20 | 0 | 0 | 0 |
+| networkx/algorithms/operators/tests/test_product.py | passed | 30 | 0 | 0 | 0 |
+| networkx/algorithms/operators/tests/test_unary.py | passed | 3 | 0 | 0 | 0 |
+| networkx/algorithms/shortest_paths/tests/test_astar.py | passed | 20 | 0 | 0 | 0 |
+| networkx/algorithms/shortest_paths/tests/test_dense.py | passed | 8 | 0 | 0 | 0 |
+| networkx/algorithms/shortest_paths/tests/test_dense_numpy.py | passed | 7 | 0 | 0 | 0 |
+| networkx/algorithms/shortest_paths/tests/test_generic.py | passed | 28 | 0 | 0 | 0 |
+| networkx/algorithms/shortest_paths/tests/test_unweighted.py | passed | 17 | 0 | 0 | 0 |
+| networkx/algorithms/shortest_paths/tests/test_weighted.py | passed | 57 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_asteroidal.py | passed | 1 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_boundary.py | passed | 13 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_bridges.py | passed | 10 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_broadcasting.py | passed | 37 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_chains.py | passed | 5 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_chordal.py | passed | 10 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_clique.py | passed | 13 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_cluster.py | passed | 56 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_communicability.py | passed | 2 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_core.py | passed | 25 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_covering.py | passed | 11 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_cuts.py | passed | 17 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_cycles.py | passed | 63 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_d_separation.py | passed | 17 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_dag.py | passed | 67 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_distance_measures.py | passed | 605 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_distance_regular.py | passed | 15 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_dominance.py | passed | 34 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_dominating.py | passed | 20 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_efficiency.py | passed | 7 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_euler.py | passed | 34 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_graph_hashing.py | passed | 30 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_graphical.py | passed | 13 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_hierarchy.py | passed | 8 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_hybrid.py | passed | 2 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_isolate.py | passed | 3 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_link_prediction.py | passed | 97 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_lowest_common_ancestors.py | passed | 59 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_matching.py | passed | 71 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_max_weight_clique.py | passed | 5 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_mis.py | passed | 7 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_moral.py | passed | 1 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_node_classification.py | passed | 15 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_non_randomness.py | passed | 14 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_perfect_graph.py | passed | 5 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_planar_drawing.py | passed | 12 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_planarity.py | passed | 39 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_polynomials.py | no-tests | 0 | 0 | 0 | 1 |
+| networkx/algorithms/tests/test_reciprocity.py | passed | 5 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_regular.py | passed | 30 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_richclub.py | passed | 11 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_similarity.py | passed | 73 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_simple_paths.py | passed | 79 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_smallworld.py | passed | 6 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_smetric.py | passed | 1 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_sparsifiers.py | passed | 7 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_structuralholes.py | passed | 40 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_summarization.py | passed | 17 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_swap.py | passed | 27 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_threshold.py | passed | 19 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_time_dependent.py | passed | 12 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_tournament.py | passed | 21 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_triads.py | passed | 14 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_vitality.py | passed | 6 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_voronoi.py | passed | 10 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_walks.py | passed | 6 | 0 | 0 | 0 |
+| networkx/algorithms/tests/test_wiener.py | passed | 14 | 0 | 0 | 0 |
+| networkx/algorithms/traversal/tests/test_beamsearch.py | passed | 3 | 0 | 0 | 0 |
+| networkx/algorithms/traversal/tests/test_bfs.py | passed | 18 | 0 | 0 | 0 |
+| networkx/algorithms/traversal/tests/test_dfs.py | passed | 20 | 0 | 0 | 0 |
+| networkx/algorithms/traversal/tests/test_edgebfs.py | passed | 16 | 0 | 0 | 0 |
+| networkx/algorithms/traversal/tests/test_edgedfs.py | passed | 15 | 0 | 0 | 0 |
+| networkx/algorithms/tree/tests/test_branchings.py | passed | 31 | 0 | 0 | 0 |
+| networkx/algorithms/tree/tests/test_coding.py | passed | 14 | 0 | 0 | 0 |
+| networkx/algorithms/tree/tests/test_decomposition.py | passed | 5 | 0 | 0 | 0 |
+| networkx/algorithms/tree/tests/test_distance_measures.py | passed | 56 | 0 | 0 | 0 |
+| networkx/algorithms/tree/tests/test_mst.py | passed | 81 | 0 | 0 | 2 |
+| networkx/algorithms/tree/tests/test_operations.py | passed | 4 | 0 | 0 | 0 |
+| networkx/algorithms/tree/tests/test_recognition.py | passed | 27 | 0 | 0 | 0 |
+| networkx/classes/tests/test_coreviews.py | passed | 56 | 0 | 0 | 0 |
+| networkx/classes/tests/test_digraph.py | passed | 84 | 0 | 0 | 0 |
+| networkx/classes/tests/test_digraph_historical.py | passed | 42 | 0 | 0 | 0 |
+| networkx/classes/tests/test_filters.py | passed | 11 | 0 | 0 | 0 |
+| networkx/classes/tests/test_function.py | passed | 81 | 0 | 0 | 0 |
+| networkx/classes/tests/test_graph.py | passed | 66 | 0 | 0 | 0 |
+| networkx/classes/tests/test_graph_historical.py | passed | 34 | 0 | 0 | 0 |
+| networkx/classes/tests/test_graphviews.py | passed | 35 | 0 | 0 | 0 |
+| networkx/classes/tests/test_multidigraph.py | passed | 187 | 0 | 0 | 0 |
+| networkx/classes/tests/test_multigraph.py | passed | 153 | 0 | 0 | 0 |
+| networkx/classes/tests/test_reportviews.py | passed | 242 | 0 | 0 | 0 |
+| networkx/classes/tests/test_special.py | passed | 348 | 0 | 0 | 0 |
+| networkx/classes/tests/test_subgraphviews.py | passed | 34 | 0 | 0 | 0 |
+| networkx/drawing/tests/test_agraph.py | no-tests | 0 | 0 | 0 | 1 |
+| networkx/drawing/tests/test_image_comparison_pylab_mpl.py | no-tests | 0 | 0 | 0 | 1 |
+| networkx/drawing/tests/test_latex.py | passed | 6 | 0 | 0 | 0 |
+| networkx/drawing/tests/test_layout.py | passed | 59 | 0 | 0 | 0 |
+| networkx/drawing/tests/test_pydot.py | no-tests | 0 | 0 | 0 | 1 |
+| networkx/drawing/tests/test_pylab.py | no-tests | 0 | 0 | 0 | 1 |
+| networkx/generators/tests/test_atlas.py | passed | 8 | 0 | 0 | 0 |
+| networkx/generators/tests/test_classic.py | passed | 70 | 0 | 0 | 0 |
+| networkx/generators/tests/test_cographs.py | passed | 6 | 0 | 0 | 0 |
+| networkx/generators/tests/test_community.py | passed | 22 | 0 | 0 | 0 |
+| networkx/generators/tests/test_degree_seq.py | passed | 40 | 0 | 0 | 0 |
+| networkx/generators/tests/test_directed.py | passed | 27 | 0 | 0 | 0 |
+| networkx/generators/tests/test_duplication.py | passed | 11 | 0 | 0 | 0 |
+| networkx/generators/tests/test_ego.py | passed | 2 | 0 | 0 | 0 |
+| networkx/generators/tests/test_expanders.py | passed | 43 | 0 | 0 | 0 |
+| networkx/generators/tests/test_geometric.py | passed | 54 | 0 | 0 | 0 |
+| networkx/generators/tests/test_harary_graph.py | passed | 2 | 0 | 0 | 0 |
+| networkx/generators/tests/test_internet_as_graphs.py | passed | 7 | 0 | 0 | 0 |
+| networkx/generators/tests/test_intersection.py | passed | 4 | 0 | 0 | 0 |
+| networkx/generators/tests/test_interval_graph.py | passed | 8 | 0 | 0 | 0 |
+| networkx/generators/tests/test_joint_degree_seq.py | passed | 4 | 0 | 0 | 0 |
+| networkx/generators/tests/test_lattice.py | passed | 26 | 0 | 0 | 0 |
+| networkx/generators/tests/test_line.py | passed | 35 | 0 | 0 | 0 |
+| networkx/generators/tests/test_mycielski.py | passed | 3 | 0 | 0 | 0 |
+| networkx/generators/tests/test_nonisomorphic_trees.py | passed | 12 | 0 | 0 | 0 |
+| networkx/generators/tests/test_random_clustered.py | passed | 5 | 0 | 0 | 0 |
+| networkx/generators/tests/test_random_graphs.py | passed | 155 | 0 | 0 | 0 |
+| networkx/generators/tests/test_small.py | passed | 38 | 0 | 0 | 0 |
+| networkx/generators/tests/test_spectral_graph_forge.py | passed | 1 | 0 | 0 | 0 |
+| networkx/generators/tests/test_stochastic.py | passed | 7 | 0 | 0 | 0 |
+| networkx/generators/tests/test_sudoku.py | passed | 6 | 0 | 0 | 0 |
+| networkx/generators/tests/test_time_series.py | passed | 7 | 0 | 0 | 0 |
+| networkx/generators/tests/test_trees.py | passed | 15 | 0 | 0 | 0 |
+| networkx/generators/tests/test_triads.py | passed | 2 | 0 | 0 | 0 |
+| networkx/linalg/tests/test_algebraic_connectivity.py | passed | 88 | 0 | 0 | 0 |
+| networkx/linalg/tests/test_attrmatrix.py | passed | 5 | 0 | 0 | 0 |
+| networkx/linalg/tests/test_bethehessian.py | passed | 1 | 0 | 0 | 0 |
+| networkx/linalg/tests/test_graphmatrix.py | passed | 4 | 0 | 0 | 0 |
+| networkx/linalg/tests/test_laplacian.py | passed | 4 | 0 | 0 | 0 |
+| networkx/linalg/tests/test_modularity.py | passed | 3 | 0 | 0 | 0 |
+| networkx/linalg/tests/test_spectrum.py | passed | 5 | 0 | 0 | 0 |
+| networkx/readwrite/json_graph/tests/test_adjacency.py | passed | 8 | 0 | 0 | 0 |
+| networkx/readwrite/json_graph/tests/test_cytoscape.py | passed | 7 | 0 | 0 | 0 |
+| networkx/readwrite/json_graph/tests/test_node_link.py | passed | 10 | 0 | 0 | 0 |
+| networkx/readwrite/json_graph/tests/test_tree.py | passed | 3 | 0 | 0 | 0 |
+| networkx/readwrite/tests/test_adjlist.py | passed | 33 | 0 | 0 | 0 |
+| networkx/readwrite/tests/test_edgelist.py | passed | 27 | 0 | 0 | 0 |
+| networkx/readwrite/tests/test_gexf.py | passed | 26 | 0 | 0 | 0 |
+| networkx/readwrite/tests/test_gml.py | passed | 25 | 0 | 0 | 0 |
+| networkx/readwrite/tests/test_graph6.py | passed | 33 | 0 | 0 | 0 |
+| networkx/readwrite/tests/test_graphml.py | passed | 19 | 0 | 0 | 41 |
+| networkx/readwrite/tests/test_leda.py | passed | 2 | 0 | 0 | 0 |
+| networkx/readwrite/tests/test_p2g.py | passed | 3 | 0 | 0 | 0 |
+| networkx/readwrite/tests/test_pajek.py | passed | 8 | 0 | 0 | 0 |
+| networkx/readwrite/tests/test_sparse6.py | passed | 16 | 0 | 0 | 0 |
+| networkx/readwrite/tests/test_text.py | passed | 32 | 0 | 0 | 0 |
+| networkx/tests/test_all_random_functions.py | no-tests | 0 | 0 | 0 | 1 |
+| networkx/tests/test_convert.py | passed | 15 | 0 | 0 | 0 |
+| networkx/tests/test_convert_numpy.py | passed | 81 | 0 | 0 | 0 |
+| networkx/tests/test_convert_pandas.py | passed | 25 | 0 | 0 | 0 |
+| networkx/tests/test_convert_scipy.py | passed | 20 | 0 | 0 | 0 |
+| networkx/tests/test_exceptions.py | passed | 7 | 0 | 0 | 0 |
+| networkx/tests/test_import.py | passed | 2 | 0 | 0 | 0 |
+| networkx/tests/test_lazy_imports.py | passed | 4 | 0 | 0 | 0 |
+| networkx/tests/test_relabel.py | passed | 30 | 0 | 0 | 0 |
+| networkx/tests/test_removed_functions_exception_messages.py | passed | 1 | 0 | 0 | 0 |
+| networkx/utils/tests/test__init.py | passed | 1 | 0 | 0 | 0 |
+| networkx/utils/tests/test_backends.py | passed | 5 | 0 | 0 | 4 |
+| networkx/utils/tests/test_config.py | passed | 8 | 0 | 0 | 0 |
+| networkx/utils/tests/test_decorators.py | passed | 36 | 0 | 0 | 0 |
+| networkx/utils/tests/test_heaps.py | passed | 2 | 0 | 0 | 0 |
+| networkx/utils/tests/test_mapped_queue.py | passed | 46 | 0 | 0 | 0 |
+| networkx/utils/tests/test_misc.py | passed | 98 | 0 | 0 | 0 |
+| networkx/utils/tests/test_random_sequence.py | passed | 10 | 0 | 0 | 0 |
+| networkx/utils/tests/test_rcm.py | passed | 2 | 0 | 0 | 0 |
+| networkx/utils/tests/test_unionfind.py | passed | 5 | 0 | 0 | 0 |
+| networkx/algorithms/assortativity/tests/base_test.py | no-tests | 0 | 0 | 0 | 0 |
+
+</details>
+
+### scikit-learn-1 @ 1.9.0
+
+<details><summary>per-file detail (87 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| sklearn/metrics/_plot/tests/test_common_curve_display.py | no-tests | 0 | 0 | 0 | 150 |
+| sklearn/metrics/_plot/tests/test_confusion_matrix_display.py | no-tests | 0 | 0 | 0 | 36 |
+| sklearn/metrics/_plot/tests/test_det_curve_display.py | no-tests | 0 | 0 | 0 | 35 |
+| sklearn/metrics/_plot/tests/test_precision_recall_display.py | no-tests | 0 | 0 | 0 | 84 |
+| sklearn/metrics/_plot/tests/test_predict_error_display.py | no-tests | 0 | 0 | 0 | 39 |
+| sklearn/metrics/_plot/tests/test_roc_curve_display.py | no-tests | 0 | 0 | 0 | 155 |
+| sklearn/metrics/cluster/tests/test_bicluster.py | passed | 3 | 0 | 0 | 0 |
+| sklearn/metrics/cluster/tests/test_common.py | passed | 79 | 0 | 0 | 30 |
+| sklearn/metrics/cluster/tests/test_supervised.py | passed | 57 | 0 | 0 | 15 |
+| sklearn/metrics/cluster/tests/test_unsupervised.py | passed | 50 | 0 | 0 | 0 |
+| sklearn/metrics/tests/test_classification.py | passed | 250 | 0 | 0 | 18 |
+| sklearn/metrics/tests/test_common.py | passed | 1629 | 0 | 0 | 1986 |
+| sklearn/metrics/tests/test_dist_metrics.py | passed | 268 | 0 | 0 | 0 |
+| sklearn/metrics/tests/test_pairwise.py | passed | 284 | 0 | 0 | 302 |
+| sklearn/metrics/tests/test_pairwise_distances_reduction.py | passed | 129 | 0 | 0 | 2 |
 | sklearn/metrics/tests/test_ranking.py | passed | 248 | 0 | 0 | 0 |
 | sklearn/metrics/tests/test_regression.py | passed | 27 | 0 | 0 | 0 |
 | sklearn/metrics/tests/test_score_objects.py | passed | 281 | 0 | 0 | 0 |
@@ -2583,7 +5336,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | sklearn/tests/test_build.py | passed | 2 | 0 | 0 | 0 |
 | sklearn/tests/test_calibration.py | passed | 97 | 0 | 0 | 137 |
 | sklearn/tests/test_check_build.py | passed | 1 | 0 | 0 | 0 |
-| sklearn/tests/test_common.py | no-tests | 0 | 0 | 0 | 0 |
+| sklearn/tests/test_common.py | timeout | 0 | 0 | 0 | 0 |
 | sklearn/tests/test_config.py | passed | 8 | 0 | 0 | 0 |
 | sklearn/tests/test_discriminant_analysis.py | passed | 56 | 0 | 0 | 0 |
 | sklearn/tests/test_docstring_parameters.py | no-tests | 0 | 0 | 0 | 212 |
@@ -2606,7 +5359,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | sklearn/tests/test_random_projection.py | passed | 239 | 0 | 0 | 0 |
 | sklearn/ensemble/_hist_gradient_boosting/tests/test_binning.py | passed | 63 | 0 | 0 | 0 |
 | sklearn/ensemble/_hist_gradient_boosting/tests/test_compare_lightgbm.py | no-tests | 0 | 0 | 0 | 100 |
-| sklearn/ensemble/_hist_gradient_boosting/tests/test_gradient_boosting.py | passed | 146 | 0 | 0 | 16 |
+| sklearn/ensemble/_hist_gradient_boosting/tests/test_gradient_boosting.py | timeout | 0 | 0 | 0 | 0 |
 | sklearn/ensemble/_hist_gradient_boosting/tests/test_grower.py | passed | 45 | 0 | 0 | 0 |
 | sklearn/ensemble/_hist_gradient_boosting/tests/test_histogram.py | passed | 7 | 0 | 0 | 0 |
 | sklearn/ensemble/_hist_gradient_boosting/tests/test_monotonic_constraints.py | passed | 12 | 0 | 0 | 2 |
@@ -2662,7 +5415,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | sklearn/cluster/tests/test_feature_agglomeration.py | passed | 2 | 0 | 0 | 0 |
 | sklearn/cluster/tests/test_hdbscan.py | passed | 148 | 0 | 0 | 0 |
 | sklearn/cluster/tests/test_hierarchical.py | passed | 72 | 0 | 0 | 0 |
-| sklearn/cluster/tests/test_k_means.py | passed | 264 | 0 | 0 | 18 |
+| sklearn/cluster/tests/test_k_means.py | timeout | 0 | 0 | 0 | 0 |
 | sklearn/cluster/tests/test_mean_shift.py | passed | 14 | 0 | 0 | 8 |
 | sklearn/cluster/tests/test_optics.py | passed | 73 | 0 | 0 | 44 |
 | sklearn/cluster/tests/test_spectral.py | passed | 37 | 0 | 0 | 0 |
@@ -2692,13 +5445,13 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | sklearn/decomposition/tests/test_incremental_pca.py | passed | 27 | 0 | 0 | 0 |
 | sklearn/decomposition/tests/test_kernel_pca.py | passed | 38 | 0 | 0 | 1 |
 | sklearn/decomposition/tests/test_nmf.py | passed | 284 | 0 | 0 | 0 |
-| sklearn/decomposition/tests/test_online_lda.py | passed | 55 | 0 | 0 | 2 |
+| sklearn/decomposition/tests/test_online_lda.py | passed | 49 | 0 | 0 | 8 |
 | sklearn/decomposition/tests/test_pca.py | passed | 386 | 0 | 0 | 220 |
-| sklearn/decomposition/tests/test_sparse_pca.py | passed | 40 | 0 | 0 | 0 |
+| sklearn/decomposition/tests/test_sparse_pca.py | passed | 39 | 0 | 0 | 1 |
 | sklearn/decomposition/tests/test_truncated_svd.py | passed | 46 | 0 | 0 | 0 |
-| sklearn/experimental/tests/test_enable_hist_gradient_boosting.py | failed | 0 | 1 | 0 | 0 |
-| sklearn/experimental/tests/test_enable_iterative_imputer.py | failed | 0 | 1 | 0 | 0 |
-| sklearn/experimental/tests/test_enable_successive_halving.py | failed | 0 | 1 | 0 | 0 |
+| sklearn/experimental/tests/test_enable_hist_gradient_boosting.py | passed | 1 | 0 | 0 | 0 |
+| sklearn/experimental/tests/test_enable_iterative_imputer.py | passed | 1 | 0 | 0 | 0 |
+| sklearn/experimental/tests/test_enable_successive_halving.py | passed | 1 | 0 | 0 | 0 |
 | sklearn/feature_extraction/tests/test_dict_vectorizer.py | passed | 38 | 0 | 0 | 0 |
 | sklearn/feature_extraction/tests/test_feature_hasher.py | passed | 13 | 0 | 0 | 0 |
 | sklearn/feature_extraction/tests/test_image.py | passed | 9 | 0 | 0 | 17 |
@@ -2721,7 +5474,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | sklearn/impute/tests/test_knn.py | passed | 47 | 0 | 0 | 0 |
 | sklearn/inspection/_plot/tests/test_boundary_decision_display.py | passed | 10 | 0 | 0 | 142 |
 | sklearn/inspection/_plot/tests/test_plot_partial_dependence.py | no-tests | 0 | 0 | 0 | 137 |
-| sklearn/inspection/tests/test_partial_dependence.py | passed | 393 | 0 | 0 | 38 |
+| sklearn/inspection/tests/test_partial_dependence.py | timeout | 0 | 0 | 0 | 0 |
 | sklearn/inspection/tests/test_pd_utils.py | passed | 10 | 0 | 0 | 1 |
 | sklearn/inspection/tests/test_permutation_importance.py | passed | 24 | 0 | 0 | 12 |
 | sklearn/manifold/tests/test_classical_mds.py | passed | 4 | 0 | 0 | 0 |
@@ -2729,7 +5482,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | sklearn/manifold/tests/test_locally_linear.py | passed | 14 | 0 | 0 | 10 |
 | sklearn/manifold/tests/test_mds.py | passed | 27 | 0 | 0 | 0 |
 | sklearn/manifold/tests/test_spectral_embedding.py | passed | 38 | 0 | 0 | 19 |
-| sklearn/manifold/tests/test_t_sne.py | passed | 77 | 0 | 0 | 1 |
+| sklearn/manifold/tests/test_t_sne.py | timeout | 0 | 0 | 0 | 0 |
 | sklearn/mixture/tests/test_bayesian_mixture.py | passed | 17 | 0 | 0 | 0 |
 | sklearn/mixture/tests/test_gaussian_mixture.py | passed | 56 | 0 | 0 | 291 |
 | sklearn/mixture/tests/test_mixture.py | passed | 4 | 0 | 0 | 0 |

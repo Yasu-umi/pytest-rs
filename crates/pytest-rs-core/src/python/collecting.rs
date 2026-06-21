@@ -72,15 +72,36 @@ pub(crate) fn first_lineno(py: Python<'_>, func: &Bound<'_, PyAny>) -> u32 {
 /// order: positional/keyword params without defaults (defaulted params and
 /// *args/**kwargs are not fixture requests, matching pytest).
 pub fn param_names(py: Python<'_>, func: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
+    param_names_inner(py, func).map(|(names, _)| names)
+}
+
+/// Like `param_names` but also reports whether any positional-only
+/// parameter exists (pytest skips the first-arg strip when it does).
+pub fn param_names_with_positional_only(
+    py: Python<'_>,
+    func: &Bound<'_, PyAny>,
+) -> PyResult<(Vec<String>, bool)> {
+    param_names_inner(py, func)
+}
+
+fn param_names_inner(
+    py: Python<'_>,
+    func: &Bound<'_, PyAny>,
+) -> PyResult<(Vec<String>, bool)> {
     let inspect = py.import("inspect")?;
     let signature = inspect.getattr("signature")?.call1((func,))?;
     let parameters = signature.getattr("parameters")?;
     let empty = inspect.getattr("Parameter")?.getattr("empty")?;
     let mut names = Vec::new();
+    let mut has_positional_only = false;
     for value in parameters.call_method0("values")?.try_iter()? {
         let parameter = value?;
         let kind = parameter.getattr("kind")?;
         let kind_name: String = kind.getattr("name")?.extract()?;
+        if kind_name == "POSITIONAL_ONLY" {
+            has_positional_only = true;
+            continue;
+        }
         if kind_name != "POSITIONAL_OR_KEYWORD" && kind_name != "KEYWORD_ONLY" {
             continue;
         }
@@ -89,7 +110,7 @@ pub fn param_names(py: Python<'_>, func: &Bound<'_, PyAny>) -> PyResult<Vec<Stri
         }
         names.push(parameter.getattr("name")?.extract()?);
     }
-    Ok(names)
+    Ok((names, has_positional_only))
 }
 
 /// pytest compat.num_mock_patch_args: how many leading parameters are
@@ -1353,10 +1374,13 @@ pub(crate) fn push_test_items(
     registry: &FixtureRegistry,
 ) -> PyResult<()> {
     let flags = async_flags(py, func)?;
-    let mut fixture_names = param_names(py, func)?;
+    let (mut fixture_names, has_positional_only) = param_names_with_positional_only(py, func)?;
     // For non-static class methods, strip the first parameter (self/cls)
     // regardless of its name — pytest does the same in getfuncargnames.
-    if cls.is_some() && !is_static && !fixture_names.is_empty() {
+    // When any positional-only parameter exists, the self/cls was already
+    // excluded by param_names (it only collects POSITIONAL_OR_KEYWORD and
+    // KEYWORD_ONLY), so skip the strip — matching pytest's getfuncargnames.
+    if cls.is_some() && !is_static && !has_positional_only && !fixture_names.is_empty() {
         fixture_names.remove(0);
     }
     // @unittest.mock.patch-injected leading params are not fixture requests.

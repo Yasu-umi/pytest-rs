@@ -70,8 +70,6 @@ class ExceptionInfo[E: BaseException]:
         return text
 
     def __repr__(self):
-        # Upstream shape: "<ExceptionInfo ValueError('boom') tblen=2>" —
-        # suites assert messages against str(excinfo).
         if self.value is None:
             return "<ExceptionInfo for raises contextmanager>"
         try:
@@ -94,9 +92,6 @@ class ExceptionInfo[E: BaseException]:
         if self.value is None:
             return _ExceptionRepr("")
         text = "".join(traceback.format_exception(self.type, self.value, self.tb)).rstrip("\n")
-        # reprcrash points at the deepest non-__tracebackhide__ frame, like
-        # pytest (so e.g. importorskip's skip() reports the caller, not the
-        # internal helper). Falls back to the deepest frame if all are hidden.
         path, lineno = "", 0
         tb = self.tb
         while tb is not None:
@@ -112,7 +107,7 @@ class ExceptionInfo[E: BaseException]:
         return _ExceptionRepr(text, path=path, lineno=lineno, message=message)
 
     def match(self, regexp):
-        # Upstream stringify_exception: PEP-678 __notes__ join the message.
+        __tracebackhide__ = True
         value = str(self.value)
         try:
             notes = getattr(self.value, "__notes__", [])
@@ -120,8 +115,14 @@ class ExceptionInfo[E: BaseException]:
             notes = []
         if notes:
             value = "\n".join([value, *map(str, notes)])
-        if not _re.search(regexp, value):
-            fail(f"Regex pattern did not match.\n Regex: {regexp!r}\n Input: {value!r}")
+        msg = (
+            f"Regex pattern did not match.\n"
+            f"  Expected regex: {regexp!r}\n"
+            f"  Actual message: {value!r}"
+        )
+        if regexp == value:
+            msg += "\n Did you mean to `re.escape()` the regex?"
+        assert _re.search(regexp, value), msg
         return True
 
 
@@ -151,9 +152,39 @@ class _ExceptionRepr:
             tw.line(line)
 
 
+def _validate_exception(expected_exception):
+    """Validate that expected_exception is a proper exception type or tuple of them."""
+    if isinstance(expected_exception, tuple):
+        for exc in expected_exception:
+            _validate_exception(exc)
+        return
+    if isinstance(expected_exception, type) and issubclass(expected_exception, BaseException):
+        return
+    if isinstance(expected_exception, type):
+        raise ValueError(
+            f"Expected a BaseException type, but got '{expected_exception.__name__}'"
+        )
+    raise TypeError(
+        f"Expected a BaseException type, but got '{type(expected_exception).__name__}'"
+    )
+
+
 class RaisesContext:
     def __init__(self, expected_exception, match=None):
         self.expected_exception = expected_exception
+        if match is not None and match == "":
+            import warnings
+            from _pytest.warning_types import PytestWarning
+
+            warnings.warn(
+                PytestWarning(
+                    "matching against an empty string will *always* pass. "
+                    "If you want to check for an empty message you need to "
+                    "pass '^$'. If you don't want to match you should pass "
+                    "`None` or leave out the parameter."
+                ),
+                stacklevel=3,
+            )
         self.match_expr = match
         self.excinfo = None
 
@@ -164,20 +195,66 @@ class RaisesContext:
     def __exit__(self, exc_type, exc_value, tb):
         __tracebackhide__ = True
         if exc_type is None:
-            expected = getattr(self.expected_exception, "__name__", str(self.expected_exception))
-            fail(f"DID NOT RAISE {expected}")
+            fail(f"DID NOT RAISE {self.expected_exception!r}")
         if not issubclass(exc_type, self.expected_exception):
             return False
         self.excinfo._set(exc_type, exc_value, tb)
         if self.match_expr is not None:
+            try:
+                _re.compile(self.match_expr)
+            except _re.error as e:
+                fail(
+                    f"Invalid regex pattern provided to 'match': {e}",
+                    pytrace=False,
+                )
             self.excinfo.match(self.match_expr)
         return True
 
 
-def raises(expected_exception, *args, match=None, **kwargs):
-    if args:
-        func, *fargs = args
-        with RaisesContext(expected_exception) as excinfo:
-            func(*fargs, **kwargs)
+def raises(expected_exception=None, *args, **kwargs):
+    __tracebackhide__ = True
+
+    if not args:
+        match = kwargs.pop("match", None)
+        if set(kwargs) - {"expected_exception"}:
+            msg = "Unexpected keyword arguments passed to pytest.raises: "
+            msg += ", ".join(sorted(kwargs))
+            msg += "\nUse context-manager form instead?"
+            raise TypeError(msg)
+
+        if expected_exception is None:
+            raise ValueError("You must specify at least one parameter to match on.")
+
+        if isinstance(expected_exception, tuple) and len(expected_exception) == 0:
+            raise ValueError("You must specify at least one parameter to match on.")
+
+        if not expected_exception:
+            raise ValueError(
+                f"Expected an exception type or a tuple of exception types, but got `{expected_exception!r}`. "
+                f"Raising exceptions is already understood as failing the test, so you don't need "
+                f"any special code to say 'this should never raise an exception'."
+            )
+
+        _validate_exception(expected_exception)
+        return RaisesContext(expected_exception, match=match)
+
+    if not expected_exception:
+        raise ValueError(
+            f"Expected an exception type or a tuple of exception types, but got `{expected_exception!r}`. "
+            f"Raising exceptions is already understood as failing the test, so you don't need "
+            f"any special code to say 'this should never raise an exception'."
+        )
+
+    _validate_exception(expected_exception)
+    func = args[0]
+    if not callable(func):
+        raise TypeError(f"{func!r} object (type: {type(func)}) must be callable")
+    with RaisesContext(expected_exception) as excinfo:
+        func(*args[1:], **kwargs)
+    try:
         return excinfo
-    return RaisesContext(expected_exception, match=match)
+    finally:
+        del excinfo
+
+
+raises.Exception = fail.Exception
