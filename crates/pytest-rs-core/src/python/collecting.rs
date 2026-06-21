@@ -910,6 +910,13 @@ pub(crate) fn introspect_namespace(
 ) -> PyResult<()> {
     register_fixtures_from(py, module, &format!("{nodeid_base}::"), registry)?;
 
+    // Module __test__ = False: skip test collection entirely (nose compat).
+    if let Ok(test_attr) = module.getattr("__test__") {
+        if test_attr.extract::<bool>().unwrap_or(true) == false {
+            return Ok(());
+        }
+    }
+
     // Module-level `pytestmark` applies to every item in the module.
     let module_marks = read_marks(py, module.as_any())?;
 
@@ -995,10 +1002,16 @@ pub(crate) fn introspect_namespace(
                 .call1((&value,))?
                 .extract()?;
             if is_testcase {
+                // Class __test__ = False: skip (nose compat).
+                let test_attr = value.getattr("__test__").ok();
+                let test_false = test_attr
+                    .as_ref()
+                    .and_then(|a| a.extract::<bool>().ok())
+                    .map_or(false, |v| !v);
                 // Abstract TestCase classes are not collected (#12275).
                 let is_abstract: bool =
                     inspect.getattr("isabstract")?.call1((&value,))?.extract()?;
-                if !is_abstract {
+                if !is_abstract && !test_false {
                     collect_testcase(
                         py,
                         &value,
@@ -1012,20 +1025,30 @@ pub(crate) fn introspect_namespace(
                     )?;
                 }
             } else if filters.matches_class(&name) {
-                collect_class(
-                    py,
-                    &value,
-                    &name,
-                    nodeid_base,
-                    module_name,
-                    path,
-                    &module_marks,
-                    items,
-                    registry,
-                    module,
-                    generate_hook.as_ref(),
-                    filters,
-                )?;
+                // Class __test__ = False: skip (nose compat).
+                let test_attr = value.getattr("__test__").ok();
+                let test_false = test_attr
+                    .as_ref()
+                    .and_then(|a| a.extract::<bool>().ok())
+                    .map_or(false, |v| !v);
+                let is_abstract: bool =
+                    inspect.getattr("isabstract")?.call1((&value,))?.extract()?;
+                if !is_abstract && !test_false {
+                    collect_class(
+                        py,
+                        &value,
+                        &name,
+                        nodeid_base,
+                        module_name,
+                        path,
+                        &module_marks,
+                        items,
+                        registry,
+                        module,
+                        generate_hook.as_ref(),
+                        filters,
+                    )?;
+                }
             }
             continue;
         }
@@ -1036,6 +1059,12 @@ pub(crate) fn introspect_namespace(
             || value.hasattr("_pytestfixturefunction").unwrap_or(false)
         {
             continue;
+        }
+        // Function __test__ = False: skip (nose compat).
+        if let Ok(test_attr) = value.getattr("__test__") {
+            if test_attr.extract::<bool>().unwrap_or(true) == false {
+                continue;
+            }
         }
         // A test-named member that is callable but not a function (an instance
         // with __call__) cannot be collected: pytest warns and skips it.
@@ -1312,6 +1341,12 @@ pub(crate) fn collect_class(
         }
         if !filters.matches_function(&name) {
             continue;
+        }
+        // Method __test__ = False: skip (nose compat).
+        if let Ok(test_attr) = value.getattr("__test__") {
+            if test_attr.extract::<bool>().unwrap_or(true) == false {
+                continue;
+            }
         }
         let mut marks = read_marks(py, &value)?;
         for mark in &class_marks {

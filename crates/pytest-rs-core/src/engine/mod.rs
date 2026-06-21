@@ -220,6 +220,7 @@ impl Engine {
             self.config.get_ini("truncation_limit_lines"),
             self.config.get_ini("truncation_limit_chars"),
         );
+        python::set_python_files_globs(py, &self.config.python_files_patterns());
 
         // --junitxml: arm the XML writer (workers never write; the parent
         // streams every report through it at session end).

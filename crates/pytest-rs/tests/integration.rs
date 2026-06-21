@@ -1050,3 +1050,165 @@ def test_with_mark(x):
     assert_eq!(output.status.code(), Some(0), "out: {out}");
     assert!(out.contains("1 passed, 1 skipped"), "out: {out}");
 }
+
+#[test]
+fn positional_only_class_method() {
+    let suite = TempSuite::new("pos-only");
+    suite.write(
+        "test_pos.py",
+        r#"
+import pytest
+
+class Test:
+    @pytest.fixture
+    def fix(self):
+        return 42
+
+    def test_method(self, /, fix):
+        assert fix == 42
+"#,
+    );
+    let output = suite.run(&["-v"]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(out.contains("1 passed"), "out: {out}");
+}
+
+#[test]
+fn yield_fixture_no_value() {
+    let suite = TempSuite::new("yield-noval");
+    suite.write(
+        "test_yf.py",
+        r#"
+import pytest
+
+@pytest.fixture(name="custom")
+def empty_yield():
+    if False:
+        yield
+
+def test_fixt(custom):
+    pass
+"#,
+    );
+    let output = suite.run(&["-v"]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(1), "out: {out}");
+    assert!(out.contains("custom did not yield a value"), "out: {out}");
+}
+
+#[test]
+fn raises_validation() {
+    let suite = TempSuite::new("raises-val");
+    suite.write(
+        "test_rv.py",
+        r#"
+import pytest
+
+def test_raises_not_callable():
+    with pytest.raises(TypeError, match="must be callable"):
+        pytest.raises(RuntimeError, "int('qwe')")
+
+def test_raises_none():
+    with pytest.raises(ValueError, match="at least one parameter"):
+        pytest.raises(expected_exception=None)
+
+def test_raises_false():
+    with pytest.raises(ValueError, match="Expected an exception type"):
+        pytest.raises(False, int)
+
+def test_raises_exception_attr():
+    assert pytest.raises.Exception is pytest.fail.Exception
+
+def test_raises_did_not_raise_repr():
+    try:
+        pytest.raises(ValueError, int, "0")
+    except pytest.fail.Exception as e:
+        assert "DID NOT RAISE <class 'ValueError'>" in e.msg
+    else:
+        assert False, "Expected exception"
+
+def test_match_format():
+    with pytest.raises(AssertionError) as excinfo:
+        with pytest.raises(ValueError, match="nope"):
+            raise ValueError("actual")
+    msg = str(excinfo.value)
+    assert "Expected regex:" in msg
+    assert "Actual message:" in msg
+"#,
+    );
+    let output = suite.run(&["-v"]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(out.contains("6 passed"), "out: {out}");
+}
+
+#[test]
+fn abstract_class_not_collected() {
+    let suite = TempSuite::new("abstract-cls");
+    suite.write(
+        "test_abs.py",
+        r#"
+import abc
+
+class TestBase(abc.ABC):
+    @abc.abstractmethod
+    def abstract1(self): ...
+
+    def test_it(self):
+        pass
+
+class TestConcrete(TestBase):
+    def abstract1(self):
+        return 1
+
+    def test_it(self):
+        assert self.abstract1() == 1
+"#,
+    );
+    let output = suite.run(&["-v"]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(out.contains("1 passed"), "out: {out}");
+    assert!(!out.contains("TestBase"), "abstract class should not be collected: {out}");
+}
+
+#[test]
+fn dunder_test_false_skips_collection() {
+    let suite = TempSuite::new("test-false");
+    suite.write(
+        "test_mod_false.py",
+        r#"
+__test__ = False
+def test_should_not_run():
+    assert False
+"#,
+    );
+    suite.write(
+        "test_items.py",
+        r#"
+def test_normal():
+    pass
+
+def test_skipped():
+    pass
+test_skipped.__test__ = False
+
+class TestSkipped:
+    __test__ = False
+    def test_method(self):
+        assert False
+
+class TestNormal:
+    def test_method(self):
+        pass
+"#,
+    );
+    let output = suite.run(&["-v"]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(out.contains("2 passed"), "out: {out}");
+    assert!(!out.contains("test_should_not_run"), "module __test__=False should skip: {out}");
+    assert!(!out.contains("test_skipped"), "function __test__=False should skip: {out}");
+    assert!(!out.contains("TestSkipped"), "class __test__=False should skip: {out}");
+}

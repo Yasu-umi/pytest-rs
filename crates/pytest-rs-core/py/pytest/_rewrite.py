@@ -38,9 +38,23 @@ _OPS = {
 # pytest.register_assert_rewrite, e.g. bundled plugin shims like pytest_mock.
 _REGISTERED_MODULES: set = set()
 
+# Extra python_files glob patterns beyond the default test_*.py / *_test.py,
+# registered by the engine when it reads the ini config.
+_PYTHON_FILES_GLOBS: set = set()
+
 
 def register_assert_rewrite(*names):
     _REGISTERED_MODULES.update(names)
+
+
+def register_python_files_globs(patterns):
+    """Register extra python_files glob patterns for assertion rewriting.
+
+    Called by the engine after reading ini so that non-standard test file
+    patterns (e.g. 'testing/python/*.py') are also assertion-rewritten.
+    ``patterns`` is an iterable of glob strings.
+    """
+    _PYTHON_FILES_GLOBS.update(patterns)
 
 
 def _is_registered_module(name):
@@ -51,10 +65,34 @@ def _is_registered_module(name):
 
 
 def _is_rewrite_target(origin):
+    import fnmatch as _fnmatch
     basename = os.path.basename(origin)
-    return basename == "conftest.py" or (
-        basename.endswith(".py") and (basename.startswith("test_") or basename.endswith("_test.py"))
-    )
+    if basename == "conftest.py":
+        return True
+    if not basename.endswith(".py"):
+        return False
+    if basename.startswith("test_") or basename.endswith("_test.py"):
+        return True
+    # Check against any extra python_files patterns registered by the engine.
+    for pat in _PYTHON_FILES_GLOBS:
+        # Bare filename glob (e.g. "test_*.py", "*.py"): match against basename.
+        if os.sep not in pat and "/" not in pat:
+            if _fnmatch.fnmatch(basename, pat):
+                return True
+        else:
+            # Path-style glob (e.g. "testing/python/*.py"): normalize separators
+            # and match the origin's suffix.  We normalise to forward slashes and
+            # check that the origin (also forward-slash-normalised) ends with the
+            # pattern prefix resolved as a suffix.
+            norm_pat = pat.replace(os.sep, "/")
+            norm_origin = origin.replace(os.sep, "/")
+            if _fnmatch.fnmatch(norm_origin, "*/" + norm_pat):
+                return True
+            # Also try a direct match against the full origin in case it's an
+            # absolute pattern.
+            if _fnmatch.fnmatch(norm_origin, norm_pat):
+                return True
+    return False
 
 
 # -v/-vv level, set by the engine at startup: full iterable diffs need
@@ -386,8 +424,30 @@ class _AssertRewriter(ast.NodeTransformer):
             ast.Subscript,
             ast.Attribute,
         )
-        left_trivial = isinstance(test.left, _TRIVIAL)
-        right_trivial = isinstance(test.comparators[0], _TRIVIAL)
+
+        def _is_approx_call(node):
+            """Return True if node is approx(...) or pytest.approx(...).
+            These objects carry their own rich repr and _repr_compare output,
+            so a redundant '+  where approx(...) = approx(...)' line is noise
+            (the real pytest assertion rewriter never emits it either)."""
+            if not isinstance(node, ast.Call):
+                return False
+            func = node.func
+            # approx(...)
+            if isinstance(func, ast.Name) and func.id == "approx":
+                return True
+            # pytest.approx(...)
+            if (
+                isinstance(func, ast.Attribute)
+                and func.attr == "approx"
+                and isinstance(func.value, ast.Name)
+                and func.value.id == "pytest"
+            ):
+                return True
+            return False
+
+        left_trivial = isinstance(test.left, _TRIVIAL) or _is_approx_call(test.left)
+        right_trivial = isinstance(test.comparators[0], _TRIVIAL) or _is_approx_call(test.comparators[0])
         if not left_trivial:
             try:
                 src = ast.unparse(test.left)

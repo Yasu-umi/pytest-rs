@@ -706,6 +706,25 @@ pub fn set_assertion_truncation(py: Python<'_>, lines: Option<&str>, chars: Opti
         .and_then(|m| m.call_method1("set_truncation_limits", (parse(lines), parse(chars))));
 }
 
+/// Pass the python_files ini patterns to the assertion rewriter so that
+/// non-standard test-file globs (e.g. "testing/python/*.py") are also
+/// assertion-rewritten.  The default patterns (test_*.py / *_test.py) are
+/// already handled by `_is_rewrite_target`; only non-default extras matter.
+pub fn set_python_files_globs(py: Python<'_>, patterns: &[String]) {
+    let default_patterns = ["test_*.py", "*_test.py"];
+    let extra: Vec<&str> = patterns
+        .iter()
+        .map(|s| s.as_str())
+        .filter(|p| !default_patterns.contains(p))
+        .collect();
+    if extra.is_empty() {
+        return;
+    }
+    let _ = py
+        .import("pytest._rewrite")
+        .and_then(|m| m.call_method1("register_python_files_globs", (extra,)));
+}
+
 /// Upstream xdist's default auto/logical worker-count detection: the
 /// PYTEST_XDIST_AUTO_NUM_WORKERS env override, psutil if installed (the
 /// pytest-xdist[psutil] extra), then sched_getaffinity/cpu_count.

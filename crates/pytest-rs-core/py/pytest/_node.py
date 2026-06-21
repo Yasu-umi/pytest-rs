@@ -135,6 +135,18 @@ class _NodeBase:
         self._nodeid = nodeid if nodeid is not None else self._compute_nodeid()
 
     @classmethod
+    def _create(cls, *k, **kw):
+        """Bypass NodeMeta.__call__ guard and construct directly (pytest compat)."""
+        from inspect import signature
+
+        try:
+            return cls(*k, **kw)
+        except TypeError:
+            sig = signature(cls.__init__)
+            known_kw = {k_: v for k_, v in kw.items() if k_ in sig.parameters}
+            return cls(*k, **known_kw)
+
+    @classmethod
     def from_parent(cls, parent, **kwargs):
         """Construct a child node under `parent` (pytest's Node.from_parent)."""
         if "session" in kwargs:
@@ -1108,6 +1120,15 @@ class Function(Node):
             fn = getattr(self.module, "teardown_function", None)
             if fn is not None:
                 _call_optional_arg(fn, self.function)
+
+
+class FunctionDefinition(Function):
+    """Stop-gap node used by Metafunc; not meant to be run as a test."""
+
+    def runtest(self):
+        raise RuntimeError("function definitions are not supposed to be run as tests")
+
+    setup = runtest
 
 
 # ---------------------------------------------------------------------------
