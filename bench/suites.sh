@@ -10,7 +10,7 @@
 # Usage:
 #   bench/suites.sh <work-dir> [suite ...]
 #     <work-dir>   where suites are cloned (rm -rf it afterwards)
-#     [suite ...]  subset of: marshmallow click  (default: all)
+#     [suite ...]  subset of: marshmallow click networkx  (default: all)
 #
 # Env:
 #   RS_SPEC   what to `uv pip install` for pytest-rs (default: "pytest-rs" from
@@ -37,17 +37,18 @@ set -euo pipefail
 
 WORK="${1:?usage: suites.sh <work-dir> [suite ...]}"
 shift
-SUITES=("$@"); [ ${#SUITES[@]} -eq 0 ] && SUITES=(marshmallow click)
+SUITES=("$@"); [ ${#SUITES[@]} -eq 0 ] && SUITES=(marshmallow click networkx)
 RS_SPEC="${RS_SPEC:-pytest-rs}"
 PYVER="${PYVER:-3.13}"
 REPS="${REPS:-5}"
 mkdir -p "$WORK"
 PERF_ROWS=""   # accumulated README-format rows (for WRITE_README)
 
-# suite spec: repo | tag | cov-source-path (repo-relative) | parallel-flag | extra deps
+# suite spec: repo | tag | cov-source-path (repo-relative) | parallel-flag | extra deps | testpath (repo-relative, default "tests")
 spec() { case "$1" in
-  marshmallow) echo "https://github.com/marshmallow-code/marshmallow|4.1.1|src/marshmallow|-n 3|simplejson==4.1.1" ;;
-  click)       echo "https://github.com/pallets/click|8.3.1|src/click|-n 3|" ;;
+  marshmallow) echo "https://github.com/marshmallow-code/marshmallow|4.1.1|src/marshmallow|-n 3|simplejson==4.1.1|" ;;
+  click)       echo "https://github.com/pallets/click|8.3.1|src/click|-n 3||" ;;
+  networkx)    echo "https://github.com/networkx/networkx|networkx-3.6.1|networkx|-n 3|numpy==2.4.6 scipy==1.18.0 pandas==3.0.3|networkx" ;;
   *) echo "unknown suite: $1" >&2; return 1 ;;
 esac; }
 
@@ -59,7 +60,8 @@ echo
 echo "suite (tests) | mode | pytest | pytest-rs | speedup"
 echo "------|------|-------:|---------:|-------"
 for name in "${SUITES[@]}"; do
-  IFS='|' read -r repo tag cov pflag extra <<<"$(spec "$name")"
+  IFS='|' read -r repo tag cov pflag extra tp <<<"$(spec "$name")"
+  tp="${tp:-tests}"
   dir="$WORK/$name"
   [ -d "$dir/.git" ] || git clone --depth 1 --branch "$tag" "$repo" "$dir" >/dev/null 2>&1
   uv venv "$dir/.venv" --python "$PYVER" >/dev/null 2>&1
@@ -69,18 +71,18 @@ for name in "${SUITES[@]}"; do
   uv pip install -q --python "$dir/.venv/bin/python" "pytest==9.0.3" pytest-cov pytest-xdist "$RS_SPEC" -e "$dir" $extra >/dev/null 2>&1
   PY="$dir/.venv/bin/python"; RS="$dir/.venv/bin/pytest-rs"
   CFLAGS="-q -p no:cacheprovider -p no:randomly"
-  cnt=$( { "$PY" -m pytest "$dir/tests" --co -q -p no:cacheprovider 2>/dev/null || true; } | grep -oE '[0-9]+ tests collected' | head -1 | grep -oE '^[0-9]+' )
+  cnt=$( { "$PY" -m pytest "$dir/$tp" --co -q -p no:cacheprovider 2>/dev/null || true; } | grep -oE '[0-9]+ tests collected' | head -1 | grep -oE '^[0-9]+' )
   [ -n "$cnt" ] || cnt='?'
 
   # median real/rs for one mode (interleaved), printed as a table row.
   measure() { # $1 = pytest args, $2 = display label
     local args="$1" label="$2"
-    ( cd "$dir" && "$PY" -m pytest tests $args $CFLAGS >/dev/null 2>&1 ) || true  # warmup
-    ( cd "$dir" && "$RS" tests $args $CFLAGS >/dev/null 2>&1 ) || true
+    ( cd "$dir" && "$PY" -m pytest $tp $args $CFLAGS >/dev/null 2>&1 ) || true  # warmup
+    ( cd "$dir" && "$RS" $tp $args $CFLAGS >/dev/null 2>&1 ) || true
     local rp=() rs=() _ R S
     for _ in $(seq "$REPS"); do
-      rp+=("$(cd "$dir" && timed "$PY" -m pytest tests $args $CFLAGS)")
-      rs+=("$(cd "$dir" && timed "$RS" tests $args $CFLAGS)")
+      rp+=("$(cd "$dir" && timed "$PY" -m pytest $tp $args $CFLAGS)")
+      rs+=("$(cd "$dir" && timed "$RS" $tp $args $CFLAGS)")
     done
     R=$(median "${rp[@]}"); S=$(median "${rs[@]}")
     local sp; sp=$(awk "BEGIN{printf \"%.1f\", $R/$S}")
@@ -94,7 +96,7 @@ for name in "${SUITES[@]}"; do
 
   # coverage modes — only if pytest-rs actually resolves & measures the source.
   # `|| true`: a failing test (non-zero exit) must not abort the sanity probe.
-  stmts=$( { cd "$dir" && "$RS" tests --cov="$cov" $CFLAGS 2>/dev/null | awk '/^TOTAL/{print $2}'; } || true )
+  stmts=$( { cd "$dir" && "$RS" $tp --cov="$cov" $CFLAGS 2>/dev/null | awk '/^TOTAL/{print $2}'; } || true )
   if [ -z "${stmts:-}" ] || [ "${stmts:-0}" = 0 ]; then
     echo "$name ($cnt) | -- | -- | -- | pytest-rs measured 0 statements for cov path '$cov' — skipping cov modes (check layout)" >&2
     continue

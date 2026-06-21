@@ -74,12 +74,15 @@ Benchmarks on open-source projects (macOS arm64, median of 3 warm runs), reprodu
 <!-- perf-results:start -->
 | suite (tests) | mode | pytest | pytest-rs | speedup |
 |---|---|---:|---:|---|
-| marshmallow (1119) | `(plain)` | 1.58 s | 1.69 s | **0.9x** |
-| marshmallow (1119) | `--cov` | 1.88 s | 1.06 s | **1.8x** |
-| marshmallow (1119) | `-n 3 --cov` | 1.84 s | 0.84 s | **2.2x** |
-| click (1336) | `(plain)` | 1.80 s | 1.86 s | **1.0x** |
-| click (1336) | `--cov` | 3.80 s | 2.19 s | **1.7x** |
-| click (1336) | `-n 3 --cov` | 3.98 s | 1.82 s | **2.2x** |
+| marshmallow (1119) | `(plain)` | 0.66 s | 0.63 s | **1.0x** |
+| marshmallow (1119) | `--cov` | 1.34 s | 0.68 s | **2.0x** |
+| marshmallow (1119) | `-n 3 --cov` | 1.39 s | 0.59 s | **2.4x** |
+| click (1336) | `(plain)` | 1.49 s | 1.50 s | **1.0x** |
+| click (1336) | `--cov` | 3.01 s | 1.68 s | **1.8x** |
+| click (1336) | `-n 3 --cov` | 2.39 s | 1.26 s | **1.9x** |
+| networkx (6890) | `(plain)` | 48.19 s | 45.92 s | **1.0x** |
+| networkx (6890) | `--cov` | 199.31 s | 62.90 s | **3.2x** |
+| networkx (6890) | `-n 3 --cov` | 80.14 s | 29.25 s | **2.7x** |
 <!-- perf-results:end -->
 
 For small, CPU-bound suites without coverage or parallelism the test bodies dominate and both runners perform similarly. Try it on your own suite:
@@ -156,6 +159,7 @@ _linux (CI-verified)_
 | fastapi | 0.115.12 | 2324 | 8 | 1 | 130 | 2463 | 99.6% | 298 | 310 | 0 |
 | packaging | 25.0 | 26897 | 50 | 110 | 0 | 27057 | 99.4% | 11 | 12 | 0 |
 | pandas | v3.0.3 | 160750 | 39 | 371 | 25459 | 186619 | 99.8% | 863 | 964 | 0 |
+| networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 6894 | 100.0% | 259 | 266 | 0 |
 | scikit-learn-1 | 1.9.0 | 8299 | 16 | 0 | 6617 | 14932 | 99.9% | 75 | 87 | 0 |
 | scikit-learn-2 | 1.9.0 | 4915 | 0 | 2 | 1888 | 6805 | 100.0% | 50 | 58 | 0 |
 | scikit-learn-3 | 1.9.0 | 9240 | 7 | 0 | 2530 | 11777 | 99.9% | 101 | 114 | 0 |
