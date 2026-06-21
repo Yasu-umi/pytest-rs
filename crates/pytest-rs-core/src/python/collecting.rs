@@ -1049,6 +1049,7 @@ pub(crate) fn introspect_namespace(
             &name,
             &value,
             None,
+            false,
             marks,
             module,
             generate_hook.as_ref(),
@@ -1307,6 +1308,7 @@ pub(crate) fn collect_class(
             &name,
             &value,
             Some(cls),
+            is_static,
             marks,
             module,
             generate_hook,
@@ -1344,6 +1346,7 @@ pub(crate) fn push_test_items(
     name: &str,
     func: &Bound<'_, PyAny>,
     cls: Option<&Bound<'_, PyAny>>,
+    is_static: bool,
     marks: Vec<MarkData>,
     module: &Bound<'_, PyModule>,
     generate_hook: Option<&Bound<'_, PyAny>>,
@@ -1351,13 +1354,9 @@ pub(crate) fn push_test_items(
 ) -> PyResult<()> {
     let flags = async_flags(py, func)?;
     let mut fixture_names = param_names(py, func)?;
-    // `cls` covers classmethods, re-bound through the instance at run time.
-    if cls.is_some()
-        && matches!(
-            fixture_names.first().map(String::as_str),
-            Some("self") | Some("cls")
-        )
-    {
+    // For non-static class methods, strip the first parameter (self/cls)
+    // regardless of its name — pytest does the same in getfuncargnames.
+    if cls.is_some() && !is_static && !fixture_names.is_empty() {
         fixture_names.remove(0);
     }
     // @unittest.mock.patch-injected leading params are not fixture requests.
@@ -1536,7 +1535,14 @@ pub(crate) fn expand_parametrize(
         // (["x"]) still expects one-element value collections.
         let (argnames, force_scalar): (Vec<String>, bool) = match argnames_obj.extract::<String>() {
             Ok(joined) => {
-                let names: Vec<String> = joined.split(',').map(|s| s.trim().to_string()).collect();
+                // Strip trailing empty names so that a trailing comma in the
+                // argnames string (e.g. "a,b,c,") is silently ignored, matching
+                // real pytest's behaviour.
+                let mut names: Vec<String> =
+                    joined.split(',').map(|s| s.trim().to_string()).collect();
+                while names.last().map(|s: &String| s.is_empty()).unwrap_or(false) {
+                    names.pop();
+                }
                 let single = names.len() == 1;
                 (names, single)
             }
