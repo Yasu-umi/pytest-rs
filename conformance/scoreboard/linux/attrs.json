@@ -96,10 +96,10 @@
     },
     {
       "file": "tests/test_functional.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 409,
-      "failed": 1,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 410,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },

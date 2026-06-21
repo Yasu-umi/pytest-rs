@@ -1,0 +1,2402 @@
+{
+  "suite": "networkx",
+  "tag": "3.6.1",
+  "category": "real-world",
+  "excluded_files": 0,
+  "files": [
+    {
+      "file": "networkx/algorithms/approximation/tests/test_approx_clust_coeff.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/approximation/tests/test_clique.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/approximation/tests/test_connectivity.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 18,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/approximation/tests/test_density.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 23,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/approximation/tests/test_distance_measures.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/approximation/tests/test_dominating_set.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/approximation/tests/test_kcomponents.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 16,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/approximation/tests/test_matching.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/approximation/tests/test_maxcut.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/approximation/tests/test_ramsey.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/approximation/tests/test_steinertree.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 21,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/approximation/tests/test_traveling_salesman.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 44,
+      "failed": 0,
+      "skipped": 1,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/approximation/tests/test_treewidth.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/approximation/tests/test_vertex_cover.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/assortativity/tests/test_connectivity.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/assortativity/tests/test_correlation.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 21,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/assortativity/tests/test_mixing.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 19,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/assortativity/tests/test_neighbor_degree.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/assortativity/tests/test_pairs.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/bipartite/tests/test_basic.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/bipartite/tests/test_centrality.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/bipartite/tests/test_cluster.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/bipartite/tests/test_covering.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/bipartite/tests/test_edgelist.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 16,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/bipartite/tests/test_extendability.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/bipartite/tests/test_generators.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 16,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/bipartite/tests/test_link_analysis.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 37,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/bipartite/tests/test_matching.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 20,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/bipartite/tests/test_matrix.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 49,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/bipartite/tests/test_project.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 18,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/bipartite/tests/test_redundancy.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/bipartite/tests/test_spectral_bipartivity.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/centrality/tests/test_betweenness_centrality.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 75,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/centrality/tests/test_betweenness_centrality_subset.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 23,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/centrality/tests/test_closeness_centrality.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/centrality/tests/test_current_flow_betweenness_centrality.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 25,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/centrality/tests/test_current_flow_betweenness_centrality_subset.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/centrality/tests/test_current_flow_closeness.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/centrality/tests/test_degree_centrality.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/centrality/tests/test_dispersion.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/centrality/tests/test_eigenvector_centrality.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/centrality/tests/test_group.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 24,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/centrality/tests/test_harmonic_centrality.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/centrality/tests/test_katz_centrality.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 26,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/centrality/tests/test_laplacian_centrality.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/centrality/tests/test_load_centrality.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 18,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/centrality/tests/test_percolation_centrality.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/centrality/tests/test_reaching.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 19,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/centrality/tests/test_second_order_centrality.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/centrality/tests/test_subgraph.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/centrality/tests/test_trophic.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/centrality/tests/test_voterank.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/coloring/tests/test_coloring.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 17,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/community/tests/test_asyn_fluid.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/community/tests/test_bipartitions.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/community/tests/test_centrality.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/community/tests/test_divisive.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/community/tests/test_kclique.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/community/tests/test_label_propagation.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 23,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/community/tests/test_leiden.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 9,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/community/tests/test_local.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/community/tests/test_louvain.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/community/tests/test_lukes.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/community/tests/test_modularity_max.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 19,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/community/tests/test_quality.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/community/tests/test_utils.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/components/tests/test_attracting.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/components/tests/test_biconnected.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/components/tests/test_connected.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/components/tests/test_semiconnected.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/components/tests/test_strongly_connected.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/components/tests/test_weakly_connected.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/connectivity/tests/test_connectivity.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 34,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/connectivity/tests/test_cuts.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 21,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/connectivity/tests/test_disjoint_paths.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 18,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/connectivity/tests/test_edge_augmentation.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 20,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/connectivity/tests/test_edge_kcomponents.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 21,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/connectivity/tests/test_kcomponents.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 15,
+      "failed": 0,
+      "skipped": 3,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/connectivity/tests/test_kcutsets.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 15,
+      "failed": 0,
+      "skipped": 11,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/connectivity/tests/test_stoer_wagner.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/flow/tests/test_gomory_hu.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 1,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/flow/tests/test_maxflow.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 27,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/flow/tests/test_maxflow_large_graph.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 1,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/flow/tests/test_mincost.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 19,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/flow/tests/test_networksimplex.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 31,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/isomorphism/tests/test_ismags.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 87,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/isomorphism/tests/test_isomorphism.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/isomorphism/tests/test_isomorphvf2.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 34,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/isomorphism/tests/test_match_helpers.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/isomorphism/tests/test_temporalisomorphvf2.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/isomorphism/tests/test_tree_isomorphism.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 28,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/isomorphism/tests/test_vf2pp.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 47,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/isomorphism/tests/test_vf2pp_helpers.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 45,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/isomorphism/tests/test_vf2userfunc.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 28,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/link_analysis/tests/test_hits.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/link_analysis/tests/test_pagerank.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 50,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/minors/tests/test_contraction.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 108,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/operators/tests/test_all.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 19,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/operators/tests/test_binary.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 20,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/operators/tests/test_product.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 30,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/operators/tests/test_unary.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/shortest_paths/tests/test_astar.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 20,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/shortest_paths/tests/test_dense.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/shortest_paths/tests/test_dense_numpy.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/shortest_paths/tests/test_generic.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 28,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/shortest_paths/tests/test_unweighted.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 17,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/shortest_paths/tests/test_weighted.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 57,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_asteroidal.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_boundary.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_bridges.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_broadcasting.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 37,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_chains.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_chordal.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_clique.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_cluster.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 56,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_communicability.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_core.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 25,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_covering.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_cuts.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 17,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_cycles.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 63,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_d_separation.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 17,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_dag.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 67,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_distance_measures.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 605,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_distance_regular.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_dominance.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 34,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_dominating.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 20,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_efficiency.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_euler.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 34,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_graph_hashing.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 30,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_graphical.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_hierarchy.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_hybrid.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_isolate.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_link_prediction.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 97,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_lowest_common_ancestors.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 59,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_matching.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 71,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_max_weight_clique.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_mis.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_moral.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_node_classification.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_non_randomness.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_perfect_graph.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_planar_drawing.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_planarity.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 39,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_polynomials.py",
+      "status": "no-tests",
+      "exit_code": 5,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 1,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_reciprocity.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_regular.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 30,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_richclub.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_similarity.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 73,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_simple_paths.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 79,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_smallworld.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_smetric.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_sparsifiers.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_structuralholes.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 40,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_summarization.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 17,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_swap.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 27,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_threshold.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 19,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_time_dependent.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_tournament.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 21,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_triads.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_vitality.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_voronoi.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_walks.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tests/test_wiener.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/traversal/tests/test_beamsearch.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/traversal/tests/test_bfs.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 18,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/traversal/tests/test_dfs.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 20,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/traversal/tests/test_edgebfs.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 16,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/traversal/tests/test_edgedfs.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tree/tests/test_branchings.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 31,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tree/tests/test_coding.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tree/tests/test_decomposition.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tree/tests/test_distance_measures.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 56,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tree/tests/test_mst.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 81,
+      "failed": 0,
+      "skipped": 2,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tree/tests/test_operations.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/tree/tests/test_recognition.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 27,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/classes/tests/test_coreviews.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 56,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/classes/tests/test_digraph.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 84,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/classes/tests/test_digraph_historical.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 42,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/classes/tests/test_filters.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/classes/tests/test_function.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 81,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/classes/tests/test_graph.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 66,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/classes/tests/test_graph_historical.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 34,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/classes/tests/test_graphviews.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 35,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/classes/tests/test_multidigraph.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 187,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/classes/tests/test_multigraph.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 153,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/classes/tests/test_reportviews.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 242,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/classes/tests/test_special.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 348,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/classes/tests/test_subgraphviews.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 34,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/drawing/tests/test_agraph.py",
+      "status": "no-tests",
+      "exit_code": 5,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 1,
+      "errors": 0
+    },
+    {
+      "file": "networkx/drawing/tests/test_image_comparison_pylab_mpl.py",
+      "status": "no-tests",
+      "exit_code": 5,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 1,
+      "errors": 0
+    },
+    {
+      "file": "networkx/drawing/tests/test_latex.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/drawing/tests/test_layout.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 59,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/drawing/tests/test_pydot.py",
+      "status": "no-tests",
+      "exit_code": 5,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 1,
+      "errors": 0
+    },
+    {
+      "file": "networkx/drawing/tests/test_pylab.py",
+      "status": "no-tests",
+      "exit_code": 5,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 1,
+      "errors": 0
+    },
+    {
+      "file": "networkx/generators/tests/test_atlas.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/generators/tests/test_classic.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 70,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/generators/tests/test_cographs.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/generators/tests/test_community.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 22,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/generators/tests/test_degree_seq.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 40,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/generators/tests/test_directed.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 27,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/generators/tests/test_duplication.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/generators/tests/test_ego.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/generators/tests/test_expanders.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 43,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/generators/tests/test_geometric.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 54,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/generators/tests/test_harary_graph.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/generators/tests/test_internet_as_graphs.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/generators/tests/test_intersection.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/generators/tests/test_interval_graph.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/generators/tests/test_joint_degree_seq.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/generators/tests/test_lattice.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 26,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/generators/tests/test_line.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 35,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/generators/tests/test_mycielski.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/generators/tests/test_nonisomorphic_trees.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/generators/tests/test_random_clustered.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/generators/tests/test_random_graphs.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 155,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/generators/tests/test_small.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 38,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/generators/tests/test_spectral_graph_forge.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/generators/tests/test_stochastic.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/generators/tests/test_sudoku.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/generators/tests/test_time_series.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/generators/tests/test_trees.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/generators/tests/test_triads.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/linalg/tests/test_algebraic_connectivity.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 88,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/linalg/tests/test_attrmatrix.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/linalg/tests/test_bethehessian.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/linalg/tests/test_graphmatrix.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/linalg/tests/test_laplacian.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/linalg/tests/test_modularity.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/linalg/tests/test_spectrum.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/readwrite/json_graph/tests/test_adjacency.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/readwrite/json_graph/tests/test_cytoscape.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/readwrite/json_graph/tests/test_node_link.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/readwrite/json_graph/tests/test_tree.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/readwrite/tests/test_adjlist.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 33,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/readwrite/tests/test_edgelist.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 27,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/readwrite/tests/test_gexf.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 26,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/readwrite/tests/test_gml.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 25,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/readwrite/tests/test_graph6.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 33,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/readwrite/tests/test_graphml.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 19,
+      "failed": 0,
+      "skipped": 41,
+      "errors": 0
+    },
+    {
+      "file": "networkx/readwrite/tests/test_leda.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/readwrite/tests/test_p2g.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/readwrite/tests/test_pajek.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/readwrite/tests/test_sparse6.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 16,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/readwrite/tests/test_text.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 32,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/tests/test_all_random_functions.py",
+      "status": "no-tests",
+      "exit_code": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 1,
+      "errors": 0
+    },
+    {
+      "file": "networkx/tests/test_convert.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/tests/test_convert_numpy.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 81,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/tests/test_convert_pandas.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 25,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/tests/test_convert_scipy.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 20,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/tests/test_exceptions.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/tests/test_import.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/tests/test_lazy_imports.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/tests/test_relabel.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 30,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/tests/test_removed_functions_exception_messages.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/utils/tests/test__init.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/utils/tests/test_backends.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 4,
+      "errors": 0
+    },
+    {
+      "file": "networkx/utils/tests/test_config.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/utils/tests/test_decorators.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/utils/tests/test_heaps.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/utils/tests/test_mapped_queue.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 46,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/utils/tests/test_misc.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 98,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/utils/tests/test_random_sequence.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/utils/tests/test_rcm.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/utils/tests/test_unionfind.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    },
+    {
+      "file": "networkx/algorithms/assortativity/tests/base_test.py",
+      "status": "no-tests",
+      "exit_code": 5,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0
+    }
+  ]
+}
