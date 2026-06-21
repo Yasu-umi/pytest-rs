@@ -201,12 +201,11 @@ class Suite:
 
     def run_file(self, path: Path) -> FileResult:
         rel = str(path.relative_to(self.checkout))
-        deselects = [
-            arg
-            for nodeid in self.deselect
-            if nodeid.split("::")[0] == rel
-            for arg in ("--deselect", nodeid)
-        ]
+        deselects = []
+        for nodeid in self.deselect:
+            deselect_file = nodeid.split("::")[0]
+            if deselect_file == rel or rel.endswith("/" + deselect_file):
+                deselects.extend(("--deselect", nodeid))
         env = dict(os.environ)
         deps_dir = self.deps_dir()
         extra_paths = [str(p) for p in [self.src_dir, deps_dir] if p is not None]

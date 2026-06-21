@@ -368,9 +368,22 @@ enabled = true
 slow_files = [
     "tests/client/test_client.py",
     "tests/client/test_event_hooks.py",
+    "tests/test_main.py",
     "tests/test_utils.py",
 ]
 slow_timeout_multiplier = 5
+# chardet 7.4.3 detects CP-1252/ISO-8859-1 differently from when these tests
+# were written; real pytest fails the same way. trio timeout test is an httpx
+# upstream bug (async generator not closed after timeout).
+deselect = [
+    "tests/client/test_client.py::test_client_decode_text_using_autodetect",
+    "tests/client/test_client.py::test_client_decode_text_using_explicit_encoding",
+    "tests/models/test_responses.py::test_response_no_charset_with_cp_1252_content",
+    "tests/models/test_responses.py::test_response_decode_text_using_autodetect",
+    "tests/test_decoders.py::test_text_decoder_with_autodetect[asyncio-data2-cp1252]",
+    "tests/test_decoders.py::test_text_decoder_with_autodetect[trio-data2-cp1252]",
+    "tests/test_timeouts.py::test_write_timeout[trio]",
+]
 
 [httpx2]
 repo = "https://github.com/pydantic/httpx2"
@@ -518,6 +531,16 @@ enabled = true
 slow_files = [
     "tests/test_tutorial/test_websockets/test_tutorial003_py39.py",
 ]
+# These tests fail under real pytest too (upstream env/version issues),
+# not pytest-rs bugs.
+# - test_fastapi_cli: requires `coverage` command; can't deselect without
+#   also deselecting test_fastapi_cli_not_installed (prefix match).
+# - test_exception_handler_body_access: body JSON serialized without spaces
+#   (`{"numbers":[1,2,3]}`) vs expected `{"numbers": [1, 2, 3]}` --
+#   upstream starlette/fastapi version mismatch.
+deselect = [
+    "tests/test_tutorial/test_custom_request_and_route/test_tutorial002.py::test_exception_handler_body_access",
+]
 
 [packaging]
 repo = "https://github.com/pypa/packaging"
@@ -526,6 +549,12 @@ testpaths = ["tests"]
 deps = ["pretend==1.0.9"]
 category = "real-world"
 enabled = true
+# TestCPythonTags::test_all_args generates a different tag list on darwin
+# (includes abi3t tags) compared to what the test expects.  The test also
+# fails under real pytest on macOS, so this is an upstream/platform issue.
+deselect = [
+    "tests/test_tags.py::TestCPythonTags::test_all_args",
+]
 
 [pandas]
 tag = "v3.0.3"
@@ -534,6 +563,25 @@ testpaths = ["pandas/tests"]
 deps = ["hypothesis>=6.116.0"]
 category = "real-world"
 enabled = true
+exclude = [
+    # httpserver fixture (pytest-localserver) not installed — also fails under
+    # real pytest.
+    "test_clipboard.py",
+    "test_network.py",
+    "test_http_headers.py",
+]
+deselect = [
+    # httpserver fixture not available — upstream env issue.
+    "tests/io/xml/test_xml.py::test_parser_consistency_url[etree]",
+    "tests/io/xml/test_xml.py::test_url",
+    "tests/io/xml/test_xml.py::test_wrong_url[etree]",
+    "tests/io/xml/test_xml.py::test_url_path_error[etree]",
+    "tests/io/parser/test_read_fwf.py::test_url_urlopen",
+    # pandas 3.0.3 API diff (internals module) — also fails under real pytest.
+    "tests/api/test_api.py::TestApi::test_api",
+    # sqlalchemy version message change — also fails under real pytest.
+    "tests/io/test_sql.py::test_con_string_import_error",
+]
 
 [networkx]
 tag = "3.6.1"
