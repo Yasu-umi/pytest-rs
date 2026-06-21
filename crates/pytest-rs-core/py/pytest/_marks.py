@@ -196,4 +196,8 @@ def param(*values, marks=(), id=None):
             "Expected id to be a string or a `pytest.HIDDEN_PARAM` sentinel, "
             f"got {type(id)}: {id!r}"
         )
-    return ParamSpec(values, [decorator.mark for decorator in marks], id)
+    return ParamSpec(
+        values,
+        [m if isinstance(m, Mark) else m.mark for m in marks],
+        id,
+    )
