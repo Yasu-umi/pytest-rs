@@ -326,17 +326,15 @@ pub fn make_node(py: Python<'_>, item: &TestItem) -> PyResult<Py<PyAny>> {
         .unwrap_or_default();
     node.setattr("location", (file, item.lineno.saturating_sub(1), domain))?;
     // node.callspec for parametrized items: params dict + the "[a-1]" id from
-    // the nodeid (pytest-env's tests read request.node.callspec.id).
-    if !item.callspec.is_empty() {
+    // the nodeid.  Both direct parametrize and indirect (fixture) parametrize
+    // produce a "[...]" suffix; pandas reads request.node.callspec.id even when
+    // all parameters are indirect (callspec.params may be empty).
+    if let Some((_, bracket_id)) = item.nodeid.rsplit_once('[') {
         let params = pyo3::types::PyDict::new(py);
         for (name, value) in &item.callspec {
             params.set_item(name, value.bind(py))?;
         }
-        let id = item
-            .nodeid
-            .rsplit_once('[')
-            .map(|(_, rest)| rest.trim_end_matches(']'))
-            .unwrap_or_default();
+        let id = bracket_id.trim_end_matches(']');
         let callspec = py
             .import("pytest._node")?
             .getattr("_CallSpec")?
