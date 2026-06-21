@@ -503,6 +503,14 @@ deps = ["hypothesis>=6.116.0"]
 category = "real-world"
 enabled = true
 
+[networkx]
+tag = "3.6.1"
+package = "networkx==3.6.1"
+testpaths = ["networkx"]
+deps = ["numpy==2.4.6", "scipy==1.18.0", "pandas==3.0.3"]
+category = "real-world"
+enabled = true
+
 [scikit-learn-1]
 tag = "1.9.0"
 package = "scikit-learn==1.9.0"
