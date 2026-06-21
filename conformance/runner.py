@@ -201,7 +201,7 @@ class Suite:
 
     def run_file(self, path: Path) -> FileResult:
         rel = str(path.relative_to(self.checkout))
-        deselects = []
+        deselects: list[str] = []
         for nodeid in self.deselect:
             deselect_file = nodeid.split("::")[0]
             if deselect_file == rel or rel.endswith("/" + deselect_file):
