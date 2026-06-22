@@ -45,6 +45,12 @@ pub struct PyConfig {
     /// Optional override for `workerinput`, set by conftest hooks in tests
     /// that simulate xdist worker processes (`config.workerinput = True`).
     workerinput_override: std::sync::Mutex<Option<Py<PyAny>>>,
+    /// The original CLI arguments before parsing (for `config.invocation_params`).
+    original_args: Vec<String>,
+    /// Cleanup callbacks registered via `config.add_cleanup`.
+    cleanups: Mutex<Vec<Py<PyAny>>>,
+    /// Lazily-created TagTracer for `config.trace`.
+    trace_obj: pyo3::sync::PyOnceLock<Py<PyAny>>,
 }
 
 impl PyConfig {
@@ -73,6 +79,9 @@ impl PyConfig {
             stash: pyo3::sync::PyOnceLock::new(),
             local_pm: pyo3::sync::PyOnceLock::new(),
             workerinput_override: std::sync::Mutex::new(None),
+            original_args: Vec::new(),
+            cleanups: Mutex::new(Vec::new()),
+            trace_obj: pyo3::sync::PyOnceLock::new(),
         }
     }
 
@@ -408,8 +417,91 @@ impl PyConfig {
     /// hooks would reconfigure the outer session's plugins.
     fn _do_configure(&self) {}
 
-    /// pytest's config teardown (registered as a parseconfig finalizer).
-    fn _ensure_unconfigure(&self) {}
+    /// pytest's config teardown: run registered cleanup callbacks (LIFO).
+    fn _ensure_unconfigure(&self, py: Python<'_>) -> PyResult<()> {
+        let callbacks: Vec<Py<PyAny>> = {
+            let mut guard = self.cleanups.lock().expect("cleanups lock poisoned");
+            std::mem::take(&mut *guard)
+        };
+        let mut errors: Vec<PyErr> = Vec::new();
+        for cb in callbacks.into_iter().rev() {
+            if let Err(e) = cb.bind(py).call0() {
+                errors.push(e);
+            }
+        }
+        if let Some(e) = errors.pop() {
+            return Err(e);
+        }
+        Ok(())
+    }
+
+    /// Store original CLI args (called by prepare_config after parsing).
+    fn _set_invocation_args(&mut self, args: Vec<String>) {
+        self.original_args = args;
+    }
+
+    /// `config.invocation_params`: namedtuple with the original CLI args,
+    /// plugins list, and invocation directory.
+    #[getter]
+    fn invocation_params<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let collections = py.import("collections")?;
+        let cls = collections.call_method1(
+            "namedtuple",
+            ("InvocationParams", "args plugins dir"),
+        )?;
+        let args_tuple =
+            pyo3::types::PyTuple::new(py, &self.original_args)?;
+        let plugins_tuple = pyo3::types::PyTuple::empty(py);
+        let invocation_dir = py
+            .import("pathlib")?
+            .getattr("Path")?
+            .call1((".",))?
+            .call_method0("resolve")?;
+        cls.call1((args_tuple, plugins_tuple, invocation_dir))
+    }
+
+    /// `config.trace`: a TagTracer-compatible callable whose `.root` has
+    /// `setwriter(fn)`, and calling `config.trace(msg)` writes
+    /// `"msg [config]\n"` through the writer.
+    #[getter]
+    fn trace<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        Ok(self
+            .trace_obj
+            .get_or_try_init(py, || -> PyResult<Py<PyAny>> {
+                Ok(py
+                    .import("pytest._config_trace")?
+                    .getattr("ConfigTrace")?
+                    .call0()?
+                    .unbind())
+            })?
+            .bind(py)
+            .clone())
+    }
+
+    /// Register a cleanup function called during `_ensure_unconfigure`.
+    /// Can be used as a decorator: `@config.add_cleanup`.
+    fn add_cleanup(&self, py: Python<'_>, func: Py<PyAny>) -> PyResult<Py<PyAny>> {
+        self.cleanups
+            .lock()
+            .expect("cleanups lock poisoned")
+            .push(func.clone_ref(py));
+        Ok(func)
+    }
+
+    /// `config._getconftest_pathlist(name, path)`: read a conftest variable
+    /// and resolve its entries as paths relative to the conftest's directory.
+    #[pyo3(signature = (name, path = None))]
+    fn _getconftest_pathlist(
+        &self,
+        py: Python<'_>,
+        name: &str,
+        path: Option<Py<PyAny>>,
+    ) -> PyResult<Py<PyAny>> {
+        Ok(py
+            .import("pytest._config_trace")?
+            .call_method1("getconftest_pathlist", (name, path, self.rootdir.as_str()))?
+            .unbind())
+    }
 
     /// `config.parse([])`: always raises AssertionError — the config was
     /// already parsed by `parseconfig`/`parseconfigure` and cannot be re-parsed.
