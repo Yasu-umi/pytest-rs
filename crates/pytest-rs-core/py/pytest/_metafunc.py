@@ -232,13 +232,13 @@ class Metafunc:
         *,
         _param_mark: Any = None,
     ) -> None:
-        decorator = _mark.parametrize(
-            argnames, list(argvalues), indirect=indirect, ids=ids, scope=scope
-        )
-        self._parametrize_marks.append(decorator.mark)
-
         argnames_parsed = _parse_argnames(argnames)
         nodeid = getattr(self.definition, "nodeid", "")
+        argvalues_list = list(argvalues)
+        decorator = _mark.parametrize(
+            argnames, argvalues_list, indirect=indirect, ids=ids, scope=scope
+        )
+        self._parametrize_marks.append(decorator.mark)
 
         if "request" in argnames_parsed:
             fail(
@@ -255,7 +255,7 @@ class Metafunc:
 
         self._validate_if_using_arg_names(argnames_parsed, indirect)
 
-        parametersets = _resolve_parametersets(argnames_parsed, argvalues, self.function)
+        parametersets = _resolve_parametersets(argnames_parsed, argvalues_list, self.function)
 
         if _param_mark and hasattr(_param_mark, "_param_ids_from") and _param_mark._param_ids_from:
             generated_ids = getattr(_param_mark._param_ids_from, "_param_ids_generated", None)
