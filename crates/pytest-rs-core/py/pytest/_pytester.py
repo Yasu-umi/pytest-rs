@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import warnings
 
@@ -695,6 +696,23 @@ class Pytester:
         old_wcapture_session_specs = list(_wcapture.session_specs)
         old_warn_filters = list(warnings.filters)
         _wcapture.captured.clear()
+        # Clear __warningregistry__ in all loaded modules so "default" filters
+        # don't suppress warnings that were already shown in a previous inner run.
+        for _mod in list(sys.modules.values()):
+            if _mod is not None and hasattr(_mod, "__warningregistry__"):
+                _mod.__warningregistry__.clear()
+        # Save/restore threadexception and unraisable module state: the inner
+        # engine calls configure()/session_cleanup() which mutate module-level
+        # globals (_deque, _prev_hook). Without save/restore the outer engine's
+        # hook is clobbered by the inner cleanup.
+        import pytest._threadexception as _threadexc
+        import pytest._unraisable as _unraisable
+        old_threadexc_deque = _threadexc._deque
+        old_threadexc_prev = _threadexc._prev_hook
+        old_threadexc_hook = threading.excepthook
+        old_unraisable_deque = _unraisable._deque
+        old_unraisable_prev = _unraisable._prev_hook
+        old_unraisable_hook = sys.unraisablehook
 
         # Redirect fds 1/2 to temp files: the inner run's terminal output
         # (printed by the native engine straight to the fds) is collected
@@ -730,6 +748,18 @@ class Pytester:
             saved_sys_out, saved_sys_err = sys.stdout, sys.stderr
             sys.stdout = os.fdopen(os.dup(1), "w", buffering=1, errors="replace")
             sys.stderr = os.fdopen(os.dup(2), "w", buffering=1, errors="replace")
+        # Forward the outer test's @pytest.mark.filterwarnings to the inner
+        # in-process run via env var (same mechanism as subprocess mode).
+        _forwarded_env_set = False
+        if self._request is not None:
+            _fwd_marks = [
+                str(mark.args[0])
+                for mark in self._request.node.iter_markers("filterwarnings")
+                if mark.args
+            ]
+            if _fwd_marks:
+                os.environ["PYTEST_RS_FORWARDED_FILTERS"] = "\n".join(reversed(_fwd_marks))
+                _forwarded_env_set = True
         try:
             try:
                 ret = pytest._native_inline_run(run_args)
@@ -806,6 +836,14 @@ class Pytester:
             _wcapture.session_specs[:] = old_wcapture_session_specs
             warnings.filters[:] = old_warn_filters
             warnings.showwarning = _wcapture._showwarning
+            # Restore threadexception/unraisable module state so the outer
+            # engine's hooks survive inner cleanup.
+            _threadexc._deque = old_threadexc_deque
+            _threadexc._prev_hook = old_threadexc_prev
+            threading.excepthook = old_threadexc_hook
+            _unraisable._deque = old_unraisable_deque
+            _unraisable._prev_hook = old_unraisable_prev
+            sys.unraisablehook = old_unraisable_hook
             # Restore the module table, sys.path, cwd, and env.
             for name in list(sys.modules):
                 if name not in modules_before:
