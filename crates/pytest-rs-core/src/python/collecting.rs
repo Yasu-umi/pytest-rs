@@ -388,6 +388,9 @@ pub fn has_pycollect_makeitem_hook(_py: Python<'_>, hooks: &[crate::session::PyH
 /// node_name)])` so the engine collects each as a leaf item rendered with the
 /// custom class label (e.g. `<MyFunction some>`). `None` means no plugin claimed
 /// this member, so the default Rust collection path applies.
+type MakeItemResult = Vec<(String, String, Option<Py<PyAny>>)>;
+
+#[allow(clippy::type_complexity)]
 pub fn fire_pycollect_makeitem(
     py: Python<'_>,
     nodeid_base: &str,
@@ -395,7 +398,7 @@ pub fn fire_pycollect_makeitem(
     name: &str,
     obj: &Bound<'_, PyAny>,
     is_test_func: bool,
-) -> Option<Vec<(String, String, Option<Py<PyAny>>)>> {
+) -> Option<MakeItemResult> {
     // Delegate to pytest._node.fire_makeitem_for_function which:
     // 1. Builds a plain Function node as the "inner result" (only when
     //    is_test_func=True so that wrapper hooks receive a node to attach

@@ -652,7 +652,6 @@ impl Engine {
         let explicit_min = self.config.get_value("durations-min");
         let verbose = self.config.global_verbosity() >= 2;
         let durations_min: f64 = explicit_min
-            .as_deref()
             .and_then(|v| v.parse().ok())
             .unwrap_or(if verbose { 0.0 } else { 0.005 });
 
