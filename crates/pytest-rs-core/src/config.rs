@@ -559,17 +559,17 @@ impl Config {
         "doctest-modules",
         "doctest-continue-on-failure",
         "doctest-ignore-import-errors",
-        "nbmake",          // accepted-but-inert: notebook collection not implemented
-        "worker",          // hidden: this process is a -n worker (IPC on stdin/stdout)
-        "runxfail",        // report xfail-marked tests as if unmarked
-        "setup-only",      // run fixtures, skip the tests
-        "setup-plan",      // show setup/teardown plan without executing fixtures
-        "setup-show",      // run tests, narrating fixture setup/teardown
-        "traceconfig",     // accepted-but-inert: plugin trace header not implemented
-        "keep-duplicates", // collect the same file once per duplicated arg
-        "noconftest",      // do not load any conftest.py files
-        "pdb",             // start pdb on failures
-        "trace",           // break at start of each test
+        "nbmake",                  // accepted-but-inert: notebook collection not implemented
+        "worker",                  // hidden: this process is a -n worker (IPC on stdin/stdout)
+        "runxfail",                // report xfail-marked tests as if unmarked
+        "setup-only",              // run fixtures, skip the tests
+        "setup-plan",              // show setup/teardown plan without executing fixtures
+        "setup-show",              // run tests, narrating fixture setup/teardown
+        "traceconfig",             // accepted-but-inert: plugin trace header not implemented
+        "keep-duplicates",         // collect the same file once per duplicated arg
+        "noconftest",              // do not load any conftest.py files
+        "pdb",                     // start pdb on failures
+        "trace",                   // break at start of each test
         "pyargs",                  // interpret args as python module paths
         "disable-plugin-autoload", // disable loading plugins from entry points
     ];

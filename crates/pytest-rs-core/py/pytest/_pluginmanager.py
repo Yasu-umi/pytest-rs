@@ -529,7 +529,9 @@ class PluginManager:
         if name is not None:
             self._names[name] = plugin
         plugin_dir = dir(plugin)
-        addhooks = getattr(plugin, "pytest_addhooks", None) if "pytest_addhooks" in plugin_dir else None
+        addhooks = (
+            getattr(plugin, "pytest_addhooks", None) if "pytest_addhooks" in plugin_dir else None
+        )
         if callable(addhooks):
             from _pytest._stub import _Unsupported
 
@@ -735,13 +737,35 @@ class PluginManager:
     def consider_conftest(self, conftestmodule: types.ModuleType, registration_name: str) -> None:
         self.register(conftestmodule, name=registration_name)
 
-    _BUILTIN_PLUGINS = frozenset({
-        "terminalprogress", "cacheprovider", "capture", "debugging",
-        "doctest", "faulthandler", "fixtures", "helpconfig", "junitxml",
-        "logging", "mark", "monkeypatch", "nose", "pastebin", "python",
-        "recwarn", "reports", "runner", "setuponly", "setupplan",
-        "skipping", "stepwise", "tmpdir", "unittest", "warnings",
-    })
+    _BUILTIN_PLUGINS = frozenset(
+        {
+            "terminalprogress",
+            "cacheprovider",
+            "capture",
+            "debugging",
+            "doctest",
+            "faulthandler",
+            "fixtures",
+            "helpconfig",
+            "junitxml",
+            "logging",
+            "mark",
+            "monkeypatch",
+            "nose",
+            "pastebin",
+            "python",
+            "recwarn",
+            "reports",
+            "runner",
+            "setuponly",
+            "setupplan",
+            "skipping",
+            "stepwise",
+            "tmpdir",
+            "unittest",
+            "warnings",
+        }
+    )
 
     def import_plugin(self, modname: str, consider_entry_points: bool = False) -> None:
         assert isinstance(modname, str), f"module name as text required, got {modname!r}"

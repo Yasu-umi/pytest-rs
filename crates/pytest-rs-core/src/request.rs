@@ -445,12 +445,9 @@ impl PyConfig {
     #[getter]
     fn invocation_params<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let collections = py.import("collections")?;
-        let cls = collections.call_method1(
-            "namedtuple",
-            ("InvocationParams", "args plugins dir"),
-        )?;
-        let args_tuple =
-            pyo3::types::PyTuple::new(py, &self.original_args)?;
+        let cls =
+            collections.call_method1("namedtuple", ("InvocationParams", "args plugins dir"))?;
+        let args_tuple = pyo3::types::PyTuple::new(py, &self.original_args)?;
         let plugins_tuple = pyo3::types::PyTuple::empty(py);
         let invocation_dir = py
             .import("pathlib")?

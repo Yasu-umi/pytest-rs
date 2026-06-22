@@ -250,7 +250,9 @@ class Pytester:
         sys.path.insert(0, entry)
         self._syspaths.insert(0, entry)
 
-    def runpytest(self, *args, timeout=None, syspathinsert=False, no_reraise_ctrlc=False, plugins=()):
+    def runpytest(
+        self, *args, timeout=None, syspathinsert=False, no_reraise_ctrlc=False, plugins=()
+    ):
         # syspathinsert=True: insert self.path into sys.path so the child can
         # import test-local plugins written to self.path.
         if syspathinsert:
@@ -480,7 +482,6 @@ class Pytester:
         command-line args (rootdir discovery, ini reading, option parsing),
         without running a session — upstream's _prepareconfig."""
         from _pytest.config import _native_prepareconfig
-        from pytest._pluginmanager import pluginmanager
 
         new_args = [str(arg) for arg in args]
         config = _native_prepareconfig(new_args)
@@ -1346,6 +1347,7 @@ class Pytester:
             for impl in _makeitem_impls:
                 try:
                     import inspect as _inspect
+
                     sig = _inspect.signature(impl)
                     kw = {}
                     if "collector" in sig.parameters:
@@ -1360,7 +1362,11 @@ class Pytester:
                 if result is None:
                     continue
                 # firstresult: may return a single node or list of nodes
-                nodes = list(result) if hasattr(result, "__iter__") and not isinstance(result, type) else [result]
+                nodes = (
+                    list(result)
+                    if hasattr(result, "__iter__") and not isinstance(result, type)
+                    else [result]
+                )
                 valid = [n for n in nodes if n is not None]
                 if valid:
                     return valid
@@ -1389,6 +1395,7 @@ class Pytester:
                         custom_node._session_obj = session
                         custom_node.funcargs = {}
                         from _pytest.fixtures import TopRequest
+
                         custom_node._request = TopRequest(custom_node, _ispytest=True)
                         items.append(custom_node)
                     continue

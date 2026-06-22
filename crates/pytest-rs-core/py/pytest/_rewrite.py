@@ -624,14 +624,16 @@ class _RewriteLoader(importlib.machinery.SourceFileLoader):
             docstring = None
         if not (docstring and "PYTEST_DONT_REWRITE" in docstring):
             _AssertRewriter(path).visit(tree)
-            _builtins_import = ast.Import(
-                names=[ast.alias(name="builtins", asname="@py_builtins")]
-            )
+            _builtins_import = ast.Import(names=[ast.alias(name="builtins", asname="@py_builtins")])
             insert_pos = 0
             for i, stmt in enumerate(tree.body):
                 if isinstance(stmt, ast.ImportFrom) and stmt.module == "__future__":
                     insert_pos = i + 1
-                elif isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
+                elif (
+                    isinstance(stmt, ast.Expr)
+                    and isinstance(stmt.value, ast.Constant)
+                    and isinstance(stmt.value.value, str)
+                ):
                     if insert_pos <= i:
                         insert_pos = i + 1
                 else:

@@ -305,9 +305,13 @@ def format_exception(exc, style="long"):
         chain_prefix.append(format_exception(context, style))
         chain_prefix.append("")
         if exc.__cause__ is not None:
-            chain_prefix.append("The above exception was the direct cause of the following exception:")
+            chain_prefix.append(
+                "The above exception was the direct cause of the following exception:"
+            )
         else:
-            chain_prefix.append("During handling of the above exception, another exception occurred:")
+            chain_prefix.append(
+                "During handling of the above exception, another exception occurred:"
+            )
         chain_prefix.append("")
 
     frames = _visible_frames(exc)
