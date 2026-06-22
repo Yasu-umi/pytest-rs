@@ -1625,8 +1625,29 @@ pub(crate) fn expand_parametrize(
             Err(_) => (argnames_obj.extract()?, false),
         };
         let ids_obj = mark.obj.bind(py).getattr("kwargs")?.get_item("ids").ok();
-        let explicit_ids: Option<Vec<Option<String>>> =
-            ids_obj.as_ref().and_then(|ids| ids.extract().ok());
+        let n_argvalues = argvalues.len().unwrap_or(usize::MAX);
+        let explicit_ids: Option<Vec<(Option<String>, bool)>> =
+            ids_obj.as_ref().and_then(|ids| {
+                if ids.is_callable() {
+                    return None;
+                }
+                let iter = ids.try_iter().ok()?;
+                let mut result = Vec::new();
+                for id in iter {
+                    if result.len() >= n_argvalues {
+                        break;
+                    }
+                    let id = id.ok()?;
+                    if id.is(&hidden_param) {
+                        result.push((None, true));
+                    } else if id.is_none() {
+                        result.push((None, false));
+                    } else {
+                        result.push((Some(id.extract::<String>().ok()?), false));
+                    }
+                }
+                Some(result)
+            });
         // ids=callable: idfn(val) per value, None falling through to the
         // default id for that value (upstream _idval_from_function).
         let ids_callable = ids_obj.filter(|ids| ids.is_callable());
@@ -1660,7 +1681,7 @@ pub(crate) fn expand_parametrize(
         let mut sets = Vec::new();
         for (index, value_set) in argvalues.try_iter()?.enumerate() {
             let value_set = value_set?;
-            let (values, spec_id, hidden, extra_marks) =
+            let (values, spec_id, mut hidden, extra_marks) =
                 if value_set.is_instance(&param_spec_cls)? {
                     let values: Vec<Bound<'_, PyAny>> = value_set
                         .getattr("values")?
@@ -1714,6 +1735,17 @@ pub(crate) fn expand_parametrize(
                 return Err(collect_error(py, &message));
             }
 
+            // Check explicit_ids for HIDDEN_PARAM at this index.
+            if !hidden {
+                if let Some(ref ids) = explicit_ids {
+                    if let Some((_, is_hidden)) = ids.get(index) {
+                        if *is_hidden {
+                            hidden = true;
+                        }
+                    }
+                }
+            }
+
             let id_part = if hidden {
                 None
             } else {
@@ -1746,7 +1778,7 @@ pub(crate) fn expand_parametrize(
                         .or_else(|| {
                             explicit_ids
                                 .as_ref()
-                                .and_then(|ids| ids.get(index).cloned().flatten())
+                                .and_then(|ids| ids.get(index).and_then(|(s, _)| s.clone()))
                         })
                         .or(callable_id)
                         .unwrap_or_else(|| {
@@ -1928,13 +1960,23 @@ fn dedup_param_ids(
             return Err(collect_error(py, &message));
         }
         if counts.get(&None).copied().unwrap_or(0) > 1 {
-            return Err(collect_error(
-                py,
-                &format!(
-                    "In {nodeid}: multiple instances of HIDDEN_PARAM cannot be used in \
-                     the same parametrize call, because the tests names need to be unique."
-                ),
-            ));
+            let func_name = nodeid.rsplit("::").next().unwrap_or(nodeid);
+            let msg = format!(
+                "In {func_name}: multiple instances of HIDDEN_PARAM cannot be used in \
+                 the same parametrize call, because the tests names need to be unique."
+            );
+            let failed_result: PyResult<PyErr> = (|| {
+                let cls = py
+                    .import("_pytest.outcomes")?
+                    .getattr("Failed")?;
+                let instance = cls.call1((&msg,))?;
+                instance.setattr("pytrace", false)?;
+                Ok(PyErr::from_value(instance))
+            })();
+            return Err(match failed_result {
+                Ok(err) => err,
+                Err(_) => collect_error(py, &msg),
+            });
         }
         let mut existing: std::collections::HashSet<String> =
             sets.iter().filter_map(|set| set.id_part.clone()).collect();
@@ -2023,16 +2065,37 @@ pub(crate) fn collect_error(py: Python<'_>, message: &str) -> PyErr {
     }
 }
 
-/// Some(message) when `err` is a CollectError, shown without a traceback.
+/// Some(message) when `err` is a CollectError or a Failed(pytrace=False),
+/// shown without a traceback.
 pub fn collect_error_message(py: Python<'_>, err: &PyErr) -> Option<String> {
-    let cls = py
+    let collect_cls = py
         .import("pytest")
         .and_then(|m| m.getattr("Collector"))
         .and_then(|c| c.getattr("CollectError"))
         .ok()?;
-    err.matches(py, &cls)
-        .unwrap_or(false)
-        .then(|| err.value(py).to_string())
+    if err.matches(py, &collect_cls).unwrap_or(false) {
+        return Some(err.value(py).to_string());
+    }
+    let failed_cls = py
+        .import("_pytest.outcomes")
+        .and_then(|m| m.getattr("Failed"))
+        .ok()?;
+    if err.matches(py, &failed_cls).unwrap_or(false) {
+        let pytrace = err
+            .value(py)
+            .getattr("pytrace")
+            .and_then(|v| v.extract::<bool>())
+            .unwrap_or(true);
+        if !pytrace {
+            let msg = err
+                .value(py)
+                .getattr("msg")
+                .and_then(|v| v.extract::<String>())
+                .unwrap_or_else(|_| err.value(py).to_string());
+            return Some(format!("E   Failed: {msg}"));
+        }
+    }
+    None
 }
 
 /// pytest-style id for one parameter value.

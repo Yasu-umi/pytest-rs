@@ -757,6 +757,18 @@ impl Engine {
                 // ERRORS section) above the collected-count summary.
                 if n_collect_errors > 0 {
                     self.print_collect_errors();
+                    self.print_short_summary();
+                    let banner = format!(
+                        "Interrupted: {n_collect_errors} error{} during collection",
+                        if n_collect_errors == 1 { "" } else { "s" }
+                    );
+                    println!(
+                        "{}",
+                        crate::tw::markup(
+                            &center_with(&banner, '!'),
+                            &[crate::tw::RED],
+                        )
+                    );
                 }
                 self.print_collect_only_summary(started.elapsed(), n_collect_errors);
             }

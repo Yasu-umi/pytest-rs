@@ -1043,7 +1043,7 @@ class Pytester:
         every node's mark list. pytest.param(..., marks=...) contributes its
         per-param marks only to the combinations that use it, and pytest.param
         ids / the ``ids=`` kwarg override the value-derived fragment."""
-        from pytest._marks import ParamSpec, get_unpacked_marks  # noqa: F401
+        from pytest._marks import HIDDEN_PARAM, ParamSpec, get_unpacked_marks  # noqa: F401
 
         param_marks = [m for m in source_marks if m.name == "parametrize"]
         base_marks = [m for m in source_marks if m.name != "parametrize"]
@@ -1055,14 +1055,23 @@ class Pytester:
         levels = []  # each level: list of (id_fragment, [per_param_marks])
         for pm in param_marks:
             argvalues = list(pm.args[1]) if len(pm.args) > 1 else []
+            argnames_raw = pm.args[0] if pm.args else pm.kwargs.get("argnames", "")
+            nargs = len(argnames_raw.split(",")) if isinstance(argnames_raw, str) else len(argnames_raw)
             ids_kwarg = pm.kwargs.get("ids", None)
             level = []
             for i, val in enumerate(argvalues):
                 if isinstance(val, ParamSpec):
                     pvalues, pmarks, pid = val.values, list(val.marks), val.id
                 else:
-                    pvalues, pmarks, pid = (val,), [], None
-                if pid is not None and isinstance(pid, str):
+                    if nargs > 1 and isinstance(val, (tuple, list)):
+                        pvalues, pmarks, pid = tuple(val), [], None
+                    else:
+                        pvalues, pmarks, pid = (val,), [], None
+                if pid is HIDDEN_PARAM:
+                    frag = None
+                elif ids_kwarg is not None and i < len(ids_kwarg) and ids_kwarg[i] is HIDDEN_PARAM:
+                    frag = None
+                elif pid is not None and isinstance(pid, str):
                     frag = pid
                 elif ids_kwarg is not None and i < len(ids_kwarg) and ids_kwarg[i] is not None:
                     frag = str(ids_kwarg[i])
@@ -1077,9 +1086,12 @@ class Pytester:
 
         items = []
         for combo in itertools.product(*levels):
-            suffix = "-".join(frag for frag, _ in combo)
+            frags = [frag for frag, _ in combo if frag is not None]
             combo_marks = [mk for _, marks in combo for mk in marks]
-            items.append(make_fn(f"{base_name}[{suffix}]", [*base_marks, *combo_marks]))
+            if frags:
+                items.append(make_fn(f"{base_name}[{'-'.join(frags)}]", [*base_marks, *combo_marks]))
+            else:
+                items.append(make_fn(base_name, [*base_marks, *combo_marks]))
         return items
 
     def _collect_items_from_path(self, path, parent_collector=None):
