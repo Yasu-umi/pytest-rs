@@ -278,6 +278,30 @@ fn build_test_setup(
     // fixtures are set up before the test's own, values not passed in.
     // Mark order follows iter_markers (upstream _getusefixturesnames):
     // function marks, class marks base-class-first, module marks.
+    // Warn about empty usefixtures() marks (the conformance suite's
+    // _getusefixturesnames would, but the Rust engine processes marks
+    // directly and must replicate the warning).
+    for mark in item.marks.iter().filter(|m| m.name == "usefixtures") {
+        let args: Vec<String> = mark
+            .obj
+            .bind(py)
+            .getattr("args")
+            .ok()
+            .and_then(|a| a.extract::<Vec<String>>().ok())
+            .unwrap_or_default();
+        if args.is_empty() {
+            let _ = python::warn_explicit_at(
+                py,
+                "PytestWarning",
+                &format!(
+                    "usefixtures() in {} without arguments has no effect",
+                    item.nodeid
+                ),
+                &item.path.to_string_lossy(),
+                item.lineno,
+            );
+        }
+    }
     let usefixtures: Vec<String> = config
         .get_ini("usefixtures")
         .map(|value| {
