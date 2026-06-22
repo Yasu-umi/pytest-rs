@@ -155,6 +155,40 @@ class Code:
             return self.raw.co_filename
 
 
+def get_real_func(obj):
+    import functools
+    import inspect
+
+    obj = inspect.unwrap(obj)
+    if isinstance(obj, functools.partial):
+        obj = obj.func
+    return obj
+
+
+def getfslineno(obj):
+    import inspect
+
+    obj = get_real_func(obj)
+    if hasattr(obj, "place_as"):
+        obj = obj.place_as
+    try:
+        code = Code.from_function(obj)
+    except TypeError:
+        try:
+            fn = inspect.getsourcefile(obj) or inspect.getfile(obj)
+        except TypeError:
+            return "", -1
+        fspath = (fn and absolutepath(fn)) or ""
+        lineno = -1
+        if fspath:
+            try:
+                _, lineno = inspect.findsource(obj)
+            except OSError:
+                pass
+        return fspath, lineno
+    return code.path, code.firstlineno
+
+
 class Frame:
     """Wrapper around a Python frame."""
 
