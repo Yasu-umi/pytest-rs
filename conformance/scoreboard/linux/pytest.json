@@ -125,8 +125,8 @@
       "file": "testing/test_assertion.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 135,
-      "failed": 25,
+      "passed": 134,
+      "failed": 26,
       "skipped": 0,
       "errors": 0
     },

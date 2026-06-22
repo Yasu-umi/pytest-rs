@@ -18,10 +18,10 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2490 | 290 | 0 | 53 | 2833 | 89.8% | 16 | 52 | 63 |
+| pytest | 9.0.3 | 2489 | 291 | 0 | 53 | 2833 | 89.7% | 16 | 52 | 63 |
 | pytest-asyncio | v1.4.0 | 174 | 94 | 0 | 0 | 268 | 64.9% | 16 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
-| pytest-cov | v7.1.0 | 154 | 52 | 0 | 3 | 209 | 75.1% | 0 | 1 | 0 |
+| pytest-cov | v7.1.0 | 186 | 20 | 0 | 3 | 209 | 90.4% | 0 | 1 | 0 |
 | pytest-xdist | v3.8.0 | 91 | 6 | 0 | 1 | 98 | 93.9% | 0 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 91 | 31 | 0 | 1 | 123 | 74.8% | 4 | 7 | 6 |
@@ -59,7 +59,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 6894 | 100.0% | 259 | 266 | 0 |
 | scikit-learn-1 | 1.9.0 | 8432 | 0 | 0 | 6624 | 15056 | 100.0% | 79 | 87 | 0 |
 | scikit-learn-2 | 1.9.0 | 5046 | 0 | 0 | 1892 | 6938 | 100.0% | 52 | 58 | 0 |
-| scikit-learn-3 | 1.9.0 | 9212 | 3 | 0 | 2530 | 11745 | 100.0% | 103 | 114 | 0 |
+| scikit-learn-3 | 1.9.0 | 9251 | 3 | 0 | 2530 | 11784 | 100.0% | 104 | 114 | 0 |
 
 ### pytest @ 9.0.3
 
@@ -80,7 +80,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/logging/test_fixture.py | passed | 27 | 0 | 0 | 0 |
 | testing/logging/test_formatter.py | passed | 4 | 0 | 0 | 0 |
 | testing/logging/test_reporting.py | failed | 44 | 8 | 0 | 0 |
-| testing/test_assertion.py | failed | 135 | 25 | 0 | 0 |
+| testing/test_assertion.py | failed | 134 | 26 | 0 | 0 |
 | testing/test_cacheprovider.py | failed | 54 | 3 | 0 | 0 |
 | testing/test_capture.py | failed | 128 | 2 | 0 | 2 |
 | testing/test_collect_imported_tests.py | failed | 2 | 1 | 0 | 0 |
@@ -177,7 +177,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| tests/test_pytest_cov.py | failed | 154 | 52 | 0 | 3 |
+| tests/test_pytest_cov.py | failed | 186 | 20 | 0 | 3 |
 
 </details>
 
@@ -2712,7 +2712,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | sklearn/feature_selection/tests/test_sequential.py | passed | 74 | 0 | 0 | 0 |
 | sklearn/feature_selection/tests/test_variance_threshold.py | passed | 25 | 0 | 0 | 0 |
 | sklearn/frozen/tests/test_frozen.py | passed | 46 | 0 | 0 | 0 |
-| sklearn/gaussian_process/tests/test_gpc.py | timeout | 0 | 0 | 0 | 0 |
+| sklearn/gaussian_process/tests/test_gpc.py | passed | 39 | 0 | 0 | 0 |
 | sklearn/gaussian_process/tests/test_gpr.py | passed | 130 | 0 | 0 | 0 |
 | sklearn/gaussian_process/tests/test_kernels.py | passed | 281 | 0 | 0 | 0 |
 | sklearn/impute/tests/test_base.py | passed | 5 | 0 | 0 | 1 |
