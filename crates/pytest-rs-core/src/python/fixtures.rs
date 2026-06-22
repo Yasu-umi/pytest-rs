@@ -665,6 +665,7 @@ pub fn expand_fixture_params(
                         .collect(),
                     collector_class: item.collector_class.clone(),
                     func_class: item.func_class.clone(),
+                    py_node: None,
                     max_param_scope,
                     scope_sort_keys: scope_sort_keys.clone(),
                 });

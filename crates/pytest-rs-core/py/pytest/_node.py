@@ -1183,6 +1183,115 @@ def set_pycollect_hooks(hooks: list) -> None:
     _pycollect_makeitem_hooks = list(hooks)
 
 
+def fire_makeitem_for_function(
+    nodeid: str,
+    func_name: str,
+    callobj: object,
+    path_str: str,
+    lineno: int,
+    is_test_func: bool = True,
+) -> object | None:
+    """Fire pytest_pycollect_makeitem hookwrappers for a collected member.
+
+    Mirrors what pytest's ``Module.collect()`` does via pluggy:
+    - Plain (non-wrapper) firstresult impls may return a custom node.
+    - Wrapper impls surround the plain result; if ``is_test_func`` is True
+      a default ``Function`` node is used as the plain result (so wrappers
+      that iterate the result can attach attributes like ``_some123``).
+      If ``is_test_func`` is False the plain result is ``None`` — wrapper
+      hooks that check ``if result:`` will skip unrecognised members.
+
+    Returns the node (or list of nodes) if any hook claimed it, else
+    ``None`` to fall through to Rust's default collection path."""
+    if not _pycollect_makeitem_hooks:
+        return None
+
+    func_node_name = nodeid.rsplit("::", 1)[-1]
+    import pathlib as _pathlib
+
+    kwargs = {
+        "name": func_name,
+        "obj": callobj,
+        "collector": None,
+    }
+    wrappers = []
+    plain_result = None
+    for func in _pycollect_makeitem_hooks:
+        opts = getattr(func, "pytest_impl", None) or {}
+        is_wrapper = bool(opts.get("wrapper") or opts.get("hookwrapper"))
+        old_style = bool(opts.get("hookwrapper"))
+        if is_wrapper:
+            try:
+                sig_params = set(inspect.signature(func).parameters)
+                call_kw = {k: v for k, v in kwargs.items() if k in sig_params}
+                gen = func(**call_kw)
+            except Exception:
+                continue
+            if not inspect.isgenerator(gen):
+                continue
+            try:
+                next(gen)
+            except StopIteration:
+                continue
+            wrappers.append((gen, old_style))
+        else:
+            # plain firstresult impl — may return a custom node
+            try:
+                sig_params = set(inspect.signature(func).parameters)
+                call_kw = {k: v for k, v in kwargs.items() if k in sig_params}
+                res = func(**call_kw)
+                if res is not None:
+                    plain_result = res
+                    break
+            except Exception:
+                continue
+
+    if not wrappers and plain_result is None:
+        return None
+
+    # Determine the inner "plain" result that wrappers will receive:
+    # - if a plain impl returned something, use that;
+    # - else if this member looks like a test function, synthesise a default
+    #   Function node (so wrapper hooks that iterate the result can attach
+    #   extra attributes like _some123);
+    # - else pass None — wrappers that check ``if result:`` will skip it.
+    if plain_result is not None:
+        result = plain_result
+    elif is_test_func:
+        plain_node = Function(
+            nodeid, func_node_name, [], [], callobj, _pathlib.Path(path_str), lineno
+        )
+        result = [plain_node]
+    else:
+        result = None
+
+    for gen, old_style in reversed(wrappers):
+        try:
+            if old_style:
+                from pytest._pluginmanager import _Result
+
+                outcome = _Result(result)
+                try:
+                    gen.send(outcome)
+                except StopIteration:
+                    pass
+                finally:
+                    gen.close()
+                result = outcome.get_result()
+            else:
+                try:
+                    gen.send(result)
+                except StopIteration as stop:
+                    if stop.value is not None:
+                        result = stop.value
+                finally:
+                    gen.close()
+        except Exception:
+            pass
+
+    return result
+
+
 def fire_makeitem_for_class(name: str) -> set:
     """Fire pytest_pycollect_makeitem hookwrappers for a class, returning
     extra_keyword_matches set that plugins may have populated."""

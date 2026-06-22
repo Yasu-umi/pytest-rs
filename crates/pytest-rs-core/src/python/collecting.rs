@@ -394,49 +394,37 @@ pub fn fire_pycollect_makeitem(
     path: &Path,
     name: &str,
     obj: &Bound<'_, PyAny>,
-) -> Option<Vec<(String, String)>> {
-    let pm = py
-        .import("pytest._pluginmanager")
-        .and_then(|m| m.getattr("pluginmanager"))
+    is_test_func: bool,
+) -> Option<Vec<(String, String, Option<Py<PyAny>>)>> {
+    // Delegate to pytest._node.fire_makeitem_for_function which:
+    // 1. Builds a plain Function node as the "inner result" (only when
+    //    is_test_func=True so that wrapper hooks receive a node to attach
+    //    attributes to; non-test members get None, so ``if result:`` guards
+    //    in wrapper hooks correctly skip them)
+    // 2. Runs wrapper hooks so they receive the node (and can attach attrs)
+    // 3. Runs firstresult plain impls that may return a custom node/class
+    // This mirrors what pytest's Module.collect() does via pluggy.
+    let nodeid = format!("{nodeid_base}::{name}");
+    let result = py
+        .import("pytest._node")
+        .and_then(|m| m.getattr("fire_makeitem_for_function"))
+        .and_then(|f| {
+            f.call1((
+                nodeid.as_str(),
+                name,
+                obj,
+                path.to_string_lossy().as_ref(),
+                0i32,
+                is_test_func,
+            ))
+        })
         .ok()?;
-    let hook_relay = pm
-        .getattr("hook")
-        .and_then(|h| h.getattr("pytest_pycollect_makeitem"))
-        .ok()?;
-    let pathlib = py.import("pathlib").and_then(|m| m.getattr("Path")).ok()?;
-    let config = crate::python::proxies::existing_py_config(py).map(|c| c.into_bound(py));
-    let node_mod = py.import("pytest._node").ok()?;
-    let collector_cls = node_mod.getattr("Collector").ok()?;
-    let collector = {
-        let kw = pyo3::types::PyDict::new(py);
-        let _ = kw.set_item("config", config.as_ref().map(|c| c.as_any()));
-        let _ = kw.set_item(
-            "path",
-            pathlib.call1((path.to_string_lossy().as_ref(),)).ok(),
-        );
-        let _ = kw.set_item("nodeid", nodeid_base);
-        let _ = kw.set_item("name", nodeid_base.rsplit('/').next().unwrap_or(""));
-        let session_proxy = config.as_ref().and_then(|c| {
-            node_mod
-                .getattr("_NodeSession")
-                .ok()?
-                .call1((c.as_any(),))
-                .ok()
-        });
-        let _ = kw.set_item("session", session_proxy.as_ref());
-        collector_cls.call((), Some(&kw)).ok()?
-    };
-    let kwargs = pyo3::types::PyDict::new(py);
-    let _ = kwargs.set_item("collector", &collector);
-    let _ = kwargs.set_item("name", name);
-    let _ = kwargs.set_item("obj", obj);
-    let result = hook_relay.call((), Some(&kwargs)).ok()?;
     if result.is_none() {
         return None;
     }
-    // makeitem may return a single node or a list/tuple of nodes.
+    // Result may be a single node or a list/tuple of nodes.
     let nodes: Vec<Bound<'_, PyAny>> =
-        if result.try_iter().is_ok() && result.hasattr("__iter__").unwrap_or(false) {
+        if result.hasattr("__iter__").unwrap_or(false) && result.try_iter().is_ok() {
             result.try_iter().ok()?.collect::<PyResult<_>>().ok()?
         } else {
             vec![result]
@@ -455,7 +443,11 @@ pub fn fire_pycollect_makeitem(
             .getattr("name")
             .and_then(|n| n.extract())
             .unwrap_or_else(|_| name.to_string());
-        out.push((class_name, node_name));
+        // Preserve the Python node object so that custom subclasses (with
+        // overridden reportinfo, extra attributes set by wrapper hooks, etc.)
+        // are used as-is in make_py_node instead of being reconstructed.
+        let py_node = Some(node.unbind());
+        out.push((class_name, node_name, py_node));
     }
     if out.is_empty() { None } else { Some(out) }
 }
@@ -657,6 +649,7 @@ pub fn collect_custom_files(
                     lineno: 0,
                     collector_class: collector_class.clone(),
                     func_class: String::new(),
+                    py_node: None,
                     max_param_scope: crate::fixture::Scope::Function,
                     scope_sort_keys: Vec::new(),
                 });
@@ -831,6 +824,7 @@ pub fn collect_doctests_from_module(
             lineno,
             collector_class: String::new(),
             func_class: String::new(),
+            py_node: None,
             max_param_scope: crate::fixture::Scope::Function,
             scope_sort_keys: Vec::new(),
         });
@@ -876,6 +870,7 @@ pub fn collect_doctests_from_textfile(
             lineno,
             collector_class: String::new(),
             func_class: String::new(),
+            py_node: None,
             max_param_scope: crate::fixture::Scope::Function,
             scope_sort_keys: Vec::new(),
         });
@@ -962,9 +957,22 @@ pub(crate) fn introspect_namespace(
         // tree renders `<MyFunction some>`; otherwise fall through to the
         // default Rust collection path.
         if makeitem_hook
-            && let Some(custom) = fire_pycollect_makeitem(py, nodeid_base, path, &name, &value)
+            && let Some(custom) = fire_pycollect_makeitem(
+                py,
+                nodeid_base,
+                path,
+                &name,
+                &value,
+                filters.matches_function(&name),
+            )
         {
-            for (class_name, node_name) in custom {
+            for (class_name, node_name, py_node) in custom {
+                // Resolve fixture names from the original callobj so the
+                // runner can fill fixtures even when a custom node class was
+                // returned by the hook (the custom node may have an empty
+                // fixturenames list at this point).
+                let (fixture_names, _) =
+                    param_names_with_positional_only(py, &value).unwrap_or_default();
                 items.push(TestItem {
                     nodeid: format!("{nodeid_base}::{node_name}"),
                     path: path.to_path_buf(),
@@ -974,7 +982,7 @@ pub(crate) fn introspect_namespace(
                     cls: None,
                     is_coroutine: false,
                     is_doctest: false,
-                    fixture_names: Vec::new(),
+                    fixture_names,
                     extra_fixture_names: Vec::new(),
                     marks: Vec::new(),
                     callspec: Vec::new(),
@@ -982,6 +990,7 @@ pub(crate) fn introspect_namespace(
                     lineno: 0,
                     collector_class: String::new(),
                     func_class: class_name,
+                    py_node,
                     max_param_scope: crate::fixture::Scope::Function,
                     scope_sort_keys: Vec::new(),
                 });
@@ -1247,6 +1256,7 @@ pub(crate) fn collect_testcase(
             lineno: first_lineno(py, &method),
             collector_class: String::new(),
             func_class: String::new(),
+            py_node: None,
             max_param_scope: crate::fixture::Scope::Function,
             scope_sort_keys: Vec::new(),
         });
@@ -1517,6 +1527,7 @@ pub(crate) fn push_test_items(
             lineno: first_lineno(py, func),
             collector_class: String::new(),
             func_class: String::new(),
+            py_node: None,
             max_param_scope: variant.max_param_scope,
             scope_sort_keys: variant.scope_sort_keys,
         });

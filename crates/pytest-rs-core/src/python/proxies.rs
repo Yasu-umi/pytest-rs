@@ -275,20 +275,32 @@ pub fn make_node(py: Python<'_>, item: &TestItem) -> PyResult<Py<PyAny>> {
         .rsplit("::")
         .next()
         .unwrap_or(item.func_name.as_str());
-    let node_cls = if item.is_doctest {
-        "DoctestNode"
+    // If a Python node was already created by pytest_pycollect_makeitem (e.g.
+    // a custom Function subclass with overridden reportinfo or extra attrs set
+    // by a wrapper hook), reuse it directly.  Otherwise build a fresh node.
+    let node = if let Some(existing) = item.py_node.as_ref() {
+        let n = existing.bind(py).clone();
+        // The Python node was created at collection time with empty fixture
+        // lists; update them now that Rust has resolved the full fixture
+        // closure so the runner can fill fixtures correctly.
+        n.setattr("fixturenames", &fixturenames)?;
+        n
     } else {
-        "Function"
+        let node_cls = if item.is_doctest {
+            "DoctestNode"
+        } else {
+            "Function"
+        };
+        py.import("pytest._node")?.getattr(node_cls)?.call1((
+            item.nodeid.as_str(),
+            name,
+            marks,
+            fixturenames,
+            item.func.bind(py),
+            item.path.to_string_lossy().as_ref(),
+            item.lineno,
+        ))?
     };
-    let node = py.import("pytest._node")?.getattr(node_cls)?.call1((
-        item.nodeid.as_str(),
-        name,
-        marks,
-        fixturenames,
-        item.func.bind(py),
-        item.path.to_string_lossy().as_ref(),
-        item.lineno,
-    ))?;
     // node.config: plugins reach the pluginmanager and stash through it
     // (e.g. pytest-timeout's item.config.pluginmanager.hook). The proxy is
     // initialized at configure time, well before any node exists.

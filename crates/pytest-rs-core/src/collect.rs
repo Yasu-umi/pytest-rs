@@ -43,6 +43,11 @@ pub struct TestItem {
     /// `pytest_pycollect_makeitem` (e.g. "MyFunction"). Empty string means the
     /// standard Function node, rendered as `<Function name>`.
     pub func_class: String,
+    /// The Python node object returned by `pytest_pycollect_makeitem`, if any.
+    /// When set, `make_py_node` uses it directly instead of constructing a
+    /// new `Function` so custom subclasses (with overridden `reportinfo` etc.)
+    /// and attributes set by wrapper hooks are preserved.
+    pub py_node: Option<Py<PyAny>>,
     /// Highest parametrize scope across all dimensions (for item reordering).
     pub max_param_scope: crate::fixture::Scope,
     /// Per non-function-scoped parametrized arg: (argname, scope, 0-based set
