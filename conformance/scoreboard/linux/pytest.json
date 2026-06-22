@@ -17,8 +17,8 @@
       "file": "testing/python/collect.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 74,
-      "failed": 8,
+      "passed": 77,
+      "failed": 5,
       "skipped": 0,
       "errors": 0
     },
@@ -35,8 +35,8 @@
       "file": "testing/python/integration.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 12,
-      "failed": 4,
+      "passed": 13,
+      "failed": 3,
       "skipped": 4,
       "errors": 0
     },
@@ -116,8 +116,8 @@
       "file": "testing/logging/test_reporting.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 15,
-      "failed": 37,
+      "passed": 44,
+      "failed": 8,
       "skipped": 0,
       "errors": 0
     },
@@ -125,8 +125,8 @@
       "file": "testing/test_assertion.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 132,
-      "failed": 28,
+      "passed": 135,
+      "failed": 25,
       "skipped": 0,
       "errors": 0
     },
@@ -161,8 +161,8 @@
       "file": "testing/test_collection.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 99,
-      "failed": 14,
+      "passed": 100,
+      "failed": 13,
       "skipped": 3,
       "errors": 0
     },
@@ -179,8 +179,8 @@
       "file": "testing/test_config.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 182,
-      "failed": 32,
+      "passed": 193,
+      "failed": 21,
       "skipped": 1,
       "errors": 0
     },
@@ -287,10 +287,10 @@
       "file": "testing/test_pastebin.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 0,
-      "failed": 5,
+      "passed": 5,
+      "failed": 3,
       "skipped": 0,
-      "errors": 3
+      "errors": 0
     },
     {
       "file": "testing/test_pytester.py",
@@ -350,8 +350,8 @@
       "file": "testing/test_session.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 23,
-      "failed": 3,
+      "passed": 24,
+      "failed": 2,
       "skipped": 0,
       "errors": 0
     },
@@ -395,8 +395,8 @@
       "file": "testing/test_subtests.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 13,
-      "failed": 21,
+      "passed": 17,
+      "failed": 17,
       "skipped": 0,
       "errors": 0
     },
@@ -450,16 +450,16 @@
       "status": "failed",
       "exit_code": 1,
       "passed": 35,
-      "failed": 8,
-      "skipped": 1,
+      "failed": 7,
+      "skipped": 2,
       "errors": 0
     },
     {
       "file": "testing/acceptance_test.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 47,
-      "failed": 44,
+      "passed": 57,
+      "failed": 34,
       "skipped": 2,
       "errors": 0
     },
