@@ -920,6 +920,7 @@ impl Engine {
             warnings_shown = self.print_warnings_summary(py, 0, false);
             self.print_passes();
             self.print_xpasses();
+            self.print_durations();
             if let Err(err) = self.print_plugin_summaries(py, code) {
                 eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
             }

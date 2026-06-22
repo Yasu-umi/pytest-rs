@@ -638,6 +638,67 @@ impl Engine {
         }
     }
 
+    /// `--durations=N`: print the N slowest setup/call/teardown phases.
+    /// `--durations=0` prints all.  `--durations-min` hides entries below
+    /// a threshold (default 0.005s; with `-vv` the threshold is ignored).
+    pub(crate) fn print_durations(&self) {
+        let n: usize = match self.config.get_value("durations") {
+            Some(v) => match v.parse() {
+                Ok(n) => n,
+                Err(_) => return,
+            },
+            None => return,
+        };
+        let durations_min: f64 = self
+            .config
+            .get_value("durations-min")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0.005);
+        let verbose = self.config.global_verbosity() >= 2;
+
+        let mut entries: Vec<(f64, &str, &str)> = self
+            .session
+            .reports
+            .iter()
+            .map(|r| {
+                let phase = match r.phase {
+                    Phase::Setup => "setup",
+                    Phase::Call => "call",
+                    Phase::Teardown => "teardown",
+                };
+                (r.duration.as_secs_f64(), phase, r.nodeid.as_str())
+            })
+            .collect();
+        entries.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+
+        if n > 0 {
+            let banner = format!("slowest {n} durations");
+            println!("{}", center_banner(&banner));
+        } else {
+            println!("{}", center_banner("slowest durations"));
+        }
+
+        let selected: Vec<_> = if n > 0 {
+            entries.into_iter().take(n).collect()
+        } else {
+            entries
+        };
+
+        let mut hidden = 0;
+        for &(secs, phase, nodeid) in &selected {
+            if !verbose && secs < durations_min {
+                hidden += 1;
+            } else {
+                println!("{secs:.2}s {phase:8} {nodeid}");
+            }
+        }
+        if hidden > 0 {
+            println!(
+                "({hidden} durations < {durations_min:.3}s hidden.  Use -vv to show these durations.)"
+            );
+        }
+    }
+
     /// The "short test summary info" section, controlled by -r chars.
     /// Groups print in the order the chars were given, matching pytest.
     pub(crate) fn print_short_summary(&self) {
