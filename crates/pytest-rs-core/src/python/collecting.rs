@@ -1444,23 +1444,12 @@ pub(crate) fn push_test_items(
     // marks, merged after the decorator-applied ones.
     let mut marks = marks;
     let fixture_names = fixture_names;
-    // Fixtures a generate hook appended (pytest-repeat's indirect step
-    // fixture): set up so their request.param is consumed, but not injected
-    // into the test signature.
-    let mut extra_generated_fixtures: Vec<String> = Vec::new();
-    if let Some(hook) = generate_hook {
-        // metafunc.config (option.count etc.) and definition markers
-        // (get_closest_marker) let plugin impls like pytest-repeat decide.
-        let config = crate::python::proxies::existing_py_config(py).map(|c| c.into_bound(py));
-        let mark_objs = pyo3::types::PyList::empty(py);
-        for m in &marks {
-            mark_objs.append(m.obj.bind(py))?;
-        }
-        // Pass the transitive fixture closure (not just direct params) so
-        // generate hooks that check `if "x" in metafunc.fixturenames` see
-        // indirect dependencies too (issue519: test_one → fix2 → fix1 → arg1).
-        let test_nodeid = format!("{nodeid_prefix}::{name}");
-        let mut closure_names: Vec<String> = fixture_names.clone();
+    // Transitive fixture closure: walk fixture deps so parametrize argnames
+    // that reference indirect dependencies (e.g. fix2 when test_it requests
+    // fix1 which depends on fix2) are recognized by validation.
+    let test_nodeid = format!("{nodeid_prefix}::{name}");
+    let mut closure_names: Vec<String> = fixture_names.clone();
+    {
         let mut seen: std::collections::HashSet<String> = closure_names.iter().cloned().collect();
         let mut i = 0;
         while i < closure_names.len() {
@@ -1473,9 +1462,22 @@ pub(crate) fn push_test_items(
             }
             i += 1;
         }
+    }
+    // Fixtures a generate hook appended (pytest-repeat's indirect step
+    // fixture): set up so their request.param is consumed, but not injected
+    // into the test signature.
+    let mut extra_generated_fixtures: Vec<String> = Vec::new();
+    if let Some(hook) = generate_hook {
+        // metafunc.config (option.count etc.) and definition markers
+        // (get_closest_marker) let plugin impls like pytest-repeat decide.
+        let config = crate::python::proxies::existing_py_config(py).map(|c| c.into_bound(py));
+        let mark_objs = pyo3::types::PyList::empty(py);
+        for m in &marks {
+            mark_objs.append(m.obj.bind(py))?;
+        }
         let metafunc = py.import("pytest._metafunc")?.getattr("Metafunc")?.call1((
             func,
-            closure_names,
+            closure_names.clone(),
             module,
             cls.map(|c| c.clone().unbind()),
             config,
@@ -1503,12 +1505,11 @@ pub(crate) fn push_test_items(
         py,
         &marks,
         name,
-        &fixture_names,
+        &closure_names,
         &extra_generated_fixtures,
         func,
     )?;
 
-    let test_nodeid = format!("{nodeid_prefix}::{name}");
     let variants = expand_parametrize(py, &marks, &test_nodeid, Some(func))?;
     for variant in variants {
         let nodeid = match &variant.id {
