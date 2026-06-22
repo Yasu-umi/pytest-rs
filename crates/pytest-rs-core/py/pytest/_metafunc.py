@@ -10,6 +10,7 @@ then inspects ._calls).
 
 from __future__ import annotations
 
+import itertools
 from collections.abc import Callable, Iterable, Sequence
 from typing import TYPE_CHECKING, Any
 
@@ -161,6 +162,7 @@ def _find_parametrized_scope(
     used_scopes: list[ScopeEnum] = []
     for argname in argnames:
         if argname not in all_indirect:
+            used_scopes.append(ScopeEnum.Function)
             continue
         fixturedefs = arg2fixturedefs.get(argname)
         if fixturedefs:
@@ -187,14 +189,15 @@ class Metafunc:
         self,
         definition_or_func: Any,
         fixtureinfo_or_names: list[str] | FuncFixtureInfo | None = None,
-        module: Any = None,
+        config_or_module: Any = None,
         cls: Any = None,
-        config: Config | None = None,
+        module_or_config: Any = None,
         marks: list | None = None,
         *,
         _ispytest: bool = False,
     ) -> None:
         if hasattr(definition_or_func, "obj"):
+            # pytest API path: (definition, fixtureinfo, config, cls, module)
             defn = definition_or_func
             self.definition = defn
             self.function = defn.obj
@@ -204,10 +207,11 @@ class Metafunc:
             else:
                 self.fixturenames = []
                 self._arg2fixturedefs = {}
-            self.config = config
-            self.module = module
+            self.config = config_or_module
+            self.module = module_or_config
             self.cls = cls
         else:
+            # Engine path: (func, names, module, cls, config, marks)
             self.function = definition_or_func
             self.definition = _Definition(definition_or_func, marks)
             if isinstance(fixtureinfo_or_names, (list, tuple)):
@@ -215,9 +219,9 @@ class Metafunc:
             else:
                 self.fixturenames = list(fixtureinfo_or_names) if fixtureinfo_or_names else []
             self._arg2fixturedefs = {}
-            self.module = module
+            self.module = config_or_module
             self.cls = cls
-            self.config = config
+            self.config = module_or_config
         self._parametrize_marks = []
         self._calls = []
         self._params_directness = {}
@@ -232,6 +236,11 @@ class Metafunc:
         *,
         _param_mark: Any = None,
     ) -> None:
+        if ids is not None and not callable(ids):
+            try:
+                iter(ids)
+            except TypeError:
+                raise TypeError("ids must be a callable or an iterable")
         argnames_parsed = _parse_argnames(argnames)
         nodeid = getattr(self.definition, "nodeid", "")
         argvalues_list = list(argvalues)
@@ -256,6 +265,32 @@ class Metafunc:
         self._validate_if_using_arg_names(argnames_parsed, indirect)
 
         parametersets = _resolve_parametersets(argnames_parsed, argvalues_list, self.function)
+
+        if not parametersets:
+            skip_mark = _mark.skip(reason="got empty parameter set %r, function %s"
+                                   % (argnames, self.function.__name__))
+            newcalls: list[CallSpec2] = []
+            for callspec in self._calls or [CallSpec2()]:
+                newcallspec = callspec.setmulti(
+                    argnames=argnames_parsed,
+                    valset=(HIDDEN_PARAM,) * len(argnames_parsed),
+                    id=HIDDEN_PARAM,
+                    marks=[skip_mark],
+                    scope=scope_,
+                    param_index=0,
+                    nodeid=nodeid,
+                )
+                newcalls.append(newcallspec)
+            self._calls = newcalls
+            return
+
+        if ids is not None and not callable(ids) and isinstance(ids, (list, tuple)):
+            if len(ids) != len(parametersets):
+                fail(
+                    f"In {self.function.__name__}: {len(ids)} ids given for "
+                    f"{len(parametersets)} expected",
+                    pytrace=False,
+                )
 
         if _param_mark and hasattr(_param_mark, "_param_ids_from") and _param_mark._param_ids_from:
             generated_ids = getattr(_param_mark._param_ids_from, "_param_ids_generated", None)
@@ -296,6 +331,8 @@ class Metafunc:
         parametersets: list[ParamSpec],
         nodeid: str,
     ) -> list[str]:
+        if ids is not None and not callable(ids) and not isinstance(ids, (list, tuple)):
+            ids = list(itertools.islice(ids, len(parametersets)))
         try:
             return IdMaker(
                 argnames=argnames,
