@@ -735,9 +735,19 @@ class PluginManager:
     def consider_conftest(self, conftestmodule: types.ModuleType, registration_name: str) -> None:
         self.register(conftestmodule, name=registration_name)
 
+    _BUILTIN_PLUGINS = frozenset({
+        "terminalprogress", "cacheprovider", "capture", "debugging",
+        "doctest", "faulthandler", "fixtures", "helpconfig", "junitxml",
+        "logging", "mark", "monkeypatch", "nose", "pastebin", "python",
+        "recwarn", "reports", "runner", "setuponly", "setupplan",
+        "skipping", "stepwise", "tmpdir", "unittest", "warnings",
+    })
+
     def import_plugin(self, modname: str, consider_entry_points: bool = False) -> None:
         assert isinstance(modname, str), f"module name as text required, got {modname!r}"
         if self.is_blocked(modname) or self.getplugin(modname) is not None:
+            return
+        if modname in self._BUILTIN_PLUGINS:
             return
         try:
             __import__(modname)
@@ -794,16 +804,7 @@ class PluginManager:
                     continue
                 if self.getplugin(ep.name) is not None:
                     continue
-                try:
-                    plugin = ep.load()
-                except Exception as e:
-                    import warnings as _w
-
-                    _w.warn(
-                        f"could not load entry point {ep.name}: {e}",
-                        stacklevel=1,
-                    )
-                    continue
+                plugin = ep.load()
                 self.register(plugin, ep.name)
 
 

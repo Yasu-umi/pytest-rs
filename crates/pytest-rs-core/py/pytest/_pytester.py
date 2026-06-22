@@ -207,7 +207,7 @@ class Pytester:
             # itself), matching upstream pytester.
             path = (self.path / basename).with_suffix(ext)
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(textwrap.dedent(self._source_text(source)).lstrip("\n"))
+            path.write_text(textwrap.dedent(self._source_text(source)).strip())
             paths.append(path)
         # pytest returns the first file's path even for multiple files.
         return paths[0]
@@ -250,7 +250,7 @@ class Pytester:
         sys.path.insert(0, entry)
         self._syspaths.insert(0, entry)
 
-    def runpytest(self, *args, timeout=None, syspathinsert=False, no_reraise_ctrlc=False):
+    def runpytest(self, *args, timeout=None, syspathinsert=False, no_reraise_ctrlc=False, plugins=()):
         # syspathinsert=True: insert self.path into sys.path so the child can
         # import test-local plugins written to self.path.
         if syspathinsert:
@@ -261,7 +261,7 @@ class Pytester:
         # after the inner run (e.g. subtests pdb tests).
         _check_cfg_pytest_section(self.path, args)
         if os.environ.get("PYTEST_RS_INLINE_INPROCESS"):
-            reprec = self._inline_run_inprocess(*args)
+            reprec = self._inline_run_inprocess(*args, plugins=plugins)
             return getattr(reprec, "_result", reprec)
         return self._runpytest(args, timeout=timeout, forward_filters=True)
 
@@ -381,7 +381,7 @@ class Pytester:
                 )
         return self._runpytest(args, timeout=timeout, forward_filters=False)
 
-    def runpytest_inprocess(self, *args, timeout=None):
+    def runpytest_inprocess(self, *args, timeout=None, plugins=()):
         """Run pytest in-process (shares sys state with the outer test).
 
         When PYTEST_RS_INLINE_INPROCESS is set (as in the conformance suite),
@@ -389,7 +389,7 @@ class Pytester:
         subprocess backend like runpytest().
         """
         if os.environ.get("PYTEST_RS_INLINE_INPROCESS"):
-            reprec = self.inline_run(*args)
+            reprec = self.inline_run(*args, plugins=plugins)
             result = getattr(reprec, "_result", None)
             if result is not None:
                 result.reprec = reprec
@@ -487,10 +487,10 @@ class Pytester:
         self._fire_addoption(config, new_args)
         _validate_required_plugins(config)
         pm = config.pluginmanager
-        pm.consider_preparse(new_args)
-        pm.consider_env()
         if not config.getoption("disable_plugin_autoload", default=False):
             pm.consider_setuptools_entrypoints()
+        pm.consider_preparse(new_args)
+        pm.consider_env()
         if self._request is not None:
             self._request.addfinalizer(config._ensure_unconfigure)
         return config
@@ -580,7 +580,7 @@ class Pytester:
         n = sum(1 for p in self.path.glob(f".{prefix}-*"))
         return self.path / f".{prefix}-{n}"
 
-    def inline_run(self, *args):
+    def inline_run(self, *args, plugins=()):
         # Two backends: a subprocess run parsed into a HookRecorder-shaped
         # result (the default, robust for the whole suite) and an in-process
         # nested run that captures live hook-call objects via a real
@@ -588,7 +588,7 @@ class Pytester:
         # instrumentation + session-global save/restore), so it is opt-in
         # behind PYTEST_RS_INLINE_INPROCESS until it is net-positive.
         if os.environ.get("PYTEST_RS_INLINE_INPROCESS"):
-            return self._inline_run_inprocess(*args)
+            return self._inline_run_inprocess(*args, plugins=plugins)
         return self._inline_run_subprocess(*args)
 
     def _inline_run_subprocess(self, *args):
@@ -612,7 +612,7 @@ class Pytester:
             pass
         return InlineRunResult(result, hook_events)
 
-    def _inline_run_inprocess(self, *args):
+    def _inline_run_inprocess(self, *args, plugins=()):
         # In-process nested run: the native engine runs a whole session in
         # this process and fires its hooks through the monitored plugin
         # manager, so the HookRecorder captures live call objects (getcalls,
@@ -671,6 +671,8 @@ class Pytester:
         }
 
         reprec = HookRecorder(pluginmanager)
+        for plugin in plugins:
+            pluginmanager.register(plugin)
         # The inner run gets a fresh global capture state so its per-item
         # capture bookkeeping does not corrupt the outer session's.
         old_capstate = _capture.state
@@ -1308,11 +1310,88 @@ class Pytester:
 
         from pytest._pycollect import IGNORED_ATTRIBUTES as _IGNORED
 
+        # Collect pytest_pycollect_makeitem implementations from conftests
+        # along the path to the source file.  These are gathered directly from
+        # the imported conftest modules (not via pluginmanager) so that in-
+        # process pytester collection honours them without registering plugins
+        # as real session-wide side effects.
+        def _gather_makeitem_impls(src_path):
+            root = self.path.resolve()
+            dirs, d = [], src_path.parent
+            while True:
+                dirs.append(d)
+                if d == root or d.parent == d:
+                    break
+                d = d.parent
+            dirs.reverse()
+            impls = []
+            for d in dirs:
+                cf = d / "conftest.py"
+                if not cf.is_file():
+                    continue
+                mod = Pytester._import_conftest_module(cf)
+                if mod is None:
+                    continue
+                fn = getattr(mod, "pytest_pycollect_makeitem", None)
+                if fn is not None:
+                    impls.append(fn)
+            return impls
+
+        _makeitem_impls = _gather_makeitem_impls(path)
+
+        def _try_makeitem(name, obj, parent=mod_node):
+            """Fire pytest_pycollect_makeitem; return custom node list or None."""
+            if not _makeitem_impls:
+                return None
+            for impl in _makeitem_impls:
+                try:
+                    import inspect as _inspect
+                    sig = _inspect.signature(impl)
+                    kw = {}
+                    if "collector" in sig.parameters:
+                        kw["collector"] = parent
+                    if "name" in sig.parameters:
+                        kw["name"] = name
+                    if "obj" in sig.parameters:
+                        kw["obj"] = obj
+                    result = impl(**kw)
+                except Exception:
+                    continue
+                if result is None:
+                    continue
+                # firstresult: may return a single node or list of nodes
+                nodes = list(result) if hasattr(result, "__iter__") and not isinstance(result, type) else [result]
+                valid = [n for n in nodes if n is not None]
+                if valid:
+                    return valid
+            return None
+
         items = []
         for name, obj in vars(module).items():
             if name in _IGNORED:
                 continue
             if _is_test_func(name) and callable(obj) and not isinstance(obj, type):
+                custom = _try_makeitem(name, obj)
+                if custom is not None:
+                    for custom_node in custom:
+                        # Wire up the in-process attrs that make_item normally sets
+                        custom_node.module = module
+                        custom_node.parent = mod_node
+                        custom_node._module_collector = module_collector
+                        if config is not None:
+                            custom_node.config = config
+                        try:
+                            requested = list(getfuncargnames(obj, name=custom_node.name, cls=None))
+                        except Exception:
+                            requested = []
+                        custom_node.fixturenames = _closure_for(requested, None)
+                        custom_node._fixturedefs_full = dict(_mod_fdefs)
+                        custom_node._session_obj = session
+                        custom_node.funcargs = {}
+                        from _pytest.fixtures import TopRequest
+                        custom_node._request = TopRequest(custom_node, _ispytest=True)
+                        items.append(custom_node)
+                    continue
                 sub = Pytester._expand_params(
                     get_unpacked_marks(obj),
                     module_marks,

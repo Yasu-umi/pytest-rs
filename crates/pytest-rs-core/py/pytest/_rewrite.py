@@ -188,9 +188,11 @@ def _format_assert(op, left, right):
     diff lines), truncated like pytest's callbinrepr unless -vv/CI/ini opt
     out."""
     try:
-        from _pytest._io.saferepr import saferepr
+        from _pytest._io.saferepr import saferepr, saferepr_unlimited
 
-        fallback = f"{saferepr(left)} {op} {saferepr(right)}"
+        av = _assertion_verbosity if _assertion_verbosity is not None else _verbosity
+        _repr = saferepr_unlimited if av >= 2 else saferepr
+        fallback = f"{_repr(left)} {op} {_repr(right)}"
     except Exception:
         fallback = f"{left!r} {op} {right!r}"
     try:

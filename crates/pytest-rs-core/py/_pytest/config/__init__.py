@@ -57,6 +57,15 @@ class Config:
     def __init__(self, option=None):
         self.option = option if option is not None else argparse.Namespace()
 
+    @classmethod
+    def fromdictargs(cls, option_dict, args):
+        from _pytest.config import _native_prepareconfig
+
+        config = _native_prepareconfig(list(args))
+        for key, value in option_dict.items():
+            setattr(config.option, key, value)
+        return config
+
     def getoption(self, name, default=_notset, skip=False):
         name = name.lstrip("-").replace("-", "_")
         try:
