@@ -883,34 +883,69 @@ fn run_item_body(
             } else {
                 match python::call_with_kwargs(py, &callable, &kwargs) {
                     Ok(retval) => {
-                        if !retval.is_none() {
-                            let _ = py
-                                .import("warnings")
-                                .and_then(|w| {
-                                    let msg = format!(
-                                        "Expected None, but {} returned {}, which will be an error in a future version of pytest.  Did you mean to use `assert` instead of `return`?",
-                                        item.nodeid,
-                                        retval.get_type().name().map_or("?".to_string(), |n| n.to_string()),
-                                    );
-                                    let cls = py
-                                        .import("pytest")?
-                                        .getattr("PytestReturnNotNoneWarning")?;
-                                    w.call_method1("warn", (cls.call1((msg,))?,))
-                                });
-                        }
-                        TestReport {
-                            nodeid: item.nodeid.clone(),
-                            phase: Phase::Call,
-                            outcome: Outcome::Passed,
-                            duration: call_started.elapsed(),
-                            longrepr: None,
-                            location: None,
-                            subtest_desc: None,
-                            sections: python::log_failure_sections(py),
-                            rerun: false,
-                            xfail_longrepr: None,
-                            reprcrash_message: None,
-                            head_line: None,
+                        let is_coro = !retval.is_none()
+                            && py
+                                .import("inspect")
+                                .and_then(|i| {
+                                    let is_c: bool =
+                                        i.call_method1("iscoroutine", (&retval,))?.extract()?;
+                                    let is_ag: bool =
+                                        i.call_method1("isasyncgen", (&retval,))?.extract()?;
+                                    Ok(is_c || is_ag)
+                                })
+                                .unwrap_or(false);
+                        if is_coro {
+                            let _ = retval.call_method0("close");
+                            TestReport {
+                                nodeid: item.nodeid.clone(),
+                                phase: Phase::Call,
+                                outcome: Outcome::Failed,
+                                duration: call_started.elapsed(),
+                                longrepr: Some(
+                                    "async def functions are not natively supported.\n\
+                                     You need to install a suitable plugin for your async framework, \
+                                     for example:\n  - anyio\n  - pytest-asyncio\n  - pytest-tornasync\n  \
+                                     - pytest-trio\n  - pytest-twisted"
+                                        .to_string(),
+                                ),
+                                location: None,
+                                subtest_desc: None,
+                                sections: Vec::new(),
+                                rerun: false,
+                                xfail_longrepr: None,
+                                reprcrash_message: None,
+                                head_line: None,
+                            }
+                        } else {
+                            if !retval.is_none() {
+                                let _ = py
+                                    .import("warnings")
+                                    .and_then(|w| {
+                                        let msg = format!(
+                                            "Expected None, but {} returned {}, which will be an error in a future version of pytest.  Did you mean to use `assert` instead of `return`?",
+                                            item.nodeid,
+                                            retval.get_type().name().map_or("?".to_string(), |n| n.to_string()),
+                                        );
+                                        let cls = py
+                                            .import("pytest")?
+                                            .getattr("PytestReturnNotNoneWarning")?;
+                                        w.call_method1("warn", (cls.call1((msg,))?,))
+                                    });
+                            }
+                            TestReport {
+                                nodeid: item.nodeid.clone(),
+                                phase: Phase::Call,
+                                outcome: Outcome::Passed,
+                                duration: call_started.elapsed(),
+                                longrepr: None,
+                                location: None,
+                                subtest_desc: None,
+                                sections: python::log_failure_sections(py),
+                                rerun: false,
+                                xfail_longrepr: None,
+                                reprcrash_message: None,
+                                head_line: None,
+                            }
                         }
                     }
                     Err(err) => {
