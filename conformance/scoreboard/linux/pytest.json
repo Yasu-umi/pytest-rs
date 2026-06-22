@@ -6,10 +6,10 @@
   "files": [
     {
       "file": "testing/python/approx.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 38,
-      "failed": 37,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 75,
+      "failed": 0,
       "skipped": 18,
       "errors": 0
     },
@@ -17,8 +17,8 @@
       "file": "testing/python/collect.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 72,
-      "failed": 10,
+      "passed": 74,
+      "failed": 8,
       "skipped": 0,
       "errors": 0
     },
@@ -26,8 +26,8 @@
       "file": "testing/python/fixtures.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 190,
-      "failed": 18,
+      "passed": 193,
+      "failed": 15,
       "skipped": 2,
       "errors": 0
     },
@@ -35,8 +35,8 @@
       "file": "testing/python/integration.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 9,
-      "failed": 7,
+      "passed": 12,
+      "failed": 4,
       "skipped": 4,
       "errors": 0
     },
@@ -51,10 +51,10 @@
     },
     {
       "file": "testing/python/raises.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 13,
-      "failed": 18,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 31,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },
