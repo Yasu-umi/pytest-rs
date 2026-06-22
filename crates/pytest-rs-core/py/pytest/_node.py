@@ -829,6 +829,63 @@ class _SetupState:
             raise BaseExceptionGroup("errors during test teardown", exceptions[::-1])
 
 
+class _CollectorProxy:
+    """Lightweight collector proxy for pytest_collectstart /
+    pytest_make_collect_report / pytest_collectreport hooks.
+
+    Mirrors real pytest's Collector with just enough surface
+    for hook callers (path, nodeid, name, session, parent,
+    own_markers, dynamic __class__.__name__).
+    """
+
+    def __init__(self, name, nodeid, path, session, parent=None, class_name="Collector"):
+        self.name = name
+        self.nodeid = nodeid
+        self.path = path
+        self.session = session
+        self.config = getattr(session, "config", None)
+        self.parent = parent
+        self.own_markers = []
+        self._keywords = {}
+        self.fspath = path
+        self.__class__ = type(class_name, (type(self),), {})
+
+    def add_marker(self, marker, append=True):
+        if append:
+            self.own_markers.append(marker)
+        else:
+            self.own_markers.insert(0, marker)
+
+    def iter_markers(self, name=None):
+        for m in self.own_markers:
+            if name is None or getattr(m, "name", None) == name:
+                yield m
+
+    def get_closest_marker(self, name):
+        from itertools import chain
+
+        return next(chain(self.iter_markers(name), iter(())), None)
+
+    def listchain(self):
+        node = self
+        while node is not None:
+            yield node
+            node = node.parent
+
+    @property
+    def keywords(self):
+        return self._keywords
+
+    @property
+    def ihook(self):
+        from unittest.mock import MagicMock
+
+        return MagicMock()
+
+    def __repr__(self):
+        return f"<{type(self).__name__} {self.nodeid!r}>"
+
+
 class _ModuleCollector:
     """A minimal Module collector node for in-process SetupState tests: its
     setup()/teardown() run the module's xunit setup_module/teardown_module."""
