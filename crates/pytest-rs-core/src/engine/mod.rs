@@ -1030,6 +1030,21 @@ impl Engine {
             self.config.get_value("capture").unwrap_or("fd")
         };
         python::configure_capture(py, capture_mode);
+        // Validate --log-file-mode (same check as run()).
+        if let Some(mode) = self
+            .config
+            .get_value("log-file-mode")
+            .or_else(|| self.config.get_ini("log_file_mode"))
+            && !matches!(mode, "w" | "a")
+        {
+            eprintln!(
+                "error: argument --log-file-mode: invalid choice: '{mode}' (choose from 'w', 'a')"
+            );
+            return exit_code::USAGE_ERROR;
+        }
+        // Logging: reconfigure session handlers (log_file / log_cli) for the
+        // nested config. The caller snapshots/restores the logging state.
+        self.session.live_logging = python::configure_logging(py, &self.config);
         // --basetemp must not be the cwd or an ancestor (same check as run()).
         if let Some(bt) = self.config.get_value("basetemp") {
             let bt_path = std::path::Path::new(bt);

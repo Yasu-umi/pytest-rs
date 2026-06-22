@@ -527,7 +527,8 @@ class PluginManager:
         self._plugins.append(plugin)
         if name is not None:
             self._names[name] = plugin
-        addhooks = getattr(plugin, "pytest_addhooks", None)
+        plugin_dir = dir(plugin)
+        addhooks = getattr(plugin, "pytest_addhooks", None) if "pytest_addhooks" in plugin_dir else None
         if callable(addhooks):
             from _pytest._stub import _Unsupported
 
@@ -746,6 +747,63 @@ class PluginManager:
         else:
             mod = sys.modules[modname]
             self.register(mod, modname)
+
+    def consider_preparse(self, args: list[str]) -> None:
+        """-p NAME plugins: import and register (skip no: entries)."""
+        i = 0
+        while i < len(args):
+            if args[i] == "-p" and i + 1 < len(args):
+                spec = args[i + 1]
+                i += 2
+                if spec.startswith("no:"):
+                    self.set_blocked(spec[3:])
+                    continue
+                self.import_plugin(spec)
+            else:
+                i += 1
+
+    def consider_env(self) -> None:
+        """Load plugins listed in PYTEST_PLUGINS env var (comma-separated)."""
+        import os
+
+        env = os.environ.get("PYTEST_PLUGINS")
+        if not env:
+            return
+        for name in env.split(","):
+            name = name.strip()
+            if name:
+                self.import_plugin(name)
+
+    def consider_setuptools_entrypoints(self) -> None:
+        """Load installed pytest11 entry-point plugins (like upstream)."""
+        import importlib.metadata
+        import os
+
+        if os.environ.get("PYTEST_DISABLE_PLUGIN_AUTOLOAD"):
+            return
+
+        for dist in importlib.metadata.distributions():
+            for ep in dist.entry_points:
+                if ep.group != "pytest11":
+                    continue
+                if self.is_blocked(ep.name):
+                    continue
+                modname = getattr(ep, "value", ep.name).split(":")[0].strip()
+                if self.is_blocked(modname):
+                    continue
+                if self.getplugin(ep.name) is not None:
+                    continue
+                try:
+                    plugin = ep.load()
+                except Exception as e:
+                    import warnings as _w
+
+                    _w.warn(
+                        f"could not load entry point {ep.name}: {e}",
+                        stacklevel=1,
+                    )
+                    continue
+                self.register(plugin, ep.name)
 
 
 pluginmanager = PluginManager()

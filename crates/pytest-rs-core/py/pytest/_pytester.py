@@ -480,11 +480,17 @@ class Pytester:
         command-line args (rootdir discovery, ini reading, option parsing),
         without running a session — upstream's _prepareconfig."""
         from _pytest.config import _native_prepareconfig
+        from pytest._pluginmanager import pluginmanager
 
         new_args = [str(arg) for arg in args]
         config = _native_prepareconfig(new_args)
         self._fire_addoption(config, new_args)
         _validate_required_plugins(config)
+        pm = config.pluginmanager
+        pm.consider_preparse(new_args)
+        pm.consider_env()
+        if not config.getoption("disable_plugin_autoload", default=False):
+            pm.consider_setuptools_entrypoints()
         if self._request is not None:
             self._request.addfinalizer(config._ensure_unconfigure)
         return config
@@ -616,6 +622,7 @@ class Pytester:
 
         import pytest
         import pytest._capture as _capture
+        import pytest._logging as _logging
         import pytest._marks as _marks
         import pytest._node as _node
         import pytest._tmp_path as _tmp_path
@@ -669,6 +676,13 @@ class Pytester:
         old_capstate = _capture.state
         inner_capstate = _capture.CaptureState()
         _capture.state = inner_capstate
+        # Logging: the inner run reconfigures _logging.state (log_file,
+        # log_cli handlers) and may lower the root logger level; swap in
+        # fresh state and restore everything afterwards.
+        old_logging_state = _logging.state
+        old_root_level = logging.getLogger().level
+        old_root_handlers = list(logging.getLogger().handlers)
+        _logging.state = _logging.LoggingState()
         # Warning capture: the inner run_session calls _wcapture.uninstall()
         # on exit, breaking the outer capture. Save the full warning state
         # and reinstall afterwards so the outer run's capture survives.
@@ -749,6 +763,21 @@ class Pytester:
             except Exception:
                 pass
             _capture.state = old_capstate
+            # Logging: close the inner run's handlers, restore the root
+            # logger's level and handler list, then restore the outer state.
+            inner_log = _logging.state
+            inner_log.end_phase()
+            if inner_log.log_file_handler is not None:
+                logging.getLogger().removeHandler(inner_log.log_file_handler)
+                inner_log.log_file_handler.close()
+            if inner_log.log_cli_handler is not None and not isinstance(
+                inner_log.log_cli_handler, _logging._NullCliHandler
+            ):
+                logging.getLogger().removeHandler(inner_log.log_cli_handler)
+            root = logging.getLogger()
+            root.handlers[:] = old_root_handlers
+            root.setLevel(old_root_level)
+            _logging.state = old_logging_state
             reprec.finish_recording()
             # Restore the session-state singletons swapped in above.
             pytest.xfail = old_xfail

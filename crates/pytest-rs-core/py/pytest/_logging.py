@@ -68,6 +68,10 @@ class LogCaptureHandler(logging.StreamHandler):
         self.records.append(record)
         super().emit(record)
 
+    def handleError(self, record):
+        if logging.raiseExceptions:
+            raise
+
     def reset(self):
         # Rebinds (pytest semantics): per-phase record lists already stored
         # in the stash stay alive for get_records().
@@ -80,12 +84,34 @@ class LogCaptureHandler(logging.StreamHandler):
         self.stream = io.StringIO()
 
 
+class _FD1Stream:
+    """File-like that always writes to the current OS fd 1.
+
+    Unlike ``sys.stdout``, this survives the fd-level shuffle that
+    ``globally_disabled()`` performs and the dup2 redirect that pytester's
+    inprocess path installs — the output lands in whatever file fd 1
+    currently points at (the terminal in a normal run, the temp-file in an
+    inprocess pytester run)."""
+
+    def write(self, data):
+        if isinstance(data, str):
+            data = data.encode("utf-8", "replace")
+        try:
+            os.write(1, data)
+        except OSError:
+            pass
+        return len(data)
+
+    def flush(self):
+        pass
+
+
 class _LiveLogHandler(logging.StreamHandler):
     """log_cli live terminal handler: prints a centered "live log {when}"
     section header before the first record of each phase."""
 
     def __init__(self):
-        super().__init__(sys.stdout)
+        super().__init__(_FD1Stream())
         self.when = None
         self._header_printed = False
 
@@ -105,7 +131,7 @@ class _LiveLogHandler(logging.StreamHandler):
                 title = f" live log {self.when} "
                 self.stream.write(f"{title:-^80}\n")
             super().emit(record)
-            self.flush()
+            self.stream.flush()
 
 
 class _RelayHandler(logging.Handler):

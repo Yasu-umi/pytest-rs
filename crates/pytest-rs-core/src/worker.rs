@@ -121,25 +121,27 @@ impl Engine {
             );
             return exit_code::INTERNAL_ERROR;
         }
-        let blocked: Vec<String> = self
-            .config
-            .plugin_opts
-            .iter()
-            .filter_map(|spec| spec.strip_prefix("no:"))
-            .map(str::to_string)
-            .collect();
-        if let Err(err) = python::load_entrypoint_plugins(
-            py,
-            &blocked,
-            &mut self.session.registry,
-            &mut self.session.py_hooks,
-            &mut self.session.plugin_distinfo,
-        ) {
-            eprintln!(
-                "INTERNAL ERROR: worker entry-point plugin loading failed: {}",
-                python::format_exception(py, &err)
-            );
-            return exit_code::INTERNAL_ERROR;
+        if !self.config.get_flag("disable-plugin-autoload") {
+            let blocked: Vec<String> = self
+                .config
+                .plugin_opts
+                .iter()
+                .filter_map(|spec| spec.strip_prefix("no:"))
+                .map(str::to_string)
+                .collect();
+            if let Err(err) = python::load_entrypoint_plugins(
+                py,
+                &blocked,
+                &mut self.session.registry,
+                &mut self.session.py_hooks,
+                &mut self.session.plugin_distinfo,
+            ) {
+                eprintln!(
+                    "INTERNAL ERROR: worker entry-point plugin loading failed: {}",
+                    python::format_exception(py, &err)
+                );
+                return exit_code::INTERNAL_ERROR;
+            }
         }
 
         let mut collection = WorkerCollection::default();

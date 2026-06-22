@@ -175,6 +175,10 @@ fn build_py_config(
         plugins_list.append(p)?;
     }
     option_ns.setattr("plugins", plugins_list)?;
+    option_ns.setattr(
+        "disable_plugin_autoload",
+        config.get_flag("disable-plugin-autoload"),
+    )?;
     let option = option_ns.unbind();
     let inipath = config
         .config_file_name

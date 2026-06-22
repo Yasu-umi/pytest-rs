@@ -537,7 +537,7 @@ impl Config {
     // Core pytest options parsed into flags/values (queried via
     // get_flag/get_value); some are still inert and gain behavior as
     // features land.
-    const CORE_FLAGS: [&str; 33] = [
+    const CORE_FLAGS: [&str; 34] = [
         "fixtures",             // list available fixtures and exit (a la --collect-only)
         "fixtures-per-test",    // list fixtures used by each test and exit
         "loadscope-reorder",    // xdist: reorder loadscope work units by size (default on)
@@ -570,7 +570,8 @@ impl Config {
         "noconftest",      // do not load any conftest.py files
         "pdb",             // start pdb on failures
         "trace",           // break at start of each test
-        "pyargs",          // interpret args as python module paths
+        "pyargs",                  // interpret args as python module paths
+        "disable-plugin-autoload", // disable loading plugins from entry points
     ];
     const CORE_VALUES: [(&str, Option<char>); 43] = [
         ("confcutdir", None),

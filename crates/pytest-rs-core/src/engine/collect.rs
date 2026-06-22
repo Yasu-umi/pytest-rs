@@ -153,21 +153,24 @@ impl Engine {
 
         // Installed third-party plugins (pytest11 entry points) autoload
         // next, before conftests — pytest's setuptools plugin loading.
-        let blocked: Vec<String> = self
-            .config
-            .plugin_opts
-            .iter()
-            .filter_map(|spec| spec.strip_prefix("no:"))
-            .map(str::to_string)
-            .collect();
-        if let Err(err) = python::load_entrypoint_plugins(
-            py,
-            &blocked,
-            &mut self.session.registry,
-            &mut self.session.py_hooks,
-            &mut self.session.plugin_distinfo,
-        ) {
-            return Err(python::format_exception(py, &err));
+        // --disable-plugin-autoload (or the env var) suppresses this.
+        if !self.config.get_flag("disable-plugin-autoload") {
+            let blocked: Vec<String> = self
+                .config
+                .plugin_opts
+                .iter()
+                .filter_map(|spec| spec.strip_prefix("no:"))
+                .map(str::to_string)
+                .collect();
+            if let Err(err) = python::load_entrypoint_plugins(
+                py,
+                &blocked,
+                &mut self.session.registry,
+                &mut self.session.py_hooks,
+                &mut self.session.plugin_distinfo,
+            ) {
+                return Err(python::format_exception(py, &err));
+            }
         }
         Ok(())
     }

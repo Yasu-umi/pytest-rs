@@ -791,13 +791,19 @@ pub(crate) fn resolve_fixture_def(
                     // its raw coroutine/async-generator and warns (this becomes
                     // an error in pytest 9.1).
                     let test_name = item.nodeid.rsplit("::").next().unwrap_or(&item.nodeid);
+                    let autouse_suffix = if def.autouse {
+                        " with autouse=True,"
+                    } else {
+                        ","
+                    };
                     python::warn_explicit_at(
                         py,
                         "PytestRemovedIn9Warning",
                         &format!(
-                            "'{test_name}' requested an async fixture '{}', with no plugin or \
+                            "'{test_name}' requested an async fixture '{}'{autouse_suffix} \
+                             with no plugin or \
                              hook that handled it. This is usually an error, as pytest does not \
-                             natively support it. This will turn into an error in pytest 9.\n  \
+                             natively support it. This will turn into an error in pytest 9.\n\
                              See: https://docs.pytest.org/en/stable/deprecations.html\
                              #sync-test-depending-on-async-fixture",
                             def.name
