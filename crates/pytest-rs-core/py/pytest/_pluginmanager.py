@@ -302,6 +302,12 @@ class _RewriteHookProxy:
                 hook.mark_rewrite(*names)
                 return
 
+    @property
+    def _must_rewrite(self):
+        from pytest._rewrite import _REGISTERED_MODULES
+
+        return _REGISTERED_MODULES
+
     def find_spec(self, name, path=None, target=None):
         from pytest._rewrite import _RewriteFinder
 

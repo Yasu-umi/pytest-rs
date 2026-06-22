@@ -250,6 +250,10 @@ pub(crate) fn register_pytest_plugins(
             .map(|name| name?.extract::<String>())
             .collect::<PyResult<_>>()?,
     };
+    if let Ok(rewrite_mod) = py.import("pytest._rewrite") {
+        let py_names = pyo3::types::PyTuple::new(py, &names)?;
+        let _ = rewrite_mod.call_method1("register_assert_rewrite", py_names);
+    }
     load_named_plugins(py, &names, None, registry, hooks)
 }
 
