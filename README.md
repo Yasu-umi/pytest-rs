@@ -162,7 +162,7 @@ _linux (CI-verified)_
 | networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 6894 | 100.0% | 259 | 266 | 0 |
 | scikit-learn-1 | 1.9.0 | 8432 | 0 | 0 | 6624 | 15056 | 100.0% | 79 | 87 | 0 |
 | scikit-learn-2 | 1.9.0 | 5046 | 0 | 0 | 1892 | 6938 | 100.0% | 52 | 58 | 0 |
-| scikit-learn-3 | 1.9.0 | 9251 | 3 | 0 | 2530 | 11784 | 100.0% | 104 | 114 | 0 |
+| scikit-learn-3 | 1.9.0 | 9212 | 3 | 0 | 2530 | 11745 | 100.0% | 103 | 114 | 0 |
 <!-- conformance-results:end -->
 
 The suites are included as **shallow git submodules** under `conformance/suites/` at the pinned release tags. Initialize them once after cloning:
