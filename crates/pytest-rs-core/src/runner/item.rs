@@ -882,20 +882,37 @@ fn run_item_body(
                 }
             } else {
                 match python::call_with_kwargs(py, &callable, &kwargs) {
-                    Ok(_) => TestReport {
-                        nodeid: item.nodeid.clone(),
-                        phase: Phase::Call,
-                        outcome: Outcome::Passed,
-                        duration: call_started.elapsed(),
-                        longrepr: None,
-                        location: None,
-                        subtest_desc: None,
-                        sections: python::log_failure_sections(py),
-                        rerun: false,
-                        xfail_longrepr: None,
-                        reprcrash_message: None,
-                        head_line: None,
-                    },
+                    Ok(retval) => {
+                        if !retval.is_none() {
+                            let _ = py
+                                .import("warnings")
+                                .and_then(|w| {
+                                    let msg = format!(
+                                        "Expected None, but {} returned {}, which will be an error in a future version of pytest.  Did you mean to use `assert` instead of `return`?",
+                                        item.nodeid,
+                                        retval.get_type().name().map_or("?".to_string(), |n| n.to_string()),
+                                    );
+                                    let cls = py
+                                        .import("pytest")?
+                                        .getattr("PytestReturnNotNoneWarning")?;
+                                    w.call_method1("warn", (cls.call1((msg,))?,))
+                                });
+                        }
+                        TestReport {
+                            nodeid: item.nodeid.clone(),
+                            phase: Phase::Call,
+                            outcome: Outcome::Passed,
+                            duration: call_started.elapsed(),
+                            longrepr: None,
+                            location: None,
+                            subtest_desc: None,
+                            sections: python::log_failure_sections(py),
+                            rerun: false,
+                            xfail_longrepr: None,
+                            reprcrash_message: None,
+                            head_line: None,
+                        }
+                    }
                     Err(err) => {
                         if let Some(code) = python::session_abort_code(py, &err) {
                             session.exit_code_override = Some(code);
