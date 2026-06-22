@@ -1,4 +1,5 @@
 use std::io::Write as _;
+use std::time::Duration;
 
 use pyo3::prelude::*;
 
@@ -8,6 +9,30 @@ use crate::fixture::Scope;
 use crate::python;
 use crate::report::{Outcome, Phase, TestReport};
 use crate::session::Session;
+
+/// Timing mark that respects `_pytest.timing.perf_counter` (mockable).
+///
+/// Unlike `std::time::Instant`, this goes through Python's timing module
+/// so that `mock_timing` fixtures (used in --durations tests) work.
+#[derive(Clone, Copy)]
+pub(crate) struct TimeMark(f64);
+
+impl TimeMark {
+    pub(crate) fn now(py: Python<'_>) -> Self {
+        let t = py
+            .import("_pytest.timing")
+            .and_then(|m| m.getattr("perf_counter"))
+            .and_then(|f| f.call0())
+            .and_then(|v| v.extract::<f64>())
+            .unwrap_or(0.0);
+        Self(t)
+    }
+
+    pub(crate) fn elapsed(self, py: Python<'_>) -> Duration {
+        let now = Self::now(py).0;
+        Duration::from_secs_f64((now - self.0).max(0.0))
+    }
+}
 
 mod fixtures;
 mod hooks;

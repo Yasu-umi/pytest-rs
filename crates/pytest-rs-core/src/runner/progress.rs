@@ -8,7 +8,7 @@ use crate::fixture::Scope;
 use crate::python;
 use crate::report::{Outcome, Phase, TestReport};
 use crate::session::Session;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 /// log_cli live mode: print outcome words for reports not yet printed
 /// (the call outcome appears between the call and teardown log sections).
@@ -224,7 +224,7 @@ pub(crate) fn report_from_err(
     config: &Config,
     item: &TestItem,
     phase: Phase,
-    started: Instant,
+    started: TimeMark,
     err: &PyErr,
 ) -> TestReport {
     // Raw unittest.SkipTest (e.g. from a plain test function) skips like
@@ -236,7 +236,7 @@ pub(crate) fn report_from_err(
             nodeid: item.nodeid.clone(),
             phase,
             outcome: Outcome::XFailed,
-            duration: started.elapsed(),
+            duration: started.elapsed(py),
             longrepr: python::outcome_msg(py, err),
             location: None,
             subtest_desc: None,
@@ -266,7 +266,7 @@ pub(crate) fn report_from_err(
             nodeid: item.nodeid.clone(),
             phase,
             outcome: Outcome::Skipped,
-            duration: started.elapsed(),
+            duration: started.elapsed(py),
             longrepr: python::outcome_msg(py, err),
             location,
             subtest_desc: None,
@@ -281,7 +281,7 @@ pub(crate) fn report_from_err(
             nodeid: item.nodeid.clone(),
             phase,
             outcome: Outcome::Failed,
-            duration: started.elapsed(),
+            duration: started.elapsed(py),
             longrepr: Some(python::format_test_failure(
                 py,
                 err,

@@ -393,7 +393,6 @@ class PluginManager:
             "cacheprovider",
             "doctest",
             "hookspec",
-            "pastebin",
             "pytester",
         }
     )
@@ -411,6 +410,10 @@ class PluginManager:
             return _capture.manager
         if name == "terminalreporter":
             return self._get_terminalreporter()
+        if name == "pastebin":
+            import _pytest.pastebin
+
+            return _pytest.pastebin
         if name in self._CORE_PLUGIN_NAMES:
             return True  # sentinel: plugin exists but has no Python object
         return None

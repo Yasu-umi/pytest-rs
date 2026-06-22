@@ -3,7 +3,7 @@
 //! `run_one_body`, which drives setup -> call -> outcome via run_item_body.
 
 use std::io::Write as _;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use pyo3::prelude::*;
 
@@ -38,7 +38,7 @@ pub(crate) fn run_one(
                     config,
                     item,
                     Phase::Setup,
-                    Instant::now(),
+                    TimeMark::now(py),
                     &err,
                 )];
             }
@@ -72,7 +72,7 @@ pub(crate) fn run_one(
                 config,
                 item,
                 Phase::Setup,
-                Instant::now(),
+                TimeMark::now(py),
                 &err,
             )];
         }
@@ -90,7 +90,7 @@ pub(crate) fn run_one(
 /// Run a custom collector item (pytest.Item subclass) via the shim's
 /// run_custom_item, mapping its (when, outcome, longrepr) tuples to reports.
 fn run_custom_item(py: Python<'_>, config: &Config, item: &TestItem) -> Vec<TestReport> {
-    let started = Instant::now();
+    let started = TimeMark::now(py);
     // reportinfo()[2] is the failure-section heading (pytest-mypy's
     // test_name_formatter); empty means "use the nodeid domain" (default Item).
     let head_line = item
@@ -158,7 +158,7 @@ fn run_custom_item(py: Python<'_>, config: &Config, item: &TestItem) -> Vec<Test
             nodeid: item.nodeid.clone(),
             phase,
             outcome: oc,
-            duration: started.elapsed(),
+            duration: started.elapsed(py),
             longrepr,
             location,
             subtest_desc: None,
@@ -457,7 +457,7 @@ fn evaluate_item_prelude(
                 config,
                 item,
                 Phase::Setup,
-                Instant::now(),
+                TimeMark::now(py),
                 &err,
             ));
             return ItemPrelude::Done(reports);
@@ -478,7 +478,7 @@ fn evaluate_item_prelude(
                 config,
                 item,
                 Phase::Setup,
-                Instant::now(),
+                TimeMark::now(py),
                 &err,
             ));
             return ItemPrelude::Done(reports);
@@ -549,7 +549,7 @@ pub(crate) fn run_one_body(
             config,
             item,
             Phase::Setup,
-            Instant::now(),
+            TimeMark::now(py),
             &err,
         ));
         return reports;
@@ -582,7 +582,7 @@ pub(crate) fn run_one_body(
                 config,
                 item,
                 Phase::Setup,
-                Instant::now(),
+                TimeMark::now(py),
                 &err,
             ));
             python::end_item_context(py);
@@ -653,7 +653,7 @@ fn run_item_body(
         &format!("{} (setup)", item.nodeid),
     );
     python::log_start_phase(py, "setup", log_level_cfg.as_deref());
-    let setup_started = Instant::now();
+    let setup_started = TimeMark::now(py);
     let setup_result = build_test_setup(py, plugins, session, config, item);
 
     let (callable, kwargs, test_request) = match setup_result {
@@ -703,7 +703,7 @@ fn run_item_body(
         nodeid: item.nodeid.clone(),
         phase: Phase::Setup,
         outcome: Outcome::Passed,
-        duration: setup_started.elapsed(),
+        duration: setup_started.elapsed(py),
         longrepr: None,
         location: None,
         subtest_desc: None,
@@ -782,7 +782,7 @@ fn run_item_body(
         }
     }
     python::log_start_phase(py, "call", log_level_cfg.as_deref());
-    let call_started = Instant::now();
+    let call_started = TimeMark::now(py);
     // pytest_runtest_call hookwrappers surround just the call phase; their
     // post-yield part runs after the test body, pass or fail.
     let (call_wrappers, wrapper_start_err) =
@@ -846,7 +846,7 @@ fn run_item_body(
             nodeid: item.nodeid.clone(),
             phase: Phase::Call,
             outcome: Outcome::Passed,
-            duration: call_started.elapsed(),
+            duration: call_started.elapsed(py),
             longrepr: None,
             location: None,
             subtest_desc: None,
@@ -864,7 +864,7 @@ fn run_item_body(
                     nodeid: item.nodeid.clone(),
                     phase: Phase::Call,
                     outcome: Outcome::Failed,
-                    duration: call_started.elapsed(),
+                    duration: call_started.elapsed(py),
                     longrepr: Some(
                         "async def functions are not natively supported.\n\
                          You need to install a suitable plugin for your async framework, \
@@ -900,7 +900,7 @@ fn run_item_body(
                                 nodeid: item.nodeid.clone(),
                                 phase: Phase::Call,
                                 outcome: Outcome::Failed,
-                                duration: call_started.elapsed(),
+                                duration: call_started.elapsed(py),
                                 longrepr: Some(
                                     "async def functions are not natively supported.\n\
                                      You need to install a suitable plugin for your async framework, \
@@ -936,7 +936,7 @@ fn run_item_body(
                                 nodeid: item.nodeid.clone(),
                                 phase: Phase::Call,
                                 outcome: Outcome::Passed,
-                                duration: call_started.elapsed(),
+                                duration: call_started.elapsed(py),
                                 longrepr: None,
                                 location: None,
                                 subtest_desc: None,

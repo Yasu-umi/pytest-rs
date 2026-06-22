@@ -649,12 +649,12 @@ impl Engine {
             },
             None => return,
         };
-        let durations_min: f64 = self
-            .config
-            .get_value("durations-min")
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(0.005);
+        let explicit_min = self.config.get_value("durations-min");
         let verbose = self.config.global_verbosity() >= 2;
+        let durations_min: f64 = explicit_min
+            .as_deref()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(if verbose { 0.0 } else { 0.005 });
 
         let mut entries: Vec<(f64, &str, &str)> = self
             .session
@@ -686,16 +686,23 @@ impl Engine {
 
         let mut hidden = 0;
         for &(secs, phase, nodeid) in &selected {
-            if !verbose && secs < durations_min {
+            if secs < durations_min {
                 hidden += 1;
             } else {
                 println!("{secs:.2}s {phase:8} {nodeid}");
             }
         }
         if hidden > 0 {
-            println!(
-                "({hidden} durations < {durations_min:.3}s hidden.  Use -vv to show these durations.)"
-            );
+            let min_str = format_g(durations_min);
+            let hint = if explicit_min.is_none() {
+                format!(
+                    "({hidden} durations < {min_str}s hidden.  Use -vv to show these durations.)"
+                )
+            } else {
+                format!("({hidden} durations < {min_str}s hidden.)")
+            };
+            println!();
+            println!("{hint}");
         }
     }
 
@@ -717,7 +724,7 @@ impl Engine {
                             continue;
                         }
                         let word = match &report.subtest_desc {
-                            Some(desc) => format!("{desc} SUBSKIP"),
+                            Some(desc) => format!("SUBSKIPPED{desc}"),
                             None => "SKIPPED".to_string(),
                         };
                         let mut line = format!("{word} {}", report.nodeid);
@@ -746,7 +753,7 @@ impl Engine {
                     }
                     if label.is_none() {
                         label = Some(match &report.subtest_desc {
-                            Some(desc) => format!("{desc} SUBSKIP"),
+                            Some(desc) => format!("SUBSKIPPED{desc}"),
                             None => "SKIPPED".to_string(),
                         });
                     }
@@ -778,9 +785,9 @@ impl Engine {
                     _ => continue,
                 };
                 let word = match (&report.subtest_desc, report.outcome) {
-                    (Some(desc), Outcome::Failed) => format!("{desc} SUBFAIL"),
-                    (Some(desc), Outcome::Passed) => format!("{desc} SUBPASS"),
-                    (Some(desc), Outcome::XFailed) => format!("{desc} SUBXFAIL"),
+                    (Some(desc), Outcome::Failed) => format!("SUBFAILED{desc}"),
+                    (Some(desc), Outcome::Passed) => format!("SUBPASSED{desc}"),
+                    (Some(desc), Outcome::XFailed) => format!("SUBXFAILED{desc}"),
                     _ => word.to_string(),
                 };
                 let mut line = format!("{word} {}", report.nodeid);
@@ -1106,6 +1113,14 @@ impl Engine {
 
 /// pytest's running_on_ci(): the CI / BUILD_NUMBER env vars suppress
 /// short-summary message trimming so CI logs keep the full crash text.
+/// Python's `%g` format: shortest representation, strip trailing zeros.
+fn format_g(v: f64) -> String {
+    let s = format!("{v:.6}");
+    let s = s.trim_end_matches('0');
+    let s = s.trim_end_matches('.');
+    s.to_string()
+}
+
 fn running_on_ci() -> bool {
     std::env::var_os("CI").is_some() || std::env::var_os("BUILD_NUMBER").is_some()
 }
