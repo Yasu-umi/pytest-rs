@@ -17,7 +17,7 @@ import types
 # tag, so it can never be confused with CPython's own (non-rewritten) bytecode
 # for the same file. Bump _CACHE_VERSION whenever _AssertRewriter's output
 # changes, to invalidate any stale rewritten pyc left on disk.
-_CACHE_VERSION = 3
+_CACHE_VERSION = 4
 _PYC_TAIL = f".{sys.implementation.cache_tag}-pytestrs{_CACHE_VERSION}.pyc"
 
 _OPS = {
@@ -624,6 +624,19 @@ class _RewriteLoader(importlib.machinery.SourceFileLoader):
             docstring = None
         if not (docstring and "PYTEST_DONT_REWRITE" in docstring):
             _AssertRewriter(path).visit(tree)
+            _builtins_import = ast.Import(
+                names=[ast.alias(name="builtins", asname="@py_builtins")]
+            )
+            insert_pos = 0
+            for i, stmt in enumerate(tree.body):
+                if isinstance(stmt, ast.ImportFrom) and stmt.module == "__future__":
+                    insert_pos = i + 1
+                elif isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
+                    if insert_pos <= i:
+                        insert_pos = i + 1
+                else:
+                    break
+            tree.body.insert(insert_pos, _builtins_import)
             ast.fix_missing_locations(tree)
         return compile(tree, path, "exec", dont_inherit=True, optimize=_optimize)
 
