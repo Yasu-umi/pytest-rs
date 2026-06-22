@@ -277,28 +277,27 @@ impl Engine {
 
         // ── Helpers ──────────────────────────────────────────────────────
 
-        let make_proxy =
-            |name: &str,
-             nodeid: &str,
-             path_str: &str,
-             parent: Py<PyAny>,
-             class_name: &str|
-             -> PyResult<Py<PyAny>> {
-                let py_path = pathlib_path
-                    .call1((path_str,))?
-                    .call_method0("resolve")
-                    .unwrap_or_else(|_| pathlib_path.call1((path_str,)).unwrap());
-                proxy_cls
-                    .call1((
-                        name,
-                        nodeid,
-                        py_path,
-                        session_proxy.clone_ref(py),
-                        parent,
-                        class_name,
-                    ))
-                    .map(|b| b.unbind())
-            };
+        let make_proxy = |name: &str,
+                          nodeid: &str,
+                          path_str: &str,
+                          parent: Py<PyAny>,
+                          class_name: &str|
+         -> PyResult<Py<PyAny>> {
+            let py_path = pathlib_path
+                .call1((path_str,))?
+                .call_method0("resolve")
+                .unwrap_or_else(|_| pathlib_path.call1((path_str,)).unwrap());
+            proxy_cls
+                .call1((
+                    name,
+                    nodeid,
+                    py_path,
+                    session_proxy.clone_ref(py),
+                    parent,
+                    class_name,
+                ))
+                .map(|b| b.unbind())
+        };
 
         let dir_key = |file: &str| -> String {
             match std::path::Path::new(file).parent() {
@@ -308,45 +307,39 @@ impl Engine {
             }
         };
 
-        let make_report =
-            |nodeid: &str,
-             outcome: &str,
-             longrepr: Py<PyAny>,
-             result: &Bound<'_, PyList>|
-             -> PyResult<Py<PyAny>> {
-                let kw = PyDict::new(py);
-                kw.set_item("nodeid", nodeid)?;
-                kw.set_item("outcome", outcome)?;
-                kw.set_item("longrepr", longrepr)?;
-                let file = nodeid.split("::").next().unwrap_or(nodeid);
-                kw.set_item("location", (file, py.None(), file))?;
-                kw.set_item("result", result)?;
-                kw.set_item("sections", PyList::empty(py))?;
-                kw.set_item("when", "collect")?;
-                collect_report_cls.call((), Some(&kw)).map(|b| b.unbind())
-            };
+        let make_report = |nodeid: &str,
+                           outcome: &str,
+                           longrepr: Py<PyAny>,
+                           result: &Bound<'_, PyList>|
+         -> PyResult<Py<PyAny>> {
+            let kw = PyDict::new(py);
+            kw.set_item("nodeid", nodeid)?;
+            kw.set_item("outcome", outcome)?;
+            kw.set_item("longrepr", longrepr)?;
+            let file = nodeid.split("::").next().unwrap_or(nodeid);
+            kw.set_item("location", (file, py.None(), file))?;
+            kw.set_item("result", result)?;
+            kw.set_item("sections", PyList::empty(py))?;
+            kw.set_item("when", "collect")?;
+            collect_report_cls.call((), Some(&kw)).map(|b| b.unbind())
+        };
 
-        let fire_collector =
-            |collector: &Py<PyAny>, report: Py<PyAny>| {
-                python::record_hook(
-                    py,
-                    "pytest_collectstart",
-                    &[("collector", collector.clone_ref(py))],
-                );
-                python::record_hook(
-                    py,
-                    "pytest_make_collect_report",
-                    &[
-                        ("collector", collector.clone_ref(py)),
-                        ("report", report.clone_ref(py)),
-                    ],
-                );
-                python::record_hook(
-                    py,
-                    "pytest_collectreport",
-                    &[("report", report)],
-                );
-            };
+        let fire_collector = |collector: &Py<PyAny>, report: Py<PyAny>| {
+            python::record_hook(
+                py,
+                "pytest_collectstart",
+                &[("collector", collector.clone_ref(py))],
+            );
+            python::record_hook(
+                py,
+                "pytest_make_collect_report",
+                &[
+                    ("collector", collector.clone_ref(py)),
+                    ("report", report.clone_ref(py)),
+                ],
+            );
+            python::record_hook(py, "pytest_collectreport", &[("report", report)]);
+        };
 
         let item_stub = |nodeid: &str, name: &str| -> PyResult<Py<PyAny>> {
             let ns = PyDict::new(py);
@@ -456,8 +449,7 @@ impl Engine {
         // ── Build proxies (Vec for deterministic order) ──────────────────
 
         let rootdir_str = self.config.rootdir.to_string_lossy().to_string();
-        let session: Py<PyAny> =
-            make_proxy("", "", &rootdir_str, py.None(), "Session")?;
+        let session: Py<PyAny> = make_proxy("", "", &rootdir_str, py.None(), "Session")?;
 
         let mut dir_proxies: Vec<(String, Py<PyAny>)> = Vec::new();
         for dir in &dirs {
@@ -514,13 +506,11 @@ impl Engine {
             let children = PyList::empty(py);
             let prefix = format!("{}::", key);
             for item in items {
-                if let Some(tail) = item.nodeid.strip_prefix(prefix.as_str()) {
-                    if !tail.contains("::") {
-                        let nm = tail;
-                        if let Ok(s) = item_stub(&item.nodeid, nm) {
-                            let _ = children.append(s.bind(py));
-                        }
-                    }
+                if let Some(tail) = item.nodeid.strip_prefix(prefix.as_str())
+                    && !tail.contains("::")
+                    && let Ok(s) = item_stub(&item.nodeid, tail)
+                {
+                    let _ = children.append(s.bind(py));
                 }
             }
             let report = make_report(key, "passed", py.None(), &children)?;
@@ -574,16 +564,17 @@ impl Engine {
                     (*location, 1u64)
                 };
                 let skip_reason = format!("Skipped: {reason}");
-                let longrepr: Py<PyAny> =
-                    pyo3::types::PyTuple::new(py, [
+                let longrepr: Py<PyAny> = pyo3::types::PyTuple::new(
+                    py,
+                    [
                         loc_file.into_pyobject(py)?.into_any().unbind(),
                         lineno.into_pyobject(py)?.into_any().unbind(),
                         skip_reason.into_pyobject(py)?.into_any().unbind(),
-                    ])?
-                    .unbind()
-                    .into();
-                let report =
-                    make_report(nodeid, "skipped", longrepr, &PyList::empty(py))?;
+                    ],
+                )?
+                .unbind()
+                .into();
+                let report = make_report(nodeid, "skipped", longrepr, &PyList::empty(py))?;
                 let _ = report.bind(py).setattr("collector", mp.bind(py));
                 fire_collector(&mp, report);
             }
@@ -602,11 +593,7 @@ impl Engine {
                 .and_then(|n| n.to_str())
                 .unwrap_or(nodeid);
             if let Ok(mp) = make_proxy(name, nodeid, nodeid, parent, "Module") {
-                python::record_hook(
-                    py,
-                    "pytest_collectstart",
-                    &[("collector", mp)],
-                );
+                python::record_hook(py, "pytest_collectstart", &[("collector", mp)]);
             }
         }
 
@@ -619,24 +606,24 @@ impl Engine {
                 }
             }
             if let Some(reason) = skipped_dirs.get(dk.as_str()) {
-                let longrepr: Py<PyAny> =
-                    pyo3::types::PyTuple::new(py, [
+                let longrepr: Py<PyAny> = pyo3::types::PyTuple::new(
+                    py,
+                    [
                         dk.as_str().into_pyobject(py)?.into_any().unbind(),
                         1u64.into_pyobject(py)?.into_any().unbind(),
                         format!("Skipped: {reason}")
                             .into_pyobject(py)?
                             .into_any()
                             .unbind(),
-                    ])?
-                    .unbind()
-                    .into();
-                let report =
-                    make_report(dk, "skipped", longrepr, &children)?;
+                    ],
+                )?
+                .unbind()
+                .into();
+                let report = make_report(dk, "skipped", longrepr, &children)?;
                 let _ = report.bind(py).setattr("collector", dp.bind(py));
                 fire_collector(dp, report);
             } else {
-                let report =
-                    make_report(dk, "passed", py.None(), &children)?;
+                let report = make_report(dk, "passed", py.None(), &children)?;
                 let _ = report.bind(py).setattr("collector", dp.bind(py));
                 fire_collector(dp, report);
             }

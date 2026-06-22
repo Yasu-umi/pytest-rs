@@ -1615,10 +1615,19 @@ fn validate_parametrize_argnames(
         }
         let argnames_obj = args.get_item(0)?;
         let argnames: Vec<String> = match argnames_obj.extract::<String>() {
-            Ok(joined) => joined.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect(),
+            Ok(joined) => joined
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect(),
             Err(_) => argnames_obj.extract()?,
         };
-        let indirect_obj = mark.obj.bind(py).getattr("kwargs")?.get_item("indirect").ok();
+        let indirect_obj = mark
+            .obj
+            .bind(py)
+            .getattr("kwargs")?
+            .get_item("indirect")
+            .ok();
         let indirect_all = indirect_obj
             .as_ref()
             .and_then(|v| v.extract::<bool>().ok())
@@ -1714,28 +1723,27 @@ pub(crate) fn expand_parametrize(
         };
         let ids_obj = mark.obj.bind(py).getattr("kwargs")?.get_item("ids").ok();
         let n_argvalues = argvalues.len().unwrap_or(usize::MAX);
-        let explicit_ids: Option<Vec<(Option<String>, bool)>> =
-            ids_obj.as_ref().and_then(|ids| {
-                if ids.is_callable() {
-                    return None;
+        let explicit_ids: Option<Vec<(Option<String>, bool)>> = ids_obj.as_ref().and_then(|ids| {
+            if ids.is_callable() {
+                return None;
+            }
+            let iter = ids.try_iter().ok()?;
+            let mut result = Vec::new();
+            for id in iter {
+                if result.len() >= n_argvalues {
+                    break;
                 }
-                let iter = ids.try_iter().ok()?;
-                let mut result = Vec::new();
-                for id in iter {
-                    if result.len() >= n_argvalues {
-                        break;
-                    }
-                    let id = id.ok()?;
-                    if id.is(&hidden_param) {
-                        result.push((None, true));
-                    } else if id.is_none() {
-                        result.push((None, false));
-                    } else {
-                        result.push((Some(id.extract::<String>().ok()?), false));
-                    }
+                let id = id.ok()?;
+                if id.is(&hidden_param) {
+                    result.push((None, true));
+                } else if id.is_none() {
+                    result.push((None, false));
+                } else {
+                    result.push((Some(id.extract::<String>().ok()?), false));
                 }
-                Some(result)
-            });
+            }
+            Some(result)
+        });
         // ids=callable: idfn(val) per value, None falling through to the
         // default id for that value (upstream _idval_from_function).
         let ids_callable = ids_obj.filter(|ids| ids.is_callable());
@@ -1754,7 +1762,8 @@ pub(crate) fn expand_parametrize(
         let indirect_names: Vec<String> = indirect_obj
             .as_ref()
             .and_then(|value| {
-                value.extract::<Vec<String>>()
+                value
+                    .extract::<Vec<String>>()
                     .ok()
                     .or_else(|| value.extract::<String>().ok().map(|s| vec![s]))
             })
@@ -1828,14 +1837,12 @@ pub(crate) fn expand_parametrize(
             }
 
             // Check explicit_ids for HIDDEN_PARAM at this index.
-            if !hidden {
-                if let Some(ref ids) = explicit_ids {
-                    if let Some((_, is_hidden)) = ids.get(index) {
-                        if *is_hidden {
-                            hidden = true;
-                        }
-                    }
-                }
+            if !hidden
+                && let Some(ref ids) = explicit_ids
+                && let Some((_, is_hidden)) = ids.get(index)
+                && *is_hidden
+            {
+                hidden = true;
             }
 
             let id_part = if hidden {
@@ -2058,9 +2065,7 @@ fn dedup_param_ids(
                  the same parametrize call, because the tests names need to be unique."
             );
             let failed_result: PyResult<PyErr> = (|| {
-                let cls = py
-                    .import("_pytest.outcomes")?
-                    .getattr("Failed")?;
+                let cls = py.import("_pytest.outcomes")?.getattr("Failed")?;
                 let instance = cls.call1((&msg,))?;
                 instance.setattr("pytrace", false)?;
                 Ok(PyErr::from_value(instance))

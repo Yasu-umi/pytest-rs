@@ -709,6 +709,7 @@ class Pytester:
         # hook is clobbered by the inner cleanup.
         import pytest._threadexception as _threadexc
         import pytest._unraisable as _unraisable
+
         old_threadexc_deque = _threadexc._deque
         old_threadexc_prev = _threadexc._prev_hook
         old_threadexc_hook = threading.excepthook
@@ -1096,7 +1097,9 @@ class Pytester:
         for pm in param_marks:
             argvalues = list(pm.args[1]) if len(pm.args) > 1 else []
             argnames_raw = pm.args[0] if pm.args else pm.kwargs.get("argnames", "")
-            nargs = len(argnames_raw.split(",")) if isinstance(argnames_raw, str) else len(argnames_raw)
+            nargs = (
+                len(argnames_raw.split(",")) if isinstance(argnames_raw, str) else len(argnames_raw)
+            )
             ids_kwarg = pm.kwargs.get("ids", None)
             level = []
             for i, val in enumerate(argvalues):
@@ -1129,7 +1132,9 @@ class Pytester:
             frags = [frag for frag, _ in combo if frag is not None]
             combo_marks = [mk for _, marks in combo for mk in marks]
             if frags:
-                items.append(make_fn(f"{base_name}[{'-'.join(frags)}]", [*base_marks, *combo_marks]))
+                items.append(
+                    make_fn(f"{base_name}[{'-'.join(frags)}]", [*base_marks, *combo_marks])
+                )
             else:
                 items.append(make_fn(base_name, [*base_marks, *combo_marks]))
         return items
@@ -1426,6 +1431,7 @@ class Pytester:
 
         def _validate_parametrize_argnames(func, marks, cls=None):
             import inspect as _insp
+
             param_marks = [m for m in marks if m.name == "parametrize"]
             if not param_marks:
                 return
@@ -1514,7 +1520,9 @@ class Pytester:
                         lineno = getattr(getattr(func, "__code__", None), "co_firstlineno", 0)
                         methods.append((lineno, mname, func))
                 for _ln, mname, func in sorted(methods):
-                    _validate_parametrize_argnames(func, [*get_unpacked_marks(func), *class_marks], cls=obj)
+                    _validate_parametrize_argnames(
+                        func, [*get_unpacked_marks(func), *class_marks], cls=obj
+                    )
                     sub = Pytester._expand_params(
                         [*get_unpacked_marks(func), *class_marks],
                         module_marks,

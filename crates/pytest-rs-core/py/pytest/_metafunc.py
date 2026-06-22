@@ -62,13 +62,13 @@ class CallSpec2:
         params: dict[str, object] | None = None,
         indices: dict[str, int] | None = None,
         _arg2scope: dict[str, ScopeEnum] | None = None,
-        _idlist: Sequence[str] | None = None,
+        _idlist: Sequence[str | object] | None = None,
         marks: list | None = None,
     ) -> None:
         self.params: dict[str, object] = dict(params) if params else {}
         self.indices: dict[str, int] = dict(indices) if indices else {}
         self._arg2scope: dict[str, ScopeEnum] = dict(_arg2scope) if _arg2scope else {}
-        self._idlist: list[str] = list(_idlist) if _idlist else []
+        self._idlist: list[str | object] = list(_idlist) if _idlist else []
         self.marks: list = list(marks) if marks else []
 
     @property
@@ -80,7 +80,7 @@ class CallSpec2:
         *,
         argnames: Iterable[str],
         valset: Iterable[object],
-        id: str,
+        id: str | object,
         marks: Iterable[Any],
         scope: ScopeEnum,
         param_index: int,
@@ -95,7 +95,7 @@ class CallSpec2:
             params[arg] = val
             indices[arg] = param_index
             arg2scope[arg] = scope
-        new_idlist = list(self._idlist)
+        new_idlist: list[str | object] = list(self._idlist)
         if id is not HIDDEN_PARAM:
             new_idlist.append(id)
         new_marks = list(self.marks)
@@ -239,8 +239,8 @@ class Metafunc:
         if ids is not None and not callable(ids):
             try:
                 iter(ids)
-            except TypeError:
-                raise TypeError("ids must be a callable or an iterable")
+            except TypeError as err:
+                raise TypeError("ids must be a callable or an iterable") from err
         argnames_parsed = _parse_argnames(argnames)
         nodeid = getattr(self.definition, "nodeid", "")
         argvalues_list = list(argvalues)
@@ -267,8 +267,9 @@ class Metafunc:
         parametersets = _resolve_parametersets(argnames_parsed, argvalues_list, self.function)
 
         if not parametersets:
-            skip_mark = _mark.skip(reason="got empty parameter set %r, function %s"
-                                   % (argnames, self.function.__name__))
+            skip_mark = _mark.skip(
+                reason=f"got empty parameter set {argnames!r}, function {self.function.__name__}"
+            )
             newcalls: list[CallSpec2] = []
             for callspec in self._calls or [CallSpec2()]:
                 newcallspec = callspec.setmulti(
@@ -309,7 +310,7 @@ class Metafunc:
         arg_directness = self._resolve_args_directness(argnames_parsed, indirect)
         self._params_directness.update(arg_directness)
 
-        newcalls: list[CallSpec2] = []
+        newcalls2: list[CallSpec2] = []
         for callspec in self._calls or [CallSpec2()]:
             for param_index, (param_id, param_set) in enumerate(zip(resolved_ids, parametersets)):
                 newcallspec = callspec.setmulti(
@@ -321,8 +322,8 @@ class Metafunc:
                     param_index=param_index,
                     nodeid=nodeid,
                 )
-                newcalls.append(newcallspec)
-        self._calls = newcalls
+                newcalls2.append(newcallspec)
+        self._calls = newcalls2
 
     def _resolve_ids(
         self,
@@ -391,8 +392,7 @@ class Metafunc:
             for arg in indirect:
                 if arg not in argnames:
                     fail(
-                        f"In {self.function.__name__}: indirect fixture '{arg}' "
-                        f"doesn't exist",
+                        f"In {self.function.__name__}: indirect fixture '{arg}' doesn't exist",
                         pytrace=False,
                     )
 

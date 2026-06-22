@@ -764,10 +764,7 @@ impl Engine {
                     );
                     println!(
                         "{}",
-                        crate::tw::markup(
-                            &center_with(&banner, '!'),
-                            &[crate::tw::RED],
-                        )
+                        crate::tw::markup(&center_with(&banner, '!'), &[crate::tw::RED],)
                     );
                 }
                 self.print_collect_only_summary(started.elapsed(), n_collect_errors);
