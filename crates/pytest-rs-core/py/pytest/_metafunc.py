@@ -376,21 +376,44 @@ class Metafunc:
     def _validate_if_using_arg_names(
         self, argnames: list[str], indirect: bool | Sequence[str]
     ) -> None:
-        if indirect is True or indirect is False:
-            return
-        if not isinstance(indirect, (list, tuple)):
+        import inspect
+
+        if isinstance(indirect, str):
+            indirect = [indirect]
+
+        if not isinstance(indirect, (bool, list, tuple)):
             fail(
                 f"In {self.function.__name__}: expected Sequence or boolean for "
                 f"indirect, got {type(indirect).__name__}",
                 pytrace=False,
             )
-        for arg in indirect:
-            if arg not in argnames:
-                fail(
-                    f"In {self.function.__name__}: indirect fixture '{arg}' "
-                    f"doesn't exist",
-                    pytrace=False,
-                )
+        if isinstance(indirect, (list, tuple)):
+            for arg in indirect:
+                if arg not in argnames:
+                    fail(
+                        f"In {self.function.__name__}: indirect fixture '{arg}' "
+                        f"doesn't exist",
+                        pytrace=False,
+                    )
+
+        try:
+            func_params = set(inspect.signature(self.function).parameters.keys())
+        except (ValueError, TypeError):
+            func_params = set()
+        all_names = set(self.fixturenames) | func_params | {"request"}
+        for arg in argnames:
+            if arg in all_names:
+                continue
+            if self._arg2fixturedefs.get(arg):
+                continue
+            if isinstance(indirect, (list, tuple)):
+                kind = "fixture" if arg in indirect else "argument"
+            else:
+                kind = "fixture" if indirect else "argument"
+            fail(
+                f"In {self.function.__name__}: function uses no {kind} '{arg}'",
+                pytrace=False,
+            )
 
     def _resolve_args_directness(
         self, argnames: list[str], indirect: bool | Sequence[str]

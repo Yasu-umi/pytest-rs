@@ -1499,7 +1499,17 @@ pub(crate) fn push_test_items(
         }
     }
 
-    let variants = expand_parametrize(py, &marks, &format!("{nodeid_prefix}::{name}"), Some(func))?;
+    validate_parametrize_argnames(
+        py,
+        &marks,
+        name,
+        &fixture_names,
+        &extra_generated_fixtures,
+        func,
+    )?;
+
+    let test_nodeid = format!("{nodeid_prefix}::{name}");
+    let variants = expand_parametrize(py, &marks, &test_nodeid, Some(func))?;
     for variant in variants {
         let nodeid = match &variant.id {
             Some(id) => format!("{nodeid_prefix}::{name}[{id}]"),
@@ -1573,6 +1583,83 @@ struct Dim {
 }
 
 /// Expand stacked @pytest.mark.parametrize marks into the cartesian product
+/// Validate that parametrize argnames are either function parameters or
+/// known fixtures. Raises Failed(pytrace=False) like upstream's
+/// `Metafunc._validate_if_using_arg_names`.
+fn validate_parametrize_argnames(
+    py: Python<'_>,
+    marks: &[MarkData],
+    func_name: &str,
+    fixture_names: &[String],
+    extra_fixture_names: &[String],
+    func: &Bound<'_, PyAny>,
+) -> PyResult<()> {
+    let inspect = py.import("inspect")?;
+    let all_params: std::collections::HashSet<String> = inspect
+        .call_method1("signature", (func,))
+        .and_then(|sig| sig.getattr("parameters"))
+        .and_then(|params| {
+            params
+                .call_method0("keys")?
+                .try_iter()?
+                .map(|k| k.and_then(|v| v.extract::<String>()))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    for mark in marks.iter().filter(|m| m.name == "parametrize") {
+        let args = mark.obj.bind(py).getattr("args")?;
+        if args.len()? == 0 {
+            continue;
+        }
+        let argnames_obj = args.get_item(0)?;
+        let argnames: Vec<String> = match argnames_obj.extract::<String>() {
+            Ok(joined) => joined.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect(),
+            Err(_) => argnames_obj.extract()?,
+        };
+        let indirect_obj = mark.obj.bind(py).getattr("kwargs")?.get_item("indirect").ok();
+        let indirect_all = indirect_obj
+            .as_ref()
+            .and_then(|v| v.extract::<bool>().ok())
+            .unwrap_or(false);
+        let indirect_names: Vec<String> = indirect_obj
+            .as_ref()
+            .and_then(|v| {
+                v.extract::<Vec<String>>()
+                    .ok()
+                    .or_else(|| v.extract::<String>().ok().map(|s| vec![s]))
+            })
+            .unwrap_or_default();
+
+        for argname in &argnames {
+            if argname == "request"
+                || fixture_names.contains(argname)
+                || extra_fixture_names.contains(argname)
+                || all_params.contains(argname.as_str())
+            {
+                continue;
+            }
+            let kind = if indirect_all || indirect_names.iter().any(|n| n == argname) {
+                "fixture"
+            } else {
+                "argument"
+            };
+            let msg = format!("In {func_name}: function uses no {kind} '{argname}'");
+            let failed_result: PyResult<PyErr> = (|| {
+                let cls = py.import("_pytest.outcomes")?.getattr("Failed")?;
+                let instance = cls.call1((&msg,))?;
+                instance.setattr("pytrace", false)?;
+                Ok(PyErr::from_value(instance))
+            })();
+            return Err(match failed_result {
+                Ok(err) => err,
+                Err(_) => collect_error(py, &msg),
+            });
+        }
+    }
+    Ok(())
+}
+
 /// of parameter sets. Marks appear in pytestmark order (bottom decorator
 /// first); ids join in that order and later marks vary fastest.
 pub(crate) fn expand_parametrize(
@@ -1665,7 +1752,11 @@ pub(crate) fn expand_parametrize(
             .unwrap_or(false);
         let indirect_names: Vec<String> = indirect_obj
             .as_ref()
-            .and_then(|value| value.extract::<Vec<String>>().ok())
+            .and_then(|value| {
+                value.extract::<Vec<String>>()
+                    .ok()
+                    .or_else(|| value.extract::<String>().ok().map(|s| vec![s]))
+            })
             .unwrap_or_default();
         let is_indirect = |name: &str| indirect_all || indirect_names.iter().any(|n| n == name);
         let dim_scope = mark

@@ -1384,6 +1384,42 @@ class Pytester:
                     return valid
             return None
 
+        def _validate_parametrize_argnames(func, marks, cls=None):
+            import inspect as _insp
+            param_marks = [m for m in marks if m.name == "parametrize"]
+            if not param_marks:
+                return
+            try:
+                func_params = set(getfuncargnames(func, name=func.__name__, cls=cls))
+            except Exception:
+                func_params = set()
+            try:
+                all_params = set(_insp.signature(func).parameters.keys())
+            except (ValueError, TypeError):
+                all_params = set()
+            func_params.add("request")
+            avail = func_params | all_params
+            for pm in param_marks:
+                argnames_raw = pm.args[0] if pm.args else pm.kwargs.get("argnames", "")
+                if isinstance(argnames_raw, str):
+                    argnames = [x.strip() for x in argnames_raw.split(",") if x.strip()]
+                else:
+                    argnames = list(argnames_raw)
+                indirect = pm.kwargs.get("indirect", False)
+                if isinstance(indirect, str):
+                    indirect = [indirect]
+                for arg in argnames:
+                    if arg in avail:
+                        continue
+                    if isinstance(indirect, (list, tuple)):
+                        kind = "fixture" if arg in indirect else "argument"
+                    else:
+                        kind = "fixture" if indirect else "argument"
+                    fail(
+                        f"In {func.__name__}: function uses no {kind} '{arg}'",
+                        pytrace=False,
+                    )
+
         items = []
         for name, obj in vars(module).items():
             if name in _IGNORED:
@@ -1411,6 +1447,7 @@ class Pytester:
                         custom_node._request = TopRequest(custom_node, _ispytest=True)
                         items.append(custom_node)
                     continue
+                _validate_parametrize_argnames(obj, get_unpacked_marks(obj))
                 sub = Pytester._expand_params(
                     get_unpacked_marks(obj),
                     module_marks,
@@ -1436,6 +1473,7 @@ class Pytester:
                         lineno = getattr(getattr(func, "__code__", None), "co_firstlineno", 0)
                         methods.append((lineno, mname, func))
                 for _ln, mname, func in sorted(methods):
+                    _validate_parametrize_argnames(func, [*get_unpacked_marks(func), *class_marks], cls=obj)
                     sub = Pytester._expand_params(
                         [*get_unpacked_marks(func), *class_marks],
                         module_marks,
