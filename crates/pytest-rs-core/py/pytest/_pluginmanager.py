@@ -289,6 +289,28 @@ class HookRelay:
         return HookCaller(name, self._pm)
 
 
+class _RewriteHookProxy:
+    """Proxy for pluginmanager.rewrite_hook — delegates to the installed
+    _RewriteFinder meta-path finder so plugins can call mark_rewrite() and
+    tests can call find_spec() to verify module rewriting."""
+
+    def mark_rewrite(self, *names):
+        from pytest._rewrite import _RewriteFinder
+
+        for hook in sys.meta_path:
+            if isinstance(hook, _RewriteFinder):
+                hook.mark_rewrite(*names)
+                return
+
+    def find_spec(self, name, path=None, target=None):
+        from pytest._rewrite import _RewriteFinder
+
+        for hook in sys.meta_path:
+            if isinstance(hook, _RewriteFinder):
+                return hook.find_spec(name, path, target)
+        return None
+
+
 class PluginManager:
     def __init__(self) -> None:
         self._plugins: list[Any] = []
@@ -306,6 +328,7 @@ class PluginManager:
         # registers itself here to record calls; see add_hookcall_monitoring).
         self._call_monitors: list[tuple[Any, Any]] = []
         self.hook = HookRelay(self)
+        self.rewrite_hook = _RewriteHookProxy()
         # Conftest loading state
         self._dirpath2confmods: dict[pathlib.Path, list[types.ModuleType]] = {}
         self._conftest_plugins: set[types.ModuleType] = set()

@@ -992,6 +992,10 @@ class Node(Item):
             return pinned
         return _NodeSession(getattr(self, "config", None))
 
+    @session.setter
+    def session(self, value):
+        self._session_obj = value
+
     @property
     def fspath(self):
         """Legacy py.path.local of this node's file (upstream Node.fspath);

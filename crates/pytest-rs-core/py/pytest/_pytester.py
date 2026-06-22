@@ -1277,8 +1277,12 @@ class Pytester:
         # getparent(pytest.Module).obj is the imported module (test_getmodulecollector).
         mod_node.obj = module
 
+        from pytest._pycollect import IGNORED_ATTRIBUTES as _IGNORED
+
         items = []
         for name, obj in vars(module).items():
+            if name in _IGNORED:
+                continue
             if _is_test_func(name) and callable(obj) and not isinstance(obj, type):
                 sub = Pytester._expand_params(
                     get_unpacked_marks(obj),
@@ -1294,7 +1298,7 @@ class Pytester:
                 methods = []
                 seen = set()
                 for mname in dir(obj):
-                    if not _is_test_func(mname) or mname in seen:
+                    if mname in _IGNORED or not _is_test_func(mname) or mname in seen:
                         continue
                     seen.add(mname)
                     mobj = getattr(obj, mname, None)

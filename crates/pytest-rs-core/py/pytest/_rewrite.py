@@ -66,6 +66,7 @@ def _is_registered_module(name):
 
 def _is_rewrite_target(origin):
     import fnmatch as _fnmatch
+
     basename = os.path.basename(origin)
     if basename == "conftest.py":
         return True
@@ -447,7 +448,9 @@ class _AssertRewriter(ast.NodeTransformer):
             return False
 
         left_trivial = isinstance(test.left, _TRIVIAL) or _is_approx_call(test.left)
-        right_trivial = isinstance(test.comparators[0], _TRIVIAL) or _is_approx_call(test.comparators[0])
+        right_trivial = isinstance(test.comparators[0], _TRIVIAL) or _is_approx_call(
+            test.comparators[0]
+        )
         if not left_trivial:
             try:
                 src = ast.unparse(test.left)
@@ -638,6 +641,9 @@ class _RewriteFinder:
             return spec
         # Let the default machinery handle everything else.
         return None
+
+    def mark_rewrite(self, *names):
+        _REGISTERED_MODULES.update(names)
 
 
 _FINDER = _RewriteFinder()

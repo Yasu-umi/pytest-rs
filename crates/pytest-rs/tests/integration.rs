@@ -1170,7 +1170,10 @@ class TestConcrete(TestBase):
     let out = stdout(&output);
     assert_eq!(output.status.code(), Some(0), "out: {out}");
     assert!(out.contains("1 passed"), "out: {out}");
-    assert!(!out.contains("TestBase"), "abstract class should not be collected: {out}");
+    assert!(
+        !out.contains("TestBase"),
+        "abstract class should not be collected: {out}"
+    );
 }
 
 #[test]
@@ -1208,9 +1211,18 @@ class TestNormal:
     let out = stdout(&output);
     assert_eq!(output.status.code(), Some(0), "out: {out}");
     assert!(out.contains("2 passed"), "out: {out}");
-    assert!(!out.contains("test_should_not_run"), "module __test__=False should skip: {out}");
-    assert!(!out.contains("test_skipped"), "function __test__=False should skip: {out}");
-    assert!(!out.contains("TestSkipped"), "class __test__=False should skip: {out}");
+    assert!(
+        !out.contains("test_should_not_run"),
+        "module __test__=False should skip: {out}"
+    );
+    assert!(
+        !out.contains("test_skipped"),
+        "function __test__=False should skip: {out}"
+    );
+    assert!(
+        !out.contains("TestSkipped"),
+        "class __test__=False should skip: {out}"
+    );
 }
 
 #[test]

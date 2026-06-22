@@ -32,6 +32,7 @@ class FixtureFunctionMarker:
             )
         if hasattr(function, "pytestmark"):
             from _pytest.deprecated import MARKED_FIXTURE
+
             warnings.warn(MARKED_FIXTURE, stacklevel=2)
         return FixtureFunctionDefinition(
             function=function,
@@ -65,6 +66,7 @@ class FixtureFunctionDefinition:
 
     def __call__(self, *args, **kwargs):
         from _pytest.outcomes import fail
+
         message = (
             f'Fixture "{self.name}" called directly. Fixtures are not meant to be called directly,\n'
             "but are created automatically when test functions request them as parameters.\n"

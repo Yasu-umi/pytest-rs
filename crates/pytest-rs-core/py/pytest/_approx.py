@@ -3,6 +3,7 @@ falls back to a self-contained implementation matching pytest 9.x behaviour."""
 
 from __future__ import annotations
 
+
 # If the real pytest source is on PYTHONPATH (e.g. during conformance testing),
 # import everything from there so that assertion-rewriting isinstance checks
 # against _pytest.python_api.ApproxBase still work.
@@ -13,14 +14,22 @@ from __future__ import annotations
 def _try_import_real_pytest():
     try:
         import _pytest.python_api as _real_api
+
         if not isinstance(getattr(_real_api, "ApproxBase", None), type):
             return False
         import sys as _sys
+
         _g = _sys.modules[__name__].__dict__
         for _name in (
-            "ApproxBase", "ApproxDecimal", "ApproxMapping", "ApproxNumpy",
-            "ApproxScalar", "ApproxSequenceLike", "approx",
-            "_compare_approx", "_recursive_sequence_map",
+            "ApproxBase",
+            "ApproxDecimal",
+            "ApproxMapping",
+            "ApproxNumpy",
+            "ApproxScalar",
+            "ApproxSequenceLike",
+            "approx",
+            "_compare_approx",
+            "_recursive_sequence_map",
         ):
             if hasattr(_real_api, _name):
                 _g[_name] = getattr(_real_api, _name)
@@ -30,6 +39,7 @@ def _try_import_real_pytest():
     except Exception:
         return False
 
+
 _USING_REAL_PYTEST = _try_import_real_pytest()
 del _try_import_real_pytest
 
@@ -37,10 +47,7 @@ if not _USING_REAL_PYTEST:
     import math
     import pprint
     import sys
-    from collections.abc import Mapping
-    from collections.abc import Sequence
-    from collections.abc import Sized
-    from collections.abc import Collection
+    from collections.abc import Collection, Mapping, Sized
     from decimal import Decimal
     from numbers import Complex
 
@@ -137,9 +144,7 @@ if not _USING_REAL_PYTEST:
             ]
 
         def __eq__(self, actual) -> bool:
-            return all(
-                a == self._approx_scalar(x) for a, x in self._yield_comparisons(actual)
-            )
+            return all(a == self._approx_scalar(x) for a, x in self._yield_comparisons(actual))
 
         def __bool__(self):
             __tracebackhide__ = True
@@ -147,7 +152,7 @@ if not _USING_REAL_PYTEST:
                 "approx() is not supported in a boolean context.\nDid you mean: `assert a == approx(b)`?"
             )
 
-        __hash__ = None
+        __hash__ = None  # type: ignore[assignment]
 
         def __ne__(self, actual) -> bool:
             return not (actual == self)
@@ -168,9 +173,7 @@ if not _USING_REAL_PYTEST:
         """Perform approximate comparisons where the expected value is numpy array."""
 
         def __repr__(self) -> str:
-            list_scalars = _recursive_sequence_map(
-                self._approx_scalar, self.expected.tolist()
-            )
+            list_scalars = _recursive_sequence_map(self._approx_scalar, self.expected.tolist())
             return f"approx({list_scalars!r})"
 
         def _repr_compare(self, other_side) -> list:
@@ -273,9 +276,7 @@ if not _USING_REAL_PYTEST:
                     f"Mappings has different keys: expected {self.expected.keys()} but got {other_side.keys()}",
                 ]
 
-            approx_side_as_map = {
-                k: self._approx_scalar(v) for k, v in self.expected.items()
-            }
+            approx_side_as_map = {k: self._approx_scalar(v) for k, v in self.expected.items()}
 
             number_of_elements = len(approx_side_as_map)
             max_abs_diff = -math.inf
@@ -376,8 +377,7 @@ if not _USING_REAL_PYTEST:
                             max_rel_diff = max(max_rel_diff, abs_diff / abs(other_value))
                     different_ids.append(i)
             message_data = [
-                (str(i), str(other_side[i]), str(approx_side_as_map[i]))
-                for i in different_ids
+                (str(i), str(other_side[i]), str(approx_side_as_map[i])) for i in different_ids
             ]
 
             return _compare_approx(
@@ -507,9 +507,7 @@ if not _USING_REAL_PYTEST:
             absolute_tolerance = set_default(self.abs, self.DEFAULT_ABSOLUTE_TOLERANCE)
 
             if absolute_tolerance < 0:
-                raise ValueError(
-                    f"absolute tolerance can't be negative: {absolute_tolerance}"
-                )
+                raise ValueError(f"absolute tolerance can't be negative: {absolute_tolerance}")
             if math.isnan(absolute_tolerance):
                 raise ValueError("absolute tolerance can't be NaN.")
 
@@ -519,14 +517,12 @@ if not _USING_REAL_PYTEST:
                 if self.abs is not None:
                     return absolute_tolerance
 
-            relative_tolerance = set_default(
-                self.rel, self.DEFAULT_RELATIVE_TOLERANCE
-            ) * abs(self.expected)
+            relative_tolerance = set_default(self.rel, self.DEFAULT_RELATIVE_TOLERANCE) * abs(
+                self.expected
+            )
 
             if relative_tolerance < 0:
-                raise ValueError(
-                    f"relative tolerance can't be negative: {relative_tolerance}"
-                )
+                raise ValueError(f"relative tolerance can't be negative: {relative_tolerance}")
             if math.isnan(relative_tolerance):
                 raise ValueError("relative tolerance can't be NaN.")
 
@@ -535,8 +531,8 @@ if not _USING_REAL_PYTEST:
     class ApproxDecimal(ApproxScalar):
         """Perform approximate comparisons where the expected value is a Decimal."""
 
-        DEFAULT_ABSOLUTE_TOLERANCE = Decimal("1e-12")
-        DEFAULT_RELATIVE_TOLERANCE = Decimal("1e-6")
+        DEFAULT_ABSOLUTE_TOLERANCE = Decimal("1e-12")  # type: ignore[assignment]
+        DEFAULT_RELATIVE_TOLERANCE = Decimal("1e-6")  # type: ignore[assignment]
 
         def __repr__(self) -> str:
             if isinstance(self.rel, float):
@@ -752,6 +748,7 @@ if not _USING_REAL_PYTEST:
         """
         __tracebackhide__ = True
 
+        cls: type[ApproxBase]
         if isinstance(expected, Decimal):
             cls = ApproxDecimal
         elif isinstance(expected, Mapping):
@@ -768,8 +765,5 @@ if not _USING_REAL_PYTEST:
             cls = ApproxScalar
 
         return cls(expected, rel, abs, nan_ok)
-
-    # The shim's assertion/util.py imports `_Approx as ApproxBase`; keep the alias.
-    _Approx = ApproxBase
 
     _Approx = ApproxBase

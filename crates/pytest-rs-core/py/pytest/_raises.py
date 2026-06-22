@@ -161,19 +161,16 @@ def _validate_exception(expected_exception):
     if isinstance(expected_exception, type) and issubclass(expected_exception, BaseException):
         return
     if isinstance(expected_exception, type):
-        raise ValueError(
-            f"Expected a BaseException type, but got '{expected_exception.__name__}'"
-        )
-    raise TypeError(
-        f"Expected a BaseException type, but got '{type(expected_exception).__name__}'"
-    )
+        raise ValueError(f"Expected a BaseException type, but got '{expected_exception.__name__}'")
+    raise TypeError(f"Expected a BaseException type, but got '{type(expected_exception).__name__}'")
 
 
 class RaisesContext:
-    def __init__(self, expected_exception, match=None):
+    def __init__(self, expected_exception, match=None, check=None):
         self.expected_exception = expected_exception
         if match is not None and match == "":
             import warnings
+
             from _pytest.warning_types import PytestWarning
 
             warnings.warn(
@@ -186,6 +183,7 @@ class RaisesContext:
                 stacklevel=3,
             )
         self.match_expr = match
+        self.check = check
         self.excinfo = None
 
     def __enter__(self):
@@ -195,8 +193,13 @@ class RaisesContext:
     def __exit__(self, exc_type, exc_value, tb):
         __tracebackhide__ = True
         if exc_type is None:
-            fail(f"DID NOT RAISE {self.expected_exception!r}")
-        if not issubclass(exc_type, self.expected_exception):
+            desc = (
+                self.expected_exception if self.expected_exception is not None else "an exception"
+            )
+            fail(f"DID NOT RAISE {desc!r}")
+        if self.expected_exception is not None and not issubclass(
+            exc_type, self.expected_exception
+        ):
             return False
         self.excinfo._set(exc_type, exc_value, tb)
         if self.match_expr is not None:
@@ -208,6 +211,9 @@ class RaisesContext:
                     pytrace=False,
                 )
             self.excinfo.match(self.match_expr)
+        if self.check is not None:
+            if not self.check(exc_value):
+                fail(f"{self.check!r} did not return True for the raised exception")
         return True
 
 
@@ -216,17 +222,28 @@ def raises(expected_exception=None, *args, **kwargs):
 
     if not args:
         match = kwargs.pop("match", None)
+        check = kwargs.pop("check", None)
         if set(kwargs) - {"expected_exception"}:
             msg = "Unexpected keyword arguments passed to pytest.raises: "
             msg += ", ".join(sorted(kwargs))
             msg += "\nUse context-manager form instead?"
             raise TypeError(msg)
 
-        if expected_exception is None:
+        no_filter = (
+            (
+                expected_exception is None
+                or (isinstance(expected_exception, tuple) and len(expected_exception) == 0)
+            )
+            and match is None
+            and check is None
+        )
+        if no_filter:
             raise ValueError("You must specify at least one parameter to match on.")
 
-        if isinstance(expected_exception, tuple) and len(expected_exception) == 0:
-            raise ValueError("You must specify at least one parameter to match on.")
+        if expected_exception is None or (
+            isinstance(expected_exception, tuple) and len(expected_exception) == 0
+        ):
+            return RaisesContext(expected_exception, match=match, check=check)
 
         if not expected_exception:
             raise ValueError(
@@ -236,7 +253,7 @@ def raises(expected_exception=None, *args, **kwargs):
             )
 
         _validate_exception(expected_exception)
-        return RaisesContext(expected_exception, match=match)
+        return RaisesContext(expected_exception, match=match, check=check)
 
     if not expected_exception:
         raise ValueError(
@@ -257,4 +274,4 @@ def raises(expected_exception=None, *args, **kwargs):
         del excinfo
 
 
-raises.Exception = fail.Exception
+raises.Exception = fail.Exception  # type: ignore[attr-defined]
