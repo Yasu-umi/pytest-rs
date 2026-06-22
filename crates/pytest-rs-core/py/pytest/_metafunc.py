@@ -376,7 +376,21 @@ class Metafunc:
     def _validate_if_using_arg_names(
         self, argnames: list[str], indirect: bool | Sequence[str]
     ) -> None:
-        pass
+        if indirect is True or indirect is False:
+            return
+        if not isinstance(indirect, (list, tuple)):
+            fail(
+                f"In {self.function.__name__}: expected Sequence or boolean for "
+                f"indirect, got {type(indirect).__name__}",
+                pytrace=False,
+            )
+        for arg in indirect:
+            if arg not in argnames:
+                fail(
+                    f"In {self.function.__name__}: indirect fixture '{arg}' "
+                    f"doesn't exist",
+                    pytrace=False,
+                )
 
     def _resolve_args_directness(
         self, argnames: list[str], indirect: bool | Sequence[str]
@@ -384,5 +398,14 @@ class Metafunc:
         if indirect is True:
             return {name: "indirect" for name in argnames}
         elif isinstance(indirect, (list, tuple)):
-            return {name: ("indirect" if name in indirect else "direct") for name in argnames}
-        return {name: "direct" for name in argnames}
+            result = {}
+            for name in argnames:
+                if name in indirect:
+                    result[name] = "indirect"
+                else:
+                    result[name] = "direct"
+                    if name not in self._arg2fixturedefs:
+                        self._arg2fixturedefs[name] = []
+            return result
+        else:
+            return {name: "direct" for name in argnames}
