@@ -487,10 +487,10 @@ class Pytester:
         self._fire_addoption(config, new_args)
         _validate_required_plugins(config)
         pm = config.pluginmanager
-        if not config.getoption("disable_plugin_autoload", default=False):
-            pm.consider_setuptools_entrypoints()
         pm.consider_preparse(new_args)
         pm.consider_env()
+        if not config.getoption("disable_plugin_autoload", default=False):
+            pm.consider_setuptools_entrypoints()
         if self._request is not None:
             self._request.addfinalizer(config._ensure_unconfigure)
         return config

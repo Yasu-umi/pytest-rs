@@ -749,6 +749,10 @@ class PluginManager:
             return
         if modname in self._BUILTIN_PLUGINS:
             return
+        if consider_entry_points:
+            loaded = self._load_entrypoint(modname)
+            if loaded:
+                return
         try:
             __import__(modname)
         except ImportError as e:
@@ -758,6 +762,20 @@ class PluginManager:
         else:
             mod = sys.modules[modname]
             self.register(mod, modname)
+
+    def _load_entrypoint(self, name: str) -> bool:
+        import importlib.metadata
+
+        for dist in importlib.metadata.distributions():
+            for ep in dist.entry_points:
+                if ep.group != "pytest11" or ep.name != name:
+                    continue
+                if self.is_blocked(ep.name) or self.getplugin(ep.name) is not None:
+                    return True
+                plugin = ep.load()
+                self.register(plugin, ep.name)
+                return True
+        return False
 
     def consider_preparse(self, args: list[str]) -> None:
         """-p NAME plugins: import and register (skip no: entries)."""
@@ -769,7 +787,7 @@ class PluginManager:
                 if spec.startswith("no:"):
                     self.set_blocked(spec[3:])
                     continue
-                self.import_plugin(spec)
+                self.import_plugin(spec, consider_entry_points=True)
             else:
                 i += 1
 
@@ -783,7 +801,7 @@ class PluginManager:
         for name in env.split(","):
             name = name.strip()
             if name:
-                self.import_plugin(name)
+                self.import_plugin(name, consider_entry_points=True)
 
     def consider_setuptools_entrypoints(self) -> None:
         """Load installed pytest11 entry-point plugins (like upstream)."""
