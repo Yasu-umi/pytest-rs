@@ -299,12 +299,27 @@ def format_exception(exc, style="long"):
         parts.append("".join(traceback.format_exception(exc, chain=False)).rstrip("\n"))
         return "\n".join(parts)
 
+    chain_prefix = []
+    context = exc.__cause__ if exc.__cause__ is not None else exc.__context__
+    if context is not None and not exc.__suppress_context__:
+        chain_prefix.append(format_exception(context, style))
+        chain_prefix.append("")
+        if exc.__cause__ is not None:
+            chain_prefix.append("The above exception was the direct cause of the following exception:")
+        else:
+            chain_prefix.append("During handling of the above exception, another exception occurred:")
+        chain_prefix.append("")
+
     frames = _visible_frames(exc)
     if not frames:
         if isinstance(exc, LookupError):
             exc_lines = _exception_lines(exc)
-            return "\n".join(f"E   {line}" for line in exc_lines)
-        return "".join(traceback.format_exception(exc))
+            body = "\n".join(f"E   {line}" for line in exc_lines)
+        else:
+            body = "".join(traceback.format_exception(exc, chain=False))
+        if chain_prefix:
+            return "\n".join(chain_prefix) + "\n" + body
+        return body
 
     if style == "line":
         frame, lineno = frames[-1]
@@ -321,7 +336,10 @@ def format_exception(exc, style="long"):
                 for entry in _exception_lines(exc):
                     lines.append(_markup(f"E   {entry}", 1, 31))
             lines.extend(_format_locals(frame, " " * 8))
-        return "\n".join(lines)
+        body = "\n".join(lines)
+        if chain_prefix:
+            return "\n".join(chain_prefix) + "\n" + body
+        return body
 
     # long (default): every frame shows its full source block with the
     # failing line marked, frames separated by the "_ _ _" rule; the last
@@ -350,4 +368,7 @@ def format_exception(exc, style="long"):
             lines.append("_ " * 40)
     # The long repr opens with a blank line, separating it from the section
     # header (pytest's "FAILURES"/"ERRORS" entry banners).
-    return "\n" + "\n".join(lines)
+    body = "\n" + "\n".join(lines)
+    if chain_prefix:
+        return "\n".join(chain_prefix) + "\n" + body
+    return body
