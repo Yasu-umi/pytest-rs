@@ -1370,17 +1370,61 @@ class Pytester:
         )
         patterns = python_files.split() if isinstance(python_files, str) else list(python_files)
         directory = pathlib.Path(str(directory))
+        roots = self._testpaths_roots(directory)
         seen_files: set = set()
         items = []
-        for pat in patterns:
-            for py_file in sorted(directory.rglob(pat)):
-                if not py_file.is_file() or py_file in seen_files:
-                    continue
-                if any(part.startswith((".", "__pycache__")) for part in py_file.parts):
-                    continue
-                seen_files.add(py_file)
-                items.extend(self._collect_items_from_path(py_file))
+        for root in roots:
+            for pat in patterns:
+                for py_file in sorted(root.rglob(pat)):
+                    if not py_file.is_file() or py_file in seen_files:
+                        continue
+                    if any(part.startswith((".", "__pycache__")) for part in py_file.parts):
+                        continue
+                    seen_files.add(py_file)
+                    items.extend(self._collect_items_from_path(py_file))
         return items, None
+
+    def _testpaths_roots(self, directory):
+        """Resolve testpaths ini (with glob support) to a list of collection
+        root directories. Falls back to [directory] when unset. Testpaths
+        only applies when the invocation dir matches rootdir (pytest rule)."""
+        cwd = pathlib.Path.cwd()
+        if cwd != directory:
+            return [cwd]
+        inner_config = self._parse_inner_ini(directory)
+        testpaths = inner_config.get("testpaths", "").strip()
+        if not testpaths:
+            return [directory]
+        roots = []
+        for entry in testpaths.split():
+            if any(c in entry for c in "*?["):
+                roots.extend(sorted(directory.glob(entry)))
+            else:
+                candidate = directory / entry
+                if candidate.exists():
+                    roots.append(candidate)
+        return roots or [directory]
+
+    def _parse_inner_ini(self, directory):
+        """Read pytest ini settings from the pytester directory's config file."""
+        for name in ("pytest.ini", "pyproject.toml", "tox.ini", "setup.cfg"):
+            path = directory / name
+            if not path.is_file():
+                continue
+            if name == "pyproject.toml":
+                try:
+                    import tomllib
+                except ImportError:
+                    import tomli as tomllib
+                with open(path, "rb") as f:
+                    data = tomllib.load(f)
+                return data.get("tool", {}).get("pytest", {}).get("ini_options", {})
+            cp = configparser.ConfigParser()
+            cp.read(str(path), encoding="utf-8")
+            for section in ("pytest", "tool:pytest"):
+                if cp.has_section(section):
+                    return dict(cp.items(section))
+        return {}
 
     def getitems(self, source):
         """Collect Function item nodes from the source in-process (a light

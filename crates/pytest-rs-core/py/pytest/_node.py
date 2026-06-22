@@ -1078,8 +1078,34 @@ class Function(Node):
             name = getattr(self, "name", None)
             self.originalname = name.split("[")[0] if name else name
 
+    def __eq__(self, other):
+        # upstream Node has no __eq__ so comparison is identity-based;
+        # _NodeBase overrides it with nodeid which breaks Function since two
+        # distinct Function objects for different callobj can share the same
+        # nodeid.  Restore identity semantics here.
+        return self is other
+
+    def __hash__(self):
+        return id(self)
+
     def __repr__(self):
         return f"<Function {getattr(self, 'name', '')}>"
+
+    @property
+    def location(self):
+        """(relpath, lineno, domain) tuple — always delegates to reportinfo()
+        so custom Function subclasses that override reportinfo() see their
+        values here (matches pytest's Item.location behaviour).
+        When Rust or plugins write ``node.location = value`` directly the
+        setter caches it in ``_location``; ``reportinfo()`` can inspect that
+        cache if needed, but the default implementation ignores it."""
+        return self.reportinfo()
+
+    @location.setter
+    def location(self, value):
+        # Allow direct assignment (e.g. pytest-rerunfailures sets
+        # node.location before calling pytest_runtest_logstart).
+        self.__dict__["_location"] = value
 
     def listchain(self):
         """The collector chain to this item ([module, item]); pytester.getitems
