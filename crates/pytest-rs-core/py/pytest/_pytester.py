@@ -696,6 +696,8 @@ class Pytester:
         old_wcapture_session_specs = list(_wcapture.session_specs)
         old_warn_filters = list(warnings.filters)
         _wcapture.captured.clear()
+        _wcapture.current_test = None
+        warnings.filters[:] = []
         # Clear __warningregistry__ in all loaded modules so "default" filters
         # don't suppress warnings that were already shown in a previous inner run.
         for _mod in list(sys.modules.values()):
@@ -1436,7 +1438,8 @@ class Pytester:
             except (ValueError, TypeError):
                 all_params = set()
             func_params.add("request")
-            avail = func_params | all_params
+            fixture_closure = set(_closure_for(list(func_params), cls))
+            avail = func_params | all_params | fixture_closure
             for pm in param_marks:
                 argnames_raw = pm.args[0] if pm.args else pm.kwargs.get("argnames", "")
                 if isinstance(argnames_raw, str):
