@@ -26,7 +26,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 91 | 31 | 0 | 1 | 123 | 74.8% | 4 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 41 | 100.0% | 1 | 1 | 0 |
-| anyio | 4.13.0 | 3120 | 0 | 0 | 42 | 3162 | 100.0% | 26 | 26 | 0 |
+| anyio | 4.13.0 | 3119 | 1 | 0 | 42 | 3162 | 100.0% | 25 | 26 | 0 |
 | pytest-mypy | v1.0.1 | 75 | 3 | 0 | 0 | 78 | 96.2% | 0 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-subtests | v0.14.2 | 25 | 7 | 0 | 0 | 32 | 78.1% | 0 | 1 | 0 |
@@ -250,7 +250,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_lowlevel.py | passed | 44 | 0 | 0 | 0 |
 | tests/test_pytest_plugin.py | passed | 35 | 0 | 0 | 0 |
 | tests/test_signals.py | passed | 12 | 0 | 0 | 0 |
-| tests/test_sockets.py | passed | 1189 | 0 | 0 | 0 |
+| tests/test_sockets.py | failed | 1188 | 1 | 0 | 0 |
 | tests/test_subprocesses.py | passed | 76 | 0 | 0 | 4 |
 | tests/test_synchronization.py | passed | 235 | 0 | 0 | 0 |
 | tests/test_taskgroups.py | passed | 393 | 0 | 0 | 10 |
