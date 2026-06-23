@@ -15,7 +15,7 @@ use crate::report::TestReport;
 /// because instance strings collide across scopes (a module-level test has
 /// the same class instance — the file — as its module instance), so scope
 /// teardown must evict only the matching scope.
-pub type CacheKey = (Scope, String, String, String, Option<usize>);
+pub type CacheKey = (Scope, String, String, String, Option<String>);
 
 /// One non-function-scope parametrization a fixture's value transitively
 /// depends on: (param scope, the scope-instance the param is constant within,

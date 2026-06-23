@@ -625,7 +625,14 @@ pub(crate) fn resolve_fixture_def(
         // rather than batched at session end.  Non-parametrized session
         // fixtures still use the shared "" key (one instance per session).
         Scope::Session => match &fixture_param {
-            Some((idx, _)) => format!("\x00session_param:{}:{}", def.name, idx),
+            Some((_, value)) => {
+                let repr = value
+                    .bind(py)
+                    .repr()
+                    .map(|r| r.to_string())
+                    .unwrap_or_else(|_| format!("{}", value.as_ptr() as usize));
+                format!("\x00session_param:{}:{}", def.name, repr)
+            }
             None => String::new(),
         },
     };
@@ -665,12 +672,19 @@ pub(crate) fn resolve_fixture_def(
             None => def.name.clone(),
         }
     };
+    let param_cache_key: Option<String> = fixture_param.as_ref().map(|(_, value)| {
+        value
+            .bind(py)
+            .repr()
+            .map(|r| r.to_string())
+            .unwrap_or_else(|_| format!("<unhashable@{}>", value.as_ptr() as usize))
+    });
     let cache_key = (
         scope,
         keyed_name,
         def.baseid.clone(),
         instance.clone(),
-        fixture_param.as_ref().map(|(index, _)| *index),
+        param_cache_key,
     );
     if let Some(cached) = session.fixture_cache.get(&cache_key) {
         // A cached setup failure re-raises (pytest re-raises the cached

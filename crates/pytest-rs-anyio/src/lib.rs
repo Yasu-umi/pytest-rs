@@ -125,7 +125,13 @@ impl AnyioPlugin {
             def.name.clone(),
             def.baseid.clone(),
             instance,
-            param.map(|(_, index, _)| *index),
+            param.map(|(_, _, value)| {
+                value
+                    .bind(py)
+                    .repr()
+                    .map(|r| r.to_string())
+                    .unwrap_or_else(|_| format!("<unhashable@{}>", value.as_ptr() as usize))
+            }),
         );
         if let Some(cached) = ctx.session.fixture_cache.get(&cache_key) {
             return Some(cached.value.clone_ref(py));

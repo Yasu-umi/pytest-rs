@@ -1512,7 +1512,7 @@ pub(crate) fn push_test_items(
         &test_nodeid,
     )?;
 
-    let variants = expand_parametrize(py, &marks, &test_nodeid, Some(func))?;
+    let variants = expand_parametrize(py, &marks, &test_nodeid, Some(func), registry)?;
     for variant in variants {
         let nodeid = match &variant.id {
             Some(id) => format!("{nodeid_prefix}::{name}[{id}]"),
@@ -1683,6 +1683,7 @@ pub(crate) fn expand_parametrize(
     marks: &[MarkData],
     nodeid: &str,
     func: Option<&Bound<'_, PyAny>>,
+    registry: &FixtureRegistry,
 ) -> PyResult<Vec<ParamVariant>> {
     let param_spec_cls = py.import("pytest")?.getattr("ParamSpec")?;
     let hidden_param = py.import("pytest")?.getattr("HIDDEN_PARAM")?;
@@ -1775,15 +1776,30 @@ pub(crate) fn expand_parametrize(
             })
             .unwrap_or_default();
         let is_indirect = |name: &str| indirect_all || indirect_names.iter().any(|n| n == name);
-        let dim_scope = mark
+        let explicit_scope = mark
             .obj
             .bind(py)
             .getattr("kwargs")?
             .get_item("scope")
             .ok()
             .and_then(|s| s.extract::<String>().ok())
-            .and_then(|s| crate::fixture::Scope::parse(&s))
-            .unwrap_or(crate::fixture::Scope::Function);
+            .and_then(|s| crate::fixture::Scope::parse(&s));
+        let dim_scope = explicit_scope.unwrap_or_else(|| {
+            if !indirect_all && indirect_names.is_empty() {
+                return crate::fixture::Scope::Function;
+            }
+            let indirect_args: Vec<&str> = if indirect_all {
+                argnames.iter().map(|s| s.as_str()).collect()
+            } else {
+                indirect_names.iter().map(|s| s.as_str()).collect()
+            };
+            indirect_args
+                .iter()
+                .filter_map(|name| registry.lookup(name, nodeid))
+                .map(|def| def.scope)
+                .min()
+                .unwrap_or(crate::fixture::Scope::Function)
+        });
 
         let mut sets = Vec::new();
         for (index, value_set) in argvalues.try_iter()?.enumerate() {

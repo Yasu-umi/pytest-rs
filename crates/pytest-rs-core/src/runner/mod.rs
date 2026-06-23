@@ -363,25 +363,35 @@ impl Engine {
                 }
             }
             // Parametrized session-scope fixture boundary: when the next item
-            // does not use the same (fixture, param_index) as the current one,
+            // does not use the same (fixture, param_value) as the current one,
             // the parametrized session-scope variant is exhausted and should be
             // torn down before the next test sets up the new variant.
             {
                 let nextitem = items.get(idx + 1);
-                for (fixture_name, param_idx, _) in &item.fixture_params {
+                for (fixture_name, _, cur_value) in &item.fixture_params {
                     if let Some(def) = session.registry.lookup(fixture_name, &item.nodeid)
                         && def.scope == Scope::Session
                     {
+                        let cur_repr = cur_value
+                            .bind(py)
+                            .repr()
+                            .map(|r| r.to_string())
+                            .unwrap_or_default();
                         let next_uses_same = nextitem
                             .map(|next| {
-                                next.fixture_params
-                                    .iter()
-                                    .any(|(n, i, _)| n == fixture_name && i == param_idx)
+                                next.fixture_params.iter().any(|(n, _, v)| {
+                                    n == fixture_name
+                                        && v.bind(py)
+                                            .repr()
+                                            .map(|r| r.to_string())
+                                            .unwrap_or_default()
+                                            == cur_repr
+                                })
                             })
                             .unwrap_or(false);
                         if !next_uses_same {
                             let instance =
-                                format!("\x00session_param:{}:{}", fixture_name, param_idx);
+                                format!("\x00session_param:{}:{}", fixture_name, cur_repr);
                             report_scope_teardown!(Scope::Session, &instance, item);
                         }
                     }
