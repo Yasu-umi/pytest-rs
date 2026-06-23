@@ -19,7 +19,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | pytest | 9.0.3 | 2538 | 242 | 0 | 53 | 2833 | 91.5% | 17 | 52 | 63 |
-| pytest-asyncio | v1.4.0 | 174 | 94 | 0 | 0 | 268 | 64.9% | 16 | 30 | 0 |
+| pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 20 | 0 | 3 | 209 | 90.4% | 0 | 1 | 0 |
 | pytest-xdist | v3.8.0 | 91 | 6 | 0 | 1 | 98 | 93.9% | 0 | 1 | 6 |
@@ -53,7 +53,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 671 | 100.0% | 2 | 2 | 0 |
 | pytest-django | v4.9.0 | 141 | 68 | 6 | 1 | 216 | 65.7% | 2 | 13 | 0 |
 | werkzeug | 3.1.3 | 922 | 0 | 0 | 1 | 923 | 100.0% | 24 | 25 | 0 |
-| fastapi | 0.115.12 | 2330 | 1 | 0 | 130 | 2461 | 100.0% | 302 | 310 | 0 |
+| fastapi | 0.115.12 | 2332 | 1 | 0 | 130 | 2463 | 100.0% | 303 | 310 | 0 |
 | packaging | 25.0 | 26947 | 0 | 0 | 0 | 26947 | 100.0% | 12 | 12 | 0 |
 | pandas | v3.0.3 | 160773 | 1 | 0 | 26984 | 187758 | 100.0% | 871 | 961 | 3 |
 | networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 6894 | 100.0% | 259 | 266 | 0 |
@@ -129,31 +129,31 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
 | tests/async_fixtures/test_async_fixtures.py | passed | 2 | 0 | 0 | 0 |
-| tests/async_fixtures/test_async_fixtures_contextvars.py | failed | 3 | 7 | 0 | 0 |
+| tests/async_fixtures/test_async_fixtures_contextvars.py | passed | 10 | 0 | 0 | 0 |
 | tests/async_fixtures/test_nested.py | passed | 1 | 0 | 0 | 0 |
-| tests/async_fixtures/test_shared_module_fixture.py | failed | 0 | 1 | 0 | 0 |
+| tests/async_fixtures/test_shared_module_fixture.py | passed | 1 | 0 | 0 | 0 |
 | tests/hypothesis/test_base.py | passed | 6 | 0 | 0 | 0 |
-| tests/markers/test_class_scope.py | failed | 8 | 2 | 0 | 0 |
-| tests/markers/test_function_scope.py | failed | 11 | 1 | 0 | 0 |
+| tests/markers/test_class_scope.py | passed | 10 | 0 | 0 | 0 |
+| tests/markers/test_function_scope.py | passed | 12 | 0 | 0 | 0 |
 | tests/markers/test_invalid_arguments.py | passed | 8 | 0 | 0 | 0 |
 | tests/markers/test_mixed_scope.py | passed | 1 | 0 | 0 | 0 |
-| tests/markers/test_module_scope.py | failed | 5 | 4 | 0 | 0 |
-| tests/markers/test_package_scope.py | failed | 4 | 4 | 0 | 0 |
-| tests/markers/test_session_scope.py | failed | 5 | 6 | 0 | 0 |
+| tests/markers/test_module_scope.py | passed | 9 | 0 | 0 | 0 |
+| tests/markers/test_package_scope.py | passed | 8 | 0 | 0 | 0 |
+| tests/markers/test_session_scope.py | passed | 11 | 0 | 0 | 0 |
 | tests/modes/test_auto_mode.py | passed | 6 | 0 | 0 | 0 |
 | tests/modes/test_strict_mode.py | passed | 7 | 0 | 0 | 0 |
-| tests/test_asyncio_debug.py | failed | 11 | 1 | 0 | 0 |
-| tests/test_asyncio_fixture.py | failed | 5 | 1 | 0 | 0 |
-| tests/test_asyncio_mark.py | failed | 7 | 2 | 0 | 0 |
+| tests/test_asyncio_debug.py | passed | 12 | 0 | 0 | 0 |
+| tests/test_asyncio_fixture.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_asyncio_mark.py | passed | 9 | 0 | 0 | 0 |
 | tests/test_doctest.py | passed | 2 | 0 | 0 | 0 |
-| tests/test_event_loop_fixture.py | failed | 2 | 1 | 0 | 0 |
-| tests/test_fixture_loop_scopes.py | failed | 1 | 10 | 0 | 0 |
+| tests/test_event_loop_fixture.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_fixture_loop_scopes.py | passed | 11 | 0 | 0 | 0 |
 | tests/test_import.py | passed | 3 | 0 | 0 | 0 |
 | tests/test_is_async_test.py | passed | 4 | 0 | 0 | 0 |
-| tests/test_loop_factory_parametrization.py | failed | 23 | 17 | 0 | 0 |
+| tests/test_loop_factory_parametrization.py | passed | 40 | 0 | 0 | 0 |
 | tests/test_package.py | passed | 1 | 0 | 0 | 0 |
 | tests/test_port_factories.py | passed | 6 | 0 | 0 | 0 |
-| tests/test_set_event_loop.py | failed | 24 | 37 | 0 | 0 |
+| tests/test_set_event_loop.py | passed | 61 | 0 | 0 | 0 |
 | tests/test_simple.py | passed | 9 | 0 | 0 | 0 |
 | tests/test_skips.py | passed | 7 | 0 | 0 | 0 |
 | tests/test_subprocess.py | passed | 1 | 0 | 0 | 0 |
@@ -1195,7 +1195,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_tutorial/test_testing_dependencies/test_tutorial001.py | passed | 35 | 0 | 0 | 0 |
 | tests/test_tutorial/test_websockets/test_tutorial001.py | passed | 2 | 0 | 0 | 0 |
 | tests/test_tutorial/test_websockets/test_tutorial002.py | passed | 30 | 0 | 0 | 0 |
-| tests/test_tutorial/test_websockets/test_tutorial003.py | timeout | 0 | 0 | 0 | 0 |
+| tests/test_tutorial/test_websockets/test_tutorial003.py | passed | 2 | 0 | 0 | 0 |
 | tests/test_tutorial/test_websockets/test_tutorial003_py39.py | passed | 2 | 0 | 0 | 0 |
 | tests/test_tutorial/test_wsgi/test_tutorial001.py | passed | 2 | 0 | 0 | 0 |
 | tests/test_typing_python39.py | passed | 1 | 0 | 0 | 0 |
