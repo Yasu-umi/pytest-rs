@@ -1298,6 +1298,35 @@ pub(crate) fn collect_class(
     let mut class_marks = read_marks(py, cls)?;
     class_marks.extend(clone_marks(py, module_marks));
 
+    // Class-level pytest_generate_tests: upstream instantiates the class and
+    // calls `cls().pytest_generate_tests` as an extra hook alongside the
+    // module-level and plugin hooks.
+    let class_generate_hook: Option<Bound<'_, PyAny>> = if cls
+        .getattr("pytest_generate_tests")
+        .ok()
+        .filter(|a| a.is_callable())
+        .is_some()
+    {
+        let gen_list = pyo3::types::PyList::empty(py);
+        if let Some(hook) = generate_hook {
+            // The module-level combined hook already wraps module + plugin impls.
+            gen_list.append(hook)?;
+        }
+        // Instantiate the class to get a bound method (upstream: cls().pytest_generate_tests).
+        let instance = cls.call0()?;
+        let cls_hook = instance.getattr("pytest_generate_tests")?;
+        gen_list.append(&cls_hook)?;
+        Some(
+            py.import("pytest._metafunc")?
+                .getattr("combine_generate_hooks")?
+                .call1((gen_list,))?,
+        )
+    } else {
+        None
+    };
+    let effective_generate_hook: Option<&Bound<'_, PyAny>> =
+        class_generate_hook.as_ref().or(generate_hook);
+
     let builtins = py.import("builtins")?;
     let staticmethod_type = builtins.getattr("staticmethod")?;
     let classmethod_type = builtins.getattr("classmethod")?;
@@ -1383,7 +1412,7 @@ pub(crate) fn collect_class(
             is_static,
             marks,
             module,
-            generate_hook,
+            effective_generate_hook,
             registry,
         )?;
     }
@@ -1451,6 +1480,20 @@ pub(crate) fn push_test_items(
     let mut closure_names: Vec<String> = fixture_names.clone();
     {
         let mut seen: std::collections::HashSet<String> = closure_names.iter().cloned().collect();
+        // @pytest.mark.usefixtures names are part of the fixture closure
+        // (upstream's initialnames = usefixtures + argnames), so
+        // metafunc.fixturenames includes them for pytest_generate_tests.
+        for mark in marks.iter().filter(|m| m.name == "usefixtures") {
+            if let Ok(args) = mark.obj.bind(py).getattr("args") {
+                for arg in args.try_iter().into_iter().flatten().flatten() {
+                    if let Ok(s) = arg.extract::<String>()
+                        && seen.insert(s.clone())
+                    {
+                        closure_names.push(s);
+                    }
+                }
+            }
+        }
         let mut i = 0;
         while i < closure_names.len() {
             if let Some(def) = registry.lookup(&closure_names[i], &test_nodeid) {
@@ -1694,6 +1737,15 @@ pub(crate) fn expand_parametrize(
         .and_then(|mark| mark.getattr("_strict_parametrization_ids"))
         .and_then(|v| v.extract::<bool>())
         .unwrap_or(false);
+    // pytest_make_parametrize_id hook: conftest/plugin can override the ID
+    // for each parameter value. Cached once; None when no config available.
+    let config = crate::python::proxies::existing_py_config(py);
+    let id_hook: Option<Bound<'_, PyAny>> = config.as_ref().and_then(|cfg| {
+        cfg.bind(py)
+            .getattr("hook")
+            .ok()
+            .and_then(|hook| hook.getattr("pytest_make_parametrize_id").ok())
+    });
     let mut dims: Vec<Dim> = Vec::new();
 
     for mark in marks.iter().filter(|m| m.name == "parametrize") {
@@ -1906,7 +1958,23 @@ pub(crate) fn expand_parametrize(
                             let parts: Vec<String> = argnames
                                 .iter()
                                 .zip(values.iter())
-                                .map(|(argname, value)| id_for_value(value, argname, index))
+                                .map(|(argname, value)| {
+                                    if let Some(ref hook) = id_hook {
+                                        let kwargs = pyo3::types::PyDict::new(py);
+                                        let _ = kwargs.set_item(
+                                            "config",
+                                            config.as_ref().map(|c| c.bind(py)),
+                                        );
+                                        let _ = kwargs.set_item("val", value);
+                                        let _ = kwargs.set_item("argname", argname);
+                                        if let Ok(result) = hook.call((), Some(&kwargs))
+                                            && let Ok(s) = result.extract::<String>()
+                                        {
+                                            return s;
+                                        }
+                                    }
+                                    id_for_value(value, argname, index)
+                                })
                                 .collect();
                             parts.join("-")
                         }),
