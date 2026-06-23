@@ -467,8 +467,9 @@ pub fn expand_fixture_params(
         // parametrized, its params propagate to this item even though the
         // override itself isn't parametrized — so walk each override chain and
         // pull the supers into the parametrize closure.
-        let mut closure_defs =
-            registry.closure_for(&item.nodeid, &requested, &std::collections::HashSet::new());
+        let direct_params: std::collections::HashSet<String> =
+            item.callspec.iter().map(|(n, _)| n.clone()).collect();
+        let mut closure_defs = registry.closure_for(&item.nodeid, &requested, &direct_params);
         let mut supers: Vec<std::sync::Arc<crate::fixture::FixtureDef>> = Vec::new();
         for def in &closure_defs {
             // Only a non-parametrized override propagates a super's params; an
