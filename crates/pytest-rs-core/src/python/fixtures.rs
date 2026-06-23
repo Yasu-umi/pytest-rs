@@ -245,6 +245,42 @@ pub(crate) fn register_fixtures_from_skip(
     Ok(())
 }
 
+pub(crate) fn validate_dynamic_fixture_scopes(
+    py: Python<'_>,
+    config: &crate::config::Config,
+    registry: &FixtureRegistry,
+) -> PyResult<()> {
+    let py_config = crate::python::make_py_config(py, config)?;
+    for def in registry.all_defs() {
+        let Some(callable) = &def.scope_callable else {
+            continue;
+        };
+        let result: String = py
+            .import("pytest._fixtures")?
+            .getattr("eval_scope_callable")?
+            .call1((callable.bind(py), def.name.as_str(), py_config.bind(py)))?
+            .extract()?;
+        if Scope::parse(&result).is_none() {
+            let where_ = def.baseid.trim_end_matches("::");
+            let from = if where_.is_empty() {
+                String::new()
+            } else {
+                format!("from {where_} ")
+            };
+            let msg = format!(
+                "Fixture '{}' {from}got an unexpected scope value '{result}'",
+                def.name
+            );
+            let collect_error = py
+                .import("pytest")?
+                .getattr("Collector")?
+                .getattr("CollectError")?;
+            return Err(PyErr::from_value(collect_error.call1((msg,))?));
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn register_fixture_def(
     py: Python<'_>,
     attr_name: &str,
@@ -265,9 +301,6 @@ pub(crate) fn register_fixture_def(
         return Ok(());
     }
     let scope_obj = marker.getattr("scope")?;
-    // A dynamic scope (`scope=<callable>`, #1781): keep the callable and resolve
-    // the real scope at fixture-resolution time, where the config it is passed
-    // is available. `scope_str` is then just a placeholder.
     let scope_callable: Option<Py<PyAny>> =
         scope_obj.is_callable().then(|| scope_obj.clone().unbind());
     let scope_str: String = if scope_callable.is_some() {
@@ -280,11 +313,6 @@ pub(crate) fn register_fixture_def(
             Err(_) => return Ok(()),
         }
     };
-    // An invalid scope name (e.g. scope="functions") fails in pytest's
-    // Scope.from_user at FixtureDef construction. We keep a placeholder scope
-    // and defer the failure to resolution (so collection still proceeds),
-    // matching pytest's message: "Fixture 'NAME' from WHERE got an unexpected
-    // scope value 'SCOPE'".
     let (scope, scope_error) = match Scope::parse(&scope_str) {
         Some(scope) => (scope, None),
         None => {
