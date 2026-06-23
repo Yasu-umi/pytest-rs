@@ -420,11 +420,11 @@
     },
     {
       "file": "sklearn/decomposition/tests/test_online_lda.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 55,
       "failed": 0,
-      "skipped": 0,
+      "skipped": 2,
       "errors": 0
     },
     {

@@ -46,7 +46,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | rich | v14.2.0 | 855 | 0 | 0 | 25 | 880 | 100.0% | 60 | 62 | 0 |
 | sqlglot | v30.11.0 | 1120 | 0 | 0 | 0 | 1120 | 100.0% | 52 | 54 | 0 |
 | pytest-bdd | 8.1.0 | 112 | 26 | 0 | 1 | 139 | 81.3% | 27 | 35 | 0 |
-| httpx | 0.28.1 | 1410 | 0 | 0 | 1 | 1411 | 100.0% | 31 | 31 | 0 |
+| httpx | 0.28.1 | 1409 | 1 | 0 | 1 | 1411 | 99.9% | 30 | 31 | 0 |
 | httpx2 | v2.4.0 | 1426 | 0 | 0 | 1 | 1427 | 100.0% | 31 | 31 | 0 |
 | starlette | 0.46.2 | 907 | 0 | 0 | 0 | 907 | 100.0% | 28 | 28 | 0 |
 | attrs | 25.3.0 | 1341 | 0 | 0 | 4 | 1345 | 100.0% | 22 | 24 | 0 |
@@ -59,7 +59,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 6894 | 100.0% | 259 | 266 | 0 |
 | scikit-learn-1 | 1.9.0 | 8432 | 0 | 0 | 6624 | 15056 | 100.0% | 79 | 87 | 0 |
 | scikit-learn-2 | 1.9.0 | 5046 | 0 | 0 | 1892 | 6938 | 100.0% | 52 | 58 | 0 |
-| scikit-learn-3 | 1.9.0 | 9196 | 3 | 0 | 2528 | 11727 | 100.0% | 103 | 114 | 0 |
+| scikit-learn-3 | 1.9.0 | 9251 | 3 | 0 | 2530 | 11784 | 100.0% | 104 | 114 | 0 |
 
 ### pytest @ 9.0.3
 
@@ -688,7 +688,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/client/test_event_hooks.py | passed | 9 | 0 | 0 | 0 |
 | tests/client/test_headers.py | passed | 17 | 0 | 0 | 0 |
 | tests/client/test_properties.py | passed | 8 | 0 | 0 | 0 |
-| tests/client/test_proxies.py | passed | 69 | 0 | 0 | 0 |
+| tests/client/test_proxies.py | failed | 68 | 1 | 0 | 0 |
 | tests/client/test_queryparams.py | passed | 3 | 0 | 0 | 0 |
 | tests/client/test_redirects.py | passed | 31 | 0 | 0 | 0 |
 | tests/models/test_cookies.py | passed | 7 | 0 | 0 | 0 |
@@ -2692,7 +2692,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | sklearn/decomposition/tests/test_incremental_pca.py | passed | 27 | 0 | 0 | 0 |
 | sklearn/decomposition/tests/test_kernel_pca.py | passed | 38 | 0 | 0 | 1 |
 | sklearn/decomposition/tests/test_nmf.py | passed | 284 | 0 | 0 | 0 |
-| sklearn/decomposition/tests/test_online_lda.py | timeout | 0 | 0 | 0 | 0 |
+| sklearn/decomposition/tests/test_online_lda.py | passed | 55 | 0 | 0 | 2 |
 | sklearn/decomposition/tests/test_pca.py | passed | 386 | 0 | 0 | 220 |
 | sklearn/decomposition/tests/test_sparse_pca.py | passed | 40 | 0 | 0 | 0 |
 | sklearn/decomposition/tests/test_truncated_svd.py | passed | 46 | 0 | 0 | 0 |
