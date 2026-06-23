@@ -1698,12 +1698,10 @@ fn validate_parametrize_argnames(
             {
                 continue;
             }
-            let kind = if indirect_all || indirect_names.iter().any(|n| n == argname) {
-                "fixture"
-            } else {
-                "argument"
-            };
-            let msg = format!("In {func_name}: function uses no {kind} '{argname}'");
+            if !(indirect_all || indirect_names.iter().any(|n| n == argname)) {
+                continue;
+            }
+            let msg = format!("In {func_name}: function uses no fixture '{argname}'");
             let failed_result: PyResult<PyErr> = (|| {
                 let cls = py.import("_pytest.outcomes")?.getattr("Failed")?;
                 let instance = cls.call1((&msg,))?;
