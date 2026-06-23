@@ -73,6 +73,7 @@ impl Engine {
         let mut done = 0usize;
         let mut prev_module: Option<String> = None;
         let mut prev_class: Option<String> = None;
+        let mut prev_package: Option<String> = None;
         let mut current_file = String::new();
         let mut line = String::new();
         let maxfail = config.maxfail();
@@ -215,6 +216,17 @@ impl Engine {
                 }
             }
             prev_module = Some(module_instance);
+
+            let package = item
+                .module_name
+                .rsplit_once('.')
+                .map(|(p, _)| p.to_string());
+            if prev_package != package
+                && let Some(prev_pkg) = &prev_package
+            {
+                report_scope_teardown!(Scope::Module, prev_pkg, item);
+            }
+            prev_package = package;
 
             let file = item
                 .nodeid
@@ -416,6 +428,11 @@ impl Engine {
         {
             report_scope_teardown!(Scope::Module, prev, last);
             report_scope_teardown!(Scope::Package, prev, last);
+        }
+        if let Some(prev) = &prev_package.clone()
+            && let Some(last) = items.last()
+        {
+            report_scope_teardown!(Scope::Module, prev, last);
         }
         if let Some(last) = items.last() {
             report_scope_teardown!(Scope::Session, "", last);

@@ -103,6 +103,52 @@ pub fn ensure_xunit_setup(
         session.stash_insert(XunitState::default());
     }
 
+    // xunit-style setup_module/teardown_module at the package level (the
+    // __init__.py one dot above the test module, e.g. pkg/__init__.py when
+    // the test lives in pkg/tests/test_foo.py). Check xunit_status first
+    // so a failing import is not retried for every item in the same module.
+    if let Some(parent_pkg) = item.module_name.rsplit_once('.').map(|(p, _)| p) {
+        let pkg_key = parent_pkg.to_string();
+        match xunit_status(py, session, false, &pkg_key) {
+            Some(Some(exc)) => {
+                return Err(PyErr::from_value(exc.bind(py).clone()));
+            }
+            Some(None) => {} // already handled (including import-not-found)
+            None => match py.import(parent_pkg) {
+                Ok(pkg_module) => {
+                    let setup_fn = lookup(pkg_module.as_any(), &["setUpModule", "setup_module"]);
+                    let setup_result: PyResult<()> = match setup_fn {
+                        Some(setup) => call_optional.call1((setup, &pkg_module)).map(|_| ()),
+                        None => Ok(()),
+                    };
+                    if let Err(err) = setup_result {
+                        let err = map_skiptest(py, err);
+                        xunit_record(py, session, false, pkg_key, Some(&err));
+                        return Err(err);
+                    }
+                    xunit_record(py, session, false, pkg_key.clone(), None);
+                    let teardown_fn =
+                        lookup(pkg_module.as_any(), &["tearDownModule", "teardown_module"]);
+                    if let Some(teardown) = teardown_fn {
+                        let finalizer = bind.call1((teardown, &pkg_module))?;
+                        session.finalizers.push(crate::session::PendingFinalizer {
+                            scope: Scope::Module,
+                            instance: pkg_key,
+                            finalizer: crate::session::Finalizer::Callable(finalizer.unbind()),
+                            bindings: Vec::new(),
+                        });
+                    }
+                }
+                Err(_) => {
+                    // Package not importable (e.g. 'tests' dir without
+                    // __init__.py). Record as done so subsequent items
+                    // in the same module skip the failing import.
+                    xunit_record(py, session, false, pkg_key, None);
+                }
+            },
+        }
+    }
+
     match xunit_status(py, session, false, &module_instance) {
         Some(Some(exc)) => {
             // setup_module already failed: every test re-raises that error.
