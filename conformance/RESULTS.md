@@ -18,7 +18,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2541 | 239 | 0 | 53 | 2833 | 91.6% | 17 | 52 | 63 |
+| pytest | 9.0.3 | 2542 | 238 | 0 | 53 | 2833 | 91.6% | 17 | 52 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 20 | 0 | 3 | 209 | 90.4% | 0 | 1 | 0 |
@@ -59,7 +59,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 6894 | 100.0% | 259 | 266 | 0 |
 | scikit-learn-1 | 1.9.0 | 8432 | 0 | 0 | 6624 | 15056 | 100.0% | 79 | 87 | 0 |
 | scikit-learn-2 | 1.9.0 | 5046 | 0 | 0 | 1892 | 6938 | 100.0% | 52 | 58 | 0 |
-| scikit-learn-3 | 1.9.0 | 9212 | 3 | 0 | 2530 | 11745 | 100.0% | 103 | 114 | 0 |
+| scikit-learn-3 | 1.9.0 | 9196 | 3 | 0 | 2528 | 11727 | 100.0% | 103 | 114 | 0 |
 
 ### pytest @ 9.0.3
 
@@ -69,7 +69,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 |---|---|---:|---:|---:|---:|
 | testing/python/approx.py | passed | 75 | 0 | 0 | 18 |
 | testing/python/collect.py | failed | 77 | 5 | 0 | 0 |
-| testing/python/fixtures.py | failed | 200 | 8 | 0 | 2 |
+| testing/python/fixtures.py | failed | 201 | 7 | 0 | 2 |
 | testing/python/integration.py | failed | 13 | 3 | 0 | 4 |
 | testing/python/metafunc.py | failed | 99 | 13 | 0 | 0 |
 | testing/python/raises.py | passed | 31 | 0 | 0 | 0 |
@@ -2692,7 +2692,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | sklearn/decomposition/tests/test_incremental_pca.py | passed | 27 | 0 | 0 | 0 |
 | sklearn/decomposition/tests/test_kernel_pca.py | passed | 38 | 0 | 0 | 1 |
 | sklearn/decomposition/tests/test_nmf.py | passed | 284 | 0 | 0 | 0 |
-| sklearn/decomposition/tests/test_online_lda.py | passed | 55 | 0 | 0 | 2 |
+| sklearn/decomposition/tests/test_online_lda.py | timeout | 0 | 0 | 0 | 0 |
 | sklearn/decomposition/tests/test_pca.py | passed | 386 | 0 | 0 | 220 |
 | sklearn/decomposition/tests/test_sparse_pca.py | passed | 40 | 0 | 0 | 0 |
 | sklearn/decomposition/tests/test_truncated_svd.py | passed | 46 | 0 | 0 | 0 |
@@ -2712,7 +2712,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | sklearn/feature_selection/tests/test_sequential.py | passed | 74 | 0 | 0 | 0 |
 | sklearn/feature_selection/tests/test_variance_threshold.py | passed | 25 | 0 | 0 | 0 |
 | sklearn/frozen/tests/test_frozen.py | passed | 46 | 0 | 0 | 0 |
-| sklearn/gaussian_process/tests/test_gpc.py | timeout | 0 | 0 | 0 | 0 |
+| sklearn/gaussian_process/tests/test_gpc.py | passed | 39 | 0 | 0 | 0 |
 | sklearn/gaussian_process/tests/test_gpr.py | passed | 130 | 0 | 0 | 0 |
 | sklearn/gaussian_process/tests/test_kernels.py | passed | 281 | 0 | 0 | 0 |
 | sklearn/impute/tests/test_base.py | passed | 5 | 0 | 0 | 1 |
