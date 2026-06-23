@@ -13,6 +13,33 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  rust-check:
+    name: rust check (fmt + clippy + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: py3.13
+
+      - name: cargo fmt
+        run: cargo fmt --all --check
+
+      - name: cargo clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: cargo test
+        run: cargo test --workspace
+
   build:
     name: build (python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
@@ -28,21 +55,10 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@v2
         with:
           key: py${{ matrix.python-version }}
-
-      - name: cargo fmt
-        run: cargo fmt --all --check
-
-      - name: cargo clippy
-        run: cargo clippy --all-targets -- -D warnings
-
-      - name: cargo test
-        run: cargo test --workspace
 
       - name: build
         run: cargo build --release
@@ -154,6 +170,7 @@ jobs:
           merge-multiple: true
 
       - name: regenerate docs
+        if: needs.conformance.result != 'cancelled'
         run: |
           export LD_LIBRARY_PATH="$(python -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR"))'):${LD_LIBRARY_PATH:-}"
           python -c "
@@ -178,13 +195,13 @@ jobs:
           python conformance/plugin_smoke.py
 
       - name: commit refreshed conformance results
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.conformance.result != 'cancelled'
         run: |
           if ! git diff --quiet conformance/scoreboard conformance/RESULTS.md README.md; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add conformance/scoreboard conformance/RESULTS.md README.md
-            git commit -m "conformance: refresh linux results"
+            git commit -m "conformance: refresh linux results (${GITHUB_SHA::7})"
             for _ in 1 2 3; do
               git push && break
               git pull --rebase -X theirs origin main
