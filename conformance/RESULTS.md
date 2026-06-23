@@ -18,7 +18,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2538 | 242 | 0 | 53 | 2833 | 91.5% | 17 | 52 | 63 |
+| pytest | 9.0.3 | 2540 | 240 | 0 | 53 | 2833 | 91.5% | 17 | 52 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 20 | 0 | 3 | 209 | 90.4% | 0 | 1 | 0 |
@@ -26,7 +26,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 91 | 31 | 0 | 1 | 123 | 74.8% | 4 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 41 | 100.0% | 1 | 1 | 0 |
-| anyio | 4.13.0 | 3119 | 1 | 0 | 42 | 3162 | 100.0% | 25 | 26 | 0 |
+| anyio | 4.13.0 | 3120 | 0 | 0 | 42 | 3162 | 100.0% | 26 | 26 | 0 |
 | pytest-mypy | v1.0.1 | 75 | 3 | 0 | 0 | 78 | 96.2% | 0 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-subtests | v0.14.2 | 25 | 7 | 0 | 0 | 32 | 78.1% | 0 | 1 | 0 |
@@ -69,7 +69,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 |---|---|---:|---:|---:|---:|
 | testing/python/approx.py | passed | 75 | 0 | 0 | 18 |
 | testing/python/collect.py | failed | 77 | 5 | 0 | 0 |
-| testing/python/fixtures.py | failed | 197 | 11 | 0 | 2 |
+| testing/python/fixtures.py | failed | 199 | 9 | 0 | 2 |
 | testing/python/integration.py | failed | 13 | 3 | 0 | 4 |
 | testing/python/metafunc.py | failed | 99 | 13 | 0 | 0 |
 | testing/python/raises.py | passed | 31 | 0 | 0 | 0 |
@@ -250,7 +250,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_lowlevel.py | passed | 44 | 0 | 0 | 0 |
 | tests/test_pytest_plugin.py | passed | 35 | 0 | 0 | 0 |
 | tests/test_signals.py | passed | 12 | 0 | 0 | 0 |
-| tests/test_sockets.py | failed | 1188 | 1 | 0 | 0 |
+| tests/test_sockets.py | passed | 1189 | 0 | 0 | 0 |
 | tests/test_subprocesses.py | passed | 76 | 0 | 0 | 4 |
 | tests/test_synchronization.py | passed | 235 | 0 | 0 | 0 |
 | tests/test_taskgroups.py | passed | 393 | 0 | 0 | 10 |
