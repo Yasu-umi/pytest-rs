@@ -15,10 +15,11 @@ def fixture(fixture_function=None, *, loop_scope=None, **kwargs):
     marker = pytest.fixture(**kwargs)
 
     def apply(func):
-        func = marker(func)
         func._pytest_asyncio_fixture = True
         if loop_scope is not None:
             func._pytest_asyncio_loop_scope = loop_scope
+        func = marker(func)
+        func._pytest_asyncio_fixture = True
         return func
 
     if fixture_function is not None:
