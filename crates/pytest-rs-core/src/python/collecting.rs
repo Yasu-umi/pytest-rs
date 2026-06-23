@@ -1508,6 +1508,8 @@ pub(crate) fn push_test_items(
         &closure_names,
         &extra_generated_fixtures,
         func,
+        registry,
+        &test_nodeid,
     )?;
 
     let variants = expand_parametrize(py, &marks, &test_nodeid, Some(func))?;
@@ -1587,6 +1589,7 @@ struct Dim {
 /// Validate that parametrize argnames are either function parameters or
 /// known fixtures. Raises Failed(pytrace=False) like upstream's
 /// `Metafunc._validate_if_using_arg_names`.
+#[allow(clippy::too_many_arguments)]
 fn validate_parametrize_argnames(
     py: Python<'_>,
     marks: &[MarkData],
@@ -1594,6 +1597,8 @@ fn validate_parametrize_argnames(
     fixture_names: &[String],
     extra_fixture_names: &[String],
     func: &Bound<'_, PyAny>,
+    registry: &FixtureRegistry,
+    test_nodeid: &str,
 ) -> PyResult<()> {
     let inspect = py.import("inspect")?;
     let all_params: std::collections::HashSet<String> = inspect
@@ -1646,6 +1651,7 @@ fn validate_parametrize_argnames(
                 || fixture_names.contains(argname)
                 || extra_fixture_names.contains(argname)
                 || all_params.contains(argname.as_str())
+                || registry.lookup(argname, test_nodeid).is_some()
             {
                 continue;
             }
