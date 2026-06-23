@@ -18,7 +18,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2489 | 291 | 0 | 53 | 2833 | 89.7% | 16 | 52 | 63 |
+| pytest | 9.0.3 | 2539 | 241 | 0 | 53 | 2833 | 91.5% | 17 | 52 | 63 |
 | pytest-asyncio | v1.4.0 | 174 | 94 | 0 | 0 | 268 | 64.9% | 16 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 20 | 0 | 3 | 209 | 90.4% | 0 | 1 | 0 |
@@ -43,7 +43,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | click | 8.3.1 | 1314 | 0 | 0 | 21 | 1335 | 100.0% | 20 | 20 | 0 |
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
-| rich | v14.2.0 | 854 | 1 | 0 | 25 | 880 | 99.9% | 59 | 62 | 0 |
+| rich | v14.2.0 | 855 | 0 | 0 | 25 | 880 | 100.0% | 60 | 62 | 0 |
 | sqlglot | v30.11.0 | 1120 | 0 | 0 | 0 | 1120 | 100.0% | 52 | 54 | 0 |
 | pytest-bdd | 8.1.0 | 112 | 26 | 0 | 1 | 139 | 81.3% | 27 | 35 | 0 |
 | httpx | 0.28.1 | 1410 | 0 | 0 | 1 | 1411 | 100.0% | 31 | 31 | 0 |
@@ -53,9 +53,9 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 671 | 100.0% | 2 | 2 | 0 |
 | pytest-django | v4.9.0 | 141 | 68 | 6 | 1 | 216 | 65.7% | 2 | 13 | 0 |
 | werkzeug | 3.1.3 | 922 | 0 | 0 | 1 | 923 | 100.0% | 24 | 25 | 0 |
-| fastapi | 0.115.12 | 2330 | 1 | 0 | 130 | 2461 | 100.0% | 302 | 310 | 0 |
+| fastapi | 0.115.12 | 2332 | 1 | 0 | 130 | 2463 | 100.0% | 303 | 310 | 0 |
 | packaging | 25.0 | 26947 | 0 | 0 | 0 | 26947 | 100.0% | 12 | 12 | 0 |
-| pandas | v3.0.3 | 160773 | 1 | 0 | 26984 | 187758 | 100.0% | 871 | 961 | 3 |
+| pandas | v3.0.3 | 159254 | 1 | 1 | 26570 | 185826 | 100.0% | 870 | 961 | 3 |
 | networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 6894 | 100.0% | 259 | 266 | 0 |
 | scikit-learn-1 | 1.9.0 | 8432 | 0 | 0 | 6624 | 15056 | 100.0% | 79 | 87 | 0 |
 | scikit-learn-2 | 1.9.0 | 5046 | 0 | 0 | 1892 | 6938 | 100.0% | 52 | 58 | 0 |
@@ -69,9 +69,9 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 |---|---|---:|---:|---:|---:|
 | testing/python/approx.py | passed | 75 | 0 | 0 | 18 |
 | testing/python/collect.py | failed | 77 | 5 | 0 | 0 |
-| testing/python/fixtures.py | failed | 193 | 15 | 0 | 2 |
+| testing/python/fixtures.py | failed | 197 | 11 | 0 | 2 |
 | testing/python/integration.py | failed | 13 | 3 | 0 | 4 |
-| testing/python/metafunc.py | failed | 67 | 45 | 0 | 0 |
+| testing/python/metafunc.py | failed | 101 | 11 | 0 | 0 |
 | testing/python/raises.py | passed | 31 | 0 | 0 | 0 |
 | testing/python/raises_group.py | failed | 26 | 3 | 0 | 0 |
 | testing/python/show_fixtures_per_test.py | passed | 8 | 0 | 0 | 0 |
@@ -86,7 +86,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_collect_imported_tests.py | failed | 2 | 1 | 0 | 0 |
 | testing/test_collection.py | failed | 100 | 13 | 0 | 3 |
 | testing/test_compat.py | passed | 10 | 0 | 0 | 0 |
-| testing/test_config.py | failed | 193 | 21 | 0 | 1 |
+| testing/test_config.py | failed | 194 | 20 | 0 | 1 |
 | testing/test_conftest.py | failed | 47 | 6 | 0 | 1 |
 | testing/test_doctest.py | passed | 139 | 0 | 0 | 1 |
 | testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 |
@@ -95,14 +95,14 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_junitxml.py | failed | 132 | 5 | 0 | 0 |
 | testing/test_link_resolve.py | failed | 0 | 1 | 0 | 0 |
 | testing/test_main.py | failed | 20 | 4 | 0 | 0 |
-| testing/test_mark.py | failed | 105 | 1 | 0 | 0 |
+| testing/test_mark.py | failed | 104 | 2 | 0 | 0 |
 | testing/test_monkeypatch.py | passed | 33 | 0 | 0 | 2 |
 | testing/test_nodes.py | failed | 6 | 2 | 0 | 0 |
 | testing/test_pastebin.py | failed | 5 | 3 | 0 | 0 |
 | testing/test_pytester.py | failed | 47 | 4 | 0 | 1 |
 | testing/test_python_path.py | failed | 3 | 3 | 0 | 0 |
 | testing/test_recwarn.py | passed | 63 | 0 | 0 | 0 |
-| testing/test_runner.py | failed | 62 | 4 | 0 | 0 |
+| testing/test_runner.py | failed | 61 | 5 | 0 | 0 |
 | testing/test_runner_xunit.py | passed | 13 | 0 | 0 | 0 |
 | testing/test_scope.py | passed | 4 | 0 | 0 | 0 |
 | testing/test_session.py | failed | 24 | 2 | 0 | 0 |
@@ -111,13 +111,13 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_skipping.py | failed | 91 | 1 | 0 | 0 |
 | testing/test_stepwise.py | passed | 18 | 0 | 0 | 0 |
 | testing/test_subtests.py | failed | 17 | 17 | 0 | 0 |
-| testing/test_terminal.py | failed | 212 | 11 | 0 | 4 |
-| testing/test_threadexception.py | failed | 1 | 7 | 0 | 0 |
+| testing/test_terminal.py | failed | 210 | 13 | 0 | 4 |
+| testing/test_threadexception.py | failed | 7 | 1 | 0 | 0 |
 | testing/test_tmpdir.py | passed | 39 | 0 | 0 | 1 |
 | testing/test_unittest.py | failed | 64 | 6 | 0 | 9 |
-| testing/test_unraisableexception.py | failed | 5 | 6 | 0 | 0 |
-| testing/test_warnings.py | failed | 35 | 7 | 0 | 2 |
-| testing/acceptance_test.py | failed | 57 | 34 | 0 | 2 |
+| testing/test_unraisableexception.py | passed | 11 | 0 | 0 | 0 |
+| testing/test_warnings.py | failed | 37 | 5 | 0 | 2 |
+| testing/acceptance_test.py | failed | 58 | 33 | 0 | 2 |
 | testing/deprecated_test.py | failed | 10 | 5 | 0 | 0 |
 
 </details>
@@ -514,7 +514,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_color_triplet.py | passed | 3 | 0 | 0 | 0 |
 | tests/test_columns.py | passed | 1 | 0 | 0 | 0 |
 | tests/test_columns_align.py | passed | 1 | 0 | 0 | 0 |
-| tests/test_console.py | failed | 98 | 1 | 0 | 0 |
+| tests/test_console.py | passed | 99 | 0 | 0 | 0 |
 | tests/test_constrain.py | passed | 1 | 0 | 0 | 0 |
 | tests/test_containers.py | passed | 4 | 0 | 0 | 0 |
 | tests/test_control.py | passed | 7 | 0 | 0 | 0 |
@@ -1196,7 +1196,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_tutorial/test_websockets/test_tutorial001.py | passed | 2 | 0 | 0 | 0 |
 | tests/test_tutorial/test_websockets/test_tutorial002.py | passed | 30 | 0 | 0 | 0 |
 | tests/test_tutorial/test_websockets/test_tutorial003.py | passed | 2 | 0 | 0 | 0 |
-| tests/test_tutorial/test_websockets/test_tutorial003_py39.py | timeout | 0 | 0 | 0 | 0 |
+| tests/test_tutorial/test_websockets/test_tutorial003_py39.py | passed | 2 | 0 | 0 | 0 |
 | tests/test_tutorial/test_wsgi/test_tutorial001.py | passed | 2 | 0 | 0 | 0 |
 | tests/test_typing_python39.py | passed | 1 | 0 | 0 | 0 |
 | tests/test_union_body.py | passed | 3 | 0 | 0 | 0 |
@@ -1993,7 +1993,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pandas/tests/series/indexing/test_indexing.py | passed | 731 | 0 | 0 | 0 |
 | pandas/tests/series/indexing/test_mask.py | passed | 4 | 0 | 0 | 0 |
 | pandas/tests/series/indexing/test_set_value.py | passed | 3 | 0 | 0 | 0 |
-| pandas/tests/series/indexing/test_setitem.py | passed | 1519 | 0 | 0 | 414 |
+| pandas/tests/series/indexing/test_setitem.py | error | 0 | 0 | 1 | 0 |
 | pandas/tests/series/indexing/test_take.py | passed | 4 | 0 | 0 | 0 |
 | pandas/tests/series/indexing/test_where.py | passed | 194 | 0 | 0 | 0 |
 | pandas/tests/series/indexing/test_xs.py | passed | 6 | 0 | 0 | 0 |
