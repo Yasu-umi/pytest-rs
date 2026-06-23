@@ -413,6 +413,21 @@ fn build_test_setup(
             kwargs.push((name.clone(), value.clone_ref(py)));
         }
     }
+    let node = crate::runner::item_node(py, item)?;
+    let request_for_node = match &test_request {
+        Some(req) => req.clone_ref(py).into_any(),
+        None => Py::new(
+            py,
+            crate::request::PyRequest::new(
+                None,
+                node.clone_ref(py),
+                None,
+                crate::fixture::Scope::Function,
+            ),
+        )?
+        .into_any(),
+    };
+    node.bind(py).setattr("_request", request_for_node)?;
     Ok((callable, kwargs, test_request))
 }
 

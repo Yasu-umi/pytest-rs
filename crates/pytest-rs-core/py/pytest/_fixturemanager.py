@@ -45,8 +45,9 @@ class ShimFixtureDef:
 
 
 class ShimFixtureManager:
-    def __init__(self, arg2fixturedefs):
+    def __init__(self, arg2fixturedefs, autousenames):
         self._arg2fixturedefs = arg2fixturedefs
+        self._autousenames = autousenames
 
     def getfixturedefs(self, argname, node):
         defs = self._arg2fixturedefs.get(argname)
@@ -56,9 +57,13 @@ class ShimFixtureManager:
         visible = tuple(d for d in defs if _visible(d.baseid, nodeid))
         return visible or None
 
+    def _getautousenames(self, node):
+        nodeid = getattr(node, "nodeid", "")
+        for baseid, names in self._autousenames:
+            if _visible(baseid, nodeid):
+                yield from names
+
     def _register_fixture(self, *, name, func, nodeid="", scope="function", params=None, **_):
-        """pytest >= 8.1 dynamic registration (pytest-bdd inject_fixture). The
-        caller sets `.cached_result` on the returned def to pin the value."""
         fixture_def = ShimFixtureDef(
             argname=name, func=func, baseid=nodeid or "", scope=scope, params=params
         )
@@ -67,11 +72,12 @@ class ShimFixtureManager:
 
 
 def build_manager(entries):
-    """Construct a ShimFixtureManager from (name, func, baseid, scope) tuples
-    enumerated from the Rust fixture registry."""
     arg2fixturedefs = {}
-    for name, func, baseid, scope in entries:
+    autousenames = {}
+    for name, func, baseid, scope, autouse in entries:
         arg2fixturedefs.setdefault(name, []).append(
             ShimFixtureDef(argname=name, func=func, baseid=baseid, scope=scope, registry_name=name)
         )
-    return ShimFixtureManager(arg2fixturedefs)
+        if autouse:
+            autousenames.setdefault(baseid, []).append(name)
+    return ShimFixtureManager(arg2fixturedefs, tuple(autousenames.items()))

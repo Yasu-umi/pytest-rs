@@ -254,13 +254,25 @@ pub(crate) fn build_fixturemanager(py: Python<'_>) -> PyResult<Py<PyAny>> {
     // Safety: same invariant as getfixturevalue — the run_one frame below us
     // owns this pointer and is suspended in the Python call that reached here.
     let session = unsafe { &*session_ptr };
+    let instance = current_resolve_instance(py);
     let entries = pyo3::types::PyList::empty(py);
     for def in session.registry.all_defs() {
+        let func = if def.needs_instance
+            && let Some(inst) = instance.as_ref()
+        {
+            let bound = inst.bind(py);
+            def.func
+                .bind(py)
+                .call_method1("__get__", (bound, bound.get_type()))?
+        } else {
+            def.func.bind(py).clone()
+        };
         entries.append((
             def.name.as_str(),
-            def.func.bind(py),
+            func,
             def.baseid.as_str(),
             def.scope.as_str(),
+            def.autouse,
         ))?;
     }
     py.import("pytest._fixturemanager")?
