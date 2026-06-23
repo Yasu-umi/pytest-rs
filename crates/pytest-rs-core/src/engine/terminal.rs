@@ -790,12 +790,6 @@ impl Engine {
                     _ => word.to_string(),
                 };
                 let mut line = format!("{word} {}", report.nodeid);
-                // Collection errors print bare, like pytest's "ERROR file.py".
-                let is_collect_error = self
-                    .session
-                    .collect_errors
-                    .iter()
-                    .any(|(nodeid, _)| nodeid == &report.nodeid);
                 // Prefer reprcrash.message (always set, tb-style-independent)
                 // over parsing longrepr lines (unavailable with --tb=no).
                 let crash_msg = report
@@ -803,7 +797,7 @@ impl Engine {
                     .as_deref()
                     .map(str::to_string)
                     .or_else(|| report.longrepr.as_deref().and_then(short_message));
-                if !is_collect_error && let Some(message) = crash_msg {
+                if let Some(message) = crash_msg {
                     // pytest's _get_line_with_reprcrash_message: failure/error
                     // lines show the full crash message on CI or at -vv, but
                     // otherwise (and always under --force-short-summary) trim it
