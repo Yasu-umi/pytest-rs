@@ -449,10 +449,7 @@ pub fn collect_conftest(
     // would produce a distinct module object missing any mutated state).
     py.import("pytest._pluginmanager")?
         .getattr("pluginmanager")?
-        .call_method1(
-            "register",
-            (&module, path.to_string_lossy().as_ref()),
-        )?;
+        .call_method1("register", (&module, path.to_string_lossy().as_ref()))?;
     // Populate _dirpath2confmods so pytester's _getconftestmodules(path)
     // returns the conftest module even after nested-run cleanup restores
     // _conftest_plugins.

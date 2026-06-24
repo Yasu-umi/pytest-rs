@@ -841,16 +841,18 @@ pub(crate) fn resolve_fixture_def(
                     Ok((value.unbind(), None))
                 } else if def.is_generator {
                     let generator = python::call_fixture(py, &def.func, fixture_instance, &kwargs)?;
-                    let value = python::next_value(py, &generator).map_err(|e| {
-                        if e.is_instance_of::<pyo3::exceptions::PyStopIteration>(py) {
-                            pyo3::exceptions::PyValueError::new_err(format!(
-                                "{} did not yield a value",
-                                def.name
-                            ))
-                        } else {
-                            e
+                    let value = match python::next_value(py, &generator) {
+                        Ok(v) => v,
+                        Err(e) if e.is_instance_of::<pyo3::exceptions::PyStopIteration>(py) => {
+                            // Re-raise via Python so the exception carries a
+                            // __traceback__, producing pytest's E-prefix
+                            // traceback rendering for setup errors.
+                            py.import("_pytest.fixtures")?
+                                .call_method1("raise_did_not_yield", (&def.name,))?;
+                            unreachable!("raise_did_not_yield always raises")
                         }
-                    })?;
+                        Err(e) => return Err(e),
+                    };
                     Ok((value.unbind(), Some(Finalizer::GenNext(generator.unbind()))))
                 } else {
                     let value = python::call_fixture(py, &def.func, fixture_instance, &kwargs)?;

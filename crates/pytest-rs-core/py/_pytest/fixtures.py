@@ -193,6 +193,22 @@ class _ShimArgFixtureDef:
         self.argname = argname
 
 
+def raise_did_not_yield(fixturename):
+    """Raise ValueError for a yield fixture that yielded no value.
+
+    Raised from Python (not constructed in Rust) so the exception carries a
+    ``__traceback__``, enabling pytest's E-prefix traceback rendering.
+
+    The ``raise`` is nested to column 12 to mirror upstream
+    _pytest/fixtures.py:910: the traceback repr aligns the E-line as
+    ``"E" + " " * (3 + source_indent)``, so keeping the same column makes the
+    rendered E-prefix identical to pytest's output.
+    """
+    if True:  # noqa: SIM102 - nesting is intentional, for E-indent alignment
+        if True:  # noqa: SIM102
+            raise ValueError(f"{fixturename} did not yield a value") from None
+
+
 def call_fixture_func(fixturefunc, request, kwargs):
     """Call a fixture-style function, honoring a single `yield` for teardown
     (pytest-bdd runs step functions through this so steps may yield). Mirrors
@@ -202,7 +218,7 @@ def call_fixture_func(fixturefunc, request, kwargs):
         try:
             value = next(generator)
         except StopIteration:
-            raise ValueError(f"{request.fixturename} did not yield a value") from None
+            raise_did_not_yield(request.fixturename)
         request.addfinalizer(functools.partial(_teardown_yield_fixture, fixturefunc, generator))
     else:
         value = fixturefunc(**kwargs)
