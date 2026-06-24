@@ -224,6 +224,7 @@ pub(crate) fn run_one_body(
 /// phase report into `reports`. Returns the xfail flag the caller's
 /// teardown should use (a NOTRUN-at-call forces it on). Teardown and the
 /// filter/context close are the caller's single trailing step.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn run_item_body(
     py: Python<'_>,
     plugins: &[Box<dyn Plugin>],

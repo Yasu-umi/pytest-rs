@@ -1,7 +1,5 @@
 //! Terminal output: header, failures, summaries, durations, fixtures.
 
-use pyo3::prelude::*;
-
 mod display;
 mod results;
 mod summary;

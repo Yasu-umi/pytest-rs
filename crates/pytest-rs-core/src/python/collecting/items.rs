@@ -10,6 +10,7 @@ use super::introspect::{NameFilters, first_lineno, param_names_with_positional_o
 use super::parametrize::push_test_items;
 use super::utils::{collect_error, read_marks};
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn introspect_namespace(
     py: Python<'_>,
     module: &Bound<'_, PyModule>,
