@@ -69,10 +69,10 @@
     },
     {
       "file": "tests/client/test_proxies.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 68,
-      "failed": 1,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 69,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },

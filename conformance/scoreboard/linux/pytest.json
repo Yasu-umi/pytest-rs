@@ -26,8 +26,8 @@
       "file": "testing/python/fixtures.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 201,
-      "failed": 7,
+      "passed": 204,
+      "failed": 4,
       "skipped": 2,
       "errors": 0
     },
@@ -305,8 +305,8 @@
       "file": "testing/test_python_path.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 3,
-      "failed": 3,
+      "passed": 4,
+      "failed": 2,
       "skipped": 0,
       "errors": 0
     },

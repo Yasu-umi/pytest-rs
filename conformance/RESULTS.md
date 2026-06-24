@@ -18,7 +18,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2542 | 238 | 0 | 53 | 2833 | 91.6% | 17 | 52 | 63 |
+| pytest | 9.0.3 | 2546 | 234 | 0 | 53 | 2833 | 91.7% | 17 | 52 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 20 | 0 | 3 | 209 | 90.4% | 0 | 1 | 0 |
@@ -46,7 +46,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | rich | v14.2.0 | 855 | 0 | 0 | 25 | 880 | 100.0% | 60 | 62 | 0 |
 | sqlglot | v30.11.0 | 1120 | 0 | 0 | 0 | 1120 | 100.0% | 52 | 54 | 0 |
 | pytest-bdd | 8.1.0 | 112 | 26 | 0 | 1 | 139 | 81.3% | 27 | 35 | 0 |
-| httpx | 0.28.1 | 1409 | 1 | 0 | 1 | 1411 | 99.9% | 30 | 31 | 0 |
+| httpx | 0.28.1 | 1410 | 0 | 0 | 1 | 1411 | 100.0% | 31 | 31 | 0 |
 | httpx2 | v2.4.0 | 1426 | 0 | 0 | 1 | 1427 | 100.0% | 31 | 31 | 0 |
 | starlette | 0.46.2 | 907 | 0 | 0 | 0 | 907 | 100.0% | 28 | 28 | 0 |
 | attrs | 25.3.0 | 1341 | 0 | 0 | 4 | 1345 | 100.0% | 22 | 24 | 0 |
@@ -69,7 +69,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 |---|---|---:|---:|---:|---:|
 | testing/python/approx.py | passed | 75 | 0 | 0 | 18 |
 | testing/python/collect.py | failed | 77 | 5 | 0 | 0 |
-| testing/python/fixtures.py | failed | 201 | 7 | 0 | 2 |
+| testing/python/fixtures.py | failed | 204 | 4 | 0 | 2 |
 | testing/python/integration.py | failed | 13 | 3 | 0 | 4 |
 | testing/python/metafunc.py | failed | 99 | 13 | 0 | 0 |
 | testing/python/raises.py | passed | 31 | 0 | 0 | 0 |
@@ -100,7 +100,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_nodes.py | failed | 6 | 2 | 0 | 0 |
 | testing/test_pastebin.py | failed | 5 | 3 | 0 | 0 |
 | testing/test_pytester.py | failed | 47 | 4 | 0 | 1 |
-| testing/test_python_path.py | failed | 3 | 3 | 0 | 0 |
+| testing/test_python_path.py | failed | 4 | 2 | 0 | 0 |
 | testing/test_recwarn.py | passed | 63 | 0 | 0 | 0 |
 | testing/test_runner.py | failed | 61 | 5 | 0 | 0 |
 | testing/test_runner_xunit.py | passed | 13 | 0 | 0 | 0 |
@@ -688,7 +688,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/client/test_event_hooks.py | passed | 9 | 0 | 0 | 0 |
 | tests/client/test_headers.py | passed | 17 | 0 | 0 | 0 |
 | tests/client/test_properties.py | passed | 8 | 0 | 0 | 0 |
-| tests/client/test_proxies.py | failed | 68 | 1 | 0 | 0 |
+| tests/client/test_proxies.py | passed | 69 | 0 | 0 | 0 |
 | tests/client/test_queryparams.py | passed | 3 | 0 | 0 | 0 |
 | tests/client/test_redirects.py | passed | 31 | 0 | 0 | 0 |
 | tests/models/test_cookies.py | passed | 7 | 0 | 0 | 0 |
