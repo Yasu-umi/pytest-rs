@@ -29,6 +29,7 @@ class _ReprFileLoc:
 class _ReprEntry:
     def __init__(self, reprfileloc):
         self.reprfileloc = reprfileloc
+        self.lines: list[str] = []
 
 
 class _ReprTraceback:
@@ -57,6 +58,13 @@ class _LongRepr(str, _ExceptionChainRepr):
                 error = parts[2].strip() if len(parts) > 2 else ""
                 return parts[0], int(parts[1]), error
         return "", 0, ""
+
+    @property
+    def reprtraceback(self):
+        lines = self.splitlines()
+        entry = _ReprEntry(_ReprFileLoc("", 0, ""))
+        entry.lines = list(lines)
+        return _ReprTraceback([entry])
 
     @property
     def reprcrash(self):

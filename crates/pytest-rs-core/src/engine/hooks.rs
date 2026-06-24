@@ -790,10 +790,18 @@ impl Engine {
             .filter(|hook| hook.name == name)
             .map(|hook| hook.func.clone_ref(py))
             .collect();
-        if hook_funcs.is_empty() {
+        // pluggy fires the HookCaller even with zero implementations, so an
+        // in-process HookRecorder records the (empty) call regardless. Skip
+        // only on the outer run when there is nothing to call and no recorder
+        // to notify.
+        if hook_funcs.is_empty() && !crate::engine::inprocess::recording() {
             return Ok(());
         }
         let config_proxy = python::make_py_config(py, &self.config)?;
+        // Record the hook call so an in-process HookRecorder's getcalls sees
+        // it (the native engine dispatches conftest/plugin hooks directly,
+        // bypassing pluggy's HookCaller that the monitoring wraps).
+        python::record_hook(py, name, &[("config", config_proxy.clone_ref(py))]);
         for func in &hook_funcs {
             python::call_py_hook(py, func, &[("config", config_proxy.clone_ref(py))])?;
         }

@@ -443,10 +443,32 @@ pub fn collect_conftest(
     scan_py_hooks(&module, &baseid, hooks)?;
     // Conftests are plugins too: custom-hook impls they define (e.g. an
     // override of pytest_timeout_set_timer) dispatch through the shim
-    // pluginmanager's hook relay, LIFO like pluggy.
+    // pluginmanager's hook relay, LIFO like pluggy. Pass the conftest
+    // path as the registration name so _importconftest's getplugin check
+    // finds the already-loaded module and avoids a fresh import (which
+    // would produce a distinct module object missing any mutated state).
     py.import("pytest._pluginmanager")?
         .getattr("pluginmanager")?
-        .call_method1("register", (&module,))?;
+        .call_method1(
+            "register",
+            (&module, path.to_string_lossy().as_ref()),
+        )?;
+    // Populate _dirpath2confmods so pytester's _getconftestmodules(path)
+    // returns the conftest module even after nested-run cleanup restores
+    // _conftest_plugins.
+    let kwargs = pyo3::types::PyDict::new(py);
+    kwargs.set_item("consider_namespace_packages", true)?;
+    let pathlib = py.import("pathlib")?.getattr("Path")?;
+    let py_path = pathlib.call1((path.to_string_lossy().as_ref(),))?;
+    let py_rootdir = pathlib.call1((rootdir.to_string_lossy().as_ref(),))?;
+    let _ = py
+        .import("pytest._pluginmanager")?
+        .getattr("pluginmanager")?
+        .call_method(
+            "_loadconftestmodules",
+            (&py_path, "prepend", &py_rootdir),
+            Some(&kwargs),
+        );
     Ok(())
 }
 

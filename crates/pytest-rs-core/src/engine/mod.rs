@@ -1003,6 +1003,11 @@ impl Engine {
                 code = crate::report::exit_code::TESTS_FAILED;
             }
         }
+        // pytest_unconfigure: mirrors upstream's config teardown (fired after
+        // the terminal summary, just before the session returns). conftest and
+        // plugin hooks observe it; in pytester inline runs the HookRecorder's
+        // getcalls("pytest_unconfigure") sees the live config via record_hook.
+        let _ = self.fire_py_hooks_simple(py, "pytest_unconfigure");
         code
     }
 
