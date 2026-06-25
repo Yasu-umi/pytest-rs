@@ -110,8 +110,6 @@ def parse_filter(arg, escape):
         raise pytest.UsageError(error_template.format(error=str(e))) from None
     try:
         category = _resolve_category(category_)
-    except ImportError:
-        raise
     except Exception as e:
         raise pytest.UsageError(error_template.format(error=f"{type(e).__name__}: {e}")) from None
     if message and escape:
