@@ -107,11 +107,7 @@ impl PyConfig {
     /// Validate that every `-o`/`--override-ini` in `args` is followed by a
     /// non-flag value within those same args (upstream: `_validate_args`).
     /// `source` is included in the UsageError message for user context.
-    fn check_parse_override_ini(
-        py: Python<'_>,
-        args: &[String],
-        source: &str,
-    ) -> PyResult<()> {
+    fn check_parse_override_ini(py: Python<'_>, args: &[String], source: &str) -> PyResult<()> {
         let mut i = 0;
         while i < args.len() {
             let arg = &args[i];
@@ -155,7 +151,10 @@ impl PyConfig {
             kw.set_item("mode", mode)?;
             dict.set_item(k, config_value_cls.call((v,), Some(&kw))?)?;
         }
-        let ini_overrides = self.ini_overrides.lock().expect("ini_overrides lock poisoned");
+        let ini_overrides = self
+            .ini_overrides
+            .lock()
+            .expect("ini_overrides lock poisoned");
         for (k, v) in ini_overrides.iter() {
             let kw = pyo3::types::PyDict::new(py);
             kw.set_item("origin", "override")?;
@@ -211,7 +210,10 @@ impl PyConfig {
         }
         let overrides = pyo3::types::PyDict::new(py);
         {
-            let ini_overrides = self.ini_overrides.lock().expect("ini_overrides lock poisoned");
+            let ini_overrides = self
+                .ini_overrides
+                .lock()
+                .expect("ini_overrides lock poisoned");
             for (key, value) in ini_overrides.iter() {
                 overrides.set_item(key, value)?;
             }
