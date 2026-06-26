@@ -37,7 +37,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pytest-order | v1.4.0 | 115 | 19 | 0 | 0 | 134 | 85.8% | 7 | 16 | 0 |
 | pytest-repeat | v0.9.4 | 16 | 0 | 0 | 0 | 16 | 100.0% | 1 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
-| pytest-env | 1.6.0 | 67 | 8 | 0 | 0 | 75 | 89.3% | 2 | 3 | 0 |
+| pytest-env | 1.6.0 | 69 | 6 | 0 | 0 | 75 | 92.0% | 2 | 3 | 0 |
 | pytest-rerunfailures | 9.1.1 | 47 | 0 | 0 | 1 | 48 | 100.0% | 1 | 1 | 0 |
 | pytest-randomly | 4.1.0 | 33 | 4 | 0 | 0 | 37 | 89.2% | 0 | 1 | 0 |
 | click | 8.3.1 | 1314 | 0 | 0 | 21 | 1335 | 100.0% | 20 | 20 | 0 |
@@ -45,13 +45,13 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
 | rich | v14.2.0 | 855 | 0 | 0 | 25 | 880 | 100.0% | 60 | 62 | 0 |
 | sqlglot | v30.11.0 | 1120 | 0 | 0 | 0 | 1120 | 100.0% | 52 | 54 | 0 |
-| pytest-bdd | 8.1.0 | 112 | 26 | 0 | 1 | 139 | 81.3% | 27 | 35 | 0 |
+| pytest-bdd | 8.1.0 | 116 | 22 | 0 | 1 | 139 | 84.2% | 28 | 35 | 0 |
 | httpx | 0.28.1 | 1410 | 0 | 0 | 1 | 1411 | 100.0% | 31 | 31 | 0 |
 | httpx2 | v2.4.0 | 1426 | 0 | 0 | 1 | 1427 | 100.0% | 31 | 31 | 0 |
 | starlette | 0.46.2 | 907 | 0 | 0 | 0 | 907 | 100.0% | 28 | 28 | 0 |
 | attrs | 25.3.0 | 1341 | 0 | 0 | 4 | 1345 | 100.0% | 22 | 24 | 0 |
 | more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 671 | 100.0% | 2 | 2 | 0 |
-| pytest-django | v4.9.0 | 187 | 22 | 6 | 1 | 216 | 87.0% | 3 | 13 | 0 |
+| pytest-django | v4.9.0 | 210 | 5 | 0 | 1 | 216 | 97.7% | 7 | 13 | 0 |
 | werkzeug | 3.1.3 | 922 | 0 | 0 | 1 | 923 | 100.0% | 24 | 25 | 0 |
 | fastapi | 0.115.12 | 2332 | 1 | 0 | 130 | 2463 | 100.0% | 303 | 310 | 0 |
 | packaging | 25.0 | 26947 | 0 | 0 | 0 | 26947 | 100.0% | 12 | 12 | 0 |
@@ -390,7 +390,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| tests/test_env.py | failed | 56 | 8 | 0 | 0 |
+| tests/test_env.py | failed | 58 | 6 | 0 | 0 |
 | tests/test_verbose.py | passed | 10 | 0 | 0 | 0 |
 | tests/test_version.py | passed | 1 | 0 | 0 | 0 |
 
@@ -655,7 +655,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/feature/test_rule_example_format.py | passed | 1 | 0 | 0 | 0 |
 | tests/feature/test_same_function_name.py | passed | 1 | 0 | 0 | 0 |
 | tests/feature/test_scenario.py | passed | 18 | 0 | 0 | 0 |
-| tests/feature/test_scenarios.py | failed | 4 | 4 | 0 | 0 |
+| tests/feature/test_scenarios.py | passed | 8 | 0 | 0 | 0 |
 | tests/feature/test_steps.py | passed | 13 | 0 | 0 | 0 |
 | tests/feature/test_tags.py | passed | 5 | 0 | 0 | 0 |
 | tests/feature/test_wrong.py | passed | 1 | 0 | 0 | 0 |
@@ -843,16 +843,16 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
 | tests/test_asserts.py | passed | 2 | 0 | 0 | 0 |
-| tests/test_database.py | failed | 54 | 1 | 6 | 0 |
+| tests/test_database.py | failed | 60 | 1 | 0 | 0 |
 | tests/test_db_access_in_repr.py | failed | 0 | 1 | 0 | 0 |
-| tests/test_db_setup.py | failed | 13 | 1 | 0 | 0 |
+| tests/test_db_setup.py | passed | 14 | 0 | 0 | 0 |
 | tests/test_django_configurations.py | no-tests | 0 | 0 | 0 | 1 |
-| tests/test_django_settings_module.py | failed | 15 | 4 | 0 | 0 |
-| tests/test_environment.py | failed | 17 | 5 | 0 | 0 |
-| tests/test_fixtures.py | failed | 51 | 1 | 0 | 0 |
+| tests/test_django_settings_module.py | failed | 18 | 1 | 0 | 0 |
+| tests/test_environment.py | passed | 22 | 0 | 0 | 0 |
+| tests/test_fixtures.py | passed | 52 | 0 | 0 | 0 |
 | tests/test_initialization.py | failed | 0 | 1 | 0 | 0 |
-| tests/test_manage_py_scan.py | failed | 5 | 4 | 0 | 0 |
-| tests/test_unittest.py | failed | 19 | 4 | 0 | 0 |
+| tests/test_manage_py_scan.py | failed | 8 | 1 | 0 | 0 |
+| tests/test_unittest.py | passed | 23 | 0 | 0 | 0 |
 | tests/test_urls.py | passed | 4 | 0 | 0 | 0 |
 | tests/test_without_django_loaded.py | passed | 7 | 0 | 0 | 0 |
 

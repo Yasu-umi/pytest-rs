@@ -135,11 +135,11 @@ _linux (CI-verified)_
 | pytest-order | v1.4.0 | 115 | 19 | 0 | 0 | 134 | 85.8% | 7 | 16 | 0 |
 | pytest-repeat | v0.9.4 | 16 | 0 | 0 | 0 | 16 | 100.0% | 1 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
-| pytest-env | 1.6.0 | 67 | 8 | 0 | 0 | 75 | 89.3% | 2 | 3 | 0 |
+| pytest-env | 1.6.0 | 69 | 6 | 0 | 0 | 75 | 92.0% | 2 | 3 | 0 |
 | pytest-rerunfailures | 9.1.1 | 47 | 0 | 0 | 1 | 48 | 100.0% | 1 | 1 | 0 |
 | pytest-randomly | 4.1.0 | 33 | 4 | 0 | 0 | 37 | 89.2% | 0 | 1 | 0 |
-| pytest-bdd | 8.1.0 | 112 | 26 | 0 | 1 | 139 | 81.3% | 27 | 35 | 0 |
-| pytest-django | v4.9.0 | 187 | 22 | 6 | 1 | 216 | 87.0% | 3 | 13 | 0 |
+| pytest-bdd | 8.1.0 | 116 | 22 | 0 | 1 | 139 | 84.2% | 28 | 35 | 0 |
+| pytest-django | v4.9.0 | 210 | 5 | 0 | 1 | 216 | 97.7% | 7 | 13 | 0 |
 
 **Real-world projects** (their suites run unchanged, as drop-in evidence):
 

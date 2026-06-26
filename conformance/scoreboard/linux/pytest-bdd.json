@@ -168,10 +168,10 @@
     },
     {
       "file": "tests/feature/test_scenarios.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 4,
-      "failed": 4,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 8,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },

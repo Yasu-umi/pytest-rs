@@ -17,10 +17,10 @@
       "file": "tests/test_database.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 54,
+      "passed": 60,
       "failed": 1,
       "skipped": 0,
-      "errors": 6
+      "errors": 0
     },
     {
       "file": "tests/test_db_access_in_repr.py",
@@ -33,10 +33,10 @@
     },
     {
       "file": "tests/test_db_setup.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 13,
-      "failed": 1,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 14,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },
@@ -53,26 +53,26 @@
       "file": "tests/test_django_settings_module.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 15,
-      "failed": 4,
+      "passed": 18,
+      "failed": 1,
       "skipped": 0,
       "errors": 0
     },
     {
       "file": "tests/test_environment.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 17,
-      "failed": 5,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 22,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },
     {
       "file": "tests/test_fixtures.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 51,
-      "failed": 1,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 52,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },
@@ -89,17 +89,17 @@
       "file": "tests/test_manage_py_scan.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 5,
-      "failed": 4,
+      "passed": 8,
+      "failed": 1,
       "skipped": 0,
       "errors": 0
     },
     {
       "file": "tests/test_unittest.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 19,
-      "failed": 4,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 23,
+      "failed": 0,
       "skipped": 0,
       "errors": 0
     },
