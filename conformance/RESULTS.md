@@ -51,7 +51,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | starlette | 0.46.2 | 907 | 0 | 0 | 0 | 907 | 100.0% | 28 | 28 | 0 |
 | attrs | 25.3.0 | 1341 | 0 | 0 | 4 | 1345 | 100.0% | 22 | 24 | 0 |
 | more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 671 | 100.0% | 2 | 2 | 0 |
-| pytest-django | v4.9.0 | 141 | 68 | 6 | 1 | 216 | 65.7% | 2 | 13 | 0 |
+| pytest-django | v4.9.0 | 187 | 22 | 6 | 1 | 216 | 87.0% | 3 | 13 | 0 |
 | werkzeug | 3.1.3 | 922 | 0 | 0 | 1 | 923 | 100.0% | 24 | 25 | 0 |
 | fastapi | 0.115.12 | 2332 | 1 | 0 | 130 | 2463 | 100.0% | 303 | 310 | 0 |
 | packaging | 25.0 | 26947 | 0 | 0 | 0 | 26947 | 100.0% | 12 | 12 | 0 |
@@ -843,17 +843,17 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
 | tests/test_asserts.py | passed | 2 | 0 | 0 | 0 |
-| tests/test_database.py | failed | 50 | 5 | 6 | 0 |
+| tests/test_database.py | failed | 54 | 1 | 6 | 0 |
 | tests/test_db_access_in_repr.py | failed | 0 | 1 | 0 | 0 |
-| tests/test_db_setup.py | failed | 0 | 14 | 0 | 0 |
+| tests/test_db_setup.py | failed | 13 | 1 | 0 | 0 |
 | tests/test_django_configurations.py | no-tests | 0 | 0 | 0 | 1 |
-| tests/test_django_settings_module.py | failed | 10 | 9 | 0 | 0 |
-| tests/test_environment.py | failed | 12 | 10 | 0 | 0 |
-| tests/test_fixtures.py | failed | 43 | 9 | 0 | 0 |
+| tests/test_django_settings_module.py | failed | 15 | 4 | 0 | 0 |
+| tests/test_environment.py | failed | 17 | 5 | 0 | 0 |
+| tests/test_fixtures.py | failed | 51 | 1 | 0 | 0 |
 | tests/test_initialization.py | failed | 0 | 1 | 0 | 0 |
 | tests/test_manage_py_scan.py | failed | 5 | 4 | 0 | 0 |
-| tests/test_unittest.py | failed | 10 | 13 | 0 | 0 |
-| tests/test_urls.py | failed | 2 | 2 | 0 | 0 |
+| tests/test_unittest.py | failed | 19 | 4 | 0 | 0 |
+| tests/test_urls.py | passed | 4 | 0 | 0 | 0 |
 | tests/test_without_django_loaded.py | passed | 7 | 0 | 0 | 0 |
 
 </details>
