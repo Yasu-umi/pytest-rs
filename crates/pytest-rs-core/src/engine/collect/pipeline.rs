@@ -96,7 +96,9 @@ impl Engine {
         conftests: &[PathBuf],
         errors: &mut Vec<(PathBuf, String)>,
     ) -> Result<(), String> {
-        if let Err(err) = python::register_builtin_fixtures(py, &self.config, &mut self.session.registry) {
+        if let Err(err) =
+            python::register_builtin_fixtures(py, &self.config, &mut self.session.registry)
+        {
             return Err(python::format_exception(py, &err));
         }
         for conftest in conftests {

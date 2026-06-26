@@ -92,7 +92,9 @@ impl Engine {
         {
             return exit_code::INTERNAL_ERROR;
         }
-        if let Err(err) = python::register_builtin_fixtures(py, &self.config, &mut self.session.registry) {
+        if let Err(err) =
+            python::register_builtin_fixtures(py, &self.config, &mut self.session.registry)
+        {
             eprintln!(
                 "INTERNAL ERROR: worker fixture registration failed: {}",
                 python::format_exception(py, &err)
