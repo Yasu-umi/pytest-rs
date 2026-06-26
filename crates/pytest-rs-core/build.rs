@@ -1,4 +1,3 @@
-use std::fmt::Write as _;
 use std::path::Path;
 
 /// Embed every .py file under py/ into a generated SHIM_FILES manifest so
@@ -26,14 +25,14 @@ fn main() {
 
     let mut out = String::from("pub const SHIM_FILES: &[(&str, &str)] = &[\n");
     for rel in &files {
-        writeln!(
-            out,
-            "    ({rel:?}, include_str!(concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/py/\", {rel:?}))),"
-        )
-        .expect("write manifest entry");
+        out.push_str(&format!(
+            "    ({rel:?}, include_str!(concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/py/\", {rel:?}))),\n"
+        ));
     }
     out.push_str("];\n");
-    writeln!(out, "pub const SHIM_CONTENT_HASH: u64 = 0x{hash:016x};").expect("write hash entry");
+    out.push_str(&format!(
+        "pub const SHIM_CONTENT_HASH: u64 = 0x{hash:016x};\n"
+    ));
 
     let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR");
     std::fs::write(Path::new(&out_dir).join("shim_manifest.rs"), out).expect("write manifest");
