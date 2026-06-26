@@ -50,6 +50,11 @@ pub fn install_shim(py: Python<'_>) -> PyResult<PathBuf> {
     let shim_root = shim_root();
     for (rel, content) in SHIM_FILES {
         let path = shim_root.join(rel);
+        // Skip if already present: shim_root is named by a build-time content
+        // hash, so an existing file is always the correct version.
+        if path.exists() {
+            continue;
+        }
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)
                 .map_err(|e| pyo3::exceptions::PyOSError::new_err(e.to_string()))?;
@@ -355,10 +360,14 @@ pub fn load_entrypoint_plugins(
     globals.set_item("bundled", SKIPPED_DISTS.to_vec())?;
     // (entry-point name, plugin module, dist Name, dist version): the dist
     // metadata feeds the "plugins:" header line (pytest's _plugin_nameversions).
+    //
+    // entry_points(group='pytest11') queries only the pytest11 group directly
+    // (O(pytest11 entries) rather than O(all installed packages)). Each
+    // EntryPoint carries a .dist reference for the owning distribution (py3.9+).
     py.run(
-        c"from importlib.metadata import distributions\n\
+        c"from importlib.metadata import entry_points\n\
 bundled = {name.lower() for name in bundled}\n\
-result = sorted({(ep.name, ep.value.split(':')[0].strip(), (dist.metadata.get('Name') if dist.metadata else None) or '', dist.version or '') for dist in distributions() if ((dist.metadata.get('Name') if dist.metadata else None) or '').lower() not in bundled for ep in dist.entry_points if ep.group == 'pytest11'})\n",
+result = sorted({(ep.name, ep.value.split(':')[0].strip(), (ep.dist.metadata.get('Name') if ep.dist else None) or '', (ep.dist.version if ep.dist else None) or '') for ep in entry_points(group='pytest11') if ((ep.dist.metadata.get('Name') if ep.dist else None) or '').lower() not in bundled})\n",
         Some(&globals),
         None,
     )?;

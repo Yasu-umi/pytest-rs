@@ -972,7 +972,11 @@ impl Plugin for CovPlugin {
         std::fs::create_dir_all(&package_root)
             .map_err(|e| core_pyo3::exceptions::PyOSError::new_err(e.to_string()))?;
         for (rel, content) in SHIM_FILES {
-            std::fs::write(package_root.join(rel), content)
+            let path = package_root.join(rel);
+            if path.exists() {
+                continue;
+            }
+            std::fs::write(path, content)
                 .map_err(|e| core_pyo3::exceptions::PyOSError::new_err(e.to_string()))?;
         }
 

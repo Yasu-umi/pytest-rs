@@ -29,10 +29,22 @@ pub use proxies::*;
 pub use reporter::*;
 pub use services::*;
 
-/// The per-run directory holding the embedded Python shim packages. Plugin
-/// crates write their own importable packages (e.g. pytest_mock) here.
+/// The directory holding the embedded Python shim packages.
+///
+/// Named after the package version and a build-time FNV-1a hash of all shim
+/// file contents, so the path is stable across invocations of the same binary.
+/// `install_shim` skips writing a file when it already exists at this path,
+/// reducing startup from ~200+ file-writes per invocation to ~200 stat calls
+/// on warm runs (order-of-magnitude faster on most OSes).
+///
+/// Plugin crates share the same root and apply the same skip-if-exists logic,
+/// so only the first invocation after a new build pays the extraction cost.
 pub fn shim_root() -> PathBuf {
-    std::env::temp_dir().join(format!("pytest-rs-{}", std::process::id()))
+    std::env::temp_dir().join(format!(
+        "pytest-rs-{}-{:016x}",
+        env!("CARGO_PKG_VERSION"),
+        SHIM_CONTENT_HASH
+    ))
 }
 
 pub fn sys_path_prepend(py: Python<'_>, path: &Path) -> PyResult<()> {
