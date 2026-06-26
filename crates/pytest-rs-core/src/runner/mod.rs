@@ -276,6 +276,20 @@ impl Engine {
                 python::reporter_logstart(py, item);
             }
 
+            // With -v and no capture, print "nodeid " before the test runs so
+            // the test's own stdout appears after the ID line, then the outcome
+            // word prints on its own line — matching upstream pytest's format.
+            let pre_printed_id = tc >= 1
+                && !config.no_terminal()
+                && config.capture_disabled()
+                && !session.live_logging
+                && !config.is_worker();
+            if pre_printed_id {
+                python::reporter_ensure_newline(py);
+                print!("{} ", item.nodeid);
+                let _ = std::io::stdout().flush();
+            }
+
             // Failed subtests share the --maxfail budget: tell the fixture
             // how many failures remain before it must stop swallowing.
             python::set_subtest_fail_budget(py, maxfail.map(|m| m.saturating_sub(failed)));
@@ -335,7 +349,16 @@ impl Engine {
                 } else if tc >= 1 {
                     python::reporter_ensure_newline(py);
                     print_verbose_report_line(
-                        py, config, session, item, &report, done, total, tc, pkind,
+                        py,
+                        config,
+                        session,
+                        item,
+                        &report,
+                        done,
+                        total,
+                        tc,
+                        pkind,
+                        pre_printed_id,
                     );
                 } else if session.live_logging && !config.quiet {
                     // log_cli: outcome words print via live_flush (between
@@ -478,6 +501,7 @@ fn print_verbose_report_line(
     total: usize,
     tc: i32,
     pkind: crate::config::ProgressKind,
+    pre_printed_id: bool,
 ) {
     if !(report.phase == Phase::Call || report.outcome != Outcome::Passed) {
         return;
@@ -521,18 +545,35 @@ fn print_verbose_report_line(
         .filter(|co| !std::path::Path::new(co).is_file())
         .map(|co| format!(" <- {co}"))
         .unwrap_or_default();
-    let prefix = format!("{}{} {}", item.nodeid, loc_suffix, word);
-    let reason_suffix = match &reason {
-        Some(r) => python::format_verbose_reason(py, prefix.chars().count(), r, tc, term_width()),
-        None => String::new(),
+    // When the test ID was already printed before the test ran (capture
+    // disabled + verbose), emit only the outcome word so test stdout/stderr
+    // appears between the ID line and the outcome line — matching upstream
+    // pytest's "-v -s" format where PASSED starts on its own line.
+    let (plain, rendered) = if pre_printed_id {
+        let reason_suffix = match &reason {
+            Some(r) => python::format_verbose_reason(py, word.chars().count(), r, tc, term_width()),
+            None => String::new(),
+        };
+        let p = format!("{word}{reason_suffix}");
+        let r = format!("{}{reason_suffix}", crate::tw::markup(&word, &codes));
+        (p, r)
+    } else {
+        let prefix = format!("{}{} {}", item.nodeid, loc_suffix, word);
+        let reason_suffix = match &reason {
+            Some(r) => {
+                python::format_verbose_reason(py, prefix.chars().count(), r, tc, term_width())
+            }
+            None => String::new(),
+        };
+        let p = format!("{prefix}{reason_suffix}");
+        let r = format!(
+            "{}{} {}{reason_suffix}",
+            item.nodeid,
+            loc_suffix,
+            crate::tw::markup(&word, &codes)
+        );
+        (p, r)
     };
-    let plain = format!("{prefix}{reason_suffix}");
-    let rendered = format!(
-        "{}{} {}{reason_suffix}",
-        item.nodeid,
-        loc_suffix,
-        crate::tw::markup(&word, &codes)
-    );
     // The progress field right-aligns against the last line
     // (a -vv reason may wrap across several).
     let last_line = plain.rsplit('\n').next().unwrap_or(&plain);
