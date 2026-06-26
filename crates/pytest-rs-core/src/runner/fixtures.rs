@@ -150,29 +150,18 @@ pub(crate) fn getfixturevalue(py: Python<'_>, name: &str) -> PyResult<Py<PyAny>>
             err_type.call1((format!("fixture '{name}' not found"),))?,
         ));
     }
-    // Record a dynamically requested fixture so it surfaces in
-    // request.fixturenames, like pytest appending to the item's closure (#3057).
-    if session.registry.lookup(name, &item.nodeid).is_some() {
-        DYNAMIC_NAMES.with(|stack| {
-            if let Some(frame) = stack.borrow_mut().last_mut()
-                && !frame.iter().any(|n| n == name)
-            {
-                frame.push(name.to_string());
-            }
-        });
-    }
     let mut stack = Vec::new();
     // Override-reuse via getfixturevalue: if `name` matches a fixture currently
     // executing on this thread, an override is asking for its own name — resolve
     // to the next less-specific definition instead of recursing into itself
     // (pytest's _getnextfixturedef on the subrequest). #1953.
     let executing = EXECUTING.with(|s| s.borrow().iter().rev().find(|d| d.name == name).cloned());
-    if let Some(current) = executing
+    let result = if let Some(current) = executing
         && let Some(parent) = session
             .registry
             .lookup_overridden(name, &item.nodeid, &current)
     {
-        return resolve_fixture_def(
+        resolve_fixture_def(
             py,
             plugins,
             session,
@@ -181,18 +170,35 @@ pub(crate) fn getfixturevalue(py: Python<'_>, name: &str) -> PyResult<Py<PyAny>>
             item,
             instance.as_ref(),
             &mut stack,
-        );
+        )
+    } else {
+        resolve_fixture(
+            py,
+            plugins,
+            session,
+            config,
+            name,
+            item,
+            instance.as_ref(),
+            &mut stack,
+        )
+    };
+    // Record a dynamically requested fixture AFTER it resolves so it surfaces
+    // in request.fixturenames, mirroring pytest's _fixture_defs which is
+    // populated after _compute_fixture_value returns (#3057). Recording before
+    // resolution would make the name visible to transitive dependencies (e.g.
+    // `_django_db_helper` would see `django_db_reset_sequences` during its own
+    // setup), causing incorrect transactional/reset_sequences detection.
+    if result.is_ok() && session.registry.lookup(name, &item.nodeid).is_some() {
+        DYNAMIC_NAMES.with(|stack| {
+            if let Some(frame) = stack.borrow_mut().last_mut()
+                && !frame.iter().any(|n| n == name)
+            {
+                frame.push(name.to_string());
+            }
+        });
     }
-    resolve_fixture(
-        py,
-        plugins,
-        session,
-        config,
-        name,
-        item,
-        instance.as_ref(),
-        &mut stack,
-    )
+    result
 }
 
 /// `request.fixturenames`: the running item's full fixture closure, in
