@@ -11,34 +11,22 @@ impl Engine {
         py: Python<'_>,
     ) -> Result<(), String> {
         // -p NAME (non-"no:") plugins import before conftests, like
-        // pytest's cmdline plugin loading. PYTEST_PLUGINS (comma-separated
-        // module names) loads the same way — pytest's env-driven early
-        // plugins, used when PYTEST_DISABLE_PLUGIN_AUTOLOAD is set.
-        let mut named_plugins: Vec<String> = self
+        // pytest's cmdline plugin loading.
+        let cmdline_plugins: Vec<String> = self
             .config
             .plugin_opts
             .iter()
             .filter(|spec| !spec.starts_with("no:"))
             .cloned()
             .collect();
-        if let Ok(env_plugins) = std::env::var("PYTEST_PLUGINS") {
-            for name in env_plugins
-                .split(',')
-                .map(str::trim)
-                .filter(|s| !s.is_empty())
-            {
-                if !named_plugins.iter().any(|n| n == name) {
-                    named_plugins.push(name.to_string());
-                }
-            }
-        }
-        if !named_plugins.is_empty()
+        if !cmdline_plugins.is_empty()
             && let Err(err) = python::load_named_plugins(
                 py,
-                &named_plugins,
+                &cmdline_plugins,
                 Some(&self.config.invocation_dir),
                 &mut self.session.registry,
                 &mut self.session.py_hooks,
+                true,
             )
         {
             return Err(python::format_exception(py, &err));
@@ -47,7 +35,9 @@ impl Engine {
         // Installed third-party plugins (pytest11 entry points) autoload
         // next, before conftests — pytest's setuptools plugin loading.
         // --disable-plugin-autoload (or the env var) suppresses this.
-        if !self.config.get_flag("disable-plugin-autoload") {
+        let autoload_disabled = self.config.get_flag("disable-plugin-autoload")
+            || std::env::var_os("PYTEST_DISABLE_PLUGIN_AUTOLOAD").is_some();
+        if !autoload_disabled {
             let blocked: Vec<String> = self
                 .config
                 .plugin_opts
@@ -62,6 +52,31 @@ impl Engine {
                 &mut self.session.py_hooks,
                 &mut self.session.plugin_distinfo,
             ) {
+                return Err(python::format_exception(py, &err));
+            }
+        }
+
+        // PYTEST_PLUGINS (comma-separated module names) loads the same
+        // way — pytest's env-driven early plugins. When autoload is
+        // disabled these are the only third-party plugins, so probe
+        // __loader__ like upstream's import_plugin → mark_rewrite.
+        if let Ok(env_plugins) = std::env::var("PYTEST_PLUGINS") {
+            let env_list: Vec<String> = env_plugins
+                .split(',')
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+                .collect();
+            if !env_list.is_empty()
+                && let Err(err) = python::load_named_plugins(
+                    py,
+                    &env_list,
+                    Some(&self.config.invocation_dir),
+                    &mut self.session.registry,
+                    &mut self.session.py_hooks,
+                    autoload_disabled,
+                )
+            {
                 return Err(python::format_exception(py, &err));
             }
         }

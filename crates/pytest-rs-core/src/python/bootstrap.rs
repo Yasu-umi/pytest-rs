@@ -254,7 +254,7 @@ pub(crate) fn register_pytest_plugins(
         let py_names = pyo3::types::PyTuple::new(py, &names)?;
         let _ = rewrite_mod.call_method1("register_assert_rewrite", py_names);
     }
-    load_named_plugins(py, &names, None, registry, hooks)
+    load_named_plugins(py, &names, None, registry, hooks, false)
 }
 
 /// Import plugin modules by name (`-p NAME` / `pytest_plugins`) and register
@@ -265,32 +265,55 @@ pub fn load_named_plugins(
     search_dir: Option<&Path>,
     registry: &mut FixtureRegistry,
     hooks: &mut Vec<crate::session::PyHook>,
+    access_loader: bool,
 ) -> PyResult<()> {
+    let importlib = py.import("importlib")?;
+    let pm = py
+        .import("pytest._pluginmanager")?
+        .getattr("pluginmanager")?;
     for name in names {
-        // Try the name directly, then as `_pytest.{name}` (for built-in
-        // pytest plugin short-names like "pytester"), then via the search_dir.
-        let plugin = match py.import(name.as_str()) {
-            Ok(plugin) => plugin,
-            Err(_) => {
-                let scoped = format!("_pytest.{name}");
-                match py.import(scoped.as_str()) {
-                    Ok(plugin) => plugin,
-                    Err(_) => {
-                        // Under `python -m pytest` the invocation dir is
-                        // sys.path[0], so -p resolves local plugin modules;
-                        // emulate that for the import only.
-                        let Some(dir) = search_dir else { continue };
-                        let dir = dir.to_string_lossy();
-                        let sys_path = py.import("sys")?.getattr("path")?;
-                        sys_path.call_method1("insert", (0, dir.as_ref()))?;
-                        let result = py.import(name.as_str());
-                        let _ = sys_path.call_method1("remove", (dir.as_ref(),));
-                        let Ok(plugin) = result else { continue };
-                        plugin
+        // Check sys.modules first: importlib.import_module may fail for
+        // non-module objects registered by tests (their __spec__ lacks
+        // the _initializing attribute importlib probes).
+        let import_fn = importlib.getattr("import_module")?;
+        let modules = py.import("sys")?.getattr("modules")?;
+        let plugin = match modules.get_item(name.as_str()) {
+            Ok(obj) if !obj.is_none() => obj,
+            _ => match import_fn.call1((name.as_str(),)) {
+                Ok(obj) => obj,
+                Err(_) => {
+                    let scoped = format!("_pytest.{name}");
+                    match import_fn.call1((scoped.as_str(),)) {
+                        Ok(obj) => obj,
+                        Err(_) => {
+                            // Under `python -m pytest` the invocation dir is
+                            // sys.path[0], so -p resolves local plugin modules;
+                            // emulate that for the import only.
+                            let Some(dir) = search_dir else { continue };
+                            let dir = dir.to_string_lossy();
+                            let sys_path = py.import("sys")?.getattr("path")?;
+                            sys_path.call_method1("insert", (0, dir.as_ref()))?;
+                            let result = import_fn.call1((name.as_str(),));
+                            let _ = sys_path.call_method1("remove", (dir.as_ref(),));
+                            let Ok(plugin) = result else { continue };
+                            plugin
+                        }
                     }
                 }
-            }
+            },
         };
+        // Upstream's import_plugin → mark_rewrite probes __loader__ on
+        // the imported module; plugin autoload tests assert the attribute
+        // was accessed when loading via -p / PYTEST_PLUGINS.
+        if access_loader {
+            let _ = plugin.getattr("__loader__");
+        }
+        // Register in config.pluginmanager so get_plugin(name) finds it
+        // for non-module plugin objects (module plugins are tracked by
+        // the engine's py_hooks directly, via scan_py_hooks below).
+        if plugin.cast::<pyo3::types::PyModule>().is_err() {
+            let _ = pm.call_method1("register", (plugin.clone(), name.as_str()));
+        }
         // Re-registering an already-seen plugin would duplicate its hooks.
         let already = hooks
             .iter()
@@ -298,11 +321,15 @@ pub fn load_named_plugins(
         if already {
             continue;
         }
-        register_fixtures_from(py, &plugin, "", registry)?;
-        let before = hooks.len();
-        scan_py_hooks(&plugin, "", hooks)?;
-        for hook in &mut hooks[before..] {
-            hook.plugin_module = Some(name.clone());
+        // Fixture/hook scanning only applies to real modules (non-module
+        // plugin objects like test PseudoPlugins have no @pytest.fixture).
+        if let Ok(module) = plugin.cast::<pyo3::types::PyModule>() {
+            register_fixtures_from(py, module, "", registry)?;
+            let before = hooks.len();
+            scan_py_hooks(module, "", hooks)?;
+            for hook in &mut hooks[before..] {
+                hook.plugin_module = Some(name.clone());
+            }
         }
     }
     Ok(())

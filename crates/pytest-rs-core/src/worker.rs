@@ -114,6 +114,7 @@ impl Engine {
             Some(&self.config.invocation_dir),
             &mut self.session.registry,
             &mut self.session.py_hooks,
+            true,
         ) {
             eprintln!(
                 "INTERNAL ERROR: worker plugin loading failed: {}",

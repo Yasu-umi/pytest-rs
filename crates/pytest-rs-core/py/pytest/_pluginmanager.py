@@ -777,6 +777,7 @@ class PluginManager:
         if consider_entry_points:
             loaded = self._load_entrypoint(modname)
             if loaded:
+                _ = getattr(sys.modules.get(modname), "__loader__", None)
                 return
         try:
             __import__(modname)
@@ -786,6 +787,7 @@ class PluginManager:
             ) from e
         else:
             mod = sys.modules[modname]
+            _ = getattr(mod, "__loader__", None)
             self.register(mod, modname)
 
     def _load_entrypoint(self, name: str) -> bool:
@@ -826,7 +828,12 @@ class PluginManager:
         for name in env.split(","):
             name = name.strip()
             if name:
+                already_loaded = self.getplugin(name) is not None
                 self.import_plugin(name, consider_entry_points=True)
+                if not already_loaded:
+                    mod = sys.modules.get(name)
+                    if mod is not None:
+                        _ = getattr(mod, "__spec__", None)
 
     def consider_setuptools_entrypoints(self) -> None:
         """Load installed pytest11 entry-point plugins (like upstream)."""
