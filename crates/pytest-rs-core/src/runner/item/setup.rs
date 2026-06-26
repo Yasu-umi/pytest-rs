@@ -324,7 +324,7 @@ pub(crate) fn evaluate_item_prelude(
                 config,
                 item,
                 Phase::Setup,
-                TimeMark::now(py),
+                TimeMark::now(),
                 &err,
             ));
             return ItemPrelude::Done(reports);
@@ -345,7 +345,7 @@ pub(crate) fn evaluate_item_prelude(
                 config,
                 item,
                 Phase::Setup,
-                TimeMark::now(py),
+                TimeMark::now(),
                 &err,
             ));
             return ItemPrelude::Done(reports);

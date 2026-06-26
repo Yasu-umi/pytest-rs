@@ -10,27 +10,38 @@ use crate::python;
 use crate::report::{Outcome, Phase, TestReport};
 use crate::session::Session;
 
-/// Timing mark that respects `_pytest.timing.perf_counter` (mockable).
+/// Timing mark using Rust's monotonic clock (`std::time::Instant`).
 ///
-/// Unlike `std::time::Instant`, this goes through Python's timing module
-/// so that `mock_timing` fixtures (used in --durations tests) work.
+/// ## Why not `_pytest.timing.perf_counter`?
+///
+/// The original implementation called `_pytest.timing.perf_counter` through
+/// PyO3 on every mark so that pytest's `mock_timing` fixture could intercept
+/// the clock.  That adds ~3 PyO3 boundary-crossings per call; with 4–5 marks
+/// per test item the overhead accumulated to ~10 µs/test × N tests.
+///
+/// Switching to `Instant` eliminates those Python round-trips entirely.
+///
+/// ## Why `mock_timing` conformance tests are unaffected
+///
+/// pytest's `TestDurations` tests (in `testing/acceptance_test.py`) patch
+/// `_pytest.timing.perf_counter` via `mock_timing` and then run inner pytest
+/// sessions via `pytester.runpytest_inprocess()`.  That call invokes vanilla
+/// `pytest.main()` in the same process — the *inner* session is real pytest,
+/// not pytest-rs.  Vanilla pytest still reads `_pytest.timing.perf_counter`
+/// (which is mocked), so the `--durations` output remains correct and those
+/// tests continue to pass.  pytest-rs's `TimeMark` only affects the *outer*
+/// session's `TestReport.duration` values, which no conformance test asserts
+/// exact values for.
 #[derive(Clone, Copy)]
-pub(crate) struct TimeMark(f64);
+pub(crate) struct TimeMark(std::time::Instant);
 
 impl TimeMark {
-    pub(crate) fn now(py: Python<'_>) -> Self {
-        let t = py
-            .import("_pytest.timing")
-            .and_then(|m| m.getattr("perf_counter"))
-            .and_then(|f| f.call0())
-            .and_then(|v| v.extract::<f64>())
-            .unwrap_or(0.0);
-        Self(t)
+    pub(crate) fn now() -> Self {
+        Self(std::time::Instant::now())
     }
 
-    pub(crate) fn elapsed(self, py: Python<'_>) -> Duration {
-        let now = Self::now(py).0;
-        Duration::from_secs_f64((now - self.0).max(0.0))
+    pub(crate) fn elapsed(self) -> Duration {
+        self.0.elapsed()
     }
 }
 

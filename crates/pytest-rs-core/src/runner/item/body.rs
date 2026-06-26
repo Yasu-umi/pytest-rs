@@ -12,7 +12,7 @@ use crate::report::{Outcome, Phase, TestReport};
 use crate::session::{Finalizer, PendingFinalizer, Session};
 
 pub(crate) fn run_custom_item(py: Python<'_>, config: &Config, item: &TestItem) -> Vec<TestReport> {
-    let started = TimeMark::now(py);
+    let started = TimeMark::now();
     // reportinfo()[2] is the failure-section heading (pytest-mypy's
     // test_name_formatter); empty means "use the nodeid domain" (default Item).
     let head_line = item
@@ -80,7 +80,7 @@ pub(crate) fn run_custom_item(py: Python<'_>, config: &Config, item: &TestItem) 
             nodeid: item.nodeid.clone(),
             phase,
             outcome: oc,
-            duration: started.elapsed(py),
+            duration: started.elapsed(),
             longrepr,
             location,
             subtest_desc: None,
@@ -144,7 +144,7 @@ pub(crate) fn run_one_body(
             config,
             item,
             Phase::Setup,
-            TimeMark::now(py),
+            TimeMark::now(),
             &err,
         ));
         return reports;
@@ -177,7 +177,7 @@ pub(crate) fn run_one_body(
                 config,
                 item,
                 Phase::Setup,
-                TimeMark::now(py),
+                TimeMark::now(),
                 &err,
             ));
             python::end_item_context(py);
@@ -248,7 +248,7 @@ pub(crate) fn run_item_body(
         &format!("{} (setup)", item.nodeid),
     );
     python::log_start_phase(py, "setup", log_level_cfg.as_deref());
-    let setup_started = TimeMark::now(py);
+    let setup_started = TimeMark::now();
     let setup_result = build_test_setup(py, plugins, session, config, item);
 
     let (callable, kwargs, test_request) = match setup_result {
@@ -298,7 +298,7 @@ pub(crate) fn run_item_body(
         nodeid: item.nodeid.clone(),
         phase: Phase::Setup,
         outcome: Outcome::Passed,
-        duration: setup_started.elapsed(py),
+        duration: setup_started.elapsed(),
         longrepr: None,
         location: None,
         subtest_desc: None,
@@ -377,7 +377,7 @@ pub(crate) fn run_item_body(
         }
     }
     python::log_start_phase(py, "call", log_level_cfg.as_deref());
-    let call_started = TimeMark::now(py);
+    let call_started = TimeMark::now();
     // pytest_runtest_call hookwrappers surround just the call phase; their
     // post-yield part runs after the test body, pass or fail.
     let (call_wrappers, wrapper_start_err) =
@@ -441,7 +441,7 @@ pub(crate) fn run_item_body(
             nodeid: item.nodeid.clone(),
             phase: Phase::Call,
             outcome: Outcome::Passed,
-            duration: call_started.elapsed(py),
+            duration: call_started.elapsed(),
             longrepr: None,
             location: None,
             subtest_desc: None,
@@ -459,7 +459,7 @@ pub(crate) fn run_item_body(
                     nodeid: item.nodeid.clone(),
                     phase: Phase::Call,
                     outcome: Outcome::Failed,
-                    duration: call_started.elapsed(py),
+                    duration: call_started.elapsed(),
                     longrepr: Some(
                         "async def functions are not natively supported.\n\
                          You need to install a suitable plugin for your async framework, \
@@ -495,7 +495,7 @@ pub(crate) fn run_item_body(
                                 nodeid: item.nodeid.clone(),
                                 phase: Phase::Call,
                                 outcome: Outcome::Failed,
-                                duration: call_started.elapsed(py),
+                                duration: call_started.elapsed(),
                                 longrepr: Some(
                                     "async def functions are not natively supported.\n\
                                      You need to install a suitable plugin for your async framework, \
@@ -531,7 +531,7 @@ pub(crate) fn run_item_body(
                                 nodeid: item.nodeid.clone(),
                                 phase: Phase::Call,
                                 outcome: Outcome::Passed,
-                                duration: call_started.elapsed(py),
+                                duration: call_started.elapsed(),
                                 longrepr: None,
                                 location: None,
                                 subtest_desc: None,

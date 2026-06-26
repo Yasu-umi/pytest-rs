@@ -74,7 +74,7 @@ pub(crate) fn teardown_one(
         &format!("{} (teardown)", item.nodeid),
     );
     python::log_start_phase(py, "teardown", log_level_cfg.as_deref());
-    let teardown_started = TimeMark::now(py);
+    let teardown_started = TimeMark::now();
     let mut errors = teardown_scope(
         py,
         plugins,
@@ -126,7 +126,7 @@ pub(crate) fn teardown_one(
             nodeid: item.nodeid.clone(),
             phase: Phase::Teardown,
             outcome: Outcome::Passed,
-            duration: teardown_started.elapsed(py),
+            duration: teardown_started.elapsed(),
             longrepr: None,
             location: None,
             subtest_desc: None,
@@ -149,7 +149,7 @@ pub(crate) fn teardown_one(
             } else {
                 Outcome::Failed
             },
-            duration: teardown_started.elapsed(py),
+            duration: teardown_started.elapsed(),
             longrepr: Some(errors.join("\n")),
             location: None,
             subtest_desc: None,
@@ -193,7 +193,7 @@ pub(crate) fn teardown_scope_reported(
     if has_finalizers {
         python::capture_scope_teardown_begin(py);
     }
-    let started = TimeMark::now(py);
+    let started = TimeMark::now();
     let errors = teardown_scope(py, plugins, session, config, scope, instance, item);
     if errors.is_empty() {
         // A passing scope teardown that printed (e.g. teardown_module): its
@@ -215,7 +215,7 @@ pub(crate) fn teardown_scope_reported(
             nodeid: report_nodeid.unwrap_or(&item.nodeid).to_string(),
             phase: Phase::Teardown,
             outcome: Outcome::Passed,
-            duration: started.elapsed(py),
+            duration: started.elapsed(),
             longrepr: None,
             location: None,
             subtest_desc: None,
@@ -232,7 +232,7 @@ pub(crate) fn teardown_scope_reported(
         nodeid: report_nodeid.unwrap_or(&item.nodeid).to_string(),
         phase: Phase::Teardown,
         outcome: Outcome::Failed,
-        duration: started.elapsed(py),
+        duration: started.elapsed(),
         longrepr: Some(errors.join("\n")),
         location: None,
         subtest_desc: None,
@@ -310,7 +310,7 @@ pub(crate) fn teardown_ended_params_reported(
     if has_finalizers {
         python::capture_scope_teardown_begin(py);
     }
-    let started = TimeMark::now(py);
+    let started = TimeMark::now();
     let errors = teardown_ended_params(py, session, config, ended);
     if !has_finalizers {
         // Nothing ran, but the param transition still evicted any cached
@@ -327,7 +327,7 @@ pub(crate) fn teardown_ended_params_reported(
             nodeid: report_nodeid.to_string(),
             phase: Phase::Teardown,
             outcome: Outcome::Passed,
-            duration: started.elapsed(py),
+            duration: started.elapsed(),
             longrepr: None,
             location: None,
             subtest_desc: None,
@@ -342,7 +342,7 @@ pub(crate) fn teardown_ended_params_reported(
         nodeid: report_nodeid.to_string(),
         phase: Phase::Teardown,
         outcome: Outcome::Failed,
-        duration: started.elapsed(py),
+        duration: started.elapsed(),
         longrepr: Some(errors.join("\n")),
         location: None,
         subtest_desc: None,

@@ -40,7 +40,7 @@ pub(crate) fn run_one(
                     config,
                     item,
                     Phase::Setup,
-                    TimeMark::now(py),
+                    TimeMark::now(),
                     &err,
                 )];
             }
@@ -74,7 +74,7 @@ pub(crate) fn run_one(
                 config,
                 item,
                 Phase::Setup,
-                TimeMark::now(py),
+                TimeMark::now(),
                 &err,
             )];
         }
