@@ -336,6 +336,14 @@ def make_runner(cls, method_name):
     # plugins shuffle by item.cls.__qualname__). Kept off TestItem.cls so the
     # engine does not instantiate/rebind around the shim runner.
     run.cls = cls
+    # Copy plugin-visible attributes from the original method so hooks that
+    # inspect item.obj (e.g. pytest-django's @tag → marker conversion) work.
+    original_method = getattr(cls, method_name, None)
+    if original_method is not None:
+        for _attr in ("tags",):
+            _val = getattr(original_method, _attr, None)
+            if _val is not None:
+                setattr(run, _attr, _val)
     return run
 
 
