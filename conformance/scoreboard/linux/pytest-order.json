@@ -80,8 +80,8 @@
       "file": "tests/test_order_group_scope_relative.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 0,
-      "failed": 5,
+      "passed": 4,
+      "failed": 1,
       "skipped": 0,
       "errors": 0
     },
@@ -125,8 +125,8 @@
       "file": "tests/test_relative_ordering.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 18,
-      "failed": 3,
+      "passed": 19,
+      "failed": 2,
       "skipped": 0,
       "errors": 0
     },
