@@ -614,6 +614,33 @@ deps = ["numpy==2.4.6", "scipy==1.18.0", "pandas==3.0.3"]
 category = "real-world"
 enabled = true
 
+[pydantic]
+repo = "https://github.com/pydantic/pydantic"
+tag = "v2.11.7"
+testpaths = ["tests"]
+deps = [
+    "pydantic[email]==2.11.7",
+    "dirty-equals==0.9.0",
+    "jsonschema==4.24.0",
+    "pytz==2025.2",
+    "pytest-run-parallel==0.4.2",
+    "pytest-benchmark==5.1.0",
+    "cloudpickle==3.1.1",
+    "faker==40.23.0",
+    "eval-type-backport==0.2.2",
+]
+exclude = [
+    # test_docs requires pytest-examples + full docs build dependencies.
+    "test_docs.py",
+]
+# pytest-run-parallel registers the 'thread_unsafe' marker that pydantic's
+# conftest.py applies dynamically. The plugin is in deps/ (PYTHONPATH) so
+# its entry_points aren't visible to importlib.metadata autoload — force-
+# load it explicitly.
+extra_args = ["-p", "pytest_run_parallel.plugin"]
+category = "real-world"
+enabled = true
+
 [scikit-learn-1]
 tag = "1.9.0"
 package = "scikit-learn==1.9.0"

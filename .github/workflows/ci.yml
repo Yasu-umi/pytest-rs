@@ -98,6 +98,8 @@ jobs:
             suites: "scikit-learn-2"
           - group: scikit-learn-3
             suites: "scikit-learn-3"
+          - group: pydantic
+            suites: "pydantic"
     steps:
       - uses: actions/checkout@v6
 

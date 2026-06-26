@@ -94,6 +94,10 @@ class Suite:
         # Install from PyPI wheel instead of cloning source (for packages
         # with C extensions whose tests live inside the package).
         self.package: str | None = config.get("package")
+        # Extra CLI arguments passed to the runner for every file in this
+        # suite (e.g. ["-p", "pytest_run_parallel.plugin"] to force-load a
+        # plugin whose entry points are unreachable via PYTHONPATH deps).
+        self.extra_args: list[str] = config.get("extra_args", [])
         self.checkout = CACHE / f"{self.name}-{self.tag}"
         self.src_dir: Path | None = None
 
@@ -216,7 +220,7 @@ class Suite:
         timeout = TIMEOUT_S * self.slow_timeout_multiplier if rel in self.slow_files else TIMEOUT_S
         try:
             proc = subprocess.run(
-                [str(BINARY), rel, *deselects],
+                [str(BINARY), rel, *deselects, *self.extra_args],
                 cwd=self.checkout,
                 capture_output=True,
                 text=True,
