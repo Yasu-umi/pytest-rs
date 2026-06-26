@@ -10,6 +10,55 @@ use pyo3::types::PyDict;
 /// conftest hooks (e.g. `config.option.foo = ...`) stay visible everywhere.
 pub(crate) static CONFIG_PROXY: std::sync::OnceLock<Py<PyAny>> = std::sync::OnceLock::new();
 
+// Cached references to hot-path Python callables. Initialized on first call;
+// stable for the lifetime of the process (module-level functions don't change).
+static CTX_CALL: pyo3::sync::PyOnceLock<Py<PyAny>> = pyo3::sync::PyOnceLock::new();
+static CTX_BEGIN_ITEM: pyo3::sync::PyOnceLock<Py<PyAny>> = pyo3::sync::PyOnceLock::new();
+static CTX_END_ITEM: pyo3::sync::PyOnceLock<Py<PyAny>> = pyo3::sync::PyOnceLock::new();
+static BUILTINS_NEXT: pyo3::sync::PyOnceLock<Py<PyAny>> = pyo3::sync::PyOnceLock::new();
+static FIXTURES_FINALIZE: pyo3::sync::PyOnceLock<Py<PyAny>> = pyo3::sync::PyOnceLock::new();
+
+fn ctx_call(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+    CTX_CALL
+        .get_or_try_init(py, || {
+            Ok(py.import("pytest._ctx")?.getattr("call")?.unbind())
+        })
+        .map(|f| f.bind(py).clone())
+}
+
+fn ctx_begin_item(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+    CTX_BEGIN_ITEM
+        .get_or_try_init(py, || {
+            Ok(py.import("pytest._ctx")?.getattr("begin_item")?.unbind())
+        })
+        .map(|f| f.bind(py).clone())
+}
+
+fn ctx_end_item(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+    CTX_END_ITEM
+        .get_or_try_init(py, || {
+            Ok(py.import("pytest._ctx")?.getattr("end_item")?.unbind())
+        })
+        .map(|f| f.bind(py).clone())
+}
+
+fn builtins_next(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+    BUILTINS_NEXT
+        .get_or_try_init(py, || Ok(py.import("builtins")?.getattr("next")?.unbind()))
+        .map(|f| f.bind(py).clone())
+}
+
+fn fixtures_finalize_fn(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+    FIXTURES_FINALIZE
+        .get_or_try_init(py, || {
+            Ok(py
+                .import("_pytest.fixtures")?
+                .getattr("finalize_generator")?
+                .unbind())
+        })
+        .map(|f| f.bind(py).clone())
+}
+
 thread_local! {
     /// Config proxies for active in-process nested runs (a stack for
     /// re-entrancy). While non-empty, the top shadows the process-global
@@ -497,7 +546,7 @@ pub fn call_fixture<'py>(
     for (name, value) in kwargs {
         dict.set_item(name, value.bind(py))?;
     }
-    let call = py.import("pytest._ctx")?.getattr("call")?;
+    let call = ctx_call(py)?;
     match instance {
         Some(instance) => call.call((func.bind(py), instance.bind(py)), Some(&dict)),
         None => call.call((func.bind(py),), Some(&dict)),
@@ -506,14 +555,12 @@ pub fn call_fixture<'py>(
 
 /// Begin/end the per-item contextvars context.
 pub fn begin_item_context(py: Python<'_>) -> PyResult<()> {
-    py.import("pytest._ctx")?.call_method0("begin_item")?;
+    ctx_begin_item(py)?.call0()?;
     Ok(())
 }
 
 pub fn end_item_context(py: Python<'_>) {
-    let _ = py
-        .import("pytest._ctx")
-        .and_then(|m| m.call_method0("end_item"));
+    let _ = ctx_end_item(py).and_then(|f| f.call0());
 }
 
 /// Resume a suspended sync generator fixture, expecting StopIteration.
@@ -523,11 +570,8 @@ pub fn finalize_generator(py: Python<'_>, generator: &Py<PyAny>) -> PyResult<()>
     // second yield, reports it like upstream's fail_fixturefunc (message +
     // location, no traceback). Run it in the item context so contextvar
     // tokens set before the yield reset cleanly.
-    let finalize = py
-        .import("_pytest.fixtures")?
-        .getattr("finalize_generator")?;
-    let call = py.import("pytest._ctx")?.getattr("call")?;
-    call.call1((finalize, generator.bind(py)))?;
+    let call = ctx_call(py)?;
+    call.call1((fixtures_finalize_fn(py)?, generator.bind(py)))?;
     Ok(())
 }
 
@@ -537,10 +581,7 @@ pub fn next_value<'py>(
     py: Python<'py>,
     generator: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let next_fn = py.import("builtins")?.getattr("next")?;
-    py.import("pytest._ctx")?
-        .getattr("call")?
-        .call1((next_fn, generator))
+    ctx_call(py)?.call1((builtins_next(py)?, generator))
 }
 
 /// Snapshot the shim pluginmanager's plugin list so a nested run's conftest
