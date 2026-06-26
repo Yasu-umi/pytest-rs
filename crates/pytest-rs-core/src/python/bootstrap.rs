@@ -254,7 +254,7 @@ pub(crate) fn register_pytest_plugins(
         let py_names = pyo3::types::PyTuple::new(py, &names)?;
         let _ = rewrite_mod.call_method1("register_assert_rewrite", py_names);
     }
-    load_named_plugins(py, &names, None, registry, hooks, false)
+    load_named_plugins(py, &names, None, registry, hooks)
 }
 
 /// Import plugin modules by name (`-p NAME` / `pytest_plugins`) and register
@@ -265,12 +265,8 @@ pub fn load_named_plugins(
     search_dir: Option<&Path>,
     registry: &mut FixtureRegistry,
     hooks: &mut Vec<crate::session::PyHook>,
-    access_loader: bool,
 ) -> PyResult<()> {
     let importlib = py.import("importlib")?;
-    let pm = py
-        .import("pytest._pluginmanager")?
-        .getattr("pluginmanager")?;
     for name in names {
         // Check sys.modules first: importlib.import_module may fail for
         // non-module objects registered by tests (their __spec__ lacks
@@ -302,18 +298,6 @@ pub fn load_named_plugins(
                 }
             },
         };
-        // Upstream's import_plugin → mark_rewrite probes __loader__ on
-        // the imported module; plugin autoload tests assert the attribute
-        // was accessed when loading via -p / PYTEST_PLUGINS.
-        if access_loader {
-            let _ = plugin.getattr("__loader__");
-        }
-        // Register in config.pluginmanager so get_plugin(name) finds it
-        // for non-module plugin objects (module plugins are tracked by
-        // the engine's py_hooks directly, via scan_py_hooks below).
-        if plugin.cast::<pyo3::types::PyModule>().is_err() {
-            let _ = pm.call_method1("register", (plugin.clone(), name.as_str()));
-        }
         // Re-registering an already-seen plugin would duplicate its hooks.
         let already = hooks
             .iter()

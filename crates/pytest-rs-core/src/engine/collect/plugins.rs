@@ -26,7 +26,6 @@ impl Engine {
                 Some(&self.config.invocation_dir),
                 &mut self.session.registry,
                 &mut self.session.py_hooks,
-                true,
             )
         {
             return Err(python::format_exception(py, &err));
@@ -74,7 +73,6 @@ impl Engine {
                     Some(&self.config.invocation_dir),
                     &mut self.session.registry,
                     &mut self.session.py_hooks,
-                    autoload_disabled,
                 )
             {
                 return Err(python::format_exception(py, &err));

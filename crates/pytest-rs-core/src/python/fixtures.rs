@@ -8,11 +8,20 @@ use pyo3::types::PyModule;
 
 /// Register the shim's builtin fixtures (tmp_path, monkeypatch, pytester,
 /// doctest_namespace) with global visibility.
-pub fn register_builtin_fixtures(py: Python<'_>, registry: &mut FixtureRegistry) -> PyResult<()> {
+pub fn register_builtin_fixtures(
+    py: Python<'_>,
+    config: &crate::config::Config,
+    registry: &mut FixtureRegistry,
+) -> PyResult<()> {
+    let mut skip: Vec<&str> = Vec::new();
+    if config.plugin_disabled("capture") {
+        skip.push("capfd");
+        skip.push("capfdbinary");
+    }
     let pytest_module = py.import("pytest")?;
-    register_fixtures_from(py, &pytest_module, "", registry)?;
+    register_fixtures_from_skip(py, &pytest_module, "", registry, &skip)?;
     let doctest_module = py.import("_pytest.doctest")?;
-    register_fixtures_from(py, &doctest_module, "", registry)?;
+    register_fixtures_from_skip(py, &doctest_module, "", registry, &[])?;
     Ok(())
 }
 
