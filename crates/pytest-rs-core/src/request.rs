@@ -561,16 +561,13 @@ impl PyConfig {
         let shlex = py.import("shlex")?;
         let mut combined: Vec<String> = Vec::new();
 
-        if addopts {
-            if let Ok(env_opts) = std::env::var("PYTEST_ADDOPTS") {
-                let env_opts = env_opts.trim().to_string();
-                if !env_opts.is_empty() {
-                    let env_args: Vec<String> =
-                        shlex.call_method1("split", (&env_opts,))?.extract()?;
-                    // Validate env args in isolation (upstream: _validate_args)
-                    Self::check_parse_override_ini(py, &env_args, "via PYTEST_ADDOPTS")?;
-                    combined.extend(env_args);
-                }
+        if addopts && let Ok(env_opts) = std::env::var("PYTEST_ADDOPTS") {
+            let env_opts = env_opts.trim().to_string();
+            if !env_opts.is_empty() {
+                let env_args: Vec<String> = shlex.call_method1("split", (&env_opts,))?.extract()?;
+                // Validate env args in isolation (upstream: _validate_args)
+                Self::check_parse_override_ini(py, &env_args, "via PYTEST_ADDOPTS")?;
+                combined.extend(env_args);
             }
         }
         combined.extend(args);
@@ -581,17 +578,17 @@ impl PyConfig {
         while i < combined.len() {
             let arg = &combined[i];
             if arg == "-o" || arg == "--override-ini" {
-                if let Some(kv) = combined.get(i + 1) {
-                    if let Some((k, v)) = kv.split_once('=') {
-                        new_overrides.push((k.to_string(), v.to_string()));
-                        i += 2;
-                        continue;
-                    }
-                }
-            } else if let Some(rest) = arg.strip_prefix("--override-ini=") {
-                if let Some((k, v)) = rest.split_once('=') {
+                if let Some(kv) = combined.get(i + 1)
+                    && let Some((k, v)) = kv.split_once('=')
+                {
                     new_overrides.push((k.to_string(), v.to_string()));
+                    i += 2;
+                    continue;
                 }
+            } else if let Some(rest) = arg.strip_prefix("--override-ini=")
+                && let Some((k, v)) = rest.split_once('=')
+            {
+                new_overrides.push((k.to_string(), v.to_string()));
             }
             i += 1;
         }
