@@ -22,6 +22,9 @@ ini_aliases: dict[str, str] = {}
 option_specs: dict[str, dict[str, Any]] = {}
 # "--flag" -> dest, for deferred CLI token resolution
 flag_dests: dict[str, str] = {}
+# "--flag" -> action, per-flag (two flags can share a dest but have different
+# actions, e.g. --nomigrations=store_true / --migrations=store_false).
+flag_actions: dict[str, str | None] = {}
 
 
 class OptionGroup:
@@ -47,9 +50,11 @@ class OptionGroup:
             "nargs": attrs.get("nargs"),
             "choices": attrs.get("choices"),
         }
+        action = attrs.get("action")
         for opt in opts:
             if opt.startswith("-"):
                 flag_dests[opt] = dest
+                flag_actions[opt] = action
 
     _addoption = addoption
 
@@ -410,8 +415,12 @@ def apply_cli_args(namespace: Any, tokens: list[str]) -> tuple[list[str], list[s
             unknown.append(token)
             continue
         spec = option_specs[dest]
-        if spec["action"] in ("store_true", "store_false"):
-            setattr(namespace, dest, spec["action"] == "store_true")
+        # Use the per-flag action so two flags sharing a dest but with
+        # different actions work correctly (e.g. --nomigrations=store_true and
+        # --migrations=store_false both with dest="nomigrations").
+        action = flag_actions.get(name) or spec["action"]
+        if action in ("store_true", "store_false"):
+            setattr(namespace, dest, action == "store_true")
             continue
         convert = spec["type"]
         nargs = spec.get("nargs")

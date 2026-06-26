@@ -719,13 +719,20 @@ impl Engine {
     /// early hook, after option specs are registered (so getini works) and
     /// before configure. pytest-env reads getini("env") here to set os.environ.
     pub(crate) fn fire_py_load_initial_conftests(&mut self, py: Python<'_>) -> PyResult<()> {
-        let hook_funcs: Vec<Py<pyo3::PyAny>> = self
+        // Respect tryfirst/trylast ordering (same as fire_py_hooks_simple).
+        let mut sorted_hooks: Vec<_> = self
             .session
             .py_hooks
             .iter()
             .filter(|hook| hook.name == "pytest_load_initial_conftests")
-            .map(|hook| hook.func.clone_ref(py))
             .collect();
+        sorted_hooks.sort_by_key(|h| match (h.tryfirst, h.trylast) {
+            (true, _) => 0,
+            (_, true) => 2,
+            _ => 1,
+        });
+        let hook_funcs: Vec<Py<pyo3::PyAny>> =
+            sorted_hooks.iter().map(|h| h.func.clone_ref(py)).collect();
         if hook_funcs.is_empty() {
             return Ok(());
         }
