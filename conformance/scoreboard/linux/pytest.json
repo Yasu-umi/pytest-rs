@@ -179,8 +179,8 @@
       "file": "testing/test_config.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 194,
-      "failed": 20,
+      "passed": 199,
+      "failed": 15,
       "skipped": 1,
       "errors": 0
     },
@@ -449,8 +449,8 @@
       "file": "testing/test_warnings.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 37,
-      "failed": 5,
+      "passed": 36,
+      "failed": 6,
       "skipped": 2,
       "errors": 0
     },
