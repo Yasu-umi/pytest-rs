@@ -449,8 +449,8 @@
       "file": "testing/test_warnings.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 36,
-      "failed": 6,
+      "passed": 37,
+      "failed": 5,
       "skipped": 2,
       "errors": 0
     },
