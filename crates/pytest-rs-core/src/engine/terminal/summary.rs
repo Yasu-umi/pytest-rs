@@ -91,7 +91,7 @@ impl Engine {
                             continue;
                         }
                         let word = match &report.subtest_desc {
-                            Some(desc) => format!("SUBSKIPPED{desc}"),
+                            Some(desc) => format!("{desc} SUBSKIP"),
                             None => "SKIPPED".to_string(),
                         };
                         let mut line = format!("{word} {}", report.nodeid);
@@ -120,7 +120,7 @@ impl Engine {
                     }
                     if label.is_none() {
                         label = Some(match &report.subtest_desc {
-                            Some(desc) => format!("SUBSKIPPED{desc}"),
+                            Some(desc) => format!("{desc} SUBSKIP"),
                             None => "SKIPPED".to_string(),
                         });
                     }
@@ -152,9 +152,9 @@ impl Engine {
                     _ => continue,
                 };
                 let word = match (&report.subtest_desc, report.outcome) {
-                    (Some(desc), Outcome::Failed) => format!("SUBFAILED{desc}"),
-                    (Some(desc), Outcome::Passed) => format!("SUBPASSED{desc}"),
-                    (Some(desc), Outcome::XFailed) => format!("SUBXFAILED{desc}"),
+                    (Some(desc), Outcome::Failed) => format!("{desc} SUBFAIL"),
+                    (Some(desc), Outcome::Passed) => format!("{desc} SUBPASS"),
+                    (Some(desc), Outcome::XFailed) => format!("{desc} SUBXFAIL"),
                     _ => word.to_string(),
                 };
                 let mut line = format!("{word} {}", report.nodeid);

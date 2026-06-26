@@ -238,11 +238,35 @@ class Subtests:
         return _SubTestContextManager(msg, kwargs)
 
 
+_compat_cls: type | None = None
+
+
+def _make_subtests() -> Subtests:
+    """Return a Subtests instance that passes isinstance(x, SubTests) when
+    the pytest-subtests plugin is installed."""
+    global _compat_cls
+    if _compat_cls is not None:
+        return _compat_cls()
+    try:
+        from pytest_subtests import SubTests as PluginCls
+    except ImportError:
+        return Subtests()
+    _compat_cls = type(
+        "Subtests",
+        (PluginCls,),
+        {
+            "__init__": lambda self: None,
+            "test": Subtests.test,
+        },
+    )
+    return _compat_cls()
+
+
 @fixture
 def subtests():
     """Provides subtests functionality."""
     _results.clear()
-    return Subtests()
+    return _make_subtests()
 
 
 def pytest_report_to_serializable(report: Any) -> dict[str, Any] | None:

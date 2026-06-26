@@ -21,6 +21,7 @@ import sys as _sys
 
 _venv = _os.environ.get('VIRTUAL_ENV')
 if _venv:
+    _venv = _os.path.abspath(_venv)
     _candidates = _glob.glob(_os.path.join(_venv, 'lib', 'python*', 'site-packages'))
     _candidates.append(_os.path.join(_venv, 'Lib', 'site-packages'))
     for _dir in _candidates:
