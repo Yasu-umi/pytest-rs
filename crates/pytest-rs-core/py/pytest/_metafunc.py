@@ -10,8 +10,9 @@ then inspects ._calls).
 
 from __future__ import annotations
 
+import dataclasses
 import itertools
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
 from _pytest._io.saferepr import saferepr
@@ -56,20 +57,13 @@ class _Definition:
         return default
 
 
+@dataclasses.dataclass(frozen=True)
 class CallSpec2:
-    def __init__(
-        self,
-        params: dict[str, object] | None = None,
-        indices: dict[str, int] | None = None,
-        _arg2scope: dict[str, ScopeEnum] | None = None,
-        _idlist: Sequence[str | object] | None = None,
-        marks: list | None = None,
-    ) -> None:
-        self.params: dict[str, object] = dict(params) if params else {}
-        self.indices: dict[str, int] = dict(indices) if indices else {}
-        self._arg2scope: dict[str, ScopeEnum] = dict(_arg2scope) if _arg2scope else {}
-        self._idlist: list[str | object] = list(_idlist) if _idlist else []
-        self.marks: list = list(marks) if marks else []
+    params: dict[str, object] = dataclasses.field(default_factory=dict)
+    indices: dict[str, int] = dataclasses.field(default_factory=dict)
+    _arg2scope: Mapping[str, ScopeEnum] = dataclasses.field(default_factory=dict)
+    _idlist: Sequence[str | object] = dataclasses.field(default_factory=tuple)
+    marks: list = dataclasses.field(default_factory=list)
 
     @property
     def id(self) -> str:
@@ -216,8 +210,10 @@ class Metafunc:
             self.definition = _Definition(definition_or_func, marks)
             if isinstance(fixtureinfo_or_names, (list, tuple)):
                 self.fixturenames = list(fixtureinfo_or_names)
+            elif fixtureinfo_or_names is not None:
+                self.fixturenames = list(getattr(fixtureinfo_or_names, "names_closure", []))
             else:
-                self.fixturenames = list(fixtureinfo_or_names) if fixtureinfo_or_names else []
+                self.fixturenames = []
             self._arg2fixturedefs = {}
             self.module = config_or_module
             self.cls = cls

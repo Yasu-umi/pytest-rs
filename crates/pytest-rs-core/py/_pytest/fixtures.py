@@ -1,5 +1,7 @@
 import functools
 import inspect
+from collections.abc import Sequence
+from typing import Any
 
 import pytest
 
@@ -8,6 +10,31 @@ FixtureRequest = getattr(pytest, "FixtureRequest", object)
 
 
 from pytest._fixtures import FixtureLookupError as FixtureLookupError  # noqa: E402
+
+
+class FuncFixtureInfo:
+    """Fixture-related information for a fixture-requesting item (e.g. test function).
+
+    Mirrors upstream _pytest.fixtures.FuncFixtureInfo. Plugins like anyio use
+    dataclasses.fields(CallSpec2) to detect pytest >= 8 and then access
+    item._fixtureinfo to build new items with modified fixture closures.
+    """
+
+    __slots__ = ("argnames", "initialnames", "name2fixturedefs", "names_closure")
+
+    def __init__(
+        self,
+        argnames: tuple[str, ...] = (),
+        initialnames: tuple[str, ...] = (),
+        names_closure: list[str] | None = None,
+        name2fixturedefs: dict[str, Sequence[Any]] | None = None,
+    ) -> None:
+        self.argnames: tuple[str, ...] = tuple(argnames)
+        self.initialnames: tuple[str, ...] = tuple(initialnames)
+        self.names_closure: list[str] = list(names_closure) if names_closure is not None else []
+        self.name2fixturedefs: dict[str, Sequence[Any]] = (
+            dict(name2fixturedefs) if name2fixturedefs is not None else {}
+        )
 
 
 class _Subscriptable:

@@ -1014,6 +1014,7 @@ class Node(Item):
             return
         self.nodeid = nodeid
         self.name = name
+        self.parent = parent
         self.own_markers = list(marks or [])
         self.fixturenames = list(fixturenames or [])
         self.function = function
@@ -1119,7 +1120,7 @@ class Function(Node):
     """Test-function node; the engine builds these for collected test items
     (conftest hooks isinstance-check pytest.Function)."""
 
-    def __init__(self, *args, callobj=None, originalname=None, **kwargs):
+    def __init__(self, *args, callobj=None, originalname=None, fixtureinfo=None, **kwargs):
         if callobj is not None and kwargs.get("function") is None and len(args) < 5:
             kwargs["function"] = callobj
         super().__init__(*args, **kwargs)
@@ -1134,6 +1135,32 @@ class Function(Node):
         else:
             name = getattr(self, "name", None)
             self.originalname = name.split("[")[0] if name else name
+        if fixtureinfo is not None:
+            self.__dict__["_fixtureinfo"] = fixtureinfo
+
+    @property
+    def _fixtureinfo(self):
+        """FuncFixtureInfo for this item. Plugins like anyio access this to
+        build modified items with additional fixture closures (e.g. anyio_backend).
+        Returns a lazily-built default from fixturenames if not explicitly set."""
+        try:
+            return self.__dict__["_fixtureinfo"]
+        except KeyError:
+            from _pytest.fixtures import FuncFixtureInfo
+
+            fixturenames = list(getattr(self, "fixturenames", []))
+            fi = FuncFixtureInfo(
+                argnames=tuple(fixturenames),
+                initialnames=tuple(fixturenames),
+                names_closure=fixturenames,
+                name2fixturedefs={},
+            )
+            self.__dict__["_fixtureinfo"] = fi
+            return fi
+
+    @_fixtureinfo.setter
+    def _fixtureinfo(self, value):
+        self.__dict__["_fixtureinfo"] = value
 
     def __eq__(self, other):
         # upstream Node has no __eq__ so comparison is identity-based;
