@@ -57,6 +57,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | packaging | 25.0 | 26947 | 0 | 0 | 0 | 26947 | 100.0% | 12 | 12 | 0 |
 | pandas | v3.0.3 | 160773 | 1 | 0 | 26984 | 187758 | 100.0% | 871 | 961 | 3 |
 | networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 6894 | 100.0% | 259 | 266 | 0 |
+| pydantic | v2.11.7 | 5336 | 14 | 0 | 232 | 5582 | 99.7% | 76 | 81 | 1 |
 | scikit-learn-1 | 1.9.0 | 8432 | 0 | 0 | 6624 | 15056 | 100.0% | 79 | 87 | 0 |
 | scikit-learn-2 | 1.9.0 | 5046 | 0 | 0 | 1892 | 6938 | 100.0% | 52 | 58 | 0 |
 | scikit-learn-3 | 1.9.0 | 9251 | 3 | 0 | 2530 | 11784 | 100.0% | 104 | 114 | 0 |
@@ -2474,6 +2475,96 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | networkx/utils/tests/test_rcm.py | passed | 2 | 0 | 0 | 0 |
 | networkx/utils/tests/test_unionfind.py | passed | 5 | 0 | 0 | 0 |
 | networkx/algorithms/assortativity/tests/base_test.py | no-tests | 0 | 0 | 0 | 0 |
+
+</details>
+
+### pydantic @ v2.11.7
+
+<details><summary>per-file detail (81 files)</summary>
+
+| file | status | passed | failed | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| tests/benchmarks/test_attribute_access.py | passed | 2 | 0 | 0 | 0 |
+| tests/benchmarks/test_discriminated_unions.py | passed | 2 | 0 | 0 | 0 |
+| tests/benchmarks/test_fastapi_startup_generics.py | passed | 1 | 0 | 0 | 0 |
+| tests/benchmarks/test_fastapi_startup_simple.py | passed | 1 | 0 | 0 | 0 |
+| tests/benchmarks/test_imports.py | passed | 2 | 0 | 0 | 0 |
+| tests/benchmarks/test_isinstance.py | passed | 1 | 0 | 0 | 0 |
+| tests/benchmarks/test_model_schema_generation.py | passed | 12 | 0 | 0 | 108 |
+| tests/benchmarks/test_model_schema_generation_recursive.py | passed | 6 | 0 | 0 | 0 |
+| tests/benchmarks/test_model_serialization.py | passed | 5 | 0 | 0 | 0 |
+| tests/benchmarks/test_model_validation.py | passed | 8 | 0 | 0 | 0 |
+| tests/benchmarks/test_north_star.py | passed | 8 | 0 | 0 | 0 |
+| tests/mypy/test_mypy.py | no-tests | 0 | 0 | 0 | 49 |
+| tests/plugin/test_plugin.py | no-tests | 0 | 0 | 0 | 1 |
+| tests/test_abc.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_aliases.py | passed | 118 | 0 | 0 | 32 |
+| tests/test_allow_partial.py | passed | 19 | 0 | 0 | 0 |
+| tests/test_annotated.py | passed | 37 | 0 | 0 | 0 |
+| tests/test_assert_in_validators.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_callable.py | passed | 8 | 0 | 0 | 0 |
+| tests/test_color.py | passed | 90 | 0 | 0 | 0 |
+| tests/test_computed_fields.py | passed | 30 | 0 | 0 | 2 |
+| tests/test_config.py | failed | 83 | 1 | 0 | 0 |
+| tests/test_construction.py | passed | 51 | 0 | 0 | 0 |
+| tests/test_create_model.py | passed | 27 | 0 | 0 | 0 |
+| tests/test_dataclasses.py | passed | 217 | 0 | 0 | 3 |
+| tests/test_datetime.py | passed | 192 | 0 | 0 | 0 |
+| tests/test_decorators.py | passed | 28 | 0 | 0 | 0 |
+| tests/test_deprecated.py | passed | 48 | 0 | 0 | 0 |
+| tests/test_deprecated_fields.py | passed | 11 | 0 | 0 | 0 |
+| tests/test_deprecated_validate_arguments.py | passed | 21 | 0 | 0 | 0 |
+| tests/test_discriminated_union.py | passed | 71 | 0 | 0 | 0 |
+| tests/test_docs_extraction.py | passed | 14 | 0 | 0 | 0 |
+| tests/test_dunder_all.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_edge_cases.py | passed | 191 | 0 | 0 | 1 |
+| tests/test_errors.py | passed | 4 | 0 | 0 | 0 |
+| tests/test_experimental_arguments_schema.py | passed | 10 | 0 | 0 | 0 |
+| tests/test_exports.py | passed | 155 | 0 | 0 | 0 |
+| tests/test_fields.py | passed | 21 | 0 | 0 | 0 |
+| tests/test_forward_ref.py | passed | 59 | 0 | 0 | 0 |
+| tests/test_generics.py | passed | 119 | 0 | 0 | 2 |
+| tests/test_internal.py | passed | 16 | 0 | 0 | 1 |
+| tests/test_json.py | passed | 59 | 0 | 0 | 0 |
+| tests/test_json_schema.py | passed | 428 | 0 | 0 | 1 |
+| tests/test_main.py | passed | 234 | 0 | 0 | 25 |
+| tests/test_meta.py | no-tests | 0 | 0 | 0 | 0 |
+| tests/test_migration.py | passed | 228 | 0 | 0 | 0 |
+| tests/test_model_signature.py | passed | 15 | 0 | 0 | 0 |
+| tests/test_model_validator.py | passed | 8 | 0 | 0 | 0 |
+| tests/test_networks.py | passed | 300 | 0 | 0 | 1 |
+| tests/test_networks_ipaddress.py | passed | 163 | 0 | 0 | 0 |
+| tests/test_parse.py | passed | 11 | 0 | 0 | 0 |
+| tests/test_pickle.py | passed | 21 | 0 | 0 | 0 |
+| tests/test_pipeline.py | passed | 63 | 0 | 0 | 0 |
+| tests/test_plugin_loader.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_plugins.py | failed | 0 | 13 | 0 | 0 |
+| tests/test_private_attributes.py | passed | 31 | 0 | 0 | 0 |
+| tests/test_rich_repr.py | passed | 2 | 0 | 0 | 0 |
+| tests/test_root_model.py | passed | 76 | 0 | 0 | 0 |
+| tests/test_serialize.py | passed | 84 | 0 | 0 | 1 |
+| tests/test_serialize_as_any.py | passed | 14 | 0 | 0 | 0 |
+| tests/test_strict.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_structural_pattern_matching.py | passed | 1 | 0 | 0 | 0 |
+| tests/test_titles.py | passed | 116 | 0 | 0 | 0 |
+| tests/test_tools.py | passed | 9 | 0 | 0 | 0 |
+| tests/test_type_adapter.py | passed | 204 | 0 | 0 | 0 |
+| tests/test_type_alias_type.py | passed | 18 | 0 | 0 | 0 |
+| tests/test_type_hints.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_types.py | passed | 944 | 0 | 0 | 3 |
+| tests/test_types_namedtuple.py | passed | 11 | 0 | 0 | 0 |
+| tests/test_types_payment_card_number.py | passed | 46 | 0 | 0 | 0 |
+| tests/test_types_self.py | passed | 26 | 0 | 0 | 0 |
+| tests/test_types_typeddict.py | passed | 69 | 0 | 0 | 0 |
+| tests/test_types_zoneinfo.py | passed | 6 | 0 | 0 | 0 |
+| tests/test_typing.py | passed | 17 | 0 | 0 | 1 |
+| tests/test_utils.py | passed | 166 | 0 | 0 | 1 |
+| tests/test_v1.py | passed | 3 | 0 | 0 | 0 |
+| tests/test_validate_call.py | passed | 58 | 0 | 0 | 0 |
+| tests/test_validators.py | passed | 174 | 0 | 0 | 0 |
+| tests/test_validators_dataclass.py | passed | 8 | 0 | 0 | 0 |
+| tests/test_version.py | passed | 7 | 0 | 0 | 0 |
+| tests/test_warnings.py | passed | 5 | 0 | 0 | 0 |
 
 </details>
 
