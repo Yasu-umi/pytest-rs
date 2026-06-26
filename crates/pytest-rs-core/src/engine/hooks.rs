@@ -731,7 +731,17 @@ impl Engine {
         }
         let early_config = python::make_py_config(py, &self.config)?;
         let parser = py.import("pytest._parser")?.getattr("parser")?.unbind();
-        let args = pyo3::types::PyList::new(py, &self.config.paths)?
+        // Upstream passes the full invocation args so plugins can call
+        // parser.parse_known_args(args) to find plugin-defined flags like --ds.
+        // We reconstruct it as plugin_args (unknown --flags) + paths (positionals).
+        let full_args: Vec<&str> = self
+            .config
+            .plugin_args
+            .iter()
+            .map(String::as_str)
+            .chain(self.config.paths.iter().map(String::as_str))
+            .collect();
+        let args = pyo3::types::PyList::new(py, &full_args)?
             .into_any()
             .unbind();
         for func in &hook_funcs {
@@ -783,13 +793,20 @@ impl Engine {
     }
 
     pub(crate) fn fire_py_hooks_simple(&mut self, py: Python<'_>, name: &str) -> PyResult<()> {
-        let hook_funcs: Vec<Py<pyo3::PyAny>> = self
+        // Respect @pytest.hookimpl(tryfirst/trylast) ordering: tryfirst before
+        // normal, normal next, trylast last (mirrors pluggy's call ordering).
+        let mut hooks: Vec<_> = self
             .session
             .py_hooks
             .iter()
             .filter(|hook| hook.name == name)
-            .map(|hook| hook.func.clone_ref(py))
             .collect();
+        hooks.sort_by_key(|h| match (h.tryfirst, h.trylast) {
+            (true, _) => 0,
+            (_, true) => 2,
+            _ => 1,
+        });
+        let hook_funcs: Vec<Py<pyo3::PyAny>> = hooks.iter().map(|h| h.func.clone_ref(py)).collect();
         // pluggy fires the HookCaller even with zero implementations, so an
         // in-process HookRecorder records the (empty) call regardless. Skip
         // only on the outer run when there is nothing to call and no recorder

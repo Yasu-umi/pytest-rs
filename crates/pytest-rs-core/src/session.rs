@@ -71,6 +71,10 @@ pub struct PyHook {
     /// The `pytest_plugins` module this hook came from, if any (used to
     /// avoid re-registering a plugin declared by several test modules).
     pub plugin_module: Option<String>,
+    /// @pytest.hookimpl(trylast=True): fires after non-trylast hooks.
+    pub trylast: bool,
+    /// @pytest.hookimpl(tryfirst=True): fires before non-tryfirst hooks.
+    pub tryfirst: bool,
 }
 
 /// Mutable state shared by the engine and every hook for one test run.

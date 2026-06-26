@@ -544,11 +544,26 @@ pub fn scan_py_hooks(
             continue;
         };
         if name.starts_with("pytest_") && value.is_callable() {
+            // Read @pytest.hookimpl(trylast=True/tryfirst=True) from the
+            // function's pytest_impl dict (set by our hookimpl decorator).
+            let get_bool_flag = |flag: &str| -> bool {
+                value
+                    .getattr("pytest_impl")
+                    .ok()
+                    .and_then(|d| d.cast_into::<pyo3::types::PyDict>().ok())
+                    .and_then(|d| d.get_item(flag).ok().flatten())
+                    .and_then(|v| v.extract::<bool>().ok())
+                    .unwrap_or(false)
+            };
+            let trylast = get_bool_flag("trylast");
+            let tryfirst = get_bool_flag("tryfirst");
             hooks.push(crate::session::PyHook {
                 name,
                 func: value.unbind(),
                 baseid: baseid.to_string(),
                 plugin_module: None,
+                trylast,
+                tryfirst,
             });
         }
     }
