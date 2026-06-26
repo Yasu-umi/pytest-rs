@@ -6,6 +6,43 @@ use crate::collect::TestItem;
 use crate::report::{Outcome, Phase};
 use pyo3::types::PyDict;
 
+static REPORTS_TEST_REPORT_CLS: pyo3::sync::PyOnceLock<Py<PyAny>> = pyo3::sync::PyOnceLock::new();
+static REPORTER_LOGREPORT_FN: pyo3::sync::PyOnceLock<Py<PyAny>> = pyo3::sync::PyOnceLock::new();
+static REPORTER_FEED_DEFAULT_FN: pyo3::sync::PyOnceLock<Py<PyAny>> = pyo3::sync::PyOnceLock::new();
+
+fn reports_test_report_cls(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+    REPORTS_TEST_REPORT_CLS
+        .get_or_try_init(py, || {
+            Ok(py
+                .import("_pytest.reports")?
+                .getattr("TestReport")?
+                .unbind())
+        })
+        .map(|f| f.bind(py).clone())
+}
+
+fn reporter_logreport_fn(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+    REPORTER_LOGREPORT_FN
+        .get_or_try_init(py, || {
+            Ok(py
+                .import("pytest._reporter")?
+                .getattr("logreport")?
+                .unbind())
+        })
+        .map(|f| f.bind(py).clone())
+}
+
+fn reporter_feed_default_fn(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+    REPORTER_FEED_DEFAULT_FN
+        .get_or_try_init(py, || {
+            Ok(py
+                .import("pytest._reporter")?
+                .getattr("feed_default")?
+                .unbind())
+        })
+        .map(|f| f.bind(py).clone())
+}
+
 /// Register the default 'terminalreporter' plugin (the stand-in that
 /// reporter-replacing plugins like pytest-sugar unregister). Must run
 /// before python pytest_configure hooks fire.
@@ -109,9 +146,7 @@ pub fn reporter_logstart(py: Python<'_>, item: &TestItem) {
 /// Drive the replacement reporter's pytest_runtest_logreport.
 pub fn reporter_logreport(py: Python<'_>, report: &Bound<'_, PyAny>) {
     let result = (|| -> PyResult<()> {
-        py.import("pytest._reporter")?
-            .getattr("logreport")?
-            .call1((report,))?;
+        reporter_logreport_fn(py)?.call1((report,))?;
         Ok(())
     })();
     if let Err(err) = result {
@@ -124,9 +159,7 @@ pub fn reporter_logreport(py: Python<'_>, report: &Bound<'_, PyAny>) {
 /// can access stats['passed'] etc. without the default reporter printing.
 pub fn reporter_feed_default(py: Python<'_>, report: &Bound<'_, PyAny>) {
     let result = (|| -> PyResult<()> {
-        py.import("pytest._reporter")?
-            .getattr("feed_default")?
-            .call1((report,))?;
+        reporter_feed_default_fn(py)?.call1((report,))?;
         Ok(())
     })();
     if let Err(err) = result {
@@ -319,6 +352,6 @@ pub fn make_report_proxy(
     if let Some(reason) = wasxfail {
         kwargs.set_item("wasxfail", reason)?;
     }
-    let cls = py.import("_pytest.reports")?.getattr("TestReport")?;
+    let cls = reports_test_report_cls(py)?;
     Ok(cls.call((), Some(&kwargs))?.unbind())
 }

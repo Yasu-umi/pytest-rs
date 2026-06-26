@@ -5,6 +5,79 @@ use super::*;
 use crate::collect::TestItem;
 use crate::report::{Outcome, Phase};
 
+static LOGGING_START_PHASE_FN: pyo3::sync::PyOnceLock<Py<PyAny>> = pyo3::sync::PyOnceLock::new();
+static LOGGING_FINISH_ITEM_FN: pyo3::sync::PyOnceLock<Py<PyAny>> = pyo3::sync::PyOnceLock::new();
+static CAPTURE_START_PHASE_FN: pyo3::sync::PyOnceLock<Py<PyAny>> = pyo3::sync::PyOnceLock::new();
+static CAPTURE_FINISH_ITEM_FN: pyo3::sync::PyOnceLock<Py<PyAny>> = pyo3::sync::PyOnceLock::new();
+static WCAPTURE_BEGIN_FILTERS_FN: pyo3::sync::PyOnceLock<Py<PyAny>> = pyo3::sync::PyOnceLock::new();
+static WCAPTURE_END_FILTERS_FN: pyo3::sync::PyOnceLock<Py<PyAny>> = pyo3::sync::PyOnceLock::new();
+
+fn logging_start_phase_fn(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+    LOGGING_START_PHASE_FN
+        .get_or_try_init(py, || {
+            Ok(py
+                .import("pytest._logging")?
+                .getattr("start_phase")?
+                .unbind())
+        })
+        .map(|f| f.bind(py).clone())
+}
+
+fn logging_finish_item_fn(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+    LOGGING_FINISH_ITEM_FN
+        .get_or_try_init(py, || {
+            Ok(py
+                .import("pytest._logging")?
+                .getattr("finish_item")?
+                .unbind())
+        })
+        .map(|f| f.bind(py).clone())
+}
+
+fn capture_start_phase_fn(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+    CAPTURE_START_PHASE_FN
+        .get_or_try_init(py, || {
+            Ok(py
+                .import("pytest._capture")?
+                .getattr("start_phase")?
+                .unbind())
+        })
+        .map(|f| f.bind(py).clone())
+}
+
+fn capture_finish_item_fn(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+    CAPTURE_FINISH_ITEM_FN
+        .get_or_try_init(py, || {
+            Ok(py
+                .import("pytest._capture")?
+                .getattr("finish_item")?
+                .unbind())
+        })
+        .map(|f| f.bind(py).clone())
+}
+
+fn wcapture_begin_filters_fn(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+    WCAPTURE_BEGIN_FILTERS_FN
+        .get_or_try_init(py, || {
+            Ok(py
+                .import("pytest._wcapture")?
+                .getattr("begin_item_filters")?
+                .unbind())
+        })
+        .map(|f| f.bind(py).clone())
+}
+
+fn wcapture_end_filters_fn(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+    WCAPTURE_END_FILTERS_FN
+        .get_or_try_init(py, || {
+            Ok(py
+                .import("pytest._wcapture")?
+                .getattr("end_item_filters")?
+                .unbind())
+        })
+        .map(|f| f.bind(py).clone())
+}
+
 /// Wire session-wide logging handlers (log_file / log_cli) from CLI + ini
 /// settings; returns whether live (log_cli) logging is enabled.
 pub fn configure_logging(py: Python<'_>, config: &crate::config::Config) -> bool {
@@ -326,29 +399,20 @@ pub fn configure_mark_generator(
 /// Apply per-item @pytest.mark.filterwarnings specs inside a
 /// catch_warnings block; returns the context to close at item end.
 pub fn begin_item_filters(py: Python<'_>, specs: &[String]) -> PyResult<Py<PyAny>> {
-    let ctx = py
-        .import("pytest._wcapture")?
-        .call_method1("begin_item_filters", (specs.to_vec(),))?;
+    let ctx = wcapture_begin_filters_fn(py)?.call1((specs.to_vec(),))?;
     Ok(ctx.unbind())
 }
 
 pub fn end_item_filters(py: Python<'_>, ctx: &Py<PyAny>) {
-    let _ = py
-        .import("pytest._wcapture")
-        .and_then(|m| m.call_method1("end_item_filters", (ctx.bind(py),)));
+    let _ = wcapture_end_filters_fn(py).and_then(|f| f.call1((ctx.bind(py),)));
 }
 
 /// Number of warnings captured so far in this session.
 /// Begin a logging capture phase for the current item (pytest's
 /// catching_logs around setup/call/teardown). Best-effort.
 pub fn log_start_phase(py: Python<'_>, when: &str, level: Option<&str>) {
-    let _ = py
-        .import("pytest._logging")
-        .and_then(|m| m.call_method1("start_phase", (when, level)));
-    if let Err(err) = py
-        .import("pytest._capture")
-        .and_then(|m| m.call_method1("start_phase", (when,)))
-    {
+    let _ = logging_start_phase_fn(py).and_then(|f| f.call1((when, level)));
+    if let Err(err) = capture_start_phase_fn(py).and_then(|f| f.call1((when,))) {
         // The capture restored the real fds before raising; surface the
         // error like pytest does (a traceback on the real stderr).
         eprintln!("{}", format_exception(py, &err));
@@ -357,13 +421,8 @@ pub fn log_start_phase(py: Python<'_>, when: &str, level: Option<&str>) {
 
 /// Close the current item's logging capture (end of teardown).
 pub fn log_finish_item(py: Python<'_>) {
-    let _ = py
-        .import("pytest._logging")
-        .and_then(|m| m.call_method0("finish_item"));
-    if let Err(err) = py
-        .import("pytest._capture")
-        .and_then(|m| m.call_method0("finish_item"))
-    {
+    let _ = logging_finish_item_fn(py).and_then(|f| f.call0());
+    if let Err(err) = capture_finish_item_fn(py).and_then(|f| f.call0()) {
         eprintln!("{}", format_exception(py, &err));
     }
 }
