@@ -458,7 +458,7 @@
       "file": "testing/acceptance_test.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 58,
+      "passed": 50,
       "failed": 33,
       "skipped": 2,
       "errors": 0

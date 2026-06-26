@@ -18,7 +18,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2555 | 225 | 0 | 53 | 2833 | 92.1% | 17 | 52 | 63 |
+| pytest | 9.0.3 | 2547 | 225 | 0 | 53 | 2825 | 92.0% | 17 | 52 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 20 | 0 | 3 | 209 | 90.4% | 0 | 1 | 0 |
@@ -117,7 +117,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_unittest.py | failed | 64 | 6 | 0 | 9 |
 | testing/test_unraisableexception.py | passed | 11 | 0 | 0 | 0 |
 | testing/test_warnings.py | failed | 37 | 5 | 0 | 2 |
-| testing/acceptance_test.py | failed | 58 | 33 | 0 | 2 |
+| testing/acceptance_test.py | failed | 50 | 33 | 0 | 2 |
 | testing/deprecated_test.py | failed | 10 | 5 | 0 | 0 |
 
 </details>
