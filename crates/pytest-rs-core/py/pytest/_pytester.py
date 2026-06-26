@@ -486,6 +486,7 @@ class Pytester:
 
         new_args = [str(arg) for arg in args]
         config = _native_prepareconfig(new_args)
+        config._mark_as_parsed()
         self._fire_addoption(config, new_args)
         _validate_required_plugins(config)
         pm = config.pluginmanager

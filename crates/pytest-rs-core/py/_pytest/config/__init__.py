@@ -62,6 +62,7 @@ class Config:
         from _pytest.config import _native_prepareconfig
 
         config = _native_prepareconfig(list(args))
+        config._mark_as_parsed()
         for key, value in option_dict.items():
             setattr(config.option, key, value)
         return config

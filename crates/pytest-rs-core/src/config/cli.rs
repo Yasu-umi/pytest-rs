@@ -636,6 +636,13 @@ impl Config {
             } else {
                 shlex_split(&addopts)
             };
+            // Validate addopts in isolation (upstream parity): -o/-override-ini
+            // must have a following value within the addopts args themselves.
+            if let Some(msg) = Self::check_addopts_override_ini(&args) {
+                return Err(format!(
+                    "pytest: {msg}\n  config source: via addopts config"
+                ));
+            }
             argv.splice(1..1, args);
         }
 
@@ -792,5 +799,28 @@ impl Config {
             plugin_args,
             reporter_delegated: std::sync::atomic::AtomicBool::new(false),
         })
+    }
+
+    /// Check addopts args for an orphaned -o/--override-ini (one with no
+    /// following value within the addopts args themselves).  Returns the clap-
+    /// style error message if found, or None when the args are well-formed.
+    fn check_addopts_override_ini(args: &[String]) -> Option<String> {
+        let mut i = 0;
+        while i < args.len() {
+            let arg = &args[i];
+            if arg == "-o" || arg == "--override-ini" {
+                let next = args.get(i + 1);
+                // Missing value OR next token is another flag
+                if next.is_none() || next.is_some_and(|s| s.starts_with('-')) {
+                    return Some(
+                        "error: argument -o/--override-ini: expected one argument".to_string(),
+                    );
+                }
+                i += 2;
+                continue;
+            }
+            i += 1;
+        }
+        None
     }
 }

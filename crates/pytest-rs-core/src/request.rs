@@ -25,7 +25,8 @@ pub struct PyConfig {
     ini_file: HashMap<String, String>,
     /// Raw -o override values, kept separately so Python's `getini` can
     /// perform alias-aware override resolution (alias in `-o` should win).
-    ini_overrides: HashMap<String, String>,
+    /// Mutex-protected so `config.parse()` can add new overrides post-init.
+    ini_overrides: Mutex<HashMap<String, String>>,
     /// Strict getini: an unregistered, non-core ini key raises ValueError
     /// (upstream behavior). Only parseconfig-built configs are strict; the
     /// session config stays lenient since the engine owns the core inis.
@@ -51,6 +52,9 @@ pub struct PyConfig {
     cleanups: Mutex<Vec<Py<PyAny>>>,
     /// Lazily-created TagTracer for `config.trace`.
     trace_obj: pyo3::sync::PyOnceLock<Py<PyAny>>,
+    /// Set to true by `_mark_as_parsed()` (called after parseconfig fully
+    /// initialises the config) so a second `parse()` raises AssertionError.
+    parsed: std::sync::atomic::AtomicBool,
 }
 
 impl PyConfig {
@@ -73,7 +77,7 @@ impl PyConfig {
             args_source,
             ini: Mutex::new(ini),
             ini_file,
-            ini_overrides,
+            ini_overrides: Mutex::new(ini_overrides),
             strict,
             option,
             stash: pyo3::sync::PyOnceLock::new(),
@@ -82,6 +86,7 @@ impl PyConfig {
             original_args: Vec::new(),
             cleanups: Mutex::new(Vec::new()),
             trace_obj: pyo3::sync::PyOnceLock::new(),
+            parsed: std::sync::atomic::AtomicBool::new(false),
         }
     }
 
@@ -97,6 +102,34 @@ impl PyConfig {
             return Ok(dest);
         }
         Ok(name.trim_start_matches('-').replace('-', "_"))
+    }
+
+    /// Validate that every `-o`/`--override-ini` in `args` is followed by a
+    /// non-flag value within those same args (upstream: `_validate_args`).
+    /// `source` is included in the UsageError message for user context.
+    fn check_parse_override_ini(
+        py: Python<'_>,
+        args: &[String],
+        source: &str,
+    ) -> PyResult<()> {
+        let mut i = 0;
+        while i < args.len() {
+            let arg = &args[i];
+            if arg == "-o" || arg == "--override-ini" {
+                let next = args.get(i + 1);
+                if next.is_none() || next.is_some_and(|s| s.starts_with('-')) {
+                    let msg = format!(
+                        "error: argument -o/--override-ini: expected one argument\n  config source: {source}"
+                    );
+                    let exc = py.import("pytest")?.getattr("UsageError")?.call1((msg,))?;
+                    return Err(PyErr::from_value(exc));
+                }
+                i += 2;
+                continue;
+            }
+            i += 1;
+        }
+        Ok(())
     }
 }
 
@@ -122,7 +155,8 @@ impl PyConfig {
             kw.set_item("mode", mode)?;
             dict.set_item(k, config_value_cls.call((v,), Some(&kw))?)?;
         }
-        for (k, v) in &self.ini_overrides {
+        let ini_overrides = self.ini_overrides.lock().expect("ini_overrides lock poisoned");
+        for (k, v) in ini_overrides.iter() {
             let kw = pyo3::types::PyDict::new(py);
             kw.set_item("origin", "override")?;
             kw.set_item("mode", "ini")?;
@@ -176,8 +210,11 @@ impl PyConfig {
             }
         }
         let overrides = pyo3::types::PyDict::new(py);
-        for (key, value) in &self.ini_overrides {
-            overrides.set_item(key, value)?;
+        {
+            let ini_overrides = self.ini_overrides.lock().expect("ini_overrides lock poisoned");
+            for (key, value) in ini_overrides.iter() {
+                overrides.set_item(key, value)?;
+            }
         }
         let kwargs = pyo3::types::PyDict::new(py);
         kwargs.set_item("overrides", &overrides)?;
@@ -500,12 +537,76 @@ impl PyConfig {
             .unbind())
     }
 
-    /// `config.parse([])`: always raises AssertionError — the config was
-    /// already parsed by `parseconfig`/`parseconfigure` and cannot be re-parsed.
-    fn parse(&self, _args: Py<PyAny>) -> PyResult<()> {
-        Err(pyo3::exceptions::PyAssertionError::new_err(
-            "config was already parsed",
-        ))
+    /// Mark this config as "already parsed" so a subsequent `parse()` call
+    /// raises AssertionError (upstream parity for parseconfig-built configs).
+    fn _mark_as_parsed(&self) {
+        self.parsed
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// `config.parse(args, addopts=True)`: apply `args` to this config,
+    /// optionally processing `PYTEST_ADDOPTS` first (upstream parity).
+    /// Extracts `-o key=value` pairs and updates `ini_overrides`/`ini`.
+    #[pyo3(signature = (args, addopts = true))]
+    fn parse(&self, py: Python<'_>, args: Vec<String>, addopts: bool) -> PyResult<()> {
+        if self.parsed.load(std::sync::atomic::Ordering::Relaxed) {
+            return Err(pyo3::exceptions::PyAssertionError::new_err(
+                "can only parse cmdline args at most once per Config object",
+            ));
+        }
+        self.parsed
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        let shlex = py.import("shlex")?;
+        let mut combined: Vec<String> = Vec::new();
+
+        if addopts {
+            if let Ok(env_opts) = std::env::var("PYTEST_ADDOPTS") {
+                let env_opts = env_opts.trim().to_string();
+                if !env_opts.is_empty() {
+                    let env_args: Vec<String> =
+                        shlex.call_method1("split", (&env_opts,))?.extract()?;
+                    // Validate env args in isolation (upstream: _validate_args)
+                    Self::check_parse_override_ini(py, &env_args, "via PYTEST_ADDOPTS")?;
+                    combined.extend(env_args);
+                }
+            }
+        }
+        combined.extend(args);
+
+        // Extract -o key=value pairs from the combined args
+        let mut new_overrides: Vec<(String, String)> = Vec::new();
+        let mut i = 0;
+        while i < combined.len() {
+            let arg = &combined[i];
+            if arg == "-o" || arg == "--override-ini" {
+                if let Some(kv) = combined.get(i + 1) {
+                    if let Some((k, v)) = kv.split_once('=') {
+                        new_overrides.push((k.to_string(), v.to_string()));
+                        i += 2;
+                        continue;
+                    }
+                }
+            } else if let Some(rest) = arg.strip_prefix("--override-ini=") {
+                if let Some((k, v)) = rest.split_once('=') {
+                    new_overrides.push((k.to_string(), v.to_string()));
+                }
+            }
+            i += 1;
+        }
+
+        // Apply overrides to ini_overrides and the merged ini map
+        {
+            let mut ini_overrides = self
+                .ini_overrides
+                .lock()
+                .expect("ini_overrides lock poisoned");
+            let mut ini = self.ini.lock().expect("config lock poisoned");
+            for (k, v) in new_overrides {
+                ini.insert(k.clone(), v.clone());
+                ini_overrides.insert(k, v);
+            }
+        }
+        Ok(())
     }
 
     /// `config.notify_exception(excinfo, option)`: fire the
