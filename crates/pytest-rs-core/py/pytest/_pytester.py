@@ -302,10 +302,11 @@ class Pytester:
         # Keep installed plugins importable even when the test cleared the
         # environment (upstream's in-process pytester shares the parent's
         # sys.path); fall back to the PYTHONPATH captured at fixture setup.
+        # Upstream popen() also prepends os.getcwd() (= pytester.path after
+        # chdir) so test-local packages are importable in nested runs.
         existing = env.get("PYTHONPATH") or _RUNNER_PYTHONPATH
-        if self._syspaths or existing:
-            entries = [*self._syspaths, *([existing] if existing else [])]
-            env["PYTHONPATH"] = os.pathsep.join(entries)
+        entries = [os.getcwd(), *self._syspaths, *([existing] if existing else [])]
+        env["PYTHONPATH"] = os.pathsep.join(filter(None, entries))
         # Upstream pytester parity: nested runs get a numbered --basetemp
         # under this pytester dir, so their tmp dirs are cleaned up with it
         # (a later user-passed --basetemp still wins).
@@ -417,10 +418,11 @@ class Pytester:
         for _var, _value in _RUNNER_LIBPATH.items():
             env.setdefault(_var, _value)
         existing = env.get("PYTHONPATH") or _RUNNER_PYTHONPATH
-        if self._syspaths or existing:
-            env["PYTHONPATH"] = os.pathsep.join(
-                [*self._syspaths, *([existing] if existing else [])]
-            )
+        # Upstream popen() prepends os.getcwd() (= pytester.path after chdir)
+        # so that test-local packages (e.g. tpkg/) are importable in subprocesses.
+        cwd = os.getcwd()
+        entries = [cwd, *self._syspaths, *([existing] if existing else [])]
+        env["PYTHONPATH"] = os.pathsep.join(filter(None, entries))
         return env
 
     def popen(
