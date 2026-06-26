@@ -655,8 +655,11 @@ impl Config {
         if version_count >= 1 {
             const PYTEST_API_VERSION: &str = "9.0.3";
             let msg = if version_count >= 2 {
+                // Match upstream's two-line verbose format so tests that
+                // fnmatch_lines("*This is pytest version*") pass.
                 format!(
-                    "pytest {} imported from pytest-rs-{}\n",
+                    "pytest {}\nThis is pytest version {}, imported from pytest-rs-{}\n",
+                    PYTEST_API_VERSION,
                     PYTEST_API_VERSION,
                     env!("CARGO_PKG_VERSION")
                 )
@@ -682,11 +685,11 @@ impl Config {
                     clap::error::ErrorKind::DisplayHelp | clap::error::ErrorKind::DisplayVersion
                 ) =>
             {
-                return Err(format!(
-                    "{}{}",
-                    crate::EXIT_ZERO_SENTINEL,
-                    err.render().ansi()
-                ));
+                // Use plain text (no ANSI) so downstream fnmatch_lines("*usage:*") works in
+                // non-TTY subprocess contexts. Normalize clap's "Usage:" to "usage:" so
+                // case-sensitive fnmatch on Linux matches upstream argparse-style patterns.
+                let plain = err.render().to_string().replace("Usage:", "usage:");
+                return Err(format!("{}{}", crate::EXIT_ZERO_SENTINEL, plain));
             }
             Err(err) => {
                 let msg = err.to_string();
