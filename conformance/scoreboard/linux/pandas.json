@@ -6801,12 +6801,12 @@
     },
     {
       "file": "pandas/tests/series/indexing/test_setitem.py",
-      "status": "error",
-      "exit_code": 2,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1519,
       "failed": 0,
-      "skipped": 0,
-      "errors": 1
+      "skipped": 414,
+      "errors": 0
     },
     {
       "file": "pandas/tests/series/indexing/test_take.py",

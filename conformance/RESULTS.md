@@ -18,7 +18,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2556 | 216 | 0 | 53 | 2825 | 92.4% | 17 | 52 | 63 |
+| pytest | 9.0.3 | 2557 | 215 | 0 | 53 | 2825 | 92.4% | 17 | 52 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 20 | 0 | 3 | 209 | 90.4% | 0 | 1 | 0 |
@@ -55,7 +55,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | werkzeug | 3.1.3 | 922 | 0 | 0 | 1 | 923 | 100.0% | 24 | 25 | 0 |
 | fastapi | 0.115.12 | 2332 | 1 | 0 | 130 | 2463 | 100.0% | 303 | 310 | 0 |
 | packaging | 25.0 | 26947 | 0 | 0 | 0 | 26947 | 100.0% | 12 | 12 | 0 |
-| pandas | v3.0.3 | 159254 | 1 | 1 | 26570 | 185826 | 100.0% | 870 | 961 | 3 |
+| pandas | v3.0.3 | 160773 | 1 | 0 | 26984 | 187758 | 100.0% | 871 | 961 | 3 |
 | networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 6894 | 100.0% | 259 | 266 | 0 |
 | pydantic | v2.11.7 | 5336 | 14 | 0 | 232 | 5582 | 99.7% | 76 | 81 | 1 |
 | scikit-learn-1 | 1.9.0 | 8432 | 0 | 0 | 6624 | 15056 | 100.0% | 79 | 87 | 0 |
@@ -96,7 +96,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_junitxml.py | failed | 132 | 5 | 0 | 0 |
 | testing/test_link_resolve.py | failed | 0 | 1 | 0 | 0 |
 | testing/test_main.py | failed | 20 | 4 | 0 | 0 |
-| testing/test_mark.py | failed | 104 | 2 | 0 | 0 |
+| testing/test_mark.py | failed | 105 | 1 | 0 | 0 |
 | testing/test_monkeypatch.py | passed | 33 | 0 | 0 | 2 |
 | testing/test_nodes.py | failed | 6 | 2 | 0 | 0 |
 | testing/test_pastebin.py | failed | 5 | 3 | 0 | 0 |
@@ -1994,7 +1994,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pandas/tests/series/indexing/test_indexing.py | passed | 731 | 0 | 0 | 0 |
 | pandas/tests/series/indexing/test_mask.py | passed | 4 | 0 | 0 | 0 |
 | pandas/tests/series/indexing/test_set_value.py | passed | 3 | 0 | 0 | 0 |
-| pandas/tests/series/indexing/test_setitem.py | error | 0 | 0 | 1 | 0 |
+| pandas/tests/series/indexing/test_setitem.py | passed | 1519 | 0 | 0 | 414 |
 | pandas/tests/series/indexing/test_take.py | passed | 4 | 0 | 0 | 0 |
 | pandas/tests/series/indexing/test_where.py | passed | 194 | 0 | 0 | 0 |
 | pandas/tests/series/indexing/test_xs.py | passed | 6 | 0 | 0 | 0 |
