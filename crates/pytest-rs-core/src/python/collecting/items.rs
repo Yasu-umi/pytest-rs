@@ -490,16 +490,26 @@ pub(crate) fn collect_class(
         per_class.push(values);
     }
 
-    for (name, value, is_static) in per_class.into_iter().rev().flatten() {
+    // Two-pass approach: register all fixtures from the MRO first so that
+    // validate_parametrize_argnames can resolve transitive deps (e.g. a base
+    // class fixture whose dep is supplied by a class-level parametrize mark)
+    // before any test method is validated.
+    let entries: Vec<(String, Bound<'_, PyAny>, bool)> =
+        per_class.into_iter().rev().flatten().collect();
+    for (name, value, is_static) in &entries {
         if value.hasattr("_pytestfixturefunction")? {
             register_fixture_def(
                 py,
-                &name,
-                &value,
+                name,
+                value,
                 &format!("{class_nodeid}::"),
-                !is_static,
+                !*is_static,
                 registry,
             )?;
+        }
+    }
+    for (name, value, is_static) in entries {
+        if value.hasattr("_pytestfixturefunction")? {
             continue;
         }
         if !filters.matches_function(&name) {

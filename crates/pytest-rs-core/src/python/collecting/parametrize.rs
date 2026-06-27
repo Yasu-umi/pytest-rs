@@ -235,6 +235,18 @@ fn validate_parametrize_argnames(
             continue;
         }
         let argnames_obj = args.get_item(0)?;
+        // Empty argvalue list is handled by expand_parametrize (fail_at_collect /
+        // xfail); upstream's Metafunc.parametrize returns early before reaching
+        // _validate_if_using_arg_names, so we match that by skipping here.
+        if args.len()? > 1
+            && args
+                .get_item(1)
+                .ok()
+                .and_then(|v| v.len().ok())
+                .is_some_and(|n| n == 0)
+        {
+            continue;
+        }
         let argnames: Vec<String> = match argnames_obj.extract::<String>() {
             Ok(joined) => joined
                 .split(',')
