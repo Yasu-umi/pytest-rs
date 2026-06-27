@@ -44,8 +44,8 @@
       "file": "testing/python/metafunc.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 100,
-      "failed": 12,
+      "passed": 99,
+      "failed": 13,
       "skipped": 0,
       "errors": 0
     },
@@ -323,8 +323,8 @@
       "file": "testing/test_runner.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 61,
-      "failed": 5,
+      "passed": 62,
+      "failed": 4,
       "skipped": 0,
       "errors": 0
     },
@@ -458,8 +458,8 @@
       "file": "testing/acceptance_test.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 50,
-      "failed": 33,
+      "passed": 52,
+      "failed": 31,
       "skipped": 2,
       "errors": 0
     },
