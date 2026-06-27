@@ -101,6 +101,12 @@ class RunResult:
         self.stdout = LineMatcher(outlines)
         self.stderr = LineMatcher(errlines)
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        pass
+
     def __repr__(self):
         from pytest import ExitCode
 
@@ -423,6 +429,12 @@ class Pytester:
         cwd = os.getcwd()
         entries = [cwd, *self._syspaths, *([existing] if existing else [])]
         env["PYTHONPATH"] = os.pathsep.join(filter(None, entries))
+        # Ensure console_scripts (e.g. pytest-bdd) installed in the venv's
+        # bin/ directory are discoverable by subprocess calls.
+        bindir = os.path.dirname(sys.executable)
+        path = env.get("PATH", "")
+        if bindir not in path.split(os.pathsep):
+            env["PATH"] = bindir + os.pathsep + path
         return env
 
     def popen(
