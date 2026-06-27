@@ -22,7 +22,13 @@ class _NodeKeywords:
         self._extra = {}
 
     def _own_items(self):
-        result = {self._node.name: True}
+        name = self._node.name
+        result = {name: True}
+        # parametrize id lives inside the brackets of the nodeid component
+        # e.g. "test_func[hello-123]" → add "hello-123" as a keyword too
+        if name.endswith("]") and "[" in name:
+            param_id = name[name.index("[") + 1 : -1]
+            result[param_id] = True
         for m in getattr(self._node, "own_markers", []):
             result[m.name] = m
         result.update(self._extra)
