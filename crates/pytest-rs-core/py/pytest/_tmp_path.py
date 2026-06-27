@@ -406,6 +406,9 @@ class LocalPath:
         h.update(self._path.read_bytes())
         return h.hexdigest()
 
+    def move(self, target):
+        return LocalPath(shutil.move(str(self._path), str(target)))
+
     def chdir(self):
         old = os.getcwd()
         os.chdir(self._path)
