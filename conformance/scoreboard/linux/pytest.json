@@ -26,8 +26,8 @@
       "file": "testing/python/fixtures.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 204,
-      "failed": 4,
+      "passed": 203,
+      "failed": 5,
       "skipped": 2,
       "errors": 0
     },
@@ -44,8 +44,8 @@
       "file": "testing/python/metafunc.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 99,
-      "failed": 13,
+      "passed": 100,
+      "failed": 12,
       "skipped": 0,
       "errors": 0
     },
@@ -395,8 +395,8 @@
       "file": "testing/test_subtests.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 21,
-      "failed": 13,
+      "passed": 22,
+      "failed": 12,
       "skipped": 0,
       "errors": 0
     },

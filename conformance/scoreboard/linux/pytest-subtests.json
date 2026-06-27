@@ -8,8 +8,8 @@
       "file": "tests/test_subtests.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 30,
-      "failed": 2,
+      "passed": 31,
+      "failed": 1,
       "skipped": 0,
       "errors": 0
     }

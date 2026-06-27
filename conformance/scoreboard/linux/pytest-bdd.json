@@ -98,8 +98,8 @@
       "file": "tests/feature/test_gherkin_terminal_reporter.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 0,
-      "failed": 14,
+      "passed": 7,
+      "failed": 7,
       "skipped": 0,
       "errors": 0
     },
