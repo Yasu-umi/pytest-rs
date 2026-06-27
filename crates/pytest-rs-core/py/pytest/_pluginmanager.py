@@ -805,6 +805,9 @@ class PluginManager:
                     continue
                 if self.is_blocked(ep.name) or self.getplugin(ep.name) is not None:
                     return True
+                from pytest._rewrite import _FINDER
+
+                _FINDER.mark_rewrite(name.split(".")[0])
                 plugin = ep.load()
                 self.register(plugin, ep.name)
                 return True
@@ -860,6 +863,9 @@ class PluginManager:
                     continue
                 if self.getplugin(ep.name) is not None:
                     continue
+                from pytest._rewrite import _FINDER
+
+                _FINDER.mark_rewrite(modname.split(".")[0])
                 plugin = ep.load()
                 self.register(plugin, ep.name)
 

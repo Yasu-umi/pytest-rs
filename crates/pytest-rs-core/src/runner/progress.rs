@@ -325,7 +325,7 @@ pub fn summary_line_with_extras(
     elapsed: Duration,
     verbosity: i32,
     extra_stats: &std::collections::HashMap<String, usize>,
-    quiet_subtests: bool,
+    _quiet_subtests: bool,
 ) -> String {
     // -qq (verbosity < -1) suppresses the stats line entirely.
     if verbosity < -1 {
@@ -348,26 +348,17 @@ pub fn summary_line_with_extras(
         // Subtest outcomes use their own categories (upstream plugin's
         // pytest_report_teststatus): passed → "subtests passed",
         // xfailed → "subtests xfailed", failed/skipped → regular buckets.
-        // In quiet mode (verbosity_subtests == 0), passes/xfails return
-        // empty categories and are not counted; failures always count.
         if report.subtest_desc.is_some() {
-            if !quiet_subtests {
-                match report.outcome {
-                    Outcome::Passed => {
-                        subtests_passed += 1;
-                        continue;
-                    }
-                    Outcome::XFailed => {
-                        subtests_xfailed += 1;
-                        continue;
-                    }
-                    _ => {} // failed/skipped fall through to regular buckets
+            match report.outcome {
+                Outcome::Passed => {
+                    subtests_passed += 1;
+                    continue;
                 }
-            } else {
-                match report.outcome {
-                    Outcome::Passed | Outcome::XFailed | Outcome::Skipped => continue,
-                    _ => {} // failed falls through to regular bucket
+                Outcome::XFailed => {
+                    subtests_xfailed += 1;
+                    continue;
                 }
+                _ => {} // failed/skipped fall through to regular buckets
             }
         }
         match (report.phase, report.outcome) {
