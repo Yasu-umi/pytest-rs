@@ -691,7 +691,6 @@ class Pytester:
         old_pm_names = dict(pluginmanager._names)
         old_pm_blocked = set(pluginmanager._blocked_plugins)
         old_pm_conftest = set(pluginmanager._conftest_plugins)
-        old_pm_dirpath2conf = dict(pluginmanager._dirpath2confmods)
         old_pm_specs = dict(pluginmanager._specs)
         old_pm_monitors = list(pluginmanager._call_monitors)
         old_pm_configured = pluginmanager._configured
@@ -846,8 +845,6 @@ class Pytester:
             pluginmanager._blocked_plugins.update(old_pm_blocked)
             pluginmanager._conftest_plugins.clear()
             pluginmanager._conftest_plugins.update(old_pm_conftest)
-            pluginmanager._dirpath2confmods.clear()
-            pluginmanager._dirpath2confmods.update(old_pm_dirpath2conf)
             pluginmanager._specs.clear()
             pluginmanager._specs.update(old_pm_specs)
             pluginmanager._call_monitors[:] = old_pm_monitors
