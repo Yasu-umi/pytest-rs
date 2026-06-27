@@ -6,6 +6,7 @@ wired up yet — unknown flags still error at the Rust argument parser."""
 
 from __future__ import annotations
 
+import argparse
 import shlex
 from pathlib import Path
 from typing import Any
@@ -437,7 +438,12 @@ def apply_cli_args(namespace: Any, tokens: list[str]) -> tuple[list[str], list[s
             if len(collected) < nargs:
                 unknown.append(token)
                 continue
-            converted = [convert(v) if callable(convert) else v for v in collected]
+            try:
+                converted = [convert(v) if callable(convert) else v for v in collected]
+            except (ValueError, argparse.ArgumentTypeError) as exc:
+                from pytest import UsageError
+
+                raise UsageError(f"error: argument {name}: {exc}") from None
         else:
             if not eq:
                 if index < len(tokens) and not tokens[index].startswith("--"):
@@ -446,7 +452,12 @@ def apply_cli_args(namespace: Any, tokens: list[str]) -> tuple[list[str], list[s
                 else:
                     unknown.append(token)
                     continue
-            converted = convert(value) if callable(convert) else value
+            try:
+                converted = convert(value) if callable(convert) else value
+            except (ValueError, argparse.ArgumentTypeError) as exc:
+                from pytest import UsageError
+
+                raise UsageError(f"error: argument {name}: {exc}") from None
         # Validate choices (argparse-compatible behaviour).
         choices = spec.get("choices")
         if choices is not None:

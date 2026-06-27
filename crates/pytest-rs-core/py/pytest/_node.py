@@ -112,14 +112,13 @@ class _NodeBase:
 
     def __init__(
         self,
-        *,
         name=None,
         parent=None,
         config=None,
-        path=None,
-        fspath=None,
-        nodeid=None,
         session=None,
+        fspath=None,
+        path=None,
+        nodeid=None,
         **kwargs,
     ):
         self.parent = parent
