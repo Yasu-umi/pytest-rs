@@ -44,8 +44,8 @@
       "file": "testing/python/metafunc.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 99,
-      "failed": 13,
+      "passed": 101,
+      "failed": 11,
       "skipped": 0,
       "errors": 0
     },
@@ -260,8 +260,8 @@
       "file": "testing/test_mark.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 105,
-      "failed": 1,
+      "passed": 104,
+      "failed": 2,
       "skipped": 0,
       "errors": 0
     },
