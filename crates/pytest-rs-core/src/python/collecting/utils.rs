@@ -44,7 +44,7 @@ pub fn collect_error_message(py: Python<'_>, err: &PyErr) -> Option<String> {
                 .getattr("msg")
                 .and_then(|v| v.extract::<String>())
                 .unwrap_or_else(|_| err.value(py).to_string());
-            return Some(format!("E   Failed: {msg}"));
+            return Some(msg);
         }
     }
     None
