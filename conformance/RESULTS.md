@@ -18,7 +18,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2557 | 215 | 0 | 53 | 2825 | 92.4% | 17 | 52 | 63 |
+| pytest | 9.0.3 | 2551 | 221 | 0 | 53 | 2825 | 92.2% | 17 | 52 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 20 | 0 | 3 | 209 | 90.4% | 0 | 1 | 0 |
@@ -29,7 +29,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | anyio | 4.13.0 | 3120 | 0 | 0 | 42 | 3162 | 100.0% | 26 | 26 | 0 |
 | pytest-mypy | v1.0.1 | 75 | 1 | 0 | 2 | 78 | 98.7% | 0 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
-| pytest-subtests | v0.14.2 | 17 | 15 | 0 | 0 | 32 | 53.1% | 0 | 1 | 0 |
+| pytest-subtests | v0.14.2 | 30 | 2 | 0 | 0 | 32 | 93.8% | 0 | 1 | 0 |
 | pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-snapshot | v0.9.0 | 102 | 5 | 0 | 0 | 107 | 95.3% | 0 | 3 | 0 |
 | pytest-icdiff | 0.5 | 10 | 2 | 0 | 0 | 12 | 83.3% | 0 | 1 | 0 |
@@ -111,7 +111,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_setupplan.py | passed | 3 | 0 | 0 | 0 |
 | testing/test_skipping.py | failed | 91 | 1 | 0 | 0 |
 | testing/test_stepwise.py | passed | 18 | 0 | 0 | 0 |
-| testing/test_subtests.py | failed | 27 | 7 | 0 | 0 |
+| testing/test_subtests.py | failed | 21 | 13 | 0 | 0 |
 | testing/test_terminal.py | failed | 210 | 13 | 0 | 4 |
 | testing/test_threadexception.py | failed | 7 | 1 | 0 | 0 |
 | testing/test_tmpdir.py | passed | 39 | 0 | 0 | 1 |
@@ -289,7 +289,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| tests/test_subtests.py | failed | 17 | 15 | 0 | 0 |
+| tests/test_subtests.py | failed | 30 | 2 | 0 | 0 |
 
 </details>
 

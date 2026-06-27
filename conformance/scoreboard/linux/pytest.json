@@ -395,8 +395,8 @@
       "file": "testing/test_subtests.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 27,
-      "failed": 7,
+      "passed": 21,
+      "failed": 13,
       "skipped": 0,
       "errors": 0
     },
