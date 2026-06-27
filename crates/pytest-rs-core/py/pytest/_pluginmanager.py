@@ -577,6 +577,7 @@ class PluginManager:
         return name in self._blocked_plugins
 
     def set_blocked(self, name: str) -> None:
+        self.unregister(name=name)
         self._blocked_plugins.add(name)
 
     def unblock(self, name: str) -> None:

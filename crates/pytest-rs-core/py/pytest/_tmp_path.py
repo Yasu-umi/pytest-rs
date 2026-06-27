@@ -285,7 +285,7 @@ class LocalPath:
     """Minimal py.path.local equivalent backing the legacy tmpdir fixture."""
 
     def __init__(self, path):
-        self._path = pathlib.Path(path)
+        self._path = pathlib.Path(os.path.realpath(path))
 
     def __str__(self):
         return str(self._path)
@@ -320,8 +320,12 @@ class LocalPath:
     def join(self, *parts):
         return LocalPath(self._path.joinpath(*[str(part) for part in parts]))
 
-    def dirpath(self, *parts):
-        return LocalPath(self._path.parent.joinpath(*[str(part) for part in parts]))
+    def dirpath(self, *parts, abs=False):
+        parent = self._path.parent
+        if abs:
+            return LocalPath(pathlib.PurePosixPath(*[str(p) for p in parts]))
+        stripped = [str(p).lstrip("/\\") for p in parts]
+        return LocalPath(parent.joinpath(*stripped))
 
     def ensure(self, *parts, dir=False):
         target = self._path.joinpath(*[str(part) for part in parts])
@@ -379,6 +383,12 @@ class LocalPath:
     def write_text(self, data, encoding="utf-8"):
         self._path.write_text(data, encoding=encoding)
 
+    def write_binary(self, data):
+        self._path.write_bytes(data)
+
+    def read_binary(self):
+        return self._path.read_bytes()
+
     def read(self, mode="r"):
         with open(self._path, mode) as f:
             return f.read()
@@ -388,6 +398,13 @@ class LocalPath:
 
     def listdir(self):
         return [LocalPath(child) for child in sorted(self._path.iterdir())]
+
+    def computehash(self, hashtype="md5"):
+        import hashlib
+
+        h = hashlib.new(hashtype)
+        h.update(self._path.read_bytes())
+        return h.hexdigest()
 
     def chdir(self):
         old = os.getcwd()
