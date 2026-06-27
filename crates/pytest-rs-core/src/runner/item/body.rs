@@ -615,10 +615,30 @@ pub(crate) fn run_item_body(
         python::maybe_pdb_interact(py, item, err);
     }
     // Subtests recorded during the call report individually before the
-    // test's own report (the main test stays PASSED; failed subtest reports
-    // drive the exit code, matching upstream pytest-subtests).
+    // test's own report.  When the main test passed but subtests failed,
+    // re-label it as FAILED with "contains N failed subtest(s)" — matching
+    // pytest 9.0's built-in `_pytest.subtests` aggregation.
     let (sub_reports, _) = python::pop_subtest_reports(py, config, item);
+    let failed_sub_count = sub_reports
+        .iter()
+        .filter(|r| r.outcome == Outcome::Failed)
+        .count();
     reports.extend(sub_reports);
+    let report = if report.outcome == Outcome::Passed && failed_sub_count > 0 {
+        let suffix = if failed_sub_count > 1 { "s" } else { "" };
+        TestReport {
+            outcome: Outcome::Failed,
+            longrepr: Some(format!(
+                "contains {failed_sub_count} failed subtest{suffix}"
+            )),
+            reprcrash_message: Some(format!(
+                "contains {failed_sub_count} failed subtest{suffix}"
+            )),
+            ..report
+        }
+    } else {
+        report
+    };
     // Unraisable exceptions surfaced during a passed call (upstream's
     // trylast pytest_runtest_call hookimpl, which pluggy skips when the
     // test itself raised): an error filter fails the call.

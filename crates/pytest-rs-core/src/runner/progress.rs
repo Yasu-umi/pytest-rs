@@ -72,7 +72,7 @@ pub(crate) fn fill_color(py: Python<'_>, session: &Session, finished: bool) -> u
 }
 
 /// The verbose outcome word for a report: "PASSED", "SKIPPED (why)",
-/// "[desc] SUBFAIL", ... (pytest-subtests prepends description before the word).
+/// "SUBFAILED[desc]", ... (built-in subtests append description after the word).
 pub(crate) fn outcome_word(report: &TestReport) -> String {
     let reasoned = |word: &str| match report.longrepr.as_deref() {
         Some(reason) if !reason.is_empty() && !reason.contains('\n') => {
@@ -82,10 +82,10 @@ pub(crate) fn outcome_word(report: &TestReport) -> String {
     };
     if let Some(desc) = &report.subtest_desc {
         match report.outcome {
-            Outcome::Failed => format!("{desc} SUBFAIL"),
-            Outcome::Skipped => format!("{desc} SUBSKIP"),
-            Outcome::XFailed => format!("{desc} SUBXFAIL"),
-            _ => format!("{desc} SUBPASS"),
+            Outcome::Failed => format!("SUBFAILED{desc}"),
+            Outcome::Skipped => format!("SUBSKIPPED{desc}"),
+            Outcome::XFailed => format!("SUBXFAILED{desc}"),
+            _ => format!("SUBPASSED{desc}"),
         }
     } else if report.rerun {
         "RERUN".to_string()
@@ -314,6 +314,7 @@ pub fn summary_line(
         elapsed,
         verbosity,
         &Default::default(),
+        verbosity == 0,
     )
 }
 
@@ -324,6 +325,7 @@ pub fn summary_line_with_extras(
     elapsed: Duration,
     verbosity: i32,
     extra_stats: &std::collections::HashMap<String, usize>,
+    quiet_subtests: bool,
 ) -> String {
     // -qq (verbosity < -1) suppresses the stats line entirely.
     if verbosity < -1 {
@@ -346,17 +348,26 @@ pub fn summary_line_with_extras(
         // Subtest outcomes use their own categories (upstream plugin's
         // pytest_report_teststatus): passed → "subtests passed",
         // xfailed → "subtests xfailed", failed/skipped → regular buckets.
+        // In quiet mode (verbosity_subtests == 0), passes/xfails return
+        // empty categories and are not counted; failures always count.
         if report.subtest_desc.is_some() {
-            match report.outcome {
-                Outcome::Passed => {
-                    subtests_passed += 1;
-                    continue;
+            if !quiet_subtests {
+                match report.outcome {
+                    Outcome::Passed => {
+                        subtests_passed += 1;
+                        continue;
+                    }
+                    Outcome::XFailed => {
+                        subtests_xfailed += 1;
+                        continue;
+                    }
+                    _ => {} // failed/skipped fall through to regular buckets
                 }
-                Outcome::XFailed => {
-                    subtests_xfailed += 1;
-                    continue;
+            } else {
+                match report.outcome {
+                    Outcome::Passed | Outcome::XFailed | Outcome::Skipped => continue,
+                    _ => {} // failed falls through to regular bucket
                 }
-                _ => {} // failed/skipped fall through to regular buckets
             }
         }
         match (report.phase, report.outcome) {

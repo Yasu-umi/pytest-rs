@@ -119,7 +119,7 @@ impl Engine {
                 self.write_junit_xml(py);
                 if !self.config.no_terminal() {
                     if !no_summary {
-                        self.print_short_summary();
+                        self.print_short_summary(py);
                     }
                     if dist_workers.is_none() {
                         let banner = if maxfail_hit {
@@ -296,7 +296,7 @@ impl Engine {
                 // ERRORS section) above the collected-count summary.
                 if n_collect_errors > 0 {
                     self.print_collect_errors();
-                    self.print_short_summary();
+                    self.print_short_summary(py);
                     let banner = format!(
                         "Interrupted: {n_collect_errors} error{} during collection",
                         if n_collect_errors == 1 { "" } else { "s" }

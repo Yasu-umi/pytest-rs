@@ -97,6 +97,8 @@ def _description(msg: str | None, kwargs: dict) -> str:
 class SubtestReport:
     """Serializable subtest report (xdist wire format compatibility)."""
 
+    __test__ = False
+
     def __init__(
         self,
         nodeid: str | None = None,
@@ -121,6 +123,22 @@ class SubtestReport:
         self.context = context or SubtestContext()
         for key, value in kw.items():
             setattr(self, key, value)
+
+    @property
+    def passed(self) -> bool:
+        return self.outcome == "passed"
+
+    @property
+    def failed(self) -> bool:
+        return self.outcome == "failed"
+
+    @property
+    def skipped(self) -> bool:
+        return self.outcome == "skipped"
+
+    @property
+    def count_towards_summary(self) -> bool:
+        return True
 
     @property
     def head_line(self) -> str:

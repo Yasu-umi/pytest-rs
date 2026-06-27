@@ -255,7 +255,7 @@ impl Engine {
                 eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
             }
             self.write_junit_xml(py);
-            self.print_short_summary();
+            self.print_short_summary(py);
             self.print_warnings_summary(py, warnings_shown, true);
             let summary = crate::runner::summary_line(
                 &self.session.reports,
@@ -372,7 +372,7 @@ impl Engine {
             println!("{}", center_banner(banner));
         }
         if !no_summary {
-            self.print_short_summary();
+            self.print_short_summary(py);
             self.print_warnings_summary(py, warnings_shown, true);
         }
         if let Some(n) = self.session.stopped_after {
@@ -405,6 +405,11 @@ impl Engine {
         }
         let warning_count = python::warning_count(py) + self.session.worker_warning_count;
         let extra_stats = python::reporter_subtest_stats(py);
+        let quiet_subtests = self
+            .config
+            .get_ini("verbosity_subtests")
+            .map(|v| v.trim() == "0")
+            .unwrap_or(self.config.verbose == 0);
         let summary = crate::runner::summary_line_with_extras(
             &self.session.reports,
             self.session.deselected,
@@ -412,6 +417,7 @@ impl Engine {
             started.elapsed(),
             self.config.global_verbosity(),
             &extra_stats,
+            quiet_subtests,
         );
         if !summary.is_empty() {
             println!("{summary}");

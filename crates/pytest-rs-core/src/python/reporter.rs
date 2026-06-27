@@ -353,5 +353,55 @@ pub fn make_report_proxy(
         kwargs.set_item("wasxfail", reason)?;
     }
     let cls = reports_test_report_cls(py)?;
-    Ok(cls.call((), Some(&kwargs))?.unbind())
+    let proxy = cls.call((), Some(&kwargs))?;
+    // For subtest reports, reclassify the proxy as a SubtestReport so
+    // Python hooks (pytest_report_teststatus) see the correct type and
+    // call _sub_test_description() for the format word.
+    if let Some(desc) = &report.subtest_desc {
+        let sub_cls = py
+            .import("pytest_subtests.plugin")
+            .and_then(|m| m.getattr("SubTestReport"))
+            .or_else(|_| {
+                py.import("_pytest.subtests")
+                    .and_then(|m| m.getattr("SubtestReport"))
+            });
+        if let Ok(sub_cls) = sub_cls {
+            let is_passed = report.outcome == Outcome::Passed;
+            let is_failed = report.outcome == Outcome::Failed;
+            let is_skipped = report.outcome == Outcome::Skipped;
+            let _ = proxy.setattr("passed", is_passed);
+            let _ = proxy.setattr("failed", is_failed);
+            let _ = proxy.setattr("skipped", is_skipped);
+            let _ = proxy.setattr("__class__", &sub_cls);
+            let desc_copy = desc.clone();
+            let desc_fn =
+                pyo3::types::PyCFunction::new_closure(py, None, None, move |_args, _kwargs| {
+                    Ok::<String, PyErr>(desc_copy.clone())
+                })?;
+            let _ = proxy.setattr("_sub_test_description", &desc_fn);
+            let _ = proxy.setattr("sub_test_description", desc_fn);
+            let ctx_cls = py
+                .import("pytest_subtests.plugin")
+                .and_then(|m| m.getattr("SubTestContext"))
+                .or_else(|_| {
+                    py.import("_pytest.subtests")
+                        .and_then(|m| m.getattr("SubtestContext"))
+                });
+            if let Ok(ctx_cls) = ctx_cls {
+                let msg = desc
+                    .strip_prefix('[')
+                    .and_then(|s| s.find(']').map(|i| &s[..i]));
+                let ctx_kwargs = PyDict::new(py);
+                match msg {
+                    Some(m) => ctx_kwargs.set_item("msg", m)?,
+                    None => ctx_kwargs.set_item("msg", pyo3::types::PyNone::get(py))?,
+                }
+                ctx_kwargs.set_item("kwargs", PyDict::new(py))?;
+                if let Ok(ctx) = ctx_cls.call((), Some(&ctx_kwargs)) {
+                    let _ = proxy.setattr("context", ctx);
+                }
+            }
+        }
+    }
+    Ok(proxy.unbind())
 }

@@ -75,7 +75,7 @@ impl Engine {
 
     /// The "short test summary info" section, controlled by -r chars.
     /// Groups print in the order the chars were given, matching pytest.
-    pub(crate) fn print_short_summary(&self) {
+    pub(crate) fn print_short_summary(&self, py: Python<'_>) {
         let chars = self.report_chars();
 
         let mut lines = Vec::new();
@@ -90,10 +90,7 @@ impl Engine {
                         if report.outcome != Outcome::Skipped {
                             continue;
                         }
-                        let word = match &report.subtest_desc {
-                            Some(desc) => format!("{desc} SUBSKIP"),
-                            None => "SKIPPED".to_string(),
-                        };
+                        let word = self.subtest_summary_word(py, report, "SKIPPED");
                         let mut line = format!("{word} {}", report.nodeid);
                         let reason = report.longrepr.clone().unwrap_or_default();
                         if !reason.is_empty() {
@@ -119,10 +116,7 @@ impl Engine {
                         continue;
                     }
                     if label.is_none() {
-                        label = Some(match &report.subtest_desc {
-                            Some(desc) => format!("{desc} SUBSKIP"),
-                            None => "SKIPPED".to_string(),
-                        });
+                        label = Some(self.subtest_summary_word(py, report, "SKIPPED"));
                     }
                     let location = report
                         .location
@@ -151,11 +145,10 @@ impl Engine {
                     ('p', Phase::Call, Outcome::Passed) => "PASSED",
                     _ => continue,
                 };
-                let word = match (&report.subtest_desc, report.outcome) {
-                    (Some(desc), Outcome::Failed) => format!("{desc} SUBFAIL"),
-                    (Some(desc), Outcome::Passed) => format!("{desc} SUBPASS"),
-                    (Some(desc), Outcome::XFailed) => format!("{desc} SUBXFAIL"),
-                    _ => word.to_string(),
+                let word = if report.subtest_desc.is_some() {
+                    self.subtest_summary_word(py, report, word)
+                } else {
+                    word.to_string()
                 };
                 let mut line = format!("{word} {}", report.nodeid);
                 // Prefer reprcrash.message (always set, tb-style-independent)
@@ -192,6 +185,31 @@ impl Engine {
         println!("{}", center_banner("short test summary info"));
         for line in lines {
             println!("{line}");
+        }
+    }
+
+    /// Resolve the summary word for a subtest report via the Python
+    /// `pytest_report_teststatus` hook (which respects installed plugins
+    /// like pytest-subtests). Falls back to the built-in format.
+    fn subtest_summary_word(
+        &self,
+        py: Python<'_>,
+        report: &crate::report::TestReport,
+        fallback: &str,
+    ) -> String {
+        use crate::runner::report_teststatus;
+        if let Some(status) = report_teststatus(py, &self.config, &self.session, report, None)
+            && !status.word.is_empty()
+        {
+            return status.word;
+        }
+        let desc = report.subtest_desc.as_deref().unwrap_or("");
+        match report.outcome {
+            Outcome::Failed => format!("SUBFAILED{desc}"),
+            Outcome::Passed => format!("SUBPASSED{desc}"),
+            Outcome::Skipped => format!("SUBSKIPPED{desc}"),
+            Outcome::XFailed => format!("SUBXFAILED{desc}"),
+            _ => fallback.to_string(),
         }
     }
 

@@ -169,6 +169,24 @@ def _getreportopt(config):
 def _default_teststatus(report):
     """The (category, letter, word) fallback when no plugin answers
     pytest_report_teststatus (upstream's runner/skipping defaults)."""
+    from pytest._subtests import SubtestReport
+
+    if isinstance(report, SubtestReport):
+        when = getattr(report, "when", "call")
+        if when != "call":
+            return None
+        desc = report._sub_test_description()
+        if hasattr(report, "wasxfail"):
+            if report.skipped:
+                return "xfailed", "y", f"SUBXFAIL{desc}"
+            return None
+        if report.failed:
+            return report.outcome, "u", f"SUBFAILED{desc}"
+        if report.passed:
+            return f"subtests {report.outcome}", "u", f"SUBPASSED{desc}"
+        if report.skipped:
+            return report.outcome, "-", f"SUBSKIPPED{desc}"
+        return None
     if hasattr(report, "wasxfail"):
         if report.skipped:
             return "xfailed", "x", "XFAIL"

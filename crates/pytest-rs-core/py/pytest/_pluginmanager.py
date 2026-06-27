@@ -37,17 +37,22 @@ def plugin_instance_fixtures() -> list:
 
 
 def instance_hook_impls(name: str) -> list:
-    """Hook impls registered on non-module plugin objects (instances
-    registered at configure time, e.g. pytest-run-parallel's runner).
-    Module-level impls fire via the engine's py_hooks instead, and the
-    'terminalreporter' plugin is driven through its own delegation path;
-    both are excluded here to avoid double dispatch."""
+    """Hook impls registered on plugin objects (instances and third-party
+    modules registered at configure time).
+    Conftest modules fire via the engine's py_hooks and internal _pytest/
+    pytest.* modules are handled by the Rust engine; both are excluded to
+    avoid double dispatch. Third-party plugin modules (e.g. pytest_subtests)
+    are included so their hooks fire normally."""
     reporter = pluginmanager.getplugin("terminalreporter")
     logreport_sink = pluginmanager.getplugin("_logreport_sink")
     impls = []
     for plugin in pluginmanager._plugins:
-        if isinstance(plugin, types.ModuleType) or plugin is reporter or plugin is logreport_sink:
+        if plugin is reporter or plugin is logreport_sink:
             continue
+        if isinstance(plugin, types.ModuleType):
+            mod_name = getattr(plugin, "__name__", "")
+            if "conftest" in mod_name or mod_name.startswith(("_pytest.", "pytest.")):
+                continue
         func = getattr(plugin, name, None)
         if callable(func):
             impls.append(func)

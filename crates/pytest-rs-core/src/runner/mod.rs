@@ -517,13 +517,7 @@ fn print_verbose_report_line(
     if !(report.phase == Phase::Call || report.outcome != Outcome::Passed) {
         return;
     }
-    // Subtest reports use the built-in word (the report proxy isn't a
-    // SubTestReport so Python hooks return the generic PASSED/FAILED).
-    let status = if report.subtest_desc.is_some() {
-        None
-    } else {
-        report_teststatus(py, config, session, report, Some(item.lineno))
-    };
+    let status = report_teststatus(py, config, session, report, Some(item.lineno));
     let (word, reason) = match &status {
         Some(s) => {
             let reason = match report.outcome {
