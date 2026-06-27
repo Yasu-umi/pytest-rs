@@ -90,6 +90,7 @@ _OUTCOME_RE = re.compile(
     r"(\d+) (passed|failed|skipped|xfailed|xpassed|errors?|warnings?|deselected|rerun)"
 )
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+_DURATION_RE = re.compile(r"\d+\.\d\ds")
 
 
 class RunResult:
@@ -126,7 +127,7 @@ class RunResult:
         plural = {"error": "errors", "warning": "warnings"}
         for line in reversed(lines):
             clean = _ANSI_RE.sub("", line)
-            if clean.startswith("====") and " in " in clean:
+            if _DURATION_RE.search(clean):
                 found = {}
                 for count, noun in _OUTCOME_RE.findall(clean):
                     found[plural.get(noun, noun)] = int(count)

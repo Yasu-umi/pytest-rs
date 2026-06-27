@@ -669,6 +669,33 @@ impl Config {
             return Err(format!("{}{}", crate::EXIT_ZERO_SENTINEL, msg));
         }
 
+        // Expand @file arguments: each arg of the form "@path" is replaced by
+        // the lines of that file (stripping \r\n, skipping blank/comment lines).
+        // This matches argparse's fromfile_prefix_chars='@' behaviour.
+        let argv = {
+            let mut expanded: Vec<String> = Vec::with_capacity(argv.len());
+            for arg in argv {
+                if let Some(path) = arg.strip_prefix('@') {
+                    match std::fs::read_to_string(path) {
+                        Ok(contents) => {
+                            for line in contents.lines() {
+                                let line = line.trim_end_matches('\r');
+                                if !line.is_empty() {
+                                    expanded.push(line.to_string());
+                                }
+                            }
+                        }
+                        Err(err) => {
+                            return Err(format!("pytest: error: {}: {}", arg, err));
+                        }
+                    }
+                } else {
+                    expanded.push(arg);
+                }
+            }
+            expanded
+        };
+
         let cmd = Self::build_clap_command(&parser);
 
         let (argv, plugin_args) = Self::partition_plugin_args(argv, &cmd);
