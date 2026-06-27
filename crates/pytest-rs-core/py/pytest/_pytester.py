@@ -675,6 +675,15 @@ class Pytester:
             "_any_failed": _tmp_path._any_failed,
         }
 
+        old_pm_plugins = list(pluginmanager._plugins)
+        old_pm_names = dict(pluginmanager._names)
+        old_pm_blocked = set(pluginmanager._blocked_plugins)
+        old_pm_conftest = set(pluginmanager._conftest_plugins)
+        old_pm_dirpath2conf = dict(pluginmanager._dirpath2confmods)
+        old_pm_specs = dict(pluginmanager._specs)
+        old_pm_monitors = list(pluginmanager._call_monitors)
+        old_pm_configured = pluginmanager._configured
+
         reprec = HookRecorder(pluginmanager)
         for plugin in plugins:
             pluginmanager.register(plugin)
@@ -818,6 +827,19 @@ class Pytester:
             root.setLevel(old_root_level)
             _logging.state = old_logging_state
             reprec.finish_recording()
+            pluginmanager._plugins[:] = old_pm_plugins
+            pluginmanager._names.clear()
+            pluginmanager._names.update(old_pm_names)
+            pluginmanager._blocked_plugins.clear()
+            pluginmanager._blocked_plugins.update(old_pm_blocked)
+            pluginmanager._conftest_plugins.clear()
+            pluginmanager._conftest_plugins.update(old_pm_conftest)
+            pluginmanager._dirpath2confmods.clear()
+            pluginmanager._dirpath2confmods.update(old_pm_dirpath2conf)
+            pluginmanager._specs.clear()
+            pluginmanager._specs.update(old_pm_specs)
+            pluginmanager._call_monitors[:] = old_pm_monitors
+            pluginmanager._configured = old_pm_configured
             # Restore the session-state singletons swapped in above.
             pytest.xfail = old_xfail
             _node._session_state = old_session_state

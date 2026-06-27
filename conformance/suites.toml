@@ -228,6 +228,7 @@ deps = [
     "starlette==1.2.1",
     "httpx==0.28.1",
     "anyio==4.13.0",
+    "requests==2.32.3",
 ]
 pythonpath = ["."]
 category = "third-party"
