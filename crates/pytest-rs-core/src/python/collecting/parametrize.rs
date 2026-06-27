@@ -500,11 +500,16 @@ pub(crate) fn expand_parametrize(
                     let mut parts = Vec::new();
                     for (argname, value) in argnames.iter().zip(values.iter()) {
                         let id = idfn.call1((value,)).map_err(|err| {
+                            let type_name = err
+                                .get_type(py)
+                                .name()
+                                .map(|n| n.to_string())
+                                .unwrap_or_default();
                             collect_error(
                                 py,
                                 &format!(
-                                    "{nodeid}: error raised while trying to determine id of \
-                                     parameter '{argname}' at position {index}\n{}",
+                                    "{type_name}: {}\n{nodeid}: error raised while trying to \
+                                     determine id of parameter '{argname}' at position {index}",
                                     err.value(py)
                                 ),
                             )
