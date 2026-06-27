@@ -18,7 +18,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2543 | 229 | 0 | 53 | 2825 | 91.9% | 17 | 52 | 63 |
+| pytest | 9.0.3 | 2557 | 215 | 0 | 53 | 2825 | 92.4% | 17 | 52 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 20 | 0 | 3 | 209 | 90.4% | 0 | 1 | 0 |
@@ -27,11 +27,11 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pytest-benchmark | v5.1.0 | 91 | 31 | 0 | 1 | 123 | 74.8% | 4 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 41 | 100.0% | 1 | 1 | 0 |
 | anyio | 4.13.0 | 3120 | 0 | 0 | 42 | 3162 | 100.0% | 26 | 26 | 0 |
-| pytest-mypy | v1.0.1 | 75 | 3 | 0 | 0 | 78 | 96.2% | 0 | 1 | 0 |
+| pytest-mypy | v1.0.1 | 75 | 1 | 0 | 2 | 78 | 98.7% | 0 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
-| pytest-subtests | v0.14.2 | 30 | 2 | 0 | 0 | 32 | 93.8% | 0 | 1 | 0 |
+| pytest-subtests | v0.14.2 | 17 | 15 | 0 | 0 | 32 | 53.1% | 0 | 1 | 0 |
 | pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
-| pytest-snapshot | v0.9.0 | 101 | 6 | 0 | 0 | 107 | 94.4% | 0 | 3 | 0 |
+| pytest-snapshot | v0.9.0 | 102 | 5 | 0 | 0 | 107 | 95.3% | 0 | 3 | 0 |
 | pytest-icdiff | 0.5 | 10 | 2 | 0 | 0 | 12 | 83.3% | 0 | 1 | 0 |
 | pytest-socket | 0.7.0 | 59 | 6 | 0 | 0 | 65 | 90.8% | 2 | 6 | 0 |
 | pytest-order | v1.4.0 | 120 | 14 | 0 | 0 | 134 | 89.6% | 7 | 16 | 0 |
@@ -39,7 +39,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
 | pytest-env | 1.6.0 | 69 | 6 | 0 | 0 | 75 | 92.0% | 2 | 3 | 0 |
 | pytest-rerunfailures | 9.1.1 | 47 | 0 | 0 | 1 | 48 | 100.0% | 1 | 1 | 0 |
-| pytest-randomly | 4.1.0 | 33 | 4 | 0 | 0 | 37 | 89.2% | 0 | 1 | 0 |
+| pytest-randomly | 4.1.0 | 35 | 2 | 0 | 0 | 37 | 94.6% | 0 | 1 | 0 |
 | click | 8.3.1 | 1314 | 0 | 0 | 21 | 1335 | 100.0% | 20 | 20 | 0 |
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
@@ -111,7 +111,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | testing/test_setupplan.py | passed | 3 | 0 | 0 | 0 |
 | testing/test_skipping.py | failed | 91 | 1 | 0 | 0 |
 | testing/test_stepwise.py | passed | 18 | 0 | 0 | 0 |
-| testing/test_subtests.py | failed | 13 | 21 | 0 | 0 |
+| testing/test_subtests.py | failed | 27 | 7 | 0 | 0 |
 | testing/test_terminal.py | failed | 210 | 13 | 0 | 4 |
 | testing/test_threadexception.py | failed | 7 | 1 | 0 | 0 |
 | testing/test_tmpdir.py | passed | 39 | 0 | 0 | 1 |
@@ -269,7 +269,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| tests/test_pytest_mypy.py | failed | 75 | 3 | 0 | 0 |
+| tests/test_pytest_mypy.py | failed | 75 | 1 | 0 | 2 |
 
 </details>
 
@@ -289,7 +289,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| tests/test_subtests.py | failed | 30 | 2 | 0 | 0 |
+| tests/test_subtests.py | failed | 17 | 15 | 0 | 0 |
 
 </details>
 
@@ -309,7 +309,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| tests/test_assert_match.py | failed | 34 | 4 | 0 | 0 |
+| tests/test_assert_match.py | failed | 35 | 3 | 0 | 0 |
 | tests/test_assert_match_dir.py | failed | 27 | 1 | 0 | 0 |
 | tests/test_misc.py | failed | 40 | 1 | 0 | 0 |
 
@@ -413,7 +413,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| tests/test_pytest_randomly.py | failed | 33 | 4 | 0 | 0 |
+| tests/test_pytest_randomly.py | failed | 35 | 2 | 0 | 0 |
 
 </details>
 

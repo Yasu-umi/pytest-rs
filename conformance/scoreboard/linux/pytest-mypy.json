@@ -9,8 +9,8 @@
       "status": "failed",
       "exit_code": 1,
       "passed": 75,
-      "failed": 3,
-      "skipped": 0,
+      "failed": 1,
+      "skipped": 2,
       "errors": 0
     }
   ]

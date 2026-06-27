@@ -8,8 +8,8 @@
       "file": "tests/test_pytest_randomly.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 33,
-      "failed": 4,
+      "passed": 35,
+      "failed": 2,
       "skipped": 0,
       "errors": 0
     }

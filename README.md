@@ -111,7 +111,7 @@ _linux (CI-verified)_
 
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2543 | 229 | 0 | 53 | 2825 | 91.9% | 17 | 52 | 63 |
+| pytest | 9.0.3 | 2557 | 215 | 0 | 53 | 2825 | 92.4% | 17 | 52 | 63 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 20 | 0 | 3 | 209 | 90.4% | 0 | 1 | 0 |
@@ -125,11 +125,11 @@ _linux (CI-verified)_
 | suite | tag | passed | failed | errors | skipped | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 41 | 100.0% | 1 | 1 | 0 |
-| pytest-mypy | v1.0.1 | 75 | 3 | 0 | 0 | 78 | 96.2% | 0 | 1 | 0 |
+| pytest-mypy | v1.0.1 | 75 | 1 | 0 | 2 | 78 | 98.7% | 0 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
-| pytest-subtests | v0.14.2 | 30 | 2 | 0 | 0 | 32 | 93.8% | 0 | 1 | 0 |
+| pytest-subtests | v0.14.2 | 17 | 15 | 0 | 0 | 32 | 53.1% | 0 | 1 | 0 |
 | pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
-| pytest-snapshot | v0.9.0 | 101 | 6 | 0 | 0 | 107 | 94.4% | 0 | 3 | 0 |
+| pytest-snapshot | v0.9.0 | 102 | 5 | 0 | 0 | 107 | 95.3% | 0 | 3 | 0 |
 | pytest-icdiff | 0.5 | 10 | 2 | 0 | 0 | 12 | 83.3% | 0 | 1 | 0 |
 | pytest-socket | 0.7.0 | 59 | 6 | 0 | 0 | 65 | 90.8% | 2 | 6 | 0 |
 | pytest-order | v1.4.0 | 120 | 14 | 0 | 0 | 134 | 89.6% | 7 | 16 | 0 |
@@ -137,7 +137,7 @@ _linux (CI-verified)_
 | pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
 | pytest-env | 1.6.0 | 69 | 6 | 0 | 0 | 75 | 92.0% | 2 | 3 | 0 |
 | pytest-rerunfailures | 9.1.1 | 47 | 0 | 0 | 1 | 48 | 100.0% | 1 | 1 | 0 |
-| pytest-randomly | 4.1.0 | 33 | 4 | 0 | 0 | 37 | 89.2% | 0 | 1 | 0 |
+| pytest-randomly | 4.1.0 | 35 | 2 | 0 | 0 | 37 | 94.6% | 0 | 1 | 0 |
 | pytest-bdd | 8.1.0 | 116 | 22 | 0 | 1 | 139 | 84.2% | 28 | 35 | 0 |
 | pytest-django | v4.9.0 | 210 | 5 | 0 | 1 | 216 | 97.7% | 7 | 13 | 0 |
 
