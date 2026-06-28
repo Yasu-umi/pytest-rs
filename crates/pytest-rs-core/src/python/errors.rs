@@ -136,7 +136,7 @@ pub fn is_skipped(py: Python<'_>, err: &PyErr) -> bool {
 /// Ctrl-C), e.g. "_pytest.outcomes.Exit: foo".
 pub fn session_abort_banner(py: Python<'_>, err: &PyErr) -> Option<String> {
     if err.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py) {
-        return Some("KeyboardInterrupt".to_string());
+        return Some("Interrupted: KeyboardInterrupt".to_string());
     }
     if err_matches_shim(py, err, "Exit") {
         let msg: String = err
