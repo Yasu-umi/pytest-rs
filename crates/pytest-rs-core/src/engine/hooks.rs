@@ -108,11 +108,30 @@ impl Engine {
             .collect::<PyResult<_>>()?;
         let node_list = pyo3::types::PyList::new(py, nodes.iter().map(|n| n.bind(py)))?;
 
-        // pytest_collectstart per distinct test class: build a pytest.Class
-        // collector (.obj = the class), fire the hooks, and propagate any
-        // markers it added to the class's item nodes (Django tags -> marks).
+        // pytest_collectstart: fire for Session proxy first (even with 0
+        // items), then per distinct test class.
         if !collectstart_funcs.is_empty() {
-            let class_cls = py.import("pytest._node")?.getattr("Class")?;
+            let node_mod = py.import("pytest._node")?;
+            let proxy_cls = node_mod.getattr("_CollectorProxy")?;
+            let rootdir_str = self.config.rootdir.to_string_lossy().to_string();
+            let py_config = python::existing_py_config(py);
+            let session_node = node_mod.getattr("_NodeSession")?.call1((py_config,))?;
+            let session_collector = proxy_cls.call1((
+                "",
+                "",
+                rootdir_str.as_str(),
+                session_node,
+                py.None(),
+                "Session",
+            ))?;
+            for func in &collectstart_funcs {
+                python::call_py_hook(
+                    py,
+                    func,
+                    &[("collector", session_collector.clone().unbind())],
+                )?;
+            }
+            let class_cls = node_mod.getattr("Class")?;
             let mut seen_cls: Vec<Py<pyo3::PyAny>> = Vec::new();
             for node in node_list.iter() {
                 let cls = node.getattr("cls").ok().filter(|c| !c.is_none());
