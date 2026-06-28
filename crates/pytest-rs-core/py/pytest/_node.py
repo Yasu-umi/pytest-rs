@@ -769,6 +769,12 @@ def set_session_items(items):
     _session_state["items"] = list(items)
 
 
+def set_session_testscollected(n):
+    """Override testscollected count (used by xdist: workers collect,
+    so session.items is empty but testscollected must reflect the total)."""
+    _session_state["testscollected"] = n
+
+
 def set_session_skipped_modules(modules):
     """Skipped-module records [(nodeid, reason, location), ...], published
     before pytest_collection_finish so the relay can serialize them."""
@@ -1036,6 +1042,8 @@ class _NodeSession:
 
     @property
     def testscollected(self):
+        if "testscollected" in _session_state:
+            return _session_state["testscollected"]
         return len(_session_state["items"])
 
     def add_marker(self, marker, append=True):

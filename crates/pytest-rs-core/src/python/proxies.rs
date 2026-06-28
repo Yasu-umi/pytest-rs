@@ -485,6 +485,15 @@ pub fn set_session_items(py: Python<'_>, items: &[crate::collect::TestItem]) -> 
     Ok(())
 }
 
+/// Set the testscollected count override (xdist: items are empty on the
+/// controller, but the true count is known from worker reports).
+pub fn set_session_testscollected(py: Python<'_>, n: usize) -> PyResult<()> {
+    py.import("pytest._node")?
+        .getattr("set_session_testscollected")?
+        .call1((n,))?;
+    Ok(())
+}
+
 /// Publish skipped-module records [(nodeid, reason, location), ...] on the
 /// session state so the relay plugin can serialize them in collection_finish.
 pub fn set_session_skipped_modules(
