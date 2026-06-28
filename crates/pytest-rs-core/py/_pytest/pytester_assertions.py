@@ -7,8 +7,6 @@ to be rewritten).
 # NOTE: keep this import at top so rewriter sees it before other imports
 from __future__ import annotations
 
-from collections.abc import Sequence
-
 
 def assertoutcome(
     outcomes,
