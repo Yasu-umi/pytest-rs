@@ -559,6 +559,18 @@ impl Plugin for AsyncioPlugin {
             &plugin_module,
             &mut ctx.session.registry,
         )?;
+
+        // Expose asyncio_mode on config.option so third-party plugins that call
+        // config.getoption("asyncio_mode") (e.g. pytest-aiohttp) don't crash.
+        let mode_str = match self.mode {
+            Mode::Auto => "auto",
+            Mode::Strict => "strict",
+        };
+        if let Ok(proxy) = pytest_rs_core::python::make_py_config(ctx.py, ctx.config) {
+            if let Ok(option) = proxy.bind(ctx.py).getattr("option") {
+                let _ = option.setattr("asyncio_mode", mode_str);
+            }
+        }
         Ok(())
     }
 
