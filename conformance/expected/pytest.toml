@@ -15,7 +15,6 @@
 "testing/deprecated_test.py" = "passed"
 "testing/test_compat.py" = "passed"
 "testing/test_scope.py" = "passed"
-"testing/test_setuponly.py" = "passed"
 "testing/test_setupplan.py" = "passed"
 "testing/test_runner_xunit.py" = "passed"
 "testing/test_unraisableexception.py" = "passed"

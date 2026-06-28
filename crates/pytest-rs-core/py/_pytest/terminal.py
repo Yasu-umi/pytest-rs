@@ -470,13 +470,22 @@ class TerminalReporter:
         return True
 
     def pytest_warning_recorded(self, warning_message, nodeid):
+        import warnings as _warnings
+
         fslocation = (
             getattr(warning_message, "filename", None),
             getattr(warning_message, "lineno", None),
         )
+        message = _warnings.formatwarning(
+            getattr(warning_message, "message", warning_message),
+            getattr(warning_message, "category", type(warning_message)),
+            getattr(warning_message, "filename", "<unknown>"),
+            getattr(warning_message, "lineno", 0),
+            getattr(warning_message, "line", None),
+        )
         self._add_stats(
             "warnings",
-            [WarningReport(str(warning_message), nodeid=nodeid, fslocation=fslocation)],
+            [WarningReport(message, nodeid=nodeid, fslocation=fslocation)],
         )
 
     def pytest_deselected(self, items):
