@@ -553,11 +553,13 @@ impl Engine {
         // Progress chars leave the line open; any full-line output must
         // close it first or fnmatch-style consumers see merged lines.
         let mut line_open = false;
-        // Nodeids from the first worker that reports Collection (all workers
-        // collect the same items in the same order, so one set is enough).
+        // Nodeids from the first worker that reports Collection. Later workers
+        // are expected to collect identically; if they don't (e.g. random
+        // parametrize), we report a mismatch and abort.
         let mut all_nodeids: Vec<String> = Vec::new();
         let mut all_xdist_groups: Vec<Option<String>> = Vec::new();
         let mut got_nodeids = false;
+        let mut first_collection_worker: usize = 0;
         // nodeid → xdist_group for verbose display ("nodeid@group").
         let mut nodeid_groups: HashMap<String, String> = HashMap::new();
         // Total items known once all Collections are received.
@@ -570,7 +572,7 @@ impl Engine {
         for event in receiver {
             match event {
                 Event::Collection {
-                    worker: _,
+                    worker,
                     nodeids,
                     xdist_groups,
                     errors,
@@ -597,12 +599,26 @@ impl Engine {
                             head_line: None,
                         });
                     }
-                    // Only use the first worker's nodeids — all workers collect
-                    // identically, so accumulating would multiply item counts.
+                    // Only use the first worker's nodeids. Later workers
+                    // must collect the same items; if they don't (e.g. due
+                    // to random parametrize) abort with a clear error.
                     if !got_nodeids {
                         got_nodeids = true;
+                        first_collection_worker = worker;
                         all_nodeids = nodeids;
                         all_xdist_groups = xdist_groups;
+                    } else if nodeids != all_nodeids {
+                        if line_open {
+                            println!();
+                            line_open = false;
+                        }
+                        println!(
+                            "Different tests were collected between gw{first_collection_worker} \
+                             and gw{worker}"
+                        );
+                        queue.stop();
+                        self.session.exit_code_override =
+                            Some(crate::report::exit_code::TESTS_FAILED);
                     }
                     if collections_pending > 0 {
                         collections_pending -= 1;
