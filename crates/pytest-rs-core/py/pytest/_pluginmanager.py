@@ -530,6 +530,7 @@ class PluginManager:
             return None
         if name is not None:
             from _pytest.deprecated import DEPRECATED_EXTERNAL_PLUGINS
+
             from pytest._warning_types import PytestConfigWarning
             if name in DEPRECATED_EXTERNAL_PLUGINS:
                 import warnings

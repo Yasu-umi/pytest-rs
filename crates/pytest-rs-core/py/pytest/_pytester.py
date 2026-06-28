@@ -498,6 +498,7 @@ class Pytester:
         command-line args (rootdir discovery, ini reading, option parsing),
         without running a session — upstream's _prepareconfig."""
         from _pytest.config import _native_prepareconfig
+
         from pytest._pluginmanager import pluginmanager
 
         new_args = [str(arg) for arg in args]
