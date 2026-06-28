@@ -363,6 +363,34 @@ impl Engine {
             .collect();
 
         let worker_chdirs = self.config.tx_worker_chdirs();
+
+        // --rsyncdir: copy each specified directory into every worker's chdir.
+        if let Some(chdirs) = &worker_chdirs {
+            if let Some(rsyncdirs) = self.config.get_values("rsyncdir") {
+                let unique_chdirs: std::collections::HashSet<&str> =
+                    chdirs.iter().flatten().map(String::as_str).collect();
+                for chdir in unique_chdirs {
+                    let dest_base = std::path::Path::new(chdir);
+                    for src_str in &rsyncdirs {
+                        let src = std::path::Path::new(src_str);
+                        if src.is_dir() {
+                            if let Some(name) = src.file_name() {
+                                let _ = copy_dir_recursive(src, &dest_base.join(name));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let rsyncdirs: Vec<String> = self
+            .config
+            .get_values("rsyncdir")
+            .unwrap_or_default()
+            .into_iter()
+            .map(str::to_string)
+            .collect();
+
         let mut handles = Vec::new();
         for index in 0..workers {
             let owner = WorkerOwner {
@@ -378,6 +406,7 @@ impl Engine {
                     .as_ref()
                     .and_then(|chdirs| chdirs.get(index).cloned())
                     .flatten(),
+                rsyncdirs: rsyncdirs.clone(),
             };
             handles.push(std::thread::spawn(move || owner.run()));
         }
@@ -1058,14 +1087,46 @@ struct WorkerOwner {
     workerinput_json: Option<String>,
     /// --tx popen//chdir=DIR: the worker's working directory.
     chdir: Option<String>,
+    /// --rsyncdir values: directories that were rsynced into each worker's chdir.
+    rsyncdirs: Vec<String>,
 }
 
 impl WorkerOwner {
+    /// Rewrite absolute test-path args that fall under an rsync'd directory
+    /// to relative paths inside the worker's chdir, so the worker collects
+    /// and imports from the rsynced copy rather than the original source.
+    fn rewrite_argv_for_rsync(&self) -> Vec<String> {
+        if self.chdir.is_none() || self.rsyncdirs.is_empty() {
+            return self.argv.clone();
+        }
+        self.argv
+            .iter()
+            .map(|arg| {
+                let path = std::path::Path::new(arg);
+                if path.is_absolute() {
+                    for src_str in &self.rsyncdirs {
+                        let src = std::path::Path::new(src_str);
+                        if let Ok(rel) = path.strip_prefix(src) {
+                            if let Some(name) = src.file_name() {
+                                return std::path::Path::new(name)
+                                    .join(rel)
+                                    .to_string_lossy()
+                                    .into_owned();
+                            }
+                        }
+                    }
+                }
+                arg.clone()
+            })
+            .collect()
+    }
+
     fn spawn(&self) -> std::io::Result<WorkerProc> {
         let exe = std::env::current_exe()?;
+        let argv = self.rewrite_argv_for_rsync();
         let mut command = Command::new(exe);
         command
-            .args(&self.argv)
+            .args(&argv)
             .arg("--worker")
             .env("PYTEST_XDIST_WORKER", format!("gw{}", self.index))
             .env("PYTEST_XDIST_WORKER_COUNT", self.worker_count.to_string())
@@ -1358,4 +1419,19 @@ impl WorkerOwner {
             self.handle_crash(&mut proc, vec![]);
         }
     }
+}
+
+
+fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let dest = dst.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            copy_dir_recursive(&entry.path(), &dest)?;
+        } else {
+            std::fs::copy(entry.path(), dest)?;
+        }
+    }
+    Ok(())
 }
