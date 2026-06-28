@@ -1,6 +1,7 @@
 """tmp_path / tmp_path_factory builtin fixtures (upstream _pytest/tmpdir.py
 port: pytest-of-{user} numbered basetemps with lock-driven retention)."""
 
+import fnmatch
 import getpass
 import os
 import pathlib
@@ -397,8 +398,6 @@ class LocalPath:
         return self._path.read_text(encoding=encoding)
 
     def listdir(self, fil=None, sort=True):
-        import fnmatch
-
         entries = sorted(self._path.iterdir())
         if fil is None:
             pass
