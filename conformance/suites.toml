@@ -642,10 +642,7 @@ deps = [
     "cloudpickle==3.1.1",
     "faker==40.23.0",
     "eval-type-backport==0.2.2",
-]
-exclude = [
-    # test_docs requires pytest-examples + full docs build dependencies.
-    "test_docs.py",
+    "pytest-examples==0.0.18",
 ]
 # pytest-run-parallel registers the 'thread_unsafe' marker that pydantic's
 # conftest.py applies dynamically. The plugin is in deps/ (PYTHONPATH) so

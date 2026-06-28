@@ -35,7 +35,8 @@ SUMMARY_RE = re.compile(
     r"(?:(?P<failed>\d+) failed)?(?:, )?"
     r"(?:(?P<passed>\d+) passed)?(?:, )?"
     r"(?:(?P<skipped>\d+) skipped)?(?:, )?"
-    r"(?:(?P<errors>\d+) errors?)?"
+    r"(?:(?P<errors>\d+) errors?)?(?:, )?"
+    r"(?:(?P<deselected>\d+) deselected)?"
 )
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
@@ -49,6 +50,7 @@ class FileResult:
     failed: int = 0
     skipped: int = 0
     errors: int = 0
+    deselected: int = 0
     stdout: str = ""
     stderr: str = ""
 
@@ -251,6 +253,7 @@ class Suite:
             failed=counts.get("failed", 0),
             skipped=counts.get("skipped", 0),
             errors=counts.get("errors", 0),
+            deselected=counts.get("deselected", 0),
             # Keep output for diagnosing pin regressions (failed) and crashes
             # (unexpected exit codes); passing files are dropped to save memory.
             stdout=out if (is_unexpected or status == "failed") else "",
@@ -303,15 +306,17 @@ def suite_summary(results: list[FileResult], excluded: int) -> str:
     """Aligned stats: tests conformant/total (%), file tally, oddity notes.
 
     "tests" counts individual test outcomes summed across every file, with
-    total = passed + failed + errors + skipped; conformant = passed + skipped
-    (reproducing an upstream skip is matching pytest's behaviour, so it counts
-    toward conformance). "files" counts per-file runs (a file is all-pass only
-    when its whole run exited cleanly)."""
+    total = passed + failed + errors + skipped + deselected; conformant =
+    passed + skipped (reproducing an upstream skip matches pytest's behaviour,
+    so it counts toward conformance; deselected tests are intentionally not run
+    and count against the total). "files" counts per-file runs (a file is
+    all-pass only when its whole run exited cleanly)."""
     passed = sum(r.passed for r in results)
     failed = sum(r.failed for r in results)
     errors = sum(r.errors for r in results)
     skipped = sum(r.skipped for r in results)
-    total = passed + failed + errors + skipped
+    deselected = sum(r.deselected for r in results)
+    total = passed + failed + errors + skipped + deselected
     conformant = passed + skipped
     pct = f"{conformant / total * 100:5.1f}%" if total else "    -"
     files_ok = sum(1 for r in results if r.status == "passed")
@@ -420,6 +425,7 @@ def run_suites(
                     "tag": suite.tag,
                     "category": suite.category,
                     "excluded_files": excluded,
+                    "deselected": sum(r.deselected for r in results),
                     "files": [
                         {k: v for k, v in result.__dict__.items() if k not in ("stdout", "stderr")}
                         for result in results
@@ -496,9 +502,9 @@ def cross_suite_tables(boards: list[dict]) -> list[str]:
 def cross_suite_table(boards: list[dict]) -> list[str]:
     """One cross-suite markdown table."""
     lines = [
-        "| suite | tag | passed | failed | errors | skipped | total | conformant % "
+        "| suite | tag | passed | failed | errors | skipped | deselected | total | conformant % "
         "| files all-pass | files run | files excluded |",
-        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for board in boards:
         files = board["files"]
@@ -506,13 +512,14 @@ def cross_suite_table(boards: list[dict]) -> list[str]:
         failed = sum(f["failed"] for f in files)
         errors = sum(f["errors"] for f in files)
         skipped = sum(f["skipped"] for f in files)
-        total = passed + failed + errors + skipped
+        deselected = sum(f.get("deselected", 0) for f in files)
+        total = passed + failed + errors + skipped + deselected
         pct = f"{(passed + skipped) / total * 100:.1f}%" if total else "-"
         files_ok = sum(1 for f in files if f["status"] == "passed")
         lines.append(
             f"| {board['suite']} | {board['tag']} | {passed} | {failed} | {errors} "
-            f"| {skipped} | {total} | {pct} | {files_ok} | {len(files)} "
-            f"| {board['excluded_files']} |"
+            f"| {skipped} | {deselected} | {total} | {pct} | {files_ok} | {len(files)} "
+            f"| {board.get('excluded_files', 0)} |"
         )
     return lines
 
@@ -529,14 +536,14 @@ def render_results_doc(suites: list[Suite]) -> str:
         "this file and the README table. Linux is canonical: CI re-runs the suites",
         "and auto-commits updated results on pushes to main.",
         "",
-        "Accounting: `total = passed + failed + errors + skipped`, summed over the",
-        "upstream test files of each suite. `conformant % = (passed + skipped) /",
-        "total` — reproducing an upstream skip matches pytest's behaviour, so it",
-        "counts toward conformance. `skipped` counts tests the upstream",
-        "suites explicitly skip when run under pytest-rs. Excluded files (the",
-        "per-suite lists in `conformance/expected/*.toml` plus path patterns in",
-        "`conformance/suites.toml`) are not run at all and only show up in the",
-        '"files excluded" column.',
+        "Accounting: `total = passed + failed + errors + skipped + deselected`, summed",
+        "over the upstream test files of each suite. `conformant % = (passed + skipped)",
+        "/ total` — reproducing an upstream skip matches pytest's behaviour, so it",
+        "counts toward conformance. `deselected` counts individual tests excluded via",
+        "`--deselect` (see `deselect` lists in `conformance/suites.toml`); they count",
+        "against the total. `files excluded` counts whole test files not run at all —",
+        "these fail under vanilla pytest too (network access, OS clipboard, etc.) and",
+        "are out of scope for pytest-rs; they are not counted in the total.",
         "",
     ]
     for platform in scoreboard_platforms():
@@ -554,12 +561,12 @@ def render_results_doc(suites: list[Suite]) -> str:
             lines.append("")
             lines.append(f"<details><summary>per-file detail ({len(files)} files)</summary>")
             lines.append("")
-            lines.append("| file | status | passed | failed | errors | skipped |")
-            lines.append("|---|---|---:|---:|---:|---:|")
+            lines.append("| file | status | passed | failed | errors | skipped | deselected |")
+            lines.append("|---|---|---:|---:|---:|---:|---:|")
             for f in files:
                 lines.append(
                     f"| {f['file']} | {f['status']} | {f['passed']} | {f['failed']} "
-                    f"| {f['errors']} | {f['skipped']} |"
+                    f"| {f['errors']} | {f['skipped']} | {f.get('deselected', 0)} |"
                 )
             lines.append("")
             lines.append("</details>")
