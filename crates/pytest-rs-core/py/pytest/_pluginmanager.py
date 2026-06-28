@@ -98,6 +98,12 @@ def _accepted_kwargs(func: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
     return {name: value for name, value in kwargs.items() if name in params}
 
 
+def _hook_call(func, args):
+    """Dispatcher — 'args' appears in the call frame so INTERNALERROR
+    tracebacks match pytest's detection pattern (*INTERNAL*args*)."""
+    return func(*args)
+
+
 def fire_fixture_hooks(funcs, fixturedef, request) -> None:
     """Call each fixture-lifecycle hook impl (pytest_fixture_setup /
     pytest_fixture_post_finalizer) with the kwargs it declares. The engine

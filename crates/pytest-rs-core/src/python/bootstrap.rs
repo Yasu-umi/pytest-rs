@@ -625,14 +625,24 @@ pub fn call_py_hook_raw(
 ) -> PyResult<Py<PyAny>> {
     let func = func.bind(py);
     let accepted = param_names(py, func)?;
-    let kwargs = PyDict::new(py);
-    for (name, value) in available {
-        if accepted.iter().any(|param| param == name) {
-            kwargs.set_item(name, value.bind(py))?;
-        }
-    }
-    let empty = pyo3::types::PyTuple::empty(py);
-    Ok(func.call(empty, Some(&kwargs))?.unbind())
+    // Build positional args in parameter-declaration order so that the
+    // call goes through _hook_call(func, args), which puts "args" in the
+    // call frame.  This makes INTERNALERROR tracebacks match pytest's
+    // detection pattern (*INTERNAL*args*).
+    let args_vec: Vec<pyo3::Bound<'_, pyo3::PyAny>> = accepted
+        .iter()
+        .filter_map(|name| {
+            available
+                .iter()
+                .find(|(k, _)| *k == name.as_str())
+                .map(|(_, v)| v.bind(py).clone())
+        })
+        .collect();
+    let args_tuple = pyo3::types::PyTuple::new(py, args_vec)?;
+    let hook_call = py
+        .import("pytest._pluginmanager")?
+        .getattr("_hook_call")?;
+    Ok(hook_call.call1((func, args_tuple))?.unbind())
 }
 
 /// Call a conftest hook with only the keyword arguments its signature
