@@ -3,6 +3,7 @@
   "tag": "v0.5",
   "category": "third-party",
   "excluded_files": 0,
+  "deselected": 0,
   "files": [
     {
       "file": "tests/test_plugin.py",
@@ -11,7 +12,8 @@
       "passed": 10,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     }
   ]
 }

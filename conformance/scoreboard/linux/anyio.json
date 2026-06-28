@@ -3,6 +3,7 @@
   "tag": "4.13.0",
   "category": "ecosystem",
   "excluded_files": 0,
+  "deselected": 0,
   "files": [
     {
       "file": "tests/streams/test_buffered.py",
@@ -11,7 +12,8 @@
       "passed": 28,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/streams/test_file.py",
@@ -20,7 +22,8 @@
       "passed": 40,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/streams/test_memory.py",
@@ -29,7 +32,8 @@
       "passed": 109,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/streams/test_stapled.py",
@@ -38,7 +42,8 @@
       "passed": 24,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/streams/test_text.py",
@@ -47,7 +52,8 @@
       "passed": 24,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/streams/test_tls.py",
@@ -56,7 +62,8 @@
       "passed": 68,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_all_attributes.py",
@@ -65,7 +72,8 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_contextmanagers.py",
@@ -74,7 +82,8 @@
       "passed": 49,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_debugging.py",
@@ -83,7 +92,8 @@
       "passed": 31,
       "failed": 0,
       "skipped": 1,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_deprecations.py",
@@ -92,7 +102,8 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_eventloop.py",
@@ -101,7 +112,8 @@
       "passed": 17,
       "failed": 0,
       "skipped": 1,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_fileio.py",
@@ -110,7 +122,8 @@
       "passed": 244,
       "failed": 0,
       "skipped": 22,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_from_thread.py",
@@ -119,7 +132,8 @@
       "passed": 195,
       "failed": 0,
       "skipped": 4,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_functools.py",
@@ -128,7 +142,8 @@
       "passed": 132,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_lowlevel.py",
@@ -137,7 +152,8 @@
       "passed": 44,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_pytest_plugin.py",
@@ -146,7 +162,8 @@
       "passed": 35,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_signals.py",
@@ -155,7 +172,8 @@
       "passed": 12,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_sockets.py",
@@ -164,7 +182,8 @@
       "passed": 1189,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_subprocesses.py",
@@ -173,7 +192,8 @@
       "passed": 76,
       "failed": 0,
       "skipped": 4,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_synchronization.py",
@@ -182,7 +202,8 @@
       "passed": 235,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_taskgroups.py",
@@ -191,7 +212,8 @@
       "passed": 393,
       "failed": 0,
       "skipped": 10,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_tempfile.py",
@@ -200,7 +222,8 @@
       "passed": 60,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_to_interpreter.py",
@@ -209,7 +232,8 @@
       "passed": 12,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_to_process.py",
@@ -218,7 +242,8 @@
       "passed": 36,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_to_thread.py",
@@ -227,7 +252,8 @@
       "passed": 64,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_typedattr.py",
@@ -236,7 +262,8 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     }
   ]
 }

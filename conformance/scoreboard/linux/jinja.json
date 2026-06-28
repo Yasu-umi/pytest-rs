@@ -3,6 +3,7 @@
   "tag": "3.1.6",
   "category": "real-world",
   "excluded_files": 0,
+  "deselected": 0,
   "files": [
     {
       "file": "tests/test_api.py",
@@ -11,7 +12,8 @@
       "passed": 34,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_async.py",
@@ -20,7 +22,8 @@
       "passed": 76,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_async_filters.py",
@@ -29,7 +32,8 @@
       "passed": 49,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_bytecode_cache.py",
@@ -38,7 +42,8 @@
       "passed": 3,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_compile.py",
@@ -47,7 +52,8 @@
       "passed": 6,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_core_tags.py",
@@ -56,7 +62,8 @@
       "passed": 63,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_debug.py",
@@ -65,7 +72,8 @@
       "passed": 7,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_ext.py",
@@ -74,7 +82,8 @@
       "passed": 51,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_filters.py",
@@ -83,7 +92,8 @@
       "passed": 132,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_idtracking.py",
@@ -92,7 +102,8 @@
       "passed": 5,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_imports.py",
@@ -101,7 +112,8 @@
       "passed": 15,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_inheritance.py",
@@ -110,7 +122,8 @@
       "passed": 22,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_lexnparse.py",
@@ -119,7 +132,8 @@
       "passed": 150,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_loader.py",
@@ -128,7 +142,8 @@
       "passed": 43,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_nativetypes.py",
@@ -137,7 +152,8 @@
       "passed": 27,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_nodes.py",
@@ -146,7 +162,8 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_pickle.py",
@@ -155,7 +172,8 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_regression.py",
@@ -164,7 +182,8 @@
       "passed": 54,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_runtime.py",
@@ -173,7 +192,8 @@
       "passed": 19,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_security.py",
@@ -182,7 +202,8 @@
       "passed": 17,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_tests.py",
@@ -191,7 +212,8 @@
       "passed": 106,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_utils.py",
@@ -200,7 +222,8 @@
       "passed": 28,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     }
   ]
 }

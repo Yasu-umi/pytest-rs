@@ -3,6 +3,7 @@
   "tag": "0.28.1",
   "category": "real-world",
   "excluded_files": 0,
+  "deselected": 7,
   "files": [
     {
       "file": "tests/client/test_async_client.py",
@@ -11,7 +12,8 @@
       "passed": 52,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/client/test_auth.py",
@@ -20,7 +22,8 @@
       "passed": 79,
       "failed": 0,
       "skipped": 1,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/client/test_client.py",
@@ -29,7 +32,8 @@
       "passed": 33,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 2
     },
     {
       "file": "tests/client/test_cookies.py",
@@ -38,7 +42,8 @@
       "passed": 7,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/client/test_event_hooks.py",
@@ -47,7 +52,8 @@
       "passed": 9,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/client/test_headers.py",
@@ -56,7 +62,8 @@
       "passed": 17,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/client/test_properties.py",
@@ -65,7 +72,8 @@
       "passed": 8,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/client/test_proxies.py",
@@ -74,7 +82,8 @@
       "passed": 69,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/client/test_queryparams.py",
@@ -83,7 +92,8 @@
       "passed": 3,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/client/test_redirects.py",
@@ -92,7 +102,8 @@
       "passed": 31,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/models/test_cookies.py",
@@ -101,7 +112,8 @@
       "passed": 7,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/models/test_headers.py",
@@ -110,7 +122,8 @@
       "passed": 27,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/models/test_queryparams.py",
@@ -119,7 +132,8 @@
       "passed": 14,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/models/test_requests.py",
@@ -128,7 +142,8 @@
       "passed": 24,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/models/test_responses.py",
@@ -137,7 +152,8 @@
       "passed": 104,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 2
     },
     {
       "file": "tests/models/test_url.py",
@@ -146,7 +162,8 @@
       "passed": 90,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/models/test_whatwg.py",
@@ -155,7 +172,8 @@
       "passed": 563,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_api.py",
@@ -164,7 +182,8 @@
       "passed": 12,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_asgi.py",
@@ -173,7 +192,8 @@
       "passed": 24,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_auth.py",
@@ -182,7 +202,8 @@
       "passed": 8,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_config.py",
@@ -191,7 +212,8 @@
       "passed": 28,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_content.py",
@@ -200,7 +222,8 @@
       "passed": 43,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_decoders.py",
@@ -209,7 +232,8 @@
       "passed": 38,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 2
     },
     {
       "file": "tests/test_exceptions.py",
@@ -218,7 +242,8 @@
       "passed": 3,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_exported_members.py",
@@ -227,7 +252,8 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_main.py",
@@ -236,7 +262,8 @@
       "passed": 11,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_multipart.py",
@@ -245,7 +272,8 @@
       "passed": 38,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_status_codes.py",
@@ -254,7 +282,8 @@
       "passed": 6,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_timeouts.py",
@@ -263,7 +292,8 @@
       "passed": 9,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 1
     },
     {
       "file": "tests/test_utils.py",
@@ -272,7 +302,8 @@
       "passed": 40,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_wsgi.py",
@@ -281,7 +312,8 @@
       "passed": 12,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     }
   ]
 }

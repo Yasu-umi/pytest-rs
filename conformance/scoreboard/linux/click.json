@@ -3,6 +3,7 @@
   "tag": "8.3.1",
   "category": "real-world",
   "excluded_files": 0,
+  "deselected": 0,
   "files": [
     {
       "file": "tests/test_arguments.py",
@@ -11,7 +12,8 @@
       "passed": 91,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_basic.py",
@@ -20,7 +22,8 @@
       "passed": 88,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_chain.py",
@@ -29,7 +32,8 @@
       "passed": 15,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_command_decorators.py",
@@ -38,7 +42,8 @@
       "passed": 9,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_commands.py",
@@ -47,7 +52,8 @@
       "passed": 79,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_compat.py",
@@ -56,7 +62,8 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_context.py",
@@ -65,7 +72,8 @@
       "passed": 30,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_custom_classes.py",
@@ -74,7 +82,8 @@
       "passed": 6,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_defaults.py",
@@ -83,7 +92,8 @@
       "passed": 6,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_formatting.py",
@@ -92,7 +102,8 @@
       "passed": 17,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_imports.py",
@@ -101,7 +112,8 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_info_dict.py",
@@ -110,7 +122,8 @@
       "passed": 22,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_normalization.py",
@@ -119,7 +132,8 @@
       "passed": 3,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_options.py",
@@ -128,7 +142,8 @@
       "passed": 531,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_parser.py",
@@ -137,7 +152,8 @@
       "passed": 7,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_shell_completion.py",
@@ -146,7 +162,8 @@
       "passed": 52,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_termui.py",
@@ -155,7 +172,8 @@
       "passed": 147,
       "failed": 0,
       "skipped": 21,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_testing.py",
@@ -164,7 +182,8 @@
       "passed": 26,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_types.py",
@@ -173,7 +192,8 @@
       "passed": 40,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_utils.py",
@@ -182,7 +202,8 @@
       "passed": 143,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     }
   ]
 }

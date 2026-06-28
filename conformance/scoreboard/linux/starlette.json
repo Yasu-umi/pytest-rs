@@ -3,6 +3,7 @@
   "tag": "0.46.2",
   "category": "real-world",
   "excluded_files": 0,
+  "deselected": 0,
   "files": [
     {
       "file": "tests/middleware/test_base.py",
@@ -11,7 +12,8 @@
       "passed": 55,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/middleware/test_cors.py",
@@ -20,7 +22,8 @@
       "passed": 30,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/middleware/test_errors.py",
@@ -29,7 +32,8 @@
       "passed": 12,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/middleware/test_gzip.py",
@@ -38,7 +42,8 @@
       "passed": 14,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/middleware/test_https_redirect.py",
@@ -47,7 +52,8 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/middleware/test_middleware.py",
@@ -56,7 +62,8 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/middleware/test_session.py",
@@ -65,7 +72,8 @@
       "passed": 14,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/middleware/test_trusted_host.py",
@@ -74,7 +82,8 @@
       "passed": 5,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/middleware/test_wsgi.py",
@@ -83,7 +92,8 @@
       "passed": 10,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test__utils.py",
@@ -92,7 +102,8 @@
       "passed": 10,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_applications.py",
@@ -101,7 +112,8 @@
       "passed": 54,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_authentication.py",
@@ -110,7 +122,8 @@
       "passed": 11,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_background.py",
@@ -119,7 +132,8 @@
       "passed": 8,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_concurrency.py",
@@ -128,7 +142,8 @@
       "passed": 6,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_config.py",
@@ -137,7 +152,8 @@
       "passed": 5,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_convertors.py",
@@ -146,7 +162,8 @@
       "passed": 16,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_datastructures.py",
@@ -155,7 +172,8 @@
       "passed": 30,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_endpoints.py",
@@ -164,7 +182,8 @@
       "passed": 20,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_exceptions.py",
@@ -173,7 +192,8 @@
       "passed": 20,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_formparsers.py",
@@ -182,7 +202,8 @@
       "passed": 76,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_requests.py",
@@ -191,7 +212,8 @@
       "passed": 85,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_responses.py",
@@ -200,7 +222,8 @@
       "passed": 111,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_routing.py",
@@ -209,7 +232,8 @@
       "passed": 91,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_schemas.py",
@@ -218,7 +242,8 @@
       "passed": 3,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_staticfiles.py",
@@ -227,7 +252,8 @@
       "passed": 60,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_templates.py",
@@ -236,7 +262,8 @@
       "passed": 34,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_testclient.py",
@@ -245,7 +272,8 @@
       "passed": 48,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_websockets.py",
@@ -254,7 +282,8 @@
       "passed": 75,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     }
   ]
 }

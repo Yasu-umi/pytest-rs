@@ -3,6 +3,7 @@
   "tag": "25.3.0",
   "category": "real-world",
   "excluded_files": 0,
+  "deselected": 1,
   "files": [
     {
       "file": "tests/test_3rd_party.py",
@@ -11,7 +12,8 @@
       "passed": 0,
       "failed": 0,
       "skipped": 1,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_abc.py",
@@ -20,7 +22,8 @@
       "passed": 4,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_annotations.py",
@@ -29,7 +32,8 @@
       "passed": 47,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_cmp.py",
@@ -38,7 +42,8 @@
       "passed": 78,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_compat.py",
@@ -47,7 +52,8 @@
       "passed": 3,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_config.py",
@@ -56,7 +62,8 @@
       "passed": 4,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_converters.py",
@@ -65,7 +72,8 @@
       "passed": 38,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_dunders.py",
@@ -74,7 +82,8 @@
       "passed": 99,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_filters.py",
@@ -83,7 +92,8 @@
       "passed": 33,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_funcs.py",
@@ -92,7 +102,8 @@
       "passed": 51,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_functional.py",
@@ -101,7 +112,8 @@
       "passed": 410,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_hooks.py",
@@ -110,7 +122,8 @@
       "passed": 14,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_import.py",
@@ -119,7 +132,8 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_init_subclass.py",
@@ -128,7 +142,8 @@
       "passed": 4,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_make.py",
@@ -137,7 +152,8 @@
       "passed": 262,
       "failed": 0,
       "skipped": 1,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_next_gen.py",
@@ -146,7 +162,8 @@
       "passed": 33,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_packaging.py",
@@ -155,7 +172,8 @@
       "passed": 6,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_pattern_matching.py",
@@ -164,7 +182,8 @@
       "passed": 5,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_pyright.py",
@@ -173,7 +192,8 @@
       "passed": 0,
       "failed": 0,
       "skipped": 1,
-      "errors": 0
+      "errors": 0,
+      "deselected": 1
     },
     {
       "file": "tests/test_setattr.py",
@@ -182,7 +202,8 @@
       "passed": 36,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_slots.py",
@@ -191,7 +212,8 @@
       "passed": 52,
       "failed": 0,
       "skipped": 1,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_utils.py",
@@ -200,7 +222,8 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_validators.py",
@@ -209,7 +232,8 @@
       "passed": 153,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_version_info.py",
@@ -218,7 +242,8 @@
       "passed": 6,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     }
   ]
 }

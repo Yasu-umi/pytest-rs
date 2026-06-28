@@ -3,6 +3,7 @@
   "tag": "0.7.0",
   "category": "third-party",
   "excluded_files": 0,
+  "deselected": 0,
   "files": [
     {
       "file": "tests/test_async.py",
@@ -11,7 +12,8 @@
       "passed": 1,
       "failed": 1,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_combinations.py",
@@ -20,7 +22,8 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_doctest.py",
@@ -29,7 +32,8 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_precedence.py",
@@ -38,7 +42,8 @@
       "passed": 10,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_restrict_hosts.py",
@@ -47,7 +52,8 @@
       "passed": 27,
       "failed": 1,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_socket.py",
@@ -56,7 +62,8 @@
       "passed": 19,
       "failed": 3,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     }
   ]
 }

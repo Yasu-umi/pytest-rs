@@ -3,6 +3,7 @@
   "tag": "4.1.1",
   "category": "real-world",
   "excluded_files": 3,
+  "deselected": 0,
   "files": [
     {
       "file": "tests/test_context.py",
@@ -11,7 +12,8 @@
       "passed": 12,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_decorators.py",
@@ -20,7 +22,8 @@
       "passed": 44,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_deserialization.py",
@@ -29,7 +32,8 @@
       "passed": 379,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_error_store.py",
@@ -38,7 +42,8 @@
       "passed": 29,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_exceptions.py",
@@ -47,7 +52,8 @@
       "passed": 7,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_fields.py",
@@ -56,7 +62,8 @@
       "passed": 92,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_options.py",
@@ -65,7 +72,8 @@
       "passed": 10,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_registry.py",
@@ -74,7 +82,8 @@
       "passed": 10,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_schema.py",
@@ -83,7 +92,8 @@
       "passed": 201,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_serialization.py",
@@ -92,7 +102,8 @@
       "passed": 128,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_utils.py",
@@ -101,7 +112,8 @@
       "passed": 16,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_validate.py",
@@ -110,7 +122,8 @@
       "passed": 191,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     }
   ]
 }

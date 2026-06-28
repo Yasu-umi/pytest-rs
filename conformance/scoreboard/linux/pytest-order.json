@@ -3,6 +3,7 @@
   "tag": "v1.4.0",
   "category": "third-party",
   "excluded_files": 0,
+  "deselected": 0,
   "files": [
     {
       "file": "tests/test_class_marks.py",
@@ -11,7 +12,8 @@
       "passed": 9,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_dependency.py",
@@ -20,7 +22,8 @@
       "passed": 22,
       "failed": 1,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_marker_prefix.py",
@@ -29,7 +32,8 @@
       "passed": 7,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_misc.py",
@@ -38,7 +42,8 @@
       "passed": 3,
       "failed": 1,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_multiple_ordering.py",
@@ -47,7 +52,8 @@
       "passed": 0,
       "failed": 4,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_order_group_scope.py",
@@ -56,7 +62,8 @@
       "passed": 6,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_order_group_scope_dep.py",
@@ -65,7 +72,8 @@
       "passed": 3,
       "failed": 1,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_order_group_scope_named_dep.py",
@@ -74,7 +82,8 @@
       "passed": 3,
       "failed": 1,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_order_group_scope_relative.py",
@@ -83,7 +92,8 @@
       "passed": 4,
       "failed": 1,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_order_scope.py",
@@ -92,7 +102,8 @@
       "passed": 4,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_order_scope_level.py",
@@ -101,7 +112,8 @@
       "passed": 5,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_ordering.py",
@@ -110,7 +122,8 @@
       "passed": 19,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_ordering_options.py",
@@ -119,7 +132,8 @@
       "passed": 0,
       "failed": 2,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_relative_ordering.py",
@@ -128,7 +142,8 @@
       "passed": 19,
       "failed": 2,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_sparse_ordinals.py",
@@ -137,7 +152,8 @@
       "passed": 16,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_xdist_handling.py",
@@ -146,7 +162,8 @@
       "passed": 0,
       "failed": 1,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     }
   ]
 }

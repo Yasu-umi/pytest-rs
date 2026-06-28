@@ -3,6 +3,7 @@
   "tag": "v30.11.0",
   "category": "real-world",
   "excluded_files": 0,
+  "deselected": 0,
   "files": [
     {
       "file": "tests/dialects/test_athena.py",
@@ -11,7 +12,8 @@
       "passed": 8,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_bigquery.py",
@@ -20,7 +22,8 @@
       "passed": 58,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_clickhouse.py",
@@ -29,7 +32,8 @@
       "passed": 31,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_databricks.py",
@@ -38,7 +42,8 @@
       "passed": 19,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_dialect.py",
@@ -47,7 +52,8 @@
       "passed": 98,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_doris.py",
@@ -56,7 +62,8 @@
       "passed": 12,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_dremio.py",
@@ -65,7 +72,8 @@
       "passed": 21,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_drill.py",
@@ -74,7 +82,8 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_druid.py",
@@ -83,7 +92,8 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_duckdb.py",
@@ -92,7 +102,8 @@
       "passed": 44,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_dune.py",
@@ -101,7 +112,8 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_exasol.py",
@@ -110,7 +122,8 @@
       "passed": 20,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_fabric.py",
@@ -119,7 +132,8 @@
       "passed": 6,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_hive.py",
@@ -128,7 +142,8 @@
       "passed": 14,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_materialize.py",
@@ -137,7 +152,8 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_mysql.py",
@@ -146,7 +162,8 @@
       "passed": 51,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_oracle.py",
@@ -155,7 +172,8 @@
       "passed": 25,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_pipe_syntax.py",
@@ -164,7 +182,8 @@
       "passed": 11,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_postgres.py",
@@ -173,7 +192,8 @@
       "passed": 26,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_presto.py",
@@ -182,7 +202,8 @@
       "passed": 20,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_prql.py",
@@ -191,7 +212,8 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_redshift.py",
@@ -200,7 +222,8 @@
       "passed": 17,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_risingwave.py",
@@ -209,7 +232,8 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_singlestore.py",
@@ -218,7 +242,8 @@
       "passed": 26,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_snowflake.py",
@@ -227,7 +252,8 @@
       "passed": 95,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_solr.py",
@@ -236,7 +262,8 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_spark.py",
@@ -245,7 +272,8 @@
       "passed": 22,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_sqlite.py",
@@ -254,7 +282,8 @@
       "passed": 11,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_starrocks.py",
@@ -263,7 +292,8 @@
       "passed": 12,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_tableau.py",
@@ -272,7 +302,8 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_teradata.py",
@@ -281,7 +312,8 @@
       "passed": 15,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_trino.py",
@@ -290,7 +322,8 @@
       "passed": 7,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/dialects/test_tsql.py",
@@ -299,7 +332,8 @@
       "passed": 55,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_build.py",
@@ -308,7 +342,8 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_dialect_entry_points.py",
@@ -317,7 +352,8 @@
       "passed": 3,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_dialect_imports.py",
@@ -326,7 +362,8 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_diff.py",
@@ -335,7 +372,8 @@
       "passed": 13,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_docs.py",
@@ -344,7 +382,8 @@
       "passed": 0,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_errors.py",
@@ -353,7 +392,8 @@
       "passed": 13,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_executor.py",
@@ -362,7 +402,8 @@
       "passed": 21,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_expressions.py",
@@ -371,7 +412,8 @@
       "passed": 70,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_generator.py",
@@ -380,7 +422,8 @@
       "passed": 6,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_helper.py",
@@ -389,7 +432,8 @@
       "passed": 3,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_integration_loader.py",
@@ -398,7 +442,8 @@
       "passed": 0,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_jsonpath.py",
@@ -407,7 +452,8 @@
       "passed": 4,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_lineage.py",
@@ -416,7 +462,8 @@
       "passed": 43,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_optimizer.py",
@@ -425,7 +472,8 @@
       "passed": 79,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_parser.py",
@@ -434,7 +482,8 @@
       "passed": 66,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_schema.py",
@@ -443,7 +492,8 @@
       "passed": 9,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_serde.py",
@@ -452,7 +502,8 @@
       "passed": 5,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_time.py",
@@ -461,7 +512,8 @@
       "passed": 3,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_tokens.py",
@@ -470,7 +522,8 @@
       "passed": 10,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_transforms.py",
@@ -479,7 +532,8 @@
       "passed": 7,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_transpile.py",
@@ -488,7 +542,8 @@
       "passed": 28,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     }
   ]
 }

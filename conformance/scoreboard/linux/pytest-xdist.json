@@ -3,15 +3,17 @@
   "tag": "v3.8.0",
   "category": "ecosystem",
   "excluded_files": 6,
+  "deselected": 0,
   "files": [
     {
       "file": "testing/acceptance_test.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 75,
-      "failed": 22,
+      "passed": 91,
+      "failed": 6,
       "skipped": 1,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     }
   ]
 }

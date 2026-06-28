@@ -3,6 +3,7 @@
   "tag": "v1.0.1",
   "category": "third-party",
   "excluded_files": 0,
+  "deselected": 0,
   "files": [
     {
       "file": "tests/test_pytest_mypy.py",
@@ -11,7 +12,8 @@
       "passed": 75,
       "failed": 1,
       "skipped": 2,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     }
   ]
 }

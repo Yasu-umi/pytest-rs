@@ -3,6 +3,7 @@
   "tag": "v5.1.0",
   "category": "ecosystem",
   "excluded_files": 6,
+  "deselected": 0,
   "files": [
     {
       "file": "tests/test_benchmark.py",
@@ -11,7 +12,8 @@
       "passed": 41,
       "failed": 12,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_calibration.py",
@@ -20,7 +22,8 @@
       "passed": 34,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_normal.py",
@@ -29,7 +32,8 @@
       "passed": 10,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_pedantic.py",
@@ -38,7 +42,8 @@
       "passed": 19,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_sample.py",
@@ -47,7 +52,8 @@
       "passed": 4,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_skip.py",
@@ -56,7 +62,8 @@
       "passed": 0,
       "failed": 0,
       "skipped": 1,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_with_testcase.py",
@@ -65,7 +72,8 @@
       "passed": 1,
       "failed": 1,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     }
   ]
 }

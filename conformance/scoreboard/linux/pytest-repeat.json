@@ -3,6 +3,7 @@
   "tag": "v0.9.4",
   "category": "third-party",
   "excluded_files": 0,
+  "deselected": 0,
   "files": [
     {
       "file": "test_repeat.py",
@@ -11,7 +12,8 @@
       "passed": 16,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     }
   ]
 }

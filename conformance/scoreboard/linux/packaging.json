@@ -3,6 +3,7 @@
   "tag": "25.0",
   "category": "real-world",
   "excluded_files": 0,
+  "deselected": 1,
   "files": [
     {
       "file": "tests/test_elffile.py",
@@ -11,7 +12,8 @@
       "passed": 15,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_licenses.py",
@@ -20,7 +22,8 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_manylinux.py",
@@ -29,7 +32,8 @@
       "passed": 32,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_markers.py",
@@ -38,7 +42,8 @@
       "passed": 2245,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_metadata.py",
@@ -47,7 +52,8 @@
       "passed": 245,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_musllinux.py",
@@ -56,7 +62,8 @@
       "passed": 10,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_requirements.py",
@@ -65,7 +72,8 @@
       "passed": 5286,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_specifiers.py",
@@ -74,7 +82,8 @@
       "passed": 806,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_structures.py",
@@ -83,7 +92,8 @@
       "passed": 14,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_tags.py",
@@ -92,7 +102,8 @@
       "passed": 178,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 1
     },
     {
       "file": "tests/test_utils.py",
@@ -101,7 +112,8 @@
       "passed": 54,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "tests/test_version.py",
@@ -110,7 +122,8 @@
       "passed": 18060,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     }
   ]
 }

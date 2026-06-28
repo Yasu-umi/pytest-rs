@@ -3,15 +3,17 @@
   "tag": "v0.14.2",
   "category": "third-party",
   "excluded_files": 0,
+  "deselected": 0,
   "files": [
     {
       "file": "tests/test_subtests.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 25,
-      "failed": 7,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 32,
+      "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     }
   ]
 }

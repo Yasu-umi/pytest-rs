@@ -3,6 +3,7 @@
   "tag": "0.9.0",
   "category": "ecosystem",
   "excluded_files": 3,
+  "deselected": 0,
   "files": [
     {
       "file": "tests/test_plugin.py",
@@ -11,7 +12,8 @@
       "passed": 59,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     }
   ]
 }

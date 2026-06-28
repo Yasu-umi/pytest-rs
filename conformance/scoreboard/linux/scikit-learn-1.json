@@ -3,6 +3,7 @@
   "tag": "1.9.0",
   "category": "real-world",
   "excluded_files": 0,
+  "deselected": 0,
   "files": [
     {
       "file": "sklearn/metrics/_plot/tests/test_common_curve_display.py",
@@ -11,7 +12,8 @@
       "passed": 0,
       "failed": 0,
       "skipped": 150,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/metrics/_plot/tests/test_confusion_matrix_display.py",
@@ -20,7 +22,8 @@
       "passed": 0,
       "failed": 0,
       "skipped": 36,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/metrics/_plot/tests/test_det_curve_display.py",
@@ -29,7 +32,8 @@
       "passed": 0,
       "failed": 0,
       "skipped": 35,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/metrics/_plot/tests/test_precision_recall_display.py",
@@ -38,7 +42,8 @@
       "passed": 0,
       "failed": 0,
       "skipped": 84,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/metrics/_plot/tests/test_predict_error_display.py",
@@ -47,7 +52,8 @@
       "passed": 0,
       "failed": 0,
       "skipped": 39,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/metrics/_plot/tests/test_roc_curve_display.py",
@@ -56,7 +62,8 @@
       "passed": 0,
       "failed": 0,
       "skipped": 155,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/metrics/cluster/tests/test_bicluster.py",
@@ -65,7 +72,8 @@
       "passed": 3,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/metrics/cluster/tests/test_common.py",
@@ -74,7 +82,8 @@
       "passed": 79,
       "failed": 0,
       "skipped": 30,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/metrics/cluster/tests/test_supervised.py",
@@ -83,7 +92,8 @@
       "passed": 57,
       "failed": 0,
       "skipped": 15,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/metrics/cluster/tests/test_unsupervised.py",
@@ -92,7 +102,8 @@
       "passed": 50,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/metrics/tests/test_classification.py",
@@ -101,7 +112,8 @@
       "passed": 250,
       "failed": 0,
       "skipped": 18,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/metrics/tests/test_common.py",
@@ -110,7 +122,8 @@
       "passed": 1629,
       "failed": 0,
       "skipped": 1986,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/metrics/tests/test_dist_metrics.py",
@@ -119,7 +132,8 @@
       "passed": 268,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/metrics/tests/test_pairwise.py",
@@ -128,7 +142,8 @@
       "passed": 284,
       "failed": 0,
       "skipped": 302,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/metrics/tests/test_pairwise_distances_reduction.py",
@@ -137,7 +152,8 @@
       "passed": 129,
       "failed": 0,
       "skipped": 2,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/metrics/tests/test_ranking.py",
@@ -146,7 +162,8 @@
       "passed": 248,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/metrics/tests/test_regression.py",
@@ -155,7 +172,8 @@
       "passed": 27,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/metrics/tests/test_score_objects.py",
@@ -164,7 +182,8 @@
       "passed": 281,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/_repr_html/tests/test_attributes.py",
@@ -173,7 +192,8 @@
       "passed": 7,
       "failed": 0,
       "skipped": 2,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/_repr_html/tests/test_estimator.py",
@@ -182,7 +202,8 @@
       "passed": 51,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/_repr_html/tests/test_features.py",
@@ -191,7 +212,8 @@
       "passed": 12,
       "failed": 0,
       "skipped": 3,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/_repr_html/tests/test_js.py",
@@ -200,7 +222,8 @@
       "passed": 0,
       "failed": 0,
       "skipped": 5,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/_repr_html/tests/test_params.py",
@@ -209,7 +232,8 @@
       "passed": 11,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_arpack.py",
@@ -218,7 +242,8 @@
       "passed": 100,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_array_api.py",
@@ -227,7 +252,8 @@
       "passed": 8,
       "failed": 0,
       "skipped": 1922,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_arrayfuncs.py",
@@ -236,7 +262,8 @@
       "passed": 18,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_bitset.py",
@@ -245,7 +272,8 @@
       "passed": 4,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_bunch.py",
@@ -254,7 +282,8 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_chunking.py",
@@ -263,7 +292,8 @@
       "passed": 9,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_class_weight.py",
@@ -272,7 +302,8 @@
       "passed": 21,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_cython_blas.py",
@@ -281,7 +312,8 @@
       "passed": 0,
       "failed": 0,
       "skipped": 44,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_dataframe.py",
@@ -290,7 +322,8 @@
       "passed": 3,
       "failed": 0,
       "skipped": 10,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_deprecation.py",
@@ -299,7 +332,8 @@
       "passed": 4,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_encode.py",
@@ -308,7 +342,8 @@
       "passed": 38,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_estimator_checks.py",
@@ -317,7 +352,8 @@
       "passed": 45,
       "failed": 0,
       "skipped": 6,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_extmath.py",
@@ -326,7 +362,8 @@
       "passed": 260,
       "failed": 0,
       "skipped": 45,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_fast_dict.py",
@@ -335,7 +372,8 @@
       "passed": 3,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_fixes.py",
@@ -344,7 +382,8 @@
       "passed": 39,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_graph.py",
@@ -353,7 +392,8 @@
       "passed": 5,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_indexing.py",
@@ -362,7 +402,8 @@
       "passed": 129,
       "failed": 0,
       "skipped": 430,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_mask.py",
@@ -371,7 +412,8 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_metaestimators.py",
@@ -380,7 +422,8 @@
       "passed": 4,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_missing.py",
@@ -389,7 +432,8 @@
       "passed": 12,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_mocking.py",
@@ -398,7 +442,8 @@
       "passed": 36,
       "failed": 0,
       "skipped": 1,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_multiclass.py",
@@ -407,7 +452,8 @@
       "passed": 13,
       "failed": 0,
       "skipped": 36,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_murmurhash.py",
@@ -416,7 +462,8 @@
       "passed": 6,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_optimize.py",
@@ -425,7 +472,8 @@
       "passed": 5,
       "failed": 0,
       "skipped": 15,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_parallel.py",
@@ -434,7 +482,8 @@
       "passed": 15,
       "failed": 0,
       "skipped": 2,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_param_validation.py",
@@ -443,7 +492,8 @@
       "passed": 147,
       "failed": 0,
       "skipped": 1,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_plotting.py",
@@ -452,7 +502,8 @@
       "passed": 80,
       "failed": 0,
       "skipped": 28,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_pprint.py",
@@ -461,7 +512,8 @@
       "passed": 13,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_random.py",
@@ -470,7 +522,8 @@
       "passed": 5,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_response.py",
@@ -479,7 +532,8 @@
       "passed": 63,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_seq_dataset.py",
@@ -488,7 +542,8 @@
       "passed": 20,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_set_output.py",
@@ -497,7 +552,8 @@
       "passed": 16,
       "failed": 0,
       "skipped": 8,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_shortest_path.py",
@@ -506,7 +562,8 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_show_versions.py",
@@ -515,7 +572,8 @@
       "passed": 3,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_sorting.py",
@@ -524,7 +582,8 @@
       "passed": 4,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_sparse.py",
@@ -533,7 +592,8 @@
       "passed": 16,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_sparsefuncs.py",
@@ -542,7 +602,8 @@
       "passed": 360,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_stats.py",
@@ -551,7 +612,8 @@
       "passed": 87,
       "failed": 0,
       "skipped": 111,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_tags.py",
@@ -560,7 +622,8 @@
       "passed": 8,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_testing.py",
@@ -569,7 +632,8 @@
       "passed": 81,
       "failed": 0,
       "skipped": 43,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_typedefs.py",
@@ -578,7 +642,8 @@
       "passed": 9,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_unique.py",
@@ -587,7 +652,8 @@
       "passed": 6,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_user_interface.py",
@@ -596,7 +662,8 @@
       "passed": 23,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_validation.py",
@@ -605,7 +672,8 @@
       "passed": 258,
       "failed": 0,
       "skipped": 259,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/utils/tests/test_weight_vector.py",
@@ -614,7 +682,8 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/linear_model/_glm/tests/test_glm.py",
@@ -623,7 +692,8 @@
       "passed": 274,
       "failed": 0,
       "skipped": 45,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/linear_model/tests/test_base.py",
@@ -632,7 +702,8 @@
       "passed": 76,
       "failed": 0,
       "skipped": 2,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/linear_model/tests/test_bayes.py",
@@ -641,7 +712,8 @@
       "passed": 24,
       "failed": 0,
       "skipped": 1,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/linear_model/tests/test_common.py",
@@ -650,7 +722,8 @@
       "passed": 117,
       "failed": 0,
       "skipped": 7,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/linear_model/tests/test_coordinate_descent.py",
@@ -659,7 +732,8 @@
       "passed": 289,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/linear_model/tests/test_huber.py",
@@ -668,7 +742,8 @@
       "passed": 12,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/linear_model/tests/test_least_angle.py",
@@ -677,7 +752,8 @@
       "passed": 62,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/linear_model/tests/test_linear_loss.py",
@@ -686,7 +762,8 @@
       "passed": 185,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/linear_model/tests/test_logistic.py",
@@ -695,7 +772,8 @@
       "passed": 295,
       "failed": 0,
       "skipped": 393,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/linear_model/tests/test_omp.py",
@@ -704,7 +782,8 @@
       "passed": 23,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/linear_model/tests/test_passive_aggressive.py",
@@ -713,7 +792,8 @@
       "passed": 63,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/linear_model/tests/test_perceptron.py",
@@ -722,7 +802,8 @@
       "passed": 6,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/linear_model/tests/test_quantile.py",
@@ -731,7 +812,8 @@
       "passed": 54,
       "failed": 0,
       "skipped": 5,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/linear_model/tests/test_ransac.py",
@@ -740,7 +822,8 @@
       "passed": 27,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/linear_model/tests/test_ridge.py",
@@ -749,7 +832,8 @@
       "passed": 1088,
       "failed": 0,
       "skipped": 348,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/linear_model/tests/test_sag.py",
@@ -758,7 +842,8 @@
       "passed": 27,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/linear_model/tests/test_sgd.py",
@@ -767,7 +852,8 @@
       "passed": 267,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/linear_model/tests/test_sparse_coordinate_descent.py",
@@ -776,7 +862,8 @@
       "passed": 159,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     },
     {
       "file": "sklearn/linear_model/tests/test_theil_sen.py",
@@ -785,7 +872,8 @@
       "passed": 16,
       "failed": 0,
       "skipped": 0,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     }
   ]
 }

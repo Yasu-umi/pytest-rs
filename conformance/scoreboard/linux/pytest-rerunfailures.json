@@ -3,6 +3,7 @@
   "tag": "9.1.1",
   "category": "third-party",
   "excluded_files": 0,
+  "deselected": 0,
   "files": [
     {
       "file": "test_pytest_rerunfailures.py",
@@ -11,7 +12,8 @@
       "passed": 47,
       "failed": 0,
       "skipped": 1,
-      "errors": 0
+      "errors": 0,
+      "deselected": 0
     }
   ]
 }
