@@ -201,7 +201,7 @@ impl Engine {
                     None => n,
                 }
             }
-            other => other.parse().ok()?,
+            other => other.trim().parse().ok()?,
         };
         (n > 0).then_some(n)
     }
