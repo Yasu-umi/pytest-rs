@@ -141,16 +141,18 @@ class _HookRelayPlugin:
             longrepr_type = "ExceptionChainRepr"
         else:
             longrepr_type = type(longrepr).__name__ if longrepr is not None else ""
-        self._events.append(
-            {
-                "hook": "pytest_runtest_logreport",
-                "nodeid": getattr(report, "nodeid", ""),
-                "when": getattr(report, "when", ""),
-                "outcome": getattr(report, "outcome", ""),
-                "longrepr_type": longrepr_type,
-                "longrepr_crash": longrepr_crash,
-            }
-        )
+        event = {
+            "hook": "pytest_runtest_logreport",
+            "nodeid": getattr(report, "nodeid", ""),
+            "when": getattr(report, "when", ""),
+            "outcome": getattr(report, "outcome", ""),
+            "longrepr_type": longrepr_type,
+            "longrepr_crash": longrepr_crash,
+        }
+        wasxfail = getattr(report, "wasxfail", None)
+        if wasxfail is not None:
+            event["wasxfail"] = wasxfail
+        self._events.append(event)
 
     def pytest_collection_finish(self, session):
         skipped_raw = getattr(session, "_rs_skipped_modules", None) or []

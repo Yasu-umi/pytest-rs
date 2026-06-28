@@ -14,6 +14,16 @@
 "testing/test_nodes.py" = "passed"
 "testing/deprecated_test.py" = "passed"
 "testing/test_compat.py" = "passed"
+"testing/test_scope.py" = "passed"
+"testing/test_setuponly.py" = "passed"
+"testing/test_setupplan.py" = "passed"
+"testing/test_runner_xunit.py" = "passed"
+"testing/test_unraisableexception.py" = "passed"
+"testing/logging/test_fixture.py" = "passed"
+"testing/logging/test_formatter.py" = "passed"
+"testing/python/approx.py" = "passed"
+"testing/python/raises.py" = "passed"
+"testing/test_error_diffs.py" = "passed"
 
 # Files intentionally not run: they test pytest's internal implementation,
 # which pytest-rs deliberately does not replicate. Behavior-level coverage

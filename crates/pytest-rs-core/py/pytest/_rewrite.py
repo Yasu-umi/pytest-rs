@@ -44,12 +44,9 @@ _PYTHON_FILES_GLOBS: set = set()
 
 
 def register_assert_rewrite(*names):
-    for name in names:
-        # Warn only if this is the first time we see this name AND the module
-        # is already imported (so we can't rewrite it). Mirrors upstream's
-        # AssertionRewritingHook._warn_already_imported check.
-        if name not in _REGISTERED_MODULES and name in sys.modules:
-            _warn_already_imported(name)
+    # pytest-rs has its own rewriter (_RewriteLoader) that hooks into the
+    # import machinery via sys.meta_path; no need to warn about already-imported
+    # modules since rewriting is handled transparently at import time.
     _REGISTERED_MODULES.update(names)
 
 

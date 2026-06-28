@@ -250,6 +250,9 @@ class _RelayHookCall:
                 outcome=event.get("outcome", ""),
                 longrepr=longrepr,
             )
+            wasxfail = event.get("wasxfail")
+            if wasxfail is not None:
+                report.wasxfail = wasxfail
             return cls(hook, {"report": report})
         if hook == "pytest_itemcollected":
             item = _RelayItem(
@@ -626,6 +629,7 @@ class InlineRunResult:
                 "::" in nodeid
                 or nodeid.endswith((".txt", ".rst", ".md"))
                 or (nodeid.endswith(".py") and "." in nodeid.split("/")[-1][:-3])
+                or nodeid in relay_reports
             )
             if bucket is not None and is_test_node and nodeid not in seen:
                 seen.add(nodeid)
