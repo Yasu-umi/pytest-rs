@@ -507,12 +507,18 @@ impl Engine {
                         // silent
                     } else if self.config.verbose > 0 {
                         if report.phase == Phase::Call || report.outcome != Outcome::Passed {
-                            let word = match report.outcome {
-                                Outcome::Passed => "PASSED",
-                                Outcome::Failed => "FAILED",
-                                Outcome::Skipped => "SKIPPED",
-                                Outcome::XFailed => "XFAIL",
-                                Outcome::XPassed => "XPASS",
+                            // Subtest reports use "{desc} SUBFAIL/SUBPASS" (description
+                            // first, then the short word) to match real xdist output.
+                            let word = if let Some(desc) = &report.subtest_desc {
+                                let short = match report.outcome {
+                                    Outcome::Failed => "SUBFAIL",
+                                    Outcome::Skipped => "SUBSKIP",
+                                    Outcome::XFailed => "SUBXFAIL",
+                                    _ => "SUBPASS",
+                                };
+                                format!("{desc} {short}")
+                            } else {
+                                crate::runner::outcome_word(&report)
                             };
                             // xdist verbose format: the relayed logstart
                             // line, then "[gw0] [ 50%] PASSED test_a.py::test"
