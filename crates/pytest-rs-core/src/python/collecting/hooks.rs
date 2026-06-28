@@ -415,6 +415,11 @@ pub fn collect_custom_files(
                     continue;
                 }
                 let name: String = item_obj.getattr("name")?.extract()?;
+                let func_class: String = item_obj
+                    .getattr("__class__")
+                    .and_then(|c| c.getattr("__name__"))
+                    .and_then(|n| n.extract())
+                    .unwrap_or_else(|_| String::new());
                 let mut marks = Vec::new();
                 if let Ok(own) = item_obj.getattr("own_markers") {
                     for mark in own.try_iter()? {
@@ -441,7 +446,7 @@ pub fn collect_custom_files(
                     fixture_params: Vec::new(),
                     lineno: 0,
                     collector_class: collector_class.clone(),
-                    func_class: String::new(),
+                    func_class,
                     py_node: None,
                     max_param_scope: crate::fixture::Scope::Function,
                     scope_sort_keys: Vec::new(),
