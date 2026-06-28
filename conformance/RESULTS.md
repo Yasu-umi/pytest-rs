@@ -21,7 +21,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pytest | 9.0.3 | 2583 | 205 | 0 | 53 | 2841 | 92.8% | 21 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
-| pytest-cov | v7.1.0 | 154 | 52 | 0 | 3 | 209 | 75.1% | 0 | 1 | 0 |
+| pytest-cov | v7.1.0 | 186 | 20 | 0 | 3 | 209 | 90.4% | 0 | 1 | 0 |
 | pytest-xdist | v3.8.0 | 91 | 6 | 0 | 1 | 98 | 93.9% | 0 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 91 | 31 | 0 | 1 | 123 | 74.8% | 4 | 7 | 6 |
@@ -53,7 +53,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 671 | 100.0% | 2 | 2 | 0 |
 | pytest-django | v4.9.0 | 210 | 5 | 0 | 1 | 216 | 97.7% | 7 | 13 | 0 |
 | werkzeug | 3.1.3 | 922 | 0 | 0 | 1 | 923 | 100.0% | 24 | 25 | 0 |
-| fastapi | 0.115.12 | 2330 | 1 | 0 | 130 | 2461 | 100.0% | 302 | 310 | 0 |
+| fastapi | 0.115.12 | 2332 | 1 | 0 | 130 | 2463 | 100.0% | 303 | 310 | 0 |
 | packaging | 25.0 | 26947 | 0 | 0 | 0 | 26947 | 100.0% | 12 | 12 | 0 |
 | pandas | v3.0.3 | 160773 | 1 | 0 | 26984 | 187758 | 100.0% | 871 | 961 | 3 |
 | networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 6894 | 100.0% | 259 | 266 | 0 |
@@ -180,7 +180,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| tests/test_pytest_cov.py | failed | 154 | 52 | 0 | 3 |
+| tests/test_pytest_cov.py | failed | 186 | 20 | 0 | 3 |
 
 </details>
 
@@ -1198,7 +1198,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | tests/test_tutorial/test_testing_dependencies/test_tutorial001.py | passed | 35 | 0 | 0 | 0 |
 | tests/test_tutorial/test_websockets/test_tutorial001.py | passed | 2 | 0 | 0 | 0 |
 | tests/test_tutorial/test_websockets/test_tutorial002.py | passed | 30 | 0 | 0 | 0 |
-| tests/test_tutorial/test_websockets/test_tutorial003.py | timeout | 0 | 0 | 0 | 0 |
+| tests/test_tutorial/test_websockets/test_tutorial003.py | passed | 2 | 0 | 0 | 0 |
 | tests/test_tutorial/test_websockets/test_tutorial003_py39.py | passed | 2 | 0 | 0 | 0 |
 | tests/test_tutorial/test_wsgi/test_tutorial001.py | passed | 2 | 0 | 0 | 0 |
 | tests/test_typing_python39.py | passed | 1 | 0 | 0 | 0 |
