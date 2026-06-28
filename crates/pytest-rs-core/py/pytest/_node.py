@@ -149,15 +149,12 @@ class _NodeBase:
 
     @classmethod
     def _create(cls, *k, **kw):
-        """Bypass NodeMeta.__call__ guard and construct directly (pytest compat)."""
-        from inspect import signature
+        """Construct cls directly, bypassing any metaclass __call__ override (e.g. NodeMeta).
 
-        try:
-            return cls(*k, **kw)
-        except TypeError:
-            sig = signature(cls.__init__)
-            known_kw = {k_: v for k_, v in kw.items() if k_ in sig.parameters}
-            return cls(*k, **known_kw)
+        Using type.__call__ skips NodeMeta.__call__ (which raises on direct construction)
+        while still invoking cls.__new__ + cls.__init__ through the normal slot machinery.
+        """
+        return type.__call__(cls, *k, **kw)
 
     @classmethod
     def from_parent(cls, parent, **kwargs):
@@ -172,7 +169,7 @@ class _NodeBase:
                 "config is a keyword-only argument of Node.from_parent; pass it via parent.config"
             )
         try:
-            return cls(parent=parent, **kwargs)
+            return cls._create(parent=parent, **kwargs)
         except TypeError:
             # Non-cooperative constructor: __init__ lacks **kwargs and raised on unknown kw.
             own_init = cls.__dict__.get("__init__")
@@ -194,7 +191,7 @@ class _NodeBase:
                             "for more details."
                         )
                     )
-                    return cls(parent=parent, **known_kw)
+                    return cls._create(parent=parent, **known_kw)
             raise
 
     def _compute_nodeid(self):

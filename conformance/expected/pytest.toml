@@ -13,6 +13,7 @@
 "testing/test_stash.py" = "passed"
 "testing/test_nodes.py" = "passed"
 "testing/deprecated_test.py" = "passed"
+"testing/test_compat.py" = "passed"
 
 # Files intentionally not run: they test pytest's internal implementation,
 # which pytest-rs deliberately does not replicate. Behavior-level coverage
