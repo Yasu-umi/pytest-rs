@@ -31,16 +31,28 @@ impl Engine {
             return Ok(errors);
         }
         self.apply_collect_ignores(py, &rootdir, &paths, &conftests, &mut files);
-        self.collect_files(py, &rootdir, &files, &mut errors)?;
-        self.collect_extra_and_custom(py, &rootdir, &paths, &files, &mut errors)?;
-        if let Err(err) =
-            python::validate_dynamic_fixture_scopes(py, &self.config, &self.session.registry)
-        {
-            let message = python::collect_error_message(py, &err)
-                .unwrap_or_else(|| python::format_exception(py, &err));
-            errors.push((rootdir.clone(), message));
-        }
-        self.finalize_items(py, &rootdir, &paths)?;
+        // Warnings issued during test collection are attributed to the "collect" phase.
+        let _ = py
+            .import("pytest._wcapture")
+            .and_then(|m| m.call_method1("set_current_when", ("collect",)));
+        let collect_result = (|| -> Result<(), String> {
+            self.collect_files(py, &rootdir, &files, &mut errors)?;
+            self.collect_extra_and_custom(py, &rootdir, &paths, &files, &mut errors)?;
+            if let Err(err) =
+                python::validate_dynamic_fixture_scopes(py, &self.config, &self.session.registry)
+            {
+                let message = python::collect_error_message(py, &err)
+                    .unwrap_or_else(|| python::format_exception(py, &err));
+                errors.push((rootdir.clone(), message));
+            }
+            self.finalize_items(py, &rootdir, &paths)?;
+            Ok(())
+        })();
+        // Reset to "config" phase after collection (covers sessionfinish/terminal_summary).
+        let _ = py
+            .import("pytest._wcapture")
+            .and_then(|m| m.call_method1("set_current_when", ("config",)));
+        collect_result?;
         Ok(errors)
     }
 }

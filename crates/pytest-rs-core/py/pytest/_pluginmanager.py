@@ -154,6 +154,12 @@ class HookCaller:
             return self._call_monitored(monitors, impls, firstresult, kwargs)
         return self._call_impls(impls, firstresult, kwargs)
 
+    def call_historic(self, func=None, kwargs=None, proc=None) -> None:
+        """Simplified call_historic: fire hook for current registered plugins.
+        (No replay to future plugins — sufficient for pytest_warning_recorded.)"""
+        if kwargs is not None:
+            self(**kwargs)
+
     def _call_monitored(self, monitors, impls, firstresult, kwargs):
         # before/after wrap the call so HookRecorder sees every hook (even
         # ones with no registered impl, e.g. a freshly-specced hook).

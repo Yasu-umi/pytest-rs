@@ -498,11 +498,27 @@ class Pytester:
         command-line args (rootdir discovery, ini reading, option parsing),
         without running a session — upstream's _prepareconfig."""
         from _pytest.config import _native_prepareconfig
+        from pytest._pluginmanager import pluginmanager
 
         new_args = [str(arg) for arg in args]
-        config = _native_prepareconfig(new_args)
+        try:
+            config = _native_prepareconfig(new_args)
+        except SystemExit:
+            # --help/--version prints output and exits; tolerate so callers
+            # can still inspect warnings fired before the early exit.
+            return None
         config._mark_as_parsed()
-        self._fire_addoption(config, new_args)
+        # Register pytester plugins into the shared pluginmanager so they
+        # receive hook calls (e.g. pytest_warning_recorded) fired during
+        # conftest loading inside _fire_addoption.
+        extra_plugins = [p for p in getattr(self, "plugins", []) if not isinstance(p, str)]
+        for plugin in extra_plugins:
+            pluginmanager.register(plugin)
+        try:
+            self._fire_addoption(config, new_args)
+        finally:
+            for plugin in extra_plugins:
+                pluginmanager.unregister(plugin)
         _validate_required_plugins(config)
         pm = config.pluginmanager
         pm.consider_preparse(new_args)
@@ -561,6 +577,10 @@ class Pytester:
 
     @staticmethod
     def _import_parseconfig_conftest(path):
+        conftest_dir = str(pathlib.Path(path).parent)
+        added_to_path = conftest_dir not in sys.path
+        if added_to_path:
+            sys.path.insert(0, conftest_dir)
         try:
             spec = importlib.util.spec_from_file_location("_pytester_parseconfig_conftest", path)
             mod = importlib.util.module_from_spec(spec)
@@ -568,6 +588,9 @@ class Pytester:
             return mod
         except Exception:
             return None
+        finally:
+            if added_to_path and conftest_dir in sys.path:
+                sys.path.remove(conftest_dir)
 
     @staticmethod
     def _import_conftest_module(path):
@@ -716,11 +739,13 @@ class Pytester:
         # and reinstall afterwards so the outer run's capture survives.
         old_wcapture_captured = list(_wcapture.captured)
         old_wcapture_current_test = _wcapture.current_test
+        old_wcapture_current_when = _wcapture.current_when
         old_wcapture_original_sw = _wcapture._original_showwarning
         old_wcapture_session_specs = list(_wcapture.session_specs)
         old_warn_filters = list(warnings.filters)
         _wcapture.captured.clear()
         _wcapture.current_test = None
+        _wcapture.current_when = "config"
         warnings.filters[:] = []
         # Clear __warningregistry__ in all loaded modules so "default" filters
         # don't suppress warnings that were already shown in a previous inner run.
@@ -870,6 +895,7 @@ class Pytester:
             # _wcapture.uninstall() which broke the outer capture.
             _wcapture.captured[:] = old_wcapture_captured
             _wcapture.current_test = old_wcapture_current_test
+            _wcapture.current_when = old_wcapture_current_when
             _wcapture._original_showwarning = old_wcapture_original_sw
             _wcapture.session_specs[:] = old_wcapture_session_specs
             warnings.filters[:] = old_warn_filters

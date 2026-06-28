@@ -44,7 +44,26 @@ _PYTHON_FILES_GLOBS: set = set()
 
 
 def register_assert_rewrite(*names):
+    for name in names:
+        # Warn only if this is the first time we see this name AND the module
+        # is already imported (so we can't rewrite it). Mirrors upstream's
+        # AssertionRewritingHook._warn_already_imported check.
+        if name not in _REGISTERED_MODULES and name in sys.modules:
+            _warn_already_imported(name)
     _REGISTERED_MODULES.update(names)
+
+
+def _warn_already_imported(name: str) -> None:
+    """Warn when a module is registered for rewriting after it was already imported."""
+    from pytest._warning_types import PytestAssertRewriteWarning
+    from pytest._wcapture import _fire_config_time_warning
+
+    warning = PytestAssertRewriteWarning(
+        f"Module already imported so cannot be rewritten; {name}"
+    )
+    # stacklevel=3: _fire_config_time_warning(0) → _warn_already_imported(1)
+    # → register_assert_rewrite(2) → caller in conftest/test(3)
+    _fire_config_time_warning(warning, stacklevel=3)
 
 
 def register_python_files_globs(patterns):

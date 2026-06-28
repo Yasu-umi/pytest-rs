@@ -15,11 +15,87 @@ from pytest._warning_types import PytestConfigWarning, PytestRemovedIn9Warning
 
 captured: list[dict[str, object]] = []
 current_test: str | None = None
+current_when: str = "config"
+_in_hook_dispatch: bool = False
 
 
 def set_current_test(nodeid):
     global current_test
     current_test = nodeid
+
+
+def set_current_when(when: str) -> None:
+    global current_when
+    current_when = when
+
+
+def _make_warning_message(message, category, filename, lineno):
+    """Construct a warnings.WarningMessage from showwarning args."""
+    wm = object.__new__(warnings.WarningMessage)
+    wm.message = message if isinstance(message, Warning) else category(str(message))
+    wm.category = category
+    wm.filename = filename
+    wm.lineno = lineno
+    wm.file = None
+    wm.line = None
+    wm.source = None
+    wm._category_name = category.__name__ if category else None
+    return wm
+
+
+def _fire_warning_recorded(wm, location=None) -> None:
+    """Fire pytest_warning_recorded hook for current plugins."""
+    global _in_hook_dispatch
+    if _in_hook_dispatch:
+        return
+    try:
+        from pytest._pluginmanager import pluginmanager
+    except ImportError:
+        return
+    when = "runtest" if current_test is not None else current_when
+    nodeid = current_test or ""
+    _in_hook_dispatch = True
+    try:
+        pluginmanager.hook.pytest_warning_recorded(
+            warning_message=wm,
+            when=when,
+            nodeid=nodeid,
+            location=location,
+        )
+    except Exception:
+        pass
+    finally:
+        _in_hook_dispatch = False
+
+
+def _fire_config_time_warning(warning: Warning, stacklevel: int) -> None:
+    """Fire pytest_warning_recorded for a config-time warning with computed location.
+
+    stacklevel: number of frames above this function where the warning originated.
+    """
+    try:
+        frame = sys._getframe(stacklevel)
+        location: tuple | None = (
+            frame.f_code.co_filename,
+            frame.f_lineno,
+            frame.f_code.co_name,
+        )
+    except (ValueError, AttributeError):
+        location = None
+
+    filename = location[0] if location else "<unknown>"
+    lineno = location[1] if location else 0
+    captured.append(
+        {
+            "message": str(warning),
+            "category": type(warning),
+            "filename": filename,
+            "lineno": lineno,
+            "test": current_test,
+        }
+    )
+    wm = _make_warning_message(warning, type(warning), filename, lineno)
+    _fire_warning_recorded(wm, location=location)
 
 
 def _showwarning(message, category, filename, lineno, file=None, line=None):
@@ -32,6 +108,11 @@ def _showwarning(message, category, filename, lineno, file=None, line=None):
             "test": current_test,
         }
     )
+    try:
+        wm = _make_warning_message(message, category, filename, lineno)
+        _fire_warning_recorded(wm, location=None)
+    except Exception:
+        pass
 
 
 _original_showwarning = None
