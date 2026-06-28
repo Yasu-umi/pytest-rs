@@ -388,15 +388,13 @@ impl Plugin for BenchmarkPlugin {
         // XDist: auto-disable benchmarks (not on workers; they don't have -n).
         if ctx.config.numprocesses_spec().is_some() && !ctx.config.is_worker() {
             self.config.disabled = true;
-            let msg = "Benchmarks are automatically disabled because xdist plugin is active.\
-                       Benchmarks cannot be performed reliably in a parallelized environment.";
             if self.verbose {
+                let msg = "Benchmarks are automatically disabled because xdist plugin is active.\
+                           Benchmarks cannot be performed reliably in a parallelized environment.";
                 eprintln!("{}", "-".repeat(72));
                 eprintln!(" WARNING: {msg}");
                 eprintln!("{}", "-".repeat(72));
             }
-            let helper = self.helper.as_ref().unwrap();
-            emit_benchmark_warning(py, helper.bind(py), msg)?;
         }
 
         self.config.verbose = self.verbose;

@@ -566,10 +566,10 @@ impl Plugin for AsyncioPlugin {
             Mode::Auto => "auto",
             Mode::Strict => "strict",
         };
-        if let Ok(proxy) = pytest_rs_core::python::make_py_config(ctx.py, ctx.config) {
-            if let Ok(option) = proxy.bind(ctx.py).getattr("option") {
-                let _ = option.setattr("asyncio_mode", mode_str);
-            }
+        if let Ok(proxy) = pytest_rs_core::python::make_py_config(ctx.py, ctx.config)
+            && let Ok(option) = proxy.bind(ctx.py).getattr("option")
+        {
+            let _ = option.setattr("asyncio_mode", mode_str);
         }
         Ok(())
     }
