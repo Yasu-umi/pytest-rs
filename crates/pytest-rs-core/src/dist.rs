@@ -979,6 +979,11 @@ impl WorkerOwner {
             },
         };
 
+        // Tracks whether the worker sent Bye (graceful shutdown). If it dies
+        // during precollect (before receiving any batch), no Bye arrives; we
+        // detect that after the drain loop and report the crash.
+        let mut graceful_shutdown = false;
+
         'work: loop {
             if self.queue.is_stopped() && !self.assigned.is_empty() {
                 // -x/--maxfail fired: drain pre-assigned but unstarted batches
@@ -1048,7 +1053,10 @@ impl WorkerOwner {
                             payload,
                         });
                     }
-                    Some(WorkerMsg::Bye) => break 'work,
+                    Some(WorkerMsg::Bye) => {
+                        graceful_shutdown = true;
+                        break 'work;
+                    }
                     None => {
                         let _ = self.sender.send(Event::Output(line));
                     }
@@ -1058,7 +1066,7 @@ impl WorkerOwner {
 
         // Drain post-shutdown frames: final scope-teardown failure reports,
         // warnings, plugin dumps, bye.
-        for line in proc.lines {
+        while let Some(line) = proc.lines.next() {
             let Ok(line) = line else { break };
             if line.trim().is_empty() {
                 // encode_frame's leading newline (and stray blank output).
@@ -1083,13 +1091,21 @@ impl WorkerOwner {
                         payload,
                     });
                 }
-                Some(WorkerMsg::Bye) => {}
+                Some(WorkerMsg::Bye) => {
+                    graceful_shutdown = true;
+                }
                 Some(_) => {}
                 None => {
                     let _ = self.sender.send(Event::Output(line));
                 }
             }
         }
-        proc.handle.wait();
+        if graceful_shutdown {
+            proc.handle.wait();
+        } else {
+            // Worker died during precollect (before receiving any batch or
+            // sending Bye): os._exit / segfault before the work loop started.
+            self.handle_crash(&mut proc, vec![]);
+        }
     }
 }
