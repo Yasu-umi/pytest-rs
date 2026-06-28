@@ -134,6 +134,11 @@ impl Engine {
                     errors.push((rootdir.to_path_buf(), python::format_exception(py, &err)));
                 }
             }
+            // Merge custom-file items in file-path order so they appear at
+            // their alphabetical position, not always after all .py items.
+            self.session
+                .items
+                .sort_by(|a, b| a.path.cmp(&b.path).then(a.lineno.cmp(&b.lineno)));
         }
 
         // Collection over: close its catching_logs phase.
