@@ -38,6 +38,17 @@ pub enum WorkerMsg {
     Workeroutput { payload: String },
     /// Clean shutdown.
     Bye,
+    /// Sent after precollect_all: the worker's full collected item set.
+    /// The controller uses this to build work batches (worker-side collection).
+    /// `errors` carries formatted collection error strings for files that
+    /// failed to import so the controller can show them in the ERRORS section.
+    /// `xdist_groups`: parallel to nodeids, the resolved xdist_group mark for
+    /// each item (None = ungrouped).
+    Collection {
+        nodeids: Vec<String>,
+        xdist_groups: Vec<Option<String>>,
+        errors: Vec<(String, String)>,
+    },
 }
 
 /// Encode a worker frame ("\n" first breaks any unterminated test output

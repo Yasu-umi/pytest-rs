@@ -35,8 +35,25 @@ impl Engine {
         let _ = py
             .import("pytest._wcapture")
             .and_then(|m| m.call_method1("set_current_when", ("collect",)));
+        // In xdist spawn mode, workers import test modules themselves.
+        // Skip collect_module in the controller so os._exit at module level
+        // cannot kill the controller process.
+        #[cfg(feature = "xdist")]
+        let skip_module_import = {
+            // "-n0" means 0 workers (sequential) — do not skip imports.
+            let using_xdist = self.config.numprocesses_spec().is_some_and(|s| s != "0")
+                || self.config.get_flag("dist-load")
+                || self.config.get_value("tx").is_some();
+            using_xdist
+                && !self.config.collect_only
+                && !self.config.get_flag("fixtures")
+                && !self.config.get_flag("fixtures-per-test")
+        };
+        #[cfg(not(feature = "xdist"))]
+        let skip_module_import = false;
+
         let collect_result = (|| -> Result<(), String> {
-            self.collect_files(py, &rootdir, &files, &mut errors)?;
+            self.collect_files(py, &rootdir, &files, &mut errors, skip_module_import)?;
             self.collect_extra_and_custom(py, &rootdir, &paths, &files, &mut errors)?;
             if let Err(err) =
                 python::validate_dynamic_fixture_scopes(py, &self.config, &self.session.registry)

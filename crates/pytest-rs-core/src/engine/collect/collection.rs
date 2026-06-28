@@ -248,6 +248,7 @@ impl Engine {
         rootdir: &Path,
         files: &[PathBuf],
         errors: &mut Vec<(PathBuf, String)>,
+        skip_module_import: bool,
     ) -> Result<(), String> {
         // pytest's catching_logs around pytest_collection: a root handler
         // during import keeps module-level logging calls from triggering
@@ -333,6 +334,12 @@ impl Engine {
                     // No collector can handle this file type (e.g. .pyc).
                     not_found_files.push(file.clone());
                 }
+                continue;
+            }
+            // In xdist spawn mode, workers collect modules themselves.
+            // The controller only discovers file paths; importing here would
+            // cause os._exit at module level to kill the controller.
+            if skip_module_import {
                 continue;
             }
             // Import-time output attaches to a failing collect report as

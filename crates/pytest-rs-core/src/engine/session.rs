@@ -174,7 +174,22 @@ impl Engine {
                     && r.outcome == crate::report::Outcome::Skipped
             })
             .count();
-        self.print_collection_count(py, collected, n_collect_errors, n_collect_skips, n_items);
+        // In xdist mode, workers collect modules themselves (controller skips
+        // collect_module). The actual count comes from the merge loop, so
+        // suppress the "collected N items" line here to avoid "collected 0 items".
+        // Exception: --collect-only bypasses the merge loop and collects locally,
+        // so the count is available now and must be printed here.
+        #[cfg(feature = "xdist")]
+        let in_dist_mode = (self.config.numprocesses_spec().is_some()
+            || self.config.get_flag("dist-load")
+            || self.config.get_value("tx").is_some())
+            && !self.config.collect_only;
+        #[cfg(not(feature = "xdist"))]
+        let in_dist_mode = false;
+
+        if !in_dist_mode {
+            self.print_collection_count(py, collected, n_collect_errors, n_collect_skips, n_items);
+        }
 
         // --fixtures / --fixtures-per-test: like --collect-only, collect then
         // print (fixtures rather than the item tree) and exit without running.
@@ -196,17 +211,27 @@ impl Engine {
         if self.config.collect_only {
             return self.run_collect_only(py, started, n_collect_errors, n_items);
         }
-        if n_items == 0 {
-            return self.handle_no_tests(py, started);
-        }
 
         #[cfg(feature = "xdist")]
         match self.resolve_numprocesses(py) {
-            Some(workers) => self.run_dist(py, workers),
-            None => self.run_items(py),
+            Some(workers) => {
+                // In dist mode workers collect themselves — n_items may be 0 here.
+                self.run_dist(py, workers);
+            }
+            None => {
+                if n_items == 0 {
+                    return self.handle_no_tests(py, started);
+                }
+                self.run_items(py);
+            }
         }
         #[cfg(not(feature = "xdist"))]
-        self.run_items(py);
+        {
+            if n_items == 0 {
+                return self.handle_no_tests(py, started);
+            }
+            self.run_items(py);
+        }
 
         self.finish_session(py, started)
     }

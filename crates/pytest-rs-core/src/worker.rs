@@ -16,6 +16,33 @@ use crate::ipc::{ParentMsg, WorkerMsg, encode_frame};
 use crate::python;
 use crate::report::{Outcome, Phase, TestReport, exit_code};
 
+/// Extract the xdist_group mark value for an item (mirrors Engine::xdist_group_of in dist.rs).
+fn xdist_group_of(py: Python<'_>, item: &TestItem) -> Option<String> {
+    let mut names: Vec<String> = item
+        .marks
+        .iter()
+        .filter(|mark| mark.name == "xdist_group")
+        .filter_map(|mark| {
+            let obj = mark.obj.bind(py);
+            obj.getattr("kwargs")
+                .ok()
+                .and_then(|kwargs| kwargs.get_item("name").ok())
+                .and_then(|value| value.extract().ok())
+                .or_else(|| {
+                    obj.getattr("args")
+                        .ok()
+                        .and_then(|args| args.get_item(0).ok())
+                        .and_then(|value| value.extract().ok())
+                })
+        })
+        .collect();
+    if names.is_empty() {
+        return None;
+    }
+    names.sort();
+    Some(names.join("_"))
+}
+
 fn send(msg: &WorkerMsg) {
     let mut stdout = std::io::stdout().lock();
     let _ = stdout.write_all(encode_frame(msg).as_bytes());
@@ -151,7 +178,15 @@ impl Engine {
         // before any test runs: lazy per-batch imports would let earlier
         // tests' side effects (warning filters, random seeds, monkey
         // patches) leak into later modules' import time.
-        self.precollect_all(py, &mut collection);
+        let collect_errors = self.precollect_all(py, &mut collection);
+        // Report the collected item set (and any errors) to the controller
+        // so it can build work batches without importing test files itself.
+        let (nodeids, xdist_groups): (Vec<_>, Vec<_>) = collection
+            .items
+            .iter()
+            .map(|item| (item.nodeid.clone(), xdist_group_of(py, item)))
+            .unzip();
+        send(&WorkerMsg::Collection { nodeids, xdist_groups, errors: collect_errors });
         self.worker_loop(py, collection)
     }
 
@@ -472,9 +507,13 @@ impl Engine {
     }
 
     /// Import every test module the session can reach, mirroring the
-    /// controller's discovery. Files that fail to import are skipped here;
-    /// the error reports properly when a batch references them.
-    fn precollect_all(&mut self, py: Python<'_>, collection: &mut WorkerCollection) {
+    /// controller's discovery. Returns collection errors as (nodeid, message) pairs.
+    fn precollect_all(
+        &mut self,
+        py: Python<'_>,
+        collection: &mut WorkerCollection,
+    ) -> Vec<(String, String)> {
+        let mut errors = Vec::new();
         // Mirror the controller's start paths (CLI args, else testpaths ini).
         let mut paths = self.config.paths.clone();
         if paths.is_empty()
@@ -499,12 +538,15 @@ impl Engine {
             self.config.get_flag("keep-duplicates"),
             &crate::collect::CollectIgnores::from_config(&self.config),
         ) else {
-            return;
+            return errors;
         };
         for file in files {
             let rel = crate::collect::file_nodeid(&self.config.rootdir, &file);
-            let _ = self.ensure_collected(py, collection, &rel);
+            if let Err(msg) = self.ensure_collected(py, collection, &rel) {
+                errors.push((rel, msg));
+            }
         }
+        errors
     }
 
     /// Import (once) everything needed to resolve a node ID: the conftest
@@ -559,7 +601,7 @@ impl Engine {
             &mut self.session.py_hooks,
             &python::NameFilters::from_config(py, &self.config),
         )
-        .map_err(|err| python::format_exception(py, &err))?;
+        .map_err(|err| python::format_test_failure(py, &err, "short"))?;
         {
             let mut ctx = HookContext {
                 py,
