@@ -8,10 +8,7 @@ per-iteration overhead matches pytest-benchmark's generated runner.
 import cProfile
 import gc
 import importlib
-import io
-import pstats
 import time
-import warnings
 from time import perf_counter
 
 import pytest
@@ -111,19 +108,22 @@ def _stderr_writeorg(msg):
     therefore `result.stderr` in pytester).
     """
     import os
+
     fd = None
     try:
         from pytest._capture import state as _cap_state
+
         cap = _cap_state._capture
-        if cap is not None and cap.err is not None and hasattr(cap.err, 'targetfd_save'):
+        if cap is not None and cap.err is not None and hasattr(cap.err, "targetfd_save"):
             fd = cap.err.targetfd_save
     except Exception:
         pass
-    data = (msg + '\n').encode('utf-8')
+    data = (msg + "\n").encode("utf-8")
     if fd is not None:
         os.write(fd, data)
     else:
         import sys
+
         sys.stderr.buffer.write(data)
         sys.stderr.flush()
 

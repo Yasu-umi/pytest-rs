@@ -398,6 +398,7 @@ class LocalPath:
 
     def listdir(self, fil=None, sort=True):
         import fnmatch
+
         entries = sorted(self._path.iterdir())
         if fil is None:
             pass
