@@ -642,6 +642,32 @@ class _RewriteLoader(importlib.machinery.SourceFileLoader):
         except Exception:
             docstring = None
         if not (docstring and "PYTEST_DONT_REWRITE" in docstring):
+            # Inject `@py_builtins = __import__("builtins")` at module level so
+            # globals()["@py_builtins"] is present, matching upstream pytest.
+            # Must be inserted after any from-__future__ imports (and docstring).
+            insert_pos = 0
+            for i, stmt in enumerate(tree.body):
+                if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant):
+                    insert_pos = i + 1  # skip docstring
+                elif (
+                    isinstance(stmt, ast.ImportFrom)
+                    and stmt.module == "__future__"
+                ):
+                    insert_pos = i + 1  # skip future imports
+                else:
+                    break
+            builtins_assign = ast.Assign(
+                targets=[ast.Name(id="@py_builtins", ctx=ast.Store())],
+                value=ast.Call(
+                    func=ast.Name(id="__import__", ctx=ast.Load()),
+                    args=[ast.Constant("builtins")],
+                    keywords=[],
+                ),
+                lineno=1,
+                col_offset=0,
+            )
+            ast.fix_missing_locations(builtins_assign)
+            tree.body.insert(insert_pos, builtins_assign)
             _AssertRewriter(path).visit(tree)
         return compile(tree, path, "exec", dont_inherit=True, optimize=_optimize)
 
