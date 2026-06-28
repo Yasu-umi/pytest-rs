@@ -54,7 +54,7 @@ Installed `pytest11` entry points load through the `pytest` API shim — plugins
 
 | evidence | plugins |
 |---|---|
-| own upstream test suite runs under pytest-rs and gates CI (per-suite pass-rate in the **Third-party plugins** [conformance table](#conformance-testing) below) | `pytest-timeout`, `pytest-randomly`, `pytest-env`, `pytest-socket`, `pytest-snapshot`, `pytest-ruff`, `pytest-rerunfailures`, `pytest-order`, `pytest-repeat`, `pytest-instafail`, `pytest-icdiff`, `pytest-metadata`, `pytest-subtests`, `pytest-mypy`, `pytest-bdd`, `pytest-django`; `anyio`'s own plugin module also loads this way |
+| own upstream test suite runs under pytest-rs and gates CI (per-suite pass-rate in the **Third-party plugins** [conformance table](#conformance-testing) below) | `pytest-timeout`, `pytest-randomly`, `pytest-env`, `pytest-socket`, `pytest-snapshot`, `pytest-ruff`, `pytest-rerunfailures`, `pytest-order`, `pytest-repeat`, `pytest-instafail`, `pytest-icdiff`, `pytest-metadata`, `pytest-subtests`, `pytest-mypy`, `pytest-bdd`, `pytest-django`, `pytest-aiohttp`; `anyio`'s own plugin module also loads this way |
 | functional smoke demo gates CI (`conformance/plugin_smoke.py`) | `Faker`, `time-machine`, `requests-mock`, `inline-snapshot` (snapshot assertions + `--inline-snapshot` flag), `pytest-run-parallel` (`--parallel-threads` really runs each test on N threads) |
 | reporter replacement — terminal output byte-diffed against real pytest 9.0.3 | `pytest-pretty`, `pytest-sugar` (progress bar, instant failures; activates on a tty or `--force-sugar`) |
 | not reimplemented yet | `pytest-html` (needs the report data model exposed); `syrupy` (serializer/extension framework) |
