@@ -1,0 +1,29 @@
+{
+  "suite": "pytest-aiohttp",
+  "tag": "v1.1.1",
+  "category": "third-party",
+  "excluded_files": 0,
+  "deselected": 1,
+  "files": [
+    {
+      "file": "tests/test_fixtures.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "deselected": 0
+    },
+    {
+      "file": "tests/test_switch_mode.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "deselected": 1
+    }
+  ]
+}

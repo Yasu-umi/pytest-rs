@@ -20,6 +20,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | pytest | 9.0.3 | 2583 | 205 | 0 | 53 | 8 | 2849 | 92.5% | 21 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
+| pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 1 | 7 | 85.7% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 2 | 90 | 97.8% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 20 | 0 | 3 | 0 | 209 | 90.4% | 0 | 1 | 0 |
 | pytest-xdist | v3.8.0 | 91 | 6 | 0 | 1 | 0 | 98 | 93.9% | 0 | 1 | 6 |
@@ -161,6 +162,17 @@ are out of scope for pytest-rs; they are not counted in the total.
 | tests/test_skips.py | passed | 7 | 0 | 0 | 0 | 0 |
 | tests/test_subprocess.py | passed | 1 | 0 | 0 | 0 | 0 |
 | tests/test_task_cleanup.py | passed | 1 | 0 | 0 | 0 | 0 |
+
+</details>
+
+### pytest-aiohttp @ v1.1.1
+
+<details><summary>per-file detail (2 files)</summary>
+
+| file | status | passed | failed | errors | skipped | deselected |
+|---|---|---:|---:|---:|---:|---:|
+| tests/test_fixtures.py | passed | 4 | 0 | 0 | 0 | 0 |
+| tests/test_switch_mode.py | passed | 2 | 0 | 0 | 0 | 1 |
 
 </details>
 
