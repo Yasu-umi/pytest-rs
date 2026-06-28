@@ -14,6 +14,7 @@ class NodeMeta(abc.ABCMeta):
 
     def __call__(cls, *k, **kw):
         from _pytest.outcomes import fail
+
         msg = (
             f"Direct construction of {cls.__module__}.{cls.__qualname__} has been deprecated, "
             f"please use {cls.__module__}.{cls.__qualname__}.from_parent.\n"

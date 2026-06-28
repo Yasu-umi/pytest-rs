@@ -4,6 +4,7 @@ This module is kept separate from pytester.py so that assertion rewriting
 can apply to its assert statements (pytester.py itself is imported too early
 to be rewritten).
 """
+
 # NOTE: keep this import at top so rewriter sees it before other imports
 from __future__ import annotations
 

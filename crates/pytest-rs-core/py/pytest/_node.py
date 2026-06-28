@@ -134,6 +134,7 @@ class _NodeBase:
             import warnings
 
             from _pytest.deprecated import NODE_CTOR_FSPATH_ARG
+
             warnings.warn(
                 NODE_CTOR_FSPATH_ARG.format(node_type_name=type(self).__name__),
                 stacklevel=3,
@@ -180,6 +181,7 @@ class _NodeBase:
                 from inspect import Parameter, signature
 
                 from _pytest.warning_types import PytestDeprecationWarning
+
                 sig = signature(own_init)
                 has_var_kw = any(p.kind == Parameter.VAR_KEYWORD for p in sig.parameters.values())
                 if not has_var_kw:
@@ -585,13 +587,12 @@ class Item(_NodeBase):
         if getattr(cls, attr_name, False):
             return
         setattr(cls, attr_name, True)
-        problems = ", ".join(
-            base.__name__ for base in cls.__bases__ if issubclass(base, Collector)
-        )
+        problems = ", ".join(base.__name__ for base in cls.__bases__ if issubclass(base, Collector))
         if problems:
             import warnings
 
             from _pytest.warning_types import PytestWarning
+
             warnings.warn(
                 f"{cls.__name__} is an Item subclass and should not be a collector, "
                 f"however its bases {problems} are collectors.\n"

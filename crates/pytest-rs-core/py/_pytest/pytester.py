@@ -7,6 +7,7 @@ from pytest import LineMatcher, Pytester, RunResult  # noqa: F401
 # pytester.py is always loaded before any test calls assertoutcome().
 try:
     from pytest import _rewrite as _rewrite_mod
+
     _rewrite_mod.register_assert_rewrite("_pytest.pytester_assertions")
 except Exception:
     pass
@@ -168,6 +169,7 @@ class HookRecorder:
     def assertoutcome(self, passed=0, skipped=0, failed=0):
         __tracebackhide__ = True
         from _pytest.pytester_assertions import assertoutcome
+
         outcomes = self.listoutcomes()
         assertoutcome(outcomes, passed=passed, skipped=skipped, failed=failed)
 

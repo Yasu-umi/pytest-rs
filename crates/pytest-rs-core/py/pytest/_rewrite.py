@@ -58,9 +58,7 @@ def _warn_already_imported(name: str) -> None:
     from pytest._warning_types import PytestAssertRewriteWarning
     from pytest._wcapture import _fire_config_time_warning
 
-    warning = PytestAssertRewriteWarning(
-        f"Module already imported so cannot be rewritten; {name}"
-    )
+    warning = PytestAssertRewriteWarning(f"Module already imported so cannot be rewritten; {name}")
     # stacklevel=3: _fire_config_time_warning(0) → _warn_already_imported(1)
     # → register_assert_rewrite(2) → caller in conftest/test(3)
     _fire_config_time_warning(warning, stacklevel=3)
@@ -649,10 +647,7 @@ class _RewriteLoader(importlib.machinery.SourceFileLoader):
             for i, stmt in enumerate(tree.body):
                 if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant):
                     insert_pos = i + 1  # skip docstring
-                elif (
-                    isinstance(stmt, ast.ImportFrom)
-                    and stmt.module == "__future__"
-                ):
+                elif isinstance(stmt, ast.ImportFrom) and stmt.module == "__future__":
                     insert_pos = i + 1  # skip future imports
                 else:
                     break
