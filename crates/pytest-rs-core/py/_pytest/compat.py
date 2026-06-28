@@ -112,6 +112,13 @@ def getfuncargnames(function, *, name: str = "", cls: type | None = None):
     if not any(p.kind is Parameter.POSITIONAL_ONLY for p in parameters) and (
         cls and not isinstance(inspect.getattr_static(cls, name, default=None), staticmethod)
     ):
+        if not arg_names:
+            from _pytest.outcomes import fail
+
+            fail(
+                f"Could not determine arguments of {function!r}: invalid method signature",
+                pytrace=False,
+            )
         arg_names = arg_names[1:]
     if hasattr(function, "__wrapped__"):
         arg_names = arg_names[num_mock_patch_args(function) :]

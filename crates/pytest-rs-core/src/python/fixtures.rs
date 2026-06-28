@@ -417,11 +417,31 @@ pub(crate) fn register_fixture_def(
         exc.setattr("pytrace", false)?;
         return Err(PyErr::from_value(exc));
     }
+    // When the inner function is a staticmethod descriptor (e.g. @pytest.fixture
+    // @staticmethod), unwrap it: staticmethod.__get__(None) returns the raw function.
+    let is_inner_static = py
+        .import("builtins")?
+        .getattr("staticmethod")
+        .and_then(|sm| unwrapped.is_instance(&sm))
+        .unwrap_or(false);
+    let unwrapped = if is_inner_static {
+        unwrapped
+            .call_method1("__get__", (py.None(), py.None()))
+            .unwrap_or(unwrapped)
+    } else {
+        unwrapped
+    };
     let flags = async_flags(py, &unwrapped)?;
     let mut param_names = param_names(py, &unwrapped)?;
     // Binding to the test instance consumes the first parameter whatever
     // its name (upstream fixtures occasionally spell it `cls`).
-    if needs_instance && !param_names.is_empty() {
+    if needs_instance && !is_inner_static {
+        if param_names.is_empty() {
+            // Invalid method signature: no self parameter.
+            // collect_class validates this via getfuncargnames before calling us;
+            // this branch is only reachable for other callers (e.g. collect_testcase).
+            return Ok(());
+        }
         param_names.remove(0);
     }
     let params_obj = marker.getattr("params")?;
@@ -444,7 +464,7 @@ pub(crate) fn register_fixture_def(
         is_async_gen: flags.is_async_gen,
         param_names,
         baseid: baseid.to_string(),
-        needs_instance,
+        needs_instance: needs_instance && !is_inner_static,
         params,
         ids,
         scope_error,

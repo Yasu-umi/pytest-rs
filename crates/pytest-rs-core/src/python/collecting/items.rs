@@ -498,6 +498,26 @@ pub(crate) fn collect_class(
         per_class.into_iter().rev().flatten().collect();
     for (name, value, is_static) in &entries {
         if value.hasattr("_pytestfixturefunction")? {
+            // Non-static class fixtures need `self`. Validate via getfuncargnames
+            // so that a missing self param raises Failed with the right message
+            // and becomes a collection error (mirrors pytest's parsefactories).
+            // Skip when the inner _fixture_function is itself a staticmethod
+            // descriptor (e.g. @pytest.fixture @staticmethod) — those don't
+            // receive self and are already handled by register_fixture_def.
+            if !*is_static {
+                let unwrapped = value
+                    .getattr("_fixture_function")
+                    .unwrap_or_else(|_| value.clone());
+                let inner_is_static = unwrapped.is_instance(&staticmethod_type)?;
+                if !inner_is_static {
+                    let kwargs = pyo3::types::PyDict::new(py);
+                    kwargs.set_item("cls", cls)?;
+                    kwargs.set_item("name", name.as_str())?;
+                    py.import("_pytest.compat")?
+                        .getattr("getfuncargnames")?
+                        .call((unwrapped,), Some(&kwargs))?;
+                }
+            }
             register_fixture_def(
                 py,
                 name,

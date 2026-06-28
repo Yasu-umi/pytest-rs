@@ -1233,7 +1233,10 @@ class Pytester:
                     # A class-defined fixture's first parameter binds to the
                     # class/instance (cls/self) — drop it like pytest does.
                     anames = list(getfuncargnames(real, name=nm, cls=owning_cls))
-                except Exception:
+                except Exception as _e:
+                    emsg = str(_e)
+                    if emsg:
+                        print(emsg)
                     anames = []
                     real = ob
                 # The 4-tuple carries the callable and owning class so an
@@ -1294,6 +1297,15 @@ class Pytester:
             return []
 
         _mod_fdefs, _mod_autouse = _gather_fixturedefs(vars(module).items())
+
+        # Eagerly scan classes for fixture signature issues (mirrors
+        # pytest's parsefactories, which fires for every Class node).
+        for _nm, _ob in vars(module).items():
+            if isinstance(_ob, type) and not _nm.startswith("_"):
+                _gather_fixturedefs(
+                    [(_a, getattr(_ob, _a, None)) for _a in dir(_ob)],
+                    owning_cls=_ob,
+                )
 
         # Walk conftest.py files from the rootdir down to the source file's
         # directory (root-first), gathering their fixturedefs. Same-scope
