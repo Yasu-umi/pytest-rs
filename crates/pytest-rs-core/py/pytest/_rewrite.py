@@ -637,9 +637,10 @@ class _RewriteLoader(importlib.machinery.SourceFileLoader):
         except Exception:
             docstring = None
         if not (docstring and "PYTEST_DONT_REWRITE" in docstring):
-            # Inject `@py_builtins = __import__("builtins")` at module level so
-            # globals()["@py_builtins"] is present, matching upstream pytest.
-            # Must be inserted after any from-__future__ imports (and docstring).
+            # Inject `@py_builtins = __import__("builtins")` after docstrings
+            # and __future__ imports.  Lineno matches the first real statement
+            # (same as upstream pytest) so coverage.py doesn't count it as an
+            # extra statement.
             insert_pos = 0
             for i, stmt in enumerate(tree.body):
                 if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant):
@@ -655,9 +656,16 @@ class _RewriteLoader(importlib.machinery.SourceFileLoader):
                     args=[ast.Constant("builtins")],
                     keywords=[],
                 ),
-                lineno=1,
-                col_offset=0,
             )
+            if insert_pos < len(tree.body):
+                # Mirror upstream pytest: lineno = first real statement's lineno
+                # so coverage.py doesn't count this as an extra statement.
+                ast.copy_location(builtins_assign, tree.body[insert_pos])
+            else:
+                builtins_assign.lineno = 1
+                builtins_assign.end_lineno = 1
+                builtins_assign.col_offset = 0
+                builtins_assign.end_col_offset = 0
             ast.fix_missing_locations(builtins_assign)
             tree.body.insert(insert_pos, builtins_assign)
             _AssertRewriter(path).visit(tree)
