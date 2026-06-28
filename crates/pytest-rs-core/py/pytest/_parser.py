@@ -28,9 +28,26 @@ flag_dests: dict[str, str] = {}
 flag_actions: dict[str, str | None] = {}
 
 
+class Option:
+    """Minimal Option wrapper for plugin compatibility.
+    Exposes names() and attrs() so plugins like typeguard can introspect
+    the last registered option (e.g. group.options[-1].names()[0])."""
+
+    def __init__(self, opts: tuple[str, ...], attrs: dict[str, Any]) -> None:
+        self._opts = opts
+        self._attrs = attrs
+
+    def names(self) -> tuple[str, ...]:
+        return self._opts
+
+    def attrs(self) -> dict[str, Any]:
+        return self._attrs
+
+
 class OptionGroup:
     def __init__(self, parser: Parser) -> None:
         self.parser = parser
+        self.options: list[Option] = []
 
     def addoption(self, *opts: str, **attrs: Any) -> None:
         dest = attrs.get("dest")
@@ -56,6 +73,7 @@ class OptionGroup:
             if opt.startswith("-"):
                 flag_dests[opt] = dest
                 flag_actions[opt] = action
+        self.options.append(Option(opts, attrs))
 
     _addoption = addoption
 

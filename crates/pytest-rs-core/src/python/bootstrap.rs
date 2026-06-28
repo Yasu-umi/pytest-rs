@@ -12,6 +12,14 @@ use std::path::{Path, PathBuf};
 /// also processes .pth files (editable installs), unlike PYTHONPATH — and
 /// move the added entries to the front so the venv shadows the base env.
 pub fn activate_virtualenv(py: Python<'_>) -> PyResult<()> {
+    // Pass the binary's own path into Python so it can detect the enclosing
+    // venv on Linux where native binaries don't get the shebang activation.
+    let exe_path = std::env::current_exe()
+        .ok()
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let locals = pyo3::types::PyDict::new(py);
+    locals.set_item("_exe_path", &exe_path)?;
     py.run(
         c"
 import glob as _glob
@@ -20,6 +28,14 @@ import site as _site
 import sys as _sys
 
 _venv = _os.environ.get('VIRTUAL_ENV')
+if not _venv and _exe_path:
+    # On Linux, a native binary at <venv>/bin/<name> is not subject to the
+    # shebang venv-activation that Python scripts get.  Detect the venv from
+    # pyvenv.cfg so `pip install pytest-rs` works without setting VIRTUAL_ENV.
+    _venv_candidate = _os.path.dirname(_os.path.dirname(_os.path.abspath(_exe_path)))
+    if _os.path.isfile(_os.path.join(_venv_candidate, 'pyvenv.cfg')):
+        _venv = _venv_candidate
+        _os.environ['VIRTUAL_ENV'] = _venv  # persist for child processes
 if _venv:
     _venv = _os.path.abspath(_venv)
     _candidates = _glob.glob(_os.path.join(_venv, 'lib', 'python*', 'site-packages'))
@@ -41,7 +57,7 @@ if _venv:
             break
 ",
         None,
-        None,
+        Some(&locals),
     )
 }
 
