@@ -96,7 +96,7 @@ class BaseReport:
         _set_report_attrs(self, kwargs)
 
     def _join_sections(self, prefix):
-        return "\n".join(
+        return "".join(
             content for (header, content) in self.sections if header.startswith(prefix)
         )
 

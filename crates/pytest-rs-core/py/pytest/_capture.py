@@ -831,6 +831,14 @@ def failure_sections():
     return state.failure_sections()
 
 
+def passing_phase_sections():
+    """Return capture sections for a passing phase report (peeks without draining).
+
+    Used to populate sections on a passing setup report so that capstdout/capstderr
+    reflect setup output, matching upstream pytest's behavior."""
+    return state.failure_sections()
+
+
 def begin_scope_teardown():
     """Arm capture for a module/class/session scope teardown running
     between items (the runner defers them past finish_item); its output

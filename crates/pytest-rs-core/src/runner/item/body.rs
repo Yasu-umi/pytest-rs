@@ -294,6 +294,10 @@ pub(crate) fn run_item_body(
         ));
         return xfail;
     }
+    // Peek at setup-phase captured output for capstdout/capstderr on passing
+    // setup reports (upstream pytest includes them; buffer is not drained yet
+    // — _snap_section() will drain it when call phase starts).
+    let setup_sections = python::log_failure_sections(py);
     reports.push(TestReport {
         nodeid: item.nodeid.clone(),
         phase: Phase::Setup,
@@ -302,7 +306,7 @@ pub(crate) fn run_item_body(
         longrepr: None,
         location: None,
         subtest_desc: None,
-        sections: Vec::new(),
+        sections: setup_sections,
         rerun: false,
         xfail_longrepr: None,
         reprcrash_message: None,

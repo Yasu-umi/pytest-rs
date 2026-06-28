@@ -131,6 +131,12 @@ class _NodeBase:
         self.config = config if config is not None else getattr(parent, "config", None)
         self.session = session if session is not None else getattr(parent, "session", None)
         if path is None and fspath is not None:
+            import warnings
+            from _pytest.deprecated import NODE_CTOR_FSPATH_ARG
+            warnings.warn(
+                NODE_CTOR_FSPATH_ARG.format(node_type_name=type(self).__name__),
+                stacklevel=3,
+            )
             path = pathlib.Path(str(fspath))
         if path is None and parent is not None:
             path = getattr(parent, "path", None)

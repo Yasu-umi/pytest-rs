@@ -528,6 +528,20 @@ class PluginManager:
         calls it at registration time)."""
         if plugin is None or plugin in self._plugins:
             return None
+        if name is not None:
+            from _pytest.deprecated import DEPRECATED_EXTERNAL_PLUGINS
+            from pytest._warning_types import PytestConfigWarning
+            if name in DEPRECATED_EXTERNAL_PLUGINS:
+                import warnings
+                warnings.warn(
+                    PytestConfigWarning(
+                        "{} plugin has been merged into the core, "
+                        "please remove it from your requirements.".format(
+                            name.replace("_", "-")
+                        )
+                    )
+                )
+                return None
         for attr in dir(plugin):
             if not attr.startswith("pytest_"):
                 continue
