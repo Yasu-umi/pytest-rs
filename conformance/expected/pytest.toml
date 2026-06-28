@@ -10,6 +10,9 @@
 "testing/test_stepwise.py" = "passed"
 "testing/test_tmpdir.py" = "passed"
 "testing/test_warning_types.py" = "passed"
+"testing/test_stash.py" = "passed"
+"testing/test_nodes.py" = "passed"
+"testing/deprecated_test.py" = "passed"
 
 # Files intentionally not run: they test pytest's internal implementation,
 # which pytest-rs deliberately does not replicate. Behavior-level coverage
@@ -35,4 +38,3 @@
 "testing/test_pathlib.py" = "path/import utility internals"
 "testing/test_pluginmanager.py" = "pluggy plugin manager internals (pytest-rs does not use pluggy)"
 "testing/test_reports.py" = "report object serialization internals"
-"testing/test_stash.py" = "Stash unit tests of internal type"

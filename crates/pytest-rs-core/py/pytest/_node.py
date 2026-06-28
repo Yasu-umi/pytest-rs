@@ -169,7 +169,29 @@ class _NodeBase:
             raise TypeError(
                 "config is a keyword-only argument of Node.from_parent; pass it via parent.config"
             )
-        return cls(parent=parent, **kwargs)
+        try:
+            return cls(parent=parent, **kwargs)
+        except TypeError:
+            # Non-cooperative constructor: __init__ lacks **kwargs and raised on unknown kw.
+            own_init = cls.__dict__.get("__init__")
+            if own_init is not None:
+                from inspect import signature, Parameter
+                import warnings
+                from _pytest.warning_types import PytestDeprecationWarning
+                sig = signature(own_init)
+                has_var_kw = any(p.kind == Parameter.VAR_KEYWORD for p in sig.parameters.values())
+                if not has_var_kw:
+                    known_kw = {k: v for k, v in kwargs.items() if k in sig.parameters}
+                    warnings.warn(
+                        PytestDeprecationWarning(
+                            f"{cls} is not using a cooperative constructor and only takes {set(known_kw)}.\n"
+                            "See https://docs.pytest.org/en/stable/deprecations.html"
+                            "#constructors-of-custom-pytest-node-subclasses-should-take-kwargs "
+                            "for more details."
+                        )
+                    )
+                    return cls(parent=parent, **known_kw)
+            raise
 
     def _compute_nodeid(self):
         parent_id = getattr(self.parent, "nodeid", None)
@@ -551,6 +573,31 @@ class Item(_NodeBase):
     """Base test item for custom collectors. Subclasses override runtest()
     (and optionally setup()/teardown()/repr_failure()/reportinfo())."""
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._check_item_and_collector_diamond_inheritance()
+
+    def _check_item_and_collector_diamond_inheritance(self):
+        cls = type(self)
+        attr_name = "_pytest_diamond_inheritance_warning_shown"
+        if getattr(cls, attr_name, False):
+            return
+        setattr(cls, attr_name, True)
+        problems = ", ".join(
+            base.__name__ for base in cls.__bases__ if issubclass(base, Collector)
+        )
+        if problems:
+            import warnings
+            from _pytest.warning_types import PytestWarning
+            warnings.warn(
+                f"{cls.__name__} is an Item subclass and should not be a collector, "
+                f"however its bases {problems} are collectors.\n"
+                "Please split the Collectors and the Item into separate node types.\n"
+                "Pytest Doc example: https://docs.pytest.org/en/latest/example/nonpython.html\n"
+                "example pull request on a plugin: https://github.com/asmeurer/pytest-flakes/pull/40/",
+                PytestWarning,
+            )
+
     def setup(self):
         pass
 
@@ -570,6 +617,13 @@ class Item(_NodeBase):
 
 class File(Collector):
     """Base file collector. Subclasses override collect() to yield Items."""
+
+    @classmethod
+    def from_parent(cls, parent, *, fspath=None, path=None, **kw):
+        """Inject path=None (mirrors FSCollector.from_parent) so non-cooperative
+        constructors that lack **kwargs receive a TypeError and the
+        cooperative-constructor deprecation warning."""
+        return super().from_parent(parent=parent, fspath=fspath, path=path, **kw)
 
     def collect(self):
         return []
