@@ -51,6 +51,8 @@ enum Event {
     Output(String),
     /// A fatal distribution condition, shown as a banner before the summary.
     Banner(String),
+    /// A worker session was interrupted (KeyboardInterrupt / pytest.exit).
+    Interrupted { code: i32, banner: Option<String> },
 }
 
 /// The shared work queue. An empty queue means shutdown for whoever asks —
@@ -618,6 +620,14 @@ impl Engine {
                 Event::Banner(message) => {
                     self.session.dist_banner.get_or_insert(message);
                 }
+                Event::Interrupted { code, banner } => {
+                    if !maxfail_hit {
+                        maxfail_hit = true;
+                        queue.stop();
+                        self.session.exit_code_override = Some(code);
+                        self.session.abort_banner = banner;
+                    }
+                }
             }
         }
         if line_open {
@@ -1023,6 +1033,9 @@ impl WorkerOwner {
                         });
                     }
                     Some(WorkerMsg::Done) => continue 'work,
+                    Some(WorkerMsg::Interrupted { code, banner }) => {
+                        let _ = self.sender.send(Event::Interrupted { code, banner });
+                    }
                     Some(WorkerMsg::Extra { plugin, payload }) => {
                         let _ = self.sender.send(Event::Extra { plugin, payload });
                     }

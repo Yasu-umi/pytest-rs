@@ -25,6 +25,10 @@ pub enum WorkerMsg {
     Report { report: TestReport },
     /// The current batch is finished; ready for the next.
     Done,
+    /// A test raised KeyboardInterrupt (or pytest.exit): the session should
+    /// stop and use this exit code. Sent before Done so the controller can
+    /// call queue.stop() without losing the Done that follows.
+    Interrupted { code: i32, banner: Option<String> },
     /// Serialized plugin state to merge in the parent (cov hits, ...).
     Extra { plugin: String, payload: String },
     /// Warnings captured in this worker, for the parent's summary.

@@ -231,6 +231,16 @@ impl Engine {
                     self.run_batch(py, &mut collection, &mut prev_module, &nodeids);
                     // xdist's [setproctitle] extra: idle between batches.
                     python::worker_set_title(py, "[pytest-xdist idle]");
+                    // Propagate KeyboardInterrupt / pytest.exit so the controller
+                    // can set the right exit code and stop dispatching new work.
+                    if let Some(code) = self.session.exit_code_override {
+                        send(&WorkerMsg::Interrupted {
+                            code,
+                            banner: self.session.abort_banner.clone(),
+                        });
+                        send(&WorkerMsg::Done);
+                        break;
+                    }
                     send(&WorkerMsg::Done);
                 }
                 ParentMsg::Shutdown => break,
@@ -282,17 +292,47 @@ impl Engine {
             }
         }
 
+        let actual_exit = self.session.exit_code_override.unwrap_or(exit_code::OK);
+        // Collect py_hooks before the mutable borrow for native plugins.
+        let py_sessionfinish: Vec<Py<PyAny>> = self
+            .session
+            .py_hooks
+            .iter()
+            .filter(|h| h.name == "pytest_sessionfinish")
+            .map(|h| h.func.clone_ref(py))
+            .collect();
         let mut ctx = HookContext {
             py,
             session: &mut self.session,
             config: &self.config,
         };
         for plugin in self.plugins.iter_mut() {
-            if let Err(err) = plugin.pytest_sessionfinish(&mut ctx, exit_code::OK) {
+            if let Err(err) = plugin.pytest_sessionfinish(&mut ctx, actual_exit) {
                 eprintln!(
                     "INTERNAL ERROR: worker sessionfinish: {}",
                     python::format_exception(py, &err)
                 );
+            }
+        }
+        // Fire conftest/plugin pytest_sessionfinish py_hooks so worker-side
+        // pytest_sessionfinish can populate config.workeroutput for the controller.
+        if !py_sessionfinish.is_empty() {
+            if let (Ok(config_proxy), Ok(session_proxy), Ok(exitstatus)) = (
+                python::make_py_config(py, &self.config),
+                python::make_session_proxy(py, &self.config),
+                actual_exit.into_pyobject(py).map(|o| o.unbind().into_any()),
+            ) {
+                for func in &py_sessionfinish {
+                    let _ = python::call_py_hook(
+                        py,
+                        func,
+                        &[
+                            ("config", config_proxy.clone_ref(py)),
+                            ("session", session_proxy.clone_ref(py)),
+                            ("exitstatus", exitstatus.clone_ref(py)),
+                        ],
+                    );
+                }
             }
         }
         for plugin in self.plugins.iter_mut() {
