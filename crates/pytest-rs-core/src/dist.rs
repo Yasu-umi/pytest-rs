@@ -69,6 +69,8 @@ struct WorkQueue {
 struct QueueState {
     queue: VecDeque<Vec<String>>,
     aborted: bool,
+    /// True once -x/--maxfail fires: workers must not start new batches.
+    soft_stopped: bool,
     /// Remaining worker-restart budget (no flag = effectively unlimited).
     restarts: isize,
 }
@@ -89,18 +91,25 @@ impl WorkQueue {
             state: Mutex::new(QueueState {
                 queue: batches,
                 aborted: false,
+                soft_stopped: false,
                 restarts,
             }),
         }
     }
 
-    /// The next batch, or None once all work is dispatched or aborted.
+    /// The next batch, or None once all work is dispatched or stopped/aborted.
     fn next(&self) -> Option<Vec<String>> {
         let mut state = self.state.lock().expect("work queue lock poisoned");
-        if state.aborted {
+        if state.aborted || state.soft_stopped {
             return None;
         }
         state.queue.pop_front()
+    }
+
+    /// True when -x/--maxfail or a fatal crash has halted dispatch.
+    fn is_stopped(&self) -> bool {
+        let state = self.state.lock().expect("work queue lock poisoned");
+        state.soft_stopped || state.aborted
     }
 
     /// -x/--maxfail: stop dispatching new batches; workers finish what
@@ -108,6 +117,7 @@ impl WorkQueue {
     fn stop(&self) {
         let mut state = self.state.lock().expect("work queue lock poisoned");
         state.queue.clear();
+        state.soft_stopped = true;
     }
 
     /// Crash bookkeeping, atomically: spend a restart and requeue the
@@ -960,6 +970,11 @@ impl WorkerOwner {
         };
 
         'work: loop {
+            if self.queue.is_stopped() && !self.assigned.is_empty() {
+                // -x/--maxfail fired: drain pre-assigned but unstarted batches
+                // without running them, then shut down the worker.
+                self.assigned.clear();
+            }
             let Some(batch) = self.assigned.pop_front().or_else(|| self.queue.next()) else {
                 let msg = serde_json::to_string(&ParentMsg::Shutdown).expect("shutdown serializes");
                 let _ = writeln!(proc.stdin, "{msg}");
