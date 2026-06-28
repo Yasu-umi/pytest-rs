@@ -2,6 +2,15 @@ import sys
 
 from pytest import LineMatcher, Pytester, RunResult  # noqa: F401
 
+# Register pytester_assertions for assertion rewriting before it is first
+# imported.  Upstream relies on the pytest11 entry point; we do it here since
+# pytester.py is always loaded before any test calls assertoutcome().
+try:
+    from pytest import _rewrite as _rewrite_mod
+    _rewrite_mod.register_assert_rewrite("_pytest.pytester_assertions")
+except Exception:
+    pass
+
 
 class SysModulesSnapshot:
     """Snapshot of ``sys.modules`` that ``restore()`` reinstates in place
@@ -158,12 +167,9 @@ class HookRecorder:
 
     def assertoutcome(self, passed=0, skipped=0, failed=0):
         __tracebackhide__ = True
+        from _pytest.pytester_assertions import assertoutcome
         outcomes = self.listoutcomes()
-        got = tuple(len(x) for x in outcomes)
-        assert got == (passed, skipped, failed), (
-            f"assertoutcome: expected (passed={passed}, skipped={skipped}, "
-            f"failed={failed}), got {got}"
-        )
+        assertoutcome(outcomes, passed=passed, skipped=skipped, failed=failed)
 
     def clear(self):
         self.calls[:] = []

@@ -193,6 +193,13 @@ class TestReport(BaseReport):
         if not hasattr(self, "keywords"):
             self.keywords = {}
 
+    def __repr__(self) -> str:
+        return (
+            f"<{self.__class__.__name__} {getattr(self, 'nodeid', '')!r}"
+            f" when={getattr(self, 'when', '')!r}"
+            f" outcome={getattr(self, 'outcome', '')!r}>"
+        )
+
     def _to_json(self):
         longrepr = None
         if getattr(self, "longrepr", None) is not None:
