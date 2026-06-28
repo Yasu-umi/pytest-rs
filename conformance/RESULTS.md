@@ -22,14 +22,14 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 88 | 100.0% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 20 | 0 | 3 | 209 | 90.4% | 0 | 1 | 0 |
-| pytest-xdist | v3.8.0 | 91 | 6 | 0 | 1 | 98 | 93.9% | 0 | 1 | 6 |
+| pytest-xdist | v3.8.0 | 75 | 22 | 0 | 1 | 98 | 77.6% | 0 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
-| pytest-benchmark | v5.1.0 | 91 | 31 | 0 | 1 | 123 | 74.8% | 4 | 7 | 6 |
+| pytest-benchmark | v5.1.0 | 109 | 13 | 0 | 1 | 123 | 89.4% | 4 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 41 | 100.0% | 1 | 1 | 0 |
 | anyio | 4.13.0 | 3120 | 0 | 0 | 42 | 3162 | 100.0% | 26 | 26 | 0 |
 | pytest-mypy | v1.0.1 | 75 | 1 | 0 | 2 | 78 | 98.7% | 0 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
-| pytest-subtests | v0.14.2 | 31 | 1 | 0 | 0 | 32 | 96.9% | 0 | 1 | 0 |
+| pytest-subtests | v0.14.2 | 25 | 7 | 0 | 0 | 32 | 78.1% | 0 | 1 | 0 |
 | pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-snapshot | v0.9.0 | 102 | 5 | 0 | 0 | 107 | 95.3% | 0 | 3 | 0 |
 | pytest-icdiff | 0.5 | 10 | 2 | 0 | 0 | 12 | 83.3% | 0 | 1 | 0 |
@@ -190,7 +190,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| testing/acceptance_test.py | failed | 91 | 6 | 0 | 1 |
+| testing/acceptance_test.py | failed | 75 | 22 | 0 | 1 |
 
 </details>
 
@@ -210,7 +210,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| tests/test_benchmark.py | failed | 23 | 30 | 0 | 0 |
+| tests/test_benchmark.py | failed | 41 | 12 | 0 | 0 |
 | tests/test_calibration.py | passed | 34 | 0 | 0 | 0 |
 | tests/test_normal.py | passed | 10 | 0 | 0 | 0 |
 | tests/test_pedantic.py | passed | 19 | 0 | 0 | 0 |
@@ -291,7 +291,7 @@ per-suite lists in `conformance/expected/*.toml` plus path patterns in
 
 | file | status | passed | failed | errors | skipped |
 |---|---|---:|---:|---:|---:|
-| tests/test_subtests.py | failed | 31 | 1 | 0 | 0 |
+| tests/test_subtests.py | failed | 25 | 7 | 0 | 0 |
 
 </details>
 
