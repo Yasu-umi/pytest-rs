@@ -82,7 +82,7 @@ jobs:
           - group: pytest
             suites: "pytest"
           - group: plugins
-            suites: "pytest-asyncio,pytest-mock,pytest-cov,pytest-xdist,pytest-split,pytest-benchmark,pytest-timeout,pytest-mypy,pytest-ruff,pytest-subtests,pytest-bdd,pytest-metadata,pytest-snapshot,pytest-icdiff,pytest-socket,pytest-order,pytest-repeat,pytest-instafail,pytest-env,pytest-rerunfailures,pytest-randomly,pytest-django"
+            suites: "pytest-asyncio,pytest-mock,pytest-cov,pytest-xdist,pytest-split,pytest-benchmark,pytest-timeout,pytest-mypy,pytest-ruff,pytest-subtests,pytest-bdd,pytest-metadata,pytest-snapshot,pytest-icdiff,pytest-socket,pytest-order,pytest-repeat,pytest-instafail,pytest-env,pytest-rerunfailures,pytest-randomly,pytest-django,pytest-aiohttp"
           - group: libs-1
             suites: "anyio,click,jinja,marshmallow,rich,more-itertools,packaging"
           - group: libs-2
