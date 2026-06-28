@@ -103,12 +103,16 @@ pub(crate) type SetupOk = (
     Vec<(String, Py<PyAny>)>,
     Option<Py<crate::request::PyRequest>>,
 );
+#[allow(clippy::type_complexity)]
 pub(crate) fn run_one_body(
     py: Python<'_>,
     plugins: &[Box<dyn Plugin>],
     session: &mut Session,
     config: &Config,
     item: &TestItem,
+    // Called with setup+call reports before teardown (worker mode: sends them
+    // to the controller so a teardown crash doesn't swallow the call outcome).
+    pre_teardown: Option<&dyn Fn(&[TestReport])>,
 ) -> Vec<TestReport> {
     // Custom collector items (pytest-ruff/pytest-mypy): the func IS a
     // pytest.Item with setup()/runtest()/teardown(); run that protocol with
@@ -206,6 +210,16 @@ pub(crate) fn run_one_body(
         runxfail,
         xfail,
     );
+    // Stream setup+call reports before teardown runs so a crash in teardown
+    // doesn't swallow the call outcome (worker mode only, None otherwise).
+    // Pytest's capfd capture redirects fd 1 during tests; suspend it so the
+    // send() writes reach the real IPC pipe rather than the capture buffer.
+    if let Some(f) = pre_teardown {
+        python::capture_suspend(py);
+        f(&reports);
+        let _ = std::io::stdout().flush();
+        python::capture_resume(py);
+    }
     teardown_one(
         py,
         plugins,

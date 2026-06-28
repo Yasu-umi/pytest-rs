@@ -21,7 +21,7 @@ pub enum Outcome {
 }
 
 /// Plain data: reports stream across the worker IPC boundary as JSON.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TestReport {
     pub nodeid: String,
     pub phase: Phase,

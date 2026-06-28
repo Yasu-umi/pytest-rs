@@ -894,6 +894,9 @@ impl WorkerOwner {
             self.index
         )));
         if let (Some(running), CrashAction::Replace | CrashAction::Abort) = (&running, &action) {
+            // Crashes always count as call failures (xdist behavior): even if the
+            // call phase completed and the crash was in teardown, reporting as
+            // Phase::Teardown would show as an "error" instead of "failed".
             let _ = self.sender.send(Event::Report {
                 report: TestReport {
                     nodeid: running.clone(),

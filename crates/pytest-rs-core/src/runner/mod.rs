@@ -306,7 +306,7 @@ impl Engine {
             python::set_subtest_fail_budget(py, maxfail.map(|m| m.saturating_sub(failed)));
             session.live_printed = 0;
             session.streamed_chars = 0;
-            let reports = run_one(py, plugins, session, config, item, items.get(idx + 1));
+            let reports = run_one(py, plugins, session, config, item, items.get(idx + 1), None);
             if inline_sub_chars {
                 let inline = python::pop_subtest_inline_count(py);
                 if inline > 0 {

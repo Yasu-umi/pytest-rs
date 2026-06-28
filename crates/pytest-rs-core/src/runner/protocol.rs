@@ -74,7 +74,7 @@ pub(crate) fn run_item_phases(py: Python<'_>) -> PyResult<Py<PyAny>> {
     session
         .fixture_cache
         .retain(|_, cached| cached.error.is_none());
-    let reports = super::run_one_body(py, plugins, session, config, item);
+    let reports = super::run_one_body(py, plugins, session, config, item, None);
     let proxies = pyo3::types::PyList::empty(py);
     for report in &reports {
         let lineno = (report.phase == Phase::Call).then_some(item.lineno);

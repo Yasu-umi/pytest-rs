@@ -388,6 +388,10 @@ impl Engine {
                 item,
                 "pytest_runtest_logstart",
             );
+            // Track how many reports were streamed before teardown so we don't
+            // double-send them (pre_teardown streams setup+call immediately so
+            // a teardown crash doesn't swallow the call outcome).
+            let pre_teardown_count = std::cell::Cell::new(0usize);
             let reports = crate::runner::run_one(
                 py,
                 &self.plugins,
@@ -395,9 +399,16 @@ impl Engine {
                 &self.config,
                 item,
                 None,
+                Some(&|pre: &[crate::report::TestReport]| {
+                    pre_teardown_count.set(pre.len());
+                    for r in pre {
+                        send(&WorkerMsg::Report { report: r.clone() });
+                    }
+                }),
             );
             collection.last_nodeid = Some(item.nodeid.clone());
-            for report in reports {
+            let pre_count = pre_teardown_count.get();
+            for (i, report) in reports.into_iter().enumerate() {
                 crate::runner::fire_logreport_hooks(
                     py,
                     &self.session,
@@ -406,7 +417,9 @@ impl Engine {
                     Some(item),
                     false,
                 );
-                send(&WorkerMsg::Report { report });
+                if i >= pre_count {
+                    send(&WorkerMsg::Report { report });
+                }
             }
             let item = &collection.items[index];
             let _ = crate::runner::fire_runtest_py_hooks(

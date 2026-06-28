@@ -19,6 +19,7 @@ mod setup;
 pub(crate) use body::run_one_body;
 pub(crate) use setup::build_test_setup;
 
+#[allow(clippy::type_complexity)]
 pub(crate) fn run_one(
     py: Python<'_>,
     plugins: &[Box<dyn Plugin>],
@@ -26,6 +27,7 @@ pub(crate) fn run_one(
     config: &Config,
     item: &TestItem,
     nextitem: Option<&TestItem>,
+    pre_teardown: Option<&dyn Fn(&[TestReport])>,
 ) -> Vec<TestReport> {
     session.delegated_render = false;
     // pytest_runtest_protocol hookwrappers (e.g. pytest-timeout's timer)
@@ -49,7 +51,7 @@ pub(crate) fn run_one(
     // the protocol; if one handles the item, use the reports it logged.
     let reports = match protocol::delegate_protocol(py, plugins, session, config, item, nextitem) {
         Ok(Some(reports)) => reports,
-        Ok(None) => run_one_body(py, plugins, session, config, item),
+        Ok(None) => run_one_body(py, plugins, session, config, item, pre_teardown),
         Err(err) => {
             let _ = finish_runtest_py_wrappers(py, &wrappers);
             if err.is_instance_of::<pyo3::exceptions::PyException>(py) {
