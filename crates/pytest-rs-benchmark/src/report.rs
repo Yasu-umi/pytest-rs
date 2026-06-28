@@ -66,7 +66,77 @@ fn group_key(result: &BenchResult, group_by: &str) -> Option<String> {
     }
 }
 
-pub fn render_table(results: &[BenchResult], sort: &str, group_by: &str) -> String {
+/// Return the machine ID string (used as the storage subdirectory name).
+pub fn machine_id(py: Python<'_>) -> PyResult<String> {
+    let platform = py.import("platform")?;
+    let sys = py.import("sys")?;
+    let system: String = platform.call_method0("system")?.extract()?;
+    let impl_name: String = platform.call_method0("python_implementation")?.extract()?;
+    let version_info = sys.getattr("version_info")?;
+    let major: u32 = version_info.getattr("major")?.extract()?;
+    let minor: u32 = version_info.getattr("minor")?.extract()?;
+    let arch = platform.call_method0("architecture")?;
+    let bits: String = arch.get_item(0)?.extract()?;
+    let bits = bits.replace("bit", "");
+    Ok(format!("{system}-{impl_name}-{major}.{minor}-{bits}bit"))
+}
+
+/// Next file number for a storage directory (scans existing 0001_*.json files).
+pub fn next_num(storage_dir: &std::path::Path) -> u32 {
+    let mut max = 0u32;
+    if let Ok(entries) = std::fs::read_dir(storage_dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if name.len() >= 4
+                && name[..4].chars().all(|c| c.is_ascii_digit())
+                && let Ok(n) = name[..4].parse::<u32>()
+            {
+                max = max.max(n);
+            }
+        }
+    }
+    max + 1
+}
+
+/// Find the most recent file in storage_dir matching `prefix` (if given).
+pub fn find_compare_file(
+    storage_dir: &std::path::Path,
+    prefix: Option<&str>,
+) -> Result<Option<std::path::PathBuf>, String> {
+    if !storage_dir.exists() {
+        return Ok(None);
+    }
+    let mut files: Vec<std::path::PathBuf> = std::fs::read_dir(storage_dir)
+        .map_err(|e| e.to_string())?
+        .flatten()
+        .filter_map(|e| {
+            let p = e.path();
+            if p.extension().map(|ext| ext == "json").unwrap_or(false) {
+                Some(p)
+            } else {
+                None
+            }
+        })
+        .collect();
+    files.sort();
+    if let Some(prefix) = prefix {
+        files.retain(|p| {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .map(|n| n.starts_with(prefix))
+                .unwrap_or(false)
+        });
+    }
+    Ok(files.into_iter().last())
+}
+
+pub fn render_table(
+    results: &[BenchResult],
+    sort: &str,
+    group_by: &str,
+    columns: Option<&[String]>,
+) -> String {
     // Partition into group tables; the unnamed group renders first, the
     // rest alphabetically (upstream's ordering).
     let mut groups: Vec<(Option<String>, Vec<&BenchResult>)> = Vec::new();
@@ -86,7 +156,7 @@ pub fn render_table(results: &[BenchResult], sort: &str, group_by: &str) -> Stri
 
     let mut out = String::new();
     for (key, members) in &groups {
-        render_group(&mut out, key.as_deref(), members, sort);
+        render_group(&mut out, key.as_deref(), members, sort, columns);
     }
     out.push_str("\nLegend:\n");
     out.push_str(
@@ -97,7 +167,92 @@ pub fn render_table(results: &[BenchResult], sort: &str, group_by: &str) -> Stri
     out
 }
 
-fn render_group(out: &mut String, group: Option<&str>, results: &[&BenchResult], sort: &str) {
+/// One column in the benchmark result table.
+struct ColSpec {
+    id: &'static str,
+    header: &'static str,
+    width: usize,
+}
+
+const ALL_COLUMNS: &[ColSpec] = &[
+    ColSpec {
+        id: "min",
+        header: "Min",
+        width: 12,
+    },
+    ColSpec {
+        id: "max",
+        header: "Max",
+        width: 12,
+    },
+    ColSpec {
+        id: "mean",
+        header: "Mean",
+        width: 12,
+    },
+    ColSpec {
+        id: "stddev",
+        header: "StdDev",
+        width: 12,
+    },
+    ColSpec {
+        id: "median",
+        header: "Median",
+        width: 12,
+    },
+    ColSpec {
+        id: "iqr",
+        header: "IQR",
+        width: 12,
+    },
+    ColSpec {
+        id: "outliers",
+        header: "Outliers",
+        width: 10,
+    },
+    ColSpec {
+        id: "ops",
+        header: "OPS (Kops/s)",
+        width: 14,
+    },
+    ColSpec {
+        id: "rounds",
+        header: "Rounds",
+        width: 7,
+    },
+    ColSpec {
+        id: "iterations",
+        header: "Iterations",
+        width: 11,
+    },
+];
+
+fn col_value(id: &str, stats: &crate::stats::Stats, scale: f64) -> String {
+    match id {
+        "min" => format!("{:>12.4}", stats.min * scale),
+        "max" => format!("{:>12.4}", stats.max * scale),
+        "mean" => format!("{:>12.4}", stats.mean * scale),
+        "stddev" => format!("{:>12.4}", stats.stddev * scale),
+        "median" => format!("{:>12.4}", stats.median * scale),
+        "iqr" => format!("{:>12.4}", stats.iqr * scale),
+        "outliers" => format!(
+            "{:>10}",
+            format!("{};{}", stats.outliers.0, stats.outliers.1)
+        ),
+        "ops" => format!("{:>14.4}", stats.ops / 1e3),
+        "rounds" => format!("{:>7}", stats.rounds),
+        "iterations" => format!("{:>11}", stats.iterations),
+        _ => String::new(),
+    }
+}
+
+fn render_group(
+    out: &mut String,
+    group: Option<&str>,
+    results: &[&BenchResult],
+    sort: &str,
+    columns: Option<&[String]>,
+) {
     let mut order: Vec<usize> = (0..results.len()).collect();
     let key = |index: usize| -> f64 {
         let stats = &results[index].stats;
@@ -132,50 +287,41 @@ fn render_group(out: &mut String, group: Option<&str>, results: &[&BenchResult],
         .max()
         .unwrap_or(24);
 
-    // Upstream always pluralizes ("1 tests").
+    // Determine active columns (user-specified order, or default all).
+    let active: Vec<&ColSpec> = if let Some(cols) = columns {
+        cols.iter()
+            .filter_map(|id| ALL_COLUMNS.iter().find(|c| c.id == id.as_str()))
+            .collect()
+    } else {
+        ALL_COLUMNS.iter().collect()
+    };
+
     let header_label = match group {
         Some(group) => format!("benchmark '{group}': {} tests", results.len()),
         None => format!("benchmark: {} tests", results.len()),
     };
-    let columns = format!(
-        "{:<name_width$} {:>12} {:>12} {:>12} {:>12} {:>12} {:>12} {:>10} {:>14} {:>7} {:>11}",
-        format!("Name (time in {unit})"),
-        "Min",
-        "Max",
-        "Mean",
-        "StdDev",
-        "Median",
-        "IQR",
-        "Outliers",
-        "OPS (Kops/s)",
-        "Rounds",
-        "Iterations",
-    );
-    let width = columns.len();
+    let mut col_header = format!("{:<name_width$}", format!("Name (time in {unit})"));
+    for col in &active {
+        col_header.push_str(&format!(" {:>width$}", col.header, width = col.width));
+    }
+    let width = col_header.len();
     out.push('\n');
     out.push_str(&center(&header_label, '-', width));
     out.push('\n');
-    out.push_str(&columns);
+    out.push_str(&col_header);
     out.push('\n');
     out.push_str(&"-".repeat(width));
     out.push('\n');
     for &index in &order {
         let result = &results[index];
         let stats = &result.stats;
-        out.push_str(&format!(
-            "{:<name_width$} {:>12.4} {:>12.4} {:>12.4} {:>12.4} {:>12.4} {:>12.4} {:>10} {:>14.4} {:>7} {:>11}\n",
-            result.name,
-            stats.min * scale,
-            stats.max * scale,
-            stats.mean * scale,
-            stats.stddev * scale,
-            stats.median * scale,
-            stats.iqr * scale,
-            format!("{};{}", stats.outliers.0, stats.outliers.1),
-            stats.ops / 1e3,
-            stats.rounds,
-            stats.iterations,
-        ));
+        let mut row = format!("{:<name_width$}", result.name);
+        for col in &active {
+            row.push(' ');
+            row.push_str(&col_value(col.id, stats, scale));
+        }
+        row.push('\n');
+        out.push_str(&row);
     }
     out.push_str(&"-".repeat(width));
     out.push('\n');

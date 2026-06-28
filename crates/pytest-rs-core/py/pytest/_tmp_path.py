@@ -396,8 +396,16 @@ class LocalPath:
     def read_text(self, encoding="utf-8"):
         return self._path.read_text(encoding=encoding)
 
-    def listdir(self):
-        return [LocalPath(child) for child in sorted(self._path.iterdir())]
+    def listdir(self, fil=None, sort=True):
+        import fnmatch
+        entries = sorted(self._path.iterdir())
+        if fil is None:
+            pass
+        elif callable(fil):
+            entries = [e for e in entries if fil(LocalPath(e))]
+        else:
+            entries = [e for e in entries if fnmatch.fnmatch(e.name, fil)]
+        return [LocalPath(child) for child in entries]
 
     def computehash(self, hashtype="md5"):
         import hashlib

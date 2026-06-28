@@ -8,8 +8,17 @@ per-iteration overhead matches pytest-benchmark's generated runner.
 import cProfile
 import gc
 import importlib
+import io
+import pstats
 import time
+import warnings
 from time import perf_counter
+
+import pytest
+
+
+class PytestBenchmarkWarning(pytest.PytestWarning):
+    """Warning emitted by pytest-benchmark."""
 
 
 def make_runner(func, args, kwargs, timer=None, disable_gc=False):
@@ -91,6 +100,32 @@ def wall_clock():
     """Real elapsed-time probe for the calibration warmup budget
     (upstream uses time.time even with an injected benchmark timer)."""
     return time.time()
+
+
+def _stderr_writeorg(msg):
+    """Write MSG to the real process stderr, bypassing pytest's fd capture.
+
+    During test execution pytest redirects fd 2 to a capture buffer. The
+    saved original fd is stored in the FDCapture object; writing there
+    produces output that reaches the subprocess's outer stderr pipe (and
+    therefore `result.stderr` in pytester).
+    """
+    import os
+    fd = None
+    try:
+        from pytest._capture import state as _cap_state
+        cap = _cap_state._capture
+        if cap is not None and cap.err is not None and hasattr(cap.err, 'targetfd_save'):
+            fd = cap.err.targetfd_save
+    except Exception:
+        pass
+    data = (msg + '\n').encode('utf-8')
+    if fd is not None:
+        os.write(fd, data)
+    else:
+        import sys
+        sys.stderr.buffer.write(data)
+        sys.stderr.flush()
 
 
 def cprofile_call(func, args, kwargs, loops=1):

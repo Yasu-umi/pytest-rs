@@ -9,7 +9,7 @@ use pyo3::types::{PyDict, PyModule, PyTuple};
 
 use crate::stats::Stats;
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct BenchResult {
     pub fullname: String,
     pub name: String,
@@ -39,6 +39,8 @@ pub struct BenchConfig {
     pub cprofile: bool,
     /// gc.disable() around the timed loops (--benchmark-disable-gc).
     pub disable_gc: bool,
+    /// --benchmark-verbose: print calibration progress to stderr.
+    pub verbose: bool,
 }
 
 impl Default for BenchConfig {
@@ -53,6 +55,7 @@ impl Default for BenchConfig {
             warmup_iterations: 100_000,
             cprofile: false,
             disable_gc: false,
+            verbose: false,
         }
     }
 }
@@ -273,6 +276,21 @@ impl BenchmarkFixture {
             .max(precision * self.config.calibration_precision as f64);
         let min_time_estimate = min_time * 5.0 / self.config.calibration_precision as f64;
 
+        if self.config.verbose {
+            let timer_name = timer
+                .bind(py)
+                .getattr("__qualname__")
+                .ok()
+                .and_then(|n| n.str().ok().map(|s| s.to_string()))
+                .unwrap_or_else(|| "perf_counter".to_string());
+            let msg = format!(
+                "  Calibrating to target round {:.10}s; will estimate when reaching {:.10}s \
+                 (using: {}, precision: {}).",
+                min_time, min_time_estimate, timer_name, self.config.calibration_precision,
+            );
+            let _ = helper.call_method1("_stderr_writeorg", (msg,));
+        }
+
         let wall_clock = helper.getattr("wall_clock")?;
         let mut loops = 1usize;
         loop {
@@ -292,15 +310,16 @@ impl BenchmarkFixture {
                     warmup_iterations += loops;
                 }
             }
+            if self.config.verbose {
+                let msg = format!("    Measured {} iterations: {:.10}s.", loops, duration);
+                let _ = helper.call_method1("_stderr_writeorg", (msg,));
+            }
             if duration >= min_time {
                 return Ok((duration, loops));
             }
             if duration >= min_time_estimate {
-                // Coarse estimation of the number of loops.
                 loops = (min_time * loops as f64 / duration).ceil() as usize;
                 if loops == 1 {
-                    // Nothing to calibrate if the function is 100 times
-                    // slower than the timer resolution.
                     return Ok((duration, loops));
                 }
             } else {
@@ -366,7 +385,16 @@ impl BenchmarkFixture {
                     runner.call1((loops,))?;
                 }
             }
+            if self.config.verbose {
+                let msg = format!("  Running {} rounds x {} iterations ...", rounds, loops);
+                let _ = helper.call_method1("_stderr_writeorg", (msg,));
+            }
             let times = self.run_rounds(&runner, loops, duration)?;
+            if self.config.verbose {
+                let total: f64 = times.iter().sum();
+                let msg = format!("  Ran for {:.10}s.", total);
+                let _ = helper.call_method1("_stderr_writeorg", (msg,));
+            }
             self.record(py, &times, loops)?;
             // cprofile: the profiled invocations REPLACE the final plain
             // call (upstream profiles loops_range invocations).
