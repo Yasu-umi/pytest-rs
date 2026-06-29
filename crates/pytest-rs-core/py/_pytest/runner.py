@@ -5,7 +5,7 @@ skip/xfail mark semantics; no fixtures."""
 import sys
 import traceback
 
-from pytest._outcomes import Exit, Skipped
+from pytest._outcomes import Exit, Skipped, XFailed
 from pytest._raises import ExceptionInfo
 
 from _pytest.reports import CollectReport as CollectReport
@@ -301,24 +301,30 @@ def pytest_runtest_call(item):
 def pytest_runtest_makereport(item, call):
     """Create a TestReport from an item and CallInfo (upstream default impl)."""
     when = call.when
+    wasxfail = None
     if call.excinfo is None:
         outcome = "passed"
         longrepr = None
     else:
         excinfo = call.excinfo
-        if isinstance(getattr(excinfo, "value", None), Skipped):
+        exc_value = getattr(excinfo, "value", None)
+        if isinstance(exc_value, XFailed):
             outcome = "skipped"
-            reason = getattr(excinfo.value, "msg", "") or ""
+            longrepr = exc_value.msg or ""
+            wasxfail = "reason: " + (exc_value.msg or "")
+        elif isinstance(exc_value, Skipped):
+            outcome = "skipped"
+            reason = getattr(exc_value, "msg", "") or ""
             path = str(getattr(item, "path", ""))
             longrepr = (path, 0, f"Skipped: {reason}")
         else:
             outcome = "failed"
-            longrepr = str(excinfo.value) if hasattr(excinfo, "value") else str(excinfo)
+            longrepr = str(exc_value) if exc_value is not None else str(excinfo)
     location = getattr(item, "location", None)
     if location is None:
         path = str(getattr(item, "path", "") or "")
         location = (path, getattr(item, "lineno", None), getattr(item, "name", ""))
-    return TestReport(
+    report = TestReport(
         nodeid=getattr(item, "nodeid", ""),
         when=when,
         outcome=outcome,
@@ -329,6 +335,9 @@ def pytest_runtest_makereport(item, call):
         start=getattr(call, "start", 0),
         stop=getattr(call, "stop", 0),
     )
+    if wasxfail is not None:
+        report.wasxfail = wasxfail
+    return report
 
 
 def check_interactive_exception(call, report):
