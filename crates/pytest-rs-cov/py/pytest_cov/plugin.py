@@ -3,11 +3,18 @@ upstream plugin classes exist only as raising stubs."""
 
 
 class CovPlugin:
-    def __init__(self, *args, **kwargs):
-        raise NotImplementedError(
-            "pytest_cov.plugin.CovPlugin is not supported by pytest-rs "
-            "(coverage is measured natively via sys.monitoring)"
-        )
+    def __init__(self, *args, start=True, **kwargs):
+        if start:
+            raise NotImplementedError(
+                "pytest_cov.plugin.CovPlugin is not supported by pytest-rs "
+                "(coverage is measured natively via sys.monitoring)"
+            )
+
+    def pytest_runtestloop(self, session):
+        pass
+
+    def pytest_terminal_summary(self, terminalreporter):
+        pass
 
 
 class StoreReport:
