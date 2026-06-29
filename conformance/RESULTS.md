@@ -18,19 +18,19 @@ are out of scope for pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2580 | 208 | 0 | 53 | 8 | 2849 | 92.4% | 21 | 54 | 61 |
+| pytest | 9.0.3 | 2584 | 204 | 0 | 53 | 8 | 2849 | 92.6% | 21 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 1 | 7 | 85.7% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 2 | 90 | 97.8% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 20 | 0 | 3 | 0 | 209 | 90.4% | 0 | 1 | 0 |
-| pytest-xdist | v3.8.0 | 97 | 0 | 0 | 1 | 0 | 98 | 100.0% | 1 | 1 | 6 |
+| pytest-xdist | v3.8.0 | 96 | 1 | 0 | 1 | 0 | 98 | 99.0% | 0 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 109 | 13 | 0 | 1 | 0 | 123 | 89.4% | 4 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 2 | 43 | 95.3% | 1 | 1 | 0 |
 | anyio | 4.13.0 | 3120 | 0 | 0 | 42 | 0 | 3162 | 100.0% | 26 | 26 | 0 |
 | pytest-mypy | v1.0.1 | 53 | 23 | 0 | 2 | 0 | 78 | 70.5% | 0 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
-| pytest-subtests | v0.14.2 | 25 | 7 | 0 | 0 | 0 | 32 | 78.1% | 0 | 1 | 0 |
+| pytest-subtests | v0.14.2 | 32 | 0 | 0 | 0 | 0 | 32 | 100.0% | 1 | 1 | 0 |
 | pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-snapshot | v0.9.0 | 102 | 5 | 0 | 0 | 0 | 107 | 95.3% | 0 | 3 | 0 |
 | pytest-icdiff | 0.5 | 10 | 2 | 0 | 0 | 0 | 12 | 83.3% | 0 | 1 | 0 |
@@ -94,7 +94,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 | 0 |
 | testing/test_faulthandler.py | failed | 3 | 9 | 0 | 0 | 0 |
 | testing/test_helpconfig.py | failed | 6 | 6 | 0 | 0 | 0 |
-| testing/test_junitxml.py | failed | 130 | 7 | 0 | 0 | 0 |
+| testing/test_junitxml.py | failed | 132 | 5 | 0 | 0 | 0 |
 | testing/test_link_resolve.py | failed | 0 | 1 | 0 | 0 | 0 |
 | testing/test_main.py | failed | 20 | 4 | 0 | 0 | 0 |
 | testing/test_mark.py | failed | 105 | 1 | 0 | 0 | 0 |
@@ -114,7 +114,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | testing/test_stash.py | passed | 1 | 0 | 0 | 0 | 0 |
 | testing/test_stepwise.py | passed | 18 | 0 | 0 | 0 | 0 |
 | testing/test_subtests.py | failed | 22 | 12 | 0 | 0 | 0 |
-| testing/test_terminal.py | failed | 207 | 16 | 0 | 4 | 0 |
+| testing/test_terminal.py | failed | 209 | 14 | 0 | 4 | 0 |
 | testing/test_threadexception.py | failed | 7 | 1 | 0 | 0 | 0 |
 | testing/test_tmpdir.py | passed | 39 | 0 | 0 | 1 | 0 |
 | testing/test_unittest.py | failed | 64 | 6 | 0 | 9 | 0 |
@@ -202,7 +202,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected |
 |---|---|---:|---:|---:|---:|---:|
-| testing/acceptance_test.py | passed | 97 | 0 | 0 | 1 | 0 |
+| testing/acceptance_test.py | failed | 96 | 1 | 0 | 1 | 0 |
 
 </details>
 
@@ -303,7 +303,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected |
 |---|---|---:|---:|---:|---:|---:|
-| tests/test_subtests.py | failed | 25 | 7 | 0 | 0 | 0 |
+| tests/test_subtests.py | passed | 32 | 0 | 0 | 0 | 0 |
 
 </details>
 
