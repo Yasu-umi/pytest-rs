@@ -1039,6 +1039,9 @@ impl WorkerOwner {
             .env("PYTEST_XDIST_WORKER", format!("gw{}", self.index))
             .env("PYTEST_XDIST_WORKER_COUNT", self.worker_count.to_string())
             .env("PYTEST_XDIST_TESTRUNUID", &self.testrun_uid)
+            // effective_args already includes PYTEST_ADDOPTS; unset it so the
+            // worker subprocess does not re-apply it and double-count options.
+            .env_remove("PYTEST_ADDOPTS")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit());
