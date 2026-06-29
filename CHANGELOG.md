@@ -3,6 +3,67 @@
 Notable changes per release. The release workflow uses the matching section
 as the GitHub release notes (auto-generated notes are the fallback).
 
+## v0.0.7 (2026-06-29)
+
+### Added
+
+- **pytest-benchmark plugin** — `@pytest.mark.benchmark` and the `benchmark`
+  fixture work out of the box (89.4% conformance, 110/123).
+- **xdist worker-side collection (spawn mode)** — workers now collect their own
+  shard independently; `--rsyncdir` copies directories into worker chdirs.
+- **`--durations` / `--durations-min`** output at the end of a run.
+- **`pytest_warning_recorded` hook** dispatched for every captured warning,
+  with `config.option.asyncio_mode` exposed for third-party plugin compat.
+- **Class-level `pytest_generate_tests` / `pytest_make_parametrize_id`** hooks.
+- **`Metafunc` class** exported from `_pytest.python`, with `CallSpec2`,
+  `_calls`, indirect-type/argname validation, and pseudo-fixture registration.
+- **`pytest_make_collect_report` hook** via `_CollectorProxy` collector tree.
+- **Parametrize argname validation** against the function signature at collection
+  time, with a clear error message on mismatch.
+- **`setup_module` / `teardown_module`** discovered from `package/__init__.py`.
+- **Dynamic fixture scope validation** at collection time (not only at call time).
+
+### Changed
+
+- **Warm-start performance** — 2–3× faster than vanilla pytest on medium suites.
+  Shim files are no longer re-written on warm start; plugin scanning switches
+  to `entry_points`. Hot-path `py.import` calls cached with `PyOnceLock`;
+  test-duration timing moved to `std::time::Instant`.
+- **New conformance suites** (44 total):
+  - pydantic v2: 6 259/6 273 = 99.8%
+  - networkx: 100%
+  - sqlglot: 100%
+  - pytest-aiohttp: 6/7 = 85.7%
+  - pytest-benchmark: 110/123 = 89.4%
+- **pytest-asyncio** reaches 268/268 = 100%.
+- **pytest-subtests** reaches 32/32 = 100% (including xdist forwarding from workers).
+- **pytest overall** improves to 2 636/2 849 = 92.5% on Linux.
+- Source split: large Rust files refactored into submodules (`collecting.rs`,
+  `config.rs`, `engine/`, `terminal/`, `runner/`) for maintainability.
+
+### Fixed
+
+- **xdist reliability** — worker crash detection during pre-collection; `KeyboardInterrupt`
+  propagated from worker to controller; `--maxfail` stops pre-assigned batches;
+  reports streamed before teardown to fix crash reporting; nodeid mismatch
+  detected when parametrize produces non-deterministic ids; `-n` argument
+  trims whitespace; `config.effective_args` used for worker argv.
+- **Subtests xdist** — reports forwarded from worker to controller.
+- `wasxfail` set correctly when `XFailed` is raised in a subtest context.
+- `pytest_collectstart` fires for the `Session` proxy before the class loop.
+- `@file` argument expansion; `--fulltrace` in pytester; `Config.parse()` with
+  `addopts`/`override-ini`.
+- Cooperative-constructor warning and diamond-inheritance check for `Item` subclasses.
+- `NodeMeta` guard raises on direct `Node()` construction (upstream parity).
+- `OptionGroup.options`, `Option.attrs()`, and venv auto-detection from binary path.
+- `capfd` blocked when capture is disabled; `parse_filter` converts `ImportError`
+  to `UsageError`; live-log routing; `--disable-plugin-autoload`.
+- `pytest.approx` NaN handling with `nan_ok`, numpy array comparisons.
+- Chained exception tracebacks (`__cause__` / `__context__`).
+- `PytestReturnNotNoneWarning` emitted when a test returns a non-`None` value.
+- Coroutine / async-generator return values detected as async test errors.
+- `pytest-benchmark` suppresses `PytestBenchmarkWarning` from the warnings summary.
+
 ## v0.0.6 (2026-06-21)
 
 ### Added
