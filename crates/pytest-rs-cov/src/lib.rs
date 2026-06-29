@@ -973,11 +973,24 @@ impl Plugin for CovPlugin {
             .map_err(|e| core_pyo3::exceptions::PyOSError::new_err(e.to_string()))?;
         for (rel, content) in SHIM_FILES {
             let path = package_root.join(rel);
-            if path.exists() {
-                continue;
+            let needs_write = std::fs::read(&path)
+                .map(|existing| existing != content.as_bytes())
+                .unwrap_or(true);
+            if needs_write {
+                std::fs::write(&path, content)
+                    .map_err(|e| core_pyo3::exceptions::PyOSError::new_err(e.to_string()))?;
             }
-            std::fs::write(path, content)
-                .map_err(|e| core_pyo3::exceptions::PyOSError::new_err(e.to_string()))?;
+        }
+
+        // Register cov/no_cover fixtures unconditionally — test_funcarg_not_active
+        // runs without --cov but still needs the cov fixture (returning None).
+        {
+            let plugin_module = py.import("pytest_cov.plugin")?;
+            pytest_rs_core::python::register_plugin_fixtures(
+                py,
+                &plugin_module,
+                &mut ctx.session.registry,
+            )?;
         }
 
         let Some(mut cov_values) = ctx
@@ -1240,6 +1253,8 @@ impl Plugin for CovPlugin {
                 .join(":"),
         )?;
         environ.set_item("PYTEST_RS_COV_BRANCH", if self.branch { "1" } else { "0" })?;
+        environ.set_item("PYTEST_RS_COV_TOOL_ID", self.tool_id.to_string())?;
+        environ.set_item("PYTEST_RS_COV_ACTIVE", "1")?;
         self.child_out_dir = Some(out_dir);
         // The hook itself goes into the environment's site-packages once
         // (pytest-cov installs its equivalent at package-install time).
