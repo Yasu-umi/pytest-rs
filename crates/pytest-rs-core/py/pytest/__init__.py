@@ -56,6 +56,7 @@ from pytest._outcomes import fail as fail
 from pytest._outcomes import importorskip as importorskip
 from pytest._outcomes import skip as skip
 from pytest._outcomes import xfail as xfail
+from pytest._parser import Parser as Parser
 from pytest._pluginmanager import PluginManager as PluginManager
 from pytest._pytester import LineComp as LineComp
 from pytest._pytester import LineMatcher as LineMatcher
