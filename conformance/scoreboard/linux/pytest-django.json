@@ -37,10 +37,10 @@
     },
     {
       "file": "tests/test_db_setup.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 14,
-      "failed": 0,
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 9,
+      "failed": 5,
       "skipped": 0,
       "errors": 0,
       "deselected": 0

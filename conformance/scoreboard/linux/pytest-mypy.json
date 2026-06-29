@@ -9,8 +9,8 @@
       "file": "tests/test_pytest_mypy.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 75,
-      "failed": 1,
+      "passed": 53,
+      "failed": 23,
       "skipped": 2,
       "errors": 0,
       "deselected": 0
