@@ -289,7 +289,7 @@ impl Engine {
         // have reported their Collection message.
         let queue = Arc::new(WorkQueue::new(max_restart.unwrap_or(isize::MAX), workers));
         let (sender, receiver) = mpsc::channel::<Event>();
-        let argv: Vec<String> = std::env::args().skip(1).collect();
+        let argv: Vec<String> = self.config.effective_args.iter().skip(1).cloned().collect();
         // One uid for the whole distributed run (the testrun_uid fixture).
         let testrun_uid = format!(
             "{:032x}",
