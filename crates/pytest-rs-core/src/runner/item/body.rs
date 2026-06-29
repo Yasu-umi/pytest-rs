@@ -639,11 +639,24 @@ pub(crate) fn run_item_body(
     // Skip re-labeling when the third-party pytest-subtests plugin is
     // installed: it keeps the main test PASSED and manages its own counts.
     let (sub_reports, _) = python::pop_subtest_reports(py, config, item);
+    // In xdist worker mode, also drain reports that third-party plugins
+    // (e.g. pytest-subtests) emitted via ihook.pytest_runtest_logreport
+    // directly. The logreport sink captures them; we forward them to the
+    // controller. In non-worker mode the TerminalReporter already handles
+    // them via the hook relay, so we leave them in the sink to avoid
+    // double-counting in the session summary.
+    let plugin_reports = if config.is_worker() {
+        python::drain_plugin_reports(py)
+    } else {
+        Vec::new()
+    };
     let failed_sub_count = sub_reports
         .iter()
+        .chain(plugin_reports.iter())
         .filter(|r| r.outcome == Outcome::Failed)
         .count();
     reports.extend(sub_reports);
+    reports.extend(plugin_reports);
     let has_subtests_plugin = py
         .eval(
             pyo3::ffi::c_str!("'pytest_subtests' in __import__('sys').modules"),

@@ -188,7 +188,21 @@ pub fn drain_plugin_reports(py: Python<'_>) -> Vec<crate::report::TestReport> {
         let mut out = Vec::new();
         for report in &reports {
             match crate::runner::report_from_proxy(py, report) {
-                Ok(r) => out.push(r),
+                Ok(mut r) => {
+                    // Extract subtest description for SubTestReport-like objects
+                    // (pytest-subtests emits these via ihook.pytest_runtest_logreport).
+                    // Try both naming conventions: our shim uses "_sub_test_description"
+                    // while the real pytest-subtests plugin uses "sub_test_description".
+                    let desc = report
+                        .call_method0("sub_test_description")
+                        .or_else(|_| report.call_method0("_sub_test_description"))
+                        .and_then(|v| v.extract::<String>())
+                        .ok();
+                    if let Some(d) = desc {
+                        r.subtest_desc = Some(d);
+                    }
+                    out.push(r);
+                }
                 Err(err) => {
                     eprintln!("INTERNAL ERROR: {}", format_exception(py, &err));
                 }
