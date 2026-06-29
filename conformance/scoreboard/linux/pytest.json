@@ -29,8 +29,8 @@
       "file": "testing/python/fixtures.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 204,
-      "failed": 4,
+      "passed": 203,
+      "failed": 5,
       "skipped": 2,
       "errors": 0,
       "deselected": 0
@@ -209,8 +209,8 @@
       "file": "testing/test_conftest.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 47,
-      "failed": 6,
+      "passed": 39,
+      "failed": 14,
       "skipped": 1,
       "errors": 0,
       "deselected": 0
