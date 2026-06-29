@@ -374,24 +374,28 @@ pub(crate) fn expand_parametrize(
             .getattr("_param_ids_from")
             .ok()
             .filter(|v| !v.is_none());
-        let cached_ids: Option<Vec<(Option<String>, bool)>> = param_ids_from.as_ref().and_then(|src| {
-            let generated = src.getattr("_param_ids_generated").ok().filter(|v| !v.is_none())?;
-            let ids_list: Vec<Bound<'_, PyAny>> =
-                generated.try_iter().ok()?.collect::<PyResult<_>>().ok()?;
-            Some(
-                ids_list
-                    .into_iter()
-                    .take(n_argvalues)
-                    .map(|id| {
-                        if id.is_none() {
-                            (None, false)
-                        } else {
-                            (id.extract::<String>().ok(), false)
-                        }
-                    })
-                    .collect(),
-            )
-        });
+        let cached_ids: Option<Vec<(Option<String>, bool)>> =
+            param_ids_from.as_ref().and_then(|src| {
+                let generated = src
+                    .getattr("_param_ids_generated")
+                    .ok()
+                    .filter(|v| !v.is_none())?;
+                let ids_list: Vec<Bound<'_, PyAny>> =
+                    generated.try_iter().ok()?.collect::<PyResult<_>>().ok()?;
+                Some(
+                    ids_list
+                        .into_iter()
+                        .take(n_argvalues)
+                        .map(|id| {
+                            if id.is_none() {
+                                (None, false)
+                            } else {
+                                (id.extract::<String>().ok(), false)
+                            }
+                        })
+                        .collect(),
+                )
+            });
         let needs_caching = cached_ids.is_none() && param_ids_from.is_some();
         let explicit_ids: Option<Vec<(Option<String>, bool)>> = if let Some(cached) = cached_ids {
             Some(cached)

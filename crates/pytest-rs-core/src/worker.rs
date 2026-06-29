@@ -186,7 +186,11 @@ impl Engine {
             .iter()
             .map(|item| (item.nodeid.clone(), xdist_group_of(py, item)))
             .unzip();
-        send(&WorkerMsg::Collection { nodeids, xdist_groups, errors: collect_errors });
+        send(&WorkerMsg::Collection {
+            nodeids,
+            xdist_groups,
+            errors: collect_errors,
+        });
         self.worker_loop(py, collection)
     }
 

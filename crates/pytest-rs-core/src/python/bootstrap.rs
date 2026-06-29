@@ -639,9 +639,7 @@ pub fn call_py_hook_raw(
         })
         .collect();
     let args_tuple = pyo3::types::PyTuple::new(py, args_vec)?;
-    let hook_call = py
-        .import("pytest._pluginmanager")?
-        .getattr("_hook_call")?;
+    let hook_call = py.import("pytest._pluginmanager")?.getattr("_hook_call")?;
     Ok(hook_call.call1((func, args_tuple))?.unbind())
 }
 

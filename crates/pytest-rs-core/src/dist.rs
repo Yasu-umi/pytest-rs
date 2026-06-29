@@ -52,7 +52,10 @@ enum Event {
     /// A fatal distribution condition, shown as a banner before the summary.
     Banner(String),
     /// A worker session was interrupted (KeyboardInterrupt / pytest.exit).
-    Interrupted { code: i32, banner: Option<String> },
+    Interrupted {
+        code: i32,
+        banner: Option<String>,
+    },
     /// Worker finished its precollect phase. Carries the full item set
     /// and any import errors so the merge loop can build batches.
     Collection {
@@ -611,7 +614,9 @@ impl Engine {
                         if !seen_errors.insert((nodeid.clone(), err.clone())) {
                             continue; // duplicate from another worker
                         }
-                        self.session.collect_errors.push((nodeid.clone(), err.clone()));
+                        self.session
+                            .collect_errors
+                            .push((nodeid.clone(), err.clone()));
                         crate::python::reporter_collect_error(py, &nodeid, &err);
                         reports.push(TestReport {
                             nodeid,
@@ -857,7 +862,10 @@ impl Engine {
                     })
                 });
             if same_module {
-                batches.back_mut().expect("just checked").push(nodeid.clone());
+                batches
+                    .back_mut()
+                    .expect("just checked")
+                    .push(nodeid.clone());
             } else {
                 batches.push_back(vec![nodeid.clone()]);
             }
@@ -1249,7 +1257,9 @@ impl WorkerOwner {
             let Some(line) = proc.lines.next() else {
                 break None; // EOF: worker died during precollect
             };
-            let Ok(line) = line else { break None; };
+            let Ok(line) = line else {
+                break None;
+            };
             if line.trim().is_empty() {
                 continue;
             }
@@ -1420,7 +1430,6 @@ impl WorkerOwner {
         }
     }
 }
-
 
 fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
     std::fs::create_dir_all(dst)?;
