@@ -51,9 +51,17 @@ pub fn sys_path_prepend(py: Python<'_>, path: &Path) -> PyResult<()> {
     let sys_path = py.import("sys")?.getattr("path")?;
     let sys_path = sys_path.cast::<PyList>().map_err(PyErr::from)?;
     let entry = path.to_string_lossy().to_string();
-    if !sys_path.contains(&entry)? {
-        sys_path.insert(0, entry)?;
+    // Remove existing occurrence first so the entry is always at position 0.
+    // A simple "skip if already present" would leave the path at a lower
+    // priority position when PYTHONPATH contains it after other directories,
+    // allowing those earlier entries to shadow project-root packages.
+    if let Some(i) = sys_path
+        .iter()
+        .position(|e| e.extract::<String>().ok().as_deref() == Some(&entry))
+    {
+        sys_path.del_item(i)?;
     }
+    sys_path.insert(0, entry)?;
     Ok(())
 }
 
