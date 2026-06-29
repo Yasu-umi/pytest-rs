@@ -136,7 +136,14 @@ impl Engine {
         // cause conftest discovery to walk up from those out-of-scope locations and
         // load unrelated conftests — matching what pytest does (it only walks from
         // explicit collection paths, not from incidentally discovered files).
-        let explicit_dirs = start_dirs.clone();
+        //
+        // Canonicalize before starts_with: a path like `invocation_dir/..` does
+        // not pass starts_with against a canonical file path even though they
+        // resolve to the same location (Path::starts_with is purely lexical).
+        let explicit_dirs: Vec<PathBuf> = start_dirs
+            .iter()
+            .map(|d| d.canonicalize().unwrap_or_else(|_| d.clone()))
+            .collect();
         start_dirs.extend(
             files
                 .iter()
