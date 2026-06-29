@@ -130,9 +130,17 @@ impl Engine {
                 }
             }
         }
+        // Only add parent dirs of files that are actually under one of the explicit
+        // start_dirs. Files discovered via sys.path (e.g. editable installs) can
+        // reside outside the intended collection scope; including their parents would
+        // cause conftest discovery to walk up from those out-of-scope locations and
+        // load unrelated conftests — matching what pytest does (it only walks from
+        // explicit collection paths, not from incidentally discovered files).
+        let explicit_dirs = start_dirs.clone();
         start_dirs.extend(
             files
                 .iter()
+                .filter(|f| explicit_dirs.iter().any(|d| f.starts_with(d)))
                 .filter_map(|f| f.parent().map(std::path::Path::to_path_buf)),
         );
 
