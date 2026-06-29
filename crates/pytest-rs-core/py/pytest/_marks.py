@@ -15,10 +15,12 @@ HIDDEN_PARAM = _HiddenParam.token
 
 
 class Mark:
-    def __init__(self, name, args=(), kwargs=None):
+    def __init__(self, name, args=(), kwargs=None, *, _param_ids_from=None, _param_ids_generated=None, _ispytest=False):
         self.name = name
         self.args = tuple(args)
         self.kwargs = dict(kwargs or {})
+        self._param_ids_from = _param_ids_from
+        self._param_ids_generated = _param_ids_generated
 
     def __repr__(self):
         return f"Mark({self.name!r}, {self.args!r}, {self.kwargs!r})"
@@ -31,9 +33,23 @@ class Mark:
     def __hash__(self):
         return hash((self.name, self.args))
 
+    def _has_param_ids(self):
+        return "ids" in self.kwargs or len(self.args) >= 4
+
     def combined_with(self, other):
         assert self.name == other.name
-        return Mark(self.name, self.args + other.args, {**self.kwargs, **other.kwargs})
+        param_ids_from = None
+        if self.name == "parametrize":
+            if other._has_param_ids():
+                param_ids_from = other
+            elif self._has_param_ids():
+                param_ids_from = self
+        return Mark(
+            self.name,
+            self.args + other.args,
+            {**self.kwargs, **other.kwargs},
+            _param_ids_from=param_ids_from,
+        )
 
 
 class MarkDecorator:
@@ -66,9 +82,8 @@ class MarkDecorator:
     def with_args(self, *args, **kwargs):
         """Bind arguments without applying — even a lone callable arg is an
         argument, not a decoration target."""
-        return MarkDecorator(
-            Mark(self.mark.name, self.mark.args + args, {**self.mark.kwargs, **kwargs})
-        )
+        other = Mark(self.mark.name, args, kwargs)
+        return MarkDecorator(self.mark.combined_with(other))
 
     def __call__(self, *args, **kwargs):
         if args and not kwargs:

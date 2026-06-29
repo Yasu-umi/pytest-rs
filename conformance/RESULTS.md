@@ -2873,7 +2873,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2608 | 181 | 0 | 53 | 8 | 2850 | 93.4% | 22 | 55 | 61 |
+| pytest | 9.0.3 | 2608 | 180 | 0 | 53 | 8 | 2849 | 93.4% | 21 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 1 | 7 | 85.7% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 0 | 88 | 100.0% | 1 | 1 | 0 |
@@ -2885,7 +2885,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | anyio | 4.13.0 | 2860 | 0 | 0 | 302 | 0 | 3162 | 100.0% | 26 | 26 | 0 |
 | pytest-mypy | v1.0.1 | 76 | 0 | 0 | 2 | 0 | 78 | 100.0% | 1 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
-| pytest-subtests | v0.14.2 | 32 | 0 | 0 | 0 | 0 | 32 | 100.0% | 1 | 1 | 0 |
+| pytest-subtests | v0.14.2 | 25 | 7 | 0 | 0 | 0 | 32 | 78.1% | 0 | 1 | 0 |
 | pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-snapshot | v0.9.0 | 102 | 5 | 0 | 0 | 0 | 107 | 95.3% | 0 | 3 | 0 |
 | pytest-icdiff | 0.5 | 10 | 2 | 0 | 0 | 0 | 12 | 83.3% | 0 | 1 | 0 |
@@ -2920,7 +2920,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 
 ### pytest @ 9.0.3
 
-<details><summary>per-file detail (55 files)</summary>
+<details><summary>per-file detail (54 files)</summary>
 
 | file | status | passed | failed | errors | skipped | deselected |
 |---|---|---:|---:|---:|---:|---:|
@@ -2928,7 +2928,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | testing/python/collect.py | failed | 77 | 5 | 0 | 0 | 0 |
 | testing/python/fixtures.py | failed | 204 | 4 | 0 | 2 | 0 |
 | testing/python/integration.py | failed | 13 | 3 | 0 | 4 | 0 |
-| testing/python/metafunc.py | failed | 101 | 11 | 0 | 0 | 0 |
+| testing/python/metafunc.py | failed | 102 | 10 | 0 | 0 | 0 |
 | testing/python/raises.py | passed | 31 | 0 | 0 | 0 | 0 |
 | testing/python/raises_group.py | failed | 26 | 3 | 0 | 0 | 0 |
 | testing/python/show_fixtures_per_test.py | passed | 8 | 0 | 0 | 0 | 0 |
@@ -2945,7 +2945,6 @@ are out of scope for pytest-rs; they are not counted in the total.
 | testing/test_compat.py | passed | 10 | 0 | 0 | 0 | 0 |
 | testing/test_config.py | failed | 203 | 11 | 0 | 1 | 0 |
 | testing/test_conftest.py | failed | 47 | 6 | 0 | 1 | 0 |
-| testing/test_debug_session.py | passed | 1 | 0 | 0 | 0 | 0 |
 | testing/test_doctest.py | passed | 139 | 0 | 0 | 1 | 0 |
 | testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 | 0 |
 | testing/test_faulthandler.py | failed | 5 | 7 | 0 | 0 | 0 |
@@ -3159,7 +3158,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected |
 |---|---|---:|---:|---:|---:|---:|
-| tests/test_subtests.py | passed | 32 | 0 | 0 | 0 | 0 |
+| tests/test_subtests.py | failed | 25 | 7 | 0 | 0 | 0 |
 
 </details>
 

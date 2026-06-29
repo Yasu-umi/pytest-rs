@@ -364,27 +364,66 @@ pub(crate) fn expand_parametrize(
         };
         let ids_obj = mark.obj.bind(py).getattr("kwargs")?.get_item("ids").ok();
         let n_argvalues = argvalues.len().unwrap_or(usize::MAX);
-        let explicit_ids: Option<Vec<(Option<String>, bool)>> = ids_obj.as_ref().and_then(|ids| {
-            if ids.is_callable() {
-                return None;
-            }
-            let iter = ids.try_iter().ok()?;
-            let mut result = Vec::new();
-            for id in iter {
-                if result.len() >= n_argvalues {
-                    break;
-                }
-                let id = id.ok()?;
-                if id.is(&hidden_param) {
-                    result.push((None, true));
-                } else if id.is_none() {
-                    result.push((None, false));
-                } else {
-                    result.push((Some(id.extract::<String>().ok()?), false));
-                }
-            }
-            Some(result)
+        // When multiple functions share the same parametrize mark's ids generator
+        // (via combined_with / _param_ids_from), the generator is exhausted after
+        // the first function. Real pytest caches the resolved IDs on the source
+        // mark's _param_ids_generated so subsequent functions reuse them.
+        let param_ids_from: Option<Bound<'_, PyAny>> = mark
+            .obj
+            .bind(py)
+            .getattr("_param_ids_from")
+            .ok()
+            .filter(|v| !v.is_none());
+        let cached_ids: Option<Vec<(Option<String>, bool)>> = param_ids_from.as_ref().and_then(|src| {
+            let generated = src.getattr("_param_ids_generated").ok().filter(|v| !v.is_none())?;
+            let ids_list: Vec<Bound<'_, PyAny>> =
+                generated.try_iter().ok()?.collect::<PyResult<_>>().ok()?;
+            Some(
+                ids_list
+                    .into_iter()
+                    .take(n_argvalues)
+                    .map(|id| {
+                        if id.is_none() {
+                            (None, false)
+                        } else {
+                            (id.extract::<String>().ok(), false)
+                        }
+                    })
+                    .collect(),
+            )
         });
+        let needs_caching = cached_ids.is_none() && param_ids_from.is_some();
+        let explicit_ids: Option<Vec<(Option<String>, bool)>> = if let Some(cached) = cached_ids {
+            Some(cached)
+        } else {
+            ids_obj.as_ref().and_then(|ids| {
+                if ids.is_callable() {
+                    return None;
+                }
+                let iter = ids.try_iter().ok()?;
+                let mut result = Vec::new();
+                for id in iter {
+                    if result.len() >= n_argvalues {
+                        break;
+                    }
+                    let id = id.ok()?;
+                    if id.is(&hidden_param) {
+                        result.push((None, true));
+                    } else if id.is_none() {
+                        result.push((None, false));
+                    } else {
+                        // Non-string ID values (int, float, etc.) are converted to
+                        // str, matching real pytest's _idval_from_ids behaviour.
+                        let s = id
+                            .extract::<String>()
+                            .or_else(|_| id.str().and_then(|s| s.to_str().map(|s| s.to_string())))
+                            .ok()?;
+                        result.push((Some(s), false));
+                    }
+                }
+                Some(result)
+            })
+        };
         // ids=callable: idfn(val) per value, None falling through to the
         // default id for that value (upstream _idval_from_function).
         let ids_callable = ids_obj.filter(|ids| ids.is_callable());
@@ -584,6 +623,37 @@ pub(crate) fn expand_parametrize(
             });
         }
         dedup_param_ids(py, &mut sets, nodeid, &argnames, strict_ids)?;
+        // Cache resolved IDs on the shared source mark so other functions
+        // sharing the same generator (via _param_ids_from) can reuse them.
+        if needs_caching {
+            if let Some(src) = param_ids_from.as_ref() {
+                let id_strs: Vec<Py<PyAny>> = sets
+                    .iter()
+                    .map(|s| match s.id_part.as_ref() {
+                        Some(id) => pyo3::types::PyString::new(py, id).into_any().unbind(),
+                        None => py.None(),
+                    })
+                    .collect();
+                if let Ok(py_list) =
+                    pyo3::types::PyList::new(py, id_strs.iter().map(|v| v.bind(py)))
+                {
+                    // Our shim Mark is a plain class; setattr works directly.
+                    // For upstream's frozen Mark dataclass, object.__setattr__
+                    // is needed — try setattr first, fall back to it.
+                    if src.setattr("_param_ids_generated", &py_list).is_err() {
+                        let _ = py
+                            .import("builtins")
+                            .and_then(|m| m.getattr("object"))
+                            .and_then(|obj| {
+                                obj.call_method1(
+                                    "__setattr__",
+                                    (src, "_param_ids_generated", &py_list),
+                                )
+                            });
+                    }
+                }
+            }
+        }
         if sets.is_empty() {
             sets.push(notset_param_set(
                 py,
