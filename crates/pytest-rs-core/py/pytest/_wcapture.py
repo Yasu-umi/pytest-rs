@@ -224,7 +224,14 @@ def _apply_filter(spec, escape):
     try:
         warnings.filterwarnings(*parse_filter(spec, escape=escape))
     except ImportError as e:
-        warnings.warn(f"Failed to import filter module '{e.name}': {spec}", PytestConfigWarning)
+        # Use _fire_config_time_warning instead of warnings.warn so that an
+        # active "error" filter (e.g. a prior `filterwarnings = error` line)
+        # does not turn this diagnostic into a raised exception that Rust
+        # code treats as USAGE_ERROR.
+        _fire_config_time_warning(
+            PytestConfigWarning(f"Failed to import filter module '{e.name}': {spec}"),
+            stacklevel=2,
+        )
 
 
 # The session's filter specs (ini then -W), kept for pytester: upstream's
