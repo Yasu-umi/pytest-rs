@@ -194,7 +194,7 @@ impl CovPlugin {
         {
             return Err(pytest_rs_core::python::usage_error(
                 py,
-                "markdown and markdown-append options cannot point to the same file.",
+                "error: markdown and markdown-append options cannot point to the same file.",
             ));
         }
         Ok(reports)
