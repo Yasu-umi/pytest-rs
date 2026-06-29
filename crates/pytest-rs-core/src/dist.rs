@@ -256,34 +256,6 @@ impl Engine {
         );
     }
 
-    /// --dist=loadgroup: the item's scheduling group — its xdist_group mark
-    /// names, sorted and joined with "_" (upstream LoadGroupScheduling).
-    fn xdist_group_of(py: Python<'_>, item: &crate::collect::TestItem) -> Option<String> {
-        let mut names: Vec<String> = item
-            .marks
-            .iter()
-            .filter(|mark| mark.name == "xdist_group")
-            .filter_map(|mark| {
-                let obj = mark.obj.bind(py);
-                obj.getattr("kwargs")
-                    .ok()
-                    .and_then(|kwargs| kwargs.get_item("name").ok())
-                    .and_then(|value| value.extract().ok())
-                    .or_else(|| {
-                        obj.getattr("args")
-                            .ok()
-                            .and_then(|args| args.get_item(0).ok())
-                            .and_then(|value| value.extract().ok())
-                    })
-            })
-            .collect();
-        if names.is_empty() {
-            return None;
-        }
-        names.sort();
-        Some(names.join("_"))
-    }
-
     pub(crate) fn run_dist(&mut self, py: Python<'_>, workers: usize) {
         // Print "created: N/N workers" immediately (item count comes later
         // from the merge loop once all workers report their Collections).
@@ -368,19 +340,19 @@ impl Engine {
         let worker_chdirs = self.config.tx_worker_chdirs();
 
         // --rsyncdir: copy each specified directory into every worker's chdir.
-        if let Some(chdirs) = &worker_chdirs {
-            if let Some(rsyncdirs) = self.config.get_values("rsyncdir") {
-                let unique_chdirs: std::collections::HashSet<&str> =
-                    chdirs.iter().flatten().map(String::as_str).collect();
-                for chdir in unique_chdirs {
-                    let dest_base = std::path::Path::new(chdir);
-                    for src_str in &rsyncdirs {
-                        let src = std::path::Path::new(src_str);
-                        if src.is_dir() {
-                            if let Some(name) = src.file_name() {
-                                let _ = copy_dir_recursive(src, &dest_base.join(name));
-                            }
-                        }
+        if let Some(chdirs) = &worker_chdirs
+            && let Some(rsyncdirs) = self.config.get_values("rsyncdir")
+        {
+            let unique_chdirs: std::collections::HashSet<&str> =
+                chdirs.iter().flatten().map(String::as_str).collect();
+            for chdir in unique_chdirs {
+                let dest_base = std::path::Path::new(chdir);
+                for src_str in &rsyncdirs {
+                    let src = std::path::Path::new(src_str);
+                    if src.is_dir()
+                        && let Some(name) = src.file_name()
+                    {
+                        let _ = copy_dir_recursive(src, &dest_base.join(name));
                     }
                 }
             }
@@ -479,77 +451,6 @@ impl Engine {
                 }
             }
         }
-    }
-
-    /// Partition collected items into worker batches for the active dist
-    /// mode (loadscope/loadfile/loadgroup fold per file/group; `each`
-    /// duplicates the queue per worker) and reorder largest-first. Returns
-    /// the batch queue and the nodeid -> xdist_group map (for -v display).
-    fn build_dist_batches(
-        &self,
-        py: Python<'_>,
-        workers: usize,
-    ) -> (VecDeque<Vec<String>>, HashMap<String, String>) {
-        let dist_mode = self.config.get_value("dist").unwrap_or("load");
-        let per_module = matches!(dist_mode, "loadscope" | "loadfile" | "loadgroup");
-
-        // loadgroup: same-group items always batch together (one worker),
-        // and their -v nodeids display as "nodeid@group".
-        let mut nodeid_groups: HashMap<String, String> = HashMap::new();
-        let mut group_batches: HashMap<String, usize> = HashMap::new();
-        let mut batches: VecDeque<Vec<String>> = VecDeque::new();
-        for item in &self.session.items {
-            if dist_mode == "loadgroup"
-                && let Some(group) = Self::xdist_group_of(py, item)
-            {
-                nodeid_groups.insert(item.nodeid.clone(), group.clone());
-                match group_batches.get(&group) {
-                    Some(&index) => batches[index].push(item.nodeid.clone()),
-                    None => {
-                        group_batches.insert(group, batches.len());
-                        batches.push_back(vec![item.nodeid.clone()]);
-                    }
-                }
-                continue;
-            }
-            let file = item.nodeid.split("::").next().unwrap_or("");
-            let same_module = per_module
-                && batches.back().is_some_and(|batch: &Vec<String>| {
-                    batch.first().is_some_and(|first| {
-                        first.split("::").next().unwrap_or("") == file
-                            // Never fold ungrouped items into a group batch.
-                            && !nodeid_groups.contains_key(first)
-                    })
-                });
-            if same_module {
-                batches
-                    .back_mut()
-                    .expect("just checked")
-                    .push(item.nodeid.clone());
-            } else {
-                batches.push_back(vec![item.nodeid.clone()]);
-            }
-        }
-        // loadscope/loadfile/loadgroup reorder the work queue by descending
-        // unit size by default (xdist LoadScopeScheduling.schedule, gated on
-        // --loadscope-reorder / --no-loadscope-reorder; default on). The sort
-        // is stable, so equal-size units keep collection order. This is what
-        // sends the largest scope to the first available worker.
-        let reorder = per_module && !self.config.get_flag("no-loadscope-reorder");
-        if reorder {
-            let mut ordered: Vec<Vec<String>> = batches.into_iter().collect();
-            ordered.sort_by_key(|batch| std::cmp::Reverse(batch.len()));
-            batches = ordered.into();
-        }
-
-        if dist_mode == "each" {
-            // every test runs on every worker
-            let base: Vec<Vec<String>> = batches.iter().cloned().collect();
-            for _ in 1..workers {
-                batches.extend(base.iter().cloned());
-            }
-        }
-        (batches, nodeid_groups)
     }
 
     /// Drain worker events in arrival order: stream progress, accumulate
@@ -654,9 +555,7 @@ impl Engine {
                         self.session.exit_code_override =
                             Some(crate::report::exit_code::TESTS_FAILED);
                     }
-                    if collections_pending > 0 {
-                        collections_pending -= 1;
-                    }
+                    collections_pending = collections_pending.saturating_sub(1);
                     if collections_pending == 0 {
                         // All workers have reported: build nodeid_groups map
                         // for verbose display, build batches, push to queue.
@@ -896,7 +795,7 @@ impl Engine {
     /// they never return. A failed fork yields None and that slot spawns
     /// instead.
     #[cfg(unix)]
-    #[allow(unsafe_code)]
+    #[allow(unsafe_code, dead_code)]
     fn fork_workers(
         &mut self,
         py: Python<'_>,
@@ -1055,6 +954,7 @@ impl Engine {
 enum WorkerHandle {
     Spawned(Child),
     #[cfg(unix)]
+    #[allow(dead_code)]
     Forked(libc::pid_t),
 }
 
@@ -1114,13 +1014,13 @@ impl WorkerOwner {
                 if path.is_absolute() {
                     for src_str in &self.rsyncdirs {
                         let src = std::path::Path::new(src_str);
-                        if let Ok(rel) = path.strip_prefix(src) {
-                            if let Some(name) = src.file_name() {
-                                return std::path::Path::new(name)
-                                    .join(rel)
-                                    .to_string_lossy()
-                                    .into_owned();
-                            }
+                        if let Ok(rel) = path.strip_prefix(src)
+                            && let Some(name) = src.file_name()
+                        {
+                            return std::path::Path::new(name)
+                                .join(rel)
+                                .to_string_lossy()
+                                .into_owned();
                         }
                     }
                 }
@@ -1234,7 +1134,7 @@ impl WorkerOwner {
         }
     }
 
-    fn run(mut self) {
+    fn run(self) {
         let mut proc = match self.spawn() {
             Ok(proc) => proc,
             Err(err) => {
@@ -1392,7 +1292,7 @@ impl WorkerOwner {
 
         // Drain post-shutdown frames: final scope-teardown failure reports,
         // warnings, plugin dumps, bye.
-        while let Some(line) = proc.lines.next() {
+        for line in proc.lines.by_ref() {
             let Ok(line) = line else { break };
             if line.trim().is_empty() {
                 continue;

@@ -629,32 +629,32 @@ pub(crate) fn expand_parametrize(
         dedup_param_ids(py, &mut sets, nodeid, &argnames, strict_ids)?;
         // Cache resolved IDs on the shared source mark so other functions
         // sharing the same generator (via _param_ids_from) can reuse them.
-        if needs_caching {
-            if let Some(src) = param_ids_from.as_ref() {
-                let id_strs: Vec<Py<PyAny>> = sets
-                    .iter()
-                    .map(|s| match s.id_part.as_ref() {
-                        Some(id) => pyo3::types::PyString::new(py, id).into_any().unbind(),
-                        None => py.None(),
-                    })
-                    .collect();
-                if let Ok(py_list) =
-                    pyo3::types::PyList::new(py, id_strs.iter().map(|v| v.bind(py)))
-                {
-                    // Our shim Mark is a plain class; setattr works directly.
-                    // For upstream's frozen Mark dataclass, object.__setattr__
-                    // is needed — try setattr first, fall back to it.
-                    if src.setattr("_param_ids_generated", &py_list).is_err() {
-                        let _ = py
-                            .import("builtins")
-                            .and_then(|m| m.getattr("object"))
-                            .and_then(|obj| {
-                                obj.call_method1(
-                                    "__setattr__",
-                                    (src, "_param_ids_generated", &py_list),
-                                )
-                            });
-                    }
+        if needs_caching
+            && let Some(src) = param_ids_from.as_ref()
+        {
+            let id_strs: Vec<Py<PyAny>> = sets
+                .iter()
+                .map(|s| match s.id_part.as_ref() {
+                    Some(id) => pyo3::types::PyString::new(py, id).into_any().unbind(),
+                    None => py.None(),
+                })
+                .collect();
+            if let Ok(py_list) =
+                pyo3::types::PyList::new(py, id_strs.iter().map(|v| v.bind(py)))
+            {
+                // Our shim Mark is a plain class; setattr works directly.
+                // For upstream's frozen Mark dataclass, object.__setattr__
+                // is needed — try setattr first, fall back to it.
+                if src.setattr("_param_ids_generated", &py_list).is_err() {
+                    let _ = py
+                        .import("builtins")
+                        .and_then(|m| m.getattr("object"))
+                        .and_then(|obj| {
+                            obj.call_method1(
+                                "__setattr__",
+                                (src, "_param_ids_generated", &py_list),
+                            )
+                        });
                 }
             }
         }

@@ -199,6 +199,7 @@ impl Engine {
     /// configure hooks — arrived via fork, so collection reduces to
     /// re-indexing the parent's collected items.
     #[cfg(unix)]
+    #[allow(dead_code)]
     pub(crate) fn run_worker_forked(&mut self, py: Python<'_>) -> i32 {
         // The inherited config was parsed by the controller (no --worker
         // flag); plugins must still see this process as a worker (e.g. cov
@@ -355,23 +356,23 @@ impl Engine {
         }
         // Fire conftest/plugin pytest_sessionfinish py_hooks so worker-side
         // pytest_sessionfinish can populate config.workeroutput for the controller.
-        if !py_sessionfinish.is_empty() {
-            if let (Ok(config_proxy), Ok(session_proxy), Ok(exitstatus)) = (
+        if !py_sessionfinish.is_empty()
+            && let (Ok(config_proxy), Ok(session_proxy), Ok(exitstatus)) = (
                 python::make_py_config(py, &self.config),
                 python::make_session_proxy(py, &self.config),
                 actual_exit.into_pyobject(py).map(|o| o.unbind().into_any()),
-            ) {
-                for func in &py_sessionfinish {
-                    let _ = python::call_py_hook(
-                        py,
-                        func,
-                        &[
-                            ("config", config_proxy.clone_ref(py)),
-                            ("session", session_proxy.clone_ref(py)),
-                            ("exitstatus", exitstatus.clone_ref(py)),
-                        ],
-                    );
-                }
+            )
+        {
+            for func in &py_sessionfinish {
+                let _ = python::call_py_hook(
+                    py,
+                    func,
+                    &[
+                        ("config", config_proxy.clone_ref(py)),
+                        ("session", session_proxy.clone_ref(py)),
+                        ("exitstatus", exitstatus.clone_ref(py)),
+                    ],
+                );
             }
         }
         for plugin in self.plugins.iter_mut() {
