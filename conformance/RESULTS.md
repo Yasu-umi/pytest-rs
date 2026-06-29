@@ -23,7 +23,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 1 | 7 | 85.7% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 2 | 90 | 97.8% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 186 | 20 | 0 | 3 | 0 | 209 | 90.4% | 0 | 1 | 0 |
-| pytest-xdist | v3.8.0 | 96 | 1 | 0 | 1 | 0 | 98 | 99.0% | 0 | 1 | 6 |
+| pytest-xdist | v3.8.0 | 97 | 0 | 0 | 1 | 0 | 98 | 100.0% | 1 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 109 | 13 | 0 | 1 | 0 | 123 | 89.4% | 4 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 2 | 43 | 95.3% | 1 | 1 | 0 |
@@ -202,7 +202,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected |
 |---|---|---:|---:|---:|---:|---:|
-| testing/acceptance_test.py | failed | 96 | 1 | 0 | 1 | 0 |
+| testing/acceptance_test.py | passed | 97 | 0 | 0 | 1 | 0 |
 
 </details>
 
