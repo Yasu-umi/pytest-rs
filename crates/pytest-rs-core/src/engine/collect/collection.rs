@@ -241,7 +241,7 @@ impl Engine {
     /// Phase 7: import each Python test file (recording collect errors /
     /// module-level skips), collecting its functions and `--doctest-modules`
     /// doctests; explicit non-Python files are routed to the doctest collector
-    /// or recorded as "not found".
+    /// or returned as deferred (to be checked after custom collection runs).
     pub(crate) fn collect_files(
         &mut self,
         py: Python<'_>,
@@ -249,7 +249,7 @@ impl Engine {
         files: &[PathBuf],
         errors: &mut Vec<(PathBuf, String)>,
         skip_module_import: bool,
-    ) -> Result<(), String> {
+    ) -> Result<Vec<PathBuf>, String> {
         // pytest's catching_logs around pytest_collection: a root handler
         // during import keeps module-level logging calls from triggering
         // logging.basicConfig (issue #6240).
@@ -514,15 +514,10 @@ impl Engine {
             }
         }
 
-        // Explicit file args with no matching collector → USAGE_ERROR.
-        if !not_found_files.is_empty() {
-            for file in &not_found_files {
-                eprintln!("ERROR: not found: {}", file.display());
-                eprintln!("(no match in any of [<Session ''>])");
-                eprintln!();
-            }
-            return Err("\x00USAGE_ERROR\x00".to_string());
-        }
-        Ok(())
+        // Return deferred non-Python files for the caller to check after
+        // custom collection (collect_extra_and_custom) runs. Custom hooks like
+        // pytest_collect_file may handle them; those that remain uncollected
+        // will be reported as "not found" by the caller.
+        Ok(not_found_files)
     }
 }

@@ -53,8 +53,24 @@ impl Engine {
         let skip_module_import = false;
 
         let collect_result = (|| -> Result<(), String> {
-            self.collect_files(py, &rootdir, &files, &mut errors, skip_module_import)?;
+            let deferred_not_found =
+                self.collect_files(py, &rootdir, &files, &mut errors, skip_module_import)?;
             self.collect_extra_and_custom(py, &rootdir, &paths, &files, &mut errors)?;
+            // Non-Python explicit file args that no custom collector handled → USAGE_ERROR.
+            if !deferred_not_found.is_empty() {
+                let truly_not_found: Vec<_> = deferred_not_found
+                    .into_iter()
+                    .filter(|f| !self.session.items.iter().any(|item| &item.path == f))
+                    .collect();
+                if !truly_not_found.is_empty() {
+                    for file in &truly_not_found {
+                        eprintln!("ERROR: not found: {}", file.display());
+                        eprintln!("(no match in any of [<Session ''>])");
+                        eprintln!();
+                    }
+                    return Err("\x00USAGE_ERROR\x00".to_string());
+                }
+            }
             if let Err(err) =
                 python::validate_dynamic_fixture_scopes(py, &self.config, &self.session.registry)
             {

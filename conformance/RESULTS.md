@@ -2873,7 +2873,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2612 | 177 | 0 | 53 | 8 | 2850 | 93.5% | 23 | 55 | 61 |
+| pytest | 9.0.3 | 2608 | 181 | 0 | 53 | 8 | 2850 | 93.4% | 22 | 55 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 1 | 7 | 85.7% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 0 | 88 | 100.0% | 1 | 1 | 0 |
@@ -2907,7 +2907,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | starlette | 0.46.2 | 907 | 0 | 0 | 0 | 0 | 907 | 100.0% | 28 | 28 | 0 |
 | attrs | 25.3.0 | 1342 | 0 | 0 | 3 | 0 | 1345 | 100.0% | 23 | 24 | 0 |
 | more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 0 | 671 | 100.0% | 2 | 2 | 0 |
-| pytest-django | v4.9.0 | 210 | 5 | 0 | 1 | 0 | 216 | 97.7% | 7 | 13 | 0 |
+| pytest-django | v4.9.0 | 205 | 10 | 0 | 1 | 0 | 216 | 95.4% | 6 | 13 | 0 |
 | werkzeug | 3.1.3 | 922 | 0 | 0 | 1 | 0 | 923 | 100.0% | 24 | 25 | 0 |
 | fastapi | 0.115.12 | 2332 | 1 | 1 | 130 | 0 | 2464 | 99.9% | 302 | 310 | 0 |
 | packaging | 25.0 | 26946 | 0 | 0 | 1 | 0 | 26947 | 100.0% | 12 | 12 | 0 |
@@ -2941,7 +2941,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | testing/test_cacheprovider.py | failed | 54 | 3 | 0 | 0 | 0 |
 | testing/test_capture.py | failed | 128 | 2 | 0 | 2 | 0 |
 | testing/test_collect_imported_tests.py | failed | 2 | 1 | 0 | 0 | 0 |
-| testing/test_collection.py | failed | 100 | 13 | 0 | 3 | 0 |
+| testing/test_collection.py | failed | 102 | 11 | 0 | 3 | 0 |
 | testing/test_compat.py | passed | 10 | 0 | 0 | 0 | 0 |
 | testing/test_config.py | failed | 203 | 11 | 0 | 1 | 0 |
 | testing/test_conftest.py | failed | 47 | 6 | 0 | 1 | 0 |
@@ -2950,7 +2950,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 | 0 |
 | testing/test_faulthandler.py | failed | 5 | 7 | 0 | 0 | 0 |
 | testing/test_helpconfig.py | failed | 6 | 6 | 0 | 0 | 0 |
-| testing/test_junitxml.py | failed | 132 | 5 | 0 | 0 | 0 |
+| testing/test_junitxml.py | failed | 130 | 7 | 0 | 0 | 0 |
 | testing/test_link_resolve.py | failed | 0 | 1 | 0 | 0 | 0 |
 | testing/test_main.py | failed | 20 | 4 | 0 | 0 | 0 |
 | testing/test_mark.py | failed | 105 | 1 | 0 | 0 | 0 |
@@ -2964,13 +2964,13 @@ are out of scope for pytest-rs; they are not counted in the total.
 | testing/test_runner_xunit.py | passed | 13 | 0 | 0 | 0 | 0 |
 | testing/test_scope.py | passed | 4 | 0 | 0 | 0 | 0 |
 | testing/test_session.py | failed | 24 | 2 | 0 | 0 | 0 |
-| testing/test_setuponly.py | passed | 26 | 0 | 0 | 0 | 0 |
+| testing/test_setuponly.py | failed | 25 | 1 | 0 | 0 | 0 |
 | testing/test_setupplan.py | passed | 3 | 0 | 0 | 0 | 0 |
 | testing/test_skipping.py | failed | 91 | 1 | 0 | 0 | 0 |
 | testing/test_stash.py | passed | 1 | 0 | 0 | 0 | 0 |
 | testing/test_stepwise.py | passed | 18 | 0 | 0 | 0 | 0 |
 | testing/test_subtests.py | failed | 22 | 12 | 0 | 0 | 0 |
-| testing/test_terminal.py | failed | 210 | 13 | 0 | 4 | 0 |
+| testing/test_terminal.py | failed | 207 | 16 | 0 | 4 | 0 |
 | testing/test_threadexception.py | failed | 7 | 1 | 0 | 0 | 0 |
 | testing/test_tmpdir.py | passed | 39 | 0 | 0 | 1 | 0 |
 | testing/test_unittest.py | failed | 64 | 6 | 0 | 9 | 0 |
@@ -3716,7 +3716,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | tests/test_asserts.py | passed | 2 | 0 | 0 | 0 | 0 |
 | tests/test_database.py | failed | 60 | 1 | 0 | 0 | 0 |
 | tests/test_db_access_in_repr.py | failed | 0 | 1 | 0 | 0 | 0 |
-| tests/test_db_setup.py | passed | 14 | 0 | 0 | 0 | 0 |
+| tests/test_db_setup.py | failed | 9 | 5 | 0 | 0 | 0 |
 | tests/test_django_configurations.py | no-tests | 0 | 0 | 0 | 1 | 0 |
 | tests/test_django_settings_module.py | failed | 18 | 1 | 0 | 0 | 0 |
 | tests/test_environment.py | passed | 22 | 0 | 0 | 0 | 0 |
