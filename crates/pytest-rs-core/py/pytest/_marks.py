@@ -15,7 +15,16 @@ HIDDEN_PARAM = _HiddenParam.token
 
 
 class Mark:
-    def __init__(self, name, args=(), kwargs=None, *, _param_ids_from=None, _param_ids_generated=None, _ispytest=False):
+    def __init__(
+        self,
+        name,
+        args=(),
+        kwargs=None,
+        *,
+        _param_ids_from=None,
+        _param_ids_generated=None,
+        _ispytest=False,
+    ):
         self.name = name
         self.args = tuple(args)
         self.kwargs = dict(kwargs or {})
