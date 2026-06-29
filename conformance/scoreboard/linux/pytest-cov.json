@@ -9,8 +9,8 @@
       "file": "tests/test_pytest_cov.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 186,
-      "failed": 20,
+      "passed": 191,
+      "failed": 15,
       "skipped": 3,
       "errors": 0,
       "deselected": 0
