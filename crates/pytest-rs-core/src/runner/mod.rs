@@ -124,18 +124,50 @@ impl Engine {
             ($report:expr) => {
                 if let Some(report) = $report {
                     if report.outcome == Outcome::Failed {
-                        fire_logreport_hooks(py, session, &report, None, None, false);
-                        failed += 1;
-                        if !config.no_terminal()
-                            && tc <= 0
-                            && !session.live_logging
-                            && !line.is_empty()
-                        {
-                            print!("E");
-                            let _ = std::io::stdout().flush();
-                            line.push('E');
+                        // A failing scope teardown (class/module/package) runs
+                        // inside the last item's teardown phase, like pytest.
+                        // If that item already has a passing teardown report,
+                        // upgrade it in-place rather than adding a second
+                        // teardown report for the same nodeid (which would break
+                        // tests asserting exactly one teardown report per item).
+                        let upgrade_idx = session.reports.iter().rposition(|r| {
+                            r.phase == Phase::Teardown
+                                && r.nodeid == report.nodeid
+                                && r.outcome == Outcome::Passed
+                        });
+                        if let Some(idx) = upgrade_idx {
+                            {
+                                let existing = &mut session.reports[idx];
+                                existing.outcome = Outcome::Failed;
+                                existing.longrepr = report.longrepr;
+                                existing.sections.extend(report.sections);
+                            }
+                            // The deferred teardown flush fires the hook after
+                            // all scope teardowns; don't fire it a second time here.
+                            failed += 1;
+                            if !config.no_terminal()
+                                && tc <= 0
+                                && !session.live_logging
+                                && !line.is_empty()
+                            {
+                                print!("E");
+                                let _ = std::io::stdout().flush();
+                                line.push('E');
+                            }
+                        } else {
+                            fire_logreport_hooks(py, session, &report, None, None, false);
+                            failed += 1;
+                            if !config.no_terminal()
+                                && tc <= 0
+                                && !session.live_logging
+                                && !line.is_empty()
+                            {
+                                print!("E");
+                                let _ = std::io::stdout().flush();
+                                line.push('E');
+                            }
+                            session.reports.push(report);
                         }
-                        session.reports.push(report);
                     } else if let Some(existing) = session
                         .reports
                         .iter_mut()
@@ -184,6 +216,25 @@ impl Engine {
                     ));
                 }
             }};
+        }
+        // Deferred teardown hook: the teardown report's logreport hook fires
+        // AFTER all scope (class/module/package) teardowns for the previous
+        // item have run, so the hook sees the final (possibly upgraded) outcome.
+        // Tuple: (report index in session.reports, item lineno, item index, delegated).
+        let mut pending_teardown: Option<(usize, u32, usize, bool)> = None;
+        macro_rules! flush_pending_teardown {
+            () => {
+                if let Some((r_idx, lineno, item_idx, del)) = pending_teardown.take() {
+                    fire_logreport_hooks(
+                        py,
+                        session,
+                        &session.reports[r_idx],
+                        Some(lineno),
+                        items.get(item_idx),
+                        del,
+                    );
+                }
+            };
         }
 
         for idx in 0..items.len() {
@@ -238,6 +289,10 @@ impl Engine {
                 report_scope_teardown!(Scope::Module, prev_pkg, item);
             }
             prev_package = package;
+
+            // Fire the previous item's deferred teardown hook now that all
+            // scope teardowns have run and the report reflects the final outcome.
+            flush_pending_teardown!();
 
             let file = item
                 .nodeid
@@ -330,14 +385,17 @@ impl Engine {
             last_nodeid = Some(item.nodeid.clone());
             let mut item_failed = false;
             for (i, report) in reports.into_iter().enumerate() {
-                fire_logreport_hooks(
-                    py,
-                    session,
-                    &report,
-                    Some(item.lineno),
-                    Some(item),
-                    delegated,
-                );
+                let is_teardown = report.phase == Phase::Teardown;
+                if !is_teardown {
+                    fire_logreport_hooks(
+                        py,
+                        session,
+                        &report,
+                        Some(item.lineno),
+                        Some(item),
+                        delegated,
+                    );
+                }
                 // A "rerun" report is a retried attempt: shown as 'R', never
                 // counted as a failure or charged against --maxfail.
                 if report.outcome == Outcome::Failed && !report.rerun {
@@ -386,6 +444,9 @@ impl Engine {
                     );
                     let _ = std::io::stdout().flush();
                     line.push(c);
+                }
+                if is_teardown {
+                    pending_teardown = Some((session.reports.len(), item.lineno, idx, delegated));
                 }
                 session.reports.push(report);
             }
@@ -471,6 +532,7 @@ impl Engine {
         if let Some(last) = items.last() {
             report_scope_teardown!(Scope::Session, "", last);
         }
+        flush_pending_teardown!();
         if tc <= 0
             && !config.no_terminal()
             && !session.live_logging
