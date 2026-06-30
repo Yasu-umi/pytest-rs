@@ -257,6 +257,8 @@ impl Engine {
     /// judges success from the streamed reports).
     fn worker_loop(&mut self, py: Python<'_>, mut collection: WorkerCollection) -> i32 {
         let mut prev_module: Option<String> = None;
+        let maxfail = self.config.maxfail();
+        let mut total_failed = 0usize;
         let stdin = std::io::stdin();
         for line in stdin.lock().lines() {
             let Ok(line) = line else { break };
@@ -268,7 +270,7 @@ impl Engine {
             };
             match msg {
                 ParentMsg::Run { nodeids } => {
-                    self.run_batch(py, &mut collection, &mut prev_module, &nodeids);
+                    total_failed += self.run_batch(py, &mut collection, &mut prev_module, &nodeids);
                     // xdist's [setproctitle] extra: idle between batches.
                     python::worker_set_title(py, "[pytest-xdist idle]");
                     // Propagate KeyboardInterrupt / pytest.exit so the controller
@@ -277,6 +279,18 @@ impl Engine {
                         send(&WorkerMsg::Interrupted {
                             code,
                             banner: self.session.abort_banner.clone(),
+                        });
+                        send(&WorkerMsg::Done);
+                        break;
+                    }
+                    // Propagate --maxfail so the controller stops dispatching
+                    // the next batch before this worker pulls it from the queue.
+                    if let Some(m) = maxfail
+                        && total_failed >= m
+                    {
+                        send(&WorkerMsg::Interrupted {
+                            code: exit_code::TESTS_FAILED,
+                            banner: None,
                         });
                         send(&WorkerMsg::Done);
                         break;
@@ -409,7 +423,8 @@ impl Engine {
         collection: &mut WorkerCollection,
         prev_module: &mut Option<String>,
         nodeids: &[String],
-    ) {
+    ) -> usize {
+        let mut batch_failed = 0usize;
         for nodeid in nodeids {
             if let Err(message) = self.ensure_collected(py, collection, nodeid) {
                 send_collect_error(nodeid, message);
@@ -488,6 +503,10 @@ impl Engine {
             );
             collection.last_nodeid = Some(item.nodeid.clone());
             let pre_count = pre_teardown_count.get();
+            batch_failed += reports
+                .iter()
+                .filter(|r| r.outcome == crate::report::Outcome::Failed)
+                .count();
             for (i, report) in reports.into_iter().enumerate() {
                 crate::runner::fire_logreport_hooks(
                     py,
@@ -509,6 +528,7 @@ impl Engine {
                 "pytest_runtest_logfinish",
             );
         }
+        batch_failed
     }
 
     /// Import every test module the session can reach, mirroring the

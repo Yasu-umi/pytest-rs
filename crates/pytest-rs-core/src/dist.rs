@@ -164,6 +164,17 @@ impl WorkQueue {
         self.ready.notify_all();
     }
 
+    /// Block until the merge loop has called `stop()` (soft_stopped or aborted).
+    /// Called by the worker owner after forwarding `Event::Interrupted` so that
+    /// the next `next_blocking()` call is guaranteed to see `soft_stopped == true`
+    /// and return `None` instead of dispatching the next batch.
+    fn wait_soft_stopped(&self) {
+        let mut state = self.state.lock().expect("work queue lock poisoned");
+        while !state.soft_stopped && !state.aborted {
+            state = self.ready.wait(state).expect("work queue condvar poisoned");
+        }
+    }
+
     /// Crash bookkeeping, atomically: spend a restart and requeue the
     /// unfinished remainder onto this worker's slot, or exhaust the budget.
     fn crash(&self, worker_idx: usize, remaining: Vec<String>) -> CrashAction {
@@ -1268,6 +1279,10 @@ impl WorkerOwner {
                     Some(WorkerMsg::Done) => continue 'work,
                     Some(WorkerMsg::Interrupted { code, banner }) => {
                         let _ = self.sender.send(Event::Interrupted { code, banner });
+                        // Block until the merge loop calls queue.stop() so that
+                        // the next next_blocking() call sees soft_stopped == true
+                        // and returns None instead of dispatching another batch.
+                        self.queue.wait_soft_stopped();
                     }
                     Some(WorkerMsg::Extra { plugin, payload }) => {
                         let _ = self.sender.send(Event::Extra { plugin, payload });
