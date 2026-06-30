@@ -111,7 +111,7 @@ _linux (CI-verified)_
 
 | suite | tag | passed | failed | errors | skipped | deselected | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2587 | 201 | 0 | 53 | 8 | 2849 | 92.7% | 21 | 54 | 61 |
+| pytest | 9.0.3 | 2585 | 203 | 0 | 53 | 8 | 2849 | 92.6% | 21 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 2 | 90 | 97.8% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 191 | 15 | 0 | 3 | 0 | 209 | 92.8% | 0 | 1 | 0 |
@@ -128,7 +128,7 @@ _linux (CI-verified)_
 | pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 2 | 43 | 95.3% | 1 | 1 | 0 |
 | pytest-mypy | v1.0.1 | 53 | 23 | 0 | 2 | 0 | 78 | 70.5% | 0 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
-| pytest-subtests | v0.14.2 | 32 | 0 | 0 | 0 | 0 | 32 | 100.0% | 1 | 1 | 0 |
+| pytest-subtests | v0.14.2 | 20 | 12 | 0 | 0 | 0 | 32 | 62.5% | 0 | 1 | 0 |
 | pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-snapshot | v0.9.0 | 102 | 5 | 0 | 0 | 0 | 107 | 95.3% | 0 | 3 | 0 |
 | pytest-icdiff | 0.5 | 10 | 2 | 0 | 0 | 0 | 12 | 83.3% | 0 | 1 | 0 |
