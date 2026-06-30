@@ -394,7 +394,7 @@ class Pytester:
 
     def runpytest_inprocess(self, *args, timeout=None, plugins=()):
         """Run pytest in-process (shares sys state with the outer test)."""
-        reprec = self.inline_run(*args, plugins=plugins)
+        reprec = self._inline_run_inprocess(*args, plugins=plugins)
         result = getattr(reprec, "_result", None)
         if result is not None:
             result.reprec = reprec
