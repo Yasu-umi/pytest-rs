@@ -17,7 +17,7 @@ import types
 # tag, so it can never be confused with CPython's own (non-rewritten) bytecode
 # for the same file. Bump _CACHE_VERSION whenever _AssertRewriter's output
 # changes, to invalidate any stale rewritten pyc left on disk.
-_CACHE_VERSION = 4
+_CACHE_VERSION = 5
 _PYC_TAIL = f".{sys.implementation.cache_tag}-pytestrs{_CACHE_VERSION}.pyc"
 
 _OPS = {
@@ -269,6 +269,30 @@ def _explain_eq(left, right):
     return _explain_op("==", left, right)
 
 
+def _should_repr_global_name(obj):
+    """Port of upstream's visit_Name gate: a bare global Name is shown by
+    repr only if it isn't a callable/module/class-like object (those read
+    better as their plain identifier, e.g. `assert some_function`)."""
+    if callable(obj):
+        return False
+    try:
+        return not hasattr(obj, "__name__")
+    except Exception:
+        return True
+
+
+def _saferepr_or_repr(obj):
+    try:
+        from _pytest._io.saferepr import saferepr
+
+        return saferepr(obj)
+    except Exception:
+        try:
+            return repr(obj)
+        except Exception:
+            return object.__repr__(obj)
+
+
 class _AssertRewriter(ast.NodeTransformer):
     def __init__(self, path="<unknown>"):
         self._counter = 0
@@ -277,6 +301,27 @@ class _AssertRewriter(ast.NodeTransformer):
     def _temp(self):
         self._counter += 1
         return f"@pytest_rs_tmp{self._counter}"
+
+    @staticmethod
+    def _module_helper_call(func_name, args):
+        """AST for `__import__("pytest._rewrite")._rewrite.<func_name>(*args)`."""
+        return ast.Call(
+            func=ast.Attribute(
+                value=ast.Attribute(
+                    value=ast.Call(
+                        func=ast.Name(id="__import__", ctx=ast.Load()),
+                        args=[ast.Constant("pytest._rewrite")],
+                        keywords=[],
+                    ),
+                    attr="_rewrite",
+                    ctx=ast.Load(),
+                ),
+                attr=func_name,
+                ctx=ast.Load(),
+            ),
+            args=args,
+            keywords=[],
+        )
 
     def visit_Assert(self, node):
         test = node.test
@@ -540,6 +585,9 @@ class _AssertRewriter(ast.NodeTransformer):
 
     def _rewrite_generic(self, node):
         """Keep the assert but add the source text to the message."""
+        test = node.test
+        if isinstance(test, ast.Name) and isinstance(test.ctx, ast.Load):
+            return self._rewrite_name(node, test)
         try:
             source = ast.unparse(node.test)
         except Exception:
@@ -557,6 +605,46 @@ class _AssertRewriter(ast.NodeTransformer):
         )
         check = ast.If(
             test=ast.UnaryOp(op=ast.Not(), operand=node.test),
+            body=[raise_stmt],
+            orelse=[],
+        )
+        for child in ast.walk(check):
+            ast.copy_location(child, node)
+        return check
+
+    def _rewrite_name(self, node, name):
+        """`assert x` on a bare Name: pytest shows the name's runtime repr
+        when it's a local var or a 'should-repr' global (see
+        _should_repr_global_name), else the bare identifier text — mirrors
+        upstream's visit_Name."""
+        locs_call = ast.Call(func=ast.Name(id="locals", ctx=ast.Load()), args=[], keywords=[])
+        inlocs = ast.Compare(left=ast.Constant(name.id), ops=[ast.In()], comparators=[locs_call])
+        dorepr = self._module_helper_call(
+            "_should_repr_global_name", [ast.Name(id=name.id, ctx=ast.Load())]
+        )
+        test_expr = ast.BoolOp(op=ast.Or(), values=[inlocs, dorepr])
+        display_call = self._module_helper_call(
+            "_saferepr_or_repr", [ast.Name(id=name.id, ctx=ast.Load())]
+        )
+        ifexp = ast.IfExp(test=test_expr, body=display_call, orelse=ast.Constant(name.id))
+
+        message = ast.JoinedStr(
+            values=[
+                *self._user_msg_prefix(node),
+                ast.Constant("assert "),
+                ast.FormattedValue(value=ifexp, conversion=-1, format_spec=None),
+            ]
+        )
+        raise_stmt = ast.Raise(
+            exc=ast.Call(
+                func=ast.Name(id="AssertionError", ctx=ast.Load()),
+                args=[message],
+                keywords=[],
+            ),
+            cause=None,
+        )
+        check = ast.If(
+            test=ast.UnaryOp(op=ast.Not(), operand=name),
             body=[raise_stmt],
             orelse=[],
         )
