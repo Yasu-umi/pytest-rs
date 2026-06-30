@@ -419,6 +419,8 @@ class PluginManager:
     def getplugin(self, name: str) -> Any:
         if name in self._names:
             return self._names[name]
+        if name == "terminalprogress":
+            return True
         if name in ("logging-plugin", "logging"):
             from pytest import _logging
 
