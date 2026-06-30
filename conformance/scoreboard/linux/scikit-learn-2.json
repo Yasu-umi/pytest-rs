@@ -347,9 +347,9 @@
     },
     {
       "file": "sklearn/ensemble/tests/test_bagging.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 126,
       "failed": 0,
       "skipped": 0,
       "errors": 0,
