@@ -23,7 +23,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 1 | 7 | 85.7% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 2 | 90 | 97.8% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 191 | 15 | 0 | 3 | 0 | 209 | 92.8% | 0 | 1 | 0 |
-| pytest-xdist | v3.8.0 | 96 | 1 | 0 | 1 | 0 | 98 | 99.0% | 0 | 1 | 6 |
+| pytest-xdist | v3.8.0 | 97 | 0 | 0 | 1 | 0 | 98 | 100.0% | 1 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 109 | 13 | 0 | 1 | 0 | 123 | 89.4% | 4 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 2 | 43 | 95.3% | 1 | 1 | 0 |
@@ -60,7 +60,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 0 | 6894 | 100.0% | 259 | 266 | 0 |
 | pydantic | v2.11.7 | 5338 | 14 | 0 | 921 | 0 | 6273 | 99.8% | 77 | 82 | 0 |
 | scikit-learn-1 | 1.9.0 | 8432 | 0 | 0 | 6624 | 0 | 15056 | 100.0% | 79 | 87 | 0 |
-| scikit-learn-2 | 1.9.0 | 5046 | 0 | 0 | 1892 | 0 | 6938 | 100.0% | 52 | 58 | 0 |
+| scikit-learn-2 | 1.9.0 | 4920 | 0 | 0 | 1892 | 0 | 6812 | 100.0% | 51 | 58 | 0 |
 | scikit-learn-3 | 1.9.0 | 9251 | 3 | 0 | 2530 | 0 | 11784 | 100.0% | 104 | 114 | 0 |
 
 ### pytest @ 9.0.3
@@ -202,7 +202,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected |
 |---|---|---:|---:|---:|---:|---:|
-| testing/acceptance_test.py | failed | 96 | 1 | 0 | 1 | 0 |
+| testing/acceptance_test.py | passed | 97 | 0 | 0 | 1 | 0 |
 
 </details>
 
@@ -2719,7 +2719,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | sklearn/ensemble/_hist_gradient_boosting/tests/test_predictor.py | passed | 10 | 0 | 0 | 0 | 0 |
 | sklearn/ensemble/_hist_gradient_boosting/tests/test_splitting.py | passed | 33 | 0 | 0 | 0 | 0 |
 | sklearn/ensemble/_hist_gradient_boosting/tests/test_warm_start.py | passed | 20 | 0 | 0 | 0 | 0 |
-| sklearn/ensemble/tests/test_bagging.py | passed | 126 | 0 | 0 | 0 | 0 |
+| sklearn/ensemble/tests/test_bagging.py | timeout | 0 | 0 | 0 | 0 | 0 |
 | sklearn/ensemble/tests/test_base.py | passed | 2 | 0 | 0 | 0 | 0 |
 | sklearn/ensemble/tests/test_bootstrap.py | passed | 8 | 0 | 0 | 0 | 0 |
 | sklearn/ensemble/tests/test_common.py | passed | 19 | 0 | 0 | 0 | 0 |
