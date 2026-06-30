@@ -459,8 +459,8 @@
       "file": "testing/test_terminal.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 209,
-      "failed": 14,
+      "passed": 211,
+      "failed": 12,
       "skipped": 4,
       "errors": 0,
       "deselected": 0
@@ -529,8 +529,8 @@
       "file": "testing/acceptance_test.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 52,
-      "failed": 31,
+      "passed": 55,
+      "failed": 28,
       "skipped": 2,
       "errors": 0,
       "deselected": 8

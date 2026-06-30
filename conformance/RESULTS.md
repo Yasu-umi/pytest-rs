@@ -18,7 +18,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2587 | 201 | 0 | 53 | 8 | 2849 | 92.7% | 21 | 54 | 61 |
+| pytest | 9.0.3 | 2592 | 196 | 0 | 53 | 8 | 2849 | 92.8% | 21 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 1 | 7 | 85.7% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 2 | 90 | 97.8% | 1 | 1 | 0 |
@@ -52,7 +52,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | starlette | 0.46.2 | 907 | 0 | 0 | 0 | 0 | 907 | 100.0% | 28 | 28 | 0 |
 | attrs | 25.3.0 | 1341 | 0 | 0 | 4 | 1 | 1346 | 99.9% | 22 | 24 | 0 |
 | more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 0 | 671 | 100.0% | 2 | 2 | 0 |
-| pytest-django | v4.9.0 | 205 | 10 | 0 | 1 | 0 | 216 | 95.4% | 6 | 13 | 0 |
+| pytest-django | v4.9.0 | 210 | 5 | 0 | 1 | 0 | 216 | 97.7% | 7 | 13 | 0 |
 | werkzeug | 3.1.3 | 922 | 0 | 0 | 1 | 25 | 948 | 97.4% | 24 | 25 | 0 |
 | fastapi | 0.115.12 | 2332 | 1 | 0 | 130 | 1 | 2464 | 99.9% | 303 | 310 | 0 |
 | packaging | 25.0 | 26947 | 0 | 0 | 0 | 1 | 26948 | 100.0% | 12 | 12 | 0 |
@@ -114,14 +114,14 @@ are out of scope for pytest-rs; they are not counted in the total.
 | testing/test_stash.py | passed | 1 | 0 | 0 | 0 | 0 |
 | testing/test_stepwise.py | passed | 18 | 0 | 0 | 0 | 0 |
 | testing/test_subtests.py | failed | 22 | 12 | 0 | 0 | 0 |
-| testing/test_terminal.py | failed | 209 | 14 | 0 | 4 | 0 |
+| testing/test_terminal.py | failed | 211 | 12 | 0 | 4 | 0 |
 | testing/test_threadexception.py | failed | 7 | 1 | 0 | 0 | 0 |
 | testing/test_tmpdir.py | passed | 39 | 0 | 0 | 1 | 0 |
 | testing/test_unittest.py | failed | 64 | 6 | 0 | 9 | 0 |
 | testing/test_unraisableexception.py | passed | 11 | 0 | 0 | 0 | 0 |
 | testing/test_warning_types.py | passed | 15 | 0 | 0 | 0 | 0 |
 | testing/test_warnings.py | failed | 38 | 4 | 0 | 2 | 0 |
-| testing/acceptance_test.py | failed | 52 | 31 | 0 | 2 | 8 |
+| testing/acceptance_test.py | failed | 55 | 28 | 0 | 2 | 8 |
 | testing/deprecated_test.py | passed | 15 | 0 | 0 | 0 | 0 |
 
 </details>
@@ -860,7 +860,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | tests/test_asserts.py | passed | 2 | 0 | 0 | 0 | 0 |
 | tests/test_database.py | failed | 60 | 1 | 0 | 0 | 0 |
 | tests/test_db_access_in_repr.py | failed | 0 | 1 | 0 | 0 | 0 |
-| tests/test_db_setup.py | failed | 9 | 5 | 0 | 0 | 0 |
+| tests/test_db_setup.py | passed | 14 | 0 | 0 | 0 | 0 |
 | tests/test_django_configurations.py | no-tests | 0 | 0 | 0 | 1 | 0 |
 | tests/test_django_settings_module.py | failed | 18 | 1 | 0 | 0 | 0 |
 | tests/test_environment.py | passed | 22 | 0 | 0 | 0 | 0 |
