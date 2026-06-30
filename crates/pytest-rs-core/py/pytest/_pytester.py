@@ -393,20 +393,13 @@ class Pytester:
         return self._runpytest(args, timeout=timeout, forward_filters=False)
 
     def runpytest_inprocess(self, *args, timeout=None, plugins=()):
-        """Run pytest in-process (shares sys state with the outer test).
-
-        When PYTEST_RS_INLINE_INPROCESS is set (as in the conformance suite),
-        this uses the native in-process backend; otherwise falls back to the
-        subprocess backend like runpytest().
-        """
-        if os.environ.get("PYTEST_RS_INLINE_INPROCESS"):
-            reprec = self.inline_run(*args, plugins=plugins)
-            result = getattr(reprec, "_result", None)
-            if result is not None:
-                result.reprec = reprec
-                return result
-            return reprec
-        return self.runpytest(*args, timeout=timeout)
+        """Run pytest in-process (shares sys state with the outer test)."""
+        reprec = self.inline_run(*args, plugins=plugins)
+        result = getattr(reprec, "_result", None)
+        if result is not None:
+            result.reprec = reprec
+            return result
+        return reprec
 
     def make_hook_recorder(self, pluginmanager):
         """Attach a HookRecorder to ``pluginmanager`` and finish recording at
