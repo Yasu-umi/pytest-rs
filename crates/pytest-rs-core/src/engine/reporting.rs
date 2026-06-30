@@ -27,6 +27,8 @@ impl Engine {
                 // (sugar prints them instantly). Native mode: instance plugins
                 // (e.g., relay plugin) still need to observe collect errors.
                 python::reporter_collect_error(py, &nodeid, &err);
+                let reprcrash_message = super::short_message(&err)
+                    .filter(|message| !message.starts_with("SyntaxError:"));
                 self.session.reports.push(crate::report::TestReport {
                     nodeid,
                     phase: Phase::Setup,
@@ -38,7 +40,7 @@ impl Engine {
                     sections: Vec::new(),
                     rerun: false,
                     xfail_longrepr: None,
-                    reprcrash_message: None,
+                    reprcrash_message,
                     head_line: None,
                 });
             }

@@ -220,17 +220,23 @@ impl Engine {
             }
             None => {
                 if n_items == 0 {
+                    let plugin_reports = python::drain_plugin_reports(py);
+                    self.session.reports.extend(plugin_reports);
                     return self.handle_no_tests(py, started);
+                } else {
+                    self.run_items(py);
                 }
-                self.run_items(py);
             }
         }
         #[cfg(not(feature = "xdist"))]
         {
             if n_items == 0 {
+                let plugin_reports = python::drain_plugin_reports(py);
+                self.session.reports.extend(plugin_reports);
                 return self.handle_no_tests(py, started);
+            } else {
+                self.run_items(py);
             }
-            self.run_items(py);
         }
 
         self.finish_session(py, started)
