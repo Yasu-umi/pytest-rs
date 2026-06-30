@@ -413,6 +413,44 @@ def run_custom_item(item):
         return str(report.longrepr)
 
     reports = []
+
+    # Walk ancestor collectors and run their setup() before the item's own
+    # setup(). Per-collector exceptions are cached on the collector object so
+    # repeated failures across items produce a traceback of the same length
+    # (the "BTW" / #12204 case). Internal shim nodes (module pytest._node,
+    # _pytest.*, and _CollectorProxy instances) are skipped.
+    for col in item.listchain()[:-1]:
+        mod = type(col).__module__
+        if mod == "pytest._node" or mod.startswith("_pytest.") or isinstance(col, _CollectorProxy):
+            continue
+        if not hasattr(col, "setup"):
+            continue
+        cached = getattr(col, "_pytest_rs_col_setup_exc", None)
+        if cached is not None:
+            cached_exc, cached_tb = cached
+            reports.append(
+                ("setup", "failed", _failrepr("setup", cached_exc.with_traceback(cached_tb)))
+            )
+            try:
+                item.teardown()
+                reports.append(("teardown", "passed", None))
+            except BaseException as texc:  # noqa: BLE001
+                reports.append(("teardown", "failed", _failrepr("teardown", texc)))
+            return reports
+        if not getattr(col, "_pytest_rs_col_setup_done", False):
+            col._pytest_rs_col_setup_done = True
+            try:
+                col.setup()
+            except BaseException as exc:  # noqa: BLE001 - protocol boundary
+                col._pytest_rs_col_setup_exc = (exc, exc.__traceback__)
+                reports.append(("setup", "failed", _failrepr("setup", exc)))
+                try:
+                    item.teardown()
+                    reports.append(("teardown", "passed", None))
+                except BaseException as texc:  # noqa: BLE001
+                    reports.append(("teardown", "failed", _failrepr("teardown", texc)))
+                return reports
+
     try:
         item.setup()
     except Skipped as exc:
