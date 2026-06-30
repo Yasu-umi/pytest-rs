@@ -300,7 +300,15 @@ impl Engine {
         // have reported their Collection message.
         let queue = Arc::new(WorkQueue::new(max_restart.unwrap_or(isize::MAX), workers));
         let (sender, receiver) = mpsc::channel::<Event>();
-        let argv: Vec<String> = self.config.effective_args.iter().skip(1).cloned().collect();
+        // effective_args holds the clap-known args (ini addopts + PYTEST_ADDOPTS
+        // + command line); plugin_args holds deferred plugin flags (--reuse-db,
+        // --create-db, --ds, ...) that clap doesn't know. A spawned worker
+        // re-parses its argv from scratch, so without plugin_args it loses
+        // those flags (e.g. --reuse-db defaults to False and the worker
+        // destroys its test database at teardown). Forked workers inherit the
+        // parsed config and don't have this problem.
+        let mut argv: Vec<String> = self.config.effective_args.iter().skip(1).cloned().collect();
+        argv.extend(self.config.plugin_args.iter().cloned());
         // One uid for the whole distributed run (the testrun_uid fixture).
         let testrun_uid = format!(
             "{:032x}",

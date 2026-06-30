@@ -598,6 +598,15 @@ impl Config {
         // `-o addopts=...` wins over the file: it must apply here, before
         // clap parsing, or the override could never disable addopts.
         let mut argv = argv;
+        // A spawned xdist worker (spawn mode) receives the controller's
+        // `effective_args`, which already include the ini addopts and
+        // PYTEST_ADDOPTS expansion (PYTEST_ADDOPTS is unset on the worker so
+        // the env splice below is a no-op). Re-applying the ini addopts here
+        // would duplicate them and make clap reject repeated boolean flags
+        // such as `--strict-markers`. Forked workers never re-enter from_args
+        // (they inherit the parsed config), so `--worker` uniquely identifies
+        // a spawned worker process.
+        let spawned_worker = argv.iter().any(|a| a == "--worker");
         let mut override_addopts: Option<String> = None;
         let mut idx = 1;
         while idx < argv.len() {
@@ -625,7 +634,7 @@ impl Config {
             argv.splice(1..1, shlex_split(&env_addopts));
         }
         let addopts = override_addopts.or_else(|| ini_file.get("addopts").cloned());
-        if let Some(addopts) = addopts {
+        if !spawned_worker && let Some(addopts) = addopts {
             // A TOML-array addopts is stored NUL-joined (see parse_toml_pytest);
             // each element is already one literal argument, so split on the
             // sentinel rather than shlex-splitting (which would re-split an

@@ -173,6 +173,47 @@ impl Engine {
             }
         }
 
+        // Mirror the controller's configure pipeline (collect pipeline
+        // phases 4-5) now that all plugins (entry points + -p) are loaded.
+        // A spawned worker is a fresh process, so unlike a forked worker it
+        // does not inherit the controller's already-fired hooks: plugins
+        // register options (pytest_addoption), then read them back in
+        // pytest_load_initial_conftests (e.g. pytest-django registers --ds/
+        // --itv and reads options.itv there, and stores the per-process db
+        // blocker stash key the worker's test setup later reads). Skipping
+        // these leaves plugin-defined options unregistered and per-process
+        // setup undone. (Conftest pytest_configure hooks fire incrementally
+        // during precollect below.)
+        if let Err(err) = self.fire_py_addoption_hooks(py) {
+            eprintln!(
+                "INTERNAL ERROR: worker addoption failed: {}",
+                python::format_exception(py, &err)
+            );
+            return exit_code::INTERNAL_ERROR;
+        }
+        if let Err(err) = self.apply_plugin_cli_args(py) {
+            if python::is_usage_error(py, &err) {
+                eprintln!("ERROR: {}", err.value(py));
+                return exit_code::USAGE_ERROR;
+            }
+            eprintln!("{}", python::format_exception(py, &err));
+            return exit_code::USAGE_ERROR;
+        }
+        if let Err(err) = self.fire_py_load_initial_conftests(py) {
+            if python::is_usage_error(py, &err) {
+                let msg = python::format_exception(py, &err);
+                let usage_msg = msg
+                    .lines()
+                    .last()
+                    .and_then(|l| l.strip_prefix("pytest.UsageError: "))
+                    .unwrap_or(msg.trim());
+                eprintln!("ERROR: {usage_msg}");
+                return exit_code::USAGE_ERROR;
+            }
+            eprintln!("{}", python::format_exception(py, &err));
+            return exit_code::USAGE_ERROR;
+        }
+
         let mut collection = WorkerCollection::default();
         // Like upstream xdist, import every test module during collection,
         // before any test runs: lazy per-batch imports would let earlier
