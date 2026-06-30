@@ -281,7 +281,6 @@ impl Engine {
         items: &[crate::collect::TestItem],
     ) -> PyResult<()> {
         use pyo3::types::{PyDict, PyList};
-
         let collect_report_cls = py.import("_pytest.reports")?.getattr("CollectReport")?;
         let simple_ns = py.import("types")?.getattr("SimpleNamespace")?;
         let node_mod = py.import("pytest._node")?;
