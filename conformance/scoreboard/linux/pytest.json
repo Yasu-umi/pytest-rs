@@ -359,8 +359,8 @@
       "file": "testing/test_runner.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 62,
-      "failed": 4,
+      "passed": 64,
+      "failed": 2,
       "skipped": 0,
       "errors": 0,
       "deselected": 0

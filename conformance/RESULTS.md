@@ -18,7 +18,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2584 | 204 | 0 | 53 | 8 | 2849 | 92.6% | 21 | 54 | 61 |
+| pytest | 9.0.3 | 2586 | 202 | 0 | 53 | 8 | 2849 | 92.6% | 21 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 1 | 7 | 85.7% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 2 | 90 | 97.8% | 1 | 1 | 0 |
@@ -34,7 +34,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-snapshot | v0.9.0 | 102 | 5 | 0 | 0 | 0 | 107 | 95.3% | 0 | 3 | 0 |
 | pytest-icdiff | 0.5 | 10 | 2 | 0 | 0 | 0 | 12 | 83.3% | 0 | 1 | 0 |
-| pytest-socket | 0.7.0 | 60 | 5 | 0 | 0 | 0 | 65 | 92.3% | 3 | 6 | 0 |
+| pytest-socket | 0.7.0 | 41 | 2 | 0 | 0 | 0 | 43 | 95.3% | 3 | 6 | 0 |
 | pytest-order | v1.4.0 | 120 | 14 | 0 | 0 | 0 | 134 | 89.6% | 7 | 16 | 0 |
 | pytest-repeat | v0.9.4 | 16 | 0 | 0 | 0 | 0 | 16 | 100.0% | 1 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
@@ -104,7 +104,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | testing/test_pytester.py | failed | 47 | 4 | 0 | 1 | 0 |
 | testing/test_python_path.py | failed | 4 | 2 | 0 | 0 | 0 |
 | testing/test_recwarn.py | passed | 63 | 0 | 0 | 0 | 0 |
-| testing/test_runner.py | failed | 62 | 4 | 0 | 0 | 0 |
+| testing/test_runner.py | failed | 64 | 2 | 0 | 0 | 0 |
 | testing/test_runner_xunit.py | passed | 13 | 0 | 0 | 0 | 0 |
 | testing/test_scope.py | passed | 4 | 0 | 0 | 0 | 0 |
 | testing/test_session.py | failed | 24 | 2 | 0 | 0 | 0 |
@@ -350,7 +350,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | tests/test_doctest.py | passed | 1 | 0 | 0 | 0 | 0 |
 | tests/test_precedence.py | passed | 10 | 0 | 0 | 0 | 0 |
 | tests/test_restrict_hosts.py | failed | 27 | 1 | 0 | 0 | 0 |
-| tests/test_socket.py | failed | 19 | 3 | 0 | 0 | 0 |
+| tests/test_socket.py | timeout | 0 | 0 | 0 | 0 | 0 |
 
 </details>
 
