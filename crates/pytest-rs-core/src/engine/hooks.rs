@@ -536,12 +536,16 @@ impl Engine {
             fire_collector(cp, report);
         }
 
-        // Passing modules: collectstart + make_collect_report + collectreport
+        // Passing modules: collectstart + make_collect_report + pycollect_makeitem* + collectreport
         for (file, mp) in &mod_proxies {
             let children = PyList::empty(py);
+            let mut makeitem_names: Vec<String> = Vec::new();
             for (key, cp) in &class_proxies {
                 if key.split_once("::").map(|(f, _)| f) == Some(file.as_str()) {
                     let _ = children.append(cp.bind(py));
+                    if let Some(cls_name) = key.split_once("::").map(|(_, c)| c) {
+                        makeitem_names.push(cls_name.to_string());
+                    }
                 }
             }
             for item in items {
@@ -553,12 +557,38 @@ impl Engine {
                         if let Ok(s) = item_stub(&item.nodeid, nm) {
                             let _ = children.append(s.bind(py));
                         }
+                        makeitem_names.push(nm.to_string());
                     }
                 }
             }
             let report = make_report(file, "passed", py.None(), &children)?;
             let _ = report.bind(py).setattr("collector", mp.bind(py));
-            fire_collector(mp, report);
+            python::record_hook(
+                py,
+                "pytest_collectstart",
+                &[("collector", mp.clone_ref(py))],
+            );
+            python::record_hook(
+                py,
+                "pytest_make_collect_report",
+                &[
+                    ("collector", mp.clone_ref(py)),
+                    ("report", report.clone_ref(py)),
+                ],
+            );
+            for name in &makeitem_names {
+                let name_py: Py<PyAny> = pyo3::types::PyString::new(py, name).into_any().unbind();
+                python::record_hook(
+                    py,
+                    "pytest_pycollect_makeitem",
+                    &[
+                        ("collector", mp.clone_ref(py)),
+                        ("name", name_py),
+                        ("obj", py.None()),
+                    ],
+                );
+            }
+            python::record_hook(py, "pytest_collectreport", &[("report", report)]);
         }
 
         // Skipped modules: collectstart + make_collect_report + collectreport(skipped)
