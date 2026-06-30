@@ -337,7 +337,6 @@ pub fn summary_line_with_extras(
     let mut skipped = 0usize;
     let mut xfailed = 0usize;
     let mut xpassed = 0usize;
-    let mut subtests_passed = 0usize;
     let mut subtests_xfailed = 0usize;
     let mut rerun = 0usize;
     for report in reports {
@@ -345,14 +344,13 @@ pub fn summary_line_with_extras(
             rerun += 1;
             continue;
         }
-        // Subtest outcomes use their own categories (upstream plugin's
-        // pytest_report_teststatus): passed → "subtests passed",
-        // xfailed → "subtests xfailed", failed/skipped → regular buckets.
+        // Subtest outcomes: passed subtests go into the empty category ("") in
+        // vanilla pytest-subtests, so they are silent in the summary line.
+        // xfailed subtests feed the xfailed bucket.
         if report.subtest_desc.is_some() {
             match report.outcome {
                 Outcome::Passed => {
-                    subtests_passed += 1;
-                    continue;
+                    continue; // SUBPASSED: not counted in summary (matches vanilla)
                 }
                 Outcome::XFailed => {
                     subtests_xfailed += 1;
@@ -390,18 +388,12 @@ pub fn summary_line_with_extras(
     }
     // Plugin-driven subtest stats (from the TerminalReporter's stats dict,
     // populated by the pytest-subtests plugin's pytest_report_teststatus hook).
-    let plugin_subtests_passed = *extra_stats.get("subtests passed").unwrap_or(&0);
+    // "subtests passed" is intentionally excluded: vanilla pytest-subtests puts
+    // SUBPASSED into the empty "" category which is never shown in the summary.
     let plugin_subtests_failed = *extra_stats.get("subtests failed").unwrap_or(&0);
     let plugin_subtests_skipped = *extra_stats.get("subtests skipped").unwrap_or(&0);
     let plugin_subtests_xfailed = *extra_stats.get("subtests xfailed").unwrap_or(&0);
     let plugin_subtests_xpassed = *extra_stats.get("subtests xpassed").unwrap_or(&0);
-    let total_subtests_passed = subtests_passed + plugin_subtests_passed;
-    if total_subtests_passed > 0 {
-        parts.push((
-            format!("{total_subtests_passed} subtests passed"),
-            tw::GREEN,
-        ));
-    }
     if plugin_subtests_failed > 0 {
         parts.push((format!("{plugin_subtests_failed} subtests failed"), tw::RED));
     }
@@ -456,7 +448,7 @@ pub fn summary_line_with_extras(
         errors,
         warning_count,
         xpassed + plugin_subtests_xpassed,
-        passed + total_subtests_passed,
+        passed,
         true,
     );
     let plain_parts: Vec<&str> = parts.iter().map(|(text, _)| text.as_str()).collect();
