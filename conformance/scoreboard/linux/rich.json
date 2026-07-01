@@ -117,10 +117,10 @@
     },
     {
       "file": "tests/test_console.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 99,
-      "failed": 0,
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 98,
+      "failed": 1,
       "skipped": 0,
       "errors": 0,
       "deselected": 0
