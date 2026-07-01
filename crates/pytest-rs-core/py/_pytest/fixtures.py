@@ -298,7 +298,11 @@ def fixture_lookup_error(argname, requesting_funcs, available):
         try:
             lines, _ = inspect.getsourcelines(func)
         except (OSError, TypeError, IndexError):
-            lines = [f"def {getattr(func, '__name__', '?')}(...):\n"]
+            # Upstream's formatrepr prints "file X, line Y: source code not
+            # available" when getsourcelines fails; a synthetic def line
+            # would swallow that message (#553).
+            deflines.append("  source code not available")
+            continue
         for raw in lines:
             stripped = raw.rstrip()
             deflines.append("  " + stripped)
