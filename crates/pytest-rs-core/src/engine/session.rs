@@ -74,6 +74,16 @@ impl Engine {
                     }
                     return exit_code::INTERNAL_ERROR;
                 }
+                // Sentinel "\x00INTERNAL_STDERR\x00": unexpected exception in
+                // pytest_configure — print INTERNALERROR to stderr (upstream
+                // routes configure failures to stderr, vs sessionstart on
+                // stdout). #49
+                if let Some(inner) = message.strip_prefix("\x00INTERNAL_STDERR\x00") {
+                    for line in inner.lines() {
+                        eprintln!("INTERNALERROR> {line}");
+                    }
+                    return exit_code::INTERNAL_ERROR;
+                }
                 // Sentinel "\x00KEYBOARD_INTERRUPT\x00": KeyboardInterrupt during
                 // collection — print the special "!!! KeyboardInterrupt !!!" banner.
                 if message == "\x00KEYBOARD_INTERRUPT\x00" {

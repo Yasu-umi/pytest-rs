@@ -62,7 +62,11 @@ impl Engine {
                 eprintln!("Exit: {exit_msg}");
                 return Err(format!("\x00EXIT\x00{code}"));
             }
-            errors.push((rootdir.to_path_buf(), python::format_exception(py, &err)));
+            // A non-UsageError, non-exit exception in pytest_configure is an
+            // INTERNALERROR (exit 3) printed to stderr — upstream routes
+            // configure failures to stderr (vs sessionstart on stdout). #49
+            let msg = python::format_exception(py, &err);
+            return Err(format!("\x00INTERNAL_STDERR\x00{msg}"));
         }
         // A plugin instance registered in pytest_configure (#2270) may define
         // @pytest.fixture methods; register them as global fixtures bound to
