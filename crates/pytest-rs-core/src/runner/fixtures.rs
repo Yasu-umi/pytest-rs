@@ -634,7 +634,25 @@ pub(crate) fn resolve_fixture_def(
     {
         return Err(no_parameter_error(py, config, &def, &item.nodeid));
     }
-    let instance = match scope {
+    // A `parametrize(indirect=True, scope=...)` call overrides the fixture's
+    // own declared scope for caching, instance, and teardown — upstream uses
+    // `callspec._arg2scope[argname]` (fixtures.py:610) while still scope-checking
+    // against `fixturedef._scope` (done above with `scope`). The wider
+    // parametrize scope is recorded in the item's scope_sort_keys; adopt it so
+    // sibling items in the same scope-instance reuse the setup instead of each
+    // re-running the fixture body. The --setup-show scope char still uses the
+    // fixture's declared scope (`def.scope`), matching upstream's display.
+    let cache_scope = if fixture_param.is_some() {
+        item.scope_sort_keys
+            .iter()
+            .find(|(n, _, _)| n == &def.name)
+            .map(|(_, s, _)| *s)
+            .filter(|s| *s > scope)
+            .unwrap_or(scope)
+    } else {
+        scope
+    };
+    let instance = match cache_scope {
         Scope::Function => item.nodeid.clone(),
         Scope::Class => item.class_instance(),
         Scope::Module | Scope::Package => item.module_instance(),
@@ -698,7 +716,7 @@ pub(crate) fn resolve_fixture_def(
             .unwrap_or_else(|_| format!("<unhashable@{}>", value.as_ptr() as usize))
     });
     let cache_key = (
-        scope,
+        cache_scope,
         keyed_name,
         def.baseid.clone(),
         instance.clone(),
@@ -732,7 +750,7 @@ pub(crate) fn resolve_fixture_def(
                         fixture_param.as_ref().map(|(_, value)| value.clone_ref(py)),
                         node,
                         Some(def.name.clone()),
-                        scope,
+                        cache_scope,
                     ),
                 )?;
                 kwargs.push((dep.clone(), req.clone_ref(py).into_any()));
@@ -882,7 +900,7 @@ pub(crate) fn resolve_fixture_def(
                 && let Ok(drainer) = request.bind(py).as_any().getattr("_drain_finalizers")
             {
                 session.finalizers.push(PendingFinalizer {
-                    scope: def.scope,
+                    scope: cache_scope,
                     instance: instance.clone(),
                     finalizer: Finalizer::Callable(drainer.unbind()),
                     bindings: bindings.clone(),
@@ -950,7 +968,7 @@ pub(crate) fn resolve_fixture_def(
             .and_then(|f| f.call1((" ".repeat(indent), scope_char.to_string(), display_name)))
         {
             session.finalizers.push(PendingFinalizer {
-                scope: def.scope,
+                scope: cache_scope,
                 instance: instance.clone(),
                 finalizer: Finalizer::Callable(printer.unbind()),
                 bindings: bindings.clone(),
@@ -966,7 +984,7 @@ pub(crate) fn resolve_fixture_def(
         && let Ok(drainer) = request.bind(py).as_any().getattr("_drain_finalizers")
     {
         session.finalizers.push(PendingFinalizer {
-            scope: def.scope,
+            scope: cache_scope,
             instance: instance.clone(),
             finalizer: Finalizer::Callable(drainer.unbind()),
             bindings: bindings.clone(),
@@ -974,14 +992,14 @@ pub(crate) fn resolve_fixture_def(
     }
     if let Some(finalizer) = finalizer {
         session.finalizers.push(PendingFinalizer {
-            scope: def.scope,
+            scope: cache_scope,
             instance: instance.clone(),
             finalizer,
             bindings: bindings.clone(),
         });
     }
     // Conftest pytest_fixture_setup / pytest_fixture_post_finalizer hooks.
-    fire_fixture_lifecycle_hooks(py, session, item, &def, scope, &instance, &bindings)?;
+    fire_fixture_lifecycle_hooks(py, session, item, &def, cache_scope, &instance, &bindings)?;
     session.fixture_cache.insert(
         cache_key,
         crate::session::CachedFixture {
