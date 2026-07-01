@@ -431,6 +431,13 @@ class Pytester:
             env["PATH"] = bindir + os.pathsep + path
         return env
 
+    def _getpytestargs(self):
+        # Match upstream Pytester._getpytestargs: spawn `python -mpytest`.
+        # Under the conformance PYTHONPATH this resolves to the upstream
+        # pytest package, so behaviors such as broken-pipe suppression
+        # (test_no_brokenpipeerror_message) match real pytest.
+        return (sys.executable, "-mpytest")
+
     def popen(
         self, cmdargs, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=CLOSE_STDIN, **kw
     ):
