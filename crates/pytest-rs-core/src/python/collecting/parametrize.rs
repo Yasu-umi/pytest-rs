@@ -177,8 +177,10 @@ pub(crate) struct ParamVariant {
     extra_marks: Vec<MarkData>,
     /// Highest parametrize scope across all dimensions (for item reordering).
     max_param_scope: crate::fixture::Scope,
-    /// Per non-function-scoped dimension: (argname, scope, 0-based set index).
-    /// Feeds `reorder_items` so items sharing a high-scope param value group.
+    /// Per non-function-scoped argname: (argname, scope, index). The index is
+    /// the callspec serial for direct params (upstream
+    /// `_recompute_direct_params_indices`) or the value index for indirect
+    /// params. Feeds `reorder_items` so items sharing a high-scope param group.
     scope_sort_keys: Vec<(String, crate::fixture::Scope, usize)>,
 }
 
@@ -719,17 +721,27 @@ fn cartesian_param_variants(py: Python<'_>, dims: &[Dim]) -> Vec<ParamVariant> {
             .map(|d| d.scope)
             .max()
             .unwrap_or(crate::fixture::Scope::Function);
-        let scope_sort_keys: Vec<(String, crate::fixture::Scope, usize)> = dims
-            .iter()
-            .zip(indices.iter())
-            .filter(|(d, _)| d.scope > crate::fixture::Scope::Function)
-            .map(|(d, &idx)| {
-                let set = &d.sets[idx];
-                let mut names: Vec<&str> = set.params.iter().map(|(n, _)| n.as_str()).collect();
-                names.extend(set.indirect_params.iter().map(|(n, _, _)| n.as_str()));
-                (names.join(","), d.scope, idx)
-            })
-            .collect();
+        // Scope-sort keys feed `reorder_items`. For DIRECT params upstream's
+        // `_recompute_direct_params_indices` rewrites the index to the callspec
+        // serial (this variant's position in the function's callspec list), so
+        // identically-parametrized functions align their Nth callspec and share
+        // the high-scope instance. INDIRECT params keep the value index from
+        // `setmulti`. Emit one key per argname (matches upstream's per-argname
+        // ParamArgKey rather than joining a dimension's argnames).
+        let callspec_serial = variants.len();
+        let mut scope_sort_keys: Vec<(String, crate::fixture::Scope, usize)> = Vec::new();
+        for (d, &idx) in dims.iter().zip(indices.iter()) {
+            if d.scope <= crate::fixture::Scope::Function {
+                continue;
+            }
+            let set = &d.sets[idx];
+            for (name, _) in &set.params {
+                scope_sort_keys.push((name.clone(), d.scope, callspec_serial));
+            }
+            for (name, val_idx, _) in &set.indirect_params {
+                scope_sort_keys.push((name.clone(), d.scope, *val_idx));
+            }
+        }
         variants.push(ParamVariant {
             // All-hidden variants keep the bare test name (no brackets).
             id: (!id_parts.is_empty()).then(|| id_parts.join("-")),

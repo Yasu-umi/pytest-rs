@@ -50,8 +50,10 @@ pub struct TestItem {
     pub py_node: Option<Py<PyAny>>,
     /// Highest parametrize scope across all dimensions (for item reordering).
     pub max_param_scope: crate::fixture::Scope,
-    /// Per non-function-scoped parametrized arg: (argname, scope, 0-based set
-    /// index). `reorder_items` groups items sharing a high-scope param value
+    /// Per non-function-scoped parametrized arg: (argname, scope, index). The
+    /// index is the callspec serial for direct params (upstream
+    /// `_recompute_direct_params_indices`) or the value index for indirect
+    /// params. `reorder_items` groups items sharing a high-scope param value
     /// (same argname + index + scope boundary), matching pytest.
     pub scope_sort_keys: Vec<(String, crate::fixture::Scope, usize)>,
 }
