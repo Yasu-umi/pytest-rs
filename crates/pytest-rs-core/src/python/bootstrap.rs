@@ -267,10 +267,17 @@ pub(crate) fn register_pytest_plugins(
     };
     let names: Vec<String> = match declared.extract::<String>() {
         Ok(single) => vec![single],
-        Err(_) => declared
-            .try_iter()?
-            .map(|name| name?.extract::<String>())
-            .collect::<PyResult<_>>()?,
+        Err(_) => match declared.try_iter() {
+            // `from . import pytest_plugins` exposes the imported submodule
+            // (a module object, not a name list) as pytest_plugins; upstream's
+            // _get_plugin_specs_as_list returns [] for a ModuleType (#3899),
+            // so treat a non-iterable value as no declaration instead of
+            // raising TypeError mid-collection.
+            Ok(iter) => iter
+                .map(|name| name?.extract::<String>())
+                .collect::<PyResult<_>>()?,
+            Err(_) => vec![],
+        },
     };
     if let Ok(rewrite_mod) = py.import("pytest._rewrite") {
         let py_names = pyo3::types::PyTuple::new(py, &names)?;
