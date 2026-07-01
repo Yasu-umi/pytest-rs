@@ -257,6 +257,7 @@ impl Engine {
                     });
                     if !matched {
                         eprintln!("ERROR: not found: {nodeid}");
+                        self.session.not_found_nodeids.push(nodeid.clone());
                     }
                 }
             }

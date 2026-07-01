@@ -127,6 +127,10 @@ pub struct Session {
     /// Collection errors as (nodeid, longrepr), shown in the ERRORS section
     /// (and excluded from FAILURES / " - msg" summary suffixes).
     pub collect_errors: Vec<(String, String)>,
+    /// Explicit node-id args (`file::name`) that matched nothing after
+    /// collection. A non-empty set forces USAGE_ERROR (exit 4) even when
+    /// collection errors aborted the session, mirroring upstream (#134).
+    pub not_found_nodeids: Vec<String>,
     /// Module nodeids skipped at collection time (pytest.skip(allow_module_level=True),
     /// --doctest-ignore-import-errors, etc.), for collector-tree hook synthesis.
     /// Each entry is (nodeid, reason, location) where location is "file:line".
@@ -180,6 +184,7 @@ impl Session {
             deselected: 0,
             deselected_items: Vec::new(),
             collect_errors: Vec::new(),
+            not_found_nodeids: Vec::new(),
             skipped_modules: Vec::new(),
             collect_file_skips: Vec::new(),
             stopped_after: None,

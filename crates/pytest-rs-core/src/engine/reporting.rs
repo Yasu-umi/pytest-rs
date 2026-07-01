@@ -145,7 +145,11 @@ impl Engine {
                         println!("{summary}");
                     }
                 }
-                let code = if maxfail_hit || dist_workers.is_some() {
+                let code = if !self.session.not_found_nodeids.is_empty() {
+                    // Explicit node-id args that matched nothing force
+                    // USAGE_ERROR even when collection errors aborted (#134).
+                    exit_code::USAGE_ERROR
+                } else if maxfail_hit || dist_workers.is_some() {
                     exit_code::TESTS_FAILED
                 } else {
                     exit_code::INTERRUPTED
