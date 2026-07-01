@@ -96,11 +96,9 @@ impl Engine {
         let sw_skip = config.get_flag("sw-skip");
         let mut sw_failed_items = 0usize;
         // Quiet subtest verbosity: non-failed subtests don't show progress
-        // chars or verbose lines (but still count in the summary).
-        let quiet_subtests = config
-            .get_ini("verbosity_subtests")
-            .map(|v| v.trim() == "0")
-            .unwrap_or(config.verbose == 0);
+        // chars, verbose lines, or count in the summary (mirrors upstream's
+        // subtests plugin returning ("", "", "") under verbosity_subtests == 0).
+        let quiet_subtests = config.quiet_subtests();
         // With -s (no capture) and non-verbose mode, subtest progress chars
         // must be printed inline from Python's __exit__ so they interleave
         // with the test's own stdout (upstream fires logreport inline).
@@ -418,7 +416,8 @@ impl Engine {
                     // -p no:terminal, or a delegated protocol whose shim
                     // TerminalReporter already rendered: no native output.
                 } else if is_quiet_sub {
-                    // Quiet subtest: counted in the summary but not displayed.
+                    // Quiet subtest: not displayed (and not counted in the
+                    // summary — see summary_line_with_extras).
                 } else if tc >= 1 {
                     python::reporter_ensure_newline(py);
                     print_verbose_report_line(

@@ -237,6 +237,21 @@ pub fn pop_subtest_reports(
     result.unwrap_or_default()
 }
 
+/// Whether the third-party pytest-subtests plugin is active. Its
+/// `pytest_report_teststatus` (v0.14) always counts/shows subtests — unlike
+/// pytest 9's builtin `_pytest.subtests`, which hides non-failed subtests
+/// under `verbosity_subtests == 0`. The Rust summary must match whichever
+/// implementation is in play, so callers gate the quiet-hiding on this.
+pub fn has_subtests_plugin(py: Python<'_>) -> bool {
+    py.eval(
+        pyo3::ffi::c_str!("'pytest_subtests' in __import__('sys').modules"),
+        None,
+        None,
+    )
+    .and_then(|v| v.extract::<bool>())
+    .unwrap_or(false)
+}
+
 /// Install session-wide warning capture (pytest default filters), then
 /// apply the `filterwarnings` ini lines and -W specs on top (-W last, so
 /// the command line takes precedence over the config file).

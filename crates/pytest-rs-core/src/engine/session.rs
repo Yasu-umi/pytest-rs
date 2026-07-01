@@ -453,11 +453,10 @@ impl Engine {
         }
         let warning_count = python::warning_count(py) + self.session.worker_warning_count;
         let extra_stats = python::reporter_subtest_stats(py);
-        let quiet_subtests = self
-            .config
-            .get_ini("verbosity_subtests")
-            .map(|v| v.trim() == "0")
-            .unwrap_or(self.config.verbose == 0);
+        // Hide non-failed subtests only for pytest 9's builtin subtests
+        // (verbosity_subtests == 0); the third-party pytest-subtests plugin
+        // has no quiet mode and always counts them.
+        let hide_subtests = self.config.quiet_subtests() && !python::has_subtests_plugin(py);
         let summary = crate::runner::summary_line_with_extras(
             &self.session.reports,
             self.session.deselected,
@@ -465,7 +464,7 @@ impl Engine {
             started.elapsed(),
             self.config.global_verbosity(),
             &extra_stats,
-            quiet_subtests,
+            hide_subtests,
         );
         if !summary.is_empty() {
             println!("{summary}");

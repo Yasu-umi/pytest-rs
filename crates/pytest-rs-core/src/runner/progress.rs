@@ -325,7 +325,7 @@ pub fn summary_line_with_extras(
     elapsed: Duration,
     verbosity: i32,
     extra_stats: &std::collections::HashMap<String, usize>,
-    _quiet_subtests: bool,
+    hide_subtests: bool,
 ) -> String {
     // -qq (verbosity < -1) suppresses the stats line entirely.
     if verbosity < -1 {
@@ -349,6 +349,15 @@ pub fn summary_line_with_extras(
         // pytest_report_teststatus): passed → "subtests passed",
         // xfailed → "subtests xfailed", failed/skipped → regular buckets.
         if report.subtest_desc.is_some() {
+            // pytest 9's builtin `_pytest.subtests` returns ("", "", "")
+            // for non-failed subtests under verbosity_subtests == 0, so
+            // they are invisible and not counted (hide_subtests). The
+            // third-party pytest-subtests plugin has no such quiet mode,
+            // so hide_subtests is false when it is active. Failed subtests
+            // always count as "failed".
+            if hide_subtests && report.outcome != Outcome::Failed {
+                continue;
+            }
             match report.outcome {
                 Outcome::Passed => {
                     subtests_passed += 1;

@@ -77,6 +77,12 @@ impl Engine {
     /// Groups print in the order the chars were given, matching pytest.
     pub(crate) fn print_short_summary(&self, py: Python<'_>) {
         let chars = self.report_chars();
+        // Under verbosity_subtests == 0 pytest 9's builtin subtests plugin
+        // returns ("", "", "") for non-failed subtests, so drop them from
+        // the short summary too. The third-party pytest-subtests plugin has
+        // no quiet mode, so this only applies when it is not active.
+        // SUBFAILED (failed) always shows.
+        let hide = self.config.quiet_subtests() && !python::has_subtests_plugin(py);
 
         let mut lines = Vec::new();
         for c in chars.chars() {
@@ -88,6 +94,9 @@ impl Engine {
                 if self.config.get_flag("no-fold-skipped") {
                     for report in &self.session.reports {
                         if report.outcome != Outcome::Skipped {
+                            continue;
+                        }
+                        if hide && report.subtest_desc.is_some() {
                             continue;
                         }
                         let word = self.subtest_summary_word(py, report, "SKIPPED");
@@ -115,6 +124,9 @@ impl Engine {
                     if report.outcome != Outcome::Skipped {
                         continue;
                     }
+                    if hide && report.subtest_desc.is_some() {
+                        continue;
+                    }
                     if label.is_none() {
                         label = Some(self.subtest_summary_word(py, report, "SKIPPED"));
                     }
@@ -136,6 +148,9 @@ impl Engine {
                 continue;
             }
             for report in &self.session.reports {
+                if hide && report.subtest_desc.is_some() && report.outcome != Outcome::Failed {
+                    continue;
+                }
                 let word = match (c, report.phase, report.outcome) {
                     ('f', Phase::Call, Outcome::Failed) => "FAILED",
                     ('E', Phase::Setup | Phase::Teardown, Outcome::Failed) => "ERROR",

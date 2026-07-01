@@ -52,6 +52,20 @@ impl Config {
         self.verbosity_for("verbosity_test_cases")
     }
 
+    /// Whether non-failed subtests are hidden from the terminal and the
+    /// summary. Mirrors upstream's builtin subtests plugin, whose
+    /// `pytest_report_teststatus` returns `("", "", "")` for passed/skipped/
+    /// xfailed subtests when `verbosity_subtests == 0` (the default): they
+    /// show no progress char, no short-summary line, and are not counted.
+    /// Failed subtests are always visible. `-v` raises the global verbosity
+    /// which `verbosity_subtests` inherits when the ini is unset.
+    pub fn quiet_subtests(&self) -> bool {
+        match self.get_ini("verbosity_subtests") {
+            Some(v) => v.trim() == "0",
+            None => self.verbose == 0,
+        }
+    }
+
     /// An ini-style option: -o overrides win over config file values.
     pub fn get_ini(&self, name: &str) -> Option<&str> {
         self.ini_overrides
