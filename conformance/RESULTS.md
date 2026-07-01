@@ -18,7 +18,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2597 | 191 | 0 | 53 | 8 | 2849 | 93.0% | 21 | 54 | 61 |
+| pytest | 9.0.3 | 2600 | 188 | 0 | 53 | 8 | 2849 | 93.1% | 21 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 1 | 7 | 85.7% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 2 | 90 | 97.8% | 1 | 1 | 0 |
@@ -44,7 +44,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | click | 8.3.1 | 1314 | 0 | 0 | 21 | 0 | 1335 | 100.0% | 20 | 20 | 0 |
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
-| rich | v14.2.0 | 854 | 1 | 0 | 25 | 0 | 880 | 99.9% | 59 | 62 | 0 |
+| rich | v14.2.0 | 855 | 0 | 0 | 25 | 0 | 880 | 100.0% | 60 | 62 | 0 |
 | sqlglot | v30.11.0 | 1120 | 0 | 0 | 0 | 0 | 1120 | 100.0% | 52 | 54 | 0 |
 | pytest-bdd | 8.1.0 | 123 | 15 | 0 | 1 | 0 | 139 | 89.2% | 28 | 35 | 0 |
 | httpx | 0.28.1 | 1410 | 0 | 0 | 1 | 7 | 1418 | 99.5% | 31 | 31 | 0 |
@@ -73,7 +73,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | testing/python/collect.py | failed | 77 | 5 | 0 | 0 | 0 |
 | testing/python/fixtures.py | failed | 204 | 4 | 0 | 2 | 0 |
 | testing/python/integration.py | failed | 13 | 3 | 0 | 4 | 0 |
-| testing/python/metafunc.py | failed | 102 | 10 | 0 | 0 | 0 |
+| testing/python/metafunc.py | failed | 105 | 7 | 0 | 0 | 0 |
 | testing/python/raises.py | passed | 31 | 0 | 0 | 0 | 0 |
 | testing/python/raises_group.py | failed | 26 | 3 | 0 | 0 | 0 |
 | testing/python/show_fixtures_per_test.py | passed | 8 | 0 | 0 | 0 | 0 |
@@ -529,7 +529,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | tests/test_color_triplet.py | passed | 3 | 0 | 0 | 0 | 0 |
 | tests/test_columns.py | passed | 1 | 0 | 0 | 0 | 0 |
 | tests/test_columns_align.py | passed | 1 | 0 | 0 | 0 | 0 |
-| tests/test_console.py | failed | 98 | 1 | 0 | 0 | 0 |
+| tests/test_console.py | passed | 99 | 0 | 0 | 0 | 0 |
 | tests/test_constrain.py | passed | 1 | 0 | 0 | 0 | 0 |
 | tests/test_containers.py | passed | 4 | 0 | 0 | 0 | 0 |
 | tests/test_control.py | passed | 7 | 0 | 0 | 0 | 0 |
