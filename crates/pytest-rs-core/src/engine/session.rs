@@ -125,7 +125,14 @@ impl Engine {
             return exit_code::OK;
         }
 
-        if let Some(code) = self.handle_collection_errors(py, collect_errors, started) {
+        let collect_code = self.handle_collection_errors(py, collect_errors, started);
+        // Explicit node-id args that matched nothing force USAGE_ERROR even
+        // when collection errors were reported (and even when there were
+        // none) — upstream returns exit 4 here. #134
+        if !self.session.not_found_nodeids.is_empty() {
+            return exit_code::USAGE_ERROR;
+        }
+        if let Some(code) = collect_code {
             return code;
         }
 
