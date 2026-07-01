@@ -65,7 +65,7 @@ impl Engine {
             // A non-UsageError, non-exit exception in pytest_configure is an
             // INTERNALERROR (exit 3) printed to stderr — upstream routes
             // configure failures to stderr (vs sessionstart on stdout). #49
-            let msg = python::format_exception(py, &err);
+            let msg = python::format_internal_error(py, &err, self.config.get_flag("full-trace"));
             return Err(format!("\x00INTERNAL_STDERR\x00{msg}"));
         }
         // A plugin instance registered in pytest_configure (#2270) may define
@@ -100,7 +100,7 @@ impl Engine {
             // An unexpected exception in pytest_sessionstart is an INTERNALERROR
             // (exit 3), not a collection error (exit 2). Signal the caller with
             // a sentinel prefix so it can print the INTERNALERROR banner.
-            let msg = python::format_exception(py, &err);
+            let msg = python::format_internal_error(py, &err, self.config.get_flag("full-trace"));
             return Err(format!("\x00INTERNAL\x00{msg}"));
         }
         // The session header: the replacement reporter's pytest_sessionstart

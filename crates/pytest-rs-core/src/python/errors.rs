@@ -42,6 +42,19 @@ pub fn format_exception(py: Python<'_>, err: &PyErr) -> String {
     result.unwrap_or_else(|_| format!("{err}"))
 }
 
+/// Format a hook exception for the INTERNALERROR banner. Upstream's
+/// `Config.notify_exception` uses the native traceback style unless
+/// `--full-trace` is set, which forces the long style (full source per
+/// frame). Used for unexpected exceptions in pytest_configure /
+/// pytest_sessionstart.
+pub fn format_internal_error(py: Python<'_>, err: &PyErr, fulltrace: bool) -> String {
+    if fulltrace {
+        format_test_failure(py, err, "long")
+    } else {
+        format_exception(py, err)
+    }
+}
+
 /// Format a test failure pytest-style (per --tb), falling back to the
 /// native traceback.
 /// Extract the short crash message from an exception (reprcrash.message equivalent).
