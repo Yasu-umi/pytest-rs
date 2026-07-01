@@ -19,12 +19,15 @@ pub type CacheKey = (Scope, String, String, String, Option<String>);
 
 /// One non-function-scope parametrization a fixture's value transitively
 /// depends on: (param scope, the scope-instance the param is constant within,
-/// argname, 0-based set index). When such a param's value changes while its
-/// scope-instance stays the same (e.g. a class-scoped `params=` fixture moving
-/// to its next value within the same class node), every fixture carrying that
-/// binding must be torn down before the next value is set up — pytest's
-/// `FixtureDef.execute` finishing a differently-parametrized cached instance.
-pub type Binding = (Scope, String, String, usize);
+/// argname, the param value's repr). When such a param's value changes while
+/// its scope-instance stays the same (e.g. a class-scoped `params=` fixture
+/// moving to its next value within the same class node), every fixture
+/// carrying that binding must be torn down before the next value is set up —
+/// pytest's `FixtureDef.execute` finishing a differently-parametrized cached
+/// instance. The value repr (not the param index) is the key so two functions
+/// parametrizing the same fixture with overlapping values at different indices
+/// still reuse the cached instance (e.g. issue634).
+pub type Binding = (Scope, String, String, String);
 
 /// A cached fixture outcome plus the parametrization bindings it depends on
 /// (used to evict it on a mid-node param transition). pytest caches a fixture's

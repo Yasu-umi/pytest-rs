@@ -256,7 +256,7 @@ impl Engine {
                 } else if idx > 0 {
                     // Same class node, but a class-scoped param advanced.
                     report_param_teardown!(
-                        items[idx - 1].ended_param_bindings(item, &[Scope::Class]),
+                        items[idx - 1].ended_param_bindings(py, item, &[Scope::Class]),
                         item
                     );
                 }
@@ -272,7 +272,11 @@ impl Engine {
                 } else if idx > 0 {
                     // Same module node, but a module/package-scoped param advanced.
                     report_param_teardown!(
-                        items[idx - 1].ended_param_bindings(item, &[Scope::Module, Scope::Package]),
+                        items[idx - 1].ended_param_bindings(
+                            py,
+                            item,
+                            &[Scope::Module, Scope::Package]
+                        ),
                         item
                     );
                 }

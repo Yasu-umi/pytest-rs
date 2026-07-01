@@ -685,7 +685,10 @@ pub(crate) fn resolve_fixture_def(
             .filter(|(argname, scope, _)| {
                 !matches!(scope, Scope::Session) && closure.contains(argname)
             })
-            .map(|(argname, scope, idx)| (*scope, item.instance_at(*scope), argname.clone(), *idx))
+            .map(|(argname, scope, _)| {
+                let val = item.param_value_repr(py, argname).unwrap_or_default();
+                (*scope, item.instance_at(*scope), argname.clone(), val)
+            })
             .collect()
     };
     // firstresult: plugins may discriminate the key further (asyncio

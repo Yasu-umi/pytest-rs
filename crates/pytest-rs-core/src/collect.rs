@@ -96,34 +96,49 @@ impl TestItem {
         }
     }
 
+    /// The `repr()` of this item's parametrized value for `argname`, whether
+    /// it is a direct param (`callspec`) or an indirect fixture param
+    /// (`fixture_params`). Used as the parametrization-binding key so teardown
+    /// keys on the value, not the per-function param index (which differs
+    /// across functions parametrizing the same fixture, e.g. issue634).
+    pub fn param_value_repr(&self, py: Python<'_>, argname: &str) -> Option<String> {
+        if let Some((_, _, value)) = self.fixture_params.iter().find(|(n, _, _)| n == argname) {
+            return value.bind(py).repr().ok().map(|r| r.to_string());
+        }
+        if let Some((_, value)) = self.callspec.iter().find(|(n, _)| n == argname) {
+            return value.bind(py).repr().ok().map(|r| r.to_string());
+        }
+        None
+    }
+
     /// Parametrization bindings of `self` (the previous item) in one of `scopes`
     /// whose value-group ends as the run moves on to `next` within the same
-    /// scope-instance: the param either advances to a new index or is no longer
+    /// scope-instance: the param advances to a new value or is no longer
     /// requested. A node-boundary change (different scope-instance) is excluded
-    /// — the deferred scope teardown covers it. Fixtures carrying these bindings
-    /// must be torn down before `next` sets the new value up.
+    /// — the deferred scope teardown covers it. Fixtures carrying these
+    /// bindings must be torn down before `next` sets the new value up.
     pub fn ended_param_bindings(
         &self,
+        py: Python<'_>,
         next: &TestItem,
         scopes: &[crate::fixture::Scope],
     ) -> Vec<crate::session::Binding> {
         self.scope_sort_keys
             .iter()
             .filter(|(_, scope, _)| scopes.contains(scope))
-            .filter_map(|(argname, scope, idx)| {
+            .filter_map(|(argname, scope, _)| {
                 let group = self.instance_at(*scope);
                 if next.instance_at(*scope) != group {
                     return None;
                 }
-                let next_idx = next
-                    .scope_sort_keys
-                    .iter()
-                    .find(|(a, _, _)| a == argname)
-                    .map(|(_, _, i)| *i);
-                if next_idx == Some(*idx) {
+                let prev_val = self.param_value_repr(py, argname);
+                let next_val = next.param_value_repr(py, argname);
+                // Same value (still requested) → the cached instance stays
+                // valid; only a changed or dropped value ends the group.
+                if next_val.is_some() && next_val == prev_val {
                     return None;
                 }
-                Some((*scope, group, argname.clone(), *idx))
+                Some((*scope, group, argname.clone(), prev_val.unwrap_or_default()))
             })
             .collect()
     }
