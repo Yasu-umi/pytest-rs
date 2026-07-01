@@ -3,7 +3,7 @@
   "tag": "9.0.3",
   "category": "ecosystem",
   "excluded_files": 61,
-  "deselected": 8,
+  "deselected": 0,
   "files": [
     {
       "file": "testing/python/approx.py",
@@ -529,11 +529,11 @@
       "file": "testing/acceptance_test.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 55,
-      "failed": 28,
-      "skipped": 2,
+      "passed": 0,
+      "failed": 1,
+      "skipped": 0,
       "errors": 0,
-      "deselected": 8
+      "deselected": 0
     },
     {
       "file": "testing/deprecated_test.py",
