@@ -263,7 +263,9 @@ class Suite:
     @staticmethod
     def _parse_summary(out: str) -> dict[str, int]:
         for line in reversed(out.splitlines()):
-            if line.startswith("====") and (" in " in line or "no tests ran" in line):
+            # Acceptance test summaries can be long enough that pytest-rs
+            # emits only "==" (2 equals) instead of "===="; accept 2+.
+            if line.startswith("==") and (" in " in line or "no tests ran" in line):
                 body = line.strip("= ")
                 match = SUMMARY_RE.match(body)
                 if match:
