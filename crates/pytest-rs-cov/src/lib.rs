@@ -9,9 +9,11 @@ mod report;
 
 use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use collector::{ArcMap, LineCollector};
 use files::PathAliases;
+use pytest_rs_core::collect::TestItem;
 use pytest_rs_core::config::{OptDef, OptionParser};
 use pytest_rs_core::hooks::{HookContext, Plugin};
 use pytest_rs_core::pyo3 as core_pyo3;
@@ -93,6 +95,11 @@ pub struct CovPlugin {
     /// The sys.monitoring tool id actually claimed (COVERAGE_ID unless a
     /// .pth child collector from an outer session got there first).
     tool_id: u8,
+    /// `@pytest.mark.no_cover` (the `no_cover` fixture pauses itself in
+    /// Python): events armed before the pause + the subprocess-child hook
+    /// path removed from the environment, restored in
+    /// `pytest_runtest_teardown`. `None` when the current item isn't paused.
+    no_cover_pause: Mutex<Option<(i64, Option<String>)>>,
 }
 
 impl CovPlugin {
@@ -115,6 +122,7 @@ impl CovPlugin {
             path_aliases: Vec::new(),
             report_messages: Vec::new(),
             tool_id: TOOL_ID,
+            no_cover_pause: Mutex::new(None),
         }
     }
 
@@ -1306,6 +1314,53 @@ impl Plugin for CovPlugin {
             for dir in site_dirs {
                 let _ = std::fs::write(dir.join("pytest-rs-cov.pth"), PTH_LINE);
             }
+        }
+        Ok(())
+    }
+
+    /// `@pytest.mark.no_cover`: pytest-cov's `pytest_runtest_call`
+    /// hookwrapper pauses the collector around just the call phase; a
+    /// native plugin has no hookwrapper slot there, so this brackets
+    /// setup-end..teardown-start instead (equivalent for a marker with no
+    /// fixtures of its own, which is the only shape upstream's own marker
+    /// form takes — fixture-based pausing already happens in the `no_cover`
+    /// fixture itself, in `py/pytest_cov/plugin.py`).
+    fn pytest_runtest_setup(&self, ctx: &mut HookContext, item: &TestItem) -> PyResult<()> {
+        if !self.enabled || item.get_closest_marker("no_cover").is_none() {
+            return Ok(());
+        }
+        let py = ctx.py;
+        let monitoring = py.import("sys")?.getattr("monitoring")?;
+        let events: i64 = monitoring
+            .call_method1("get_events", (self.tool_id,))?
+            .extract()?;
+        monitoring.call_method1("set_events", (self.tool_id, 0))?;
+        let environ = py.import("os")?.getattr("environ")?;
+        let saved_child: Option<String> = environ
+            .call_method1("pop", ("PYTEST_RS_COV_CHILD", py.None()))?
+            .extract()
+            .ok();
+        *self.no_cover_pause.lock().expect("cov lock poisoned") = Some((events, saved_child));
+        Ok(())
+    }
+
+    fn pytest_runtest_teardown(&self, ctx: &mut HookContext, _item: &TestItem) -> PyResult<()> {
+        let Some((events, saved_child)) = self
+            .no_cover_pause
+            .lock()
+            .expect("cov lock poisoned")
+            .take()
+        else {
+            return Ok(());
+        };
+        let py = ctx.py;
+        py.import("sys")?
+            .getattr("monitoring")?
+            .call_method1("set_events", (self.tool_id, events))?;
+        if let Some(child) = saved_child {
+            py.import("os")?
+                .getattr("environ")?
+                .set_item("PYTEST_RS_COV_CHILD", child)?;
         }
         Ok(())
     }
