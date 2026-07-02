@@ -89,20 +89,6 @@ pub(crate) fn build_test_setup(
     // xunit-style setup_module/setup_class/setup_method/setup_function.
     python::ensure_xunit_setup(py, session, item, instance.as_ref())?;
 
-    // The remaining (function-scoped) autouse fixtures; higher-scoped ones
-    // above are now cache hits.
-    for def in session.registry.autouse_for(&item.nodeid) {
-        resolve_fixture(
-            py,
-            plugins,
-            session,
-            config,
-            &def.name,
-            item,
-            instance.as_ref(),
-            &mut stack,
-        )?;
-    }
     // @pytest.mark.usefixtures (and the usefixtures ini option): named
     // fixtures are set up before the test's own, values not passed in.
     // Mark order follows iter_markers (upstream _getusefixturesnames):
@@ -155,27 +141,6 @@ pub(crate) fn build_test_setup(
                 }),
         )
         .collect();
-    for name in &usefixtures {
-        if item.callspec.iter().any(|(param, _)| param == name) {
-            continue;
-        }
-        // `request` is the always-available pseudo-fixture, never in the
-        // registry; usefixtures("request") (pytest-bdd marks scenario
-        // functions that declare a `request` arg this way) is a no-op.
-        if name == "request" {
-            continue;
-        }
-        resolve_fixture(
-            py,
-            plugins,
-            session,
-            config,
-            name,
-            item,
-            instance.as_ref(),
-            &mut stack,
-        )?;
-    }
     // Set up the test's fixtures in pytest's scope-sorted closure order
     // (getfixtureclosure: highest scope first, dependencies resolved on demand),
     // so the *execution* order matches upstream even when it differs from the
@@ -184,9 +149,15 @@ pub(crate) fn build_test_setup(
     // already set up above reappear here as cache hits.
     let ignore: std::collections::HashSet<String> =
         item.callspec.iter().map(|(name, _)| name.clone()).collect();
-    let initialnames = session
-        .registry
-        .initial_names(&item.nodeid, &item.fixture_names);
+    // Seed the closure with autouse + usefixtures + argnames (mirroring
+    // upstream's initialnames = deduplicate(autousenames, usefixturesnames,
+    // argnames)) so getfixtureclosure's scope sort orders a module-scope
+    // usefixtures fixture ahead of a function-scope autouse one. setup is a
+    // single closure walk; higher-scope autouse set up before xunit above
+    // reappear here as cache hits.
+    let mut requested: Vec<String> = usefixtures.clone();
+    requested.extend(item.fixture_names.iter().cloned());
+    let initialnames = session.registry.initial_names(&item.nodeid, &requested);
     let closure = session
         .registry
         .getfixtureclosure(&item.nodeid, &initialnames, &ignore);
