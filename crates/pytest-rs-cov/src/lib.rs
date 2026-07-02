@@ -1087,15 +1087,16 @@ impl Plugin for CovPlugin {
             })
             .and_then(|value| value.parse().ok())
             .unwrap_or(0);
-        // NOTE: [report] fail_under is deliberately NOT read from the
-        // coverage config: our native measurement can undercount versus
-        // coverage.py (subprocess merge gaps), so honoring a project's
-        // fail_under gate would fail runs that real pytest-cov passes
-        // (pytest-split's own suite sets fail_under=90).
+        // [report] fail_under: --cov-fail-under wins; otherwise .coveragerc
+        // / setup.cfg / tox.ini [report] or pyproject [tool.coverage.report].
         self.fail_under = ctx
             .config
             .get_value("cov-fail-under")
-            .and_then(|value| value.parse().ok());
+            .and_then(|value| value.parse().ok())
+            .or_else(|| {
+                Self::section_option_value(&plain_rootdir, cov_config, "report", "fail_under")
+                    .and_then(|value| value.parse().ok())
+            });
         self.exclude_patterns =
             Self::load_exclude_patterns(&rootdir, ctx.config.get_value("cov-config"));
 

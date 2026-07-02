@@ -117,6 +117,15 @@ tag = "0.9.0"
 testpaths = ["tests"]
 local = "conformance/suites/pytest-split"
 enabled = true
+# pyproject.toml's own addopts set `--cov pytest_split --cov tests` purely
+# for the upstream project's own CI coverage dashboard — none of its tests
+# assert on coverage output, so pytest-cov is not actually under test here.
+# `[tool.coverage.report] fail_under = 90` is sized for one whole-suite pytest
+# session; the runner scores file by file, so any single file's coverage of
+# the whole package never reaches 90%. Rather than special-case that one
+# option, disable the native cov plugin outright for this suite — it isn't
+# what pytest-split's conformance is validating.
+extra_args = ["-p", "no:pytest_cov"]
 
 [pytest-benchmark]
 repo = "https://github.com/ionelmc/pytest-benchmark"
