@@ -216,7 +216,7 @@ impl CovPlugin {
         }
         if patterns.is_empty()
             && let Ok(content) = std::fs::read_to_string(rootdir.join("pyproject.toml"))
-            && let Ok(document) = content.parse::<toml::Value>()
+            && let Ok(document) = content.parse::<toml::Table>()
             && let Some(lines) = document
                 .get("tool")
                 .and_then(|tool| tool.get("coverage"))
@@ -1539,6 +1539,26 @@ mod run_option_tests {
         assert!(names.contains("mod.pyw"));
         assert!(!names.contains("run.local.py"));
         assert!(!names.contains("foo.bak.py"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn pyproject_exclude_lines() {
+        let dir = std::env::temp_dir().join("ptrs-exclude-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("pyproject.toml"),
+            "[tool.coverage.report]\nexclude_lines = [\n    'raise NotImplementedError',\n]\n",
+        )
+        .unwrap();
+        let patterns = super::CovPlugin::load_exclude_patterns(&dir, None);
+        assert!(
+            patterns
+                .iter()
+                .any(|re| re.is_match("    raise NotImplementedError")),
+            "{patterns:?}"
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
