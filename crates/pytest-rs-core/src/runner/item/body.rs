@@ -638,7 +638,7 @@ pub(crate) fn run_item_body(
     // pytest 9.0's built-in `_pytest.subtests` aggregation.
     // Skip re-labeling when the third-party pytest-subtests plugin is
     // installed: it keeps the main test PASSED and manages its own counts.
-    let (sub_reports, _) = python::pop_subtest_reports(py, config, item);
+    let (sub_reports, failed_fixture_subs) = python::pop_subtest_reports(py, config, item);
     // In xdist worker mode, also drain reports that third-party plugins
     // (e.g. pytest-subtests) emitted via ihook.pytest_runtest_logreport
     // directly. The logreport sink captures them; we forward them to the
@@ -650,11 +650,14 @@ pub(crate) fn run_item_body(
     } else {
         Vec::new()
     };
-    let failed_sub_count = sub_reports
-        .iter()
-        .chain(plugin_reports.iter())
-        .filter(|r| r.outcome == Outcome::Failed)
-        .count();
+    // Only fixture-style subtest failures fail the enclosing test: unittest
+    // subTest failures do not (pop_subtest_reports excludes them from the
+    // count). Third-party plugin reports are fixture-style, so they count.
+    let failed_sub_count = failed_fixture_subs
+        + plugin_reports
+            .iter()
+            .filter(|r| r.outcome == Outcome::Failed)
+            .count();
     reports.extend(sub_reports);
     reports.extend(plugin_reports);
     let has_subtests_plugin = py
