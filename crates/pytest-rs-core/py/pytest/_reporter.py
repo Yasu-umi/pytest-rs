@@ -169,6 +169,12 @@ def setup(config: Any) -> None:
 def replacement() -> Any | None:
     """The non-default 'terminalreporter' plugin, or None when terminal
     output stays native."""
+    # When setup() was never called (_default is None) — e.g. a -n worker,
+    # whose only stdout is the IPC pipe — there is no pytest-rs-managed
+    # default and no replacement to drive; the registered TerminalReporter
+    # is the upstream default, which must stay silent (the master renders).
+    if _default is None:
+        return None
     reporter = pluginmanager.getplugin("terminalreporter")
     if reporter is None or reporter is _default:
         return None
