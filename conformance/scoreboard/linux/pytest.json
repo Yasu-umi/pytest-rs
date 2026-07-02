@@ -447,10 +447,10 @@
     },
     {
       "file": "testing/test_subtests.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 22,
-      "failed": 12,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 34,
+      "failed": 0,
       "skipped": 0,
       "errors": 0,
       "deselected": 0
@@ -529,8 +529,8 @@
       "file": "testing/acceptance_test.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 60,
-      "failed": 23,
+      "passed": 61,
+      "failed": 22,
       "skipped": 2,
       "errors": 0,
       "deselected": 8
