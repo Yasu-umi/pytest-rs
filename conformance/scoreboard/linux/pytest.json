@@ -529,8 +529,8 @@
       "file": "testing/acceptance_test.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 61,
-      "failed": 22,
+      "passed": 63,
+      "failed": 20,
       "skipped": 2,
       "errors": 0,
       "deselected": 8
