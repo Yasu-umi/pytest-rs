@@ -18,7 +18,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2613 | 175 | 0 | 53 | 8 | 2849 | 93.6% | 22 | 54 | 61 |
+| pytest | 9.0.3 | 2618 | 170 | 0 | 53 | 8 | 2849 | 93.8% | 22 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 1 | 7 | 85.7% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 2 | 90 | 97.8% | 1 | 1 | 0 |
@@ -114,7 +114,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | testing/test_stash.py | passed | 1 | 0 | 0 | 0 | 0 |
 | testing/test_stepwise.py | passed | 18 | 0 | 0 | 0 | 0 |
 | testing/test_subtests.py | passed | 34 | 0 | 0 | 0 | 0 |
-| testing/test_terminal.py | failed | 211 | 12 | 0 | 4 | 0 |
+| testing/test_terminal.py | failed | 216 | 7 | 0 | 4 | 0 |
 | testing/test_threadexception.py | failed | 7 | 1 | 0 | 0 | 0 |
 | testing/test_tmpdir.py | passed | 39 | 0 | 0 | 1 | 0 |
 | testing/test_unittest.py | failed | 64 | 6 | 0 | 9 | 0 |
