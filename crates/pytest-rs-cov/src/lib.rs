@@ -4,12 +4,14 @@
 
 mod analysis;
 mod collector;
+mod files;
 mod report;
 
 use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 
 use collector::{ArcMap, LineCollector};
+use files::PathAliases;
 use pytest_rs_core::config::{OptDef, OptionParser};
 use pytest_rs_core::hooks::{HookContext, Plugin};
 use pytest_rs_core::pyo3 as core_pyo3;
@@ -82,7 +84,9 @@ pub struct CovPlugin {
     branch: bool,
     /// Dump directory for subprocess coverage (children write, we merge).
     child_out_dir: Option<PathBuf>,
-    /// coverage [paths] groups (canonical first).
+    /// coverage [paths] groups (canonical first); serialized to env for the
+    /// subprocess shim and used to build each `LineCollector`'s own
+    /// `PathAliases` (the remap is applied once per hit, at record time).
     path_aliases: Vec<Vec<String>>,
     /// "Coverage X written to ..." lines for the terminal section.
     report_messages: Vec<String>,
@@ -374,8 +378,9 @@ impl CovPlugin {
     }
 
     /// coverage `[paths]` groups: each is (canonical, aliases) — measured
-    /// paths under an alias report as the canonical path (subset of
-    /// coverage.py's path aliasing: literal prefixes, no globs).
+    /// paths under an alias report as the canonical path. Aliases are globs
+    /// (coverage.py `PathAliases` semantics: `*` = non-separator run,
+    /// `*/dir`/`**/` = any prefix), compiled in `files::PathAliases`.
     fn paths_aliases(rootdir: &Path, cov_config: Option<&str>) -> Vec<Vec<String>> {
         let mut groups: Vec<Vec<String>> = Vec::new();
         for candidate in [cov_config.unwrap_or(".coveragerc"), "setup.cfg", "tox.ini"] {
@@ -872,22 +877,17 @@ impl CovPlugin {
                     }
                 }
             }
-            let mut name = path
+            // `path` is already canonical here: [paths] aliasing (e.g. a
+            // worker's chdir copy matched by `*/dir1`) is applied once, when
+            // the hit/arc is first recorded (collector.rs's `canonical_name`,
+            // `_child.py`'s `_map_alias`), so every producer's key already
+            // collapses onto the same canonical name before it ever reaches
+            // this per-file loop.
+            let name = path
                 .strip_prefix(rootdir)
                 .unwrap_or(&path)
                 .to_string_lossy()
                 .to_string();
-            // [paths] aliasing: an alias prefix reports as the canonical one.
-            'groups: for group in &self.path_aliases {
-                let canonical = &group[0];
-                for alias in &group[1..] {
-                    let prefix = format!("{}{}", alias.trim_end_matches('/'), '/');
-                    if let Some(rest) = name.strip_prefix(&prefix) {
-                        name = format!("{}/{rest}", canonical.trim_end_matches('/'));
-                        break 'groups;
-                    }
-                }
-            }
             rows.push(FileRow {
                 name,
                 executable,
@@ -1112,6 +1112,19 @@ impl Plugin for CovPlugin {
             || Self::branch_enabled(&ctx.config.rootdir, ctx.config.get_value("cov-config"));
         self.path_aliases =
             Self::paths_aliases(&ctx.config.rootdir, ctx.config.get_value("cov-config"));
+        // An xdist worker runs with a rootdir set to its chdir; the coverage
+        // config (rsync'd as a fixture) may not sit on its rootdir resolution
+        // path, so `[paths]` parses empty. Fall back to the controller's
+        // serialized aliases so worker-native tracing and the subprocess shim
+        // still accept files under an alias (`*/dir1`).
+        if self.path_aliases.is_empty()
+            && ctx.config.is_worker()
+            && let Ok(raw) = std::env::var("PYTEST_RS_COV_PATHS")
+            && !raw.is_empty()
+            && let Ok(groups) = serde_json::from_str::<Vec<Vec<String>>>(&raw)
+        {
+            self.path_aliases = groups;
+        }
 
         // pytest-cov parity for dynamic_context=test_function in the
         // coverage config: fatal under xdist, a warning otherwise (the
@@ -1191,6 +1204,7 @@ impl Plugin for CovPlugin {
             LineCollector::new(
                 with_sep(&rootdir),
                 self.sources.iter().map(|source| with_sep(source)).collect(),
+                PathAliases::from_groups(&self.path_aliases, &rootdir),
                 with_sep(&pytest_rs_core::python::shim_root()),
                 self.branch,
                 need_jump_targets,
@@ -1255,6 +1269,12 @@ impl Plugin for CovPlugin {
         environ.set_item("PYTEST_RS_COV_BRANCH", if self.branch { "1" } else { "0" })?;
         environ.set_item("PYTEST_RS_COV_TOOL_ID", self.tool_id.to_string())?;
         environ.set_item("PYTEST_RS_COV_ACTIVE", "1")?;
+        // [paths] aliases serialized as JSON (canonical first per group) so
+        // the subprocess shim can accept files under an alias (`*/dir1`) the
+        // same way the native LineCollector does.
+        if let Ok(paths_json) = serde_json::to_string(&self.path_aliases) {
+            environ.set_item("PYTEST_RS_COV_PATHS", paths_json)?;
+        }
         self.child_out_dir = Some(out_dir);
         // The hook itself goes into the environment's site-packages once
         // (pytest-cov installs its equivalent at package-install time).
@@ -1323,7 +1343,10 @@ impl Plugin for CovPlugin {
             let _ = py
                 .import("os")
                 .and_then(|os| os.getattr("environ"))
-                .and_then(|environ| environ.call_method1("pop", ("PYTEST_RS_COV_OUT", py.None())));
+                .and_then(|environ| {
+                    environ.call_method1("pop", ("PYTEST_RS_COV_OUT", py.None()))?;
+                    environ.call_method1("pop", ("PYTEST_RS_COV_PATHS", py.None()))
+                });
         }
         if ctx.config.is_worker() {
             // Workers don't report: hits and arcs travel to the parent.

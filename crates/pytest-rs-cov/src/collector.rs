@@ -11,6 +11,8 @@ use std::sync::{Arc, Mutex};
 
 use pyo3::prelude::*;
 
+use crate::files::PathAliases;
+
 /// filename -> executed (source line, destination line, direction) arcs.
 pub type ArcMap = HashMap<String, BTreeSet<(u32, i64, u8)>>;
 
@@ -35,6 +37,10 @@ pub struct LineCollector {
     /// Source filters (absolute, dirs end with a separator); empty = any
     /// file under rootdir.
     sources: Vec<String>,
+    /// coverage `[paths]` aliases: a file whose path prefix-matches an alias
+    /// is measured (e.g. a script rsync'd to a worker dir under `*/dir1`),
+    /// then remapped to canonical at report time.
+    aliases: PathAliases,
     /// The embedded shim dir; never measured.
     shim_root: String,
     hits: Mutex<HashMap<String, BTreeSet<u32>>>,
@@ -63,6 +69,7 @@ impl LineCollector {
     pub fn new(
         rootdir: String,
         sources: Vec<String>,
+        aliases: PathAliases,
         shim_root: String,
         branch: bool,
         need_jump_targets: bool,
@@ -74,6 +81,7 @@ impl LineCollector {
         Self {
             rootdir,
             sources,
+            aliases,
             shim_root,
             hits: Mutex::new(HashMap::new()),
             arcs: Mutex::new(HashMap::new()),
@@ -105,12 +113,32 @@ impl LineCollector {
             return false;
         }
         if self.sources.is_empty() {
-            filename.starts_with(&self.rootdir)
-        } else {
-            self.sources.iter().any(|source| {
-                filename == source.trim_end_matches('/') || filename.starts_with(source.as_str())
-            })
+            if filename.starts_with(&self.rootdir) {
+                return true;
+            }
+        } else if self.sources.iter().any(|source| {
+            filename == source.trim_end_matches('/') || filename.starts_with(source.as_str())
+        }) {
+            return true;
         }
+        // coverage `[paths]` aliases: a file rsync'd to a worker dir
+        // (matched by an alias like `*/dir1`) is measured even though it is
+        // not under the `--cov` source root; the recorded alias path is then
+        // remapped to canonical at report time.
+        self.aliases.matches(filename)
+    }
+
+    /// [paths] remap, applied once per code object (`py_start`) so every hit
+    /// and arc is stored under the canonical name from the start — letting
+    /// workers whose chdir'd copies land under different alias prefixes
+    /// (`*/dir1`, `*/dir2`) merge into a single row instead of surviving as
+    /// separate ones that only happen to print the same name.
+    fn canonical_name(&self, filename: &str) -> Arc<str> {
+        Arc::from(
+            self.aliases
+                .map(filename)
+                .unwrap_or_else(|| filename.to_string()),
+        )
     }
 
     /// Record one executed (source line, destination line, direction) arc.
@@ -244,7 +272,7 @@ impl LineCollector {
                         key,
                         TrackedCode {
                             _code: code.unbind(),
-                            filename: Arc::from(filename),
+                            filename: self.canonical_name(&filename),
                             lines,
                             jump_targets,
                         },

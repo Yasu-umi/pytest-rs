@@ -11,9 +11,95 @@ Activation contract (all set by the running pytest-rs session):
     PYTEST_RS_COV_ROOT     rootdir prefix for tracked files
     PYTEST_RS_COV_SOURCES  os.pathsep-joined source filters (optional)
     PYTEST_RS_COV_BRANCH   "1" to record branch arcs
+    PYTEST_RS_COV_PATHS    JSON [paths] groups; an alias prefix tracks a file
+                           (e.g. a script rsync'd to a worker dir `*/dir1`)
 """
 
 import os
+import re as _re
+
+# coverage.py's _glob_to_regex tokenizer (files.py G2RX_TOKENS). ``None`` means
+# the matched text is disallowed; we fall through to a narrower rule instead of
+# raising, so ``***`` is consumed one ``*`` at a time.
+_G2RX_TOKENS = [
+    (_re.compile(rx), sub)
+    for rx, sub in [
+        (r"\*\*\*+", None),
+        (r"[^/]+\*\*+", None),
+        (r"\*\*+[^/]+", None),
+        (r"\*\*/\*\*", None),
+        (r"^\*+/", r"(.*[/\\\\])?"),
+        (r"/\*+$", r"[/\\\\].*"),
+        (r"\*\*/", r"(.*[/\\\\])?"),
+        (r"/", r"[/\\\\]"),
+        (r"\*", r"[^/\\\\]*"),
+        (r"\?", r"[^/\\\\]"),
+        (r"\[.*?\]", r"\g<0>"),
+        (r"[a-zA-Z0-9_-]+", r"\g<0>"),
+        (r"[\[\]]", None),
+        (r".", r"\\\g<0>"),
+    ]
+]
+
+
+def _glob_to_regex(pattern):
+    """coverage.py _glob_to_regex: a single glob -> unanchored regex string."""
+    pattern = pattern.replace("\\", "/")
+    if "/" not in pattern:
+        pattern = "**/" + pattern
+    out = []
+    pos = 0
+    while pos < len(pattern):
+        for rx, sub in _G2RX_TOKENS:
+            m = rx.match(pattern, pos)
+            if m:
+                if sub is not None:
+                    out.append(m.expand(sub))
+                    pos = m.end()
+                    break
+                # disallowed token; a narrower rule below handles it.
+        else:
+            out.append(_re.escape(pattern[pos]))
+            pos += 1
+    return "".join(out)
+
+
+def _resolve_alias(pattern, base):
+    """coverage.py's `abs_file`: a pattern with no leading wildcard is
+    resolved against `base` (the process cwd, upstream) unless already
+    absolute — otherwise it can never match an absolute traced filename."""
+    if pattern.startswith("*") or os.path.isabs(pattern):
+        return pattern
+    return os.path.join(base, pattern)
+
+
+def _compile_path_aliases(raw, base):
+    """Compile [paths] alias patterns (JSON groups, canonical first) into
+    (regex, canonical) rules: `regex` is a prefix match for the tracked-file
+    check, `canonical` is the group's first entry (with a trailing
+    separator) used to remap a matched path to its canonical name."""
+    if not raw:
+        return []
+    import json
+
+    try:
+        groups = json.loads(raw)
+    except (ValueError, TypeError):
+        return []
+    rules = []
+    for group in groups:
+        if not isinstance(group, list) or len(group) < 2:
+            continue
+        canonical = _resolve_alias(group[0], base).rstrip("/\\") + os.sep
+        for alias in group[1:]:
+            if not isinstance(alias, str):
+                continue
+            pat = alias.rstrip("/\\")
+            if not pat or pat.endswith("*"):
+                continue
+            pat = _resolve_alias(pat, base)
+            rules.append((_re.compile(_glob_to_regex(pat + "/"), _re.IGNORECASE), canonical))
+    return rules
 
 
 def start():
@@ -27,6 +113,7 @@ def start():
     root = os.environ.get("PYTEST_RS_COV_ROOT", "")
     sources = [s for s in os.environ.get("PYTEST_RS_COV_SOURCES", "").split(os.pathsep) if s]
     branch = os.environ.get("PYTEST_RS_COV_BRANCH") == "1"
+    alias_rules = _compile_path_aliases(os.environ.get("PYTEST_RS_COV_PATHS"), root)
 
     mon = sys.monitoring
     tool = mon.COVERAGE_ID
@@ -54,8 +141,26 @@ def start():
         if filename.startswith("<") or "site-packages" in filename or "/lib/python" in filename:
             return False
         if sources:
-            return any(filename == s.rstrip(os.sep) or filename.startswith(s) for s in sources)
-        return filename.startswith(root)
+            if any(filename == s.rstrip(os.sep) or filename.startswith(s) for s in sources):
+                return True
+        elif filename.startswith(root):
+            return True
+        # coverage [paths] aliases: a file under an alias (e.g. a script
+        # rsync'd to a worker dir matched by `*/dir1`) is tracked too.
+        return any(rx.match(filename) for rx, _ in alias_rules)
+
+    def _map_alias(filename):
+        """[paths] remap: the first alias whose prefix matches `filename`
+        rewrites the matched prefix to its canonical result, if that
+        canonical path actually exists (mirrors coverage.py's PathAliases.map
+        and the Rust LineCollector's `canonical_name`)."""
+        for rx, canonical in alias_rules:
+            m = rx.match(filename)
+            if m:
+                new = canonical + filename[m.end() :]
+                if os.path.exists(new):
+                    return new
+        return filename
 
     def py_start(code, _offset):
         key = id(code)
@@ -82,7 +187,7 @@ def start():
                         for i in dis.get_instructions(code)
                         if i.opname in conditional and isinstance(i.argval, int)
                     }
-                tracked[key] = (filename, table, jumps, code)
+                tracked[key] = (_map_alias(filename), table, jumps, code)
                 mon.set_local_events(tool, code, local_events)
         return mon.DISABLE
 
