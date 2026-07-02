@@ -358,7 +358,7 @@ impl Engine {
 
         let worker_chdirs = self.config.tx_worker_chdirs();
 
-        // --rsyncdir: copy each specified directory into every worker's chdir.
+        // --rsyncdir: copy each specified directory or file into every worker's chdir.
         if let Some(chdirs) = &worker_chdirs
             && let Some(rsyncdirs) = self.config.get_values("rsyncdir")
         {
@@ -368,10 +368,13 @@ impl Engine {
                 let dest_base = std::path::Path::new(chdir);
                 for src_str in &rsyncdirs {
                     let src = std::path::Path::new(src_str);
-                    if src.is_dir()
-                        && let Some(name) = src.file_name()
-                    {
+                    let Some(name) = src.file_name() else {
+                        continue;
+                    };
+                    if src.is_dir() {
                         let _ = copy_dir_recursive(src, &dest_base.join(name));
+                    } else if src.is_file() {
+                        let _ = std::fs::copy(src, dest_base.join(name));
                     }
                 }
             }
