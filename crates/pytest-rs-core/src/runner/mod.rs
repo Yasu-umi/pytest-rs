@@ -447,6 +447,30 @@ impl Engine {
                     );
                     let _ = std::io::stdout().flush();
                     line.push(c);
+                    // Mid-line edge wrap (pytest's _write_progress_information_
+                    // if_past_edge): when the line plus the reserved progress
+                    // field would overflow the terminal, emit the field (empty
+                    // for "times", which shows the duration only at file end)
+                    // and continue the dots on a fresh line. Skip the last
+                    // collected item — the final 100%/duration flush handles it.
+                    if idx + 1 < items.len()
+                        && let Some(msg) = edge_wrap_message(
+                            pkind,
+                            line.chars().count(),
+                            term_width(),
+                            done,
+                            total,
+                            file_dur,
+                        )
+                    {
+                        let color = fill_color(py, session, false);
+                        if msg.is_empty() {
+                            println!();
+                        } else {
+                            println!("{}", crate::tw::markup(&msg, &[color]));
+                        }
+                        line.clear();
+                    }
                 }
                 if is_teardown {
                     pending_teardown = Some((session.reports.len(), item.lineno, idx, delegated));

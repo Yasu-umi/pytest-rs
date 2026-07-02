@@ -157,6 +157,51 @@ pub(crate) fn progress_message(
     }
 }
 
+/// The maximum width of the progress field, used to decide when a streaming
+/// progress line would overflow the terminal edge and must wrap. Mirrors
+/// pytest's TerminalReporter._write_progress_information_if_past_edge: a
+/// leading space is always reserved for the field (" [100%]", " [20/20]",
+/// " 99h 59m"). The "times" style uses the longest possible duration.
+pub(crate) fn progress_length(kind: ProgressKind, total: usize) -> usize {
+    match kind {
+        // The leading space is part of the field (" [100%]", " [n/n]",
+        // " 99h 59m"), matching pytest's _write_progress_information_if_past_edge.
+        ProgressKind::Percent => " [100%]".len(),
+        ProgressKind::Count => format!(" [{total}/{total}]").len(),
+        ProgressKind::Times => " 99h 59m".len(),
+        ProgressKind::Hidden => 0,
+    }
+}
+
+/// pytest's _write_progress_information_if_past_edge: when the streaming
+/// progress line plus the reserved field would reach the terminal edge, the
+/// field is emitted and the dots continue on a fresh line. Returns the field
+/// to print before the newline — a leading space + the field for percent/count
+/// (" [ 50%]", " [10/20]"), or empty for "times" (the duration shows only at
+/// file end via progress_suffix). None when no wrap is needed or the style
+/// hides the field.
+pub(crate) fn edge_wrap_message(
+    kind: ProgressKind,
+    line_width: usize,
+    width: usize,
+    done: usize,
+    total: usize,
+    dur: Duration,
+) -> Option<String> {
+    if matches!(kind, ProgressKind::Hidden) {
+        return None;
+    }
+    let length = progress_length(kind, total);
+    if line_width + length + 1 >= width {
+        Some(match kind {
+            ProgressKind::Times => String::new(),
+            _ => format!(" {}", progress_message(kind, done, total, dur)),
+        })
+    } else {
+        None
+    }
+}
+
 /// pytest's format_node_duration, sans the leading space: a compact, human
 /// readable duration (us/ms/s/m/h) for the "times" progress style.
 fn node_duration(d: Duration) -> String {
