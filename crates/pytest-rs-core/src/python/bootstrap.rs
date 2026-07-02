@@ -559,6 +559,31 @@ pub(crate) fn import_module_from_path<'py>(
     let spec = util
         .getattr("spec_from_file_location")?
         .call1((name, path.to_string_lossy().as_ref()))?;
+    // spec_from_file_location bypasses sys.meta_path, so the assertion-rewrite
+    // finder never sees modules loaded this way — notably the 2nd+ shadowed
+    // conftest in an in-process run, imported under an alias (the plain
+    // "conftest" name is taken). Mirror _RewriteFinder.find_spec: when the
+    // file is a rewrite target and rewriting is enabled, swap in _RewriteLoader
+    // so the asserts are rewritten (a fixture teardown `assert False` then
+    // reads "assert False", not bare "AssertionError").
+    let origin: String = spec.getattr("origin")?.extract().unwrap_or_default();
+    let rewrite_mod = py.import("pytest._rewrite")?;
+    let enabled: bool = rewrite_mod
+        .getattr("_rewrite_enabled")?
+        .extract()
+        .unwrap_or(true);
+    let is_target: bool = enabled
+        && rewrite_mod
+            .getattr("_is_rewrite_target")?
+            .call1((origin.as_str(),))?
+            .extract()
+            .unwrap_or(false);
+    if is_target {
+        let loader = rewrite_mod
+            .getattr("_RewriteLoader")?
+            .call1((spec.getattr("name")?, origin.as_str()))?;
+        spec.setattr("loader", loader)?;
+    }
     let module = util.getattr("module_from_spec")?.call1((&spec,))?;
     sys_modules.set_item(name, &module)?;
     spec.getattr("loader")?
