@@ -5,6 +5,7 @@ Usage:
     uv run python conformance/runner.py                 # all enabled suites
     uv run python conformance/runner.py --suite pytest  # one suite
     uv run python conformance/runner.py --check         # gate on expected/*.toml
+    uv run python conformance/runner.py --suite pytest-cov --test path/to/test.py::node  # one node (diagnostic)
 """
 
 from __future__ import annotations
@@ -205,13 +206,8 @@ class Suite:
         kept = [f for f in files if not any(part in self.exclude for part in f.parts)]
         return kept, len(files) - len(kept)
 
-    def run_file(self, path: Path) -> FileResult:
-        rel = str(path.relative_to(self.checkout))
-        deselects: list[str] = []
-        for nodeid in self.deselect:
-            deselect_file = nodeid.split("::")[0]
-            if deselect_file == rel or rel.endswith("/" + deselect_file):
-                deselects.extend(("--deselect", nodeid))
+    def _launch_env(self, rel: str) -> dict[str, str]:
+        """PYTHONPATH + per-suite env for running `rel` under pytest-rs."""
         env = dict(os.environ)
         deps_dir = self.deps_dir()
         extra_paths = [str(p) for p in [self.src_dir, deps_dir] if p is not None]
@@ -219,15 +215,31 @@ class Suite:
         if extra_paths:
             env["PYTHONPATH"] = ":".join(extra_paths)
         env.update(self.env)
-        timeout = TIMEOUT_S * self.slow_timeout_multiplier if rel in self.slow_files else TIMEOUT_S
+        return env
+
+    def _deselect_args(self, rel: str) -> list[str]:
+        """--deselect args for the node ids pinned out of this file."""
+        deselects: list[str] = []
+        for nodeid in self.deselect:
+            deselect_file = nodeid.split("::")[0]
+            if deselect_file == rel or rel.endswith("/" + deselect_file):
+                deselects.extend(("--deselect", nodeid))
+        return deselects
+
+    def _timeout(self, rel: str) -> float:
+        return TIMEOUT_S * self.slow_timeout_multiplier if rel in self.slow_files else TIMEOUT_S
+
+    def run_file(self, path: Path) -> FileResult:
+        rel = str(path.relative_to(self.checkout))
+        cmd = [str(BINARY), rel, *self._deselect_args(rel), *self.extra_args]
         try:
             proc = subprocess.run(
-                [str(BINARY), rel, *deselects, *self.extra_args],
+                cmd,
                 cwd=self.checkout,
                 capture_output=True,
                 text=True,
-                timeout=timeout,
-                env=env,
+                timeout=self._timeout(rel),
+                env=self._launch_env(rel),
             )
         except subprocess.TimeoutExpired:
             return FileResult(file=rel, status="timeout", exit_code=None)
@@ -258,6 +270,23 @@ class Suite:
             # (unexpected exit codes); passing files are dropped to save memory.
             stdout=out if (is_unexpected or status == "failed") else "",
             stderr=proc.stderr if is_unexpected else "",
+        )
+
+    def run_one(self, path: Path, node: str | None) -> subprocess.CompletedProcess[str]:
+        """Run one file or a single node within it for diagnosis. Env, cwd,
+        deselect and extra_args match a normal suite run so the node behaves
+        exactly as inside the file. Returns the raw completed process; the
+        caller inspects stdout/stderr. Used by `--test`, which is diagnostic
+        only and never updates the scoreboard."""
+        rel = str(path.relative_to(self.checkout))
+        spec = f"{rel}::{node}" if node else rel
+        return subprocess.run(
+            [str(BINARY), spec, *self._deselect_args(rel), *self.extra_args],
+            cwd=self.checkout,
+            capture_output=True,
+            text=True,
+            timeout=self._timeout(rel),
+            env=self._launch_env(rel),
         )
 
     @staticmethod
@@ -653,10 +682,37 @@ def main() -> None:
         metavar="i/n",
         help="run shard i of n: round-robin the selected suites across n shards",
     )
+    parser.add_argument(
+        "--test",
+        default=None,
+        metavar="NODEID",
+        help="run a single file or node (file::node) under one suite for "
+        "diagnosis; requires --suite; prints raw pytest-rs output and skips "
+        "the scoreboard/docs",
+    )
     args = parser.parse_args()
 
     if not BINARY.exists():
         sys.exit("build first: cargo build")
+
+    if args.test:
+        suites = load_suites(args.suite)
+        if len(suites) != 1:
+            sys.exit("--test requires exactly one --suite (e.g. --suite pytest-cov)")
+        suite = suites[0]
+        suite.fetch(args.local)
+        file_part, sep, node_part = args.test.partition("::")
+        node = node_part if sep else None
+        file_path = suite.checkout / file_part
+        if not file_path.is_file():
+            sys.exit(f"file not found in {suite.name} checkout: {file_part}")
+        spec = f"{file_part}::{node}" if node else file_part
+        sys.stderr.write(f"[{suite.name}] pytest-rs {spec}\n")
+        proc = suite.run_one(file_path, node)
+        sys.stdout.write(proc.stdout)
+        if proc.stderr:
+            sys.stderr.write(proc.stderr)
+        return
 
     suites = load_suites(args.suite)
     if args.pinned:
