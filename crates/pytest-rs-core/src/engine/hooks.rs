@@ -18,6 +18,18 @@ impl Engine {
         Ok(())
     }
 
+    pub(crate) fn fire_plugins_registered(&mut self, py: Python<'_>) -> PyResult<()> {
+        let mut ctx = HookContext {
+            py,
+            session: &mut self.session,
+            config: &self.config,
+        };
+        for plugin in self.plugins.iter_mut() {
+            plugin.pytest_plugins_registered(&mut ctx)?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn fire_sessionstart(&mut self, py: Python<'_>) -> PyResult<()> {
         let mut ctx = HookContext {
             py,

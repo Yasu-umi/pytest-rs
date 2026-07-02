@@ -31,3 +31,8 @@ class CovDisabledWarning(Warning):
 
 class CovReportWarning(Warning):
     pass
+
+
+class CoverageWarning(Warning):
+    """A warning from the native coverage measurement (mirrors
+    coverage.py's own `coverage.exceptions.CoverageWarning`)."""

@@ -40,6 +40,19 @@ pub trait Plugin: Send {
         Ok(())
     }
 
+    /// Fires once `-p NAME` / entry-point plugins have been imported (their
+    /// module-level code has already run), before conftest discovery and
+    /// test collection. Upstream pytest imports `-p`/entry-point plugins
+    /// during early config parsing, well before any `pytest_configure`; a
+    /// plugin that needs to distinguish "already loaded" from "not yet
+    /// collected" code (e.g. pytest-cov's coverage-start point, which in
+    /// real pytest-cov is `pytest_load_initial_conftests`, itself after
+    /// `-p` loading) should act here rather than in `pytest_configure`,
+    /// which native plugins run earlier, before `-p` plugins even import.
+    fn pytest_plugins_registered(&mut self, _ctx: &mut HookContext) -> PyResult<()> {
+        Ok(())
+    }
+
     fn pytest_sessionstart(&mut self, _ctx: &mut HookContext) -> PyResult<()> {
         Ok(())
     }

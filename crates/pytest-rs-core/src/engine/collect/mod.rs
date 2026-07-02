@@ -22,6 +22,13 @@ impl Engine {
         let rootdir = self.config.rootdir.clone();
         let (paths, mut files) = self.resolve_collection_paths(py, &rootdir)?;
         self.load_cmdline_and_entrypoint_plugins(py)?;
+        // `-p`/entry-point plugins have now imported (upstream loads them
+        // during early config parsing, well before pytest_configure); let
+        // plugins that need to distinguish "already loaded" from
+        // "not yet collected" code act now (e.g. pytest-cov's coverage
+        // start point).
+        self.fire_plugins_registered(py)
+            .map_err(|err| python::format_exception(py, &err))?;
         let (start_dirs, conftests) = self.discover_conftests(&rootdir, &paths, &files);
 
         let mut errors = Vec::new();

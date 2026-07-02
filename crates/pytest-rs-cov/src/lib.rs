@@ -68,6 +68,11 @@ pub struct CovPlugin {
     /// Absolute source roots (dirs get a trailing separator); empty = all
     /// files under rootdir that get executed.
     sources: Vec<PathBuf>,
+    /// The raw `--cov=X` values `sources` was resolved from, same order —
+    /// for the end-of-session "was this source ever measured?" warnings
+    /// (coverage.py's `warn_unimported_source`/`_warn_about_unmeasured_code`,
+    /// keyed by the original name, not the resolved path).
+    cov_source_names: Vec<String>,
     reports: Vec<ReportSpec>,
     fail_under: Option<f64>,
     /// --cov-precision / [report] precision: Cover column decimals.
@@ -92,6 +97,10 @@ pub struct CovPlugin {
     path_aliases: Vec<Vec<String>>,
     /// "Coverage X written to ..." lines for the terminal section.
     report_messages: Vec<String>,
+    /// Set instead of `data`/`report_messages` when there was nothing to
+    /// report at all (coverage.py's `NoDataError`): printed alone, with
+    /// neither the "tests coverage" header nor a (necessarily empty) table.
+    report_failed_message: Option<String>,
     /// The sys.monitoring tool id actually claimed (COVERAGE_ID unless a
     /// .pth child collector from an outer session got there first).
     tool_id: u8,
@@ -107,6 +116,7 @@ impl CovPlugin {
         Self {
             enabled: false,
             sources: Vec::new(),
+            cov_source_names: Vec::new(),
             reports: Vec::new(),
             fail_under: None,
             precision: 0,
@@ -121,6 +131,7 @@ impl CovPlugin {
             child_out_dir: None,
             path_aliases: Vec::new(),
             report_messages: Vec::new(),
+            report_failed_message: None,
             tool_id: TOOL_ID,
             no_cover_pause: Mutex::new(None),
         }
@@ -684,6 +695,93 @@ impl CovPlugin {
         Ok(())
     }
 
+    /// coverage.py `warn_unimported_source`/`_warn_about_unmeasured_code`: a
+    /// `--cov=X` source that was never actually traced — either because it
+    /// was imported (by a `-p` plugin, a conftest, ...) before this
+    /// process ever started tracing, or never imported at all. Returns the
+    /// unmeasured sources' resolved paths: coverage.py's own report-file
+    /// selection is driven by what was actually observed (`measured_files`),
+    /// not by walking `[run] source` for candidates, so an unmeasured
+    /// source contributes no row at all (not even a 0% one) — unlike a
+    /// measured-but-incomplete source, which still gets the usual
+    /// zero-coverage-line treatment for its untouched files.
+    fn warn_unmeasured_sources(
+        &self,
+        py: Python<'_>,
+        hits: &HashMap<String, BTreeSet<u32>>,
+    ) -> PyResult<Vec<PathBuf>> {
+        let sys_modules = py.import("sys")?.getattr("modules")?;
+        let mut unmeasured = Vec::new();
+        for (name, source) in self.cov_source_names.iter().zip(self.sources.iter()) {
+            let source_str = source.to_string_lossy();
+            let measured = hits
+                .keys()
+                .any(|file| file == source_str.as_ref() || file.starts_with(source_str.as_ref()));
+            if measured {
+                continue;
+            }
+            unmeasured.push(source.clone());
+            let module = sys_modules.call_method1("get", (name, py.None()))?;
+            if module.is_none() {
+                Self::emit_warning(
+                    py,
+                    "CoverageWarning",
+                    &format!("Module {name} was never imported. (module-not-imported)"),
+                )?;
+                continue;
+            }
+            // A namespace package (multiple __path__ entries) has no code of
+            // its own to measure — not a warning-worthy gap.
+            if module
+                .getattr("__path__")
+                .and_then(|path| path.len())
+                .is_ok_and(|len| len > 1)
+            {
+                continue;
+            }
+            if module
+                .getattr("__file__")
+                .map(|file| file.is_none())
+                .unwrap_or(true)
+            {
+                Self::emit_warning(
+                    py,
+                    "CoverageWarning",
+                    &format!("Module {name} has no Python source. (module-not-python)"),
+                )?;
+                continue;
+            }
+            Self::emit_warning(
+                py,
+                "CoverageWarning",
+                &format!(
+                    "Module {name} was previously imported, but not measured \
+                     (module-not-measured)"
+                ),
+            )?;
+        }
+        Ok(unmeasured)
+    }
+
+    /// A warning that must actually reach the terminal (bypassing
+    /// `filterwarnings = error`) — mirrors real pytest-cov registering a
+    /// `once` filter for its own warning categories ahead of the ini's
+    /// blanket rule, then letting the warning fall through to the real
+    /// `showwarning` (capture is briefly lifted so it prints immediately
+    /// instead of landing in the end-of-session warnings summary, matching
+    /// coverage.py emitting these directly to stderr as they happen).
+    fn emit_warning(py: Python<'_>, category_name: &str, message: &str) -> PyResult<()> {
+        let category = py.import("pytest_cov")?.getattr(category_name)?;
+        let warnings = py.import("warnings")?;
+        warnings.call_method1("simplefilter", ("once", &category))?;
+        let wcapture = py.import("pytest._wcapture")?;
+        wcapture.call_method0("uninstall")?;
+        let instance = category.call1((message,))?;
+        let result = warnings.call_method1("warn", (instance,)).map(|_| ());
+        wcapture.call_method0("install")?;
+        result
+    }
+
     /// The `.coverage` data file location (COVERAGE_FILE honored).
     fn data_file_path(ctx: &HookContext) -> PathBuf {
         match std::env::var("COVERAGE_FILE") {
@@ -778,11 +876,18 @@ impl CovPlugin {
         rootdir: &Path,
         hits: HashMap<String, BTreeSet<u32>>,
         arcs: ArcMap,
+        unmeasured_sources: &[PathBuf],
     ) -> CoverageData {
         // Report set: every hit file, plus (with explicit --cov=src) every
-        // .py file under the sources, so never-imported files show as 0%.
+        // .py file under the sources, so never-imported files show as 0% —
+        // except a source that was never measured at all (imported before
+        // tracing started, or never imported), which coverage.py excludes
+        // entirely rather than showing as a 0% row.
         let mut files: BTreeSet<PathBuf> = hits.keys().map(PathBuf::from).collect();
         for source in &self.sources {
+            if unmeasured_sources.contains(source) {
+                continue;
+            }
             Self::walk_py_files(source, &mut files);
         }
 
@@ -1058,9 +1163,14 @@ impl Plugin for CovPlugin {
             .rootdir
             .canonicalize()
             .unwrap_or_else(|_| ctx.config.rootdir.clone());
-        self.sources = cov_values
+        self.cov_source_names = cov_values
             .iter()
             .filter(|value| !value.is_empty())
+            .cloned()
+            .collect();
+        self.sources = self
+            .cov_source_names
+            .iter()
             .map(|value| Self::resolve_source(py, &rootdir, value))
             .collect();
         self.reports = Self::parse_reports(py, ctx.config.get_values("cov-report"))?;
@@ -1246,10 +1356,6 @@ impl Plugin for CovPlugin {
                 (self.tool_id, event, collector.bind(py).getattr(*method)?),
             )?;
         }
-        // Globally only the PY_START gate; LINE events arm per tracked code
-        // object (coverage.py's sysmon core layout).
-        monitoring.call_method1("set_events", (self.tool_id, &py_start_event))?;
-        monitoring.call_method0("restart_events")?;
         self.collector = Some(collector);
 
         // Subprocess coverage: python children self-measure via the site
@@ -1315,6 +1421,27 @@ impl Plugin for CovPlugin {
                 let _ = std::fs::write(dir.join("pytest-rs-cov.pth"), PTH_LINE);
             }
         }
+        Ok(())
+    }
+
+    /// Arms tracing only once `-p`/entry-point plugins have imported —
+    /// matching real pytest-cov, whose coverage-start hook
+    /// (`pytest_load_initial_conftests`) runs after upstream's own early
+    /// `-p` plugin loading. A plugin loaded via `-p` that imports a
+    /// `--cov`-measured module at its own import time (module-level code)
+    /// must not have that import counted (coverage.py would report it as
+    /// "previously imported, but not measured").
+    fn pytest_plugins_registered(&mut self, ctx: &mut HookContext) -> PyResult<()> {
+        if self.collector.is_none() {
+            return Ok(());
+        }
+        let py = ctx.py;
+        let monitoring = py.import("sys")?.getattr("monitoring")?;
+        let py_start_event = monitoring.getattr("events")?.getattr("PY_START")?;
+        // Globally only the PY_START gate; LINE events arm per tracked code
+        // object (coverage.py's sysmon core layout).
+        monitoring.call_method1("set_events", (self.tool_id, &py_start_event))?;
+        monitoring.call_method0("restart_events")?;
         Ok(())
     }
 
@@ -1423,13 +1550,34 @@ impl Plugin for CovPlugin {
         if ctx.config.get_flag("cov-append") {
             self.merge_appended_data(ctx, &mut hits, &mut arcs)?;
         }
+        let unmeasured_sources = self.warn_unmeasured_sources(py, &hits)?;
+        if hits.is_empty() {
+            Self::emit_warning(
+                py,
+                "CoverageWarning",
+                "No data was collected. (no-data-collected)",
+            )?;
+        }
         self.write_data_file(ctx, &hits, &arcs)?;
         let rootdir = ctx
             .config
             .rootdir
             .canonicalize()
             .unwrap_or_else(|_| ctx.config.rootdir.clone());
-        let data = self.build_data(&rootdir, hits, arcs);
+        let data = self.build_data(&rootdir, hits, arcs, &unmeasured_sources);
+
+        // coverage.py's report_core.get_analysis_to_report: an empty file
+        // set (nothing matched any `--cov` source at all) fails every
+        // report kind at once with NoDataError("No data to report."),
+        // which pytest-cov converts to a warning instead of writing
+        // anything.
+        if data.rows.is_empty() && !self.reports.is_empty() {
+            let message = "Failed to generate report: No data to report.".to_string();
+            Self::emit_warning(py, "CovReportWarning", &message)?;
+            self.report_messages = Vec::new();
+            self.report_failed_message = Some(message);
+            return Ok(());
+        }
 
         let mut messages = Vec::new();
         for spec in &self.reports {
@@ -1502,6 +1650,10 @@ impl Plugin for CovPlugin {
     }
 
     fn pytest_terminal_summary(&self, ctx: &mut HookContext, out: &mut String) -> PyResult<()> {
+        if let Some(message) = &self.report_failed_message {
+            out.push_str(&format!("\nWARNING: {message}\n"));
+            return Ok(());
+        }
         let Some(data) = &self.data else {
             return Ok(());
         };
