@@ -120,11 +120,31 @@ impl Engine {
                         self.session
                             .items
                             .retain(|item| !skipped_set.contains(&item.path));
-                        self.session.collect_file_skips.extend(
-                            collect_result.skipped.into_iter().map(|(p, reason)| {
-                                (crate::collect::file_nodeid(rootdir, &p), reason)
-                            }),
-                        );
+                        // A `pytest.skip()` raised inside `pytest_collect_file`
+                        // makes the file's collectreport "skipped" upstream.
+                        // Record each as a setup-phase skip so the summary line
+                        // counts it ("N skipped") instead of collapsing to
+                        // "no tests ran".
+                        for (file, reason) in &collect_result.skipped {
+                            let nodeid = crate::collect::file_nodeid(rootdir, file);
+                            self.session
+                                .collect_file_skips
+                                .push((nodeid.clone(), reason.clone()));
+                            self.session.reports.push(crate::report::TestReport {
+                                nodeid: nodeid.clone(),
+                                phase: crate::report::Phase::Setup,
+                                outcome: crate::report::Outcome::Skipped,
+                                duration: std::time::Duration::ZERO,
+                                longrepr: Some(reason.clone()),
+                                location: Some(format!("{nodeid}:1")),
+                                subtest_desc: None,
+                                sections: Vec::new(),
+                                rerun: false,
+                                xfail_longrepr: None,
+                                reprcrash_message: None,
+                                head_line: None,
+                            });
+                        }
                     }
                     for (path, longrepr) in collect_result.errors {
                         errors.push((path, longrepr));
