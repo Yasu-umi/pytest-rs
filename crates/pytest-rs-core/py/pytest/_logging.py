@@ -366,8 +366,16 @@ class LoggingState:
             return []
         text = self.report_handler.stream.getvalue().strip()
         self.report_handler.reset()
+        # A subtest's "Captured log call" accumulates every log from the
+        # start of the test through this subtest's body (upstream's subtests
+        # plugin taps a handler that has recorded the parent logs too).
+        # Carry this subtest's logs forward so the next subtest inherits them.
+        parent_log = "\n".join(self._subtest_parent_log)
         if text:
-            return [(f"Captured log {self.when}", text)]
+            self._subtest_parent_log.append(text)
+        combined = "\n".join(filter(None, [parent_log, text]))
+        if combined:
+            return [(f"Captured log {self.when}", combined)]
         return []
 
     def failure_sections(self):
