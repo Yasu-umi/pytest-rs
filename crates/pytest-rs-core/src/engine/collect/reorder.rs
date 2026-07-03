@@ -24,6 +24,7 @@ impl Engine {
                 files,
             );
             if let Ok(py_config) = python::make_py_config(py, &self.config) {
+                let import_mode = crate::collect::ImportMode::from_config(&self.config);
                 for extra_file in &extra_py {
                     // Import the module and collect doctests.
                     if let Err(err) = python::collect_doctests_from_module(
@@ -32,6 +33,7 @@ impl Engine {
                         extra_file,
                         &py_config,
                         &mut self.session.items,
+                        import_mode,
                     ) {
                         // Import errors skip the module with --doctest-ignore-import-errors.
                         if self.config.get_flag("doctest-ignore-import-errors") {

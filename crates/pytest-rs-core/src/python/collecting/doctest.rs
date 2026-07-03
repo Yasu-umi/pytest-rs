@@ -1,7 +1,8 @@
 #[allow(unused_imports)]
 use super::super::*;
-use crate::collect::{TestItem, file_nodeid, module_name_for};
+use crate::collect::{ImportMode, TestItem, file_nodeid};
 use crate::fixture::FixtureRegistry;
+use crate::python::bootstrap::import_module_for;
 use std::path::Path;
 
 use super::hooks::{
@@ -71,6 +72,7 @@ fn check_import_path_mismatch(
     Err(collect_error(py, &message))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn collect_module(
     py: Python<'_>,
     rootdir: &Path,
@@ -79,15 +81,18 @@ pub fn collect_module(
     registry: &mut FixtureRegistry,
     hooks: &mut Vec<crate::session::PyHook>,
     filters: &NameFilters,
+    mode: ImportMode,
 ) -> PyResult<()> {
-    let (basedir, module_name) = module_name_for(path);
-    sys_path_prepend(py, &basedir)?;
-    let module = py.import(module_name.as_str())?;
+    let (module_name, module) = import_module_for(py, rootdir, path, mode)?;
     // pytest's import_path raises ImportPathMismatchError when a module of the
     // same dotted name was already imported from a different file (e.g. two
     // test files sharing a basename in different dirs). We import by name and
-    // get the cached module back, so mirror that check explicitly.
-    check_import_path_mismatch(py, &module, &module_name, path)?;
+    // get the cached module back, so mirror that check explicitly. Only
+    // prepend/append can produce this collision (importlib mode's names are
+    // already unique per file, upstream only raises it for those two modes).
+    if mode != ImportMode::Importlib {
+        check_import_path_mismatch(py, &module, &module_name, path)?;
+    }
     let nodeid_base = file_nodeid(rootdir, path);
 
     register_pytest_plugins(py, &module, registry, hooks)?;
@@ -141,9 +146,12 @@ pub fn collect_doctests_from_module(
     path: &Path,
     py_config: &Py<PyAny>,
     items: &mut Vec<TestItem>,
+    mode: ImportMode,
 ) -> PyResult<()> {
-    let (basedir, module_name) = module_name_for(path);
-    sys_path_prepend(py, &basedir)?;
+    // Ensures sys.path (prepend/append) or sys.modules (importlib) is set up
+    // the same way as collect_module; the doctest shim below then finds the
+    // module already cached under this exact name.
+    let (module_name, _module) = import_module_for(py, rootdir, path, mode)?;
     let nodeid_base = file_nodeid(rootdir, path);
     let doctest_mod = py.import("_pytest.doctest")?;
     let results = doctest_mod.getattr("collect_module_doctests")?.call1((

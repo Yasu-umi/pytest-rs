@@ -65,6 +65,22 @@ pub fn sys_path_prepend(py: Python<'_>, path: &Path) -> PyResult<()> {
     Ok(())
 }
 
+/// `--import-mode=append`: like prepend, but the directory is appended to
+/// the end of `sys.path` (only if not already present), so it is searched
+/// after directories already there.
+pub fn sys_path_append(py: Python<'_>, path: &Path) -> PyResult<()> {
+    let sys_path = py.import("sys")?.getattr("path")?;
+    let sys_path = sys_path.cast::<PyList>().map_err(PyErr::from)?;
+    let entry = path.to_string_lossy().to_string();
+    let already_present = sys_path
+        .iter()
+        .any(|e| e.extract::<String>().ok().as_deref() == Some(&entry));
+    if !already_present {
+        sys_path.append(entry)?;
+    }
+    Ok(())
+}
+
 /// Return the `pytest.__version__` string from the Python environment.
 pub fn pytest_version(py: Python<'_>) -> PyResult<String> {
     py.import("pytest")?.getattr("__version__")?.extract()

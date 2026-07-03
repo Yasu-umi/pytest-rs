@@ -677,6 +677,7 @@ impl Engine {
             dir = d.parent();
         }
         chain.reverse();
+        let import_mode = crate::collect::ImportMode::from_config(&self.config);
         for conftest in chain {
             python::collect_conftest(
                 py,
@@ -684,6 +685,7 @@ impl Engine {
                 &conftest,
                 &mut self.session.registry,
                 &mut self.session.py_hooks,
+                import_mode,
             )
             .map_err(|err| python::format_exception(py, &err))?;
             collection.loaded_conftests.insert(conftest);
@@ -700,6 +702,7 @@ impl Engine {
             &mut self.session.registry,
             &mut self.session.py_hooks,
             &python::NameFilters::from_config(py, &self.config),
+            import_mode,
         )
         .map_err(|err| python::format_test_failure(py, &err, "short"))?;
         {

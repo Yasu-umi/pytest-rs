@@ -2,9 +2,9 @@
 
 #[allow(unused_imports)]
 use super::*;
-use crate::collect::{file_nodeid, module_name_for};
+use crate::collect::{ImportMode, file_nodeid, module_name_for, module_name_from_path};
 use crate::fixture::FixtureRegistry;
-use pyo3::types::{PyDict, PyModule};
+use pyo3::types::{PyDict, PyList, PyModule};
 use std::path::{Path, PathBuf};
 
 /// An embedded interpreter does not activate a virtualenv on its own: when
@@ -462,15 +462,27 @@ pub fn collect_conftest(
     path: &Path,
     registry: &mut FixtureRegistry,
     hooks: &mut Vec<crate::session::PyHook>,
+    mode: ImportMode,
 ) -> PyResult<()> {
-    let (basedir, module_name) = module_name_for(path);
-    sys_path_prepend(py, &basedir)?;
-    // Conftests in nested directories (without __init__.py) all resolve to
-    // the module name "conftest"; a plain import would alias them to the
-    // first one imported. Import shadowed ones under a unique name instead.
-    let module = match conftest_alias_name(py, &module_name, path)? {
-        Some(unique) => import_module_from_path(py, &unique, path)?,
-        None => py.import(module_name.as_str())?,
+    let module = if mode == ImportMode::Importlib {
+        // importlib mode's per-file dotted names are already unique across
+        // sibling directories (module_name_from_path's fallback), so the
+        // "conftest" name-collision workaround below doesn't apply.
+        import_module_for(py, rootdir, path, mode)?.1
+    } else {
+        let (basedir, module_name) = module_name_for(path);
+        if mode == ImportMode::Append {
+            sys_path_append(py, &basedir)?;
+        } else {
+            sys_path_prepend(py, &basedir)?;
+        }
+        // Conftests in nested directories (without __init__.py) all resolve to
+        // the module name "conftest"; a plain import would alias them to the
+        // first one imported. Import shadowed ones under a unique name instead.
+        match conftest_alias_name(py, &module_name, path)? {
+            Some(unique) => import_module_from_path(py, &unique, path)?,
+            None => py.import(module_name.as_str())?,
+        }
     };
     let dir_nodeid = file_nodeid(rootdir, path.parent().unwrap_or(rootdir));
     let baseid = if dir_nodeid.is_empty() || dir_nodeid == "." {
@@ -542,6 +554,138 @@ pub(crate) fn conftest_alias_name(
         .map(|dir| dir.to_string_lossy().replace(['/', '\\', '.', ':'], "_"))
         .unwrap_or_default();
     Ok(Some(format!("{module_name}@{suffix}")))
+}
+
+/// Import `path` per `--import-mode` (upstream `_pytest.pathlib.import_path`):
+/// resolves the dotted module name for `mode` and imports it, returning the
+/// name (for `TestItem.module_name` / doctest collection) and the module.
+/// Prepend/append mutate `sys.path`; importlib never does, instead deriving
+/// a name that is unique per file so same-named files in different, non-package
+/// directories don't collide in `sys.modules`.
+pub(crate) fn import_module_for<'py>(
+    py: Python<'py>,
+    rootdir: &Path,
+    path: &Path,
+    mode: ImportMode,
+) -> PyResult<(String, Bound<'py, PyModule>)> {
+    match mode {
+        ImportMode::Prepend | ImportMode::Append => {
+            let (basedir, module_name) = module_name_for(path);
+            if mode == ImportMode::Prepend {
+                sys_path_prepend(py, &basedir)?;
+            } else {
+                sys_path_append(py, &basedir)?;
+            }
+            let module = py.import(module_name.as_str())?;
+            Ok((module_name, module))
+        }
+        ImportMode::Importlib => {
+            let (basedir, module_name) = module_name_for(path);
+            let sys_modules = py.import("sys")?.getattr("modules")?;
+            // An __init__.py chain was walked up to basedir (upstream's
+            // resolve_package_path found a real package): the dotted name's
+            // parents are real packages, which may do their own absolute
+            // intra-package imports (e.g. `from pkg.sub import x`) — expose
+            // basedir on sys.path only for the moment of import so a normal
+            // dotted `import_module` resolves the whole parent chain via
+            // real spec-based imports (with correct __path__), then remove
+            // it again. Only the *first* file under a given package tree
+            // needs this: later imports resolve via the already-cached
+            // parent packages in sys.modules, no sys.path needed.
+            if basedir != path.parent().unwrap_or(Path::new(".")) {
+                if let Ok(existing) = sys_modules.get_item(&module_name) {
+                    return Ok((module_name, existing.cast_into::<PyModule>()?));
+                }
+                let module = import_real_package_module(py, &basedir, &module_name)?;
+                return Ok((module_name, module));
+            }
+            // No package found: fall back to a root-relative unique name
+            // (module_name_from_path) that stays distinct across sibling
+            // directories with same-named files.
+            let module_name = module_name_from_path(path, rootdir);
+            if let Ok(existing) = sys_modules.get_item(&module_name) {
+                return Ok((module_name, existing.cast_into::<PyModule>()?));
+            }
+            let module = import_module_from_path(py, &module_name, path)?;
+            insert_missing_modules(py, &module_name)?;
+            Ok((module_name, module))
+        }
+    }
+}
+
+/// Import a real `__init__.py`-rooted package's module by dotted name,
+/// exposing `pkg_root` on `sys.path` only for the duration of the import
+/// (never left mutated afterward, unlike prepend/append) so Python's normal
+/// import machinery can resolve the whole parent chain — and any absolute
+/// intra-package imports the modules themselves perform — correctly.
+fn import_real_package_module<'py>(
+    py: Python<'py>,
+    pkg_root: &Path,
+    module_name: &str,
+) -> PyResult<Bound<'py, PyModule>> {
+    let sys_path = py.import("sys")?.getattr("path")?;
+    let sys_path = sys_path.cast::<PyList>().map_err(PyErr::from)?;
+    let entry = pkg_root.to_string_lossy().to_string();
+    let already_present = sys_path
+        .iter()
+        .any(|e| e.extract::<String>().ok().as_deref() == Some(entry.as_str()));
+    if !already_present {
+        sys_path.insert(0, &entry)?;
+    }
+    let result = py.import(module_name);
+    if !already_present
+        && let Some(idx) = sys_path
+            .iter()
+            .position(|e| e.extract::<String>().ok().as_deref() == Some(entry.as_str()))
+    {
+        sys_path.del_item(idx)?;
+    }
+    result
+}
+
+/// upstream `_pytest.pathlib.insert_missing_modules`: `--import-mode
+/// importlib` may register a module under a multi-part dotted name (e.g.
+/// "tests_a.test_foo"); create placeholder parent packages so the dotted
+/// chain is importable/attribute-accessible like a real package. A parent
+/// name that resolves to a *real* importable module (e.g. reachable via
+/// `pythonpath =`) is preferred over a placeholder stub (upstream #9645).
+fn insert_missing_modules(py: Python<'_>, module_name: &str) -> PyResult<()> {
+    let sys = py.import("sys")?;
+    let sys_modules = sys.getattr("modules")?;
+    let meta_path_empty = sys.getattr("meta_path")?.len().unwrap_or(0) == 0;
+    let module_type = py.import("types")?.getattr("ModuleType")?;
+    let importlib = py.import("importlib")?;
+    let mut current = module_name.to_string();
+    while let Some(idx) = current.rfind('.') {
+        let parent_name = current[..idx].to_string();
+        let child_name = current[idx + 1..].to_string();
+        let parent = match sys_modules.get_item(&parent_name) {
+            Ok(existing) => existing,
+            Err(_) => {
+                let imported = if meta_path_empty {
+                    None
+                } else {
+                    importlib
+                        .call_method1("import_module", (parent_name.as_str(),))
+                        .ok()
+                };
+                match imported {
+                    Some(real) => real,
+                    None => {
+                        let placeholder = module_type.call1((parent_name.as_str(),))?;
+                        sys_modules.set_item(&parent_name, &placeholder)?;
+                        placeholder
+                    }
+                }
+            }
+        };
+        if !parent.hasattr(child_name.as_str())? {
+            let child = sys_modules.get_item(&current)?;
+            parent.setattr(child_name.as_str(), child)?;
+        }
+        current = parent_name;
+    }
+    Ok(())
 }
 
 /// Import a module from an explicit file path under the given name

@@ -361,6 +361,7 @@ impl Engine {
                 &mut self.session.registry,
                 &mut self.session.py_hooks,
                 &python::NameFilters::from_config(py, &self.config),
+                crate::collect::ImportMode::from_config(&self.config),
             );
             let collect_sections = python::capture_collect_end(py);
             let with_sections = |mut message: String| {
@@ -503,6 +504,7 @@ impl Engine {
                     file,
                     &py_config,
                     &mut self.session.items,
+                    crate::collect::ImportMode::from_config(&self.config),
                 ) {
                     Ok(()) => {
                         // The module's doctests run BEFORE its functions

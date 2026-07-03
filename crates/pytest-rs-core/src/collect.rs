@@ -456,6 +456,62 @@ pub fn module_name_for(path: &Path) -> (PathBuf, String) {
     (basedir, parts.join("."))
 }
 
+/// `--import-mode` (upstream `_pytest.pathlib.ImportMode`): controls how
+/// test/conftest files are turned into importable modules.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ImportMode {
+    Prepend,
+    Append,
+    Importlib,
+}
+
+impl ImportMode {
+    /// Reads `--import-mode` (default "prepend"); an unrecognized value
+    /// falls back to prepend rather than erroring, matching upstream's
+    /// lenient CLI choices handling elsewhere in pytest-rs.
+    pub fn from_config(config: &crate::config::Config) -> Self {
+        match config.get_value("import-mode") {
+            Some("append") => ImportMode::Append,
+            Some("importlib") => ImportMode::Importlib,
+            _ => ImportMode::Prepend,
+        }
+    }
+}
+
+/// upstream `_pytest.pathlib.module_name_from_path`: a dotted module name
+/// derived from the full path relative to `root`, used by `--import-mode
+/// importlib` when the file does not belong to a package (no `__init__.py`
+/// chain) — unlike `module_name_for`, this stays unique across sibling
+/// directories with same-named files (the value doesn't depend on walking
+/// up from the file, only on its full location).
+pub fn module_name_from_path(path: &Path, root: &Path) -> String {
+    let path = path.with_extension("");
+    let parts: Vec<String> = match path.strip_prefix(root) {
+        Ok(relative) => relative
+            .components()
+            .map(|c| c.as_os_str().to_string_lossy().to_string())
+            .collect(),
+        // No common root: use the full path parts except the first
+        // ("/" or "C:\\" depending on platform).
+        Err(_) => path
+            .components()
+            .skip(1)
+            .map(|c| c.as_os_str().to_string_lossy().to_string())
+            .collect(),
+    };
+    // A package's module name does not include the trailing __init__,
+    // unless __init__.py sits directly at the root.
+    let mut parts = parts;
+    if parts.len() >= 2 && parts.last().map(String::as_str) == Some("__init__") {
+        parts.pop();
+    }
+    parts
+        .iter()
+        .map(|p| p.replace('.', "_"))
+        .collect::<Vec<_>>()
+        .join(".")
+}
+
 /// Collect all Python files (including non-test files like __init__.py) for
 /// --doctest-modules. Does not include files already covered by collect_test_files.
 pub fn collect_all_python_files(

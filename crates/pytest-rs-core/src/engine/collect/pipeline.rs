@@ -142,6 +142,7 @@ impl Engine {
                 conftest,
                 &mut self.session.registry,
                 &mut self.session.py_hooks,
+                crate::collect::ImportMode::from_config(&self.config),
             ) {
                 let err_msg = python::format_exception(py, &err);
                 // Conftest import failures are a configuration error (USAGE_ERROR),
