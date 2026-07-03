@@ -92,10 +92,15 @@ pub fn collect_module(
 
     register_pytest_plugins(py, &module, registry, hooks)?;
     // Plugin/conftest pytest_generate_tests impls (e.g. pytest-repeat) run on
-    // the metafunc alongside any module-level one.
+    // the metafunc alongside any module-level one. Scope conftest-registered
+    // hooks to this file's subtree (baseid is a directory prefix, "" for the
+    // rootdir conftest) so a sibling directory's conftest doesn't also fire —
+    // matches gethookproxy(fspath) upstream.
     let extra_generate_hooks: Vec<Py<PyAny>> = hooks
         .iter()
-        .filter(|hook| hook.name == "pytest_generate_tests")
+        .filter(|hook| {
+            hook.name == "pytest_generate_tests" && nodeid_base.starts_with(&hook.baseid)
+        })
         .map(|hook| hook.func.clone_ref(py))
         .collect();
     // pytest_pycollect_makemodule: a conftest may return a custom Module
