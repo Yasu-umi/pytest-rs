@@ -151,6 +151,7 @@ class Suite:
             if local.exists():
                 self.checkout = local
                 self._detect_src()
+                self._ensure_scm_version_stub()
                 return
         if not self.checkout.exists():
             CACHE.mkdir(parents=True, exist_ok=True)
@@ -169,6 +170,7 @@ class Suite:
                 capture_output=True,
             )
         self._detect_src()
+        self._ensure_scm_version_stub()
 
     def _detect_src(self) -> None:
         """src-layout checkouts import the package from src/."""
@@ -177,6 +179,31 @@ class Suite:
         src = self.checkout / "src"
         if src.is_dir():
             self.src_dir = src
+
+    def _ensure_scm_version_stub(self) -> None:
+        """setuptools_scm's `write_to` file is generated at build/install
+        time; a bare `git clone` never creates it. Some modules (e.g.
+        pytest's own _pytest/assertion/rewrite.py) import it unconditionally,
+        so a freshly cloned checkout breaks `import pytest` outright. Stub it
+        from the pinned tag so a clone behaves like an installed copy."""
+        pyproject = self.checkout / "pyproject.toml"
+        if not pyproject.exists():
+            return
+        config = tomllib.loads(pyproject.read_text())
+        write_to = config.get("tool", {}).get("setuptools_scm", {}).get("write_to")
+        if not write_to:
+            return
+        target = self.checkout / write_to
+        if target.exists():
+            return
+        version = self.tag.lstrip("v")
+        version_tuple = tuple(int(p) if p.isdigit() else p for p in version.split("."))
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            "from __future__ import annotations\n\n"
+            f"__version__ = version = {version!r}\n"
+            f"__version_tuple__ = version_tuple = {version_tuple!r}\n"
+        )
 
     def test_files(self) -> tuple[list[Path], int]:
         """(files to run, number excluded by configuration)."""
