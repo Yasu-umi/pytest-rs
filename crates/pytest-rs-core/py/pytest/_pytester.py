@@ -270,6 +270,12 @@ class Pytester:
         # needed for tests that monkeypatch module-level state and check it
         # after the inner run (e.g. subtests pdb tests).
         _check_cfg_pytest_section(self.path, args)
+        if "run" in vars(self):
+            # A test replaced .run() to intercept the raw subprocess (e.g. to
+            # spy on a long-running --looponfail process). Mirror upstream's
+            # Pytester.runpytest_subprocess, which always spawns through
+            # self.run(), so the monkeypatch takes effect.
+            return self._runpytest_subprocess_via_run(args, timeout=timeout)
         if os.environ.get("PYTEST_RS_INLINE_INPROCESS"):
             reprec = self._inline_run_inprocess(*args, plugins=plugins)
             return getattr(reprec, "_result", reprec)
@@ -390,7 +396,28 @@ class Pytester:
                     f"plugins as objects is not supported in pytester subprocess mode; "
                     f"specify by name instead: {plugin}"
                 )
+        if "run" in vars(self):
+            # A test replaced .run() to intercept the raw subprocess (e.g. to
+            # spy on a long-running --looponfail process). Mirror upstream's
+            # Pytester.runpytest_subprocess, which always spawns through
+            # self.run(), so the monkeypatch takes effect.
+            return self._runpytest_subprocess_via_run(args, timeout=timeout)
         return self._runpytest(args, timeout=timeout, forward_filters=False)
+
+    def _runpytest_subprocess_via_run(self, args, *, timeout=None):
+        # Spawn the pytest-rs binary directly (not upstream's `python -mpytest`)
+        # so a test's monkeypatched .run() still exercises pytest-rs itself.
+        exe = os.environ.get("PYTEST_RS_EXE") or _RUNNER_EXE
+        if exe is None:
+            fail("PYTEST_RS_EXE is not set; pytester cannot run the runner")
+        n = sum(1 for p in self.path.glob("runpytest-*"))
+        basetemp = self.path / f"runpytest-{n}"
+        basetemp.mkdir(mode=0o700)
+        args = (f"--basetemp={basetemp}", *args)
+        for plugin in self.plugins:
+            args = ("-p", plugin, *args)
+        args = (exe, *args)
+        return self.run(*args, timeout=timeout)
 
     def runpytest_inprocess(self, *args, timeout=None, plugins=()):
         """Run pytest in-process (shares sys state with the outer test)."""

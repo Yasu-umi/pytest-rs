@@ -61,7 +61,7 @@ fn main() {
     }
 
     let argv: Vec<String> = std::env::args().collect();
-    let config = match Config::from_args(parser, argv) {
+    let config = match Config::from_args(parser, argv.clone()) {
         Ok(config) => config,
         Err(message) if message.starts_with(pytest_rs_core::EXIT_ZERO_SENTINEL) => {
             print!("{}", &message[pytest_rs_core::EXIT_ZERO_SENTINEL.len()..]);
@@ -72,6 +72,15 @@ fn main() {
             std::process::exit(pytest_rs_core::report::exit_code::USAGE_ERROR);
         }
     };
+
+    #[cfg(feature = "xdist")]
+    if config.get_flag("looponfail") {
+        if config.get_flag("pdb") {
+            eprintln!("ERROR: --pdb is incompatible with --looponfail.");
+            std::process::exit(pytest_rs_core::report::exit_code::USAGE_ERROR);
+        }
+        std::process::exit(pytest_rs_core::looponfail::run(&config, &argv));
+    }
 
     // `-p no:NAME` disables a bundled plugin at runtime (pytest semantics);
     // both the short name (no:cov) and the distribution-style name

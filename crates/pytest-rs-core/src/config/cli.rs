@@ -199,6 +199,14 @@ impl Config {
                     .action(clap::ArgAction::SetTrue)
                     .hide(true),
             );
+            // xdist's `-f`/`--looponfail`: rerun on file changes.
+            cmd = cmd.arg(
+                clap::Arg::new("looponfail")
+                    .short('f')
+                    .long("looponfail")
+                    .action(clap::ArgAction::SetTrue)
+                    .hide(true),
+            );
         }
         cmd = cmd.arg(
             clap::Arg::new("capture-disable")
@@ -354,6 +362,9 @@ impl Config {
         }
         if has_xdist && matches.get_flag("dist-load") {
             flags.insert("dist-load".to_string());
+        }
+        if has_xdist && matches.get_flag("looponfail") {
+            flags.insert("looponfail".to_string());
         }
         if let Some(mut parsed) = matches.get_many::<String>("cache-show")
             && let Some(last) = parsed.next_back()

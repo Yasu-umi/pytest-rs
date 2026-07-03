@@ -8,6 +8,8 @@ pub mod fixture;
 pub mod hooks;
 #[cfg(feature = "xdist")]
 pub mod ipc;
+#[cfg(feature = "xdist")]
+pub mod looponfail;
 pub mod python;
 pub mod report;
 pub mod request;
