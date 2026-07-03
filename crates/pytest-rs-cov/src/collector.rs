@@ -48,6 +48,14 @@ pub struct LineCollector {
     /// arcs; destination -1 = "no line", direction 1 = fall-through (LEFT),
     /// 2 = jump (RIGHT), 0 = unknown (3.13 without dis info).
     arcs: Mutex<ArcMap>,
+    /// `--cov-context=test`: every hit line is ALSO recorded per (context,
+    /// file), in addition to the blanket `hits` map used for the coverage
+    /// %/table report. `current_context` is updated by CovPlugin's
+    /// runtest_setup/pyfunc_call/runtest_teardown hooks (coverage.py's
+    /// TestContextPlugin switches at exactly those three boundaries).
+    context_hits: Mutex<HashMap<String, HashMap<String, BTreeSet<u32>>>>,
+    current_context: Mutex<Arc<str>>,
+    track_contexts: bool,
     /// 3.13 single-BRANCH-event fallback: destinations seen per
     /// (code id, instruction offset). DISABLE there kills both directions,
     /// so it is only returned once both have been observed.
@@ -77,6 +85,7 @@ impl LineCollector {
         disable: Py<PyAny>,
         monitoring: Py<PyAny>,
         tool_id: u8,
+        track_contexts: bool,
     ) -> Self {
         Self {
             rootdir,
@@ -85,6 +94,9 @@ impl LineCollector {
             shim_root,
             hits: Mutex::new(HashMap::new()),
             arcs: Mutex::new(HashMap::new()),
+            context_hits: Mutex::new(HashMap::new()),
+            current_context: Mutex::new(Arc::from("")),
+            track_contexts,
             seen_dests: Mutex::new(HashMap::new()),
             tracked_codes: Mutex::new(HashMap::new()),
             branch,
@@ -102,6 +114,21 @@ impl LineCollector {
 
     pub fn take_arcs(&self) -> ArcMap {
         std::mem::take(&mut self.arcs.lock().expect("collector lock poisoned"))
+    }
+
+    pub fn take_context_hits(&self) -> HashMap<String, HashMap<String, BTreeSet<u32>>> {
+        std::mem::take(&mut self.context_hits.lock().expect("collector lock poisoned"))
+    }
+
+    /// Switches the "current" context: subsequent hits attribute to it
+    /// until the next switch. A no-op when `--cov-context` isn't active.
+    pub fn set_context(&self, context: &str) {
+        if self.track_contexts {
+            *self
+                .current_context
+                .lock()
+                .expect("collector lock poisoned") = Arc::from(context);
+        }
     }
 
     fn tracked(&self, filename: &str) -> bool {
@@ -283,7 +310,15 @@ impl LineCollector {
     }
 
     /// Local LINE on tracked code: record the hit and DISABLE, so every
-    /// tracked line costs exactly one callback ever.
+    /// tracked line costs exactly one callback ever — except under
+    /// `--cov-context`, where a line must keep firing for every future
+    /// execution so a *later* invocation (e.g. the next parametrized case,
+    /// running under a different context) still gets recorded. This is the
+    /// same tradeoff coverage.py itself makes: its sys.monitoring core
+    /// doesn't support dynamic contexts at all (core.py: "it doesn't yet
+    /// support dynamic contexts"), falling back to its slower settrace
+    /// tracer specifically because DISABLE-after-first-hit is incompatible
+    /// with per-context attribution.
     fn line(&self, py: Python<'_>, code: Bound<'_, PyAny>, line: u32) -> PyResult<Py<PyAny>> {
         let key = code.as_ptr() as usize;
         let filename = self
@@ -299,6 +334,22 @@ impl LineCollector {
                 .entry(filename.as_ref().to_string())
                 .or_default()
                 .insert(line);
+            if self.track_contexts {
+                let context = self
+                    .current_context
+                    .lock()
+                    .expect("collector lock poisoned");
+                self.context_hits
+                    .lock()
+                    .expect("collector lock poisoned")
+                    .entry(context.to_string())
+                    .or_default()
+                    .entry(filename.as_ref().to_string())
+                    .or_default()
+                    .insert(line);
+                drop(context);
+                return Ok(py.None());
+            }
         }
         Ok(self.disable.clone_ref(py))
     }

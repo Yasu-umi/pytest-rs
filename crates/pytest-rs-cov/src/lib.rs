@@ -15,7 +15,7 @@ use collector::{ArcMap, LineCollector};
 use files::PathAliases;
 use pytest_rs_core::collect::TestItem;
 use pytest_rs_core::config::{OptDef, OptionParser};
-use pytest_rs_core::hooks::{HookContext, Plugin};
+use pytest_rs_core::hooks::{HookContext, HookResult, Plugin};
 use pytest_rs_core::pyo3 as core_pyo3;
 use report::{CoverageData, FileRow};
 
@@ -26,6 +26,8 @@ use core_pyo3::prelude::*;
 struct CovDump {
     hits: HashMap<String, BTreeSet<u32>>,
     arcs: ArcMap,
+    #[serde(default)]
+    context_hits: HashMap<String, HashMap<String, BTreeSet<u32>>>,
 }
 
 /// sys.monitoring's reserved coverage tool slot.
@@ -109,6 +111,15 @@ pub struct CovPlugin {
     /// path removed from the environment, restored in
     /// `pytest_runtest_teardown`. `None` when the current item isn't paused.
     no_cover_pause: Mutex<Option<(i64, Option<String>)>>,
+    /// `--cov-context=test`: switches a "current context" (`{nodeid}|setup`
+    /// / `|run` / `|teardown`) at each test-phase boundary, matching
+    /// pytest-cov's `TestContextPlugin`. Only `test` is supported (the only
+    /// value any conformance test uses; coverage.py's OWN
+    /// `dynamic_context=test_function` config is handled separately above).
+    context_enabled: bool,
+    /// Parent mode: per-context hits merged in from workers, mirroring
+    /// `worker_hits` but keyed by context first.
+    worker_context_hits: HashMap<String, HashMap<String, BTreeSet<u32>>>,
 }
 
 impl CovPlugin {
@@ -134,6 +145,8 @@ impl CovPlugin {
             report_failed_message: None,
             tool_id: TOOL_ID,
             no_cover_pause: Mutex::new(None),
+            context_enabled: false,
+            worker_context_hits: HashMap::new(),
         }
     }
 
@@ -799,6 +812,7 @@ impl CovPlugin {
         ctx: &mut HookContext,
         hits: &HashMap<String, BTreeSet<u32>>,
         arcs: &ArcMap,
+        context_hits: &HashMap<String, HashMap<String, BTreeSet<u32>>>,
     ) -> PyResult<()> {
         let py = ctx.py;
         let Ok(coverage_mod) = py.import("coverage") else {
@@ -831,20 +845,40 @@ impl CovPlugin {
             .rootdir
             .canonicalize()
             .unwrap_or_else(|_| ctx.config.rootdir.clone());
-        let lines = core_pyo3::types::PyDict::new(py);
-        for (file, hit_lines) in hits {
-            let key = if relative {
+        let relative_key = |file: &str| -> String {
+            if relative {
                 Path::new(file)
                     .strip_prefix(&rootdir_canon)
                     .map(|p| p.to_string_lossy().to_string())
-                    .unwrap_or_else(|_| file.clone())
+                    .unwrap_or_else(|_| file.to_string())
             } else {
-                file.clone()
-            };
-            let list: Vec<u32> = hit_lines.iter().copied().collect();
-            lines.set_item(key, list)?;
+                file.to_string()
+            }
+        };
+        // --cov-context=test: one add_lines call per context (coverage.py's
+        // CoverageData.set_context + add_lines pattern) instead of a single
+        // blanket write — context_hits' union across contexts equals `hits`
+        // exactly (every hit is recorded under whichever context, including
+        // `""`, was current when it fired), so this replaces rather than
+        // supplements the blanket write.
+        if context_hits.is_empty() {
+            let lines = core_pyo3::types::PyDict::new(py);
+            for (file, hit_lines) in hits {
+                let list: Vec<u32> = hit_lines.iter().copied().collect();
+                lines.set_item(relative_key(file), list)?;
+            }
+            data.call_method1("add_lines", (lines,))?;
+        } else {
+            for (context, file_hits) in context_hits {
+                let lines = core_pyo3::types::PyDict::new(py);
+                for (file, hit_lines) in file_hits {
+                    let list: Vec<u32> = hit_lines.iter().copied().collect();
+                    lines.set_item(relative_key(file), list)?;
+                }
+                data.call_method1("set_context", (context.as_str(),))?;
+                data.call_method1("add_lines", (lines,))?;
+            }
         }
-        data.call_method1("add_lines", (lines,))?;
         data.call_method0("write")?;
         // Branch arcs use an internal representation (src, dst, direction)
         // that coverage.py's data model cannot hold; a sidecar JSON next to
@@ -1013,6 +1047,19 @@ impl CovPlugin {
         CoverageData {
             rows,
             branch: self.branch,
+        }
+    }
+
+    /// `--cov-context=test`: mirrors pytest-cov's `TestContextPlugin.
+    /// switch_context` (`f'{item.nodeid}|{when}'`), a no-op unless
+    /// `--cov-context=test` is active.
+    fn switch_context(&self, py: Python<'_>, item: &TestItem, when: &str) {
+        if self.context_enabled
+            && let Some(collector) = &self.collector
+        {
+            collector
+                .borrow(py)
+                .set_context(&format!("{}|{when}", item.nodeid));
         }
     }
 }
@@ -1229,6 +1276,7 @@ impl Plugin for CovPlugin {
 
         self.branch = ctx.config.get_flag("cov-branch")
             || Self::branch_enabled(&ctx.config.rootdir, ctx.config.get_value("cov-config"));
+        self.context_enabled = ctx.config.get_value("cov-context") == Some("test");
         self.path_aliases =
             Self::paths_aliases(&ctx.config.rootdir, ctx.config.get_value("cov-config"));
         // An xdist worker runs with a rootdir set to its chdir; the coverage
@@ -1331,6 +1379,7 @@ impl Plugin for CovPlugin {
                 disable,
                 monitoring.clone().unbind(),
                 self.tool_id,
+                self.context_enabled,
             ),
         )?;
 
@@ -1468,7 +1517,11 @@ impl Plugin for CovPlugin {
     /// form takes — fixture-based pausing already happens in the `no_cover`
     /// fixture itself, in `py/pytest_cov/plugin.py`).
     fn pytest_runtest_setup(&self, ctx: &mut HookContext, item: &TestItem) -> PyResult<()> {
-        if !self.enabled || item.get_closest_marker("no_cover").is_none() {
+        if !self.enabled {
+            return Ok(());
+        }
+        self.switch_context(ctx.py, item, "setup");
+        if item.get_closest_marker("no_cover").is_none() {
             return Ok(());
         }
         let py = ctx.py;
@@ -1486,7 +1539,10 @@ impl Plugin for CovPlugin {
         Ok(())
     }
 
-    fn pytest_runtest_teardown(&self, ctx: &mut HookContext, _item: &TestItem) -> PyResult<()> {
+    fn pytest_runtest_teardown(&self, ctx: &mut HookContext, item: &TestItem) -> PyResult<()> {
+        if self.enabled {
+            self.switch_context(ctx.py, item, "teardown");
+        }
         let Some((events, saved_child)) = self
             .no_cover_pause
             .lock()
@@ -1507,6 +1563,23 @@ impl Plugin for CovPlugin {
         Ok(())
     }
 
+    /// `pytest_pyfunc_call` fires (as an observer only — never claims the
+    /// invocation) right before the test's own body runs, so it is the
+    /// closest native equivalent to upstream's `pytest_runtest_call`
+    /// hookwrapper for switching into the "run" context.
+    fn pytest_pyfunc_call(
+        &self,
+        ctx: &mut HookContext,
+        item: &TestItem,
+        _callable: &Py<PyAny>,
+        _kwargs: &[(String, Py<PyAny>)],
+    ) -> HookResult<()> {
+        if self.enabled {
+            self.switch_context(ctx.py, item, "run");
+        }
+        Ok(None)
+    }
+
     fn pytest_sessionfinish(&mut self, ctx: &mut HookContext, _exit_code: i32) -> PyResult<()> {
         let Some(collector) = self.collector.take() else {
             return Ok(());
@@ -1518,6 +1591,7 @@ impl Plugin for CovPlugin {
 
         let mut hits = collector.borrow(py).take_hits();
         let mut arcs = collector.borrow(py).take_arcs();
+        let mut context_hits = collector.borrow(py).take_context_hits();
         // Merge subprocess dumps (this process's children, parent or
         // worker alike), then drop the dump dir.
         if let Some(out_dir) = self.child_out_dir.take() {
@@ -1535,6 +1609,12 @@ impl Plugin for CovPlugin {
                     for (file, file_arcs) in dump.arcs {
                         arcs.entry(file).or_default().extend(file_arcs);
                     }
+                    for (context, file_hits) in dump.context_hits {
+                        let entry = context_hits.entry(context).or_default();
+                        for (file, lines) in file_hits {
+                            entry.entry(file).or_default().extend(lines);
+                        }
+                    }
                 }
             }
             let _ = std::fs::remove_dir_all(&out_dir);
@@ -1549,8 +1629,12 @@ impl Plugin for CovPlugin {
         if ctx.config.is_worker() {
             // Workers don't report: hits and arcs travel to the parent.
             self.dump_payload = Some(
-                serde_json::to_string(&CovDump { hits, arcs })
-                    .map_err(|e| core_pyo3::exceptions::PyValueError::new_err(e.to_string()))?,
+                serde_json::to_string(&CovDump {
+                    hits,
+                    arcs,
+                    context_hits,
+                })
+                .map_err(|e| core_pyo3::exceptions::PyValueError::new_err(e.to_string()))?,
             );
             return Ok(());
         }
@@ -1561,6 +1645,12 @@ impl Plugin for CovPlugin {
         }
         for (file, file_arcs) in self.worker_arcs.drain() {
             arcs.entry(file).or_default().extend(file_arcs);
+        }
+        for (context, file_hits) in self.worker_context_hits.drain() {
+            let entry = context_hits.entry(context).or_default();
+            for (file, lines) in file_hits {
+                entry.entry(file).or_default().extend(lines);
+            }
         }
         if ctx.config.get_flag("cov-append") {
             self.merge_appended_data(ctx, &mut hits, &mut arcs)?;
@@ -1573,7 +1663,7 @@ impl Plugin for CovPlugin {
                 "No data was collected. (no-data-collected)",
             )?;
         }
-        self.write_data_file(ctx, &hits, &arcs)?;
+        self.write_data_file(ctx, &hits, &arcs, &context_hits)?;
         let rootdir = ctx
             .config
             .rootdir
@@ -1660,6 +1750,12 @@ impl Plugin for CovPlugin {
         }
         for (file, file_arcs) in dump.arcs {
             self.worker_arcs.entry(file).or_default().extend(file_arcs);
+        }
+        for (context, file_hits) in dump.context_hits {
+            let entry = self.worker_context_hits.entry(context).or_default();
+            for (file, lines) in file_hits {
+                entry.entry(file).or_default().extend(lines);
+            }
         }
         Ok(())
     }
