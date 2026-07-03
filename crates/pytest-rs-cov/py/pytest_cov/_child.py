@@ -13,6 +13,7 @@ Activation contract (all set by the running pytest-rs session):
     PYTEST_RS_COV_BRANCH   "1" to record branch arcs
     PYTEST_RS_COV_PATHS    JSON [paths] groups; an alias prefix tracks a file
                            (e.g. a script rsync'd to a worker dir `*/dir1`)
+    PYTEST_RS_COV_SIGTERM  "1" to also dump on SIGTERM ([run] sigterm = true)
 """
 
 import os
@@ -113,6 +114,7 @@ def start():
     root = os.environ.get("PYTEST_RS_COV_ROOT", "")
     sources = [s for s in os.environ.get("PYTEST_RS_COV_SOURCES", "").split(os.pathsep) if s]
     branch = os.environ.get("PYTEST_RS_COV_BRANCH") == "1"
+    sigterm = os.environ.get("PYTEST_RS_COV_SIGTERM") == "1"
     alias_rules = _compile_path_aliases(os.environ.get("PYTEST_RS_COV_PATHS"), root)
 
     mon = sys.monitoring
@@ -268,6 +270,25 @@ def start():
             pass
 
     atexit.register(dump)
+
+    if sigterm:
+        import signal
+
+        old_sigterm = signal.getsignal(signal.SIGTERM)
+
+        def on_sigterm(signum, frame):
+            # atexit never runs on an unhandled SIGTERM — dump now, then
+            # restore the original disposition and re-raise so the process
+            # still dies the same way it would have (coverage.py's
+            # Coverage._on_sigterm).
+            dump()
+            signal.signal(signal.SIGTERM, old_sigterm)
+            os.kill(os.getpid(), signal.SIGTERM)
+
+        try:
+            signal.signal(signal.SIGTERM, on_sigterm)
+        except (ValueError, OSError):
+            pass  # not the main thread, or platform doesn't support it
 
 
 if __name__ == "pytest_rs_cov_child":  # via the .pth runpy loader

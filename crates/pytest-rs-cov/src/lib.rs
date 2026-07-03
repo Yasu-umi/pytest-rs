@@ -1382,6 +1382,21 @@ impl Plugin for CovPlugin {
                 .join(":"),
         )?;
         environ.set_item("PYTEST_RS_COV_BRANCH", if self.branch { "1" } else { "0" })?;
+        // [run] sigterm = true: a subprocess that gets SIGTERM'd (proc.terminate())
+        // has no atexit chance to dump — the child shim installs its own
+        // SIGTERM handler to save data first, then re-raises SIG_DFL.
+        environ.set_item(
+            "PYTEST_RS_COV_SIGTERM",
+            if Self::run_option_enabled(
+                &ctx.config.rootdir,
+                ctx.config.get_value("cov-config"),
+                "sigterm",
+            ) {
+                "1"
+            } else {
+                "0"
+            },
+        )?;
         environ.set_item("PYTEST_RS_COV_TOOL_ID", self.tool_id.to_string())?;
         environ.set_item("PYTEST_RS_COV_ACTIVE", "1")?;
         // [paths] aliases serialized as JSON (canonical first per group) so
