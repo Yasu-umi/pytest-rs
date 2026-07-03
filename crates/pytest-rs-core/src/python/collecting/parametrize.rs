@@ -219,17 +219,34 @@ fn validate_parametrize_argnames(
     test_nodeid: &str,
 ) -> PyResult<()> {
     let inspect = py.import("inspect")?;
-    let all_params: std::collections::HashSet<String> = inspect
+    let parameters = inspect
         .call_method1("signature", (func,))
         .and_then(|sig| sig.getattr("parameters"))
-        .and_then(|params| {
-            params
-                .call_method0("keys")?
-                .try_iter()?
-                .map(|k| k.and_then(|v| v.extract::<String>()))
-                .collect()
-        })
-        .unwrap_or_default();
+        .and_then(|params| params.call_method0("values"))
+        .and_then(|values| values.try_iter())
+        .and_then(|it| it.collect::<PyResult<Vec<_>>>());
+    let empty = inspect.getattr("Parameter")?.getattr("empty")?;
+    // upstream getfuncargnames excludes defaulted parameters from a
+    // function's argnames — get_default_arg_names mirrors that exclusion so
+    // a parametrized argname which is already a defaulted parameter gets its
+    // own dedicated error instead of silently passing as "a plain arg".
+    let mut all_params: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut default_arg_names: std::collections::HashSet<String> = std::collections::HashSet::new();
+    if let Ok(parameters) = parameters {
+        for param in parameters {
+            let Ok(name) = param.getattr("name").and_then(|n| n.extract::<String>()) else {
+                continue;
+            };
+            let has_default = param
+                .getattr("default")
+                .is_ok_and(|default| !default.is(&empty));
+            if has_default {
+                default_arg_names.insert(name);
+            } else {
+                all_params.insert(name);
+            }
+        }
+    }
 
     // upstream validates against `metafunc.fixturenames`: the caller's
     // closure_names already covers direct/usefixtures/transitive deps but
@@ -303,9 +320,15 @@ fn validate_parametrize_argnames(
             {
                 continue;
             }
-            let is_indirect = indirect_all || indirect_names.iter().any(|n| n == argname);
-            let kind = if is_indirect { "fixture" } else { "argument" };
-            let msg = format!("In {func_name}: function uses no {kind} '{argname}'");
+            let msg = if default_arg_names.contains(argname) {
+                format!(
+                    "In {func_name}: function already takes an argument '{argname}' with a default value"
+                )
+            } else {
+                let is_indirect = indirect_all || indirect_names.iter().any(|n| n == argname);
+                let kind = if is_indirect { "fixture" } else { "argument" };
+                format!("In {func_name}: function uses no {kind} '{argname}'")
+            };
             let failed_result: PyResult<PyErr> = (|| {
                 let cls = py.import("_pytest.outcomes")?.getattr("Failed")?;
                 let instance = cls.call1((&msg,))?;
