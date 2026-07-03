@@ -231,6 +231,24 @@ fn validate_parametrize_argnames(
         })
         .unwrap_or_default();
 
+    // upstream validates against `metafunc.fixturenames`: the caller's
+    // closure_names already covers direct/usefixtures/transitive deps but
+    // (unlike getfixtureclosure) skips autouse fixtures, which a class-level
+    // indirect parametrize commonly targets (e.g. an autouse class-scoped
+    // fixture never named in any test's signature). closure_for seeds from
+    // autouse_for(nodeid) too, so it catches those without also accepting an
+    // unrelated, unrequested fixture elsewhere in the suite.
+    let requested: Vec<String> = fixture_names
+        .iter()
+        .chain(extra_fixture_names.iter())
+        .cloned()
+        .collect();
+    let closure_names: std::collections::HashSet<String> = registry
+        .closure_for(test_nodeid, &requested, &Default::default())
+        .into_iter()
+        .map(|def| def.name.clone())
+        .collect();
+
     for mark in marks.iter().filter(|m| m.name == "parametrize") {
         let args = mark.obj.bind(py).getattr("args")?;
         if args.len()? == 0 {
@@ -281,7 +299,7 @@ fn validate_parametrize_argnames(
                 || fixture_names.contains(argname)
                 || extra_fixture_names.contains(argname)
                 || all_params.contains(argname.as_str())
-                || registry.lookup(argname, test_nodeid).is_some()
+                || closure_names.contains(argname)
             {
                 continue;
             }
@@ -330,6 +348,10 @@ pub(crate) fn expand_parametrize(
             .ok()
             .and_then(|hook| hook.getattr("pytest_make_parametrize_id").ok())
     });
+    let func_name: Option<String> = func
+        .and_then(|f| f.getattr("__name__").ok())
+        .and_then(|n| n.extract::<String>().ok());
+    let error_prefix = format!("In {}: ", func_name.as_deref().unwrap_or(nodeid));
     let mut dims: Vec<Dim> = Vec::new();
 
     for mark in marks.iter().filter(|m| m.name == "parametrize") {
@@ -401,34 +423,41 @@ pub(crate) fn expand_parametrize(
         let needs_caching = cached_ids.is_none() && param_ids_from.is_some();
         let explicit_ids: Option<Vec<(Option<String>, bool)>> = if let Some(cached) = cached_ids {
             Some(cached)
+        } else if let Some(ids) = ids_obj
+            .as_ref()
+            .filter(|ids| !ids.is_none() && !ids.is_callable())
+        {
+            let idmaker = py.import("pytest._idmaker")?;
+            let mut result = Vec::new();
+            for (index, id) in ids.try_iter()?.enumerate() {
+                if result.len() >= n_argvalues {
+                    break;
+                }
+                let id = id?;
+                if id.is(&hidden_param) {
+                    result.push((None, true));
+                } else if id.is_none() {
+                    result.push((None, false));
+                } else {
+                    // Explicit ids are validated like any other id value
+                    // (upstream IdMaker._idval_from_value_required): an
+                    // unsupported type is a collection error, not a silent
+                    // str(id) fallback.
+                    let s: String = idmaker
+                        .getattr("idval_from_value_required")?
+                        .call1((
+                            &id,
+                            index,
+                            &error_prefix,
+                            config.as_ref().map(|c| c.bind(py)),
+                        ))?
+                        .extract()?;
+                    result.push((Some(s), false));
+                }
+            }
+            Some(result)
         } else {
-            ids_obj.as_ref().and_then(|ids| {
-                if ids.is_callable() {
-                    return None;
-                }
-                let iter = ids.try_iter().ok()?;
-                let mut result = Vec::new();
-                for id in iter {
-                    if result.len() >= n_argvalues {
-                        break;
-                    }
-                    let id = id.ok()?;
-                    if id.is(&hidden_param) {
-                        result.push((None, true));
-                    } else if id.is_none() {
-                        result.push((None, false));
-                    } else {
-                        // Non-string ID values (int, float, etc.) are converted to
-                        // str, matching real pytest's _idval_from_ids behaviour.
-                        let s = id
-                            .extract::<String>()
-                            .or_else(|_| id.str().and_then(|s| s.to_str().map(|s| s.to_string())))
-                            .ok()?;
-                        result.push((Some(s), false));
-                    }
-                }
-                Some(result)
-            })
+            None
         };
         // ids=callable: idfn(val) per value, None falling through to the
         // default id for that value (upstream _idval_from_function).

@@ -31,6 +31,38 @@ def _ascii_escaped_by_config(val, config):
     return val if escape_option else ascii_escaped(val)
 
 
+def idval_from_value(val, config=None):
+    """Make an ID from a value, if the value type is supported."""
+    if isinstance(val, (str, bytes)):
+        return _ascii_escaped_by_config(val, config)
+    elif val is None or isinstance(val, (float, int, bool, complex)):
+        return str(val)
+    elif isinstance(val, re.Pattern):
+        return ascii_escaped(val.pattern)
+    elif val is NOTSET:
+        pass
+    elif isinstance(val, enum.Enum):
+        return str(val)
+    elif isinstance(getattr(val, "__name__", None), str):
+        return val.__name__
+    return None
+
+
+def idval_from_value_required(val, idx, error_prefix="", config=None):
+    """Like idval_from_value(), but raises a collect error (upstream's
+    IdMaker._idval_from_value_required) if the type is not supported. Called
+    directly by the Rust collector for an explicit `ids=[...]` entry."""
+    id = idval_from_value(val, config)
+    if id is not None:
+        return id
+    msg = (
+        f"{error_prefix}ids contains unsupported value {saferepr(val)} (type: {type(val)!r}) "
+        f"at index {idx}. Supported types are: str, bytes, int, float, complex, bool, "
+        "enum, regex or anything with a __name__."
+    )
+    fail(msg, pytrace=False)
+
+
 @dataclasses.dataclass(frozen=True)
 class IdMaker:
     """Make IDs for a parametrization."""
@@ -158,31 +190,10 @@ class IdMaker:
 
     def _idval_from_value(self, val):
         """Make an ID from a value, if the value type is supported."""
-        if isinstance(val, (str, bytes)):
-            return _ascii_escaped_by_config(val, self.config)
-        elif val is None or isinstance(val, (float, int, bool, complex)):
-            return str(val)
-        elif isinstance(val, re.Pattern):
-            return ascii_escaped(val.pattern)
-        elif val is NOTSET:
-            pass
-        elif isinstance(val, enum.Enum):
-            return str(val)
-        elif isinstance(getattr(val, "__name__", None), str):
-            return val.__name__
-        return None
+        return idval_from_value(val, self.config)
 
     def _idval_from_value_required(self, val, idx):
-        id = self._idval_from_value(val)
-        if id is not None:
-            return id
-        prefix = self._make_error_prefix()
-        msg = (
-            f"{prefix}ids contains unsupported value {saferepr(val)} (type: {type(val)!r}) "
-            f"at index {idx}. Supported types are: str, bytes, int, float, complex, bool, "
-            "enum, regex or anything with a __name__."
-        )
-        fail(msg, pytrace=False)
+        return idval_from_value_required(val, idx, self._make_error_prefix(), self.config)
 
     @staticmethod
     def _idval_from_argname(argname, idx):
