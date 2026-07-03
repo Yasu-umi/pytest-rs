@@ -68,12 +68,16 @@ impl Engine {
                 };
                 labels.push(format!("<{func_class} {function}>"));
             }
-            // Print only the suffix that differs from the previous item.
+            // Print only the suffix that differs from the previous item. The
+            // leaf label is never collapsed even for a fully-duplicate item
+            // (--keep-duplicates can produce two consecutive identical
+            // nodeids), so a repeated item still shows its own leaf line.
             let shared = open
                 .iter()
                 .zip(labels.iter())
                 .take_while(|(open_label, label)| open_label == label)
-                .count();
+                .count()
+                .min(labels.len() - 1);
             let last = labels.len() - 1;
             for (depth, label) in labels.iter().enumerate().skip(shared) {
                 let indent = "  ".repeat(depth + 1);
