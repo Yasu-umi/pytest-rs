@@ -173,6 +173,20 @@ impl Engine {
             }
         }
 
+        // `-p`/entry-point plugins have now imported, same as collect()'s
+        // load_cmdline_and_entrypoint_plugins + fire_plugins_registered — a
+        // worker never calls collect() (it has this whole separate startup
+        // path instead), so without this a plugin that arms itself here
+        // (e.g. pytest-cov's coverage tracing) never starts in worker
+        // processes at all.
+        if let Err(err) = self.fire_plugins_registered(py) {
+            eprintln!(
+                "INTERNAL ERROR: worker plugins-registered hook failed: {}",
+                python::format_exception(py, &err)
+            );
+            return exit_code::INTERNAL_ERROR;
+        }
+
         // Mirror the controller's configure pipeline (collect pipeline
         // phases 4-5) now that all plugins (entry points + -p) are loaded.
         // A spawned worker is a fresh process, so unlike a forked worker it
