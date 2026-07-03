@@ -208,7 +208,13 @@ pub fn collect_test_files(
         paths.to_vec()
     };
 
-    let mut files = Vec::new();
+    struct ResolvedArg {
+        path: PathBuf,
+        has_parts: bool,
+        is_dir: bool,
+    }
+
+    let mut resolved = Vec::with_capacity(args.len());
     for arg in &args {
         // Node-id args select within a file; only the path part is
         // collected here (the engine filters items afterwards).
@@ -244,11 +250,53 @@ pub fn collect_test_files(
         if ignores.is_ignored(&path) {
             continue;
         }
-        if meta.is_dir() {
+        resolved.push(ResolvedArg {
+            path,
+            has_parts: arg.contains("::"),
+            is_dir: meta.is_dir(),
+        });
+    }
+
+    // Mirror upstream's normalize_collection_arguments: when one arg's path
+    // is a directory ancestor of (or equal to) another arg without node-id
+    // parts, the descendant is redundant and dropped, keeping CLI order
+    // among the survivors. --keep-duplicates bypasses this entirely.
+    let survivors: Vec<&ResolvedArg> = if keep_duplicates {
+        resolved.iter().collect()
+    } else {
+        let mut indexed: Vec<(usize, &ResolvedArg)> = resolved.iter().enumerate().collect();
+        indexed.sort_by(|a, b| {
+            a.1.path
+                .cmp(&b.1.path)
+                .then(a.1.has_parts.cmp(&b.1.has_parts))
+        });
+        let mut kept_indices = Vec::new();
+        let mut last_kept: Option<&ResolvedArg> = None;
+        for (idx, ra) in &indexed {
+            let subsumed = match last_kept {
+                Some(prev) if prev.path == ra.path => {
+                    !prev.has_parts || prev.has_parts == ra.has_parts
+                }
+                Some(prev) => !prev.has_parts && ra.path.starts_with(&prev.path),
+                None => false,
+            };
+            if subsumed {
+                continue;
+            }
+            kept_indices.push(*idx);
+            last_kept = Some(ra);
+        }
+        kept_indices.sort_unstable();
+        kept_indices.into_iter().map(|i| &resolved[i]).collect()
+    };
+
+    let mut files = Vec::new();
+    for ra in survivors {
+        if ra.is_dir {
             // An explicitly given directory is collected even if it is a
             // virtualenv root; only recursion skips them.
             collect_dir(
-                &path,
+                &ra.path,
                 files.as_mut(),
                 collect_in_virtualenv,
                 python_files,
@@ -256,10 +304,10 @@ pub fn collect_test_files(
                 ignores,
                 keep_duplicates,
             )?;
-        } else if keep_duplicates || !files.contains(&path) {
+        } else if keep_duplicates || !files.contains(&ra.path) {
             // --keep-duplicates: a file given twice collects twice (pytest
             // keeps duplicated args).
-            files.push(path);
+            files.push(ra.path.clone());
         }
     }
     Ok(files)
