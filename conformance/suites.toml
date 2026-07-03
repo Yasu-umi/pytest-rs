@@ -131,6 +131,10 @@ extra_args = ["-p", "no:pytest_cov"]
 repo = "https://github.com/ionelmc/pytest-benchmark"
 tag = "v5.1.0"
 testpaths = ["tests"]
+# benchmark_weave (aspect-oriented monkeypatching) needs the optional
+# aspectlib extra; without it test_with_testcase.py::test_foo2 errors on
+# `import aspectlib`.
+deps = ["aspectlib==2.0.0"]
 # Wall-clock-bound calibration tests (warmup budgets of max_time=10s per
 # loop level); upstream pytest needs ~3m20s for the file, pytest-rs ~2m40s.
 slow_files = ["tests/test_calibration.py"]

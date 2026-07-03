@@ -148,6 +148,9 @@ pub struct BenchmarkFixture {
     extra_info: Py<PyDict>,
     #[pyo3(get, set)]
     group: Py<PyAny>,
+    /// Upstream's `benchmark._cleanup_callbacks`: aspectlib rollbacks
+    /// registered by `weave`/`patch`, run LIFO at fixture teardown.
+    cleanup_callbacks: Mutex<Vec<Py<PyAny>>>,
 }
 
 impl BenchmarkFixture {
@@ -171,6 +174,7 @@ impl BenchmarkFixture {
             used: Mutex::new(None),
             extra_info: PyDict::new(py).unbind(),
             group: py.None(),
+            cleanup_callbacks: Mutex::new(Vec::new()),
         })
     }
 
@@ -208,6 +212,27 @@ impl BenchmarkFixture {
             .lock()
             .expect("min_time lock poisoned")
             .unwrap_or(self.config.min_time)
+    }
+
+    fn weave_impl(
+        slf: PyRef<'_, Self>,
+        target: Py<PyAny>,
+        kwargs: Option<Py<PyDict>>,
+    ) -> PyResult<()> {
+        let py = slf.py();
+        let kwargs_obj = match &kwargs {
+            Some(k) => k.bind(py).clone(),
+            None => PyDict::new(py),
+        };
+        let rollback = slf
+            .helper
+            .bind(py)
+            .call_method1("weave", (&slf, target.bind(py), kwargs_obj))?;
+        slf.cleanup_callbacks
+            .lock()
+            .expect("cleanup lock poisoned")
+            .push(rollback.unbind());
+        Ok(())
     }
 
     fn record(&self, py: Python<'_>, times: &[f64], iterations: usize) -> PyResult<()> {
@@ -446,14 +471,35 @@ impl BenchmarkFixture {
             .expect("min_time lock poisoned") = Some(value);
     }
 
-    /// Upstream's benchmark.weave (aspect mode): requires the aspectlib
-    /// extra, which pytest-rs does not reproduce — same ImportError as
-    /// upstream without it.
-    #[pyo3(signature = (_target = None, **_kwargs))]
-    fn weave(&self, _target: Option<Py<PyAny>>, _kwargs: Option<Py<PyDict>>) -> PyResult<()> {
-        Err(pyo3::exceptions::PyImportError::new_err(
-            "Please install aspectlib or pytest-benchmark[aspect]",
-        ))
+    /// Upstream's benchmark.weave (aspect mode): weaves `self(target, ...)`
+    /// into `target` via aspectlib (requires the optional aspectlib extra;
+    /// same ImportError as upstream without it). The rollback is deferred
+    /// to fixture teardown, mirroring upstream's `_cleanup_callbacks`.
+    #[pyo3(signature = (target, **kwargs))]
+    fn weave(slf: PyRef<'_, Self>, target: Py<PyAny>, kwargs: Option<Py<PyDict>>) -> PyResult<()> {
+        Self::weave_impl(slf, target, kwargs)
+    }
+
+    /// `patch` is upstream's alias for `weave` (`patch = weave`).
+    #[pyo3(signature = (target, **kwargs))]
+    fn patch(slf: PyRef<'_, Self>, target: Py<PyAny>, kwargs: Option<Py<PyDict>>) -> PyResult<()> {
+        Self::weave_impl(slf, target, kwargs)
+    }
+
+    /// Upstream's `benchmark._cleanup`: runs aspectlib rollbacks LIFO.
+    /// Invoked as the fixture's teardown finalizer.
+    fn _cleanup(&self, py: Python<'_>) -> PyResult<()> {
+        loop {
+            let callback = self
+                .cleanup_callbacks
+                .lock()
+                .expect("cleanup lock poisoned")
+                .pop();
+            let Some(callback) = callback else {
+                return Ok(());
+            };
+            callback.bind(py).call0()?;
+        }
     }
 
     #[getter]

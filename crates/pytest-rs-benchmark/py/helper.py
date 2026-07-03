@@ -143,6 +143,24 @@ class FixtureAlreadyUsed(Exception):
     pytest_benchmark.fixture.FixtureAlreadyUsed)."""
 
 
+def weave(benchmark, target, kwargs):
+    """benchmark.weave/patch (aspect mode): weaves a call through
+    `benchmark(function, ...)` into `target` via aspectlib. Returns the
+    rollback callable (upstream's `aspectlib.weave(...).rollback`)."""
+    try:
+        import aspectlib
+    except ImportError as exc:
+        raise ImportError(exc.args, "Please install aspectlib or pytest-benchmark[aspect]") from exc
+
+    def aspect(function):
+        def wrapper(*args, **kwargs):
+            return benchmark(function, *args, **kwargs)
+
+        return wrapper
+
+    return aspectlib.weave(target, aspect, **kwargs).rollback
+
+
 def resolve_timer(spec):
     """--benchmark-timer=module.attr (upstream's NameWrapper-ed dotted
     lookup, e.g. time.time or time.perf_counter)."""

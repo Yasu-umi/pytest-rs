@@ -15,6 +15,7 @@ use pytest_rs_core::config::{OptDef, OptionParser};
 use pytest_rs_core::fixture::FixtureDef;
 use pytest_rs_core::hooks::{FixtureValue, HookContext, HookResult, Plugin};
 use pytest_rs_core::pyo3 as core_pyo3;
+use pytest_rs_core::session::Finalizer;
 
 use core_pyo3::prelude::*;
 use core_pyo3::types::PyModule;
@@ -536,9 +537,10 @@ impl Plugin for BenchmarkPlugin {
         if let Some(timer) = timer {
             fixture.bind(py).setattr("_timer", timer)?;
         }
+        let cleanup = fixture.bind(py).getattr("_cleanup")?.unbind();
         Ok(Some(FixtureValue {
             value: fixture.into_any(),
-            finalizer: None,
+            finalizer: Some(Finalizer::Callable(cleanup)),
         }))
     }
 
