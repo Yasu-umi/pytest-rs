@@ -282,6 +282,10 @@ def tmp_path(tmp_path_factory, request):
         rm_rf(path)
 
 
+class _NeverRaised(Exception):
+    """Sentinel so ``LocalPath.visit``'s default ``ignore`` never matches."""
+
+
 class LocalPath:
     """Minimal py.path.local equivalent backing the legacy tmpdir fixture."""
 
@@ -305,6 +309,9 @@ class LocalPath:
 
     def __hash__(self):
         return hash(str(self._path))
+
+    def __lt__(self, other):
+        return str(self) < str(other)
 
     @property
     def strpath(self):
@@ -421,6 +428,52 @@ class LocalPath:
         old = os.getcwd()
         os.chdir(self._path)
         return LocalPath(old)
+
+    def visit(self, fil=None, rec=None, ignore=_NeverRaised, bf=False, sort=False):
+        """py.path.local.visit: yield paths below this one matching ``fil``,
+        recursing into dirs matching ``rec`` (default: recurse into all)."""
+        if isinstance(fil, str):
+            fil = LocalPath._fnmatcher(fil)
+        if isinstance(rec, str):
+            rec = LocalPath._fnmatcher(rec)
+        elif rec and not callable(rec):
+            rec = LocalPath._always_recurse
+        yield from self._visit_entries(fil, rec, ignore, bf)
+
+    @staticmethod
+    def _always_recurse(_path):
+        return True
+
+    def _visit_entries(self, fil, rec, ignore, bf):
+        try:
+            entries = self.listdir()
+        except ignore:
+            return
+        dirs = [p for p in entries if p.isdir() and (rec is None or rec(p))]
+        if not bf:
+            for subdir in dirs:
+                yield from subdir._visit_entries(fil, rec, ignore, bf)
+        for p in entries:
+            if fil is None or fil(p):
+                yield p
+        if bf:
+            for subdir in dirs:
+                yield from subdir._visit_entries(fil, rec, ignore, bf)
+
+    @staticmethod
+    def _fnmatcher(pattern):
+        def match(path):
+            sep = os.sep
+            pat = pattern
+            if pat.find(sep) == -1:
+                name = path.basename
+            else:
+                name = str(path)
+                if not os.path.isabs(pat):
+                    pat = "*" + sep + pat
+            return fnmatch.fnmatch(name, pat)
+
+        return match
 
 
 @fixture
