@@ -651,6 +651,51 @@ pub fn expand_fixture_params(
                 .bind(py)
                 .try_iter()?
                 .collect::<PyResult<_>>()?;
+            // `params=[]`: upstream still collects one item (not zero),
+            // carrying the configured empty_parameter_set_mark (default:
+            // skip) instead of a bound value — mirrors notset_param_set for
+            // `@pytest.mark.parametrize([], ...)`.
+            if values.is_empty() {
+                let mark_decorator = py
+                    .import("_pytest.mark")?
+                    .getattr("get_empty_parameterset_mark")?
+                    .call1((
+                        existing_py_config(py).unwrap_or_else(|| py.None()),
+                        vec![def.name.clone()],
+                        item.func.bind(py),
+                    ))?;
+                let mark_obj = mark_decorator.getattr("mark")?;
+                let mark_name: String = mark_obj.getattr("name")?.extract()?;
+                let notset = py.import("_pytest.compat")?.getattr("NOTSET")?;
+                let mut next = Vec::new();
+                for (id, assignments, variant_marks) in &variants {
+                    let part = "NOTSET".to_string();
+                    let id = if id.is_empty() {
+                        part
+                    } else {
+                        format!("{id}-{part}")
+                    };
+                    let mut assignments = assignments
+                        .iter()
+                        .map(|(n, i, v)| (n.clone(), *i, v.clone_ref(py)))
+                        .collect::<Vec<_>>();
+                    assignments.push((def.name.clone(), 0, notset.clone().unbind()));
+                    let mut variant_marks: Vec<MarkData> = variant_marks
+                        .iter()
+                        .map(|m| MarkData {
+                            name: m.name.clone(),
+                            obj: m.obj.clone_ref(py),
+                        })
+                        .collect();
+                    variant_marks.push(MarkData {
+                        name: mark_name.clone(),
+                        obj: mark_obj.clone().unbind(),
+                    });
+                    next.push((id, assignments, variant_marks));
+                }
+                variants = next;
+                continue;
+            }
             let mut next = Vec::new();
             for (id, assignments, variant_marks) in &variants {
                 for (index, wrapped) in values.iter().enumerate() {
