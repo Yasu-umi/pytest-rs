@@ -317,6 +317,15 @@ fn validate_parametrize_argnames(
                 || extra_fixture_names.contains(argname)
                 || all_params.contains(argname.as_str())
                 || closure_names.contains(argname)
+                // Some native plugins (e.g. anyio) connect a fixture to an
+                // item only in a later pytest_collection_modifyitems-style
+                // pass, after this file's items are already collected — the
+                // argname is genuinely unreachable from any closure computed
+                // here yet. Accepting any visible same-named fixture is
+                // looser than upstream but avoids flagging those as errors;
+                // see test_parametrize_uses_no_fixture_error_indirect_true's
+                // note for the accuracy this trades away.
+                || registry.lookup(argname, test_nodeid).is_some()
             {
                 continue;
             }
