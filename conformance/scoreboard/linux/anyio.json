@@ -27,12 +27,12 @@
     },
     {
       "file": "tests/streams/test_memory.py",
-      "status": "error",
-      "exit_code": 2,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 109,
       "failed": 0,
       "skipped": 0,
-      "errors": 1,
+      "errors": 0,
       "deselected": 0
     },
     {
@@ -127,12 +127,12 @@
     },
     {
       "file": "tests/test_from_thread.py",
-      "status": "error",
-      "exit_code": 2,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 195,
       "failed": 0,
-      "skipped": 0,
-      "errors": 1,
+      "skipped": 4,
+      "errors": 0,
       "deselected": 0
     },
     {
@@ -177,12 +177,12 @@
     },
     {
       "file": "tests/test_sockets.py",
-      "status": "error",
-      "exit_code": 2,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1189,
       "failed": 0,
       "skipped": 0,
-      "errors": 1,
+      "errors": 0,
       "deselected": 0
     },
     {
@@ -197,22 +197,22 @@
     },
     {
       "file": "tests/test_synchronization.py",
-      "status": "error",
-      "exit_code": 2,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 235,
       "failed": 0,
       "skipped": 0,
-      "errors": 1,
+      "errors": 0,
       "deselected": 0
     },
     {
       "file": "tests/test_taskgroups.py",
-      "status": "error",
-      "exit_code": 2,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 393,
       "failed": 0,
-      "skipped": 0,
-      "errors": 1,
+      "skipped": 10,
+      "errors": 0,
       "deselected": 0
     },
     {
@@ -247,12 +247,12 @@
     },
     {
       "file": "tests/test_to_thread.py",
-      "status": "error",
-      "exit_code": 2,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 64,
       "failed": 0,
       "skipped": 0,
-      "errors": 1,
+      "errors": 0,
       "deselected": 0
     },
     {

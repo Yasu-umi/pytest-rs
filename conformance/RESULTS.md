@@ -18,7 +18,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2625 | 163 | 0 | 53 | 8 | 2849 | 94.0% | 22 | 54 | 61 |
+| pytest | 9.0.3 | 2624 | 164 | 0 | 53 | 8 | 2849 | 94.0% | 22 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 1 | 7 | 85.7% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 2 | 90 | 97.8% | 1 | 1 | 0 |
@@ -27,14 +27,14 @@ are out of scope for pytest-rs; they are not counted in the total.
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 109 | 13 | 0 | 1 | 0 | 123 | 89.4% | 4 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 2 | 43 | 95.3% | 1 | 1 | 0 |
-| anyio | 4.13.0 | 935 | 0 | 6 | 28 | 0 | 969 | 99.4% | 20 | 26 | 0 |
+| anyio | 4.13.0 | 3120 | 0 | 0 | 42 | 0 | 3162 | 100.0% | 26 | 26 | 0 |
 | pytest-mypy | v1.0.1 | 53 | 23 | 0 | 2 | 0 | 78 | 70.5% | 0 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-subtests | v0.14.2 | 32 | 0 | 0 | 0 | 0 | 32 | 100.0% | 1 | 1 | 0 |
 | pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-snapshot | v0.9.0 | 102 | 5 | 0 | 0 | 0 | 107 | 95.3% | 0 | 3 | 0 |
 | pytest-icdiff | 0.5 | 10 | 2 | 0 | 0 | 0 | 12 | 83.3% | 0 | 1 | 0 |
-| pytest-socket | 0.7.0 | 41 | 2 | 0 | 0 | 0 | 43 | 95.3% | 3 | 6 | 0 |
+| pytest-socket | 0.7.0 | 60 | 5 | 0 | 0 | 0 | 65 | 92.3% | 3 | 6 | 0 |
 | pytest-order | v1.4.0 | 120 | 14 | 0 | 0 | 0 | 134 | 89.6% | 7 | 16 | 0 |
 | pytest-repeat | v0.9.4 | 16 | 0 | 0 | 0 | 0 | 16 | 100.0% | 1 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
@@ -57,10 +57,10 @@ are out of scope for pytest-rs; they are not counted in the total.
 | fastapi | 0.115.12 | 2332 | 1 | 0 | 130 | 1 | 2464 | 99.9% | 303 | 310 | 0 |
 | packaging | 25.0 | 26947 | 0 | 0 | 0 | 1 | 26948 | 100.0% | 12 | 12 | 0 |
 | pandas | v3.0.3 | 160773 | 1 | 0 | 26984 | 15 | 187773 | 100.0% | 871 | 961 | 3 |
-| networkx | 3.6.1 | 6800 | 0 | 0 | 76 | 0 | 6876 | 100.0% | 258 | 266 | 0 |
+| networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 0 | 6894 | 100.0% | 259 | 266 | 0 |
 | pydantic | v2.11.7 | 5338 | 14 | 0 | 921 | 0 | 6273 | 99.8% | 77 | 82 | 0 |
 | scikit-learn-1 | 1.9.0 | 8432 | 0 | 0 | 6624 | 0 | 15056 | 100.0% | 79 | 87 | 0 |
-| scikit-learn-2 | 1.9.0 | 5038 | 0 | 0 | 1892 | 0 | 6930 | 100.0% | 51 | 58 | 0 |
+| scikit-learn-2 | 1.9.0 | 5046 | 0 | 0 | 1892 | 0 | 6938 | 100.0% | 52 | 58 | 0 |
 | scikit-learn-3 | 1.9.0 | 9251 | 3 | 0 | 2530 | 0 | 11784 | 100.0% | 104 | 114 | 0 |
 
 ### pytest @ 9.0.3
@@ -73,7 +73,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | testing/python/collect.py | failed | 77 | 5 | 0 | 0 | 0 |
 | testing/python/fixtures.py | failed | 204 | 4 | 0 | 2 | 0 |
 | testing/python/integration.py | failed | 13 | 3 | 0 | 4 | 0 |
-| testing/python/metafunc.py | failed | 110 | 2 | 0 | 0 | 0 |
+| testing/python/metafunc.py | failed | 109 | 3 | 0 | 0 | 0 |
 | testing/python/raises.py | passed | 31 | 0 | 0 | 0 | 0 |
 | testing/python/raises_group.py | failed | 26 | 3 | 0 | 0 | 0 |
 | testing/python/show_fixtures_per_test.py | passed | 8 | 0 | 0 | 0 | 0 |
@@ -250,7 +250,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 |---|---|---:|---:|---:|---:|---:|
 | tests/streams/test_buffered.py | passed | 28 | 0 | 0 | 0 | 0 |
 | tests/streams/test_file.py | passed | 40 | 0 | 0 | 0 | 0 |
-| tests/streams/test_memory.py | error | 0 | 0 | 1 | 0 | 0 |
+| tests/streams/test_memory.py | passed | 109 | 0 | 0 | 0 | 0 |
 | tests/streams/test_stapled.py | passed | 24 | 0 | 0 | 0 | 0 |
 | tests/streams/test_text.py | passed | 24 | 0 | 0 | 0 | 0 |
 | tests/streams/test_tls.py | passed | 68 | 0 | 0 | 0 | 0 |
@@ -260,19 +260,19 @@ are out of scope for pytest-rs; they are not counted in the total.
 | tests/test_deprecations.py | passed | 1 | 0 | 0 | 0 | 0 |
 | tests/test_eventloop.py | passed | 17 | 0 | 0 | 1 | 0 |
 | tests/test_fileio.py | passed | 244 | 0 | 0 | 22 | 0 |
-| tests/test_from_thread.py | error | 0 | 0 | 1 | 0 | 0 |
+| tests/test_from_thread.py | passed | 195 | 0 | 0 | 4 | 0 |
 | tests/test_functools.py | passed | 132 | 0 | 0 | 0 | 0 |
 | tests/test_lowlevel.py | passed | 44 | 0 | 0 | 0 | 0 |
 | tests/test_pytest_plugin.py | passed | 35 | 0 | 0 | 0 | 0 |
 | tests/test_signals.py | passed | 12 | 0 | 0 | 0 | 0 |
-| tests/test_sockets.py | error | 0 | 0 | 1 | 0 | 0 |
+| tests/test_sockets.py | passed | 1189 | 0 | 0 | 0 | 0 |
 | tests/test_subprocesses.py | passed | 76 | 0 | 0 | 4 | 0 |
-| tests/test_synchronization.py | error | 0 | 0 | 1 | 0 | 0 |
-| tests/test_taskgroups.py | error | 0 | 0 | 1 | 0 | 0 |
+| tests/test_synchronization.py | passed | 235 | 0 | 0 | 0 | 0 |
+| tests/test_taskgroups.py | passed | 393 | 0 | 0 | 10 | 0 |
 | tests/test_tempfile.py | passed | 60 | 0 | 0 | 0 | 0 |
 | tests/test_to_interpreter.py | passed | 12 | 0 | 0 | 0 | 0 |
 | tests/test_to_process.py | passed | 36 | 0 | 0 | 0 | 0 |
-| tests/test_to_thread.py | error | 0 | 0 | 1 | 0 | 0 |
+| tests/test_to_thread.py | passed | 64 | 0 | 0 | 0 | 0 |
 | tests/test_typedattr.py | passed | 1 | 0 | 0 | 0 | 0 |
 
 </details>
@@ -350,7 +350,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | tests/test_doctest.py | passed | 1 | 0 | 0 | 0 | 0 |
 | tests/test_precedence.py | passed | 10 | 0 | 0 | 0 | 0 |
 | tests/test_restrict_hosts.py | failed | 27 | 1 | 0 | 0 | 0 |
-| tests/test_socket.py | timeout | 0 | 0 | 0 | 0 | 0 |
+| tests/test_socket.py | failed | 19 | 3 | 0 | 0 | 0 |
 
 </details>
 
@@ -2300,7 +2300,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | networkx/algorithms/connectivity/tests/test_disjoint_paths.py | passed | 18 | 0 | 0 | 0 | 0 |
 | networkx/algorithms/connectivity/tests/test_edge_augmentation.py | passed | 20 | 0 | 0 | 0 | 0 |
 | networkx/algorithms/connectivity/tests/test_edge_kcomponents.py | passed | 21 | 0 | 0 | 0 | 0 |
-| networkx/algorithms/connectivity/tests/test_kcomponents.py | timeout | 0 | 0 | 0 | 0 | 0 |
+| networkx/algorithms/connectivity/tests/test_kcomponents.py | passed | 15 | 0 | 0 | 3 | 0 |
 | networkx/algorithms/connectivity/tests/test_kcutsets.py | passed | 15 | 0 | 0 | 11 | 0 |
 | networkx/algorithms/connectivity/tests/test_stoer_wagner.py | passed | 5 | 0 | 0 | 0 | 0 |
 | networkx/algorithms/flow/tests/test_gomory_hu.py | passed | 8 | 0 | 0 | 1 | 0 |
@@ -2690,7 +2690,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | sklearn/tests/test_calibration.py | passed | 97 | 0 | 0 | 137 | 0 |
 | sklearn/tests/test_check_build.py | passed | 1 | 0 | 0 | 0 | 0 |
 | sklearn/tests/test_common.py | no-tests | 0 | 0 | 0 | 0 | 0 |
-| sklearn/tests/test_config.py | timeout | 0 | 0 | 0 | 0 | 0 |
+| sklearn/tests/test_config.py | passed | 8 | 0 | 0 | 0 | 0 |
 | sklearn/tests/test_discriminant_analysis.py | passed | 56 | 0 | 0 | 0 | 0 |
 | sklearn/tests/test_docstring_parameters.py | no-tests | 0 | 0 | 0 | 212 | 0 |
 | sklearn/tests/test_docstring_parameters_consistency.py | no-tests | 0 | 0 | 0 | 4 | 0 |

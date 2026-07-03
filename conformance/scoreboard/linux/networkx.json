@@ -777,11 +777,11 @@
     },
     {
       "file": "networkx/algorithms/connectivity/tests/test_kcomponents.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 15,
       "failed": 0,
-      "skipped": 0,
+      "skipped": 3,
       "errors": 0,
       "deselected": 0
     },
