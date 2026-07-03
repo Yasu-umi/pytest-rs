@@ -49,8 +49,8 @@
       "file": "testing/python/metafunc.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 105,
-      "failed": 7,
+      "passed": 110,
+      "failed": 2,
       "skipped": 0,
       "errors": 0,
       "deselected": 0
