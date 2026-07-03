@@ -751,6 +751,24 @@ impl Engine {
         workers: usize,
     ) -> VecDeque<Vec<String>> {
         let dist_mode = self.config.get_value("dist").unwrap_or("load");
+        // Plain `load` (no scope/file/group grouping): upstream's initial
+        // distribution is round-robin over CHUNKS of consecutive items, not
+        // one at a time, once there are enough items to give every worker
+        // at least 2 (xdist.scheduler.load.LoadScheduling.schedule). Below
+        // that threshold it falls back to one-at-a-time, same as a chunk
+        // size of 1. Keeping adjacent items (e.g. two tests in the same
+        // unittest.TestCase, sharing setUpClass/tearDownClass) on the same
+        // worker matters beyond just ordering — splitting them across
+        // workers double-runs class-scoped setup/teardown.
+        if dist_mode == "load" && workers > 0 {
+            let chunk_size = if nodeids.len() < 2 * workers {
+                1
+            } else {
+                let items_per_node = nodeids.len() / workers;
+                (items_per_node / 4).max(2)
+            };
+            return nodeids.chunks(chunk_size).map(<[String]>::to_vec).collect();
+        }
         let per_module = matches!(dist_mode, "loadscope" | "loadfile" | "loadgroup");
         let mut group_batches: HashMap<String, usize> = HashMap::new();
         let mut batches: VecDeque<Vec<String>> = VecDeque::new();

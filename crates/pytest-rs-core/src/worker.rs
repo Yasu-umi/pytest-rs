@@ -325,7 +325,14 @@ impl Engine {
             };
             match msg {
                 ParentMsg::Run { nodeids } => {
-                    total_failed += self.run_batch(py, &mut collection, &mut prev_module, &nodeids);
+                    total_failed += self.run_batch(
+                        py,
+                        &mut collection,
+                        &mut prev_module,
+                        &nodeids,
+                        maxfail,
+                        total_failed,
+                    );
                     // xdist's [setproctitle] extra: idle between batches.
                     python::worker_set_title(py, "[pytest-xdist idle]");
                     // Propagate KeyboardInterrupt / pytest.exit so the controller
@@ -478,6 +485,8 @@ impl Engine {
         collection: &mut WorkerCollection,
         prev_module: &mut Option<String>,
         nodeids: &[String],
+        maxfail: Option<usize>,
+        failed_before_batch: usize,
     ) -> usize {
         let mut batch_failed = 0usize;
         for nodeid in nodeids {
@@ -582,6 +591,17 @@ impl Engine {
                 item,
                 "pytest_runtest_logfinish",
             );
+            // --maxfail/-x: a chunked batch can hold several items (xdist's
+            // own load scheduler does the same once there are enough tests
+            // per worker); upstream re-derives its `session.shouldfail`
+            // per item inside the worker's own runtestloop, so later items
+            // already dispatched in this batch still don't run once the
+            // threshold is crossed mid-batch.
+            if let Some(m) = maxfail
+                && failed_before_batch + batch_failed >= m
+            {
+                break;
+            }
         }
         batch_failed
     }
