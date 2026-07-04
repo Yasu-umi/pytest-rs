@@ -389,7 +389,11 @@ impl Engine {
             }
             return code;
         }
-        if let Some(banner) = &self.session.abort_banner {
+        // A KeyboardInterrupt's richer repr prints later, after the summary
+        // (below) — skip this immediate pytest.exit()-style banner for it.
+        if let Some(banner) = &self.session.abort_banner
+            && self.session.keyboard_interrupt_repr.is_none()
+        {
             println!("{}", center_with(banner, '!'));
         }
         // --no-summary suppresses pytest's whole terminal-summary block
@@ -450,6 +454,25 @@ impl Engine {
             };
             println!("{}", center_with(&banner, '!'));
             code = exit_code::INTERRUPTED;
+        }
+        // A KeyboardInterrupt during a test: upstream's
+        // _report_keyboardinterrupt prints its banner + crash info here, at
+        // the very end (after the whole summary), not with the other abort
+        // banners printed earlier.
+        if let Some((short, long)) = &self.session.keyboard_interrupt_repr {
+            println!("{}", center_with("KeyboardInterrupt", '!'));
+            if self.config.get_flag("full-trace") {
+                println!("{long}");
+            } else {
+                println!("{short}");
+                println!(
+                    "{}",
+                    crate::tw::markup(
+                        "(to show a full traceback on KeyboardInterrupt use --full-trace)",
+                        &[crate::tw::YELLOW]
+                    )
+                );
+            }
         }
         let warning_count = python::warning_count(py) + self.session.worker_warning_count;
         let extra_stats = python::reporter_subtest_stats(py);

@@ -11,6 +11,26 @@ use crate::python;
 use crate::report::{Outcome, Phase, TestReport};
 use crate::session::{Finalizer, PendingFinalizer, Session};
 
+/// Record a pytest.exit()/Ctrl-C abort during a test's setup or call.
+/// `abort_banner` is always set (an xdist worker forwards it verbatim to the
+/// controller over the WorkerMsg::Interrupted IPC message, which has no
+/// field for the richer repr below). A KeyboardInterrupt additionally gets
+/// `keyboard_interrupt_repr`, rendered as its own end-of-summary
+/// "!!! KeyboardInterrupt !!!" block (upstream's `_report_keyboardinterrupt`,
+/// with a crash line and, under --fulltrace, the full traceback) instead of
+/// `abort_banner`'s immediate pre-summary print — `finish_session` skips that
+/// early print whenever `keyboard_interrupt_repr` is set, to avoid double
+/// (and wrongly-ordered) output in the local, non-xdist case.
+fn record_abort(py: Python<'_>, session: &mut Session, err: &PyErr, code: i32) {
+    session.exit_code_override = Some(code);
+    session.abort_banner = python::session_abort_banner(py, err);
+    if err.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py) {
+        let short = python::format_test_failure(py, err, "line");
+        let long = python::format_test_failure(py, err, "long");
+        session.keyboard_interrupt_repr = Some((short, long));
+    }
+}
+
 pub(crate) fn run_custom_item(py: Python<'_>, config: &Config, item: &TestItem) -> Vec<TestReport> {
     let started = TimeMark::now();
     // reportinfo()[2] is the failure-section heading (pytest-mypy's
@@ -447,8 +467,7 @@ pub(crate) fn run_item_body(
     if let Err(err) = &call_result
         && let Some(code) = python::session_abort_code(py, err)
     {
-        session.exit_code_override = Some(code);
-        session.abort_banner = python::session_abort_banner(py, err);
+        record_abort(py, session, err, code);
         // Subtests recorded before the abort still report (e.g. pytest.exit
         // inside a subtest block records a failed subtest, then aborts).
         let (sub_reports, _) = python::pop_subtest_reports(py, config, item);
@@ -567,8 +586,7 @@ pub(crate) fn run_item_body(
                     }
                     Err(err) => {
                         if let Some(code) = python::session_abort_code(py, &err) {
-                            session.exit_code_override = Some(code);
-                            session.abort_banner = python::session_abort_banner(py, &err);
+                            record_abort(py, session, &err, code);
                             let (sub_reports, _) = python::pop_subtest_reports(py, config, item);
                             reports.extend(sub_reports);
                             return xfail;

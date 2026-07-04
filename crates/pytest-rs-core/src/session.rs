@@ -101,6 +101,12 @@ pub struct Session {
     pub exit_code_override: Option<i32>,
     /// "!!! ... !!!" banner for pytest.exit / Ctrl-C aborts.
     pub abort_banner: Option<String>,
+    /// A KeyboardInterrupt during a test's setup/call: (short crash line,
+    /// full traceback). Rendered as its own "!!! KeyboardInterrupt !!!"
+    /// block after the whole summary (upstream's `_report_keyboardinterrupt`),
+    /// not as `abort_banner` (which prints before the summary, for
+    /// pytest.exit's different, immediate-abort banner).
+    pub keyboard_interrupt_repr: Option<(String, String)>,
     /// Warnings forwarded from -n workers, merged into the summary.
     pub worker_warnings: Vec<String>,
     pub worker_warning_count: usize,
@@ -175,6 +181,7 @@ impl Session {
             py_hooks: Vec::new(),
             exit_code_override: None,
             abort_banner: None,
+            keyboard_interrupt_repr: None,
             worker_warnings: Vec::new(),
             worker_warning_count: 0,
             report_workers: HashMap::new(),
