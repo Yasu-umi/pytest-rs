@@ -605,6 +605,11 @@ impl Config {
     }
 
     pub fn from_args(parser: OptionParser, argv: Vec<String>) -> Result<Self, String> {
+        // `argv[0]` is always a program-name placeholder regardless of caller
+        // (the real CLI's actual argv[0], or a synthetic "pytest-rs" from
+        // in-process callers) — the rest is exactly what was passed to
+        // `pytest.main()`/the CLI, for `config.invocation_params.args`.
+        let invocation_args = argv.get(1..).map(<[String]>::to_vec).unwrap_or_default();
         let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
         let cwd = std::fs::canonicalize(&cwd).unwrap_or(cwd);
         let (rootdir, config_file_name, ini_file, ignored_config_files) =
@@ -852,6 +857,7 @@ impl Config {
             ignored_config_files,
             effective_args,
             plugin_args,
+            invocation_args,
             reporter_delegated: std::sync::atomic::AtomicBool::new(false),
         })
     }

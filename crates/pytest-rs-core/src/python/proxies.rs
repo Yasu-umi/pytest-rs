@@ -254,6 +254,9 @@ fn build_py_config(
     let bound = proxy.bind(py);
     let opt = bound.getattr("option")?;
     bound.setattr("known_args_namespace", opt)?;
+    // config.invocation_params.args: the verbatim args passed to
+    // pytest.main()/the CLI (before addopts splicing).
+    bound.call_method1("_set_invocation_args", (&config.invocation_args,))?;
     // config.pluginmanager._confcutdir: the directory below which conftest.py
     // files are not considered (--confcutdir if given, else rootdir).
     let confcutdir_str = config
@@ -273,16 +276,12 @@ fn build_py_config(
 /// without running a session. Raises `pytest.UsageError` on bad args,
 /// matching upstream's `_prepareconfig`.
 pub fn prepare_config(py: Python<'_>, args: Vec<String>) -> PyResult<Py<PyAny>> {
-    let original_args = args.clone();
     let mut argv = vec!["pytest-rs".to_string()];
     argv.extend(args);
     let parser = crate::config::OptionParser::default();
     match crate::config::Config::from_args(parser, argv) {
         Ok(config) => {
             let proxy = build_py_config(py, &config, true)?;
-            proxy
-                .bind(py)
-                .call_method1("_set_invocation_args", (original_args,))?;
             Ok(proxy)
         }
         Err(message) if message.starts_with(crate::EXIT_ZERO_SENTINEL) => {

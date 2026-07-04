@@ -49,6 +49,9 @@ pub struct Config {
     /// specs (pytest_addoption): applied after plugin load, where clap
     /// cannot know them. Space-separated values are not supported.
     pub plugin_args: Vec<String>,
+    /// The verbatim args passed to `pytest.main()`/the CLI, before addopts
+    /// splicing — for `config.invocation_params.args`.
+    pub invocation_args: Vec<String>,
     /// A plugin replaced the 'terminalreporter' plugin during configure
     /// (pytest-sugar/pytest-pretty): native terminal output is suppressed
     /// and the engine drives the replacement object instead. Set once,
