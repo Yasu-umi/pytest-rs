@@ -221,10 +221,21 @@ def _format_assert(op, left, right):
         # win over the built-in comparison; first non-None explanation is used.
         expl = None
         try:
+            import pathlib
+
+            from pytest import _wcapture
             from pytest._pluginmanager import pluginmanager
 
-            hooked = pluginmanager.hook.pytest_assertrepr_compare(
-                config=cfg, op=op, left=left, right=right
+            # Scope conftest-registered impls to the running test's directory
+            # (upstream: item.ihook is a gethookproxy subset, not the global
+            # hook) — a sibling directory's conftest must not apply here.
+            exclude = set()
+            test_path = _wcapture.current_test_path
+            if test_path is not None:
+                in_scope = set(pluginmanager._getconftestmodules(pathlib.Path(test_path)))
+                exclude = pluginmanager._conftest_plugins - in_scope
+            hooked = pluginmanager.hook.pytest_assertrepr_compare.call_excluding(
+                exclude, config=cfg, op=op, left=left, right=right
             )
             for result in hooked or []:
                 if result:

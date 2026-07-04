@@ -131,10 +131,14 @@ pub(crate) fn run_one_body(
     let _resolve_ctx = push_resolve_ctx(plugins, session, config, item);
 
     // Warnings emitted from here on are attributed to this item in the
-    // warnings summary.
-    let _ = py
-        .import("pytest._wcapture")
-        .and_then(|m| m.call_method1("set_current_test", (item.nodeid.as_str(),)));
+    // warnings summary. The path also lets _rewrite._format_assert scope
+    // conftest pytest_assertrepr_compare hooks to this item's directory.
+    let _ = py.import("pytest._wcapture").and_then(|m| {
+        m.call_method1(
+            "set_current_test",
+            (item.nodeid.as_str(), item.path.to_string_lossy().as_ref()),
+        )
+    });
 
     // One contextvars context per async item: fixtures + test share it,
     // and context changes stay isolated between async tests. Sync tests run

@@ -15,13 +15,18 @@ from pytest._warning_types import PytestConfigWarning, PytestRemovedIn9Warning
 
 captured: list[dict[str, object]] = []
 current_test: str | None = None
+# Absolute path of the currently-running test's file, alongside its nodeid —
+# used to scope directory-local plugins (e.g. conftest pytest_assertrepr_compare)
+# to the test actually running (see pytest._rewrite._format_assert).
+current_test_path: str | None = None
 current_when: str = "config"
 _in_hook_dispatch: bool = False
 
 
-def set_current_test(nodeid):
-    global current_test
+def set_current_test(nodeid, path=None):
+    global current_test, current_test_path
     current_test = nodeid
+    current_test_path = path
 
 
 def set_current_when(when: str) -> None:

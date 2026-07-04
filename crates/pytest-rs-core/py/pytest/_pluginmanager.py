@@ -160,6 +160,22 @@ class HookCaller:
             return self._call_monitored(monitors, impls, firstresult, kwargs)
         return self._call_impls(impls, firstresult, kwargs)
 
+    def call_excluding(self, exclude, **kwargs: Any) -> Any:
+        """Like __call__, but skips plugins in `exclude` (upstream's
+        subset_hook_caller / gethookproxy scoping — used by
+        pytest_assertrepr_compare to exclude conftests outside the running
+        test's directory)."""
+        kwargs = self._fix_path_args(kwargs)
+        firstresult = self._pm._specs.get(self._name, {}).get("firstresult", False)
+        impls = []
+        for plugin in reversed(self._pm._plugins):
+            if plugin in exclude:
+                continue
+            func = getattr(plugin, self._name, None)
+            if callable(func):
+                impls.append(func)
+        return self._call_impls(impls, firstresult, kwargs)
+
     def call_historic(self, func=None, kwargs=None, proc=None) -> None:
         """Simplified call_historic: fire hook for current registered plugins.
         (No replay to future plugins — sufficient for pytest_warning_recorded.)"""
@@ -696,6 +712,11 @@ class PluginManager:
         conftestpath_plugin_name = str(conftestpath)
         existing = self.getplugin(conftestpath_plugin_name)
         if existing is not None:
+            # Already registered (e.g. by the native engine, which registers
+            # a conftest before this path-scoping pass runs) — still track it
+            # as a conftest so directory-scoped hook lookups (_conftest_plugins
+            # minus in-scope modules) see it.
+            self._conftest_plugins.add(existing)
             return existing  # type: ignore[return-value]
 
         # Non-package conftest.py files all have module name "conftest"; clear
