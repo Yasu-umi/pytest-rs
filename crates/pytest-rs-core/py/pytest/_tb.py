@@ -38,6 +38,57 @@ def set_fulltrace(on):
     _fulltrace = on
 
 
+# Set by the engine from verbosity (True unless -vvv): truncate each frame's
+# own call-argument reprs, matching pytest's `truncate_args`.
+_truncate_args = True
+
+
+def set_truncate_args(on):
+    global _truncate_args
+    _truncate_args = on
+
+
+def _format_args_line(frame):
+    """pytest's repr_args + ReprFuncArgs.toterminal: "name = <saferepr>" for
+    each of the frame's own call arguments (not all locals — long style only,
+    always on regardless of -l/--showlocals), joined with ", " and wrapped at
+    the terminal width, followed by a blank line."""
+    from _pytest._io import get_terminal_width
+    from _pytest._io.saferepr import saferepr, saferepr_unlimited
+
+    code = frame.f_code
+    argcount = (
+        code.co_argcount
+        + (code.co_flags & inspect.CO_VARARGS)
+        + (code.co_flags & inspect.CO_VARKEYWORDS)
+    )
+    args = []
+    for name in code.co_varnames[:argcount]:
+        try:
+            value = frame.f_locals[name]
+        except KeyError:
+            continue
+        repr_fn = saferepr if _truncate_args else saferepr_unlimited
+        args.append((name, repr_fn(value)))
+    if not args:
+        return []
+    width = get_terminal_width()
+    lines = []
+    linesofar = ""
+    for name, value in args:
+        ns = f"{name} = {value}"
+        if len(ns) + len(linesofar) + 2 > width:
+            if linesofar:
+                lines.append(linesofar)
+            linesofar = ns
+        else:
+            linesofar = f"{linesofar}, {ns}" if linesofar else ns
+    if linesofar:
+        lines.append(linesofar)
+    lines.append("")
+    return lines
+
+
 def _format_locals(frame, indent):
     """pytest's repr_locals: "<name:<10> = <saferepr>" per local, sorted,
     skipping assertion-rewrite temporaries (names starting with "@")."""
@@ -369,6 +420,7 @@ def format_exception(exc, style="long"):
         last = index == len(frames) - 1
         if index > 0:
             lines.append("")
+        lines.extend(_format_args_line(frame))
         block, fail_indent = _source_block(frame, lineno)
         lines.extend(block)
         if last:

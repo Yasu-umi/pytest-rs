@@ -149,6 +149,7 @@ impl Engine {
             self.config.get_flag("showlocals") && !self.config.get_flag("no-showlocals"),
         );
         python::set_fulltrace(py, self.config.get_flag("full-trace"));
+        python::set_truncate_args(py, self.config.global_verbosity() <= 2);
         let result = self.run_session(py, started);
         // Reset the junit state so the next nested run (or the outer run)
         // doesn't see a stale LogXML instance from this run.

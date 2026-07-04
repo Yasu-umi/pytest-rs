@@ -665,6 +665,14 @@ pub fn set_fulltrace(py: Python<'_>, on: bool) {
         .and_then(|m| m.call_method1("set_fulltrace", (on,)));
 }
 
+/// Each traceback frame's own call arguments ("name = <saferepr>", long style
+/// only) are truncated by default; `-vvv` (verbosity > 2) shows them in full.
+pub fn set_truncate_args(py: Python<'_>, truncate: bool) {
+    let _ = py
+        .import("pytest._tb")
+        .and_then(|m| m.call_method1("set_truncate_args", (truncate,)));
+}
+
 /// Toggle the cyclic garbage collector. Collection imports thousands of test
 /// modules and their app dependencies, and those allocations trigger gc runs
 /// that scan the ever-growing set of just-imported objects for cycles —

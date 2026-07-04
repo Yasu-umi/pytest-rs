@@ -99,6 +99,7 @@ impl Engine {
             self.config.get_flag("showlocals") && !self.config.get_flag("no-showlocals"),
         );
         python::set_fulltrace(py, self.config.get_flag("full-trace"));
+        python::set_truncate_args(py, self.config.global_verbosity() <= 2);
         if let Some(message) = python::invalid_theme_message(py) {
             eprintln!("ERROR: {message}");
             return exit_code::USAGE_ERROR;
