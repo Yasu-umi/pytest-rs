@@ -287,8 +287,17 @@ def format_exception(exc, style="long"):
     # keeps its pytest-style block first, like upstream's chain repr.
     if isinstance(exc, BaseExceptionGroup):
         parts = []
-        context = exc.__cause__ if exc.__cause__ is not None else exc.__context__
-        if context is not None and not exc.__suppress_context__:
+        # __suppress_context__ only gates the __context__ fallback: CPython
+        # sets it as a side effect of assigning __cause__ (e.g. `raise ... from
+        # ...`, or multiprocessing's exception unpickling), so an explicit
+        # cause must still be shown.
+        if exc.__cause__ is not None:
+            context = exc.__cause__
+        elif exc.__context__ is not None and not exc.__suppress_context__:
+            context = exc.__context__
+        else:
+            context = None
+        if context is not None:
             parts.append(format_exception(context, style))
             parts.append("")
             if exc.__cause__ is not None:
@@ -300,8 +309,15 @@ def format_exception(exc, style="long"):
         return "\n".join(parts)
 
     chain_prefix = []
-    context = exc.__cause__ if exc.__cause__ is not None else exc.__context__
-    if context is not None and not exc.__suppress_context__:
+    # See the BaseExceptionGroup branch above: __suppress_context__ only
+    # gates the __context__ fallback, never an explicit __cause__.
+    if exc.__cause__ is not None:
+        context = exc.__cause__
+    elif exc.__context__ is not None and not exc.__suppress_context__:
+        context = exc.__context__
+    else:
+        context = None
+    if context is not None:
         chain_prefix.append(format_exception(context, style))
         chain_prefix.append("")
         if exc.__cause__ is not None:
