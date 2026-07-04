@@ -285,9 +285,12 @@ pub(crate) fn start_runtest_py_wrappers(
         .filter(|hook| hook.name == name && item.nodeid.starts_with(hook.baseid.as_str()))
         .map(|hook| hook.func.clone_ref(py))
         .collect();
-    // In a nested run, surface the call-phase hook to the HookRecorder once
-    // per item (fixtures tests read getcalls("pytest_runtest_call")[0].item).
-    if name == "pytest_runtest_call" && crate::engine::inprocess::recording() {
+    // In a nested run, surface these hooks to the HookRecorder once per item
+    // (fixtures tests read getcalls("pytest_runtest_call")[0].item; other
+    // tests check that pytest_runtest_protocol itself was called).
+    if matches!(name, "pytest_runtest_call" | "pytest_runtest_protocol")
+        && crate::engine::inprocess::recording()
+    {
         let node = super::item_node(py, item)?;
         python::record_hook(py, name, &[("item", node)]);
     }
