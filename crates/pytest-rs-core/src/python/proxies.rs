@@ -257,6 +257,14 @@ fn build_py_config(
     // config.invocation_params.args: the verbatim args passed to
     // pytest.main()/the CLI (before addopts splicing).
     bound.call_method1("_set_invocation_args", (&config.invocation_args,))?;
+    // config.invocation_params.plugins: extra plugin objects passed to this
+    // invocation (pytester.inline_run(..., plugins=[...])), staged by
+    // pytest._pytester in a module-level list before the nested run starts;
+    // empty for every other config build (normal CLI run, parseconfig).
+    let invocation_plugins = py
+        .import("pytest._pytester")?
+        .getattr("_pending_invocation_plugins")?;
+    bound.call_method1("_set_invocation_plugins", (invocation_plugins,))?;
     // config.pluginmanager._confcutdir: the directory below which conftest.py
     // files are not considered (--confcutdir if given, else rootdir).
     let confcutdir_str = config

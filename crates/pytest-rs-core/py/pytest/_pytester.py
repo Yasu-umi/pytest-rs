@@ -86,6 +86,20 @@ _RUNNER_LIBPATH = {v: os.environ[v] for v in _LIBPATH_VARS if v in os.environ}
 # upstream's in-process pytester where module import precedes monkeypatch.
 _RUNNER_COLUMNS = os.environ.get("COLUMNS")
 
+# Staged by _inline_run_inprocess just before the nested engine builds its
+# Config, read once by the Rust side (build_py_config) for
+# config.invocation_params.plugins; empty outside that narrow window, so a
+# normal CLI run or pytester.parseconfig() never sees stale entries.
+_pending_invocation_plugins: list = []
+
+
+class PytesterHelperPlugin:
+    """Identity marker matching upstream's inline_run() sentinel plugin, so
+    config.invocation_params.plugins has the same shape (upstream relies on
+    its pytest_configure to build the HookRecorder; pytest-rs builds it
+    directly, so this carries no hooks)."""
+
+
 _OUTCOME_RE = re.compile(
     r"(\d+) (passed|failed|skipped|xfailed|xpassed|errors?|warnings?|deselected|rerun)"
 )
@@ -752,7 +766,9 @@ class Pytester:
         old_pm_configured = pluginmanager._configured
 
         reprec = HookRecorder(pluginmanager)
-        for plugin in plugins:
+        helper_plugin = PytesterHelperPlugin()
+        invocation_plugins = [*plugins, helper_plugin]
+        for plugin in invocation_plugins:
             pluginmanager.register(plugin)
         # The inner run gets a fresh global capture state so its per-item
         # capture bookkeeping does not corrupt the outer session's.
@@ -844,6 +860,7 @@ class Pytester:
             if _fwd_marks:
                 os.environ["PYTEST_RS_FORWARDED_FILTERS"] = "\n".join(reversed(_fwd_marks))
                 _forwarded_env_set = True
+        _pending_invocation_plugins[:] = invocation_plugins
         try:
             try:
                 ret = pytest._native_inline_run(run_args)
@@ -856,6 +873,7 @@ class Pytester:
                 else:
                     raise
         finally:
+            _pending_invocation_plugins.clear()
             sys.stdout.flush()
             sys.stderr.flush()
             # Restore the Python streams (and close our fd wrappers while fd

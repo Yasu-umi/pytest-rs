@@ -54,6 +54,17 @@ class Config:
         INCOVATION_DIR = INVOCATION_DIR  # backwards compatibility alias
         TESTPATHS = enum.auto()
 
+    class InvocationParams:
+        """Stub matching upstream's frozen dataclass (real instances come
+        from the Rust-built config's `invocation_params` namedtuple, not
+        this class) — kept for `Config.InvocationParams(...)` construction
+        and its args/plugins-cannot-be-None validation."""
+
+        def __init__(self, *, args, plugins, dir):
+            self.args = tuple(args)
+            self.plugins = plugins
+            self.dir = dir
+
     def __init__(self, option=None):
         self.option = option if option is not None else argparse.Namespace()
 

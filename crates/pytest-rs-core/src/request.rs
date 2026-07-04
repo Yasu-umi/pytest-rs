@@ -48,6 +48,9 @@ pub struct PyConfig {
     workerinput_override: std::sync::Mutex<Option<Py<PyAny>>>,
     /// The original CLI arguments before parsing (for `config.invocation_params`).
     original_args: Vec<String>,
+    /// Extra plugin *objects* passed to `pytest.main()`/`Pytester.inline_run`
+    /// (for `config.invocation_params.plugins`); empty for a normal run.
+    invocation_plugins: Vec<Py<PyAny>>,
     /// Cleanup callbacks registered via `config.add_cleanup`.
     cleanups: Mutex<Vec<Py<PyAny>>>,
     /// Lazily-created TagTracer for `config.trace`.
@@ -84,6 +87,7 @@ impl PyConfig {
             local_pm: pyo3::sync::PyOnceLock::new(),
             workerinput_override: std::sync::Mutex::new(None),
             original_args: Vec::new(),
+            invocation_plugins: Vec::new(),
             cleanups: Mutex::new(Vec::new()),
             trace_obj: pyo3::sync::PyOnceLock::new(),
             parsed: std::sync::atomic::AtomicBool::new(false),
@@ -479,6 +483,12 @@ impl PyConfig {
         self.original_args = args;
     }
 
+    /// Store the extra plugin objects passed to this invocation (called by
+    /// build_py_config from pytest._pytester's pending-plugins stash).
+    fn _set_invocation_plugins(&mut self, plugins: Vec<Py<PyAny>>) {
+        self.invocation_plugins = plugins;
+    }
+
     /// `config.invocation_params`: namedtuple with the original CLI args,
     /// plugins list, and invocation directory.
     #[getter]
@@ -487,7 +497,8 @@ impl PyConfig {
         let cls =
             collections.call_method1("namedtuple", ("InvocationParams", "args plugins dir"))?;
         let args_tuple = pyo3::types::PyTuple::new(py, &self.original_args)?;
-        let plugins_tuple = pyo3::types::PyTuple::empty(py);
+        let plugins_tuple =
+            pyo3::types::PyTuple::new(py, self.invocation_plugins.iter().map(|p| p.bind(py)))?;
         let invocation_dir = py
             .import("pathlib")?
             .getattr("Path")?
