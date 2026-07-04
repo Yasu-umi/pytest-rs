@@ -18,7 +18,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2661 | 127 | 0 | 53 | 8 | 2849 | 95.3% | 23 | 54 | 61 |
+| pytest | 9.0.3 | 2664 | 124 | 0 | 53 | 8 | 2849 | 95.4% | 23 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 1 | 7 | 85.7% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 2 | 90 | 97.8% | 1 | 1 | 0 |
@@ -82,13 +82,13 @@ are out of scope for pytest-rs; they are not counted in the total.
 | testing/logging/test_fixture.py | passed | 27 | 0 | 0 | 0 | 0 |
 | testing/logging/test_formatter.py | passed | 4 | 0 | 0 | 0 | 0 |
 | testing/logging/test_reporting.py | failed | 44 | 8 | 0 | 0 | 0 |
-| testing/test_assertion.py | failed | 158 | 2 | 0 | 0 | 0 |
+| testing/test_assertion.py | failed | 159 | 1 | 0 | 0 | 0 |
 | testing/test_cacheprovider.py | failed | 54 | 3 | 0 | 0 | 0 |
 | testing/test_capture.py | failed | 128 | 2 | 0 | 2 | 0 |
 | testing/test_collect_imported_tests.py | failed | 2 | 1 | 0 | 0 | 0 |
 | testing/test_collection.py | failed | 105 | 8 | 0 | 3 | 0 |
 | testing/test_compat.py | passed | 10 | 0 | 0 | 0 | 0 |
-| testing/test_config.py | failed | 204 | 10 | 0 | 1 | 0 |
+| testing/test_config.py | failed | 205 | 9 | 0 | 1 | 0 |
 | testing/test_conftest.py | failed | 47 | 6 | 0 | 1 | 0 |
 | testing/test_doctest.py | passed | 139 | 0 | 0 | 1 | 0 |
 | testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 | 0 |
@@ -114,7 +114,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | testing/test_stash.py | passed | 1 | 0 | 0 | 0 | 0 |
 | testing/test_stepwise.py | passed | 18 | 0 | 0 | 0 | 0 |
 | testing/test_subtests.py | passed | 34 | 0 | 0 | 0 | 0 |
-| testing/test_terminal.py | failed | 216 | 7 | 0 | 4 | 0 |
+| testing/test_terminal.py | failed | 217 | 6 | 0 | 4 | 0 |
 | testing/test_threadexception.py | failed | 7 | 1 | 0 | 0 | 0 |
 | testing/test_tmpdir.py | passed | 39 | 0 | 0 | 1 | 0 |
 | testing/test_unittest.py | failed | 64 | 6 | 0 | 9 | 0 |

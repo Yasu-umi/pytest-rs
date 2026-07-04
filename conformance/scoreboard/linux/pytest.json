@@ -139,8 +139,8 @@
       "file": "testing/test_assertion.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 158,
-      "failed": 2,
+      "passed": 159,
+      "failed": 1,
       "skipped": 0,
       "errors": 0,
       "deselected": 0
@@ -199,8 +199,8 @@
       "file": "testing/test_config.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 204,
-      "failed": 10,
+      "passed": 205,
+      "failed": 9,
       "skipped": 1,
       "errors": 0,
       "deselected": 0
@@ -459,8 +459,8 @@
       "file": "testing/test_terminal.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 216,
-      "failed": 7,
+      "passed": 217,
+      "failed": 6,
       "skipped": 4,
       "errors": 0,
       "deselected": 0
