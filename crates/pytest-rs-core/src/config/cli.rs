@@ -93,6 +93,42 @@ impl Config {
         ("pdbcls", None),             // custom debugger class (modname:classname)
     ];
 
+    /// Bundled-plugin names blocked via `-p no:X`/`--plugin no:X`/`-pno:X`,
+    /// scanned from the raw argv (after addopts splicing, before clap parses
+    /// it). A blocked plugin's own CLI options must not be registered at
+    /// all, or clap accepts them instead of upstream's
+    /// "unrecognized arguments" UsageError (e.g. `-p no:capture -s`: `-s`
+    /// belongs to the now-disabled capture plugin). Also raises upstream's
+    /// UsageError for `-p no:X` naming a conftest.py file — conftest files
+    /// aren't plugins and can't be disabled this way (`--noconftest` is the
+    /// real switch); upstream's `consider_pluginarg` checks this before
+    /// anything else about the `-p` value.
+    fn blocked_bundled_plugins(argv: &[String]) -> Result<HashSet<String>, String> {
+        let mut blocked = HashSet::new();
+        for (i, arg) in argv.iter().enumerate() {
+            // Upstream's own pre-parse scan (Config._preparse) strips the
+            // value before checking — `-p " no:capture"`-style whitespace
+            // (e.g. from a single "-p no:capture" argv token) still counts.
+            let value = if let Some(rest) = arg.strip_prefix("--plugin=") {
+                Some(rest.trim().to_string())
+            } else if arg == "-p" || arg == "--plugin" {
+                argv.get(i + 1).map(|v| v.trim().to_string())
+            } else {
+                arg.strip_prefix("-p").map(|v| v.trim().to_string())
+            };
+            if let Some(name) = value.as_deref().and_then(|v| v.strip_prefix("no:")) {
+                if name.ends_with("conftest.py") {
+                    return Err(format!(
+                        "Blocking conftest files using -p is not supported: -p no:{name}\n\
+                         conftest.py files are not plugins and cannot be disabled via -p.\n"
+                    ));
+                }
+                blocked.insert(name.to_string());
+            }
+        }
+        Ok(blocked)
+    }
+
     fn xdist_only(name: &str) -> bool {
         matches!(
             name,
@@ -110,7 +146,7 @@ impl Config {
     /// Assemble the clap parser: core pytest flags/values, cacheprovider
     /// and -n/xdist options (when built in), plus plugin pytest_addoption
     /// specs. Depends only on the parser's registered option specs.
-    fn build_clap_command(parser: &OptionParser) -> clap::Command {
+    fn build_clap_command(parser: &OptionParser, blocked: &HashSet<String>) -> clap::Command {
         let mut cmd = clap::Command::new("pytest-rs")
             .disable_help_flag(false)
             .disable_version_flag(true)
@@ -208,12 +244,14 @@ impl Config {
                     .hide(true),
             );
         }
-        cmd = cmd.arg(
-            clap::Arg::new("capture-disable")
-                .short('s')
-                .action(clap::ArgAction::SetTrue)
-                .hide(true),
-        );
+        if !blocked.contains("capture") {
+            cmd = cmd.arg(
+                clap::Arg::new("capture-disable")
+                    .short('s')
+                    .action(clap::ArgAction::SetTrue)
+                    .hide(true),
+            );
+        }
         // -l / --showlocals: show local variables in tracebacks.
         cmd = cmd.arg(
             clap::Arg::new("showlocals")
@@ -275,6 +313,9 @@ impl Config {
             if !has_xdist && Self::xdist_only(name) {
                 continue;
             }
+            if name == "capture" && blocked.contains("capture") {
+                continue;
+            }
             let mut arg = clap::Arg::new(name)
                 .value_name("VALUE")
                 .action(clap::ArgAction::Append)
@@ -320,6 +361,7 @@ impl Config {
     fn extract_match_flags_values(
         matches: &clap::ArgMatches,
         parser: &OptionParser,
+        blocked: &HashSet<String>,
     ) -> (HashSet<String>, HashMap<String, String>, Vec<String>) {
         let has_xdist = cfg!(feature = "xdist");
         let mut flags = HashSet::new();
@@ -356,6 +398,9 @@ impl Config {
             if !has_xdist && Self::xdist_only(flag) {
                 continue;
             }
+            if flag == "capture-disable" && blocked.contains("capture") {
+                continue;
+            }
             if matches.get_flag(flag) {
                 flags.insert(flag.to_string());
             }
@@ -379,6 +424,9 @@ impl Config {
         let mut plugin_opts = Vec::new();
         for (name, _) in Self::CORE_VALUES {
             if !has_xdist && Self::xdist_only(name) {
+                continue;
+            }
+            if name == "capture" && blocked.contains("capture") {
                 continue;
             }
             let Some(parsed) = matches.get_many::<String>(name) else {
@@ -726,7 +774,8 @@ impl Config {
             expanded
         };
 
-        let cmd = Self::build_clap_command(&parser);
+        let blocked = Self::blocked_bundled_plugins(&argv)?;
+        let cmd = Self::build_clap_command(&parser, &blocked);
 
         let (argv, plugin_args) = Self::partition_plugin_args(argv, &cmd);
 
@@ -749,6 +798,17 @@ impl Config {
                 return Err(format!("{}{}", crate::EXIT_ZERO_SENTINEL, plain));
             }
             Err(err) => {
+                // A short flag whose owning bundled plugin was just blocked
+                // (`-p no:capture -s`) is unregistered, so clap rejects it
+                // outright instead of deferring to apply_plugin_cli_args
+                // (that path only defers unknown *long* `--flag` tokens).
+                // Match pytest's argparse-style wording for this case.
+                if err.kind() == clap::error::ErrorKind::UnknownArgument
+                    && let Some(clap::error::ContextValue::String(arg)) =
+                        err.get(clap::error::ContextKind::InvalidArg)
+                {
+                    return Err(format!("pytest: error: unrecognized arguments: {arg}"));
+                }
                 let msg = err.to_string();
                 // Rewrite clap's verbose error for --override-ini missing value
                 // to match pytest's argparse-style: "*: error: argument -o/--override-ini: ..."
@@ -764,7 +824,8 @@ impl Config {
             }
         };
 
-        let (flags, values, plugin_opts) = Self::extract_match_flags_values(&matches, &parser);
+        let (flags, values, plugin_opts) =
+            Self::extract_match_flags_values(&matches, &parser, &blocked);
 
         let mut ini_overrides = HashMap::new();
         if let Some(overrides) = matches.get_many::<String>("override-ini") {
