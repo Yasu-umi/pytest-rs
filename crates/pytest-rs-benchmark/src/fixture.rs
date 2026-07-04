@@ -21,6 +21,22 @@ pub struct BenchResult {
     #[serde(default)]
     pub params: Vec<(String, String)>,
     pub stats: Stats,
+    /// `benchmark.extra_info[...] = ...`, JSON-serialized (upstream always
+    /// emits this key, `{}` when unused).
+    #[serde(default)]
+    pub extra_info: serde_json::Value,
+}
+
+/// `json.dumps` the object then reparse as `serde_json::Value` — `extra_info`
+/// only needs to be JSON-serializable (upstream's own contract), so this
+/// covers arbitrary nesting without a hand-rolled PyAny→Value walk.
+fn py_to_json(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<serde_json::Value> {
+    let dumped: String = py
+        .import("json")?
+        .call_method1("dumps", (obj,))?
+        .extract()?;
+    serde_json::from_str(&dumped)
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
 }
 
 pub type ResultStore = Arc<Mutex<Vec<BenchResult>>>;
@@ -271,6 +287,7 @@ impl BenchmarkFixture {
             },
         )?;
         *self.recorded.lock().expect("stats lock poisoned") = Some(py_stats);
+        let extra_info = py_to_json(py, self.extra_info.bind(py))?;
         self.results
             .lock()
             .expect("benchmark results lock poisoned")
@@ -280,6 +297,7 @@ impl BenchmarkFixture {
                 group,
                 params: self.params.clone(),
                 stats,
+                extra_info,
             });
         Ok(())
     }

@@ -386,6 +386,7 @@ pub fn render_json(py: Python<'_>, results: &[BenchResult]) -> PyResult<String> 
                     "total": stats.total,
                     "outliers": format!("{};{}", stats.outliers.0, stats.outliers.1),
                 },
+                "extra_info": result.extra_info,
             })
         })
         .collect();
