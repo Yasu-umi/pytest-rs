@@ -1168,7 +1168,7 @@ class Pytester:
         return str(val)
 
     @staticmethod
-    def _expand_params(source_marks, module_marks, base_name, make_fn):
+    def _expand_params(source_marks, module_marks, base_name, make_fn, scope_caches=None):
         """Expand the parametrize marks in source_marks into one node per
         combination, building each via make_fn(param_name, all_marks).
 
@@ -1176,7 +1176,17 @@ class Pytester:
         own marks followed by any class marks); module_marks are folded into
         every node's mark list. pytest.param(..., marks=...) contributes its
         per-param marks only to the combinations that use it, and pytest.param
-        ids / the ``ids=`` kwarg override the value-derived fragment."""
+        ids / the ``ids=`` kwarg override the value-derived fragment.
+
+        scope_caches (optional): {"module": dict, "class": dict} identity
+        caches for direct (non-indirect) parametrize argnames at scope >
+        function — mirrors upstream's per-scope-node ``name2pseudofixturedef``
+        stash, so e.g. a "class"-scoped parametrize with no real Class (which
+        upstream falls back to module scope for) shares its pseudo FixtureDef
+        with another function's explicit "module"-scoped parametrize of the
+        same argname when both caches point at the same dict. Package/session
+        scope isn't cached here (always a fresh FixtureDef) — this pytester
+        shim only serves single-module static introspection."""
         from pytest._marks import HIDDEN_PARAM, ParamSpec, get_unpacked_marks  # noqa: F401
 
         param_marks = [m for m in source_marks if m.name == "parametrize"]
@@ -1185,6 +1195,34 @@ class Pytester:
 
         if not param_marks:
             return [make_fn(base_name, base_marks)]
+
+        # Pseudo FixtureDefs for direct (no indirect=) parametrize argnames:
+        # upstream's Metafunc.parametrize always registers one in
+        # _fixtureinfo.name2fixturedefs, even for plain positional test args.
+        from pytest._fixturemanager import ShimFixtureDef
+
+        pseudo_fixturedefs = {}
+        for pm in param_marks:
+            argnames_raw = pm.args[0] if pm.args else pm.kwargs.get("argnames", "")
+            names = (
+                [a.strip() for a in argnames_raw.split(",") if a.strip()]
+                if isinstance(argnames_raw, str)
+                else list(argnames_raw)
+            )
+            indirect = pm.kwargs.get("indirect", False)
+            indirect_names = set(names) if indirect is True else set(indirect or ())
+            scope = pm.kwargs.get("scope") or "function"
+            cache = scope_caches.get(scope) if scope_caches else None
+            for argname in names:
+                if argname in indirect_names:
+                    continue
+                if cache is not None and argname in cache:
+                    fixturedef = cache[argname]
+                else:
+                    fixturedef = ShimFixtureDef(argname=argname, func=None, scope=scope)
+                    if cache is not None:
+                        cache[argname] = fixturedef
+                pseudo_fixturedefs[argname] = fixturedef
 
         levels = []  # each level: list of (id_fragment, [per_param_marks])
         for pm in param_marks:
@@ -1218,18 +1256,31 @@ class Pytester:
                 levels.append(level)
 
         if not levels:
-            return [make_fn(base_name, base_marks)]
+            items = [make_fn(base_name, base_marks)]
+        else:
+            items = []
+            for combo in itertools.product(*levels):
+                frags = [frag for frag, _ in combo if frag is not None]
+                combo_marks = [mk for _, marks in combo for mk in marks]
+                if frags:
+                    items.append(
+                        make_fn(f"{base_name}[{'-'.join(frags)}]", [*base_marks, *combo_marks])
+                    )
+                else:
+                    items.append(make_fn(base_name, [*base_marks, *combo_marks]))
 
-        items = []
-        for combo in itertools.product(*levels):
-            frags = [frag for frag, _ in combo if frag is not None]
-            combo_marks = [mk for _, marks in combo for mk in marks]
-            if frags:
-                items.append(
-                    make_fn(f"{base_name}[{'-'.join(frags)}]", [*base_marks, *combo_marks])
+        if pseudo_fixturedefs:
+            from _pytest.fixtures import FuncFixtureInfo
+
+            name2fixturedefs = {name: [fd] for name, fd in pseudo_fixturedefs.items()}
+            for item in items:
+                fixturenames = list(getattr(item, "fixturenames", []))
+                item._fixtureinfo = FuncFixtureInfo(
+                    argnames=tuple(fixturenames),
+                    initialnames=tuple(fixturenames),
+                    names_closure=fixturenames,
+                    name2fixturedefs=name2fixturedefs,
                 )
-            else:
-                items.append(make_fn(base_name, [*base_marks, *combo_marks]))
         return items
 
     def _collect_items_from_path(self, path, parent_collector=None):
@@ -1758,9 +1809,15 @@ class Pytester:
             _NodeSession,
         )
 
-        if withinit:
-            (self.path / "__init__.py").touch()
-        path = pathlib.Path(str(self.makepyfile(source)))
+        if isinstance(source, os.PathLike):
+            # Already a written file (e.g. the Path makepyfile() returned):
+            # use it directly, matching upstream — calling makepyfile again
+            # would treat the path string itself as source code.
+            path = self.path.joinpath(source)
+        else:
+            if withinit:
+                (self.path / "__init__.py").touch()
+            path = pathlib.Path(str(self.makepyfile(source)))
         config = self._request.config if self._request is not None else None
 
         # Import the module in-process. A failed import (ImportError, syntax
@@ -1783,6 +1840,10 @@ class Pytester:
         session = _NodeSession(config)
         module_collector = _ModuleCollector(mod, session, path) if mod is not None else None
         module_marks = get_unpacked_marks(mod) if mod is not None else []
+        # Identity cache for direct-parametrize pseudo FixtureDefs at module
+        # scope (see _expand_params) — shared by every function/class built
+        # below, mirroring upstream's per-Module `name2pseudofixturedef` stash.
+        _module_pseudofixturedefs = {}
         # A real Session backs modcol.session.perform_collect (test_modulecol_roundtrip).
         # Resolve collection args relative to the module's own directory, not the
         # outer invocation rootdir (the pytester file lives in a tmp dir).
@@ -1849,7 +1910,16 @@ class Pytester:
 
                         children.extend(
                             Pytester._expand_params(
-                                get_unpacked_marks(obj), module_marks, name, _mk
+                                get_unpacked_marks(obj),
+                                module_marks,
+                                name,
+                                _mk,
+                                # No real Class here: "class" scope falls back
+                                # to module scope, same as upstream.
+                                scope_caches={
+                                    "module": _module_pseudofixturedefs,
+                                    "class": _module_pseudofixturedefs,
+                                },
                             )
                         )
                     elif name.startswith("Test") and isinstance(obj, type):
@@ -1871,6 +1941,9 @@ class Pytester:
                 self.cls = cls_obj
                 self.instance = None
                 self._children = None
+                # This real Class is its own scope node for "class"-scoped
+                # direct parametrize; "module" still shares the outer dict.
+                self._pseudofixturedefs = {}
 
             def collect(self):
                 if self._children is not None:
@@ -1925,7 +1998,14 @@ class Pytester:
 
                     children.extend(
                         Pytester._expand_params(
-                            [*get_unpacked_marks(func), *class_marks], module_marks, mname, _mk
+                            [*get_unpacked_marks(func), *class_marks],
+                            module_marks,
+                            mname,
+                            _mk,
+                            scope_caches={
+                                "module": _module_pseudofixturedefs,
+                                "class": self._pseudofixturedefs,
+                            },
                         )
                     )
                 self._children = children
