@@ -477,11 +477,11 @@
     },
     {
       "file": "sklearn/utils/tests/test_parallel.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 15,
+      "status": "timeout",
+      "exit_code": null,
+      "passed": 0,
       "failed": 0,
-      "skipped": 2,
+      "skipped": 0,
       "errors": 0,
       "deselected": 0
     },

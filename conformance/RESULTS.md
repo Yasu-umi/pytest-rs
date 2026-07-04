@@ -18,7 +18,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2664 | 124 | 0 | 53 | 8 | 2849 | 95.4% | 23 | 54 | 61 |
+| pytest | 9.0.3 | 2671 | 117 | 0 | 53 | 8 | 2849 | 95.6% | 24 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 1 | 7 | 85.7% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 2 | 90 | 97.8% | 1 | 1 | 0 |
@@ -59,7 +59,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | pandas | v3.0.3 | 160773 | 1 | 0 | 26984 | 15 | 187773 | 100.0% | 871 | 961 | 3 |
 | networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 0 | 6894 | 100.0% | 259 | 266 | 0 |
 | pydantic | v2.11.7 | 5338 | 14 | 0 | 921 | 0 | 6273 | 99.8% | 77 | 82 | 0 |
-| scikit-learn-1 | 1.9.0 | 8432 | 0 | 0 | 6624 | 0 | 15056 | 100.0% | 79 | 87 | 0 |
+| scikit-learn-1 | 1.9.0 | 8417 | 0 | 0 | 6622 | 0 | 15039 | 100.0% | 78 | 87 | 0 |
 | scikit-learn-2 | 1.9.0 | 5046 | 0 | 0 | 1892 | 0 | 6938 | 100.0% | 52 | 58 | 0 |
 | scikit-learn-3 | 1.9.0 | 9251 | 3 | 0 | 2530 | 0 | 11784 | 100.0% | 104 | 114 | 0 |
 
@@ -108,19 +108,19 @@ are out of scope for pytest-rs; they are not counted in the total.
 | testing/test_runner_xunit.py | passed | 13 | 0 | 0 | 0 | 0 |
 | testing/test_scope.py | passed | 4 | 0 | 0 | 0 | 0 |
 | testing/test_session.py | failed | 24 | 2 | 0 | 0 | 0 |
-| testing/test_setuponly.py | failed | 25 | 1 | 0 | 0 | 0 |
+| testing/test_setuponly.py | passed | 26 | 0 | 0 | 0 | 0 |
 | testing/test_setupplan.py | passed | 3 | 0 | 0 | 0 | 0 |
 | testing/test_skipping.py | failed | 91 | 1 | 0 | 0 | 0 |
 | testing/test_stash.py | passed | 1 | 0 | 0 | 0 | 0 |
 | testing/test_stepwise.py | passed | 18 | 0 | 0 | 0 | 0 |
 | testing/test_subtests.py | passed | 34 | 0 | 0 | 0 | 0 |
-| testing/test_terminal.py | failed | 217 | 6 | 0 | 4 | 0 |
+| testing/test_terminal.py | failed | 222 | 1 | 0 | 4 | 0 |
 | testing/test_threadexception.py | failed | 7 | 1 | 0 | 0 | 0 |
 | testing/test_tmpdir.py | passed | 39 | 0 | 0 | 1 | 0 |
 | testing/test_unittest.py | failed | 64 | 6 | 0 | 9 | 0 |
 | testing/test_unraisableexception.py | passed | 11 | 0 | 0 | 0 | 0 |
 | testing/test_warning_types.py | passed | 15 | 0 | 0 | 0 | 0 |
-| testing/test_warnings.py | failed | 39 | 3 | 0 | 2 | 0 |
+| testing/test_warnings.py | failed | 40 | 2 | 0 | 2 | 0 |
 | testing/acceptance_test.py | failed | 67 | 16 | 0 | 2 | 8 |
 | testing/deprecated_test.py | passed | 15 | 0 | 0 | 0 | 0 |
 
@@ -2636,7 +2636,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | sklearn/utils/tests/test_multiclass.py | passed | 13 | 0 | 0 | 36 | 0 |
 | sklearn/utils/tests/test_murmurhash.py | passed | 6 | 0 | 0 | 0 | 0 |
 | sklearn/utils/tests/test_optimize.py | passed | 5 | 0 | 0 | 15 | 0 |
-| sklearn/utils/tests/test_parallel.py | passed | 15 | 0 | 0 | 2 | 0 |
+| sklearn/utils/tests/test_parallel.py | timeout | 0 | 0 | 0 | 0 | 0 |
 | sklearn/utils/tests/test_param_validation.py | passed | 147 | 0 | 0 | 1 | 0 |
 | sklearn/utils/tests/test_plotting.py | passed | 80 | 0 | 0 | 28 | 0 |
 | sklearn/utils/tests/test_pprint.py | passed | 13 | 0 | 0 | 0 | 0 |
