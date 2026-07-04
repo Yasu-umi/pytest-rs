@@ -9,8 +9,8 @@
       "file": "tests/test_pytest_randomly.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 30,
-      "failed": 7,
+      "passed": 22,
+      "failed": 15,
       "skipped": 0,
       "errors": 0,
       "deselected": 0

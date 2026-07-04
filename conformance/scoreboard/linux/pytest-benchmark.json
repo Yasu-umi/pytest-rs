@@ -9,8 +9,8 @@
       "file": "tests/test_benchmark.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 41,
-      "failed": 12,
+      "passed": 44,
+      "failed": 9,
       "skipped": 0,
       "errors": 0,
       "deselected": 0
