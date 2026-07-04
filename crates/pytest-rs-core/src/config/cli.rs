@@ -446,6 +446,11 @@ impl Config {
                 } else {
                     cwd.join(&cf_arg)
                 };
+                // Upstream resolves inipath via os.path.abspath (normalizes
+                // ".." segments without following symlinks); canonicalize is
+                // the closest std equivalent and the file must already exist
+                // to be loaded as an ini anyway.
+                let cf_path = std::fs::canonicalize(&cf_path).unwrap_or(cf_path);
                 let ini_file = load_config_from_path(&cf_path)?;
                 let rootdir = cf_path
                     .parent()

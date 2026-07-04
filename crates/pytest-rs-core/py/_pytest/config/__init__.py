@@ -61,7 +61,15 @@ class Config:
     def fromdictargs(cls, option_dict, args):
         from _pytest.config import _native_prepareconfig
 
-        config = _native_prepareconfig(list(args))
+        # inifilename steers ini discovery itself (rootdir/inipath), so it
+        # must reach the native parser as a real "-c" CLI arg, not just be
+        # set on config.option after the fact (upstream applies option_dict
+        # to config.option before parsing, for the same reason).
+        native_args = list(args)
+        inifilename = option_dict.get("inifilename")
+        if inifilename is not None:
+            native_args = ["-c", inifilename, *native_args]
+        config = _native_prepareconfig(native_args)
         config._mark_as_parsed()
         for key, value in option_dict.items():
             setattr(config.option, key, value)
