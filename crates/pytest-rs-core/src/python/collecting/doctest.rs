@@ -2,6 +2,7 @@
 use super::super::*;
 use crate::collect::{ImportMode, TestItem, file_nodeid};
 use crate::fixture::FixtureRegistry;
+use crate::hooks::Plugin;
 use crate::python::bootstrap::import_module_for;
 use std::path::Path;
 
@@ -82,6 +83,7 @@ pub fn collect_module(
     hooks: &mut Vec<crate::session::PyHook>,
     filters: &NameFilters,
     mode: ImportMode,
+    plugins: &[Box<dyn Plugin>],
 ) -> PyResult<()> {
     let (module_name, module) = import_module_for(py, rootdir, path, mode)?;
     // pytest's import_path raises ImportPathMismatchError when a module of the
@@ -129,6 +131,7 @@ pub fn collect_module(
         &extra_generate_hooks,
         makeitem_hook,
         filters,
+        plugins,
     )?;
     if let Some(class_name) = custom_module_class {
         for item in items.iter_mut().skip(module_items_start) {

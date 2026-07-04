@@ -384,6 +384,7 @@ impl Engine {
                 &mut self.session.py_hooks,
                 &python::NameFilters::from_config(py, &self.config),
                 crate::collect::ImportMode::from_config(&self.config),
+                &self.plugins,
             );
             let collect_sections = python::capture_collect_end(py);
             let with_sections = |mut message: String| {

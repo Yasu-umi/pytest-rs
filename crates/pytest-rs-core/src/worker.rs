@@ -703,6 +703,7 @@ impl Engine {
             &mut self.session.py_hooks,
             &python::NameFilters::from_config(py, &self.config),
             import_mode,
+            &self.plugins,
         )
         .map_err(|err| python::format_test_failure(py, &err, "short"))?;
         {

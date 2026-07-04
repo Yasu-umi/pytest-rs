@@ -2,6 +2,7 @@
 use super::super::*;
 use crate::collect::{MarkData, TestItem};
 use crate::fixture::FixtureRegistry;
+use crate::hooks::Plugin;
 use pyo3::types::{PyList, PyModule};
 use std::path::Path;
 
@@ -25,6 +26,7 @@ pub(crate) fn push_test_items(
     module: &Bound<'_, PyModule>,
     generate_hook: Option<&Bound<'_, PyAny>>,
     registry: &FixtureRegistry,
+    plugins: &[Box<dyn Plugin>],
 ) -> PyResult<()> {
     let flags = async_flags(py, func)?;
     let (mut fixture_names, has_positional_only) = param_names_with_positional_only(py, func)?;
@@ -117,12 +119,33 @@ pub(crate) fn push_test_items(
         }
     }
 
+    // Native plugins that connect a fixture to matching items only in a
+    // later pytest_collection_preexpand/modifyitems pass (e.g. anyio's
+    // anyio_backend) contribute the name here so validation below sees it,
+    // without the actual mark existing yet. Validation-only: not folded into
+    // extra_generated_fixtures, which the item itself carries.
+    let mut validation_extra_fixtures = extra_generated_fixtures.clone();
+    for plugin in plugins {
+        for name in plugin.pytest_collect_implied_fixtures(
+            py,
+            flags.is_coroutine,
+            func,
+            &marks,
+            registry,
+            &test_nodeid,
+        )? {
+            if !validation_extra_fixtures.contains(&name) {
+                validation_extra_fixtures.push(name);
+            }
+        }
+    }
+
     validate_parametrize_argnames(
         py,
         &marks,
         name,
         &closure_names,
-        &extra_generated_fixtures,
+        &validation_extra_fixtures,
         func,
         registry,
         &test_nodeid,
@@ -317,15 +340,6 @@ fn validate_parametrize_argnames(
                 || extra_fixture_names.contains(argname)
                 || all_params.contains(argname.as_str())
                 || closure_names.contains(argname)
-                // Some native plugins (e.g. anyio) connect a fixture to an
-                // item only in a later pytest_collection_modifyitems-style
-                // pass, after this file's items are already collected — the
-                // argname is genuinely unreachable from any closure computed
-                // here yet. Accepting any visible same-named fixture is
-                // looser than upstream but avoids flagging those as errors;
-                // see test_parametrize_uses_no_fixture_error_indirect_true's
-                // note for the accuracy this trades away.
-                || registry.lookup(argname, test_nodeid).is_some()
             {
                 continue;
             }

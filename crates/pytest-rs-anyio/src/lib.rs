@@ -572,6 +572,36 @@ impl Plugin for AnyioPlugin {
         }))
     }
 
+    /// Whether this test function will get `anyio_backend` attached by the
+    /// later `pytest_collection_preexpand`/`modifyitems` pass — same gating
+    /// (marked-in-strict-mode, or async-like-in-auto-mode) without mutating
+    /// anything, so `validate_parametrize_argnames` sees it in the item's
+    /// closure even though no mark has been injected yet at this point.
+    fn pytest_collect_implied_fixtures(
+        &self,
+        py: Python<'_>,
+        is_coroutine: bool,
+        func: &Bound<'_, PyAny>,
+        marks: &[MarkData],
+        registry: &pytest_rs_core::fixture::FixtureRegistry,
+        nodeid: &str,
+    ) -> PyResult<Vec<String>> {
+        let marked = marks.iter().any(|mark| mark.name == "anyio");
+        if self.mode == Mode::Strict && !marked {
+            return Ok(Vec::new());
+        }
+        let async_like = is_coroutine
+            || !self
+                .helper(py)?
+                .getattr("hypothesis_async_inner")?
+                .call1((func,))?
+                .is_none();
+        if !async_like || registry.lookup("anyio_backend", nodeid).is_none() {
+            return Ok(Vec::new());
+        }
+        Ok(vec!["anyio_backend".to_string()])
+    }
+
     fn pytest_pyfunc_call(
         &self,
         ctx: &mut HookContext,

@@ -2,6 +2,7 @@
 use super::super::*;
 use crate::collect::{MarkData, TestItem};
 use crate::fixture::FixtureRegistry;
+use crate::hooks::Plugin;
 use pyo3::types::PyModule;
 use std::path::Path;
 
@@ -22,6 +23,7 @@ pub(crate) fn introspect_namespace(
     extra_generate_hooks: &[Py<PyAny>],
     makeitem_hook: bool,
     filters: &NameFilters,
+    plugins: &[Box<dyn Plugin>],
 ) -> PyResult<()> {
     register_fixtures_from(py, module, &format!("{nodeid_base}::"), registry)?;
 
@@ -178,6 +180,7 @@ pub(crate) fn introspect_namespace(
                         module,
                         generate_hook.as_ref(),
                         filters,
+                        plugins,
                     )?;
                 }
             }
@@ -237,6 +240,7 @@ pub(crate) fn introspect_namespace(
             module,
             generate_hook.as_ref(),
             registry,
+            plugins,
         )?;
     }
     Ok(())
@@ -402,6 +406,7 @@ pub(crate) fn collect_class(
     module: &Bound<'_, PyModule>,
     generate_hook: Option<&Bound<'_, PyAny>>,
     filters: &NameFilters,
+    plugins: &[Box<dyn Plugin>],
 ) -> PyResult<()> {
     // Test classes with a custom __init__/__new__ can't be instantiated for
     // collection: pytest warns and skips them (handled in the Python shim so
@@ -564,6 +569,7 @@ pub(crate) fn collect_class(
             module,
             effective_generate_hook,
             registry,
+            plugins,
         )?;
     }
     // Fire pytest_pycollect_makeitem hooks so plugins can set extra_keyword_matches.

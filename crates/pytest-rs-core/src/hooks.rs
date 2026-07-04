@@ -1,8 +1,8 @@
 use pyo3::prelude::*;
 
-use crate::collect::TestItem;
+use crate::collect::{MarkData, TestItem};
 use crate::config::{Config, OptionParser};
-use crate::fixture::FixtureDef;
+use crate::fixture::{FixtureDef, FixtureRegistry};
 use crate::session::{Finalizer, Session};
 
 /// firstresult hooks return `Ok(Some(_))` to claim the call; `Ok(None)` to
@@ -75,6 +75,26 @@ pub trait Plugin: Send {
         _items: &mut Vec<TestItem>,
     ) -> PyResult<()> {
         Ok(())
+    }
+
+    /// Extra fixture names to treat as requested by one test function for
+    /// parametrize-argname validation, for a plugin that connects its
+    /// fixture to matching items only in `pytest_collection_preexpand`/
+    /// `pytest_collection_modifyitems` (e.g. anyio's `anyio_backend`) — by
+    /// which point this file's items have already been validated. Called
+    /// once per test function during that file's collection, so it must
+    /// decide from per-function state alone (marks, is_coroutine, the
+    /// fixture registry), not full-session state.
+    fn pytest_collect_implied_fixtures(
+        &self,
+        _py: Python<'_>,
+        _is_coroutine: bool,
+        _func: &Bound<'_, PyAny>,
+        _marks: &[MarkData],
+        _registry: &FixtureRegistry,
+        _nodeid: &str,
+    ) -> PyResult<Vec<String>> {
+        Ok(Vec::new())
     }
 
     /// firstresult: provide the value (and optional finalizer) for a fixture
