@@ -51,35 +51,7 @@ impl Engine {
                 eprintln!("INTERNAL ERROR: failed to add pythonpath entry {rel}: {err}");
             }
         }
-        // --debug: pytest's debug trace file (minimal: create the file and
-        // announce it on stderr like upstream). The "wrote" message fires on
-        // drop so every exit path (early returns, NO_TESTS_COLLECTED, etc.)
-        // emits it.
-        struct DebugGuard(Option<std::path::PathBuf>);
-        impl Drop for DebugGuard {
-            fn drop(&mut self) {
-                if let Some(path) = &self.0 {
-                    eprintln!("wrote pytest debug information to {}", path.display());
-                }
-            }
-        }
-        let _debug_guard = if let Some(name) = self.config.get_value("debug") {
-            let path = self.config.invocation_dir.join(name);
-            let _ = std::fs::write(
-                &path,
-                format!(
-                    "versions pytest-rs-{}, python-{}\n\
-                     pytest_configure\n\
-                     pytest_sessionstart\n",
-                    env!("CARGO_PKG_VERSION"),
-                    py.version().split_whitespace().next().unwrap_or("")
-                ),
-            );
-            eprintln!("writing pytest debug information to {}", path.display());
-            DebugGuard(Some(path))
-        } else {
-            DebugGuard(None)
-        };
+        let _debug_guard = super::install_debug_guard(py, &self.config);
         let ini_filters: Vec<String> = self
             .config
             .get_ini_lines("filterwarnings")

@@ -21,6 +21,9 @@ impl Engine {
         // Snapshot the pluginmanager so conftest registrations from this nested
         // run don't leak into subsequent runs (guard restores on drop).
         let _pm_guard = python::snapshot_pluginmanager(py).ok();
+        // --debug: same trace-file behavior as the top-level run() (a nested
+        // pytester.runpytest("--debug") must also write/announce the file).
+        let _debug_guard = super::install_debug_guard(py, &self.config);
         // The nested config may declare its own pythonpath ini entries.
         for rel in self.config.get_ini_lines("pythonpath") {
             let abs = self.config.rootdir.join(rel);

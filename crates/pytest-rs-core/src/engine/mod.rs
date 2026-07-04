@@ -71,6 +71,40 @@ fn short_message(longrepr: &str) -> Option<String> {
         .filter(|message| !message.is_empty())
 }
 
+/// `--debug`: pytest's debug trace file (minimal: create the file and
+/// announce it on stderr like upstream). The "wrote" message fires on drop
+/// so every exit path (early returns, NO_TESTS_COLLECTED, etc.) emits it.
+/// Shared by both the top-level run and a nested run (`pytester.runpytest`),
+/// so `--debug` works the same in either.
+pub(crate) struct DebugGuard(Option<std::path::PathBuf>);
+
+impl Drop for DebugGuard {
+    fn drop(&mut self) {
+        if let Some(path) = &self.0 {
+            eprintln!("wrote pytest debug information to {}", path.display());
+        }
+    }
+}
+
+pub(crate) fn install_debug_guard(py: Python<'_>, config: &Config) -> DebugGuard {
+    let Some(name) = config.get_value("debug") else {
+        return DebugGuard(None);
+    };
+    let path = config.invocation_dir.join(name);
+    let _ = std::fs::write(
+        &path,
+        format!(
+            "versions pytest-rs-{}, python-{}\n\
+             pytest_configure\n\
+             pytest_sessionstart\n",
+            env!("CARGO_PKG_VERSION"),
+            py.version().split_whitespace().next().unwrap_or("")
+        ),
+    );
+    eprintln!("writing pytest debug information to {}", path.display());
+    DebugGuard(Some(path))
+}
+
 pub fn center_banner(label: &str) -> String {
     center_with(label, '=')
 }
