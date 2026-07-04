@@ -561,6 +561,36 @@ impl Plugin for BenchmarkPlugin {
         Ok(())
     }
 
+    fn pytest_report_header(&self, ctx: &mut HookContext) -> PyResult<Vec<String>> {
+        let py = ctx.py;
+        let timer_name: String = self
+            .helper
+            .as_ref()
+            .expect("helper module set in pytest_configure")
+            .bind(py)
+            .call_method1("timer_display_name", (self.timer_spec.as_deref(),))?
+            .extract()?;
+        Ok(vec![format!(
+            "benchmark: {version} (defaults: timer={timer} disable_gc={disable_gc} \
+             min_rounds={min_rounds} min_time={min_time} max_time={max_time} \
+             calibration_precision={calibration_precision} warmup={warmup} \
+             warmup_iterations={warmup_iterations})",
+            version = env!("CARGO_PKG_VERSION"),
+            timer = timer_name,
+            disable_gc = if self.config.disable_gc {
+                "True"
+            } else {
+                "False"
+            },
+            min_rounds = self.config.min_rounds,
+            min_time = self.config.min_time,
+            max_time = self.config.max_time,
+            calibration_precision = self.config.calibration_precision,
+            warmup = if self.config.warmup { "True" } else { "False" },
+            warmup_iterations = self.config.warmup_iterations,
+        )])
+    }
+
     fn pytest_sessionfinish(&mut self, ctx: &mut HookContext, _exit_code: i32) -> PyResult<()> {
         if ctx.config.is_worker() {
             return Ok(());

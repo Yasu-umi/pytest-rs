@@ -161,10 +161,29 @@ def weave(benchmark, target, kwargs):
     return aspectlib.weave(target, aspect, **kwargs).rollback
 
 
-def resolve_timer(spec):
-    """--benchmark-timer=module.attr (upstream's NameWrapper-ed dotted
-    lookup, e.g. time.time or time.perf_counter)."""
+def _load_timer(spec):
+    """Resolve --benchmark-timer's dotted spec into a callable, honoring
+    the historical `pep418` module alias for `time` (PEP 418 added the
+    perf_counter/monotonic clocks to it; upstream's load_timer special-cases
+    it since `time` predates that PEP)."""
     module_name, _, attr = spec.rpartition(".")
     if not module_name:
         raise ValueError(f"Value for --benchmark-timer must be in dotted form. Got: {spec!r}")
+    if module_name == "pep418":
+        module_name = "time"
     return getattr(importlib.import_module(module_name), attr)
+
+
+def resolve_timer(spec):
+    """--benchmark-timer=module.attr (upstream's NameWrapper-ed dotted
+    lookup, e.g. time.time or time.perf_counter)."""
+    return _load_timer(spec)
+
+
+def timer_display_name(spec=None):
+    """The `timer=...` value shown in the benchmark report header
+    (upstream's `str(NameWrapper(timer))`: `<target.__module__>.<target.__name__>`)."""
+    target = _load_timer(spec) if spec is not None else perf_counter
+    module = getattr(target, "__module__", "")
+    name = getattr(target, "__name__", repr(target))
+    return f"{module}.{name}" if module else name

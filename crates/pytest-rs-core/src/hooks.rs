@@ -129,6 +129,13 @@ pub trait Plugin: Send {
         Ok(())
     }
 
+    /// Lines printed under the session header (upstream's
+    /// `pytest_report_header` hookspec) — e.g. pytest-benchmark's
+    /// "benchmark: X.Y.Z (defaults: ...)" line.
+    fn pytest_report_header(&self, _ctx: &mut HookContext) -> PyResult<Vec<String>> {
+        Ok(Vec::new())
+    }
+
     fn pytest_sessionfinish(&mut self, _ctx: &mut HookContext, _exit_code: i32) -> PyResult<()> {
         Ok(())
     }

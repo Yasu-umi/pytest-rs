@@ -432,6 +432,20 @@ impl Engine {
         if self.config.quiet || self.config.no_terminal() {
             return Ok(());
         }
+        {
+            let mut ctx = HookContext {
+                py,
+                session: &mut self.session,
+                config: &self.config,
+            };
+            for plugin in &self.plugins {
+                for block in plugin.pytest_report_header(&mut ctx)? {
+                    for line in block.split('\n') {
+                        println!("{line}");
+                    }
+                }
+            }
+        }
         let hook_funcs: Vec<Py<pyo3::PyAny>> = self
             .session
             .py_hooks
