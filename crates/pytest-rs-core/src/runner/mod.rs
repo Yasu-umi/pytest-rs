@@ -624,11 +624,13 @@ fn print_verbose_report_line(
         .as_ref()
         .and_then(|s| s.markup.clone())
         .unwrap_or_else(|| outcome_codes(report).to_vec());
-    // pytest's _locationline appends " <- <src>" when the
-    // test's code has no real source file — an exec'd def
-    // reports co_filename "<string>". Real files (including
-    // wrapper shims like _unittest.py, whose co_filename is
-    // not the test module) are not flagged.
+    // pytest's _locationline appends " <- <src>" in two cases: an exec'd def
+    // has no real source file (co_filename "<string>"), or (at -vv) the
+    // nodeid's file differs from the file the code actually lives in — e.g.
+    // a test method inherited from a base class defined in another module.
+    // The second comparison only applies to files under rootdir: internal
+    // engine shims (e.g. the unittest wrapper) are real files too but live
+    // outside the project tree, so they must never be flagged.
     let loc_suffix = item
         .func
         .bind(py)
@@ -636,8 +638,27 @@ fn print_verbose_report_line(
         .and_then(|c| c.getattr("co_filename"))
         .and_then(|f| f.extract::<String>())
         .ok()
-        .filter(|co| !std::path::Path::new(co).is_file())
-        .map(|co| format!(" <- {co}"))
+        .map(|co| {
+            let co_path = std::path::Path::new(&co);
+            if !co_path.is_file() {
+                return format!(" <- {co}");
+            }
+            let canonical =
+                std::fs::canonicalize(co_path).unwrap_or_else(|_| co_path.to_path_buf());
+            if config.global_verbosity() >= 2 && canonical.starts_with(&config.rootdir) {
+                // Upstream's bestrelpath(startpath, Path(fspath)) call looks
+                // directory-relative, but fspath is itself rootdir-relative
+                // and startpath is absolute — bestrelpath's "both paths must
+                // be the same kind" fallback then just returns fspath as-is.
+                // The practical result is the plain rootdir-relative path.
+                let co_file = crate::collect::file_nodeid(&config.rootdir, &canonical);
+                let item_file = item.nodeid.split("::").next().unwrap_or(&item.nodeid);
+                if co_file != item_file {
+                    return format!(" <- {co_file}");
+                }
+            }
+            String::new()
+        })
         .unwrap_or_default();
     // When the test ID was already printed before the test ran (capture
     // disabled + verbose), emit only the outcome word so test stdout/stderr
