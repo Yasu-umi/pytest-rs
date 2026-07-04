@@ -1,8 +1,9 @@
 //! Benchmark terminal table and --benchmark-json output.
 
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
 
-use crate::fixture::BenchResult;
+use crate::fixture::{BenchResult, py_to_json};
 
 /// The display unit for one group table, from its fastest min.
 fn unit_for_min(fastest: f64) -> (&'static str, f64) {
@@ -339,19 +340,57 @@ fn center(label: &str, fill: char, width: usize) -> String {
     )
 }
 
-pub fn render_json(py: Python<'_>, results: &[BenchResult]) -> PyResult<String> {
+/// Builds the base machine_info dict, then fires
+/// `pytest_benchmark_update_machine_info(config, machine_info)` for every
+/// conftest hookimpl of that name so it can mutate the dict in place
+/// (upstream pytest-benchmark's extension hook). Not a formally registered
+/// hookspec — any `pytest_*`-named conftest function is already collected in
+/// `session.py_hooks` regardless, so no native hookspec plumbing is needed.
+pub fn build_machine_info(
+    py: Python<'_>,
+    config: &pytest_rs_core::config::Config,
+    py_hooks: &[pytest_rs_core::session::PyHook],
+) -> PyResult<serde_json::Value> {
     let sys = py.import("sys")?;
     let platform = py.import("platform")?;
-    let machine_info = serde_json::json!({
-        "node": platform.call_method0("node")?.extract::<String>()?,
-        "processor": platform.call_method0("processor")?.extract::<String>()?,
-        "machine": platform.call_method0("machine")?.extract::<String>()?,
-        "system": platform.call_method0("system")?.extract::<String>()?,
-        "python_version": platform.call_method0("python_version")?.extract::<String>()?,
-        "python_implementation":
-            platform.call_method0("python_implementation")?.extract::<String>()?,
-        "executable": sys.getattr("executable")?.extract::<String>()?,
+    let machine_info = PyDict::new(py);
+    machine_info.set_item("node", platform.call_method0("node")?)?;
+    machine_info.set_item("processor", platform.call_method0("processor")?)?;
+    machine_info.set_item("machine", platform.call_method0("machine")?)?;
+    machine_info.set_item("system", platform.call_method0("system")?)?;
+    machine_info.set_item("python_version", platform.call_method0("python_version")?)?;
+    machine_info.set_item(
+        "python_implementation",
+        platform.call_method0("python_implementation")?,
+    )?;
+    machine_info.set_item("executable", sys.getattr("executable")?)?;
+
+    let mut hooks: Vec<_> = py_hooks
+        .iter()
+        .filter(|hook| hook.name == "pytest_benchmark_update_machine_info")
+        .collect();
+    hooks.sort_by_key(|h| match (h.tryfirst, h.trylast) {
+        (true, _) => 0,
+        (_, true) => 2,
+        _ => 1,
     });
+    if !hooks.is_empty() {
+        let config_proxy = pytest_rs_core::python::make_py_config(py, config)?;
+        for hook in hooks {
+            pytest_rs_core::python::call_py_hook(
+                py,
+                &hook.func,
+                &[
+                    ("config", config_proxy.clone_ref(py)),
+                    ("machine_info", machine_info.clone().into_any().unbind()),
+                ],
+            )?;
+        }
+    }
+    py_to_json(py, machine_info.as_any())
+}
+
+pub fn render_json(results: &[BenchResult], machine_info: serde_json::Value) -> PyResult<String> {
     let benchmarks: Vec<serde_json::Value> = results
         .iter()
         .map(|result| {

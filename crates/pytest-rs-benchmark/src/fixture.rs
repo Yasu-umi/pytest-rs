@@ -30,7 +30,7 @@ pub struct BenchResult {
 /// `json.dumps` the object then reparse as `serde_json::Value` — `extra_info`
 /// only needs to be JSON-serializable (upstream's own contract), so this
 /// covers arbitrary nesting without a hand-rolled PyAny→Value walk.
-fn py_to_json(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<serde_json::Value> {
+pub(crate) fn py_to_json(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<serde_json::Value> {
     let dumped: String = py
         .import("json")?
         .call_method1("dumps", (obj,))?

@@ -572,14 +572,6 @@ impl Plugin for BenchmarkPlugin {
             .expect("benchmark results lock poisoned")
             .clone();
 
-        // --benchmark-json
-        if let Some(json_path) = &self.json_path {
-            let content = report::render_json(py, &results)?;
-            let path = ctx.config.invocation_dir.join(json_path);
-            std::fs::write(&path, content)
-                .map_err(|e| core_pyo3::exceptions::PyOSError::new_err(e.to_string()))?;
-        }
-
         // --benchmark-save / --benchmark-autosave
         let save_name = if let Some(name) = &self.save_name {
             Some(name.clone())
@@ -593,6 +585,24 @@ impl Plugin for BenchmarkPlugin {
             None
         };
 
+        let machine_info = if self.json_path.is_some() || save_name.is_some() {
+            Some(report::build_machine_info(
+                py,
+                ctx.config,
+                &ctx.session.py_hooks,
+            )?)
+        } else {
+            None
+        };
+
+        // --benchmark-json
+        if let Some(json_path) = &self.json_path {
+            let content = report::render_json(&results, machine_info.clone().unwrap())?;
+            let path = ctx.config.invocation_dir.join(json_path);
+            std::fs::write(&path, content)
+                .map_err(|e| core_pyo3::exceptions::PyOSError::new_err(e.to_string()))?;
+        }
+
         if let Some(name) = save_name
             && !results.is_empty()
             && let Some(storage_dir) = &self.storage_dir
@@ -602,7 +612,7 @@ impl Plugin for BenchmarkPlugin {
             let num = report::next_num(storage_dir);
             let filename = format!("{:04}_{}.json", num, name);
             let path = storage_dir.join(&filename);
-            let content = report::render_json(py, &results)?;
+            let content = report::render_json(&results, machine_info.clone().unwrap())?;
             std::fs::write(&path, &content)
                 .map_err(|e| core_pyo3::exceptions::PyOSError::new_err(e.to_string()))?;
             eprintln!("Saved benchmark data in: {}", path.display());
