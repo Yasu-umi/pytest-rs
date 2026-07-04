@@ -168,11 +168,21 @@ impl Engine {
                 let mut line = format!("{word} {}", report.nodeid);
                 // Prefer reprcrash.message (always set, tb-style-independent)
                 // over parsing longrepr lines (unavailable with --tb=no).
+                // A collection SyntaxError has no reprcrash (upstream's
+                // CollectErrorRepr lacks .reprcrash): don't re-derive the
+                // message from longrepr in that case either, or the
+                // reporting.rs suppression above gets silently undone.
                 let crash_msg = report
                     .reprcrash_message
                     .as_deref()
                     .map(str::to_string)
-                    .or_else(|| report.longrepr.as_deref().and_then(short_message));
+                    .or_else(|| {
+                        report
+                            .longrepr
+                            .as_deref()
+                            .and_then(short_message)
+                            .filter(|message| !message.starts_with("SyntaxError:"))
+                    });
                 if let Some(message) = crash_msg {
                     // pytest's _get_line_with_reprcrash_message: failure/error
                     // lines show the full crash message on CI or at -vv, but
