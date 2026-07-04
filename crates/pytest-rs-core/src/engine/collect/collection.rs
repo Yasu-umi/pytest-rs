@@ -100,6 +100,13 @@ impl Engine {
         // runs last under pluggy LIFO). A conftest sessionstart may stash
         // state the pytest_report_header hooks read back (e.g. config._x).
         if let Err(err) = self.fire_py_sessionstart(py) {
+            // KeyboardInterrupt in pytest_sessionstart: same "!!! KeyboardInterrupt
+            // !!!" banner (exit 2) as during collection, not the pytest.exit()
+            // formatting below (which has no .msg attribute on KeyboardInterrupt
+            // and would print a blank "Exit:  !!!" banner).
+            if err.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py) {
+                return Err("\x00KEYBOARD_INTERRUPT\x00".to_string());
+            }
             // pytest.exit() in pytest_sessionstart: print "Exit: msg" to stderr
             // AND show a "!!! Exit: msg !!!" banner in stdout.
             if let Some(code) = python::session_abort_code(py, &err) {
