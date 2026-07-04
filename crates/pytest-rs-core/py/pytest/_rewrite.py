@@ -17,7 +17,7 @@ import types
 # tag, so it can never be confused with CPython's own (non-rewritten) bytecode
 # for the same file. Bump _CACHE_VERSION whenever _AssertRewriter's output
 # changes, to invalidate any stale rewritten pyc left on disk.
-_CACHE_VERSION = 5
+_CACHE_VERSION = 6
 _PYC_TAIL = f".{sys.implementation.cache_tag}-pytestrs{_CACHE_VERSION}.pyc"
 
 _OPS = {
@@ -433,6 +433,57 @@ class _AssertRewriter(ast.NodeTransformer):
         )
         return stmts, new_expr
 
+    def _call_explain_values(self, call):
+        """Build JoinedStr value pieces for a Call node's "where" display,
+        substituting each Name/Constant argument with its repr — e.g. `len(l)`
+        renders as `len([0, 1, 2])`, matching upstream's recursive explain
+        string (built from `visit_Call`/`visit_Name`). Returns None (caller
+        falls back to the plain unparsed source) for anything with a
+        non-Name/Constant argument, a starred arg, or an unparsable func —
+        upstream's fuller recursive builder (BinOp, nested Call, etc.) isn't
+        attempted here."""
+        if not isinstance(call, ast.Call):
+            return None
+        if any(isinstance(arg, ast.Starred) for arg in call.args):
+            return None
+
+        def leaf(value_node):
+            if isinstance(value_node, ast.Name):
+                return ast.FormattedValue(
+                    value=ast.Name(id=value_node.id, ctx=ast.Load()),
+                    conversion=114,
+                    format_spec=None,
+                )
+            if isinstance(value_node, ast.Constant):
+                return ast.Constant(repr(value_node.value))
+            return None
+
+        try:
+            func_src = ast.unparse(call.func)
+        except Exception:
+            return None
+        items = []
+        for arg in call.args:
+            piece = leaf(arg)
+            if piece is None:
+                return None
+            items.append((None, piece))
+        for kw in call.keywords:
+            piece = leaf(kw.value)
+            if piece is None:
+                return None
+            items.append((kw.arg, piece))
+
+        parts = [ast.Constant(f"{func_src}(")]
+        for index, (kwname, piece) in enumerate(items):
+            if index:
+                parts.append(ast.Constant(", "))
+            if kwname is not None:
+                parts.append(ast.Constant(f"{kwname}="))
+            parts.append(piece)
+        parts.append(ast.Constant(")"))
+        return parts
+
     def _rewrite_compare(self, node):
         test = node.test
         op = _OPS.get(type(test.ops[0]))
@@ -524,11 +575,12 @@ class _AssertRewriter(ast.NodeTransformer):
             test.comparators[0]
         )
         if not left_trivial:
+            call_parts = self._call_explain_values(test.left)
             try:
                 src = ast.unparse(test.left)
             except Exception:
                 src = None
-            if src:
+            if call_parts is not None or src:
                 values.extend(
                     [
                         ast.Constant("\n +  where "),
@@ -537,15 +589,17 @@ class _AssertRewriter(ast.NodeTransformer):
                             conversion=114,
                             format_spec=None,
                         ),
-                        ast.Constant(f" = {src}"),
+                        ast.Constant(" = "),
                     ]
                 )
+                values.extend(call_parts if call_parts is not None else [ast.Constant(src)])
         if not right_trivial:
+            call_parts = self._call_explain_values(test.comparators[0])
             try:
                 src = ast.unparse(test.comparators[0])
             except Exception:
                 src = None
-            if src:
+            if call_parts is not None or src:
                 label = "and   " if not left_trivial else "where "
                 values.extend(
                     [
@@ -555,9 +609,10 @@ class _AssertRewriter(ast.NodeTransformer):
                             conversion=114,
                             format_spec=None,
                         ),
-                        ast.Constant(f" = {src}"),
+                        ast.Constant(" = "),
                     ]
                 )
+                values.extend(call_parts if call_parts is not None else [ast.Constant(src)])
         message = ast.JoinedStr(values=values)
         raise_stmt = ast.Raise(
             exc=ast.Call(
