@@ -200,6 +200,10 @@ class Pytester:
     @staticmethod
     def _source_text(source):
         # makepyfile accepts utf-8 bytes as well as str/Source (#2738).
+        # A list/tuple (upstream's Source(obj)) is joined line-by-line —
+        # str(source) would otherwise write the Python repr of the list.
+        if isinstance(source, (list, tuple)):
+            return "\n".join(Pytester._source_text(line) for line in source)
         return source.decode("utf-8") if isinstance(source, bytes) else str(source)
 
     def _makefile(self, ext, args, kwargs):
