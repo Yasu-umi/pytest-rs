@@ -38,7 +38,22 @@ impl Engine {
             errors.push((rootdir.to_path_buf(), python::format_exception(py, &err)));
         }
         // conftest pytest_configure hooks run once conftests are loaded.
-        if let Err(err) = self.fire_py_hooks_simple(py, "pytest_configure") {
+        // Upstream fires this hook with no catch_warnings_for_item window at
+        // all, so a warning raised directly in a conftest's pytest_configure
+        // reaches whichever handler was already ambient (e.g. an outer
+        // nested run's recwarn) instead of pytest's own capture. Re-apply the
+        // ini/-W filters on reinstall too, or install()'s own defaults would
+        // re-take priority over a user's filterwarnings override.
+        let _ = python::suspend_warning_capture(py);
+        let configure_result = self.fire_py_hooks_simple(py, "pytest_configure");
+        let ini_filters: Vec<String> = self
+            .config
+            .get_ini_lines("filterwarnings")
+            .into_iter()
+            .map(str::to_string)
+            .collect();
+        let _ = python::install_warning_capture(py, &ini_filters, &self.config.w_options);
+        if let Err(err) = configure_result {
             if python::is_usage_error(py, &err) {
                 // UsageError in configure → eprintln ERROR: msg, then exit 4.
                 let msg = python::format_exception(py, &err);

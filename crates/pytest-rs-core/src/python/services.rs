@@ -268,6 +268,17 @@ pub fn install_warning_capture(
     Ok(())
 }
 
+/// Temporarily restore the pre-session `showwarning` (upstream's
+/// `pytest_configure` runs with no `catch_warnings_for_item` window at all —
+/// a warning raised directly in a `pytest_configure` hookimpl reaches
+/// whichever handler was already ambient, e.g. an outer nested run's
+/// `recwarn`, instead of pytest's own capture). Pair with a fresh
+/// `install_warning_capture` call immediately after firing the hook.
+pub fn suspend_warning_capture(py: Python<'_>) -> PyResult<()> {
+    py.import("pytest._wcapture")?.call_method0("uninstall")?;
+    Ok(())
+}
+
 /// The `config.cache` object (a pytest._cache.Cache) for this run.
 pub(crate) fn cache_object<'py>(
     py: Python<'py>,
