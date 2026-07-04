@@ -673,7 +673,15 @@ fn print_verbose_report_line(
         let r = format!("{}{reason_suffix}", crate::tw::markup(&word, &codes));
         (p, r)
     } else {
-        let prefix = format!("{}{} {}", item.nodeid, loc_suffix, word);
+        // Upstream's cwd_relative_nodeid: the displayed nodeid is
+        // invocation-dir-relative, not rootdir-relative, when the two
+        // differ (e.g. an explicit --rootdir=subdir run from its parent).
+        let display_nodeid = crate::collect::cwd_relative_nodeid(
+            &config.rootdir,
+            &config.invocation_dir,
+            &item.nodeid,
+        );
+        let prefix = format!("{display_nodeid}{loc_suffix} {word}");
         let reason_suffix = match &reason {
             Some(r) => {
                 python::format_verbose_reason(py, prefix.chars().count(), r, tc, term_width())
@@ -682,9 +690,7 @@ fn print_verbose_report_line(
         };
         let p = format!("{prefix}{reason_suffix}");
         let r = format!(
-            "{}{} {}{reason_suffix}",
-            item.nodeid,
-            loc_suffix,
+            "{display_nodeid}{loc_suffix} {}{reason_suffix}",
             crate::tw::markup(&word, &codes)
         );
         (p, r)

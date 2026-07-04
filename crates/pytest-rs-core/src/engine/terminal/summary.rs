@@ -100,7 +100,14 @@ impl Engine {
                             continue;
                         }
                         let word = self.subtest_summary_word(py, report, "SKIPPED");
-                        let mut line = format!("{word} {}", report.nodeid);
+                        let mut line = format!(
+                            "{word} {}",
+                            crate::collect::cwd_relative_nodeid(
+                                &self.config.rootdir,
+                                &self.config.invocation_dir,
+                                &report.nodeid
+                            )
+                        );
                         let reason = report.longrepr.clone().unwrap_or_default();
                         if !reason.is_empty() {
                             let reason = if reason.starts_with("Skipped") {
@@ -130,10 +137,13 @@ impl Engine {
                     if label.is_none() {
                         label = Some(self.subtest_summary_word(py, report, "SKIPPED"));
                     }
-                    let location = report
-                        .location
-                        .clone()
-                        .unwrap_or_else(|| report.nodeid.clone());
+                    let location = report.location.clone().unwrap_or_else(|| {
+                        crate::collect::cwd_relative_nodeid(
+                            &self.config.rootdir,
+                            &self.config.invocation_dir,
+                            &report.nodeid,
+                        )
+                    });
                     let reason = report.longrepr.clone().unwrap_or_default();
                     let key = (location, reason);
                     match skip_groups.iter_mut().find(|(group, _)| group == &key) {
@@ -165,7 +175,14 @@ impl Engine {
                 } else {
                     word.to_string()
                 };
-                let mut line = format!("{word} {}", report.nodeid);
+                let mut line = format!(
+                    "{word} {}",
+                    crate::collect::cwd_relative_nodeid(
+                        &self.config.rootdir,
+                        &self.config.invocation_dir,
+                        &report.nodeid
+                    )
+                );
                 // Prefer reprcrash.message (always set, tb-style-independent)
                 // over parsing longrepr lines (unavailable with --tb=no).
                 // A collection SyntaxError has no reprcrash (upstream's

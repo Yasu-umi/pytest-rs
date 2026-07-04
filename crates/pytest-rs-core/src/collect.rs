@@ -837,3 +837,23 @@ fn bestrelpath(directory: &Path, dest: &Path) -> String {
         parts.join("/")
     }
 }
+
+/// Upstream's `Config.cwd_relative_nodeid`: nodeids are always rootdir-
+/// relative internally (matching, `-k`, parametrize IDs, JUnit XML — none of
+/// that changes here), but a nodeid printed to the terminal is re-relativized
+/// against the invocation dir when it differs from rootdir (e.g. an explicit
+/// `--rootdir=subdir` run from its parent). Display-only; never touches
+/// `TestItem.nodeid`/`file_nodeid`.
+pub fn cwd_relative_nodeid(rootdir: &Path, invocation_dir: &Path, nodeid: &str) -> String {
+    if invocation_dir == rootdir {
+        return nodeid.to_string();
+    }
+    let (path_part, rest) = nodeid.split_once("::").unwrap_or((nodeid, ""));
+    let fullpath = rootdir.join(path_part);
+    let relative_path = bestrelpath(invocation_dir, &fullpath);
+    if rest.is_empty() {
+        relative_path
+    } else {
+        format!("{relative_path}::{rest}")
+    }
+}
