@@ -204,11 +204,15 @@ impl Engine {
         reorder_items_by_param_scope(&mut self.session.items);
 
         // request.fixturenames must list the item's whole fixture closure
-        // (transitive deps + autouse), not just its direct params — plugins
-        // probe it (pytest-django: "transactional_db" in request.fixturenames,
-        // pulled in transitively by django_db_reset_sequences). Record the
-        // closure-only names as extra fixturenames (display only; the fixtures
-        // themselves resolve through the dependency chain).
+        // (transitive deps + autouse + `request` itself), not just its direct
+        // params — plugins probe it (pytest-django: "transactional_db" in
+        // request.fixturenames, pulled in transitively by
+        // django_db_reset_sequences) and upstream's "--setup-plan"/
+        // "--setup-show" display it verbatim (sorted(item.fixturenames),
+        // unfiltered). Record the closure-only names as extra fixturenames
+        // (display only; the fixtures themselves resolve through the
+        // dependency chain via closure_for, which drops `request` since it
+        // isn't a real fixture to set up).
         for item in &mut self.session.items {
             let mut direct: Vec<String> = item.fixture_names.clone();
             direct.extend(item.extra_fixture_names.iter().cloned());
@@ -217,15 +221,15 @@ impl Engine {
             // their dependencies.
             let ignore: std::collections::HashSet<String> =
                 item.callspec.iter().map(|(name, _)| name.clone()).collect();
-            let closure = self
-                .session
-                .registry
-                .closure_for(&item.nodeid, &direct, &ignore);
-            for def in closure {
-                if !item.fixture_names.contains(&def.name)
-                    && !item.extra_fixture_names.contains(&def.name)
+            let initialnames = self.session.registry.initial_names(&item.nodeid, &direct);
+            let closure_names =
+                self.session
+                    .registry
+                    .getfixtureclosure(&item.nodeid, &initialnames, &ignore);
+            for name in closure_names {
+                if !item.fixture_names.contains(&name) && !item.extra_fixture_names.contains(&name)
                 {
-                    item.extra_fixture_names.push(def.name.clone());
+                    item.extra_fixture_names.push(name);
                 }
             }
         }

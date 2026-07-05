@@ -352,14 +352,13 @@ pub(crate) fn run_item_body(
     });
 
     if setup_show_active(config) {
-        let mut names: Vec<String> = kwargs
-            .iter()
-            .map(|(name, _)| name.clone())
-            .filter(|name| name != "request")
-            .collect();
-        for def in session.registry.autouse_for(&item.nodeid) {
-            if !names.contains(&def.name) {
-                names.push(def.name.clone());
+        // Upstream's show_test_item: sorted(item.fixturenames), the item's
+        // whole closure (incl. `request` and autouse), not just its direct
+        // call kwargs.
+        let mut names: Vec<String> = item.fixture_names.clone();
+        for extra in &item.extra_fixture_names {
+            if !names.contains(extra) {
+                names.push(extra.clone());
             }
         }
         names.sort_unstable();
