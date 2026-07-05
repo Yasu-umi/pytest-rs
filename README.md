@@ -111,7 +111,7 @@ _linux (CI-verified)_
 
 | suite | tag | passed | failed | errors | skipped | deselected | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2679 | 109 | 0 | 53 | 8 | 2849 | 95.9% | 25 | 54 | 61 |
+| pytest | 9.0.3 | 2682 | 106 | 0 | 53 | 8 | 2849 | 96.0% | 25 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 2 | 90 | 97.8% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 204 | 2 | 0 | 3 | 0 | 209 | 99.0% | 0 | 1 | 0 |
@@ -132,7 +132,7 @@ _linux (CI-verified)_
 | pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-snapshot | v0.9.0 | 102 | 5 | 0 | 0 | 0 | 107 | 95.3% | 0 | 3 | 0 |
 | pytest-icdiff | 0.5 | 10 | 2 | 0 | 0 | 0 | 12 | 83.3% | 0 | 1 | 0 |
-| pytest-socket | 0.7.0 | 60 | 5 | 0 | 0 | 0 | 65 | 92.3% | 3 | 6 | 0 |
+| pytest-socket | 0.7.0 | 41 | 2 | 0 | 0 | 0 | 43 | 95.3% | 3 | 6 | 0 |
 | pytest-order | v1.4.0 | 120 | 14 | 0 | 0 | 0 | 134 | 89.6% | 7 | 16 | 0 |
 | pytest-repeat | v0.9.4 | 16 | 0 | 0 | 0 | 0 | 16 | 100.0% | 1 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
@@ -140,7 +140,7 @@ _linux (CI-verified)_
 | pytest-rerunfailures | 9.1.1 | 47 | 0 | 0 | 1 | 0 | 48 | 100.0% | 1 | 1 | 0 |
 | pytest-randomly | 4.1.0 | 22 | 15 | 0 | 0 | 0 | 37 | 59.5% | 0 | 1 | 0 |
 | pytest-bdd | 8.1.0 | 123 | 15 | 0 | 1 | 0 | 139 | 89.2% | 28 | 35 | 0 |
-| pytest-django | v4.9.0 | 211 | 4 | 0 | 1 | 0 | 216 | 98.1% | 8 | 13 | 0 |
+| pytest-django | v4.9.0 | 210 | 5 | 0 | 1 | 0 | 216 | 97.7% | 8 | 13 | 0 |
 
 **Real-world projects** (their suites run unchanged, as drop-in evidence):
 
