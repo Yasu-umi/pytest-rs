@@ -1388,6 +1388,15 @@ class Pytester:
         if not path.is_absolute():
             path = self.path / path
         path = path.resolve()
+        # The nodeid's file part is the path relative to the pytester rootdir
+        # (e.g. "pkg/__init__.py"), not just the bare filename — a nested
+        # file's directory prefix must survive so its nodeid matches the
+        # real engine's (relevant e.g. when comparing against relay items
+        # from a subprocess run of the same file).
+        try:
+            nodeid_file = path.relative_to(self.path).as_posix()
+        except ValueError:
+            nodeid_file = path.name
         module_name = path.stem
         spec = importlib.util.spec_from_file_location(module_name, path)
         if spec is None or spec.loader is None:
@@ -1506,7 +1515,7 @@ class Pytester:
         def make_item(func, nodeid_name, all_marks, cls=None, parent=None):
             lineno = getattr(getattr(func, "__code__", None), "co_firstlineno", 0)
             node = Function(
-                f"{path.name}::{nodeid_name}",
+                f"{nodeid_file}::{nodeid_name}",
                 nodeid_name.rsplit("::", 1)[-1],
                 all_marks,
                 [],
