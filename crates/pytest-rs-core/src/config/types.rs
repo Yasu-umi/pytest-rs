@@ -57,6 +57,13 @@ pub struct Config {
     /// and the engine drives the replacement object instead. Set once,
     /// after python pytest_configure hooks fire.
     pub(crate) reporter_delegated: std::sync::atomic::AtomicBool,
+    /// `-h`/`--help`'s pre-rendered, argparse-styled help text (`Some` only
+    /// when the flag was given). Unlike `--version`, `--help` can't be
+    /// resolved before conftest/plugin option registration — a plugin's
+    /// addoption might itself be malformed (upstream still shows help, in
+    /// a reduced "minimal help" form, when that happens) — so printing is
+    /// deferred to after `load_and_validate_config` succeeds or fails.
+    pub help_text: Option<String>,
 }
 
 /// pytest's rootdir-discovery inputs: explicit filesystem path args, falling

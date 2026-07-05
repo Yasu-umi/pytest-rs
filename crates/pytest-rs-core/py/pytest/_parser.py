@@ -457,13 +457,15 @@ def apply_cli_args(namespace: Any, tokens: list[str]) -> tuple[list[str], list[s
                 from pytest import UsageError
 
                 plural = "s" if nargs != 1 else ""
-                raise UsageError(f"error: argument {name}: expected {nargs} argument{plural}")
+                raise UsageError(
+                    f"pytest: error: argument {name}: expected {nargs} argument{plural}"
+                )
             try:
                 converted = [convert(v) if callable(convert) else v for v in collected]
             except (ValueError, argparse.ArgumentTypeError) as exc:
                 from pytest import UsageError
 
-                raise UsageError(f"error: argument {name}: {exc}") from None
+                raise UsageError(f"pytest: error: argument {name}: {exc}") from None
         else:
             if not eq:
                 if index < len(tokens) and not tokens[index].startswith("--"):
@@ -472,13 +474,13 @@ def apply_cli_args(namespace: Any, tokens: list[str]) -> tuple[list[str], list[s
                 else:
                     from pytest import UsageError
 
-                    raise UsageError(f"error: argument {name}: expected one argument")
+                    raise UsageError(f"pytest: error: argument {name}: expected one argument")
             try:
                 converted = convert(value) if callable(convert) else value
             except (ValueError, argparse.ArgumentTypeError) as exc:
                 from pytest import UsageError
 
-                raise UsageError(f"error: argument {name}: {exc}") from None
+                raise UsageError(f"pytest: error: argument {name}: {exc}") from None
         # Validate choices (argparse-compatible behaviour).
         choices = spec.get("choices")
         if choices is not None:
@@ -489,7 +491,7 @@ def apply_cli_args(namespace: Any, tokens: list[str]) -> tuple[list[str], list[s
 
                     choices_str = ", ".join(repr(c) for c in choices)
                     raise UsageError(
-                        f"error: argument {name}: invalid choice: {val!r} (choose from {choices_str})"
+                        f"pytest: error: argument {name}: invalid choice: {val!r} (choose from {choices_str})"
                     )
         # action="append" accumulates into a list (default []).
         if spec["action"] == "append":

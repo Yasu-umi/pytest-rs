@@ -32,7 +32,26 @@ impl Engine {
         let (start_dirs, conftests) = self.discover_conftests(&rootdir, &paths, &files);
 
         let mut errors = Vec::new();
-        self.load_and_validate_config(py, &rootdir, &paths, &start_dirs, &conftests, &mut errors)?;
+        if let Err(err) = self.load_and_validate_config(
+            py,
+            &rootdir,
+            &paths,
+            &start_dirs,
+            &conftests,
+            &mut errors,
+        ) {
+            // -h/--help combined with a UsageError from conftest/plugin
+            // option registration (e.g. a malformed pytest_addoption): upstream's
+            // Config.pytest_cmdline_parse still shows help — the full option
+            // listing only, no markers/fixtures footer — annotated as
+            // "minimal help", then re-raises so the usual UsageError
+            // reporting (stderr message, exit code) still happens.
+            if let Some(help_text) = &self.config.help_text {
+                print!("{help_text}");
+                print!("\nNOTE: displaying only minimal help due to UsageError.\n\n");
+            }
+            return Err(err);
+        }
         if self.fire_configure_and_print_header(py, &rootdir, &mut errors)? {
             // --markers (or another short-circuit) handled output; skip collection.
             return Ok(errors);

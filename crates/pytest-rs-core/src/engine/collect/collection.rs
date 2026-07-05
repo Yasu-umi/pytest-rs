@@ -89,6 +89,14 @@ impl Engine {
         if let Err(err) = self.register_plugin_instance_fixtures(py) {
             errors.push((rootdir.to_path_buf(), python::format_exception(py, &err)));
         }
+        // -h/--help: matches upstream's pytest_cmdline_main, which calls
+        // showhelp() right after config._do_configure() and returns without
+        // ever reaching wrap_session (no session header, no collection).
+        if let Some(help_text) = &self.config.help_text {
+            print!("{help_text}");
+            print!("{}", crate::config::Config::HELP_FOOTER);
+            return Ok(true);
+        }
         // A plugin swapped in its own terminal reporter: suppress native
         // terminal output and drive the replacement object instead.
         if let Some(reporter) = python::reporter_replacement(py) {

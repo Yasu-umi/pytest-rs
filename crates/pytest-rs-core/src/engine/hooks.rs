@@ -841,7 +841,18 @@ impl Engine {
         if !positionals.is_empty() {
             self.config.paths.extend(positionals);
         }
-        if !unknown.is_empty() {
+        // A genuinely unrecognized flag is only found by scanning every
+        // token to the end (upstream: argparse's parse_known_args collects
+        // it into "extras" and keeps scanning). `-h`/`--help`'s own argparse
+        // Action interrupts parsing the instant it's reached — via a raised
+        // PrintHelp, before parse_args ever gets back around to checking
+        // those extras — so an unrelated unknown flag earlier in the same
+        // addopts/CLI never becomes a UsageError when --help is present.
+        // A malformed *registered* option (below, via a raised UsageError
+        // from apply_cli_args) still fails immediately regardless: argparse
+        // raises synchronously the moment it tries and fails to consume that
+        // option's own value, before ever reaching --help's token.
+        if !unknown.is_empty() && self.config.help_text.is_none() {
             // Match argparse/pytest's MyOptionParser.error: a
             // "<prog>: error: <message>" line followed by the sorted
             // extra_info (inifile, rootdir) pytest attaches to the parser.

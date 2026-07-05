@@ -148,8 +148,19 @@ impl Config {
     /// specs. Depends only on the parser's registered option specs.
     fn build_clap_command(parser: &OptionParser, blocked: &HashSet<String>) -> clap::Command {
         let mut cmd = clap::Command::new("pytest-rs")
-            .disable_help_flag(false)
+            // A plain flag, not clap's own auto --help: showing help needs
+            // conftest/plugin option registration first (a malformed plugin
+            // option must still show a reduced "minimal help", matching
+            // upstream) — see Config::help_text.
+            .disable_help_flag(true)
             .disable_version_flag(true)
+            .arg(
+                clap::Arg::new("help")
+                    .short('h')
+                    .long("help")
+                    .action(clap::ArgAction::SetTrue)
+                    .help("Show help message and configuration info"),
+            )
             .arg(
                 clap::Arg::new("version")
                     .short('V')
@@ -661,12 +672,15 @@ impl Config {
     pub(crate) const USAGE_SYNOPSIS: &str = "usage: pytest-rs-bin [OPTIONS] [FILE_OR_DIR]...\n";
 
     /// Rewrite clap's auto-generated `--help` text into upstream's
-    /// argparse-based `showhelp()` shape: the section headings clap and
-    /// argparse disagree on, plus pytest's own footer lines (helpconfig.py's
-    /// `showhelp`) appended after the option list. The ini-options listing
-    /// and "Environment variables:" section upstream also prints need a
-    /// fully configured session (conftest/plugin ini keys aren't known yet
-    /// at this point in argument parsing), so they aren't reproduced here.
+    /// argparse-based `showhelp()`/`print_help()` shape: only the section
+    /// headings clap and argparse disagree on. This is also exactly what
+    /// upstream prints for its "minimal help" (a UsageError from a plugin's
+    /// own option parsing, e.g. a missing required value) — the ini-options
+    /// listing, "Environment variables:" section, and markers/fixtures
+    /// footer (see `HELP_FOOTER`) are additions `showhelp()` makes only on
+    /// the full-help path and need a fully configured session (conftest/
+    /// plugin ini keys aren't known yet at this point in argument parsing),
+    /// so they aren't reproduced here either way.
     fn to_argparse_style_help(clap_help: &str) -> String {
         let mut out = String::new();
         for line in clap_help.lines() {
@@ -679,15 +693,16 @@ impl Config {
                 }
             }
         }
-        out.push('\n');
-        out.push_str("to see available markers type: pytest --markers\n");
-        out.push_str("to see available fixtures type: pytest --fixtures\n");
-        out.push_str(
-            "(shown according to specified file_or_dir or current dir if not specified; \
-             fixtures with leading '_' are only shown with the '-v' option\n",
-        );
         out
     }
+
+    /// The full-help-only footer (upstream's `showhelp()`, after the option
+    /// listing) — printed when `--help` reaches it with no UsageError.
+    pub(crate) const HELP_FOOTER: &str = "\n\
+        to see available markers type: pytest --markers\n\
+        to see available fixtures type: pytest --fixtures\n\
+        (shown according to specified file_or_dir or current dir if not specified; \
+        fixtures with leading '_' are only shown with the '-v' option\n";
 
     pub fn from_args(parser: OptionParser, argv: Vec<String>) -> Result<Self, String> {
         // `argv[0]` is always a program-name placeholder regardless of caller
@@ -812,33 +827,16 @@ impl Config {
         };
 
         let blocked = Self::blocked_bundled_plugins(&argv)?;
-        let cmd = Self::build_clap_command(&parser, &blocked);
+        let mut cmd = Self::build_clap_command(&parser, &blocked);
 
         let (argv, plugin_args) = Self::partition_plugin_args(argv, &cmd);
 
         let effective_args = argv.clone();
-        let matches = match cmd.try_get_matches_from(argv) {
+        // `_mut`, not the consuming variant: `-h`/`--help` is now a plain
+        // flag (see build_clap_command), so `cmd` must survive matching to
+        // render its help text below.
+        let matches = match cmd.try_get_matches_from_mut(argv) {
             Ok(matches) => matches,
-            // --help/--version: return a sentinel so the caller can print and
-            // exit cleanly. Using process::exit here would kill the Python
-            // interpreter when called in-process (pytester.parseconfig()).
-            Err(err)
-                if matches!(
-                    err.kind(),
-                    clap::error::ErrorKind::DisplayHelp | clap::error::ErrorKind::DisplayVersion
-                ) =>
-            {
-                // Use plain text (no ANSI) so downstream fnmatch_lines("*usage:*") works in
-                // non-TTY subprocess contexts. Normalize clap's "Usage:" to "usage:" so
-                // case-sensitive fnmatch on Linux matches upstream argparse-style patterns.
-                let plain = err.render().to_string().replace("Usage:", "usage:");
-                let plain = if err.kind() == clap::error::ErrorKind::DisplayHelp {
-                    Self::to_argparse_style_help(&plain)
-                } else {
-                    plain
-                };
-                return Err(format!("{}{}", crate::EXIT_ZERO_SENTINEL, plain));
-            }
             Err(err) => {
                 // A short flag whose owning bundled plugin was just blocked
                 // (`-p no:capture -s`) is unregistered, so clap rejects it
@@ -865,6 +863,17 @@ impl Config {
                 return Err(msg);
             }
         };
+
+        // Rendered eagerly (not deferred to the print site): `cmd` is local
+        // to this function and clap's `render_help()` needs a live `&mut
+        // Command`. Whether this actually gets printed, and in which form
+        // (full vs. upstream's reduced "minimal help"), is decided later —
+        // once conftest/plugin option registration has had a chance to
+        // succeed or raise a UsageError (see engine/collect/mod.rs).
+        let help_text = matches.get_flag("help").then(|| {
+            let rendered = cmd.render_help().to_string().replace("Usage:", "usage:");
+            Self::to_argparse_style_help(&rendered)
+        });
 
         let (flags, values, plugin_opts) =
             Self::extract_match_flags_values(&matches, &parser, &blocked);
@@ -962,6 +971,7 @@ impl Config {
             plugin_args,
             invocation_args,
             reporter_delegated: std::sync::atomic::AtomicBool::new(false),
+            help_text,
         })
     }
 

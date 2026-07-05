@@ -117,10 +117,12 @@ impl Engine {
         python::set_gc_enabled(py, true);
         let n_collect_errors = collect_errors.len();
 
-        // --markers (and similar early-exit modes) printed their output during
-        // collect and skipped item collection.  Return OK now — falling through
-        // would reach handle_no_tests() → exit 5 ("no tests ran").
-        if self.config.get_flag("markers") {
+        // --markers / -h,--help (and similar early-exit modes) printed their
+        // output during collect and skipped item collection.  Return OK now
+        // — falling through would reach handle_no_tests() → exit 5 ("no
+        // tests ran"). A --help combined with a UsageError never reaches
+        // here at all (collect() returns Err, handled above).
+        if self.config.get_flag("markers") || self.config.help_text.is_some() {
             let _ = self.fire_py_hooks_simple(py, "pytest_unconfigure");
             return exit_code::OK;
         }
