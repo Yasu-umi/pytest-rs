@@ -74,6 +74,21 @@ pub fn crash_message_with_type(py: Python<'_>, err: &PyErr) -> Option<String> {
         .ok()
 }
 
+/// Format a conftest.py import failure pytest-style: an "ImportError while
+/// loading conftest '<path>'." header followed by a short traceback with
+/// the import-machinery frames dropped (upstream's print_conftest_import_error).
+pub fn format_conftest_import_error(py: Python<'_>, err: &PyErr, conftest_path: &str) -> String {
+    let result: PyResult<String> = (|| {
+        py.import("pytest._tb")?
+            .call_method1(
+                "format_conftest_import_error",
+                (err.value(py), conftest_path),
+            )?
+            .extract()
+    })();
+    result.unwrap_or_else(|_| format_exception(py, err))
+}
+
 pub fn format_test_failure(py: Python<'_>, err: &PyErr, style: &str) -> String {
     let result: PyResult<String> = (|| {
         py.import("pytest._tb")?

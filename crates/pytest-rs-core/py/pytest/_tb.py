@@ -444,3 +444,26 @@ def format_exception(exc, style="long"):
     if chain_prefix:
         return "\n".join(chain_prefix) + "\n" + body
     return body
+
+
+def format_conftest_import_error(exc, conftest_path):
+    """upstream's print_conftest_import_error: an "ImportError while loading
+    conftest '<path>'." header, then a short-style traceback of `exc` with
+    dynamically-generated frames dropped (upstream's filter_traceback
+    "is_generated" check) — this drops the frozen importlib frames from the
+    machinery used to load the conftest itself, e.g. "<frozen
+    importlib._bootstrap_external>", which have no real source to show."""
+    lines = [_markup(f"ImportError while loading conftest '{conftest_path}'.", 1, 31)]
+    frames = [
+        (frame, lineno)
+        for frame, lineno in _visible_frames(exc)
+        if not ("<" in frame.f_code.co_filename and ">" in frame.f_code.co_filename)
+    ]
+    if not frames:
+        lines.extend(_markup(f"E   {entry}", 1, 31) for entry in _exception_lines(exc))
+        return "\n".join(lines)
+    for index, (frame, lineno) in enumerate(frames):
+        lines.extend(_format_short_frame(frame, lineno))
+        if index == len(frames) - 1:
+            lines.extend(_markup(f"E   {entry}", 1, 31) for entry in _exception_lines(exc))
+    return "\n".join(lines)

@@ -90,6 +90,12 @@ impl Engine {
         if let Some(help_text) = &self.config.help_text {
             print!("{help_text}");
             print!("{}", crate::config::Config::HELP_FOOTER);
+            // helpconfig.showhelp(): warnings recorded before this point (e.g.
+            // a broken initial conftest, downgraded to a warning so --help
+            // could still run) print as their own "warning : ..." lines.
+            for line in python::showhelp_warning_lines(py) {
+                println!("{line}");
+            }
             return Ok(true);
         }
         // A plugin swapped in its own terminal reporter: suppress native

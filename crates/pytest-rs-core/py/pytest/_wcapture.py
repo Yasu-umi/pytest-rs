@@ -287,6 +287,22 @@ def count():
     return len(captured)
 
 
+def showhelp_warning_lines():
+    """pytest's helpconfig.showhelp(): warnings recorded before --help
+    prints (e.g. a broken initial conftest, downgraded to a warning so
+    --help can still run) are shown as their own "warning : <formatted>"
+    lines after the option listing, using the same formatted text
+    (filename:lineno: Category: message [+ source line]) as
+    warning_record_to_str."""
+    lines = []
+    for warning in captured:
+        text = warnings.formatwarning(
+            warning["message"], warning["category"], warning["filename"], warning["lineno"]
+        ).rstrip("\n")
+        lines.append(f"warning : {text}")
+    return lines
+
+
 def _location(warning):
     """Nodeid if the warning was raised during a test, else the warning's
     origin as an invocation-dir-relative file:lineno (pytest's

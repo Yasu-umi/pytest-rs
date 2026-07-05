@@ -144,11 +144,32 @@ impl Engine {
                 &mut self.session.py_hooks,
                 crate::collect::ImportMode::from_config(&self.config),
             ) {
-                let err_msg = python::format_exception(py, &err);
+                // -h/--help: upstream still shows the (full) help text rather
+                // than aborting on a broken initial conftest — the failure is
+                // downgraded to a PytestConfigWarning (Config.parse's
+                // ConftestImportFailure handling) and printed alongside the
+                // help output (helpconfig.showhelp's warning lines) instead.
+                if self.config.help_text.is_some() {
+                    let msg = format!("could not load initial conftests: {}", conftest.display());
+                    let _ = python::warn_explicit_at(
+                        py,
+                        "PytestConfigWarning",
+                        &msg,
+                        &conftest.to_string_lossy(),
+                        0,
+                    );
+                    continue;
+                }
                 // Conftest import failures are a configuration error (USAGE_ERROR),
-                // not a collection error (INTERRUPTED). Signal with the sentinel so
-                // the caller in mod.rs returns the right exit code.
-                return Err(format!("\x00USAGE_ERROR\x00{err_msg}"));
+                // not a collection error (INTERRUPTED), and print upstream's
+                // dedicated "ImportError while loading conftest" repr verbatim
+                // (no "ERROR during collection:" wrapper, no session banner —
+                // this happens before the header ever prints). Signal both
+                // with the sentinel so the caller in mod.rs returns the right
+                // exit code.
+                let err_msg =
+                    python::format_conftest_import_error(py, &err, &conftest.to_string_lossy());
+                return Err(format!("\x00CONFTEST_IMPORT_ERROR\x00{err_msg}"));
             }
         }
         // Upstream reports pytest_plugins in non-top-level conftests as an error.

@@ -901,6 +901,16 @@ pub fn warning_summary_lines(py: Python<'_>, start: usize) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// `helpconfig.showhelp`'s trailing "warning : <formatted>" lines: warnings
+/// recorded before --help prints (e.g. a broken initial conftest, downgraded
+/// to a warning so --help could still run).
+pub fn showhelp_warning_lines(py: Python<'_>) -> Vec<String> {
+    py.import("pytest._wcapture")
+        .and_then(|m| m.call_method0("showhelp_warning_lines"))
+        .and_then(|lines| lines.extract())
+        .unwrap_or_default()
+}
+
 /// Emit a warning of a pytest category attributed to an explicit
 /// file/line (registry=None: never deduplicated).
 pub fn warn_explicit_at(

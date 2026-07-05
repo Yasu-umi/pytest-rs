@@ -90,6 +90,14 @@ impl Engine {
                     println!("!!! KeyboardInterrupt !!!");
                     return exit_code::INTERRUPTED;
                 }
+                // Sentinel "\x00CONFTEST_IMPORT_ERROR\x00": a broken initial
+                // conftest — print upstream's dedicated repr verbatim (no
+                // "ERROR during collection:" wrapper) and exit 4.
+                if let Some(inner) = message.strip_prefix("\x00CONFTEST_IMPORT_ERROR\x00") {
+                    eprintln!("{inner}");
+                    let _ = self.fire_py_hooks_simple(py, "pytest_unconfigure");
+                    return exit_code::USAGE_ERROR;
+                }
                 // Sentinel "\x00USAGE_ERROR\x00": UsageError in configure —
                 // run unconfigure and exit 4. May have an error message appended.
                 if let Some(inner) = message.strip_prefix("\x00USAGE_ERROR\x00") {
