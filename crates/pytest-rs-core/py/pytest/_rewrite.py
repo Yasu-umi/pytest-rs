@@ -17,7 +17,7 @@ import types
 # tag, so it can never be confused with CPython's own (non-rewritten) bytecode
 # for the same file. Bump _CACHE_VERSION whenever _AssertRewriter's output
 # changes, to invalidate any stale rewritten pyc left on disk.
-_CACHE_VERSION = 6
+_CACHE_VERSION = 7
 _PYC_TAIL = f".{sys.implementation.cache_tag}-pytestrs{_CACHE_VERSION}.pyc"
 
 _OPS = {
@@ -32,6 +32,26 @@ _OPS = {
     ast.Is: "is",
     ast.IsNot: "is not",
 }
+
+# Symbols for the recursive "where" explanation builder (_AssertRewriter
+# .decompose_and_explain), matching upstream's BINOP_MAP/UNARY_MAP
+# (_pytest.assertion.rewrite).
+_BINOP_SYMS = {
+    ast.BitOr: "|",
+    ast.BitXor: "^",
+    ast.BitAnd: "&",
+    ast.LShift: "<<",
+    ast.RShift: ">>",
+    ast.Add: "+",
+    ast.Sub: "-",
+    ast.Mult: "*",
+    ast.Div: "/",
+    ast.FloorDiv: "//",
+    ast.Mod: "%",
+    ast.Pow: "**",
+    ast.MatMult: "@",
+}
+_UNARY_PREFIXES = {ast.Not: "not ", ast.Invert: "~", ast.USub: "-", ast.UAdd: "+"}
 
 
 # Module names (and their submodules) explicitly opted into rewriting via
@@ -280,6 +300,24 @@ def _explain_eq(left, right):
     return _explain_op("==", left, right)
 
 
+def _format_where(expl_template):
+    """Render a "{"/"}"-marked explanation template (see
+    _AssertRewriter._wrap_block) into the indented "+  where"/"+    where"/
+    "+  and" lines pytest shows after a failed comparison's summary. Reuses
+    upstream's own _pytest.assertion.util.format_explanation (bundled
+    as-is) for the nesting/sibling ("where" vs "and") bookkeeping instead of
+    re-deriving it here, since it already implements this exactly.
+
+    `expl_template` starts with an empty anchor line (see _wrap_block's
+    caller) so the result always starts with "\\n", ready to append
+    directly after the "assert ..." summary line."""
+    try:
+        from _pytest.assertion import util
+    except Exception:
+        return ""
+    return util.format_explanation(expl_template)
+
+
 def _should_repr_global_name(obj):
     """Port of upstream's visit_Name gate: a bare global Name is shown by
     repr only if it isn't a callable/module/class-like object (those read
@@ -293,15 +331,35 @@ def _should_repr_global_name(obj):
 
 
 def _saferepr_or_repr(obj):
-    try:
-        from _pytest._io.saferepr import saferepr
+    """Port of upstream's `_saferepr` (_pytest.assertion.rewrite): bound
+    methods show just their name (dropping the redundant "<bound method
+    ...>" noise), the repr is verbosity-aware truncated (full text at -vv,
+    10x the default limit at -v), and embedded newlines are escaped — the
+    text is often embedded into _pytest.assertion.util.format_explanation's
+    "{"/"}" mini-language, where raw newlines are significant."""
+    import types
 
-        return saferepr(obj)
+    if isinstance(obj, types.MethodType):
+        try:
+            return obj.__name__
+        except Exception:
+            pass
+    av = _assertion_verbosity if _assertion_verbosity is not None else _verbosity
+    try:
+        from _pytest._io.saferepr import DEFAULT_REPR_MAX_SIZE, saferepr, saferepr_unlimited
+
+        if av >= 2:
+            text = saferepr_unlimited(obj)
+        elif av >= 1:
+            text = saferepr(obj, maxsize=DEFAULT_REPR_MAX_SIZE * 10)
+        else:
+            text = saferepr(obj)
     except Exception:
         try:
-            return repr(obj)
+            text = repr(obj)
         except Exception:
-            return object.__repr__(obj)
+            text = object.__repr__(obj)
+    return text.replace("\n", "\\n")
 
 
 class _AssertRewriter(ast.NodeTransformer):
@@ -363,126 +421,191 @@ class _AssertRewriter(ast.NodeTransformer):
             ast.Constant("\n"),
         ]
 
-    def _decompose_expr(self, expr, loc):
-        """Recursively decompose Call arguments into temp-var assignments.
-
-        For each Call node, non-trivial arguments (and keyword values) are
-        extracted into their own temp assignments so that intermediate objects
-        stay alive across the whole assertion.  This mirrors real pytest's
-        behaviour and matters when object identity (and thus id()-based
-        __hash__) is relevant: without decomposition, a temporary created for
-        one argument can be freed before the next temporary is allocated,
-        allowing CPython to reuse the same memory address.
-
-        Returns (stmts, new_expr) where stmts is a (possibly empty) list of
-        ast.Assign nodes that must be emitted *before* the expression that
-        uses new_expr.
-        """
-        _SIMPLE = (ast.Name, ast.Constant, ast.Attribute, ast.Subscript)
-        if not isinstance(expr, ast.Call):
-            return [], expr
-
-        stmts = []
-
-        # Recursively decompose each positional argument.
-        new_args = []
-        for arg in expr.args:
-            # Starred (*args) cannot be assigned to a temp var.
-            if isinstance(arg, ast.Starred):
-                new_args.append(arg)
-                continue
-            sub_stmts, new_arg = self._decompose_expr(arg, loc)
-            stmts.extend(sub_stmts)
-            if isinstance(new_arg, _SIMPLE):
-                new_args.append(new_arg)
-            else:
-                tmp = self._temp()
-                assign = ast.Assign(
-                    targets=[ast.Name(id=tmp, ctx=ast.Store())],
-                    value=new_arg,
-                )
-                ast.copy_location(assign, loc)
-                ast.copy_location(assign.targets[0], loc)
-                stmts.append(assign)
-                new_args.append(ast.copy_location(ast.Name(id=tmp, ctx=ast.Load()), loc))
-
-        # Recursively decompose keyword values.
-        new_keywords = []
-        for kw in expr.keywords:
-            sub_stmts, new_val = self._decompose_expr(kw.value, loc)
-            stmts.extend(sub_stmts)
-            if isinstance(new_val, _SIMPLE):
-                new_keywords.append(ast.keyword(arg=kw.arg, value=new_val))
-            else:
-                tmp = self._temp()
-                assign = ast.Assign(
-                    targets=[ast.Name(id=tmp, ctx=ast.Store())],
-                    value=new_val,
-                )
-                ast.copy_location(assign, loc)
-                ast.copy_location(assign.targets[0], loc)
-                stmts.append(assign)
-                new_keywords.append(
-                    ast.keyword(
-                        arg=kw.arg, value=ast.copy_location(ast.Name(id=tmp, ctx=ast.Load()), loc)
-                    )
-                )
-
-        new_expr = ast.copy_location(
-            ast.Call(func=expr.func, args=new_args, keywords=new_keywords), expr
-        )
-        return stmts, new_expr
-
-    def _call_explain_values(self, call):
-        """Build JoinedStr value pieces for a Call node's "where" display,
-        substituting each Name/Constant argument with its repr — e.g. `len(l)`
-        renders as `len([0, 1, 2])`, matching upstream's recursive explain
-        string (built from `visit_Call`/`visit_Name`). Returns None (caller
-        falls back to the plain unparsed source) for anything with a
-        non-Name/Constant argument, a starred arg, or an unparsable func —
-        upstream's fuller recursive builder (BinOp, nested Call, etc.) isn't
-        attempted here."""
+    @staticmethod
+    def _is_approx_call(call):
+        """Return True if node is approx(...) or pytest.approx(...).
+        These objects carry their own rich repr and _repr_compare output,
+        so a redundant '+  where approx(...) = approx(...)' line is noise
+        (the real pytest assertion rewriter never emits it either)."""
         if not isinstance(call, ast.Call):
-            return None
-        if any(isinstance(arg, ast.Starred) for arg in call.args):
-            return None
+            return False
+        func = call.func
+        # approx(...)
+        if isinstance(func, ast.Name) and func.id == "approx":
+            return True
+        # pytest.approx(...)
+        if (
+            isinstance(func, ast.Attribute)
+            and func.attr == "approx"
+            and isinstance(func.value, ast.Name)
+            and func.value.id == "pytest"
+        ):
+            return True
+        return False
 
-        def leaf(value_node):
-            if isinstance(value_node, ast.Name):
-                return ast.FormattedValue(
-                    value=ast.Name(id=value_node.id, ctx=ast.Load()),
-                    conversion=114,
-                    format_spec=None,
+    def _name_repr_ifexp(self, name):
+        """AST for `<repr> if <local-or-should-repr> else "<bare-id>"`,
+        mirroring upstream's visit_Name gate (see _should_repr_global_name)."""
+        locs_call = ast.Call(func=ast.Name(id="locals", ctx=ast.Load()), args=[], keywords=[])
+        inlocs = ast.Compare(left=ast.Constant(name.id), ops=[ast.In()], comparators=[locs_call])
+        dorepr = self._module_helper_call(
+            "_should_repr_global_name", [ast.Name(id=name.id, ctx=ast.Load())]
+        )
+        test_expr = ast.BoolOp(op=ast.Or(), values=[inlocs, dorepr])
+        display_call = self._module_helper_call(
+            "_saferepr_or_repr", [ast.Name(id=name.id, ctx=ast.Load())]
+        )
+        return ast.IfExp(test=test_expr, body=display_call, orelse=ast.Constant(name.id))
+
+    def _repr_formatted(self, ref):
+        """A JoinedStr value piece rendering `_saferepr_or_repr(ref)`."""
+        call = self._module_helper_call("_saferepr_or_repr", [ref])
+        return ast.FormattedValue(value=call, conversion=-1, format_spec=None)
+
+    @staticmethod
+    def _mk_assign(name, value, loc):
+        assign = ast.Assign(targets=[ast.Name(id=name, ctx=ast.Store())], value=value)
+        ast.copy_location(assign, loc)
+        ast.copy_location(assign.targets[0], loc)
+        return assign
+
+    def _wrap_block(self, value_ref, desc_parts):
+        """Just the "{value = desc}" mini-language block itself (see
+        _pytest.assertion.util.format_explanation and _format_where above)
+        — no leading inline repr, since the caller decides separately
+        whether/where a repr of value_ref also needs to appear inline (see
+        _child_display, which needs both; the top-level compare operand,
+        which doesn't — its value already appears in the "assert x == y"
+        summary line)."""
+        return [
+            ast.Constant("\n{"),
+            self._repr_formatted(value_ref),
+            ast.Constant(" = "),
+            *desc_parts,
+            ast.Constant("\n}"),
+        ]
+
+    def _child_display(self, expr, stmts):
+        """Decompose `expr` (a sub-node reached while explaining a parent
+        expression) and return (value_ref, display_parts): display_parts is
+        an inline repr followed by its own "{...}" block for Call/Attribute
+        (matching upstream — they get their own "where" line wherever
+        referenced), or left as bare inline text for everything else
+        (BinOp/UnaryOp/Name/Constant/fallback fold into the parent's own
+        text, unwrapped)."""
+        value_ref, desc_parts = self._decompose_and_explain(expr, stmts)
+        if isinstance(expr, (ast.Attribute, ast.Call)) and not self._is_approx_call(expr):
+            return value_ref, [
+                self._repr_formatted(value_ref),
+                *self._wrap_block(value_ref, desc_parts),
+            ]
+        return value_ref, desc_parts
+
+    def _decompose_and_explain(self, expr, stmts):
+        """Recursively single-evaluate `expr` into temp-var assignments
+        (Python's actual evaluation order — matters for object identity and
+        side effects) and return (value_ref, desc_parts): value_ref is an
+        ast.expr referencing the already-computed value (a temp Name for
+        anything with possible side effects, or the original node for
+        side-effect-free Name-Load / Constant), and desc_parts is a list of
+        JoinedStr value pieces (Constant / FormattedValue) describing how
+        that value was derived — an adapted, recursive port of upstream's
+        visit_Name/visit_Attribute/visit_Call/visit_BinOp/visit_UnaryOp
+        (_pytest.assertion.rewrite). Appends the necessary ast.Assign
+        statements, in evaluation order, to `stmts`.
+
+        Node types outside this function's scope (Subscript, BoolOp,
+        comprehensions, lambdas, walrus, chained Compare, ...) still get a
+        single-eval temp for correctness, but no recursive breakdown — just
+        their own repr (or unparsed source, when available) is shown,
+        matching the previous implementation's fallback for these.
+        """
+        if isinstance(expr, ast.Constant):
+            return expr, [ast.Constant(repr(expr.value))]
+
+        if isinstance(expr, ast.Name) and isinstance(expr.ctx, ast.Load):
+            return expr, [
+                ast.FormattedValue(
+                    value=self._name_repr_ifexp(expr), conversion=-1, format_spec=None
                 )
-            if isinstance(value_node, ast.Constant):
-                return ast.Constant(repr(value_node.value))
-            return None
+            ]
 
+        if isinstance(expr, ast.Attribute) and isinstance(expr.ctx, ast.Load):
+            base_ref, base_desc = self._child_display(expr.value, stmts)
+            tmp = self._temp()
+            access = ast.Attribute(value=base_ref, attr=expr.attr, ctx=ast.Load())
+            stmts.append(self._mk_assign(tmp, access, expr))
+            return ast.Name(id=tmp, ctx=ast.Load()), [*base_desc, ast.Constant(f".{expr.attr}")]
+
+        if isinstance(expr, ast.Call):
+            func_ref, func_desc = self._child_display(expr.func, stmts)
+            pos_refs = []
+            kw_refs = []
+            desc_groups = []
+            for arg in expr.args:
+                if isinstance(arg, ast.Starred):
+                    inner_ref, inner_desc = self._child_display(arg.value, stmts)
+                    pos_refs.append(ast.Starred(value=inner_ref, ctx=ast.Load()))
+                    desc_groups.append([ast.Constant("*"), *inner_desc])
+                    continue
+                ref, desc = self._child_display(arg, stmts)
+                pos_refs.append(ref)
+                desc_groups.append(desc)
+            for kw in expr.keywords:
+                ref, desc = self._child_display(kw.value, stmts)
+                kw_refs.append(ast.keyword(arg=kw.arg, value=ref))
+                if kw.arg:
+                    desc_groups.append([ast.Constant(f"{kw.arg}="), *desc])
+                else:
+                    desc_groups.append([ast.Constant("**"), *desc])
+            tmp = self._temp()
+            new_call = ast.Call(func=func_ref, args=pos_refs, keywords=kw_refs)
+            stmts.append(self._mk_assign(tmp, new_call, expr))
+            desc = [*func_desc, ast.Constant("(")]
+            for i, group in enumerate(desc_groups):
+                if i:
+                    desc.append(ast.Constant(", "))
+                desc.extend(group)
+            desc.append(ast.Constant(")"))
+            return ast.Name(id=tmp, ctx=ast.Load()), desc
+
+        if isinstance(expr, ast.BinOp) and type(expr.op) in _BINOP_SYMS:
+            left_ref, left_desc = self._child_display(expr.left, stmts)
+            right_ref, right_desc = self._child_display(expr.right, stmts)
+            tmp = self._temp()
+            new_binop = ast.BinOp(left=left_ref, op=expr.op, right=right_ref)
+            stmts.append(self._mk_assign(tmp, new_binop, expr))
+            sym = _BINOP_SYMS[type(expr.op)]
+            desc = [
+                ast.Constant("("),
+                *left_desc,
+                ast.Constant(f" {sym} "),
+                *right_desc,
+                ast.Constant(")"),
+            ]
+            return ast.Name(id=tmp, ctx=ast.Load()), desc
+
+        if isinstance(expr, ast.UnaryOp) and type(expr.op) in _UNARY_PREFIXES:
+            operand_ref, operand_desc = self._child_display(expr.operand, stmts)
+            tmp = self._temp()
+            new_unary = ast.UnaryOp(op=expr.op, operand=operand_ref)
+            stmts.append(self._mk_assign(tmp, new_unary, expr))
+            desc = [ast.Constant(_UNARY_PREFIXES[type(expr.op)]), *operand_desc]
+            return ast.Name(id=tmp, ctx=ast.Load()), desc
+
+        # Fallback: node types outside this function's recursive coverage.
+        # Still single-eval into a temp for correctness (object identity /
+        # side effects), but only show its own repr or unparsed source.
+        tmp = self._temp()
+        stmts.append(self._mk_assign(tmp, expr, expr))
+        ref = ast.Name(id=tmp, ctx=ast.Load())
         try:
-            func_src = ast.unparse(call.func)
+            src = ast.unparse(expr)
         except Exception:
-            return None
-        items = []
-        for arg in call.args:
-            piece = leaf(arg)
-            if piece is None:
-                return None
-            items.append((None, piece))
-        for kw in call.keywords:
-            piece = leaf(kw.value)
-            if piece is None:
-                return None
-            items.append((kw.arg, piece))
-
-        parts = [ast.Constant(f"{func_src}(")]
-        for index, (kwname, piece) in enumerate(items):
-            if index:
-                parts.append(ast.Constant(", "))
-            if kwname is not None:
-                parts.append(ast.Constant(f"{kwname}="))
-            parts.append(piece)
-        parts.append(ast.Constant(")"))
-        return parts
+            src = None
+        if src is None:
+            return ref, [self._repr_formatted(ref)]
+        return ref, [ast.Constant(src)]
 
     def _rewrite_compare(self, node):
         test = node.test
@@ -490,16 +613,18 @@ class _AssertRewriter(ast.NodeTransformer):
         if op is None:
             return self._rewrite_generic(node)
 
-        # Decompose sub-expressions so intermediate objects stay alive.
-        left_decomp_stmts, left_expr = self._decompose_expr(test.left, node)
-        right_decomp_stmts, right_expr = self._decompose_expr(test.comparators[0], node)
+        # Recursively single-evaluate both operands into temp-var
+        # assignments, alongside a description of how each was derived.
+        pre_stmts = []
+        left_ref, left_desc = self._decompose_and_explain(test.left, pre_stmts)
+        right_ref, right_desc = self._decompose_and_explain(test.comparators[0], pre_stmts)
 
         left_name = self._temp()
         right_name = self._temp()
-        assign_left = ast.Assign(targets=[ast.Name(id=left_name, ctx=ast.Store())], value=left_expr)
+        assign_left = ast.Assign(targets=[ast.Name(id=left_name, ctx=ast.Store())], value=left_ref)
         assign_right = ast.Assign(
             targets=[ast.Name(id=right_name, ctx=ast.Store())],
-            value=right_expr,
+            value=right_ref,
         )
         recomposed = ast.Compare(
             left=ast.Name(id=left_name, ctx=ast.Load()),
@@ -546,73 +671,32 @@ class _AssertRewriter(ast.NodeTransformer):
             ast.JoinedStr,
             ast.FormattedValue,
             ast.Subscript,
-            ast.Attribute,
         )
 
-        def _is_approx_call(node):
-            """Return True if node is approx(...) or pytest.approx(...).
-            These objects carry their own rich repr and _repr_compare output,
-            so a redundant '+  where approx(...) = approx(...)' line is noise
-            (the real pytest assertion rewriter never emits it either)."""
-            if not isinstance(node, ast.Call):
-                return False
-            func = node.func
-            # approx(...)
-            if isinstance(func, ast.Name) and func.id == "approx":
-                return True
-            # pytest.approx(...)
-            if (
-                isinstance(func, ast.Attribute)
-                and func.attr == "approx"
-                and isinstance(func.value, ast.Name)
-                and func.value.id == "pytest"
-            ):
-                return True
-            return False
-
-        left_trivial = isinstance(test.left, _TRIVIAL) or _is_approx_call(test.left)
-        right_trivial = isinstance(test.comparators[0], _TRIVIAL) or _is_approx_call(
+        left_trivial = isinstance(test.left, _TRIVIAL) or self._is_approx_call(test.left)
+        right_trivial = isinstance(test.comparators[0], _TRIVIAL) or self._is_approx_call(
             test.comparators[0]
         )
+        # Seed with an empty anchor line so _format_where's leading "line 0"
+        # (discarded — it belongs to the "assert ..." summary above, not to
+        # this suffix) never collides with a real where-block.
+        where_values = [ast.Constant("")]
         if not left_trivial:
-            call_parts = self._call_explain_values(test.left)
-            try:
-                src = ast.unparse(test.left)
-            except Exception:
-                src = None
-            if call_parts is not None or src:
-                values.extend(
-                    [
-                        ast.Constant("\n +  where "),
-                        ast.FormattedValue(
-                            value=ast.Name(id=left_name, ctx=ast.Load()),
-                            conversion=114,
-                            format_spec=None,
-                        ),
-                        ast.Constant(" = "),
-                    ]
-                )
-                values.extend(call_parts if call_parts is not None else [ast.Constant(src)])
+            where_values.extend(self._wrap_block(ast.Name(id=left_name, ctx=ast.Load()), left_desc))
         if not right_trivial:
-            call_parts = self._call_explain_values(test.comparators[0])
-            try:
-                src = ast.unparse(test.comparators[0])
-            except Exception:
-                src = None
-            if call_parts is not None or src:
-                label = "and   " if not left_trivial else "where "
-                values.extend(
-                    [
-                        ast.Constant(f"\n +  {label}"),
-                        ast.FormattedValue(
-                            value=ast.Name(id=right_name, ctx=ast.Load()),
-                            conversion=114,
-                            format_spec=None,
-                        ),
-                        ast.Constant(" = "),
-                    ]
+            where_values.extend(
+                self._wrap_block(ast.Name(id=right_name, ctx=ast.Load()), right_desc)
+            )
+        if len(where_values) > 1:
+            values.append(
+                ast.FormattedValue(
+                    value=self._module_helper_call(
+                        "_format_where", [ast.JoinedStr(values=where_values)]
+                    ),
+                    conversion=-1,
+                    format_spec=None,
                 )
-                values.extend(call_parts if call_parts is not None else [ast.Constant(src)])
+            )
         message = ast.JoinedStr(values=values)
         raise_stmt = ast.Raise(
             exc=ast.Call(
@@ -630,15 +714,10 @@ class _AssertRewriter(ast.NodeTransformer):
         # Upstream parity: clear the temporaries after a passing assert —
         # they live in the frame, and leak tests (weakref + gc.collect
         # inside the test) would see the asserted values kept alive.
-        # Include any temp vars from sub-expression decomposition.
-        decomp_tmp_names = [
-            assign.targets[0].id for assign in left_decomp_stmts + right_decomp_stmts
-        ]
-        all_tmp_names = decomp_tmp_names + [left_name, right_name]
+        all_tmp_names = [assign.targets[0].id for assign in pre_stmts] + [left_name, right_name]
         clear = ast.Delete(targets=[ast.Name(id=n, ctx=ast.Del()) for n in all_tmp_names])
         statements = [
-            *left_decomp_stmts,
-            *right_decomp_stmts,
+            *pre_stmts,
             assign_left,
             assign_right,
             check,
@@ -683,16 +762,7 @@ class _AssertRewriter(ast.NodeTransformer):
         when it's a local var or a 'should-repr' global (see
         _should_repr_global_name), else the bare identifier text — mirrors
         upstream's visit_Name."""
-        locs_call = ast.Call(func=ast.Name(id="locals", ctx=ast.Load()), args=[], keywords=[])
-        inlocs = ast.Compare(left=ast.Constant(name.id), ops=[ast.In()], comparators=[locs_call])
-        dorepr = self._module_helper_call(
-            "_should_repr_global_name", [ast.Name(id=name.id, ctx=ast.Load())]
-        )
-        test_expr = ast.BoolOp(op=ast.Or(), values=[inlocs, dorepr])
-        display_call = self._module_helper_call(
-            "_saferepr_or_repr", [ast.Name(id=name.id, ctx=ast.Load())]
-        )
-        ifexp = ast.IfExp(test=test_expr, body=display_call, orelse=ast.Constant(name.id))
+        ifexp = self._name_repr_ifexp(name)
 
         message = ast.JoinedStr(
             values=[
