@@ -133,6 +133,26 @@ def _prepareconfig(args=None, plugins=None):
     return Config(option)
 
 
+def parse(conftest_path):
+    """upstream Config.parse(): when --help/--version is requested, a
+    ConftestImportFailure while loading the initial conftest is downgraded
+    to a warning instead of aborting (config/__init__.py:1604-1617)."""
+    import importlib.util
+
+    from pytest._warning_types import PytestConfigWarning
+    from pytest._wcapture import _fire_config_time_warning
+
+    try:
+        spec = importlib.util.spec_from_file_location("conftest", conftest_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+    except Exception:
+        _fire_config_time_warning(
+            PytestConfigWarning(f"could not load initial conftests: {conftest_path}"),
+            stacklevel=1,
+        )
+
+
 def parse_warning_filter(arg, *, escape):
     """Parse a warnings filter string (the engine's own parser, which is
     already a port of upstream's)."""

@@ -543,24 +543,36 @@ class Pytester:
         command-line args (rootdir discovery, ini reading, option parsing),
         without running a session — upstream's _prepareconfig."""
         from _pytest.config import _native_prepareconfig
+        from _pytest.config import parse as _warn_on_initial_conftest_failure
 
         from pytest._pluginmanager import pluginmanager
 
         new_args = [str(arg) for arg in args]
-        try:
-            config = _native_prepareconfig(new_args)
-        except SystemExit:
-            # --help/--version prints output and exits; tolerate so callers
-            # can still inspect warnings fired before the early exit.
-            return None
-        config._mark_as_parsed()
-        # Register pytester plugins into the shared pluginmanager so they
-        # receive hook calls (e.g. pytest_warning_recorded) fired during
-        # conftest loading inside _fire_addoption.
+        # Register pytester plugins into the shared pluginmanager up front so
+        # they receive hook calls (e.g. pytest_warning_recorded) fired either
+        # below (--help/--version) or during conftest loading inside
+        # _fire_addoption.
         extra_plugins = [p for p in getattr(self, "plugins", []) if not isinstance(p, str)]
         for plugin in extra_plugins:
             pluginmanager.register(plugin)
         try:
+            if any(arg in ("-h", "--help", "-V", "--version") for arg in new_args):
+                # --help/--version short-circuits to SystemExit before the
+                # in-process config ever reaches conftest loading
+                # (_fire_addoption below); attempt it here so a broken
+                # conftest still surfaces as the warning upstream issues
+                # instead of being silently skipped.
+                conftest = self.path / "conftest.py"
+                if conftest.is_file():
+                    _warn_on_initial_conftest_failure(conftest)
+            try:
+                config = _native_prepareconfig(new_args)
+            except SystemExit:
+                # --help/--version prints output and exits; tolerate so
+                # callers can still inspect warnings fired before the early
+                # exit.
+                return None
+            config._mark_as_parsed()
             self._fire_addoption(config, new_args)
         finally:
             for plugin in extra_plugins:
