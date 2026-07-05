@@ -652,6 +652,14 @@ impl Config {
         (kept, plugin_args)
     }
 
+    /// clap's one-line usage synopsis (name + `[OPTIONS] [FILE_OR_DIR]...`),
+    /// fixed regardless of which plugins registered options — the paths
+    /// positional and `[OPTIONS]` collapse are static in `build_clap_command`.
+    /// Upstream's `PytestArgumentParser.error()` always prefixes UsageError
+    /// messages with this same synopsis (`self.format_usage() + msg`); reused
+    /// wherever a Rust-raised UsageError needs the same treatment.
+    pub(crate) const USAGE_SYNOPSIS: &str = "usage: pytest-rs-bin [OPTIONS] [FILE_OR_DIR]...\n";
+
     /// Rewrite clap's auto-generated `--help` text into upstream's
     /// argparse-based `showhelp()` shape: the section headings clap and
     /// argparse disagree on, plus pytest's own footer lines (helpconfig.py's

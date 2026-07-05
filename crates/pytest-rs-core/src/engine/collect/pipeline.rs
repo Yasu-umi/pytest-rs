@@ -172,9 +172,17 @@ impl Engine {
         // above; anything still unknown is a usage error (pytest parity).
         if let Err(err) = self.apply_plugin_cli_args(py) {
             // Usage errors print their bare message ("ERROR: <message>"),
-            // not a class-prefixed traceback line.
+            // not a class-prefixed traceback line. Prefixed with the usage
+            // synopsis, matching upstream's PytestArgumentParser.error()
+            // (`self.format_usage() + msg`) for every argparse-style CLI
+            // parsing failure (missing value, invalid choice, unrecognized
+            // argument).
             if python::is_usage_error(py, &err) {
-                return Err(err.value(py).to_string());
+                return Err(format!(
+                    "{}{}",
+                    crate::config::Config::USAGE_SYNOPSIS,
+                    err.value(py)
+                ));
             }
             return Err(python::format_exception(py, &err));
         }
