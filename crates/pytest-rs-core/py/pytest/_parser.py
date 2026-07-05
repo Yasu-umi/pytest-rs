@@ -454,8 +454,10 @@ def apply_cli_args(namespace: Any, tokens: list[str]) -> tuple[list[str], list[s
                 collected.append(tokens[index])
                 index += 1
             if len(collected) < nargs:
-                unknown.append(token)
-                continue
+                from pytest import UsageError
+
+                plural = "s" if nargs != 1 else ""
+                raise UsageError(f"error: argument {name}: expected {nargs} argument{plural}")
             try:
                 converted = [convert(v) if callable(convert) else v for v in collected]
             except (ValueError, argparse.ArgumentTypeError) as exc:
@@ -468,8 +470,9 @@ def apply_cli_args(namespace: Any, tokens: list[str]) -> tuple[list[str], list[s
                     value = tokens[index]
                     index += 1
                 else:
-                    unknown.append(token)
-                    continue
+                    from pytest import UsageError
+
+                    raise UsageError(f"error: argument {name}: expected one argument")
             try:
                 converted = convert(value) if callable(convert) else value
             except (ValueError, argparse.ArgumentTypeError) as exc:
