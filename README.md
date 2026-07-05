@@ -102,69 +102,69 @@ hyperfine -w 1 'pytest --cov=mypkg' 'pytest-rs --cov=mypkg'
 
 Compatibility is verified by running the **upstream test suites** of the libraries pytest-rs reproduces, unchanged, under pytest-rs (`conformance/`).
 
-Current results (`total = passed + failed + errors + skipped + deselected`; `deselected` = tests intentionally skipped via `--deselect` in `conformance/suites.toml`, counted against total; `files excluded` = whole files that also fail under vanilla pytest, out of scope; updated automatically by `conformance/runner.py` — see [conformance/RESULTS.md](https://github.com/Yasu-umi/pytest-rs/blob/main/conformance/RESULTS.md) for per-file detail):
+Current results (`total = passed + failed + errors + skipped + deselected + known_failed`; `deselected` = tests that never run, excluded via `--deselect` in `conformance/suites.toml` because running them would be flaky or environmentally invalid; `known_failed` = tests that run normally but fail for a known, permanent, accepted reason (matched by exact nodeid against the run's own output, so a test that starts passing again is simply counted as `passed` instead of masking a real fix); both count against the total but not toward conformance; `files excluded` = whole files that also fail under vanilla pytest, out of scope; updated automatically by `conformance/runner.py` — see [conformance/RESULTS.md](https://github.com/Yasu-umi/pytest-rs/blob/main/conformance/RESULTS.md) for per-file detail):
 
 <!-- conformance-results:start -->
 _linux (CI-verified)_
 
 **pytest & plugin ecosystem** (the APIs pytest-rs reimplements):
 
-| suite | tag | passed | failed | errors | skipped | deselected | total | conformant % | files all-pass | files run | files excluded |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2682 | 106 | 0 | 53 | 8 | 2849 | 96.0% | 25 | 54 | 61 |
-| pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
-| pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 2 | 90 | 97.8% | 1 | 1 | 0 |
-| pytest-cov | v7.1.0 | 204 | 2 | 0 | 3 | 0 | 209 | 99.0% | 0 | 1 | 0 |
-| pytest-xdist | v3.8.0 | 97 | 0 | 0 | 1 | 0 | 98 | 100.0% | 1 | 1 | 6 |
-| pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
-| pytest-benchmark | v5.1.0 | 113 | 9 | 0 | 1 | 0 | 123 | 92.7% | 5 | 7 | 6 |
-| anyio | 4.13.0 | 3120 | 0 | 0 | 42 | 0 | 3162 | 100.0% | 26 | 26 | 0 |
+| suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| pytest | 9.0.3 | 2682 | 106 | 0 | 53 | 8 | 0 | 2849 | 96.0% | 25 | 54 | 61 |
+| pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
+| pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 2 | 0 | 90 | 97.8% | 1 | 1 | 0 |
+| pytest-cov | v7.1.0 | 204 | 2 | 0 | 3 | 0 | 0 | 209 | 99.0% | 0 | 1 | 0 |
+| pytest-xdist | v3.8.0 | 97 | 0 | 0 | 1 | 0 | 0 | 98 | 100.0% | 1 | 1 | 6 |
+| pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
+| pytest-benchmark | v5.1.0 | 113 | 9 | 0 | 1 | 0 | 0 | 123 | 92.7% | 5 | 7 | 6 |
+| anyio | 4.13.0 | 3120 | 0 | 0 | 42 | 0 | 0 | 3162 | 100.0% | 26 | 26 | 0 |
 
 **Third-party plugins** (not reimplemented — their own upstream test suites run under pytest-rs, loaded via the `pytest11` entry-point shim):
 
-| suite | tag | passed | failed | errors | skipped | deselected | total | conformant % | files all-pass | files run | files excluded |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 1 | 7 | 85.7% | 2 | 2 | 0 |
-| pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 2 | 43 | 95.3% | 1 | 1 | 0 |
-| pytest-mypy | v1.0.1 | 53 | 23 | 0 | 2 | 0 | 78 | 70.5% | 0 | 1 | 0 |
-| pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
-| pytest-subtests | v0.14.2 | 32 | 0 | 0 | 0 | 0 | 32 | 100.0% | 1 | 1 | 0 |
-| pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
-| pytest-snapshot | v0.9.0 | 102 | 5 | 0 | 0 | 0 | 107 | 95.3% | 0 | 3 | 0 |
-| pytest-icdiff | 0.5 | 10 | 2 | 0 | 0 | 0 | 12 | 83.3% | 0 | 1 | 0 |
-| pytest-socket | 0.7.0 | 41 | 2 | 0 | 0 | 0 | 43 | 95.3% | 3 | 6 | 0 |
-| pytest-order | v1.4.0 | 120 | 14 | 0 | 0 | 0 | 134 | 89.6% | 7 | 16 | 0 |
-| pytest-repeat | v0.9.4 | 16 | 0 | 0 | 0 | 0 | 16 | 100.0% | 1 | 1 | 0 |
-| pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
-| pytest-env | 1.6.0 | 69 | 6 | 0 | 0 | 0 | 75 | 92.0% | 2 | 3 | 0 |
-| pytest-rerunfailures | 9.1.1 | 47 | 0 | 0 | 1 | 0 | 48 | 100.0% | 1 | 1 | 0 |
-| pytest-randomly | 4.1.0 | 22 | 15 | 0 | 0 | 0 | 37 | 59.5% | 0 | 1 | 0 |
-| pytest-bdd | 8.1.0 | 123 | 15 | 0 | 1 | 0 | 139 | 89.2% | 28 | 35 | 0 |
-| pytest-django | v4.9.0 | 210 | 5 | 0 | 1 | 0 | 216 | 97.7% | 8 | 13 | 0 |
+| suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 1 | 0 | 7 | 85.7% | 2 | 2 | 0 |
+| pytest-timeout | 2.4.0 | 40 | 0 | 0 | 1 | 2 | 0 | 43 | 95.3% | 1 | 1 | 0 |
+| pytest-mypy | v1.0.1 | 53 | 23 | 0 | 2 | 0 | 0 | 78 | 70.5% | 0 | 1 | 0 |
+| pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
+| pytest-subtests | v0.14.2 | 32 | 0 | 0 | 0 | 0 | 0 | 32 | 100.0% | 1 | 1 | 0 |
+| pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
+| pytest-snapshot | v0.9.0 | 102 | 5 | 0 | 0 | 0 | 0 | 107 | 95.3% | 0 | 3 | 0 |
+| pytest-icdiff | 0.5 | 10 | 2 | 0 | 0 | 0 | 0 | 12 | 83.3% | 0 | 1 | 0 |
+| pytest-socket | 0.7.0 | 41 | 2 | 0 | 0 | 0 | 0 | 43 | 95.3% | 3 | 6 | 0 |
+| pytest-order | v1.4.0 | 120 | 14 | 0 | 0 | 0 | 0 | 134 | 89.6% | 7 | 16 | 0 |
+| pytest-repeat | v0.9.4 | 16 | 0 | 0 | 0 | 0 | 0 | 16 | 100.0% | 1 | 1 | 0 |
+| pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
+| pytest-env | 1.6.0 | 69 | 6 | 0 | 0 | 0 | 0 | 75 | 92.0% | 2 | 3 | 0 |
+| pytest-rerunfailures | 9.1.1 | 47 | 0 | 0 | 1 | 0 | 0 | 48 | 100.0% | 1 | 1 | 0 |
+| pytest-randomly | 4.1.0 | 22 | 15 | 0 | 0 | 0 | 0 | 37 | 59.5% | 0 | 1 | 0 |
+| pytest-bdd | 8.1.0 | 123 | 15 | 0 | 1 | 0 | 0 | 139 | 89.2% | 28 | 35 | 0 |
+| pytest-django | v4.9.0 | 210 | 5 | 0 | 1 | 0 | 0 | 216 | 97.7% | 8 | 13 | 0 |
 
 **Real-world projects** (their suites run unchanged, as drop-in evidence):
 
-| suite | tag | passed | failed | errors | skipped | deselected | total | conformant % | files all-pass | files run | files excluded |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| click | 8.3.1 | 1314 | 0 | 0 | 21 | 0 | 1335 | 100.0% | 20 | 20 | 0 |
-| jinja | 3.1.6 | 909 | 0 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
-| marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
-| rich | v14.2.0 | 855 | 0 | 0 | 25 | 0 | 880 | 100.0% | 60 | 62 | 0 |
-| sqlglot | v30.11.0 | 1120 | 0 | 0 | 0 | 0 | 1120 | 100.0% | 52 | 54 | 0 |
-| httpx | 0.28.1 | 1410 | 0 | 0 | 1 | 7 | 1418 | 99.5% | 31 | 31 | 0 |
-| httpx2 | v2.4.0 | 1426 | 0 | 0 | 1 | 0 | 1427 | 100.0% | 31 | 31 | 0 |
-| starlette | 0.46.2 | 907 | 0 | 0 | 0 | 0 | 907 | 100.0% | 28 | 28 | 0 |
-| attrs | 25.3.0 | 1341 | 0 | 0 | 4 | 1 | 1346 | 99.9% | 22 | 24 | 0 |
-| more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 0 | 671 | 100.0% | 2 | 2 | 0 |
-| werkzeug | 3.1.3 | 922 | 0 | 0 | 1 | 25 | 948 | 97.4% | 24 | 25 | 0 |
-| fastapi | 0.115.12 | 2332 | 1 | 0 | 130 | 1 | 2464 | 99.9% | 303 | 310 | 0 |
-| packaging | 25.0 | 26947 | 0 | 0 | 0 | 1 | 26948 | 100.0% | 12 | 12 | 0 |
-| pandas | v3.0.3 | 160773 | 1 | 0 | 26984 | 15 | 187773 | 100.0% | 871 | 961 | 3 |
-| networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 0 | 6894 | 100.0% | 259 | 266 | 0 |
-| pydantic | v2.11.7 | 5338 | 14 | 0 | 921 | 0 | 6273 | 99.8% | 77 | 82 | 0 |
-| scikit-learn-1 | 1.9.0 | 8432 | 0 | 0 | 6624 | 0 | 15056 | 100.0% | 79 | 87 | 0 |
-| scikit-learn-2 | 1.9.0 | 5046 | 0 | 0 | 1892 | 0 | 6938 | 100.0% | 52 | 58 | 0 |
-| scikit-learn-3 | 1.9.0 | 9251 | 3 | 0 | 2530 | 0 | 11784 | 100.0% | 104 | 114 | 0 |
+| suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| click | 8.3.1 | 1314 | 0 | 0 | 21 | 0 | 0 | 1335 | 100.0% | 20 | 20 | 0 |
+| jinja | 3.1.6 | 909 | 0 | 0 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
+| marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
+| rich | v14.2.0 | 855 | 0 | 0 | 25 | 0 | 0 | 880 | 100.0% | 60 | 62 | 0 |
+| sqlglot | v30.11.0 | 1120 | 0 | 0 | 0 | 0 | 0 | 1120 | 100.0% | 52 | 54 | 0 |
+| httpx | 0.28.1 | 1410 | 0 | 0 | 1 | 7 | 0 | 1418 | 99.5% | 31 | 31 | 0 |
+| httpx2 | v2.4.0 | 1426 | 0 | 0 | 1 | 0 | 0 | 1427 | 100.0% | 31 | 31 | 0 |
+| starlette | 0.46.2 | 907 | 0 | 0 | 0 | 0 | 0 | 907 | 100.0% | 28 | 28 | 0 |
+| attrs | 25.3.0 | 1341 | 0 | 0 | 4 | 1 | 0 | 1346 | 99.9% | 22 | 24 | 0 |
+| more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 0 | 0 | 671 | 100.0% | 2 | 2 | 0 |
+| werkzeug | 3.1.3 | 922 | 0 | 0 | 1 | 25 | 0 | 948 | 97.4% | 24 | 25 | 0 |
+| fastapi | 0.115.12 | 2332 | 1 | 0 | 130 | 1 | 0 | 2464 | 99.9% | 303 | 310 | 0 |
+| packaging | 25.0 | 26947 | 0 | 0 | 0 | 1 | 0 | 26948 | 100.0% | 12 | 12 | 0 |
+| pandas | v3.0.3 | 160773 | 1 | 0 | 26984 | 15 | 0 | 187773 | 100.0% | 871 | 961 | 3 |
+| networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 0 | 0 | 6894 | 100.0% | 259 | 266 | 0 |
+| pydantic | v2.11.7 | 5338 | 14 | 0 | 921 | 0 | 0 | 6273 | 99.8% | 77 | 82 | 0 |
+| scikit-learn-1 | 1.9.0 | 8432 | 0 | 0 | 6624 | 0 | 0 | 15056 | 100.0% | 79 | 87 | 0 |
+| scikit-learn-2 | 1.9.0 | 5046 | 0 | 0 | 1892 | 0 | 0 | 6938 | 100.0% | 52 | 58 | 0 |
+| scikit-learn-3 | 1.9.0 | 9251 | 3 | 0 | 2530 | 0 | 0 | 11784 | 100.0% | 104 | 114 | 0 |
 <!-- conformance-results:end -->
 
 The suites are included as **shallow git submodules** under `conformance/suites/` at the pinned release tags. Initialize them once after cloning:

@@ -42,6 +42,16 @@ SUMMARY_RE = re.compile(
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
+def _failed_nodeid(row: str) -> str | None:
+    """Extract the nodeid from a "short test summary info" row, e.g.
+    'FAILED path::Class::test - AssertionError: ...' -> 'path::Class::test'.
+    Returns None for rows that aren't a FAILED/ERROR summary line."""
+    for prefix in ("FAILED ", "ERROR "):
+        if row.startswith(prefix):
+            return row[len(prefix) :].split(" - ", 1)[0].strip()
+    return None
+
+
 @dataclass
 class FileResult:
     file: str
@@ -52,6 +62,7 @@ class FileResult:
     skipped: int = 0
     errors: int = 0
     deselected: int = 0
+    known_failed: int = 0
     stdout: str = ""
     stderr: str = ""
 
@@ -75,9 +86,26 @@ class Suite:
         self.use_src = config.get("use_src", True)
         self.deps: list[str] = config.get("deps", [])
         self.exclude: list[str] = config.get("exclude", [])
-        # Node ids never run (flaky under load; they would destabilize the
-        # committed results the release gate compares against).
+        # Node ids never run (flaky under load, or environmentally invalid —
+        # e.g. depend on a mock/CI-detection mechanism pytest-rs's execution
+        # model doesn't apply to — so even attempting them would destabilize
+        # the committed results the release gate compares against). Matched
+        # by nodeid PREFIX (mirrors pytest's own --deselect semantics), so a
+        # short name here can collaterally swallow longer sibling nodeids
+        # (e.g. "test_foo" also deselects "test_foo_bar") — prefer
+        # known_failures below when the test runs fine and just fails
+        # predictably; it matches by exact nodeid instead.
         self.deselect: list[str] = config.get("deselect", [])
+        # Node ids that run normally but are known, permanent, accepted
+        # non-conformance (e.g. a cosmetic path-display difference from
+        # pytest-rs's own module layout). Unlike deselect, these are matched
+        # by EXACT nodeid against the "short test summary info" FAILED/ERROR
+        # lines post-hoc in Python (see _failed_nodeid) — never passed to the
+        # pytest-rs CLI — so they can't collaterally swallow a sibling test,
+        # and they keep verifying the test still fails as expected (if it
+        # starts passing, it's silently absorbed into the normal passed
+        # count instead of masking a real fix).
+        self.known_failures: list[str] = config.get("known_failures", [])
         # "ecosystem" (pytest + its plugins, the reimplementation targets)
         # or "real-world" (famous suites run as drop-in evidence).
         self.category: str = config.get("category", "ecosystem")
@@ -244,14 +272,38 @@ class Suite:
         env.update(self.env)
         return env
 
+    @staticmethod
+    def _nodeid_in_file(nodeid: str, rel: str) -> bool:
+        """True if `nodeid`'s file part (before the first '::') is `rel`."""
+        nodeid_file = nodeid.split("::")[0]
+        return nodeid_file == rel or rel.endswith("/" + nodeid_file)
+
+    @staticmethod
+    def _nodeid_matches(candidate: str, want: str) -> bool:
+        """True if `want` (a suites.toml-listed nodeid, written relative to
+        `testpaths`) identifies the same test as `candidate` (a full nodeid
+        parsed from a FAILED/ERROR summary line, relative to the checkout
+        root — which can have an extra path prefix, e.g. a `package`
+        install's top-level package dir, same mismatch _nodeid_in_file
+        handles for the file part alone). Suffix-matching the WHOLE nodeid
+        (not just the file part, unlike --deselect's bare prefix match) is
+        safe: colliding would need another file to coincidentally end with
+        the same path AND contain a test of the exact same qualified name."""
+        return candidate == want or candidate.endswith("/" + want)
+
     def _deselect_args(self, rel: str) -> list[str]:
         """--deselect args for the node ids pinned out of this file."""
         deselects: list[str] = []
         for nodeid in self.deselect:
-            deselect_file = nodeid.split("::")[0]
-            if deselect_file == rel or rel.endswith("/" + deselect_file):
+            if self._nodeid_in_file(nodeid, rel):
                 deselects.extend(("--deselect", nodeid))
         return deselects
+
+    def _known_failures_for(self, rel: str) -> set[str]:
+        """Nodeids (as written in suites.toml, relative to testpaths) in
+        this file that are pre-approved permanent failures (see
+        known_failures docstring above)."""
+        return {nodeid for nodeid in self.known_failures if self._nodeid_in_file(nodeid, rel)}
 
     def _timeout(self, rel: str) -> float:
         return TIMEOUT_S * self.slow_timeout_multiplier if rel in self.slow_files else TIMEOUT_S
@@ -273,10 +325,25 @@ class Suite:
 
         out = ANSI_RE.sub("", proc.stdout)
         counts = self._parse_summary(out)
+        known = self._known_failures_for(rel)
+        if known:
+            reclassified = 0
+            for line in out.splitlines():
+                nodeid = _failed_nodeid(line)
+                if nodeid is None or not any(self._nodeid_matches(nodeid, k) for k in known):
+                    continue
+                bucket = "failed" if line.startswith("FAILED ") else "errors"
+                counts[bucket] = max(0, counts.get(bucket, 0) - 1)
+                reclassified += 1
+            if reclassified:
+                counts["known_failed"] = reclassified
         if proc.returncode == 0 and counts.get("passed", 0) > 0:
             status = "passed"
         elif proc.returncode == 0:
             status = "no-tests"
+        elif proc.returncode == 1 and counts.get("failed", 0) == 0 and counts.get("errors", 0) == 0:
+            # All real failures in this file are pre-approved known_failures.
+            status = "passed"
         elif proc.returncode == 1:
             status = "failed"
         elif proc.returncode == 5:
@@ -293,6 +360,7 @@ class Suite:
             skipped=counts.get("skipped", 0),
             errors=counts.get("errors", 0),
             deselected=counts.get("deselected", 0),
+            known_failed=counts.get("known_failed", 0),
             # Keep output for diagnosing pin regressions (failed) and crashes
             # (unexpected exit codes); passing files are dropped to save memory.
             stdout=out if (is_unexpected or status == "failed") else "",
@@ -364,23 +432,29 @@ def suite_summary(results: list[FileResult], excluded: int) -> str:
     """Aligned stats: tests conformant/total (%), file tally, oddity notes.
 
     "tests" counts individual test outcomes summed across every file, with
-    total = passed + failed + errors + skipped + deselected; conformant =
-    passed + skipped (reproducing an upstream skip matches pytest's behaviour,
-    so it counts toward conformance; deselected tests are intentionally not run
-    and count against the total). "files" counts per-file runs (a file is
-    all-pass only when its whole run exited cleanly)."""
+    total = passed + failed + errors + skipped + deselected + known_failed;
+    conformant = passed + skipped (reproducing an upstream skip matches
+    pytest's behaviour, so it counts toward conformance; deselected and
+    known_failed tests count against the total but not toward it — see
+    Suite.deselect / Suite.known_failures for the difference between them).
+    "files" counts per-file runs (a file is all-pass only when its whole run
+    exited cleanly, i.e. any known_failed tests in it were its only
+    failures)."""
     passed = sum(r.passed for r in results)
     failed = sum(r.failed for r in results)
     errors = sum(r.errors for r in results)
     skipped = sum(r.skipped for r in results)
     deselected = sum(r.deselected for r in results)
-    total = passed + failed + errors + skipped + deselected
+    known_failed = sum(r.known_failed for r in results)
+    total = passed + failed + errors + skipped + deselected + known_failed
     conformant = passed + skipped
     pct = f"{conformant / total * 100:5.1f}%" if total else "    -"
     files_ok = sum(1 for r in results if r.status == "passed")
     notes = []
     if skipped:
         notes.append(f"{skipped} skipped")
+    if known_failed:
+        notes.append(f"{known_failed} known-failed")
     # Files that died before running any test contribute no test counts.
     dead = [
         r.file for r in results if r.status in ("error", "timeout") and r.passed + r.failed == 0
@@ -484,6 +558,7 @@ def run_suites(
                     "category": suite.category,
                     "excluded_files": excluded,
                     "deselected": sum(r.deselected for r in results),
+                    "known_failed": sum(r.known_failed for r in results),
                     "files": [
                         {k: v for k, v in result.__dict__.items() if k not in ("stdout", "stderr")}
                         for result in results
@@ -560,9 +635,9 @@ def cross_suite_tables(boards: list[dict]) -> list[str]:
 def cross_suite_table(boards: list[dict]) -> list[str]:
     """One cross-suite markdown table."""
     lines = [
-        "| suite | tag | passed | failed | errors | skipped | deselected | total | conformant % "
-        "| files all-pass | files run | files excluded |",
-        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| suite | tag | passed | failed | errors | skipped | deselected | known_failed "
+        "| total | conformant % | files all-pass | files run | files excluded |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for board in boards:
         files = board["files"]
@@ -571,13 +646,14 @@ def cross_suite_table(boards: list[dict]) -> list[str]:
         errors = sum(f["errors"] for f in files)
         skipped = sum(f["skipped"] for f in files)
         deselected = sum(f.get("deselected", 0) for f in files)
-        total = passed + failed + errors + skipped + deselected
+        known_failed = sum(f.get("known_failed", 0) for f in files)
+        total = passed + failed + errors + skipped + deselected + known_failed
         pct = f"{(passed + skipped) / total * 100:.1f}%" if total else "-"
         files_ok = sum(1 for f in files if f["status"] == "passed")
         lines.append(
             f"| {board['suite']} | {board['tag']} | {passed} | {failed} | {errors} "
-            f"| {skipped} | {deselected} | {total} | {pct} | {files_ok} | {len(files)} "
-            f"| {board.get('excluded_files', 0)} |"
+            f"| {skipped} | {deselected} | {known_failed} | {total} | {pct} | {files_ok} "
+            f"| {len(files)} | {board.get('excluded_files', 0)} |"
         )
     return lines
 
@@ -594,14 +670,21 @@ def render_results_doc(suites: list[Suite]) -> str:
         "this file and the README table. Linux is canonical: CI re-runs the suites",
         "and auto-commits updated results on pushes to main.",
         "",
-        "Accounting: `total = passed + failed + errors + skipped + deselected`, summed",
-        "over the upstream test files of each suite. `conformant % = (passed + skipped)",
-        "/ total` — reproducing an upstream skip matches pytest's behaviour, so it",
-        "counts toward conformance. `deselected` counts individual tests excluded via",
-        "`--deselect` (see `deselect` lists in `conformance/suites.toml`); they count",
-        "against the total. `files excluded` counts whole test files not run at all —",
-        "these fail under vanilla pytest too (network access, OS clipboard, etc.) and",
-        "are out of scope for pytest-rs; they are not counted in the total.",
+        "Accounting: `total = passed + failed + errors + skipped + deselected +",
+        "known_failed`, summed over the upstream test files of each suite.",
+        "`conformant % = (passed + skipped) / total` — reproducing an upstream skip",
+        "matches pytest's behaviour, so it counts toward conformance. `deselected`",
+        "counts individual tests excluded via `--deselect` before they ever run (see",
+        "`deselect` lists in `conformance/suites.toml` — used for tests that are flaky",
+        "or environmentally invalid under pytest-rs's execution model). `known_failed`",
+        "counts individual tests that DO run but are known, permanent, accepted",
+        "non-conformance (see `known_failures` lists in `conformance/suites.toml` —",
+        "matched by exact nodeid against the run's own FAILED/ERROR lines, so a test",
+        "that starts passing again is simply absorbed into `passed` instead of masking",
+        "a real fix). Both count against the total but not toward conformance. `files",
+        "excluded` counts whole test files not run at all — these fail under vanilla",
+        "pytest too (network access, OS clipboard, etc.) and are out of scope for",
+        "pytest-rs; they are not counted in the total.",
         "",
     ]
     for platform in scoreboard_platforms():
@@ -619,12 +702,15 @@ def render_results_doc(suites: list[Suite]) -> str:
             lines.append("")
             lines.append(f"<details><summary>per-file detail ({len(files)} files)</summary>")
             lines.append("")
-            lines.append("| file | status | passed | failed | errors | skipped | deselected |")
-            lines.append("|---|---|---:|---:|---:|---:|---:|")
+            lines.append(
+                "| file | status | passed | failed | errors | skipped | deselected | known_failed |"
+            )
+            lines.append("|---|---|---:|---:|---:|---:|---:|---:|")
             for f in files:
                 lines.append(
                     f"| {f['file']} | {f['status']} | {f['passed']} | {f['failed']} "
-                    f"| {f['errors']} | {f['skipped']} | {f.get('deselected', 0)} |"
+                    f"| {f['errors']} | {f['skipped']} | {f.get('deselected', 0)} "
+                    f"| {f.get('known_failed', 0)} |"
                 )
             lines.append("")
             lines.append("</details>")
@@ -666,11 +752,15 @@ def check_suite(suite: Suite, results: list[FileResult]) -> list[str]:
             line = f"{suite.name}: {file}: expected {want}, got {got}"
             # Surface the offending tests so a CI-only regression is
             # actionable without re-running the file by hand (the captured
-            # output is kept for "failed" files in run_one).
+            # output is kept for "failed" files in run_one). Known, pre-
+            # approved failures are excluded so only genuinely new breakage
+            # shows up here.
+            known = suite._known_failures_for(file)
             failing = [
                 row
                 for row in (result.stdout if result else "").splitlines()
-                if row.startswith("FAILED ") or row.startswith("ERROR ")
+                for nodeid in [_failed_nodeid(row)]
+                if nodeid is not None and not any(suite._nodeid_matches(nodeid, k) for k in known)
             ]
             if failing:
                 line += "\n      " + "\n      ".join(failing[:20])
