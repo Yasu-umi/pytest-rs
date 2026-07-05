@@ -4,6 +4,7 @@
   "category": "third-party",
   "excluded_files": 0,
   "deselected": 0,
+  "known_failed": 0,
   "files": [
     {
       "file": "tests/test_async.py",
@@ -13,7 +14,8 @@
       "failed": 1,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "tests/test_combinations.py",
@@ -23,7 +25,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "tests/test_doctest.py",
@@ -33,7 +36,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "tests/test_precedence.py",
@@ -43,7 +47,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "tests/test_restrict_hosts.py",
@@ -53,17 +58,19 @@
       "failed": 1,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "tests/test_socket.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
-      "failed": 0,
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 19,
+      "failed": 3,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     }
   ]
 }

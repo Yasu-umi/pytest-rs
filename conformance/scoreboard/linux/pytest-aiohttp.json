@@ -3,7 +3,8 @@
   "tag": "v1.1.1",
   "category": "third-party",
   "excluded_files": 0,
-  "deselected": 1,
+  "deselected": 0,
+  "known_failed": 1,
   "files": [
     {
       "file": "tests/test_fixtures.py",
@@ -13,17 +14,19 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "tests/test_switch_mode.py",
       "status": "passed",
-      "exit_code": 0,
+      "exit_code": 1,
       "passed": 2,
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 1
+      "deselected": 0,
+      "known_failed": 1
     }
   ]
 }

@@ -4,6 +4,7 @@
   "category": "real-world",
   "excluded_files": 3,
   "deselected": 0,
+  "known_failed": 0,
   "files": [
     {
       "file": "tests/test_context.py",
@@ -13,7 +14,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "tests/test_decorators.py",
@@ -23,7 +25,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "tests/test_deserialization.py",
@@ -33,7 +36,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "tests/test_error_store.py",
@@ -43,7 +47,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "tests/test_exceptions.py",
@@ -53,7 +58,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "tests/test_fields.py",
@@ -63,7 +69,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "tests/test_options.py",
@@ -73,7 +80,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "tests/test_registry.py",
@@ -83,7 +91,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "tests/test_schema.py",
@@ -93,7 +102,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "tests/test_serialization.py",
@@ -103,7 +113,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "tests/test_utils.py",
@@ -113,7 +124,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "tests/test_validate.py",
@@ -123,7 +135,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     }
   ]
 }

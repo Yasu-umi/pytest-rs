@@ -4,6 +4,7 @@
   "category": "real-world",
   "excluded_files": 0,
   "deselected": 0,
+  "known_failed": 0,
   "files": [
     {
       "file": "networkx/algorithms/approximation/tests/test_approx_clust_coeff.py",
@@ -13,7 +14,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/approximation/tests/test_clique.py",
@@ -23,7 +25,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/approximation/tests/test_connectivity.py",
@@ -33,7 +36,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/approximation/tests/test_density.py",
@@ -43,7 +47,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/approximation/tests/test_distance_measures.py",
@@ -53,7 +58,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/approximation/tests/test_dominating_set.py",
@@ -63,7 +69,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/approximation/tests/test_kcomponents.py",
@@ -73,7 +80,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/approximation/tests/test_matching.py",
@@ -83,7 +91,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/approximation/tests/test_maxcut.py",
@@ -93,7 +102,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/approximation/tests/test_ramsey.py",
@@ -103,7 +113,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/approximation/tests/test_steinertree.py",
@@ -113,7 +124,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/approximation/tests/test_traveling_salesman.py",
@@ -123,7 +135,8 @@
       "failed": 0,
       "skipped": 1,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/approximation/tests/test_treewidth.py",
@@ -133,7 +146,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/approximation/tests/test_vertex_cover.py",
@@ -143,7 +157,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/assortativity/tests/test_connectivity.py",
@@ -153,7 +168,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/assortativity/tests/test_correlation.py",
@@ -163,7 +179,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/assortativity/tests/test_mixing.py",
@@ -173,7 +190,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/assortativity/tests/test_neighbor_degree.py",
@@ -183,7 +201,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/assortativity/tests/test_pairs.py",
@@ -193,7 +212,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/bipartite/tests/test_basic.py",
@@ -203,7 +223,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/bipartite/tests/test_centrality.py",
@@ -213,7 +234,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/bipartite/tests/test_cluster.py",
@@ -223,7 +245,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/bipartite/tests/test_covering.py",
@@ -233,7 +256,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/bipartite/tests/test_edgelist.py",
@@ -243,7 +267,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/bipartite/tests/test_extendability.py",
@@ -253,7 +278,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/bipartite/tests/test_generators.py",
@@ -263,7 +289,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/bipartite/tests/test_link_analysis.py",
@@ -273,7 +300,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/bipartite/tests/test_matching.py",
@@ -283,7 +311,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/bipartite/tests/test_matrix.py",
@@ -293,7 +322,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/bipartite/tests/test_project.py",
@@ -303,7 +333,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/bipartite/tests/test_redundancy.py",
@@ -313,7 +344,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/bipartite/tests/test_spectral_bipartivity.py",
@@ -323,7 +355,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/centrality/tests/test_betweenness_centrality.py",
@@ -333,7 +366,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/centrality/tests/test_betweenness_centrality_subset.py",
@@ -343,7 +377,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/centrality/tests/test_closeness_centrality.py",
@@ -353,7 +388,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/centrality/tests/test_current_flow_betweenness_centrality.py",
@@ -363,7 +399,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/centrality/tests/test_current_flow_betweenness_centrality_subset.py",
@@ -373,7 +410,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/centrality/tests/test_current_flow_closeness.py",
@@ -383,7 +421,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/centrality/tests/test_degree_centrality.py",
@@ -393,7 +432,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/centrality/tests/test_dispersion.py",
@@ -403,7 +443,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/centrality/tests/test_eigenvector_centrality.py",
@@ -413,7 +454,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/centrality/tests/test_group.py",
@@ -423,7 +465,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/centrality/tests/test_harmonic_centrality.py",
@@ -433,7 +476,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/centrality/tests/test_katz_centrality.py",
@@ -443,7 +487,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/centrality/tests/test_laplacian_centrality.py",
@@ -453,7 +498,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/centrality/tests/test_load_centrality.py",
@@ -463,7 +509,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/centrality/tests/test_percolation_centrality.py",
@@ -473,7 +520,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/centrality/tests/test_reaching.py",
@@ -483,7 +531,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/centrality/tests/test_second_order_centrality.py",
@@ -493,7 +542,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/centrality/tests/test_subgraph.py",
@@ -503,7 +553,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/centrality/tests/test_trophic.py",
@@ -513,7 +564,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/centrality/tests/test_voterank.py",
@@ -523,7 +575,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/coloring/tests/test_coloring.py",
@@ -533,7 +586,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/community/tests/test_asyn_fluid.py",
@@ -543,7 +597,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/community/tests/test_bipartitions.py",
@@ -553,7 +608,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/community/tests/test_centrality.py",
@@ -563,7 +619,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/community/tests/test_divisive.py",
@@ -573,7 +630,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/community/tests/test_kclique.py",
@@ -583,7 +641,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/community/tests/test_label_propagation.py",
@@ -593,7 +652,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/community/tests/test_leiden.py",
@@ -603,7 +663,8 @@
       "failed": 0,
       "skipped": 9,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/community/tests/test_local.py",
@@ -613,7 +674,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/community/tests/test_louvain.py",
@@ -623,7 +685,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/community/tests/test_lukes.py",
@@ -633,7 +696,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/community/tests/test_modularity_max.py",
@@ -643,7 +707,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/community/tests/test_quality.py",
@@ -653,7 +718,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/community/tests/test_utils.py",
@@ -663,7 +729,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/components/tests/test_attracting.py",
@@ -673,7 +740,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/components/tests/test_biconnected.py",
@@ -683,7 +751,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/components/tests/test_connected.py",
@@ -693,7 +762,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/components/tests/test_semiconnected.py",
@@ -703,7 +773,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/components/tests/test_strongly_connected.py",
@@ -713,7 +784,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/components/tests/test_weakly_connected.py",
@@ -723,7 +795,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/connectivity/tests/test_connectivity.py",
@@ -733,7 +806,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/connectivity/tests/test_cuts.py",
@@ -743,7 +817,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/connectivity/tests/test_disjoint_paths.py",
@@ -753,7 +828,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/connectivity/tests/test_edge_augmentation.py",
@@ -763,7 +839,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/connectivity/tests/test_edge_kcomponents.py",
@@ -773,7 +850,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/connectivity/tests/test_kcomponents.py",
@@ -783,7 +861,8 @@
       "failed": 0,
       "skipped": 3,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/connectivity/tests/test_kcutsets.py",
@@ -793,7 +872,8 @@
       "failed": 0,
       "skipped": 11,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/connectivity/tests/test_stoer_wagner.py",
@@ -803,7 +883,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/flow/tests/test_gomory_hu.py",
@@ -813,7 +894,8 @@
       "failed": 0,
       "skipped": 1,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/flow/tests/test_maxflow.py",
@@ -823,7 +905,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/flow/tests/test_maxflow_large_graph.py",
@@ -833,7 +916,8 @@
       "failed": 0,
       "skipped": 1,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/flow/tests/test_mincost.py",
@@ -843,7 +927,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/flow/tests/test_networksimplex.py",
@@ -853,7 +938,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/isomorphism/tests/test_ismags.py",
@@ -863,7 +949,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/isomorphism/tests/test_isomorphism.py",
@@ -873,7 +960,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/isomorphism/tests/test_isomorphvf2.py",
@@ -883,7 +971,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/isomorphism/tests/test_match_helpers.py",
@@ -893,7 +982,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/isomorphism/tests/test_temporalisomorphvf2.py",
@@ -903,7 +993,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/isomorphism/tests/test_tree_isomorphism.py",
@@ -913,7 +1004,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/isomorphism/tests/test_vf2pp.py",
@@ -923,7 +1015,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/isomorphism/tests/test_vf2pp_helpers.py",
@@ -933,7 +1026,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/isomorphism/tests/test_vf2userfunc.py",
@@ -943,7 +1037,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/link_analysis/tests/test_hits.py",
@@ -953,7 +1048,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/link_analysis/tests/test_pagerank.py",
@@ -963,7 +1059,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/minors/tests/test_contraction.py",
@@ -973,7 +1070,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/operators/tests/test_all.py",
@@ -983,7 +1081,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/operators/tests/test_binary.py",
@@ -993,7 +1092,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/operators/tests/test_product.py",
@@ -1003,7 +1103,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/operators/tests/test_unary.py",
@@ -1013,7 +1114,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/shortest_paths/tests/test_astar.py",
@@ -1023,7 +1125,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/shortest_paths/tests/test_dense.py",
@@ -1033,7 +1136,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/shortest_paths/tests/test_dense_numpy.py",
@@ -1043,7 +1147,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/shortest_paths/tests/test_generic.py",
@@ -1053,7 +1158,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/shortest_paths/tests/test_unweighted.py",
@@ -1063,7 +1169,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/shortest_paths/tests/test_weighted.py",
@@ -1073,7 +1180,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_asteroidal.py",
@@ -1083,7 +1191,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_boundary.py",
@@ -1093,7 +1202,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_bridges.py",
@@ -1103,7 +1213,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_broadcasting.py",
@@ -1113,7 +1224,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_chains.py",
@@ -1123,7 +1235,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_chordal.py",
@@ -1133,7 +1246,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_clique.py",
@@ -1143,7 +1257,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_cluster.py",
@@ -1153,7 +1268,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_communicability.py",
@@ -1163,7 +1279,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_core.py",
@@ -1173,7 +1290,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_covering.py",
@@ -1183,7 +1301,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_cuts.py",
@@ -1193,7 +1312,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_cycles.py",
@@ -1203,7 +1323,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_d_separation.py",
@@ -1213,7 +1334,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_dag.py",
@@ -1223,7 +1345,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_distance_measures.py",
@@ -1233,7 +1356,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_distance_regular.py",
@@ -1243,7 +1367,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_dominance.py",
@@ -1253,7 +1378,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_dominating.py",
@@ -1263,7 +1389,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_efficiency.py",
@@ -1273,7 +1400,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_euler.py",
@@ -1283,7 +1411,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_graph_hashing.py",
@@ -1293,7 +1422,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_graphical.py",
@@ -1303,7 +1433,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_hierarchy.py",
@@ -1313,7 +1444,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_hybrid.py",
@@ -1323,7 +1455,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_isolate.py",
@@ -1333,7 +1466,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_link_prediction.py",
@@ -1343,7 +1477,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_lowest_common_ancestors.py",
@@ -1353,7 +1488,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_matching.py",
@@ -1363,7 +1499,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_max_weight_clique.py",
@@ -1373,7 +1510,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_mis.py",
@@ -1383,7 +1521,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_moral.py",
@@ -1393,7 +1532,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_node_classification.py",
@@ -1403,7 +1543,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_non_randomness.py",
@@ -1413,7 +1554,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_perfect_graph.py",
@@ -1423,7 +1565,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_planar_drawing.py",
@@ -1433,7 +1576,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_planarity.py",
@@ -1443,7 +1587,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_polynomials.py",
@@ -1453,7 +1598,8 @@
       "failed": 0,
       "skipped": 1,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_reciprocity.py",
@@ -1463,7 +1609,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_regular.py",
@@ -1473,7 +1620,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_richclub.py",
@@ -1483,7 +1631,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_similarity.py",
@@ -1493,7 +1642,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_simple_paths.py",
@@ -1503,7 +1653,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_smallworld.py",
@@ -1513,7 +1664,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_smetric.py",
@@ -1523,7 +1675,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_sparsifiers.py",
@@ -1533,7 +1686,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_structuralholes.py",
@@ -1543,7 +1697,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_summarization.py",
@@ -1553,7 +1708,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_swap.py",
@@ -1563,7 +1719,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_threshold.py",
@@ -1573,7 +1730,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_time_dependent.py",
@@ -1583,7 +1741,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_tournament.py",
@@ -1593,7 +1752,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_triads.py",
@@ -1603,7 +1763,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_vitality.py",
@@ -1613,7 +1774,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_voronoi.py",
@@ -1623,7 +1785,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_walks.py",
@@ -1633,7 +1796,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tests/test_wiener.py",
@@ -1643,7 +1807,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/traversal/tests/test_beamsearch.py",
@@ -1653,7 +1818,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/traversal/tests/test_bfs.py",
@@ -1663,7 +1829,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/traversal/tests/test_dfs.py",
@@ -1673,7 +1840,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/traversal/tests/test_edgebfs.py",
@@ -1683,7 +1851,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/traversal/tests/test_edgedfs.py",
@@ -1693,7 +1862,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tree/tests/test_branchings.py",
@@ -1703,7 +1873,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tree/tests/test_coding.py",
@@ -1713,7 +1884,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tree/tests/test_decomposition.py",
@@ -1723,7 +1895,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tree/tests/test_distance_measures.py",
@@ -1733,7 +1906,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tree/tests/test_mst.py",
@@ -1743,7 +1917,8 @@
       "failed": 0,
       "skipped": 2,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tree/tests/test_operations.py",
@@ -1753,7 +1928,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/tree/tests/test_recognition.py",
@@ -1763,7 +1939,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/classes/tests/test_coreviews.py",
@@ -1773,7 +1950,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/classes/tests/test_digraph.py",
@@ -1783,7 +1961,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/classes/tests/test_digraph_historical.py",
@@ -1793,7 +1972,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/classes/tests/test_filters.py",
@@ -1803,7 +1983,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/classes/tests/test_function.py",
@@ -1813,7 +1994,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/classes/tests/test_graph.py",
@@ -1823,7 +2005,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/classes/tests/test_graph_historical.py",
@@ -1833,7 +2016,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/classes/tests/test_graphviews.py",
@@ -1843,7 +2027,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/classes/tests/test_multidigraph.py",
@@ -1853,7 +2038,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/classes/tests/test_multigraph.py",
@@ -1863,7 +2049,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/classes/tests/test_reportviews.py",
@@ -1873,7 +2060,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/classes/tests/test_special.py",
@@ -1883,7 +2071,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/classes/tests/test_subgraphviews.py",
@@ -1893,7 +2082,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/drawing/tests/test_agraph.py",
@@ -1903,7 +2093,8 @@
       "failed": 0,
       "skipped": 1,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/drawing/tests/test_image_comparison_pylab_mpl.py",
@@ -1913,7 +2104,8 @@
       "failed": 0,
       "skipped": 1,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/drawing/tests/test_latex.py",
@@ -1923,7 +2115,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/drawing/tests/test_layout.py",
@@ -1933,7 +2126,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/drawing/tests/test_pydot.py",
@@ -1943,7 +2137,8 @@
       "failed": 0,
       "skipped": 1,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/drawing/tests/test_pylab.py",
@@ -1953,7 +2148,8 @@
       "failed": 0,
       "skipped": 1,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/generators/tests/test_atlas.py",
@@ -1963,7 +2159,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/generators/tests/test_classic.py",
@@ -1973,7 +2170,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/generators/tests/test_cographs.py",
@@ -1983,7 +2181,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/generators/tests/test_community.py",
@@ -1993,7 +2192,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/generators/tests/test_degree_seq.py",
@@ -2003,7 +2203,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/generators/tests/test_directed.py",
@@ -2013,7 +2214,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/generators/tests/test_duplication.py",
@@ -2023,7 +2225,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/generators/tests/test_ego.py",
@@ -2033,7 +2236,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/generators/tests/test_expanders.py",
@@ -2043,7 +2247,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/generators/tests/test_geometric.py",
@@ -2053,7 +2258,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/generators/tests/test_harary_graph.py",
@@ -2063,7 +2269,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/generators/tests/test_internet_as_graphs.py",
@@ -2073,7 +2280,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/generators/tests/test_intersection.py",
@@ -2083,7 +2291,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/generators/tests/test_interval_graph.py",
@@ -2093,7 +2302,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/generators/tests/test_joint_degree_seq.py",
@@ -2103,7 +2313,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/generators/tests/test_lattice.py",
@@ -2113,7 +2324,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/generators/tests/test_line.py",
@@ -2123,7 +2335,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/generators/tests/test_mycielski.py",
@@ -2133,7 +2346,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/generators/tests/test_nonisomorphic_trees.py",
@@ -2143,7 +2357,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/generators/tests/test_random_clustered.py",
@@ -2153,7 +2368,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/generators/tests/test_random_graphs.py",
@@ -2163,7 +2379,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/generators/tests/test_small.py",
@@ -2173,7 +2390,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/generators/tests/test_spectral_graph_forge.py",
@@ -2183,7 +2401,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/generators/tests/test_stochastic.py",
@@ -2193,7 +2412,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/generators/tests/test_sudoku.py",
@@ -2203,7 +2423,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/generators/tests/test_time_series.py",
@@ -2213,7 +2434,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/generators/tests/test_trees.py",
@@ -2223,7 +2445,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/generators/tests/test_triads.py",
@@ -2233,7 +2456,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/linalg/tests/test_algebraic_connectivity.py",
@@ -2243,7 +2467,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/linalg/tests/test_attrmatrix.py",
@@ -2253,7 +2478,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/linalg/tests/test_bethehessian.py",
@@ -2263,7 +2489,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/linalg/tests/test_graphmatrix.py",
@@ -2273,7 +2500,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/linalg/tests/test_laplacian.py",
@@ -2283,7 +2511,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/linalg/tests/test_modularity.py",
@@ -2293,7 +2522,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/linalg/tests/test_spectrum.py",
@@ -2303,7 +2533,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/readwrite/json_graph/tests/test_adjacency.py",
@@ -2313,7 +2544,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/readwrite/json_graph/tests/test_cytoscape.py",
@@ -2323,7 +2555,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/readwrite/json_graph/tests/test_node_link.py",
@@ -2333,7 +2566,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/readwrite/json_graph/tests/test_tree.py",
@@ -2343,7 +2577,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/readwrite/tests/test_adjlist.py",
@@ -2353,7 +2588,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/readwrite/tests/test_edgelist.py",
@@ -2363,7 +2599,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/readwrite/tests/test_gexf.py",
@@ -2373,7 +2610,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/readwrite/tests/test_gml.py",
@@ -2383,7 +2621,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/readwrite/tests/test_graph6.py",
@@ -2393,7 +2632,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/readwrite/tests/test_graphml.py",
@@ -2403,7 +2643,8 @@
       "failed": 0,
       "skipped": 41,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/readwrite/tests/test_leda.py",
@@ -2413,7 +2654,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/readwrite/tests/test_p2g.py",
@@ -2423,7 +2665,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/readwrite/tests/test_pajek.py",
@@ -2433,7 +2676,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/readwrite/tests/test_sparse6.py",
@@ -2443,7 +2687,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/readwrite/tests/test_text.py",
@@ -2453,7 +2698,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/tests/test_all_random_functions.py",
@@ -2463,7 +2709,8 @@
       "failed": 0,
       "skipped": 1,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/tests/test_convert.py",
@@ -2473,7 +2720,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/tests/test_convert_numpy.py",
@@ -2483,7 +2731,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/tests/test_convert_pandas.py",
@@ -2493,7 +2742,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/tests/test_convert_scipy.py",
@@ -2503,7 +2753,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/tests/test_exceptions.py",
@@ -2513,7 +2764,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/tests/test_import.py",
@@ -2523,7 +2775,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/tests/test_lazy_imports.py",
@@ -2533,7 +2786,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/tests/test_relabel.py",
@@ -2543,7 +2797,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/tests/test_removed_functions_exception_messages.py",
@@ -2553,7 +2808,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/utils/tests/test__init.py",
@@ -2563,7 +2819,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/utils/tests/test_backends.py",
@@ -2573,7 +2830,8 @@
       "failed": 0,
       "skipped": 4,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/utils/tests/test_config.py",
@@ -2583,7 +2841,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/utils/tests/test_decorators.py",
@@ -2593,7 +2852,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/utils/tests/test_heaps.py",
@@ -2603,7 +2863,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/utils/tests/test_mapped_queue.py",
@@ -2613,7 +2874,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/utils/tests/test_misc.py",
@@ -2623,7 +2885,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/utils/tests/test_random_sequence.py",
@@ -2633,7 +2896,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/utils/tests/test_rcm.py",
@@ -2643,7 +2907,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/utils/tests/test_unionfind.py",
@@ -2653,7 +2918,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "networkx/algorithms/assortativity/tests/base_test.py",
@@ -2663,7 +2929,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     }
   ]
 }

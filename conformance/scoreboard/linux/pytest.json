@@ -3,7 +3,8 @@
   "tag": "9.0.3",
   "category": "ecosystem",
   "excluded_files": 61,
-  "deselected": 8,
+  "deselected": 0,
+  "known_failed": 8,
   "files": [
     {
       "file": "testing/python/approx.py",
@@ -13,7 +14,8 @@
       "failed": 0,
       "skipped": 18,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/python/collect.py",
@@ -23,17 +25,19 @@
       "failed": 3,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/python/fixtures.py",
       "status": "failed",
       "exit_code": 1,
       "passed": 204,
-      "failed": 4,
+      "failed": 2,
       "skipped": 2,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 2
     },
     {
       "file": "testing/python/integration.py",
@@ -43,7 +47,8 @@
       "failed": 3,
       "skipped": 4,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/python/metafunc.py",
@@ -53,7 +58,8 @@
       "failed": 1,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/python/raises.py",
@@ -63,7 +69,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/python/raises_group.py",
@@ -73,7 +80,8 @@
       "failed": 3,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/python/show_fixtures_per_test.py",
@@ -83,7 +91,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/examples/test_issue519.py",
@@ -93,7 +102,8 @@
       "failed": 1,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/freeze/tests/test_trivial.py",
@@ -103,7 +113,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/logging/test_fixture.py",
@@ -113,7 +124,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/logging/test_formatter.py",
@@ -123,7 +135,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/logging/test_reporting.py",
@@ -133,7 +146,8 @@
       "failed": 8,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_assertion.py",
@@ -143,7 +157,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_cacheprovider.py",
@@ -153,7 +168,8 @@
       "failed": 3,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_capture.py",
@@ -163,7 +179,8 @@
       "failed": 2,
       "skipped": 2,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_collect_imported_tests.py",
@@ -173,7 +190,8 @@
       "failed": 1,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_collection.py",
@@ -183,7 +201,8 @@
       "failed": 8,
       "skipped": 3,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_compat.py",
@@ -193,7 +212,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_config.py",
@@ -203,7 +223,8 @@
       "failed": 1,
       "skipped": 1,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_conftest.py",
@@ -213,7 +234,8 @@
       "failed": 6,
       "skipped": 1,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_doctest.py",
@@ -223,7 +245,8 @@
       "failed": 0,
       "skipped": 1,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_error_diffs.py",
@@ -233,7 +256,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_faulthandler.py",
@@ -243,7 +267,8 @@
       "failed": 7,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_helpconfig.py",
@@ -253,7 +278,8 @@
       "failed": 6,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_junitxml.py",
@@ -263,7 +289,8 @@
       "failed": 5,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_link_resolve.py",
@@ -273,7 +300,8 @@
       "failed": 1,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_main.py",
@@ -283,7 +311,8 @@
       "failed": 4,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_mark.py",
@@ -293,7 +322,8 @@
       "failed": 1,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_monkeypatch.py",
@@ -303,7 +333,8 @@
       "failed": 0,
       "skipped": 2,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_nodes.py",
@@ -313,7 +344,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_pastebin.py",
@@ -323,7 +355,8 @@
       "failed": 3,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_pytester.py",
@@ -333,7 +366,8 @@
       "failed": 4,
       "skipped": 1,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_python_path.py",
@@ -343,7 +377,8 @@
       "failed": 2,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_recwarn.py",
@@ -353,7 +388,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_runner.py",
@@ -363,7 +399,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_runner_xunit.py",
@@ -373,7 +410,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_scope.py",
@@ -383,7 +421,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_session.py",
@@ -393,7 +432,8 @@
       "failed": 2,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_setuponly.py",
@@ -403,7 +443,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_setupplan.py",
@@ -413,7 +454,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_skipping.py",
@@ -423,7 +465,8 @@
       "failed": 1,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_stash.py",
@@ -433,7 +476,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_stepwise.py",
@@ -443,7 +487,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_subtests.py",
@@ -453,7 +498,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_terminal.py",
@@ -463,7 +509,8 @@
       "failed": 1,
       "skipped": 4,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_threadexception.py",
@@ -473,7 +520,8 @@
       "failed": 1,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_tmpdir.py",
@@ -483,7 +531,8 @@
       "failed": 0,
       "skipped": 1,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_unittest.py",
@@ -493,7 +542,8 @@
       "failed": 6,
       "skipped": 9,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_unraisableexception.py",
@@ -503,7 +553,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_warning_types.py",
@@ -513,7 +564,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/test_warnings.py",
@@ -523,17 +575,19 @@
       "failed": 2,
       "skipped": 2,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "testing/acceptance_test.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 67,
+      "passed": 69,
       "failed": 16,
       "skipped": 2,
       "errors": 0,
-      "deselected": 8
+      "deselected": 0,
+      "known_failed": 6
     },
     {
       "file": "testing/deprecated_test.py",
@@ -543,7 +597,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     }
   ]
 }

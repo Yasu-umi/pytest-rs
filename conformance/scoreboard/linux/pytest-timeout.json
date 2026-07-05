@@ -3,17 +3,19 @@
   "tag": "2.4.0",
   "category": "third-party",
   "excluded_files": 0,
-  "deselected": 2,
+  "deselected": 0,
+  "known_failed": 0,
   "files": [
     {
       "file": "test_pytest_timeout.py",
       "status": "passed",
       "exit_code": 0,
-      "passed": 40,
+      "passed": 42,
       "failed": 0,
       "skipped": 1,
       "errors": 0,
-      "deselected": 2
+      "deselected": 0,
+      "known_failed": 0
     }
   ]
 }

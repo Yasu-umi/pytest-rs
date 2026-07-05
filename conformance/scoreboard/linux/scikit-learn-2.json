@@ -4,6 +4,7 @@
   "category": "real-world",
   "excluded_files": 0,
   "deselected": 0,
+  "known_failed": 0,
   "files": [
     {
       "file": "sklearn/tests/test_base.py",
@@ -13,7 +14,8 @@
       "failed": 0,
       "skipped": 6,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/tests/test_build.py",
@@ -23,7 +25,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/tests/test_calibration.py",
@@ -33,7 +36,8 @@
       "failed": 0,
       "skipped": 137,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/tests/test_check_build.py",
@@ -43,7 +47,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/tests/test_common.py",
@@ -53,7 +58,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/tests/test_config.py",
@@ -63,7 +69,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/tests/test_discriminant_analysis.py",
@@ -73,7 +80,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/tests/test_docstring_parameters.py",
@@ -83,7 +91,8 @@
       "failed": 0,
       "skipped": 212,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/tests/test_docstring_parameters_consistency.py",
@@ -93,7 +102,8 @@
       "failed": 0,
       "skipped": 4,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/tests/test_docstrings.py",
@@ -103,7 +113,8 @@
       "failed": 0,
       "skipped": 1,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/tests/test_dummy.py",
@@ -113,7 +124,8 @@
       "failed": 0,
       "skipped": 1,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/tests/test_init.py",
@@ -123,7 +135,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/tests/test_isotonic.py",
@@ -133,7 +146,8 @@
       "failed": 0,
       "skipped": 1,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/tests/test_kernel_approximation.py",
@@ -143,7 +157,8 @@
       "failed": 0,
       "skipped": 332,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/tests/test_kernel_ridge.py",
@@ -153,7 +168,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/tests/test_metadata_routing.py",
@@ -163,7 +179,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/tests/test_metaestimators.py",
@@ -173,7 +190,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/tests/test_metaestimators_metadata_routing.py",
@@ -183,7 +201,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/tests/test_min_dependencies_readme.py",
@@ -193,7 +212,8 @@
       "failed": 0,
       "skipped": 2,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/tests/test_multiclass.py",
@@ -203,7 +223,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/tests/test_multioutput.py",
@@ -213,7 +234,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/tests/test_naive_bayes.py",
@@ -223,7 +245,8 @@
       "failed": 0,
       "skipped": 61,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/tests/test_pipeline.py",
@@ -233,7 +256,8 @@
       "failed": 0,
       "skipped": 27,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/tests/test_public_functions.py",
@@ -243,7 +267,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/tests/test_random_projection.py",
@@ -253,7 +278,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/ensemble/_hist_gradient_boosting/tests/test_binning.py",
@@ -263,7 +289,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/ensemble/_hist_gradient_boosting/tests/test_compare_lightgbm.py",
@@ -273,7 +300,8 @@
       "failed": 0,
       "skipped": 100,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/ensemble/_hist_gradient_boosting/tests/test_gradient_boosting.py",
@@ -283,7 +311,8 @@
       "failed": 0,
       "skipped": 16,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/ensemble/_hist_gradient_boosting/tests/test_grower.py",
@@ -293,7 +322,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/ensemble/_hist_gradient_boosting/tests/test_histogram.py",
@@ -303,7 +333,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/ensemble/_hist_gradient_boosting/tests/test_monotonic_constraints.py",
@@ -313,7 +344,8 @@
       "failed": 0,
       "skipped": 2,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/ensemble/_hist_gradient_boosting/tests/test_predictor.py",
@@ -323,7 +355,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/ensemble/_hist_gradient_boosting/tests/test_splitting.py",
@@ -333,7 +366,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/ensemble/_hist_gradient_boosting/tests/test_warm_start.py",
@@ -343,7 +377,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/ensemble/tests/test_bagging.py",
@@ -353,7 +388,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/ensemble/tests/test_base.py",
@@ -363,7 +399,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/ensemble/tests/test_bootstrap.py",
@@ -373,7 +410,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/ensemble/tests/test_common.py",
@@ -383,7 +421,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/ensemble/tests/test_forest.py",
@@ -393,7 +432,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/ensemble/tests/test_gradient_boosting.py",
@@ -403,7 +443,8 @@
       "failed": 0,
       "skipped": 1,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/ensemble/tests/test_iforest.py",
@@ -413,7 +454,8 @@
       "failed": 0,
       "skipped": 1,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/ensemble/tests/test_stacking.py",
@@ -423,7 +465,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/ensemble/tests/test_voting.py",
@@ -433,7 +476,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/ensemble/tests/test_weight_boosting.py",
@@ -443,7 +487,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/model_selection/tests/test_classification_threshold.py",
@@ -453,7 +498,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/model_selection/tests/test_plot.py",
@@ -463,7 +509,8 @@
       "failed": 0,
       "skipped": 29,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/model_selection/tests/test_search.py",
@@ -473,7 +520,8 @@
       "failed": 0,
       "skipped": 31,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/model_selection/tests/test_split.py",
@@ -483,7 +531,8 @@
       "failed": 0,
       "skipped": 45,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/model_selection/tests/test_successive_halving.py",
@@ -493,7 +542,8 @@
       "failed": 0,
       "skipped": 4,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/model_selection/tests/test_validation.py",
@@ -503,7 +553,8 @@
       "failed": 0,
       "skipped": 90,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/preprocessing/tests/test_common.py",
@@ -513,7 +564,8 @@
       "failed": 0,
       "skipped": 9,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/preprocessing/tests/test_data.py",
@@ -523,7 +575,8 @@
       "failed": 0,
       "skipped": 279,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/preprocessing/tests/test_discretization.py",
@@ -533,7 +586,8 @@
       "failed": 0,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/preprocessing/tests/test_encoders.py",
@@ -543,7 +597,8 @@
       "failed": 0,
       "skipped": 32,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/preprocessing/tests/test_function_transformer.py",
@@ -553,7 +608,8 @@
       "failed": 0,
       "skipped": 33,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/preprocessing/tests/test_label.py",
@@ -563,7 +619,8 @@
       "failed": 0,
       "skipped": 171,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/preprocessing/tests/test_polynomial.py",
@@ -573,7 +630,8 @@
       "failed": 0,
       "skipped": 255,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     },
     {
       "file": "sklearn/preprocessing/tests/test_target_encoder.py",
@@ -583,7 +641,8 @@
       "failed": 0,
       "skipped": 10,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     }
   ]
 }

@@ -4,6 +4,7 @@
   "category": "third-party",
   "excluded_files": 0,
   "deselected": 0,
+  "known_failed": 0,
   "files": [
     {
       "file": "tests/test_pytest_randomly.py",
@@ -13,7 +14,8 @@
       "failed": 15,
       "skipped": 0,
       "errors": 0,
-      "deselected": 0
+      "deselected": 0,
+      "known_failed": 0
     }
   ]
 }
