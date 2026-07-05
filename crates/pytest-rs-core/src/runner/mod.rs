@@ -85,6 +85,11 @@ impl Engine {
         let mut prev_module: Option<String> = None;
         let mut prev_class: Option<String> = None;
         let mut prev_package: Option<String> = None;
+        // Package-scope fixture instance (the module's directory), tracked
+        // separately from prev_module — a package-scoped fixture must stay
+        // cached across every module in the same directory, only tearing
+        // down when the run actually crosses into a different directory.
+        let mut prev_pkg_instance: Option<String> = None;
         let mut current_file = String::new();
         let mut line = String::new();
         let maxfail = config.maxfail();
@@ -265,21 +270,29 @@ impl Engine {
             if let Some(prev) = &prev_module {
                 if prev != &module_instance {
                     report_scope_teardown!(Scope::Module, prev, item);
-                    // Package-scoped fixtures are keyed per module instance.
-                    report_scope_teardown!(Scope::Package, prev, item);
                 } else if idx > 0 {
-                    // Same module node, but a module/package-scoped param advanced.
+                    // Same module node, but a module-scoped param advanced.
                     report_param_teardown!(
-                        items[idx - 1].ended_param_bindings(
-                            py,
-                            item,
-                            &[Scope::Module, Scope::Package]
-                        ),
+                        items[idx - 1].ended_param_bindings(py, item, &[Scope::Module]),
                         item
                     );
                 }
             }
             prev_module = Some(module_instance);
+
+            let pkg_instance = item.package_instance();
+            if let Some(prev) = &prev_pkg_instance {
+                if prev != &pkg_instance {
+                    report_scope_teardown!(Scope::Package, prev, item);
+                } else if idx > 0 {
+                    // Same package directory, but a package-scoped param advanced.
+                    report_param_teardown!(
+                        items[idx - 1].ended_param_bindings(py, item, &[Scope::Package]),
+                        item
+                    );
+                }
+            }
+            prev_pkg_instance = Some(pkg_instance);
 
             let package = item
                 .module_name
@@ -303,11 +316,19 @@ impl Engine {
                 .unwrap_or_else(|| item.nodeid.clone());
             if tc == 0 && !config.no_terminal() && !session.live_logging && file != current_file {
                 if !current_file.is_empty() {
-                    let msg = progress_message(pkind, done, total, file_dur);
-                    println!(
-                        "{}",
-                        progress_suffix(&line, &msg, fill_color(py, session, false))
-                    );
+                    if setup_show_active(config) {
+                        // --setup-plan/-show/-only narration lines don't end
+                        // with a newline (so a same-line outcome char could
+                        // normally follow); close the line here instead of
+                        // the percent-progress field real dot-progress uses.
+                        println!();
+                    } else {
+                        let msg = progress_message(pkind, done, total, file_dur);
+                        println!(
+                            "{}",
+                            progress_suffix(&line, &msg, fill_color(py, session, false))
+                        );
+                    }
                 }
                 file_dur = std::time::Duration::ZERO;
                 // Display the file path like pytest's write_fspath_result:
@@ -549,6 +570,10 @@ impl Engine {
             && let Some(last) = items.last()
         {
             report_scope_teardown!(Scope::Module, prev, last);
+        }
+        if let Some(prev) = &prev_pkg_instance.clone()
+            && let Some(last) = items.last()
+        {
             report_scope_teardown!(Scope::Package, prev, last);
         }
         if let Some(prev) = &prev_package.clone()

@@ -85,6 +85,17 @@ impl TestItem {
         }
     }
 
+    /// The Package-scope cache/teardown key: the module's enclosing directory
+    /// (pytest's Package node identity), not the module file itself — a
+    /// package-scoped fixture stays cached across every module in that
+    /// directory rather than being re-created per file.
+    pub fn package_instance(&self) -> String {
+        self.module_instance()
+            .rsplit_once('/')
+            .map(|(dir, _)| dir.to_string())
+            .unwrap_or_default()
+    }
+
     /// The scope-instance string a fixture of `scope` is cached/torn down
     /// under for this item (the instance the scope stays constant within).
     pub fn instance_at(&self, scope: crate::fixture::Scope) -> String {
@@ -92,7 +103,8 @@ impl TestItem {
         match scope {
             Scope::Function => self.nodeid.clone(),
             Scope::Class => self.class_instance(),
-            Scope::Module | Scope::Package | Scope::Session => self.module_instance(),
+            Scope::Package => self.package_instance(),
+            Scope::Module | Scope::Session => self.module_instance(),
         }
     }
 

@@ -655,7 +655,8 @@ pub(crate) fn resolve_fixture_def(
     let instance = match cache_scope {
         Scope::Function => item.nodeid.clone(),
         Scope::Class => item.class_instance(),
-        Scope::Module | Scope::Package => item.module_instance(),
+        Scope::Module => item.module_instance(),
+        Scope::Package => item.package_instance(),
         // Parametrized session-scope fixtures use a per-param instance key so
         // they can be torn down when the last test using that param finishes,
         // rather than batched at session end.  Non-parametrized session
