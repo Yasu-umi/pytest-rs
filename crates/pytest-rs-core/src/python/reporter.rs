@@ -44,13 +44,26 @@ fn reporter_feed_default_fn(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
 }
 
 /// Register the default 'terminalreporter' plugin (the stand-in that
-/// reporter-replacing plugins like pytest-sugar unregister). Must run
-/// before python pytest_configure hooks fire.
+/// reporter-replacing plugins like pytest-sugar unregister). Fires between
+/// the tryfirst/normal-priority and trylast-priority pytest_configure
+/// groups (see Engine::fire_py_configure), matching where upstream pluggy's
+/// LIFO order runs `_pytest.terminal`'s own configure hook.
 pub fn reporter_setup(py: Python<'_>, config: &crate::config::Config) -> PyResult<()> {
     let config_proxy = make_py_config(py, config)?;
     py.import("pytest._reporter")?
         .getattr("setup")?
         .call1((config_proxy,))?;
+    Ok(())
+}
+
+/// Toggle `_pluginmanager._configuring_terminalreporter`, suppressing the
+/// synthetic terminalreporter fallback while the tryfirst/normal-priority
+/// `pytest_configure` hooks that upstream's pluggy LIFO order runs before
+/// `_pytest.terminal`'s own configure (the one that actually registers
+/// terminalreporter) are firing.
+pub fn set_reporter_configuring(py: Python<'_>, value: bool) -> PyResult<()> {
+    py.import("pytest._pluginmanager")?
+        .setattr("_configuring_terminalreporter", value)?;
     Ok(())
 }
 

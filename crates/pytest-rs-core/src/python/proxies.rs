@@ -603,6 +603,16 @@ pub fn next_value<'py>(
 /// Snapshot the shim pluginmanager's plugin list so a nested run's conftest
 /// registrations can be rolled back. Returns a guard that restores the
 /// original list on drop.
+///
+/// Also unregisters 'terminalreporter': a real subprocess-backed nested run
+/// starts with a brand-new plugin manager that has never seen it, so a
+/// nested `-p`/conftest pytest_configure hook querying
+/// `get_plugin("terminalreporter")` should see it as absent until the
+/// nested run's own configure phase re-registers it (upstream pluggy LIFO
+/// ordering). The shim's pluginmanager is a single process-wide singleton,
+/// so without this the nested run would see the outer run's registration
+/// left over from before this guard was taken. Restored on drop regardless
+/// of what the nested run did to it.
 pub(crate) fn snapshot_pluginmanager(py: Python<'_>) -> PyResult<PluginManagerGuard> {
     let pm = py
         .import("pytest._pluginmanager")?
@@ -612,15 +622,19 @@ pub(crate) fn snapshot_pluginmanager(py: Python<'_>) -> PyResult<PluginManagerGu
         .getattr("_conftest_plugins")?
         .call_method0("copy")?
         .unbind();
+    let names: Py<PyAny> = pm.getattr("_names")?.call_method0("copy")?.unbind();
+    pm.call_method1("unregister", (py.None(), "terminalreporter"))?;
     Ok(PluginManagerGuard {
         plugins,
         conftest_plugins,
+        names,
     })
 }
 
 pub(crate) struct PluginManagerGuard {
     plugins: Py<PyAny>,
     conftest_plugins: Py<PyAny>,
+    names: Py<PyAny>,
 }
 
 impl Drop for PluginManagerGuard {
@@ -632,6 +646,7 @@ impl Drop for PluginManagerGuard {
             {
                 let _ = pm.setattr("_plugins", self.plugins.bind(py));
                 let _ = pm.setattr("_conftest_plugins", self.conftest_plugins.bind(py));
+                let _ = pm.setattr("_names", self.names.bind(py));
             }
         });
     }

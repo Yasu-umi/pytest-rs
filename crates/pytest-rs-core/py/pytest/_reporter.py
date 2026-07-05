@@ -157,6 +157,11 @@ def setup(config: Any) -> None:
     global _default
     if _default is not None:
         _default.__init__(config)
+        # A nested run's snapshot_pluginmanager guard unregisters
+        # 'terminalreporter' so the nested config sees it as absent until now
+        # (upstream pluggy LIFO parity); re-register the reused instance.
+        if pluginmanager.getplugin("terminalreporter") is not _default:
+            pluginmanager.register(_default, "terminalreporter")
         return
     pluginmanager.register(_CoreHeader(), "_core_report_header")
     pluginmanager.register(_CoreTestStatus(), "_core_teststatus")

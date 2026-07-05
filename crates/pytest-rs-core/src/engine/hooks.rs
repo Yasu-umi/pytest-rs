@@ -903,6 +903,76 @@ impl Engine {
         Ok(())
     }
 
+    /// pytest_configure fires in two passes, with the default
+    /// 'terminalreporter' plugin registering between them. Upstream
+    /// registers built-in plugins (incl. `_pytest.terminal`, which creates
+    /// `terminalreporter`) before `-p`/entry-point plugins, so pluggy's LIFO
+    /// call order runs a `-p` plugin's normal-priority `pytest_configure`
+    /// *before* `_pytest.terminal`'s — hence `terminalreporter` doesn't exist
+    /// yet from a plain `-p` plugin's point of view. Reporter-replacing
+    /// plugins (pytest-sugar/pytest-pretty) mark their own `pytest_configure`
+    /// `trylast=True` specifically so it runs *after* `_pytest.terminal`'s,
+    /// once `terminalreporter` exists and can be swapped out.
+    pub(crate) fn fire_py_configure(
+        &mut self,
+        py: Python<'_>,
+        rootdir: &std::path::Path,
+        errors: &mut Vec<(std::path::PathBuf, String)>,
+    ) -> PyResult<()> {
+        let name = "pytest_configure";
+        let mut hooks: Vec<_> = self
+            .session
+            .py_hooks
+            .iter()
+            .filter(|hook| hook.name == name)
+            .collect();
+        hooks.sort_by_key(|h| match (h.tryfirst, h.trylast) {
+            (true, _) => 0,
+            (_, true) => 2,
+            _ => 1,
+        });
+        let before_funcs: Vec<Py<pyo3::PyAny>> = hooks
+            .iter()
+            .filter(|h| !h.trylast)
+            .map(|h| h.func.clone_ref(py))
+            .collect();
+        let after_funcs: Vec<Py<pyo3::PyAny>> = hooks
+            .iter()
+            .filter(|h| h.trylast)
+            .map(|h| h.func.clone_ref(py))
+            .collect();
+
+        let mut before_result = Ok(());
+        if !before_funcs.is_empty()
+            || !after_funcs.is_empty()
+            || crate::engine::inprocess::recording()
+        {
+            let config_proxy = python::make_py_config(py, &self.config)?;
+            python::record_hook(py, name, &[("config", config_proxy.clone_ref(py))]);
+            let _ = python::set_reporter_configuring(py, true);
+            for func in &before_funcs {
+                if let Err(err) =
+                    python::call_py_hook(py, func, &[("config", config_proxy.clone_ref(py))])
+                {
+                    before_result = Err(err);
+                    break;
+                }
+            }
+            let _ = python::set_reporter_configuring(py, false);
+        }
+        if let Err(err) = python::reporter_setup(py, &self.config) {
+            errors.push((rootdir.to_path_buf(), python::format_exception(py, &err)));
+        }
+        before_result?;
+        if !after_funcs.is_empty() {
+            let config_proxy = python::make_py_config(py, &self.config)?;
+            for func in &after_funcs {
+                python::call_py_hook(py, func, &[("config", config_proxy.clone_ref(py))])?;
+            }
+        }
+        Ok(())
+    }
+
     pub(crate) fn fire_sessionfinish(&mut self, py: Python<'_>, code: i32) -> PyResult<()> {
         let mut ctx = HookContext {
             py,

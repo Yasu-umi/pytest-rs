@@ -13,6 +13,13 @@ import types
 import warnings
 from typing import Any
 
+# True only while `-p`/entry-point/conftest pytest_configure hooks that run
+# before the default terminalreporter registers (see engine's fire_py_configure)
+# are firing. Suppresses _get_terminalreporter's synthetic fallback during that
+# window so a hook querying get_plugin("terminalreporter") sees the same
+# "not yet registered" answer upstream's pluggy LIFO order would give it.
+_configuring_terminalreporter = False
+
 
 def plugin_instance_fixtures() -> list:
     """(name, bound_method) for @pytest.fixture methods on non-module plugin
@@ -446,6 +453,8 @@ class PluginManager:
 
             return _capture.manager
         if name == "terminalreporter":
+            if _configuring_terminalreporter:
+                return None
             return self._get_terminalreporter()
         if name == "pastebin":
             import _pytest.pastebin

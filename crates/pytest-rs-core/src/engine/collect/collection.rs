@@ -32,11 +32,6 @@ impl Engine {
             eprintln!("{}", python::format_exception(py, &err));
             return Err("\x00USAGE_ERROR\x00".to_string());
         }
-        // The default 'terminalreporter' plugin registers before configure
-        // so reporter-replacing plugins (pytest-sugar/pretty) find it.
-        if let Err(err) = python::reporter_setup(py, &self.config) {
-            errors.push((rootdir.to_path_buf(), python::format_exception(py, &err)));
-        }
         // conftest pytest_configure hooks run once conftests are loaded.
         // Upstream fires this hook with no catch_warnings_for_item window at
         // all, so a warning raised directly in a conftest's pytest_configure
@@ -45,7 +40,7 @@ impl Engine {
         // ini/-W filters on reinstall too, or install()'s own defaults would
         // re-take priority over a user's filterwarnings override.
         let _ = python::suspend_warning_capture(py);
-        let configure_result = self.fire_py_hooks_simple(py, "pytest_configure");
+        let configure_result = self.fire_py_configure(py, rootdir, errors);
         let ini_filters: Vec<String> = self
             .config
             .get_ini_lines("filterwarnings")
