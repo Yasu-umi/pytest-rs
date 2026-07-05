@@ -18,7 +18,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2674 | 114 | 0 | 53 | 8 | 2849 | 95.7% | 24 | 54 | 61 |
+| pytest | 9.0.3 | 2679 | 109 | 0 | 53 | 8 | 2849 | 95.9% | 25 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 1 | 7 | 85.7% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 2 | 90 | 97.8% | 1 | 1 | 0 |
@@ -52,7 +52,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | starlette | 0.46.2 | 907 | 0 | 0 | 0 | 0 | 907 | 100.0% | 28 | 28 | 0 |
 | attrs | 25.3.0 | 1341 | 0 | 0 | 4 | 1 | 1346 | 99.9% | 22 | 24 | 0 |
 | more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 0 | 671 | 100.0% | 2 | 2 | 0 |
-| pytest-django | v4.9.0 | 210 | 5 | 0 | 1 | 0 | 216 | 97.7% | 7 | 13 | 0 |
+| pytest-django | v4.9.0 | 211 | 4 | 0 | 1 | 0 | 216 | 98.1% | 8 | 13 | 0 |
 | werkzeug | 3.1.3 | 922 | 0 | 0 | 1 | 25 | 948 | 97.4% | 24 | 25 | 0 |
 | fastapi | 0.115.12 | 2332 | 1 | 0 | 130 | 1 | 2464 | 99.9% | 303 | 310 | 0 |
 | packaging | 25.0 | 26947 | 0 | 0 | 0 | 1 | 26948 | 100.0% | 12 | 12 | 0 |
@@ -73,7 +73,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 | testing/python/collect.py | failed | 79 | 3 | 0 | 0 | 0 |
 | testing/python/fixtures.py | failed | 204 | 4 | 0 | 2 | 0 |
 | testing/python/integration.py | failed | 13 | 3 | 0 | 4 | 0 |
-| testing/python/metafunc.py | failed | 109 | 3 | 0 | 0 | 0 |
+| testing/python/metafunc.py | failed | 111 | 1 | 0 | 0 | 0 |
 | testing/python/raises.py | passed | 31 | 0 | 0 | 0 | 0 |
 | testing/python/raises_group.py | failed | 26 | 3 | 0 | 0 | 0 |
 | testing/python/show_fixtures_per_test.py | passed | 8 | 0 | 0 | 0 | 0 |
@@ -82,13 +82,13 @@ are out of scope for pytest-rs; they are not counted in the total.
 | testing/logging/test_fixture.py | passed | 27 | 0 | 0 | 0 | 0 |
 | testing/logging/test_formatter.py | passed | 4 | 0 | 0 | 0 | 0 |
 | testing/logging/test_reporting.py | failed | 44 | 8 | 0 | 0 | 0 |
-| testing/test_assertion.py | failed | 159 | 1 | 0 | 0 | 0 |
+| testing/test_assertion.py | passed | 160 | 0 | 0 | 0 | 0 |
 | testing/test_cacheprovider.py | failed | 54 | 3 | 0 | 0 | 0 |
 | testing/test_capture.py | failed | 128 | 2 | 0 | 2 | 0 |
 | testing/test_collect_imported_tests.py | failed | 2 | 1 | 0 | 0 | 0 |
 | testing/test_collection.py | failed | 105 | 8 | 0 | 3 | 0 |
 | testing/test_compat.py | passed | 10 | 0 | 0 | 0 | 0 |
-| testing/test_config.py | failed | 208 | 6 | 0 | 1 | 0 |
+| testing/test_config.py | failed | 210 | 4 | 0 | 1 | 0 |
 | testing/test_conftest.py | failed | 47 | 6 | 0 | 1 | 0 |
 | testing/test_doctest.py | passed | 139 | 0 | 0 | 1 | 0 |
 | testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 | 0 |
@@ -859,7 +859,7 @@ are out of scope for pytest-rs; they are not counted in the total.
 |---|---|---:|---:|---:|---:|---:|
 | tests/test_asserts.py | passed | 2 | 0 | 0 | 0 | 0 |
 | tests/test_database.py | failed | 60 | 1 | 0 | 0 | 0 |
-| tests/test_db_access_in_repr.py | failed | 0 | 1 | 0 | 0 | 0 |
+| tests/test_db_access_in_repr.py | passed | 1 | 0 | 0 | 0 | 0 |
 | tests/test_db_setup.py | passed | 14 | 0 | 0 | 0 | 0 |
 | tests/test_django_configurations.py | no-tests | 0 | 0 | 0 | 1 | 0 |
 | tests/test_django_settings_module.py | failed | 18 | 1 | 0 | 0 | 0 |
