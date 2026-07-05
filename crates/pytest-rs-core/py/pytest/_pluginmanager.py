@@ -144,6 +144,19 @@ class HookCaller:
         self._name = name
         self._pm = pm
 
+    # pytest_load_initial_conftests is fired natively by the Rust engine
+    # (conftest loading / legacypath / capture / warnings init have no real
+    # Python plugin object registered in self._pm._plugins), so get_hookimpls()
+    # has nothing to enumerate for it. Synthesize the upstream-shaped entries
+    # here rather than polluting _plugins with dummy objects shared by every
+    # other hook call / plugin listing.
+    _SYNTHETIC_LOAD_INITIAL_CONFTESTS_IMPLS: tuple[tuple[str, dict[str, bool]], ...] = (
+        ("_pytest.config", {"tryfirst": True}),
+        ("_pytest.legacypath", {}),
+        ("_pytest.capture", {"wrapper": True}),
+        ("_pytest.warnings", {"wrapper": True}),
+    )
+
     def get_hookimpls(self) -> list[_HookImpl]:
         """Return HookImpl objects for all registered implementations (pluggy API)."""
         impls = []
@@ -152,7 +165,30 @@ class HookCaller:
             if callable(func):
                 opts = getattr(func, "pytest_impl", None) or {}
                 impls.append(_HookImpl(func, opts))
+        if self._name == "pytest_load_initial_conftests":
+            for module_name, opts in self._SYNTHETIC_LOAD_INITIAL_CONFTESTS_IMPLS:
+                func = types.SimpleNamespace(__module__=module_name)
+                impls.append(_HookImpl(func, opts))
+            impls = self._order_hookimpls(impls)
         return impls
+
+    @staticmethod
+    def _order_hookimpls(impls: list[_HookImpl]) -> list[_HookImpl]:
+        """Reorder into pluggy's tryfirst/normal/trylast-then-wrapper grouping
+        (mirrors _call_impls' actual call-order grouping)."""
+        wrappers = [impl for impl in impls if impl.wrapper or impl.hookwrapper]
+        plain_first = [
+            impl for impl in impls if not (impl.wrapper or impl.hookwrapper) and impl.tryfirst
+        ]
+        plain_last = [
+            impl for impl in impls if not (impl.wrapper or impl.hookwrapper) and impl.trylast
+        ]
+        plain_normal = [
+            impl
+            for impl in impls
+            if not (impl.wrapper or impl.hookwrapper) and not impl.tryfirst and not impl.trylast
+        ]
+        return plain_first + plain_normal + plain_last + wrappers
 
     def __call__(self, **kwargs: Any) -> Any:
         kwargs = self._fix_path_args(kwargs)
