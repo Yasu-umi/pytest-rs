@@ -652,6 +652,35 @@ impl Config {
         (kept, plugin_args)
     }
 
+    /// Rewrite clap's auto-generated `--help` text into upstream's
+    /// argparse-based `showhelp()` shape: the section headings clap and
+    /// argparse disagree on, plus pytest's own footer lines (helpconfig.py's
+    /// `showhelp`) appended after the option list. The ini-options listing
+    /// and "Environment variables:" section upstream also prints need a
+    /// fully configured session (conftest/plugin ini keys aren't known yet
+    /// at this point in argument parsing), so they aren't reproduced here.
+    fn to_argparse_style_help(clap_help: &str) -> String {
+        let mut out = String::new();
+        for line in clap_help.lines() {
+            match line {
+                "Arguments:" => out.push_str("positional arguments:\n"),
+                "Options:" => out.push_str("options:\n"),
+                _ => {
+                    out.push_str(line);
+                    out.push('\n');
+                }
+            }
+        }
+        out.push('\n');
+        out.push_str("to see available markers type: pytest --markers\n");
+        out.push_str("to see available fixtures type: pytest --fixtures\n");
+        out.push_str(
+            "(shown according to specified file_or_dir or current dir if not specified; \
+             fixtures with leading '_' are only shown with the '-v' option\n",
+        );
+        out
+    }
+
     pub fn from_args(parser: OptionParser, argv: Vec<String>) -> Result<Self, String> {
         // `argv[0]` is always a program-name placeholder regardless of caller
         // (the real CLI's actual argv[0], or a synthetic "pytest-rs" from
@@ -795,6 +824,11 @@ impl Config {
                 // non-TTY subprocess contexts. Normalize clap's "Usage:" to "usage:" so
                 // case-sensitive fnmatch on Linux matches upstream argparse-style patterns.
                 let plain = err.render().to_string().replace("Usage:", "usage:");
+                let plain = if err.kind() == clap::error::ErrorKind::DisplayHelp {
+                    Self::to_argparse_style_help(&plain)
+                } else {
+                    plain
+                };
                 return Err(format!("{}{}", crate::EXIT_ZERO_SENTINEL, plain));
             }
             Err(err) => {
