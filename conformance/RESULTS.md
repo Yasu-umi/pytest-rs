@@ -25,7 +25,7 @@ pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2684 | 104 | 0 | 53 | 0 | 8 | 2849 | 96.1% | 25 | 54 | 61 |
+| pytest | 9.0.3 | 2688 | 100 | 0 | 53 | 0 | 8 | 2849 | 96.2% | 25 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 0 | 1 | 7 | 85.7% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 0 | 2 | 90 | 97.8% | 1 | 1 | 0 |
@@ -77,8 +77,8 @@ pytest-rs; they are not counted in the total.
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
 | testing/python/approx.py | passed | 75 | 0 | 0 | 18 | 0 | 0 |
-| testing/python/collect.py | failed | 79 | 3 | 0 | 0 | 0 | 0 |
-| testing/python/fixtures.py | failed | 204 | 2 | 0 | 2 | 0 | 2 |
+| testing/python/collect.py | failed | 80 | 2 | 0 | 0 | 0 | 0 |
+| testing/python/fixtures.py | failed | 205 | 1 | 0 | 2 | 0 | 2 |
 | testing/python/integration.py | failed | 13 | 3 | 0 | 4 | 0 | 0 |
 | testing/python/metafunc.py | failed | 111 | 1 | 0 | 0 | 0 | 0 |
 | testing/python/raises.py | passed | 31 | 0 | 0 | 0 | 0 | 0 |
@@ -127,8 +127,8 @@ pytest-rs; they are not counted in the total.
 | testing/test_unittest.py | failed | 64 | 6 | 0 | 9 | 0 | 0 |
 | testing/test_unraisableexception.py | passed | 11 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_warning_types.py | passed | 15 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_warnings.py | failed | 40 | 2 | 0 | 2 | 0 | 0 |
-| testing/acceptance_test.py | failed | 69 | 16 | 0 | 2 | 0 | 6 |
+| testing/test_warnings.py | failed | 41 | 1 | 0 | 2 | 0 | 0 |
+| testing/acceptance_test.py | failed | 70 | 15 | 0 | 2 | 0 | 6 |
 | testing/deprecated_test.py | passed | 15 | 0 | 0 | 0 | 0 | 0 |
 
 </details>
