@@ -347,6 +347,12 @@ pub fn make_node(py: Python<'_>, item: &TestItem) -> PyResult<Py<PyAny>> {
         // lists; update them now that Rust has resolved the full fixture
         // closure so the runner can fill fixtures correctly.
         n.setattr("fixturenames", &fixturenames)?;
+        // A pytest_pycollect_makeitem-returned node is built via
+        // Node.from_parent(parent=None, ...) (the shim never threads a real
+        // collector through), so its own ._nodeid computation has nothing to
+        // work with and stays None. Assign the authoritative nodeid Rust
+        // already computed (nodeid.setter exists precisely for this).
+        n.setattr("nodeid", item.nodeid.as_str())?;
         n
     } else {
         let node_cls = if item.is_doctest {
