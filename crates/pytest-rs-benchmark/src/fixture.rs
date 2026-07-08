@@ -143,7 +143,10 @@ impl PyStats {
     }
 }
 
-#[pyclass(name = "BenchmarkFixture")]
+// module="pytest_benchmark.fixture" matches upstream's real class location —
+// a bare pyclass otherwise reports __module__="builtins", which breaks tests
+// asserting `repr(benchmark)` (e.g. "<pytest_benchmark.fixture.BenchmarkFixture object at ...>").
+#[pyclass(name = "BenchmarkFixture", module = "pytest_benchmark.fixture")]
 pub struct BenchmarkFixture {
     nodeid: String,
     config: BenchConfig,

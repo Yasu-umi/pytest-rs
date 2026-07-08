@@ -869,6 +869,17 @@ impl PyRequest {
         self.fixturename.clone()
     }
 
+    /// Upstream's SubRequest/FixtureRequest.__repr__: a request resolving a
+    /// dependency fixture names it ("<SubRequest 'bad_fixture' for ...>"),
+    /// a test's own top-level request just names the item.
+    fn __repr__(&self, py: Python<'_>) -> PyResult<String> {
+        let node_repr = self.node.bind(py).repr()?.to_string();
+        Ok(match &self.fixturename {
+            Some(name) => format!("<SubRequest '{name}' for {node_repr}>"),
+            None => format!("<FixtureRequest for {node_repr}>"),
+        })
+    }
+
     /// The `request.node` object (a pytest._node.Node shim instance).
     #[getter]
     fn node(&self, py: Python<'_>) -> Py<PyAny> {
