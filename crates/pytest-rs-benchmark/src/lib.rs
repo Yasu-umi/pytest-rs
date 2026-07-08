@@ -683,7 +683,7 @@ impl Plugin for BenchmarkPlugin {
                         )
                     } else {
                         format!(
-                            "Can't compare. No benchmark files in '{}' matching '{compare_spec}'.",
+                            "Can't compare. No benchmark files in '{}' match '{compare_spec}'.",
                             storage_dir.display()
                         )
                     };
@@ -691,6 +691,13 @@ impl Plugin for BenchmarkPlugin {
                         eprintln!("{}", "-".repeat(72));
                         eprintln!(" WARNING: {msg}");
                         eprintln!("{}", "-".repeat(72));
+                    } else {
+                        // Non-verbose: upstream's logger.warning() still reaches
+                        // stderr directly (this fires outside pytest's own
+                        // warning-capture window, so it never lands in the
+                        // terminal summary) via Python's default showwarning
+                        // format ("file:line: Category: message").
+                        eprintln!("pytest_benchmark/logger.py:0: PytestBenchmarkWarning: {msg}");
                     }
                     if let Some(helper) = helper_ref {
                         emit_benchmark_warning(py, helper.bind(py), &msg)?;
