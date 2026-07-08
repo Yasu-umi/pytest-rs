@@ -301,9 +301,18 @@ fn render_group(
         Some(group) => format!("benchmark '{group}': {} tests", results.len()),
         None => format!("benchmark: {} tests", results.len()),
     };
+    // Upstream reserves extra trailing space after every comparable column's
+    // header (room for a " (N.NN)" best/worst scale annotation shown next to
+    // each data value) except outliers/rounds/iterations, which never carry
+    // one. The reservation is a flat 10 columns whenever there's more than
+    // one benchmark to compare (0 when solo — nothing to compare against).
+    let rpadding = if results.len() > 1 { 10 } else { 0 };
     let mut col_header = format!("{:<name_width$}", format!("Name (time in {unit})"));
     for col in &active {
         col_header.push_str(&format!(" {:>width$}", col.header, width = col.width));
+        if !matches!(col.id, "outliers" | "rounds" | "iterations") {
+            col_header.push_str(&" ".repeat(rpadding));
+        }
     }
     let width = col_header.len();
     out.push('\n');
