@@ -668,6 +668,17 @@ class File(Collector):
         return []
 
 
+def is_bare_file_collector(collector):
+    """True when `collector` is a File/Module instance relying on the base
+    stub's `collect()` (no real subclass override — e.g. a conftest's
+    `pytest_collect_file` returning a plain `Module.from_parent(...)`
+    unmodified). The engine falls back to native module scanning instead of
+    trusting the stub's unconditional empty list; a genuine custom collector
+    (pytest-mypy's MypyFile, pytest-ruff's RuffFile) overrides `collect()`
+    and is left alone."""
+    return getattr(type(collector), "collect", None) is File.collect
+
+
 class Package(File):
     """Directory-level collector for Python packages (has __init__.py).
     Alias used by upstream isinstance checks (e.g. pytest.Package in test_collection)."""

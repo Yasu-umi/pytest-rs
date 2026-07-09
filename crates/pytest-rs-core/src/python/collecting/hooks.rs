@@ -273,6 +273,10 @@ pub fn has_collect_file_hook(py: Python<'_>, hooks: &[crate::session::PyHook]) -
 pub struct CustomCollectResult {
     pub skipped: Vec<(PathBuf, String)>,
     pub errors: Vec<(PathBuf, String)>,
+    /// Files where a hook returned a bare File/Module (no real `collect()`
+    /// override) — the caller re-collects these through the native
+    /// module-scanning path instead of trusting the stub's empty yield.
+    pub native_fallback: Vec<PathBuf>,
 }
 
 /// Collect items via pytest_collect_file hooks.
@@ -285,10 +289,12 @@ pub fn collect_custom_files(
 ) -> PyResult<CustomCollectResult> {
     let mut skipped: Vec<(PathBuf, String)> = Vec::new();
     let mut collect_errors: Vec<(PathBuf, String)> = Vec::new();
+    let mut native_fallback: Vec<PathBuf> = Vec::new();
     let Some(config) = crate::python::proxies::existing_py_config(py) else {
         return Ok(CustomCollectResult {
             skipped,
             errors: collect_errors,
+            native_fallback,
         });
     };
     let config = config.bind(py);
@@ -303,6 +309,7 @@ pub fn collect_custom_files(
     let pathlib = py.import("pathlib")?.getattr("Path")?;
     let node_mod = py.import("pytest._node")?;
     let collector_cls = node_mod.getattr("Collector")?;
+    let is_bare_file_collector = node_mod.getattr("is_bare_file_collector")?;
     // A session stand-in with .config (plugins read parent.session.config).
     let session = node_mod.getattr("_NodeSession")?.call1((&config,))?;
     // Custom collectors (pytest-mypy) inspect session.items mid-collection to
@@ -367,7 +374,12 @@ pub fn collect_custom_files(
                 .and_then(|n| n.extract())
                 .unwrap_or_else(|_| "Module".to_string());
             // Update already-collected items for this file to use the custom
-            // collector class (e.g. MyModule replacing the default Module).
+            // collector class (e.g. MyModule replacing the default Module) —
+            // relabel first, regardless of whether collect() is a real
+            // override: a hook matching broadly (e.g. every ".py" file) may
+            // return a bare collector for a file the standard pipeline
+            // already scanned natively, and those items just need their
+            // display class updated, not re-collecting.
             let pre_existing: std::collections::HashSet<String> = items
                 .iter_mut()
                 .filter_map(|it| {
@@ -379,6 +391,21 @@ pub fn collect_custom_files(
                     }
                 })
                 .collect();
+            // A bare File/Module (from_parent(...) with no collect() override)
+            // always yields [] via the base stub — real scanning for
+            // standard .py files happens natively in Rust and never calls
+            // this method. Only queue the native fallback when this file
+            // truly has no items yet (e.g. an unrecognized extension); a
+            // file the standard pipeline already collected just needed the
+            // relabel above.
+            if pre_existing.is_empty()
+                && is_bare_file_collector
+                    .call1((&collector,))?
+                    .extract::<bool>()?
+            {
+                native_fallback.push(file.clone());
+                continue;
+            }
             // If the hook returned a bare Item (not a Collector), treat it
             // directly as a single leaf item without calling .collect().
             let item_iter: Box<dyn Iterator<Item = PyResult<Bound<'_, PyAny>>>> = if collector
@@ -457,5 +484,6 @@ pub fn collect_custom_files(
     Ok(CustomCollectResult {
         skipped,
         errors: collect_errors,
+        native_fallback,
     })
 }

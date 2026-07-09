@@ -151,6 +151,41 @@ impl Engine {
                     for (path, longrepr) in collect_result.errors {
                         errors.push((path, longrepr));
                     }
+                    // pytest_collect_file handed back a bare File/Module (no
+                    // real collect() override) for one of these files —
+                    // trusting its stub's empty yield would silently collect
+                    // zero tests, so scan it the same way a standard .py file
+                    // is scanned instead.
+                    let filters = python::NameFilters::from_config(py, &self.config);
+                    let mode = crate::collect::ImportMode::from_config(&self.config);
+                    for file in collect_result.native_fallback {
+                        // A hook matching broadly (e.g. every ".py" file) may
+                        // hand back a bare collector for a file the standard
+                        // pipeline already scanned as a real test module, or
+                        // for conftest.py itself (never a collectible module,
+                        // and already imported through the dedicated
+                        // conftest-loading path — re-importing it here would
+                        // just trip the "import file mismatch" guard).
+                        // Skip both: the file's own items already exist.
+                        if files.contains(&file)
+                            || file.file_name().and_then(|n| n.to_str()) == Some("conftest.py")
+                        {
+                            continue;
+                        }
+                        if let Err(err) = python::collect_module(
+                            py,
+                            rootdir,
+                            &file,
+                            &mut self.session.items,
+                            &mut self.session.registry,
+                            &mut self.session.py_hooks,
+                            &filters,
+                            mode,
+                            &self.plugins,
+                        ) {
+                            errors.push((file, python::format_exception(py, &err)));
+                        }
+                    }
                 }
                 Err(err) => {
                     errors.push((rootdir.to_path_buf(), python::format_exception(py, &err)));
