@@ -10,6 +10,19 @@ impl Engine {
         &mut self,
         py: Python<'_>,
     ) -> Result<(), String> {
+        // Tracks module names loaded within this one bootstrap call — scoped
+        // per Engine (a nested run gets its own), unlike the process-wide
+        // pluginmanager registry — so a hook-less plugin's entry-point
+        // autoload can still detect it was already loaded via -p NAME.
+        let mut loaded_modules: Vec<String> = Vec::new();
+        let blocked: Vec<String> = self
+            .config
+            .plugin_opts
+            .iter()
+            .filter_map(|spec| spec.strip_prefix("no:"))
+            .map(str::to_string)
+            .collect();
+
         // -p NAME (non-"no:") plugins import before conftests, like
         // pytest's cmdline plugin loading.
         let cmdline_plugins: Vec<String> = self
@@ -26,6 +39,9 @@ impl Engine {
                 Some(&self.config.invocation_dir),
                 &mut self.session.registry,
                 &mut self.session.py_hooks,
+                &mut loaded_modules,
+                &blocked,
+                true,
             )
         {
             return Err(python::format_exception(py, &err));
@@ -36,23 +52,17 @@ impl Engine {
         // --disable-plugin-autoload (or the env var) suppresses this.
         let autoload_disabled = self.config.get_flag("disable-plugin-autoload")
             || std::env::var_os("PYTEST_DISABLE_PLUGIN_AUTOLOAD").is_some();
-        if !autoload_disabled {
-            let blocked: Vec<String> = self
-                .config
-                .plugin_opts
-                .iter()
-                .filter_map(|spec| spec.strip_prefix("no:"))
-                .map(str::to_string)
-                .collect();
-            if let Err(err) = python::load_entrypoint_plugins(
+        if !autoload_disabled
+            && let Err(err) = python::load_entrypoint_plugins(
                 py,
                 &blocked,
                 &mut self.session.registry,
                 &mut self.session.py_hooks,
                 &mut self.session.plugin_distinfo,
-            ) {
-                return Err(python::format_exception(py, &err));
-            }
+                &mut loaded_modules,
+            )
+        {
+            return Err(python::format_exception(py, &err));
         }
 
         // PYTEST_PLUGINS (comma-separated module names) loads the same
@@ -73,6 +83,9 @@ impl Engine {
                     Some(&self.config.invocation_dir),
                     &mut self.session.registry,
                     &mut self.session.py_hooks,
+                    &mut loaded_modules,
+                    &blocked,
+                    false,
                 )
             {
                 return Err(python::format_exception(py, &err));

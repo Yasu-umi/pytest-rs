@@ -130,6 +130,14 @@ impl Engine {
         }
         // Mirror the controller's plugin loading (-p NAME, then pytest11
         // entry points); forked workers inherit these instead.
+        let mut loaded_modules: Vec<String> = Vec::new();
+        let blocked: Vec<String> = self
+            .config
+            .plugin_opts
+            .iter()
+            .filter_map(|spec| spec.strip_prefix("no:"))
+            .map(str::to_string)
+            .collect();
         let named: Vec<String> = self
             .config
             .plugin_opts
@@ -143,6 +151,9 @@ impl Engine {
             Some(&self.config.invocation_dir),
             &mut self.session.registry,
             &mut self.session.py_hooks,
+            &mut loaded_modules,
+            &blocked,
+            true,
         ) {
             eprintln!(
                 "INTERNAL ERROR: worker plugin loading failed: {}",
@@ -150,27 +161,21 @@ impl Engine {
             );
             return exit_code::INTERNAL_ERROR;
         }
-        if !self.config.get_flag("disable-plugin-autoload") {
-            let blocked: Vec<String> = self
-                .config
-                .plugin_opts
-                .iter()
-                .filter_map(|spec| spec.strip_prefix("no:"))
-                .map(str::to_string)
-                .collect();
-            if let Err(err) = python::load_entrypoint_plugins(
+        if !self.config.get_flag("disable-plugin-autoload")
+            && let Err(err) = python::load_entrypoint_plugins(
                 py,
                 &blocked,
                 &mut self.session.registry,
                 &mut self.session.py_hooks,
                 &mut self.session.plugin_distinfo,
-            ) {
-                eprintln!(
-                    "INTERNAL ERROR: worker entry-point plugin loading failed: {}",
-                    python::format_exception(py, &err)
-                );
-                return exit_code::INTERNAL_ERROR;
-            }
+                &mut loaded_modules,
+            )
+        {
+            eprintln!(
+                "INTERNAL ERROR: worker entry-point plugin loading failed: {}",
+                python::format_exception(py, &err)
+            );
+            return exit_code::INTERNAL_ERROR;
         }
 
         // `-p`/entry-point plugins have now imported, same as collect()'s

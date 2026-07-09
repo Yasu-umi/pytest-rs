@@ -283,20 +283,98 @@ pub(crate) fn register_pytest_plugins(
         let py_names = pyo3::types::PyTuple::new(py, &names)?;
         let _ = rewrite_mod.call_method1("register_assert_rewrite", py_names);
     }
-    load_named_plugins(py, &names, None, registry, hooks)
+    load_named_plugins(
+        py,
+        &names,
+        None,
+        registry,
+        hooks,
+        &mut Vec::new(),
+        &[],
+        false,
+    )
 }
 
 /// Import plugin modules by name (`-p NAME` / `pytest_plugins`) and register
-/// their fixtures and pytest_* hooks globally.
+/// their fixtures and pytest_* hooks globally. `consider_entry_points`
+/// mirrors upstream's `import_plugin(modname, consider_entry_points=...)`:
+/// only `-p NAME` (`consider_pluginarg`) passes `true` — `pytest_plugins`
+/// and `PYTEST_PLUGINS` (`consider_module`/`consider_env`) always pass
+/// `false` and resolve `name` as a literal importable module.
+#[allow(clippy::too_many_arguments)]
 pub fn load_named_plugins(
     py: Python<'_>,
     names: &[String],
     search_dir: Option<&Path>,
     registry: &mut FixtureRegistry,
     hooks: &mut Vec<crate::session::PyHook>,
+    loaded_modules: &mut Vec<String>,
+    // -p no:NAME specs. Real pytest processes every -p arg in CLI order in a
+    // single pass, where a later "-p no:X" unregisters an earlier "-p X"
+    // (pluggy's set_blocked() unregisters if already registered) — pytest-rs
+    // instead resolves all `-p NAME` loads (this function) and all `-p
+    // no:NAME` blocks (load_entrypoint_plugins's `blocked`) in two separate
+    // passes, so a later no:NAME can't retroactively unregister an earlier
+    // NAME's load. Skipping any name in `blocked` here approximates the
+    // common case (block wins) without implementing real unregistration; the
+    // reverse order (no:NAME before NAME, where upstream re-enables it) is
+    // not handled.
+    blocked: &[String],
+    consider_entry_points: bool,
 ) -> PyResult<()> {
     let importlib = py.import("importlib")?;
     for name in names {
+        if consider_entry_points && blocked.contains(name) {
+            continue;
+        }
+        // -p NAME first tries a matching pytest11 entry point by name (e.g.
+        // "-p mycov" resolves the entry point named "mycov", whose module
+        // may be named anything, such as "mycov_module" — not a literal
+        // "mycov" module import) before falling back to a plain import.
+        if consider_entry_points {
+            let ep_globals = pyo3::types::PyDict::new(py);
+            ep_globals.set_item("bundled", SKIPPED_DISTS.to_vec())?;
+            ep_globals.set_item("target", name.as_str())?;
+            py.run(
+                c"import importlib.metadata\n\
+bundled = {n.lower() for n in bundled}\n\
+dist_name = lambda dist: (getattr(dist, 'metadata', None) or {}).get('Name') or ''\n\
+result = next(((getattr(ep, 'module', None) or '', ep) for dist in importlib.metadata.distributions() for ep in dist.entry_points if ep.group == 'pytest11' and ep.name == target if dist_name(dist).lower() not in bundled), None)\n",
+                Some(&ep_globals),
+                None,
+            )?;
+            let found: Option<(String, Py<pyo3::PyAny>)> = ep_globals
+                .get_item("result")?
+                .map(|r| r.extract())
+                .transpose()?
+                .flatten();
+            if let Some((module_name, ep)) = found {
+                // A hook-less plugin module never appends to `hooks`, so
+                // `loaded_modules` (scoped to this bootstrap call, unlike
+                // the process-wide pluginmanager registry) also tracks it.
+                let already = hooks
+                    .iter()
+                    .any(|hook| hook.plugin_module.as_deref() == Some(module_name.as_str()))
+                    || loaded_modules.iter().any(|m| m == &module_name);
+                if already {
+                    continue;
+                }
+                let loaded = ep
+                    .bind(py)
+                    .call_method0("load")
+                    .and_then(|obj| obj.cast_into::<pyo3::types::PyModule>().map_err(Into::into));
+                if let Ok(module) = loaded {
+                    register_fixtures_from(py, &module, "", registry)?;
+                    let before = hooks.len();
+                    scan_py_hooks(&module, "", hooks)?;
+                    for hook in &mut hooks[before..] {
+                        hook.plugin_module = Some(module_name.clone());
+                    }
+                    loaded_modules.push(module_name);
+                    continue;
+                }
+            }
+        }
         // Check sys.modules first: importlib.import_module may fail for
         // non-module objects registered by tests (their __spec__ lacks
         // the _initializing attribute importlib probes).
@@ -376,43 +454,68 @@ pub fn load_entrypoint_plugins(
     registry: &mut FixtureRegistry,
     hooks: &mut Vec<crate::session::PyHook>,
     distinfo: &mut Vec<String>,
+    loaded_modules: &mut Vec<String>,
 ) -> PyResult<()> {
     if std::env::var_os("PYTEST_DISABLE_PLUGIN_AUTOLOAD").is_some() {
         return Ok(());
     }
     let globals = pyo3::types::PyDict::new(py);
     globals.set_item("bundled", SKIPPED_DISTS.to_vec())?;
-    // (entry-point name, plugin module, dist Name, dist version): the dist
-    // metadata feeds the "plugins:" header line (pytest's _plugin_nameversions).
+    // (entry-point name, plugin module, dist Name, dist version, the
+    // EntryPoint itself): the dist metadata feeds the "plugins:" header line
+    // (pytest's _plugin_nameversions).
     //
-    // entry_points(group='pytest11') queries only the pytest11 group directly
-    // (O(pytest11 entries) rather than O(all installed packages)). Each
-    // EntryPoint carries a .dist reference for the owning distribution (py3.9+).
+    // Iterate distributions() and each dist's own .entry_points, like
+    // pluggy's PluginManager.load_setuptools_entrypoints — not the
+    // convenience entry_points(group='pytest11') function, which internally
+    // dedupes distributions() by dist._normalized_name and crashes on a
+    // minimal Distribution stub lacking that attribute. `ep.module` (not
+    // `ep.value.split(':')[0]`) and `ep.load()` (not `py.import` on that
+    // module name) are used so a test double overriding `.load()` runs its
+    // own override rather than being bypassed (test_early_load_setuptools_name
+    // monkeypatches importlib.metadata.distributions() with exactly such
+    // stubs: a Distribution lacking `.metadata`/`._normalized_name`, and
+    // EntryPoints whose `.load()` records call order instead of importing
+    // `.value`, which they don't even define).
+    // No sorting: pluggy's load_setuptools_entrypoints preserves the natural
+    // distributions()/entry_points declaration order (load order is
+    // observable — test_early_load_setuptools_name asserts on it).
     py.run(
-        c"from importlib.metadata import entry_points\n\
+        c"import importlib.metadata\n\
 bundled = {name.lower() for name in bundled}\n\
-result = sorted({(ep.name, ep.value.split(':')[0].strip(), (ep.dist.metadata.get('Name') if ep.dist else None) or '', (ep.dist.version if ep.dist else None) or '') for ep in entry_points(group='pytest11') if ((ep.dist.metadata.get('Name') if ep.dist else None) or '').lower() not in bundled})\n",
+dist_name = lambda dist: (getattr(dist, 'metadata', None) or {}).get('Name') or ''\n\
+result = [(ep.name, getattr(ep, 'module', None) or '', dist_name(dist), getattr(dist, 'version', None) or '', ep) for dist in importlib.metadata.distributions() for ep in dist.entry_points if ep.group == 'pytest11' if dist_name(dist).lower() not in bundled]\n",
         Some(&globals),
         None,
     )?;
-    let entrypoints: Vec<(String, String, String, String)> = globals
+    let entrypoints: Vec<(String, String, String, String, Py<pyo3::PyAny>)> = globals
         .get_item("result")?
         .map(|result| result.extract())
         .transpose()?
         .unwrap_or_default();
 
-    for (ep_name, module_name, dist_name, dist_version) in entrypoints {
+    for (ep_name, module_name, dist_name, dist_version, ep) in entrypoints {
         if blocked.contains(&ep_name) || blocked.contains(&module_name) {
             continue;
         }
-        // Already loaded via -p NAME or a conftest's pytest_plugins.
+        // Already loaded via -p NAME or a conftest's pytest_plugins. A
+        // hook-less plugin module never appends to `hooks`, so
+        // `loaded_modules` (scoped to this bootstrap call — unlike the
+        // process-wide pluginmanager registry, which must not gate a nested
+        // run's own bootstrap on the outer session's registrations) also
+        // tracks it.
         let already = hooks
             .iter()
-            .any(|hook| hook.plugin_module.as_deref() == Some(module_name.as_str()));
+            .any(|hook| hook.plugin_module.as_deref() == Some(module_name.as_str()))
+            || loaded_modules.iter().any(|m| m == &module_name);
         if already {
             continue;
         }
-        let plugin = match py.import(module_name.as_str()) {
+        let loaded = ep
+            .bind(py)
+            .call_method0("load")
+            .and_then(|obj| obj.cast_into::<pyo3::types::PyModule>().map_err(Into::into));
+        let plugin = match loaded {
             Ok(plugin) => plugin,
             Err(err) => {
                 let _ = warn_explicit_at(
@@ -431,6 +534,7 @@ result = sorted({(ep.name, ep.value.split(':')[0].strip(), (ep.dist.metadata.get
         for hook in &mut hooks[before..] {
             hook.plugin_module = Some(module_name.clone());
         }
+        loaded_modules.push(module_name.clone());
         // Track the module in the shim pluginmanager so its custom-hook
         // impls are reachable via config.pluginmanager.hook.<name> and its
         // pytest_addhooks specs register (pluggy registration parity).
