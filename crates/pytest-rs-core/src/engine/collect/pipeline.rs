@@ -136,14 +136,30 @@ impl Engine {
                     continue;
                 }
             }
-            if let Err(err) = python::collect_conftest(
+            // Import-time output (module-level print()s) is captured the same
+            // way collection.rs brackets a standard .py file's import: on
+            // success it's discarded (matches upstream — a cleanly loading
+            // conftest's stdout is silent), on failure it's surfaced below so
+            // it still reaches the caller's stdout/stderr instead of leaking
+            // into whatever the nested run's own capture happened to be.
+            python::capture_collect_begin(py);
+            let conftest_result = python::collect_conftest(
                 py,
                 rootdir,
                 conftest,
                 &mut self.session.registry,
                 &mut self.session.py_hooks,
                 crate::collect::ImportMode::from_config(&self.config),
-            ) {
+            );
+            let conftest_sections = python::capture_collect_end(py);
+            if let Err(err) = conftest_result {
+                for (title, text) in &conftest_sections {
+                    if title == "Captured stderr" {
+                        eprint!("{text}");
+                    } else {
+                        print!("{text}");
+                    }
+                }
                 // -h/--help: upstream still shows the (full) help text rather
                 // than aborting on a broken initial conftest — the failure is
                 // downgraded to a PytestConfigWarning (Config.parse's
