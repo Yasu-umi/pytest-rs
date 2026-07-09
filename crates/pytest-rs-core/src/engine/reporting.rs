@@ -6,7 +6,7 @@ use super::super::Engine;
 use crate::python;
 use crate::report::{Outcome, Phase, exit_code};
 
-use super::center_with;
+use super::{center_with, flush_hook_output};
 
 impl Engine {
     pub(crate) fn handle_collection_errors(
@@ -157,7 +157,8 @@ impl Engine {
                 if !self.config.is_worker() {
                     // pytest fires sessionfinish even on aborted collection
                     // (pretty's wall-clock end time comes from it).
-                    if let Err(err) = self.fire_py_sessionfinish(py, code) {
+                    if let Err(err) = flush_hook_output(py, || self.fire_py_sessionfinish(py, code))
+                    {
                         eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
                     }
                     if self.session.custom_reporter.is_some() {
@@ -293,7 +294,7 @@ impl Engine {
                 } else {
                     exit_code::OK
                 };
-                if let Err(err) = self.fire_py_sessionfinish(py, code) {
+                if let Err(err) = flush_hook_output(py, || self.fire_py_sessionfinish(py, code)) {
                     eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
                 }
                 python::reporter_finish(py, &self.config, code, None);

@@ -127,6 +127,27 @@ pub fn center_with(label: &str, fill: char) -> String {
     )
 }
 
+/// Runs `f` (a `pytest_unconfigure`/`pytest_sessionfinish` hook dispatch)
+/// with capture resumed around it, then flushes any output the hooks
+/// printed to the real streams. These dispatch points sit outside
+/// `_capture`'s active periods (only `start_phase("setup")` and
+/// `collect_begin`/`collect_end` resume it) — without this, a conftest's
+/// `pytest_unconfigure`/`pytest_sessionfinish` print() leaks into whichever
+/// capture object happens to be ambient (e.g. an outer nested run's own
+/// capture) instead of this run's own stdout/stderr.
+pub(crate) fn flush_hook_output<T>(py: Python<'_>, f: impl FnOnce() -> T) -> T {
+    crate::python::capture_collect_begin(py);
+    let result = f();
+    for (title, text) in crate::python::capture_collect_end(py) {
+        if title == "Captured stderr" {
+            eprint!("{text}");
+        } else {
+            print!("{text}");
+        }
+    }
+    result
+}
+
 /// Scan the collection start directories (and their subdirs) for conftest.py
 /// files not already loaded. If any non-top-level conftest contains
 /// `pytest_plugins`, add an error — upstream reports this since pytest 7.

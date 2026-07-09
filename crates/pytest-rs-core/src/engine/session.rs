@@ -6,7 +6,7 @@ use super::super::Engine;
 use crate::python;
 use crate::report::{Outcome, exit_code};
 
-use super::{center_banner, center_with};
+use super::{center_banner, center_with, flush_hook_output};
 
 impl Engine {
     pub(crate) fn run_session(&mut self, py: Python<'_>, started: Instant) -> i32 {
@@ -95,7 +95,9 @@ impl Engine {
                 // "ERROR during collection:" wrapper) and exit 4.
                 if let Some(inner) = message.strip_prefix("\x00CONFTEST_IMPORT_ERROR\x00") {
                     eprintln!("{inner}");
-                    let _ = self.fire_py_hooks_simple(py, "pytest_unconfigure");
+                    let _ = flush_hook_output(py, || {
+                        self.fire_py_hooks_simple(py, "pytest_unconfigure")
+                    });
                     return exit_code::USAGE_ERROR;
                 }
                 // Sentinel "\x00USAGE_ERROR\x00": UsageError in configure —
@@ -104,7 +106,9 @@ impl Engine {
                     if !inner.is_empty() {
                         eprintln!("ERROR during collection:\n{inner}");
                     }
-                    let _ = self.fire_py_hooks_simple(py, "pytest_unconfigure");
+                    let _ = flush_hook_output(py, || {
+                        self.fire_py_hooks_simple(py, "pytest_unconfigure")
+                    });
                     return exit_code::USAGE_ERROR;
                 }
                 // Sentinel "\x00EXIT\x00{code}": pytest.exit() during configure or
@@ -114,7 +118,9 @@ impl Engine {
                     if let Some(banner) = &self.session.abort_banner.clone() {
                         println!("{}", center_with(banner, '!'));
                     }
-                    let _ = self.fire_py_hooks_simple(py, "pytest_unconfigure");
+                    let _ = flush_hook_output(py, || {
+                        self.fire_py_hooks_simple(py, "pytest_unconfigure")
+                    });
                     return code;
                 }
                 eprintln!("ERROR: {message}");
@@ -131,7 +137,7 @@ impl Engine {
         // tests ran"). A --help combined with a UsageError never reaches
         // here at all (collect() returns Err, handled above).
         if self.config.get_flag("markers") || self.config.help_text.is_some() {
-            let _ = self.fire_py_hooks_simple(py, "pytest_unconfigure");
+            let _ = flush_hook_output(py, || self.fire_py_hooks_simple(py, "pytest_unconfigure"));
             return exit_code::OK;
         }
 
@@ -224,14 +230,14 @@ impl Engine {
             if let Err(err) = self.show_fixtures(py) {
                 eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
             }
-            let _ = self.fire_py_hooks_simple(py, "pytest_unconfigure");
+            let _ = flush_hook_output(py, || self.fire_py_hooks_simple(py, "pytest_unconfigure"));
             return exit_code::OK;
         }
         if self.config.get_flag("fixtures-per-test") {
             if let Err(err) = self.show_fixtures_per_test(py) {
                 eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
             }
-            let _ = self.fire_py_hooks_simple(py, "pytest_unconfigure");
+            let _ = flush_hook_output(py, || self.fire_py_hooks_simple(py, "pytest_unconfigure"));
             return exit_code::OK;
         }
 
@@ -277,7 +283,7 @@ impl Engine {
         // module-level skips produced skip reports.
         let mut code = exit_code::NO_TESTS_COLLECTED;
         let mut session_exited = false;
-        if let Err(err) = self.fire_py_sessionfinish(py, code) {
+        if let Err(err) = flush_hook_output(py, || self.fire_py_sessionfinish(py, code)) {
             if let Some(returncode) = python::exit_returncode(py, &err) {
                 let msg = python::exit_msg(py, &err);
                 if !msg.is_empty() {
@@ -344,7 +350,7 @@ impl Engine {
         };
 
         let mut session_exited = false;
-        if let Err(err) = self.fire_sessionfinish(py, code) {
+        if let Err(err) = flush_hook_output(py, || self.fire_sessionfinish(py, code)) {
             if let Some(returncode) = python::exit_returncode(py, &err) {
                 let msg = python::exit_msg(py, &err);
                 if !msg.is_empty() {
