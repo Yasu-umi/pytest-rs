@@ -61,6 +61,15 @@ impl Engine {
                 };
                 if let Some(fs_path) = python::resolve_pyarg(py, path_part) {
                     resolved.push(format!("{}{rest}", fs_path.display()));
+                } else if self.config.invocation_dir.join(path_part).exists() {
+                    // Not a resolvable dotted module (e.g. a filename that
+                    // happens to contain dots, like "t.py"), but it IS a
+                    // literal path relative to the invocation dir. Upstream's
+                    // resolve_collection_argument() falls through to the
+                    // literal path in this case instead of erroring —
+                    // search_pypath() failing only means module_name stays
+                    // unset, not that the arg itself is invalid.
+                    resolved.push(arg.clone());
                 } else {
                     return Err(format!(
                         "module or package not found: {arg} (missing __init__.py?)"
