@@ -132,24 +132,45 @@ def console_main() -> int:
     raise NotImplementedError("pytest.console_main is not supported by pytest-rs")
 
 
+def _resolve_string_plugin(name):
+    """Resolve a `plugins=` string entry the way `-p NAME` does: a matching
+    pytest11 entry point by name first (its module may differ from `name`),
+    then a plain `sys.modules`/import lookup — raising ImportError (matching
+    upstream's PytestPluginManager.import_plugin message) if neither
+    resolves, since pytest.main() runs in-process and unlike a `-p NAME` CLI
+    arg, its failure must reach the caller as a real exception."""
+    import importlib
+    import importlib.metadata
+    import sys
+
+    for dist in importlib.metadata.distributions():
+        for ep in dist.entry_points:
+            if ep.group == "pytest11" and ep.name == name:
+                return ep.load()
+    existing = sys.modules.get(name)
+    if existing is not None:
+        return existing
+    try:
+        return importlib.import_module(name)
+    except ImportError as exc:
+        message = exc.args[0] if exc.args else str(exc)
+        raise ImportError(f'Error importing plugin "{name}": {message}') from exc
+
+
 def main(args=None, plugins=None):
     """Run pytest, returning an integer exit code.
 
     args: list of CLI arg strings, or a single path-like object, or None
           (defaults to sys.argv[1:]).
-    plugins: list of plugin objects or strings (only string plugin names are
-             supported; object plugins are silently ignored).
+    plugins: list of plugin objects and/or strings (a string is resolved to
+             a plugin module the same way `-p NAME` is). Object plugins only
+             work when this call is already running inside the pytest-rs
+             embedded interpreter (see below) — from a bare `python` process
+             they are silently ignored, same as upstream document for a
+             foreign in-process caller.
     """
-    import os
-    import subprocess
     import sys
     from pathlib import Path
-
-    from pytest._pytester import _RUNNER_LIBPATH
-
-    exe = os.environ.get("PYTEST_RS_EXE")
-    if exe is None:
-        raise RuntimeError("PYTEST_RS_EXE is not set; pytest.main() cannot find the runner")
 
     if args is None:
         cli = list(sys.argv[1:])
@@ -159,6 +180,34 @@ def main(args=None, plugins=None):
         cli = [str(args)]
     else:
         cli = [str(a) for a in args]
+
+    # `_native_inline_run` is registered on this very module object at Rust
+    # startup (bootstrap.rs::install_shim) — it lives only in the running
+    # embedded interpreter's memory, never in the on-disk shim source. A
+    # bare `python script.py` process (e.g. one pytester.runpython() spawns)
+    # imports a plain copy of this file and never gets it, so it must fall
+    # back to spawning the real pytest-rs binary — which, being pytest-rs
+    # itself, always has it. Calling code already running inside pytest-rs
+    # (an outer test's own body, a conftest, a nested pytest.main() call)
+    # gets the in-process path, which is what lets object plugins and a
+    # failed plugin import's ImportError reach the caller directly.
+    if "_native_inline_run" in globals():
+        from pytest._pytester import run_inprocess
+
+        resolved_plugins = [
+            _resolve_string_plugin(p) if isinstance(p, str) else p for p in (plugins or [])
+        ]
+        reprec = run_inprocess(cli, plugins=resolved_plugins)
+        return reprec.ret
+
+    import os
+    import subprocess
+
+    from pytest._pytester import _RUNNER_LIBPATH
+
+    exe = os.environ.get("PYTEST_RS_EXE")
+    if exe is None:
+        raise RuntimeError("PYTEST_RS_EXE is not set; pytest.main() cannot find the runner")
 
     extra = []
     for p in plugins or []:
@@ -170,10 +219,7 @@ def main(args=None, plugins=None):
     for var, val in _RUNNER_LIBPATH.items():
         env.setdefault(var, val)
 
-    proc = subprocess.run(
-        [str(exe), *extra, *cli],
-        env=env,
-    )
+    proc = subprocess.run([str(exe), *extra, *cli], env=env)
     return proc.returncode
 
 

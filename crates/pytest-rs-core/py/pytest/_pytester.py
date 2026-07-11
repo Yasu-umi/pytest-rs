@@ -180,6 +180,316 @@ class RunResult:
             assert actual.get("deselected", 0) == deselected
 
 
+def run_inprocess(args, plugins=(), helper_plugin=None, forwarded_filter_marks=()):
+    """Run a whole pytest session in this same interpreter (the native engine
+    runs a nested Engine, firing its hooks through the monitored plugin
+    manager so a HookRecorder — when one is listening — captures live call
+    objects a subprocess JSON relay could never carry).
+
+    Shared by Pytester._inline_run_inprocess (the pytester test-harness API:
+    `helper_plugin` is its upstream-parity sentinel, `forwarded_filter_marks`
+    forwards the enclosing test's @pytest.mark.filterwarnings) and
+    pytest.main() (a real top-level call some other code makes — there is no
+    enclosing Pytester, so both of those are absent). Either way this is
+    still a *nested* run in the pytest-rs sense: the `pytest` package only
+    resolves at all inside an already-running pytest-rs-embedded interpreter,
+    so a bare `import pytest; pytest.main()` is already running inside one
+    engine session before this ever starts a second.
+    """
+    from _pytest.pytester import HookRecorder
+
+    import pytest
+    import pytest._capture as _capture
+    import pytest._logging as _logging
+    import pytest._marks as _marks
+    import pytest._node as _node
+    import pytest._tmp_path as _tmp_path
+    import pytest._wcapture as _wcapture
+    from pytest._pluginmanager import pluginmanager
+
+    run_args = [str(arg) for arg in args]
+
+    # Snapshot module/path/cwd/env so the inner run does not pollute ours
+    # (a separate subprocess used to give this isolation for free).
+    modules_before = sys.modules.copy()
+    syspath_before = list(sys.path)
+    cwd_before = os.getcwd()
+    env_before = dict(os.environ)
+
+    # --runxfail monkeypatches pytest.xfail; save/restore so it doesn't
+    # leak between nested and outer runs.
+    old_xfail = pytest.xfail
+
+    # Per-session global state the native engine mutates lives in shim
+    # module singletons; a nested run would leak it to the outer session
+    # (e.g. an inner `-x` run setting session.shouldstop, or reconfiguring
+    # the mark generator). Swap in fresh state and restore afterwards.
+    _sentinel = object()
+    old_session_state = _node._session_state
+    _node._session_state = {
+        "shouldfail": None,
+        "shouldstop": None,
+        "items": [],
+        "session_markers": [],
+        "session_keywords": {},
+    }
+    old_added_marks = list(_node._added_marks)
+    _node._added_marks.clear()
+    _mark_attrs = ("_config", "_strict", "_markers", "_strict_parametrization_ids")
+    old_mark_state = {k: getattr(_marks.mark, k, _sentinel) for k in _mark_attrs}
+    # tmp_path machinery: the nested run reconfigures basetemp/retention and
+    # records its own pass/fail outcomes; snapshot so the outer run's
+    # retention bookkeeping survives (run_nested resets these).
+    old_tmp_state = {
+        "_given_basetemp": _tmp_path._given_basetemp,
+        "_retention_count": _tmp_path._retention_count,
+        "_retention_policy": _tmp_path._retention_policy,
+        "_call_results": dict(_tmp_path._call_results),
+        "_any_failed": _tmp_path._any_failed,
+    }
+
+    old_pm_plugins = list(pluginmanager._plugins)
+    old_pm_names = dict(pluginmanager._names)
+    old_pm_blocked = set(pluginmanager._blocked_plugins)
+    old_pm_conftest = set(pluginmanager._conftest_plugins)
+    old_pm_specs = dict(pluginmanager._specs)
+    old_pm_monitors = list(pluginmanager._call_monitors)
+    old_pm_configured = pluginmanager._configured
+
+    reprec = HookRecorder(pluginmanager)
+    invocation_plugins = list(plugins)
+    if helper_plugin is not None:
+        invocation_plugins.append(helper_plugin)
+    for plugin in invocation_plugins:
+        pluginmanager.register(plugin)
+    # The inner run gets a fresh global capture state so its per-item
+    # capture bookkeeping does not corrupt the outer session's.
+    old_capstate = _capture.state
+    inner_capstate = _capture.CaptureState()
+    _capture.state = inner_capstate
+    # Logging: the inner run reconfigures _logging.state (log_file,
+    # log_cli handlers) and may lower the root logger level; swap in
+    # fresh state and restore everything afterwards.
+    old_logging_state = _logging.state
+    old_root_level = logging.getLogger().level
+    old_root_handlers = list(logging.getLogger().handlers)
+    _logging.state = _logging.LoggingState()
+    # Warning capture: the inner run_session calls _wcapture.uninstall()
+    # on exit, breaking the outer capture. Save the full warning state
+    # and reinstall afterwards so the outer run's capture survives.
+    old_wcapture_captured = list(_wcapture.captured)
+    old_wcapture_current_test = _wcapture.current_test
+    old_wcapture_current_when = _wcapture.current_when
+    old_wcapture_original_sw = _wcapture._original_showwarning
+    old_wcapture_session_specs = list(_wcapture.session_specs)
+    old_warn_filters = list(warnings.filters)
+    _wcapture.captured.clear()
+    _wcapture.current_test = None
+    _wcapture.current_when = "config"
+    warnings.filters[:] = []
+    # Clear __warningregistry__ in all loaded modules so "default" filters
+    # don't suppress warnings that were already shown in a previous inner run.
+    for _mod in list(sys.modules.values()):
+        if _mod is not None and hasattr(_mod, "__warningregistry__"):
+            _mod.__warningregistry__.clear()
+    # Save/restore threadexception and unraisable module state: the inner
+    # engine calls configure()/session_cleanup() which mutate module-level
+    # globals (_deque, _prev_hook). Without save/restore the outer engine's
+    # hook is clobbered by the inner cleanup.
+    import pytest._threadexception as _threadexc
+    import pytest._unraisable as _unraisable
+
+    old_threadexc_deque = _threadexc._deque
+    old_threadexc_prev = _threadexc._prev_hook
+    old_threadexc_hook = threading.excepthook
+    old_unraisable_deque = _unraisable._deque
+    old_unraisable_prev = _unraisable._prev_hook
+    old_unraisable_hook = sys.unraisablehook
+
+    # Redirect fds 1/2 to temp files: the inner run's terminal output
+    # (printed by the native engine straight to the fds) is collected
+    # here, then echoed into the outer streams so capsys/caplog of the
+    # enclosing test see what an in-process run would have printed.
+    out_f = tempfile.TemporaryFile()
+    err_f = tempfile.TemporaryFile()
+    sys.stdout.flush()
+    sys.stderr.flush()
+    saved_out = os.dup(1)
+    saved_err = os.dup(2)
+    os.dup2(out_f.fileno(), 1)
+    os.dup2(err_f.fileno(), 2)
+    # When capture is disabled (-s/--capture=no) the engine leaves the
+    # Python-level streams alone, so the inner test's print() output flows
+    # to whatever sys.stdout points at — which is the OUTER session's
+    # capture object, not the redirected fd. Point sys.stdout/err at the
+    # redirected fds so that output lands in out_f/err_f (and thus
+    # result.outlines). With capture enabled the engine installs its own
+    # fd-level capture, so leave the Python streams untouched to avoid
+    # bypassing it.
+    _args_str = [str(a) for a in run_args]
+    capture_disabled = (
+        "-s" in _args_str
+        or "--capture=no" in _args_str
+        or any(
+            _args_str[i] == "--capture" and i + 1 < len(_args_str) and _args_str[i + 1] == "no"
+            for i in range(len(_args_str))
+        )
+    )
+    saved_sys_out = saved_sys_err = None
+    if capture_disabled:
+        saved_sys_out, saved_sys_err = sys.stdout, sys.stderr
+        sys.stdout = os.fdopen(os.dup(1), "w", buffering=1, errors="replace")
+        sys.stderr = os.fdopen(os.dup(2), "w", buffering=1, errors="replace")
+    # Forward the outer test's @pytest.mark.filterwarnings to the inner
+    # in-process run via env var (same mechanism as subprocess mode).
+    _forwarded_env_set = False
+    if forwarded_filter_marks:
+        os.environ["PYTEST_RS_FORWARDED_FILTERS"] = "\n".join(
+            reversed(list(forwarded_filter_marks))
+        )
+        _forwarded_env_set = True
+    _pending_invocation_plugins[:] = invocation_plugins
+    try:
+        try:
+            ret = pytest._native_inline_run(run_args)
+        except SystemExit as exc:
+            ret = int(exc.code) if exc.code is not None else 0
+        except Exception as exc:
+            if type(exc).__name__ == "UsageError":
+                os.write(2, f"ERROR: {exc}\n".encode())
+                ret = 4
+            else:
+                raise
+    finally:
+        _pending_invocation_plugins.clear()
+        sys.stdout.flush()
+        sys.stderr.flush()
+        # Restore the Python streams (and close our fd wrappers while fd
+        # 1/2 still point at out_f/err_f) before reverting the fds.
+        if saved_sys_out is not None:
+            for _wrapper, _orig in ((sys.stdout, saved_sys_out), (sys.stderr, saved_sys_err)):
+                try:
+                    _wrapper.close()
+                except Exception:
+                    pass
+            sys.stdout = saved_sys_out
+            sys.stderr = saved_sys_err
+        os.dup2(saved_out, 1)
+        os.dup2(saved_err, 2)
+        os.close(saved_out)
+        os.close(saved_err)
+        # Stop the inner capture if a run path left it active, so its
+        # temp files are closed (else a ResourceWarning leaks).
+        try:
+            if inner_capstate._capture is not None:
+                inner_capstate.session_end()
+        except Exception:
+            pass
+        _capture.state = old_capstate
+        # Logging: close the inner run's handlers, restore the root
+        # logger's level and handler list, then restore the outer state.
+        inner_log = _logging.state
+        inner_log.end_phase()
+        if inner_log.log_file_handler is not None:
+            logging.getLogger().removeHandler(inner_log.log_file_handler)
+            inner_log.log_file_handler.close()
+        if inner_log.log_cli_handler is not None and not isinstance(
+            inner_log.log_cli_handler, _logging._NullCliHandler
+        ):
+            logging.getLogger().removeHandler(inner_log.log_cli_handler)
+        root = logging.getLogger()
+        root.handlers[:] = old_root_handlers
+        root.setLevel(old_root_level)
+        _logging.state = old_logging_state
+        reprec.finish_recording()
+        pluginmanager._plugins[:] = old_pm_plugins
+        pluginmanager._names.clear()
+        pluginmanager._names.update(old_pm_names)
+        pluginmanager._blocked_plugins.clear()
+        pluginmanager._blocked_plugins.update(old_pm_blocked)
+        pluginmanager._conftest_plugins.clear()
+        pluginmanager._conftest_plugins.update(old_pm_conftest)
+        pluginmanager._specs.clear()
+        pluginmanager._specs.update(old_pm_specs)
+        pluginmanager._call_monitors[:] = old_pm_monitors
+        pluginmanager._configured = old_pm_configured
+        # Restore the session-state singletons swapped in above.
+        pytest.xfail = old_xfail
+        _node._session_state = old_session_state
+        _node._added_marks[:] = old_added_marks
+        for key, value in old_mark_state.items():
+            if value is _sentinel:
+                if hasattr(_marks.mark, key):
+                    delattr(_marks.mark, key)
+            else:
+                setattr(_marks.mark, key, value)
+        _tmp_path._given_basetemp = old_tmp_state["_given_basetemp"]
+        _tmp_path._retention_count = old_tmp_state["_retention_count"]
+        _tmp_path._retention_policy = old_tmp_state["_retention_policy"]
+        _tmp_path._call_results.clear()
+        _tmp_path._call_results.update(old_tmp_state["_call_results"])
+        _tmp_path._any_failed = old_tmp_state["_any_failed"]
+        # Restore warning capture: the inner run_session called
+        # _wcapture.uninstall() which broke the outer capture.
+        _wcapture.captured[:] = old_wcapture_captured
+        _wcapture.current_test = old_wcapture_current_test
+        _wcapture.current_when = old_wcapture_current_when
+        _wcapture._original_showwarning = old_wcapture_original_sw
+        _wcapture.session_specs[:] = old_wcapture_session_specs
+        warnings.filters[:] = old_warn_filters
+        warnings.showwarning = _wcapture._showwarning
+        # Restore threadexception/unraisable module state so the outer
+        # engine's hooks survive inner cleanup.
+        _threadexc._deque = old_threadexc_deque
+        _threadexc._prev_hook = old_threadexc_prev
+        threading.excepthook = old_threadexc_hook
+        _unraisable._deque = old_unraisable_deque
+        _unraisable._prev_hook = old_unraisable_prev
+        sys.unraisablehook = old_unraisable_hook
+        # Restore the module table, sys.path, cwd, and env.
+        for name in list(sys.modules):
+            if name not in modules_before:
+                del sys.modules[name]
+        sys.modules.update(modules_before)
+        sys.path[:] = syspath_before
+        os.chdir(cwd_before)
+        # Restore env: add back removed vars, update changed ones, remove
+        # new ones — but do NOT restore PYTEST_CURRENT_TEST (the inner
+        # run's teardown already unset it, and the outer runner will re-set
+        # it for the outer item's teardown phase).
+        _no_restore = {"PYTEST_CURRENT_TEST"}
+        for key in list(os.environ):
+            if key not in env_before and key not in _no_restore:
+                del os.environ[key]
+        for key, val in env_before.items():
+            if key in _no_restore:
+                continue
+            if os.environ.get(key) != val:
+                os.environ[key] = val
+
+    out_f.seek(0)
+    err_f.seek(0)
+    outlines = out_f.read().decode(errors="replace").splitlines()
+    errlines = err_f.read().decode(errors="replace").splitlines()
+    out_f.close()
+    err_f.close()
+    # Always echo inner run output so outer test capsys/--tb sees it.
+    for line in outlines:
+        print(line)
+    for line in errlines:
+        print(line, file=sys.stderr)
+
+    reprec.ret = ret
+    # Carry the captured output for tests reaching past the HookRecorder
+    # API (e.g. result.stdout / .outlines like the old InlineRunResult).
+    result = RunResult(ret, outlines, errlines, 0.0)
+    result.reprec = reprec
+    reprec._result = result
+    reprec.outlines = outlines
+    reprec.errlines = errlines
+    return reprec
+
+
 class Pytester:
     # Raised by run()/runpytest_subprocess() when a child overruns its timeout
     # (the same class subprocess raises, so callers can catch either).
@@ -716,302 +1026,22 @@ class Pytester:
         # this process and fires its hooks through the monitored plugin
         # manager, so the HookRecorder captures live call objects (getcalls,
         # getreports, assertoutcome) — including custom hooks a subprocess
-        # JSON relay could never carry.
-        from _pytest.pytester import HookRecorder
-
-        import pytest
-        import pytest._capture as _capture
-        import pytest._logging as _logging
-        import pytest._marks as _marks
-        import pytest._node as _node
-        import pytest._tmp_path as _tmp_path
-        import pytest._wcapture as _wcapture
-        from pytest._pluginmanager import pluginmanager
-
-        run_args = [str(arg) for arg in args]
-
-        # Snapshot module/path/cwd/env so the inner run does not pollute ours
-        # (a separate subprocess used to give this isolation for free).
-        modules_before = sys.modules.copy()
-        syspath_before = list(sys.path)
-        cwd_before = os.getcwd()
-        env_before = dict(os.environ)
-
-        # --runxfail monkeypatches pytest.xfail; save/restore so it doesn't
-        # leak between nested and outer runs.
-        old_xfail = pytest.xfail
-
-        # Per-session global state the native engine mutates lives in shim
-        # module singletons; a nested run would leak it to the outer session
-        # (e.g. an inner `-x` run setting session.shouldstop, or reconfiguring
-        # the mark generator). Swap in fresh state and restore afterwards.
-        _sentinel = object()
-        old_session_state = _node._session_state
-        _node._session_state = {
-            "shouldfail": None,
-            "shouldstop": None,
-            "items": [],
-            "session_markers": [],
-            "session_keywords": {},
-        }
-        old_added_marks = list(_node._added_marks)
-        _node._added_marks.clear()
-        _mark_attrs = ("_config", "_strict", "_markers", "_strict_parametrization_ids")
-        old_mark_state = {k: getattr(_marks.mark, k, _sentinel) for k in _mark_attrs}
-        # tmp_path machinery: the nested run reconfigures basetemp/retention and
-        # records its own pass/fail outcomes; snapshot so the outer run's
-        # retention bookkeeping survives (run_nested resets these).
-        old_tmp_state = {
-            "_given_basetemp": _tmp_path._given_basetemp,
-            "_retention_count": _tmp_path._retention_count,
-            "_retention_policy": _tmp_path._retention_policy,
-            "_call_results": dict(_tmp_path._call_results),
-            "_any_failed": _tmp_path._any_failed,
-        }
-
-        old_pm_plugins = list(pluginmanager._plugins)
-        old_pm_names = dict(pluginmanager._names)
-        old_pm_blocked = set(pluginmanager._blocked_plugins)
-        old_pm_conftest = set(pluginmanager._conftest_plugins)
-        old_pm_specs = dict(pluginmanager._specs)
-        old_pm_monitors = list(pluginmanager._call_monitors)
-        old_pm_configured = pluginmanager._configured
-
-        reprec = HookRecorder(pluginmanager)
-        helper_plugin = PytesterHelperPlugin()
-        invocation_plugins = [*plugins, helper_plugin]
-        for plugin in invocation_plugins:
-            pluginmanager.register(plugin)
-        # The inner run gets a fresh global capture state so its per-item
-        # capture bookkeeping does not corrupt the outer session's.
-        old_capstate = _capture.state
-        inner_capstate = _capture.CaptureState()
-        _capture.state = inner_capstate
-        # Logging: the inner run reconfigures _logging.state (log_file,
-        # log_cli handlers) and may lower the root logger level; swap in
-        # fresh state and restore everything afterwards.
-        old_logging_state = _logging.state
-        old_root_level = logging.getLogger().level
-        old_root_handlers = list(logging.getLogger().handlers)
-        _logging.state = _logging.LoggingState()
-        # Warning capture: the inner run_session calls _wcapture.uninstall()
-        # on exit, breaking the outer capture. Save the full warning state
-        # and reinstall afterwards so the outer run's capture survives.
-        old_wcapture_captured = list(_wcapture.captured)
-        old_wcapture_current_test = _wcapture.current_test
-        old_wcapture_current_when = _wcapture.current_when
-        old_wcapture_original_sw = _wcapture._original_showwarning
-        old_wcapture_session_specs = list(_wcapture.session_specs)
-        old_warn_filters = list(warnings.filters)
-        _wcapture.captured.clear()
-        _wcapture.current_test = None
-        _wcapture.current_when = "config"
-        warnings.filters[:] = []
-        # Clear __warningregistry__ in all loaded modules so "default" filters
-        # don't suppress warnings that were already shown in a previous inner run.
-        for _mod in list(sys.modules.values()):
-            if _mod is not None and hasattr(_mod, "__warningregistry__"):
-                _mod.__warningregistry__.clear()
-        # Save/restore threadexception and unraisable module state: the inner
-        # engine calls configure()/session_cleanup() which mutate module-level
-        # globals (_deque, _prev_hook). Without save/restore the outer engine's
-        # hook is clobbered by the inner cleanup.
-        import pytest._threadexception as _threadexc
-        import pytest._unraisable as _unraisable
-
-        old_threadexc_deque = _threadexc._deque
-        old_threadexc_prev = _threadexc._prev_hook
-        old_threadexc_hook = threading.excepthook
-        old_unraisable_deque = _unraisable._deque
-        old_unraisable_prev = _unraisable._prev_hook
-        old_unraisable_hook = sys.unraisablehook
-
-        # Redirect fds 1/2 to temp files: the inner run's terminal output
-        # (printed by the native engine straight to the fds) is collected
-        # here, then echoed into the outer streams so capsys/caplog of the
-        # enclosing test see what an in-process run would have printed.
-        out_f = tempfile.TemporaryFile()
-        err_f = tempfile.TemporaryFile()
-        sys.stdout.flush()
-        sys.stderr.flush()
-        saved_out = os.dup(1)
-        saved_err = os.dup(2)
-        os.dup2(out_f.fileno(), 1)
-        os.dup2(err_f.fileno(), 2)
-        # When capture is disabled (-s/--capture=no) the engine leaves the
-        # Python-level streams alone, so the inner test's print() output flows
-        # to whatever sys.stdout points at — which is the OUTER session's
-        # capture object, not the redirected fd. Point sys.stdout/err at the
-        # redirected fds so that output lands in out_f/err_f (and thus
-        # result.outlines). With capture enabled the engine installs its own
-        # fd-level capture, so leave the Python streams untouched to avoid
-        # bypassing it.
-        _args_str = [str(a) for a in run_args]
-        capture_disabled = (
-            "-s" in _args_str
-            or "--capture=no" in _args_str
-            or any(
-                _args_str[i] == "--capture" and i + 1 < len(_args_str) and _args_str[i + 1] == "no"
-                for i in range(len(_args_str))
-            )
-        )
-        saved_sys_out = saved_sys_err = None
-        if capture_disabled:
-            saved_sys_out, saved_sys_err = sys.stdout, sys.stderr
-            sys.stdout = os.fdopen(os.dup(1), "w", buffering=1, errors="replace")
-            sys.stderr = os.fdopen(os.dup(2), "w", buffering=1, errors="replace")
-        # Forward the outer test's @pytest.mark.filterwarnings to the inner
-        # in-process run via env var (same mechanism as subprocess mode).
-        _forwarded_env_set = False
+        # JSON relay could never carry. `run_inprocess` (module-level, shared
+        # with pytest.main()) does the actual work; this just supplies the
+        # two pieces that only make sense with a real Pytester behind them.
+        forwarded_filter_marks = ()
         if self._request is not None:
-            _fwd_marks = [
+            forwarded_filter_marks = [
                 str(mark.args[0])
                 for mark in self._request.node.iter_markers("filterwarnings")
                 if mark.args
             ]
-            if _fwd_marks:
-                os.environ["PYTEST_RS_FORWARDED_FILTERS"] = "\n".join(reversed(_fwd_marks))
-                _forwarded_env_set = True
-        _pending_invocation_plugins[:] = invocation_plugins
-        try:
-            try:
-                ret = pytest._native_inline_run(run_args)
-            except SystemExit as exc:
-                ret = int(exc.code) if exc.code is not None else 0
-            except Exception as exc:
-                if type(exc).__name__ == "UsageError":
-                    os.write(2, f"ERROR: {exc}\n".encode())
-                    ret = 4
-                else:
-                    raise
-        finally:
-            _pending_invocation_plugins.clear()
-            sys.stdout.flush()
-            sys.stderr.flush()
-            # Restore the Python streams (and close our fd wrappers while fd
-            # 1/2 still point at out_f/err_f) before reverting the fds.
-            if saved_sys_out is not None:
-                for _wrapper, _orig in ((sys.stdout, saved_sys_out), (sys.stderr, saved_sys_err)):
-                    try:
-                        _wrapper.close()
-                    except Exception:
-                        pass
-                sys.stdout = saved_sys_out
-                sys.stderr = saved_sys_err
-            os.dup2(saved_out, 1)
-            os.dup2(saved_err, 2)
-            os.close(saved_out)
-            os.close(saved_err)
-            # Stop the inner capture if a run path left it active, so its
-            # temp files are closed (else a ResourceWarning leaks).
-            try:
-                if inner_capstate._capture is not None:
-                    inner_capstate.session_end()
-            except Exception:
-                pass
-            _capture.state = old_capstate
-            # Logging: close the inner run's handlers, restore the root
-            # logger's level and handler list, then restore the outer state.
-            inner_log = _logging.state
-            inner_log.end_phase()
-            if inner_log.log_file_handler is not None:
-                logging.getLogger().removeHandler(inner_log.log_file_handler)
-                inner_log.log_file_handler.close()
-            if inner_log.log_cli_handler is not None and not isinstance(
-                inner_log.log_cli_handler, _logging._NullCliHandler
-            ):
-                logging.getLogger().removeHandler(inner_log.log_cli_handler)
-            root = logging.getLogger()
-            root.handlers[:] = old_root_handlers
-            root.setLevel(old_root_level)
-            _logging.state = old_logging_state
-            reprec.finish_recording()
-            pluginmanager._plugins[:] = old_pm_plugins
-            pluginmanager._names.clear()
-            pluginmanager._names.update(old_pm_names)
-            pluginmanager._blocked_plugins.clear()
-            pluginmanager._blocked_plugins.update(old_pm_blocked)
-            pluginmanager._conftest_plugins.clear()
-            pluginmanager._conftest_plugins.update(old_pm_conftest)
-            pluginmanager._specs.clear()
-            pluginmanager._specs.update(old_pm_specs)
-            pluginmanager._call_monitors[:] = old_pm_monitors
-            pluginmanager._configured = old_pm_configured
-            # Restore the session-state singletons swapped in above.
-            pytest.xfail = old_xfail
-            _node._session_state = old_session_state
-            _node._added_marks[:] = old_added_marks
-            for key, value in old_mark_state.items():
-                if value is _sentinel:
-                    if hasattr(_marks.mark, key):
-                        delattr(_marks.mark, key)
-                else:
-                    setattr(_marks.mark, key, value)
-            _tmp_path._given_basetemp = old_tmp_state["_given_basetemp"]
-            _tmp_path._retention_count = old_tmp_state["_retention_count"]
-            _tmp_path._retention_policy = old_tmp_state["_retention_policy"]
-            _tmp_path._call_results.clear()
-            _tmp_path._call_results.update(old_tmp_state["_call_results"])
-            _tmp_path._any_failed = old_tmp_state["_any_failed"]
-            # Restore warning capture: the inner run_session called
-            # _wcapture.uninstall() which broke the outer capture.
-            _wcapture.captured[:] = old_wcapture_captured
-            _wcapture.current_test = old_wcapture_current_test
-            _wcapture.current_when = old_wcapture_current_when
-            _wcapture._original_showwarning = old_wcapture_original_sw
-            _wcapture.session_specs[:] = old_wcapture_session_specs
-            warnings.filters[:] = old_warn_filters
-            warnings.showwarning = _wcapture._showwarning
-            # Restore threadexception/unraisable module state so the outer
-            # engine's hooks survive inner cleanup.
-            _threadexc._deque = old_threadexc_deque
-            _threadexc._prev_hook = old_threadexc_prev
-            threading.excepthook = old_threadexc_hook
-            _unraisable._deque = old_unraisable_deque
-            _unraisable._prev_hook = old_unraisable_prev
-            sys.unraisablehook = old_unraisable_hook
-            # Restore the module table, sys.path, cwd, and env.
-            for name in list(sys.modules):
-                if name not in modules_before:
-                    del sys.modules[name]
-            sys.modules.update(modules_before)
-            sys.path[:] = syspath_before
-            os.chdir(cwd_before)
-            # Restore env: add back removed vars, update changed ones, remove
-            # new ones — but do NOT restore PYTEST_CURRENT_TEST (the inner
-            # run's teardown already unset it, and the outer runner will re-set
-            # it for the outer item's teardown phase).
-            _no_restore = {"PYTEST_CURRENT_TEST"}
-            for key in list(os.environ):
-                if key not in env_before and key not in _no_restore:
-                    del os.environ[key]
-            for key, val in env_before.items():
-                if key in _no_restore:
-                    continue
-                if os.environ.get(key) != val:
-                    os.environ[key] = val
-
-        out_f.seek(0)
-        err_f.seek(0)
-        outlines = out_f.read().decode(errors="replace").splitlines()
-        errlines = err_f.read().decode(errors="replace").splitlines()
-        out_f.close()
-        err_f.close()
-        # Always echo inner run output so outer test capsys/--tb sees it.
-        for line in outlines:
-            print(line)
-        for line in errlines:
-            print(line, file=sys.stderr)
-
-        reprec.ret = ret
-        # Carry the captured output for tests reaching past the HookRecorder
-        # API (e.g. result.stdout / .outlines like the old InlineRunResult).
-        result = RunResult(ret, outlines, errlines, 0.0)
-        result.reprec = reprec
-        reprec._result = result
-        reprec.outlines = outlines
-        reprec.errlines = errlines
-        return reprec
+        return run_inprocess(
+            args,
+            plugins=plugins,
+            helper_plugin=PytesterHelperPlugin(),
+            forwarded_filter_marks=forwarded_filter_marks,
+        )
 
     def inline_runsource(self, source, *args):
         path = self.makepyfile(source)
