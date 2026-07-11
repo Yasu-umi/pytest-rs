@@ -559,7 +559,10 @@ def collect_textfile_doctests(
     if not dtest.examples:
         return []
 
-    nodeid = nodeid_base
+    # Upstream's DoctestTextfile.collect() names the single DoctestItem after
+    # the file's own basename (test.name = self.path.name), so the nodeid is
+    # "<file>::<file>", not the bare file nodeid.
+    nodeid = f"{nodeid_base}::{name}"
     func = _make_doctest_func(dtest, runner_cls, optionflags=optionflags, extra_globs=extra_globs)
     return [(nodeid, func, 0)]
 

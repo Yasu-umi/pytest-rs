@@ -188,18 +188,33 @@ impl Engine {
                 // A collection SyntaxError has no reprcrash (upstream's
                 // CollectErrorRepr lacks .reprcrash): don't re-derive the
                 // message from longrepr in that case either, or the
-                // reporting.rs suppression above gets silently undone.
-                let crash_msg = report
-                    .reprcrash_message
-                    .as_deref()
-                    .map(str::to_string)
-                    .or_else(|| {
-                        report
-                            .longrepr
-                            .as_deref()
-                            .and_then(short_message)
-                            .filter(|message| !message.starts_with("SyntaxError:"))
-                    });
+                // reporting.rs suppression above gets silently undone. A
+                // doctest failure has no reprcrash at all upstream (its
+                // DocTestFailure/UnexpectedException repr never sets one, so
+                // `rep.longrepr.reprcrash.message` raises AttributeError,
+                // silently skipped) — override both sources so no summary
+                // suffix appears, matching upstream's bare "FAILED nodeid".
+                let is_doctest = self
+                    .session
+                    .items
+                    .iter()
+                    .find(|item| item.nodeid == report.nodeid)
+                    .is_some_and(|item| item.is_doctest);
+                let crash_msg = if is_doctest {
+                    None
+                } else {
+                    report
+                        .reprcrash_message
+                        .as_deref()
+                        .map(str::to_string)
+                        .or_else(|| {
+                            report
+                                .longrepr
+                                .as_deref()
+                                .and_then(short_message)
+                                .filter(|message| !message.starts_with("SyntaxError:"))
+                        })
+                };
                 if let Some(message) = crash_msg {
                     // pytest's _get_line_with_reprcrash_message: failure/error
                     // lines show the full crash message on CI or at -vv, but
