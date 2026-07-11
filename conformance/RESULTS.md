@@ -25,7 +25,7 @@ pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2690 | 98 | 0 | 53 | 0 | 8 | 2849 | 96.3% | 26 | 54 | 61 |
+| pytest | 9.0.3 | 2701 | 87 | 0 | 53 | 0 | 8 | 2849 | 96.7% | 26 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 0 | 1 | 7 | 85.7% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 0 | 2 | 90 | 97.8% | 1 | 1 | 0 |
@@ -42,7 +42,7 @@ pytest-rs; they are not counted in the total.
 | pytest-snapshot | v0.9.0 | 102 | 5 | 0 | 0 | 0 | 0 | 107 | 95.3% | 0 | 3 | 0 |
 | pytest-icdiff | 0.5 | 10 | 2 | 0 | 0 | 0 | 0 | 12 | 83.3% | 0 | 1 | 0 |
 | pytest-socket | 0.7.0 | 60 | 5 | 0 | 0 | 0 | 0 | 65 | 92.3% | 3 | 6 | 0 |
-| pytest-order | v1.4.0 | 120 | 14 | 0 | 0 | 0 | 0 | 134 | 89.6% | 7 | 16 | 0 |
+| pytest-order | v1.4.0 | 121 | 13 | 0 | 0 | 0 | 0 | 134 | 90.3% | 8 | 16 | 0 |
 | pytest-repeat | v0.9.4 | 16 | 0 | 0 | 0 | 0 | 0 | 16 | 100.0% | 1 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
 | pytest-env | 1.6.0 | 69 | 6 | 0 | 0 | 0 | 0 | 75 | 92.0% | 2 | 3 | 0 |
@@ -66,7 +66,7 @@ pytest-rs; they are not counted in the total.
 | pandas | v3.0.3 | 160780 | 1 | 0 | 26985 | 0 | 7 | 187773 | 100.0% | 879 | 961 | 3 |
 | networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 0 | 0 | 6894 | 100.0% | 259 | 266 | 0 |
 | pydantic | v2.11.7 | 5338 | 14 | 0 | 921 | 0 | 0 | 6273 | 99.8% | 77 | 82 | 0 |
-| scikit-learn-1 | 1.9.0 | 8417 | 0 | 0 | 6622 | 0 | 0 | 15039 | 100.0% | 78 | 87 | 0 |
+| scikit-learn-1 | 1.9.0 | 8432 | 0 | 0 | 6624 | 0 | 0 | 15056 | 100.0% | 79 | 87 | 0 |
 | scikit-learn-2 | 1.9.0 | 5046 | 0 | 0 | 1892 | 0 | 0 | 6938 | 100.0% | 52 | 58 | 0 |
 | scikit-learn-3 | 1.9.0 | 9251 | 3 | 0 | 2530 | 0 | 0 | 11784 | 100.0% | 104 | 114 | 0 |
 
@@ -90,10 +90,10 @@ pytest-rs; they are not counted in the total.
 | testing/logging/test_formatter.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
 | testing/logging/test_reporting.py | failed | 44 | 8 | 0 | 0 | 0 | 0 |
 | testing/test_assertion.py | passed | 160 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_cacheprovider.py | failed | 54 | 3 | 0 | 0 | 0 | 0 |
+| testing/test_cacheprovider.py | failed | 55 | 2 | 0 | 0 | 0 | 0 |
 | testing/test_capture.py | failed | 128 | 2 | 0 | 2 | 0 | 0 |
 | testing/test_collect_imported_tests.py | failed | 2 | 1 | 0 | 0 | 0 | 0 |
-| testing/test_collection.py | failed | 105 | 8 | 0 | 3 | 0 | 0 |
+| testing/test_collection.py | failed | 106 | 7 | 0 | 3 | 0 | 0 |
 | testing/test_compat.py | passed | 10 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_config.py | failed | 213 | 1 | 0 | 1 | 0 | 0 |
 | testing/test_conftest.py | failed | 47 | 6 | 0 | 1 | 0 | 0 |
@@ -128,7 +128,7 @@ pytest-rs; they are not counted in the total.
 | testing/test_unraisableexception.py | passed | 11 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_warning_types.py | passed | 15 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_warnings.py | failed | 41 | 1 | 0 | 2 | 0 | 0 |
-| testing/acceptance_test.py | failed | 70 | 15 | 0 | 2 | 0 | 6 |
+| testing/acceptance_test.py | failed | 79 | 6 | 0 | 2 | 0 | 6 |
 | testing/deprecated_test.py | passed | 15 | 0 | 0 | 0 | 0 | 0 |
 
 </details>
@@ -370,7 +370,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_class_marks.py | passed | 9 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_dependency.py | failed | 22 | 1 | 0 | 0 | 0 | 0 |
 | tests/test_marker_prefix.py | passed | 7 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_misc.py | failed | 3 | 1 | 0 | 0 | 0 | 0 |
+| tests/test_misc.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_multiple_ordering.py | failed | 0 | 4 | 0 | 0 | 0 | 0 |
 | tests/test_order_group_scope.py | passed | 6 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_order_group_scope_dep.py | failed | 3 | 1 | 0 | 0 | 0 | 0 |
@@ -2643,7 +2643,7 @@ pytest-rs; they are not counted in the total.
 | sklearn/utils/tests/test_multiclass.py | passed | 13 | 0 | 0 | 36 | 0 | 0 |
 | sklearn/utils/tests/test_murmurhash.py | passed | 6 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/utils/tests/test_optimize.py | passed | 5 | 0 | 0 | 15 | 0 | 0 |
-| sklearn/utils/tests/test_parallel.py | timeout | 0 | 0 | 0 | 0 | 0 | 0 |
+| sklearn/utils/tests/test_parallel.py | passed | 15 | 0 | 0 | 2 | 0 | 0 |
 | sklearn/utils/tests/test_param_validation.py | passed | 147 | 0 | 0 | 1 | 0 | 0 |
 | sklearn/utils/tests/test_plotting.py | passed | 80 | 0 | 0 | 28 | 0 | 0 |
 | sklearn/utils/tests/test_pprint.py | passed | 13 | 0 | 0 | 0 | 0 | 0 |
