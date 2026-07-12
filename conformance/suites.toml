@@ -354,6 +354,11 @@ deps = [
     "numpy==2.4.6",
     "model-bakery==1.23.4",
 ]
+# pytest-randomly's own tests never use the benchmark fixture, but pytest-rs's
+# native benchmark plugin always prints its header line — one line more than
+# upstream, which shifts every verbose per-test PASSED/FAILED line off by one
+# and breaks fnmatch/outlines-index assertions across this suite.
+env = { PYTEST_RS_DISABLE_PLUGINS = "benchmark" }
 category = "third-party"
 enabled = true
 
