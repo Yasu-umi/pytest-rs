@@ -10,6 +10,16 @@ use super::{center_banner, center_with, flush_hook_output};
 
 impl Engine {
     pub(crate) fn run_session(&mut self, py: Python<'_>, started: Instant) -> i32 {
+        #[cfg(feature = "xdist")]
+        {
+            let using_xdist = self.config.is_worker()
+                || self.config.numprocesses_spec().is_some_and(|s| s != "0")
+                || self.config.get_flag("dist-load")
+                || self.config.get_value("tx").is_some();
+            if using_xdist {
+                python::register_xdist_marker_plugin(py);
+            }
+        }
         if let Err(err) = self
             .fire_configure(py)
             .and_then(|()| self.fire_sessionstart(py))

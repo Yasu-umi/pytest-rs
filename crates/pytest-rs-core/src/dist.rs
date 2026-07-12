@@ -322,13 +322,41 @@ impl Engine {
         // xdist data exchange: one controller-side node per worker;
         // conftest pytest_configure_node hooks fill node.workerinput
         // before the worker starts.
-        let configure_node_hooks: Vec<Py<pyo3::PyAny>> = self
+        let mut configure_node_hooks: Vec<Py<pyo3::PyAny>> = self
             .session
             .py_hooks
             .iter()
             .filter(|hook| hook.name == "pytest_configure_node")
             .map(|hook| hook.func.clone_ref(py))
             .collect();
+        // session.py_hooks is a snapshot scanned from conftest/entry-point
+        // MODULES at load time; it never sees a hook-providing *object*
+        // registered dynamically via `config.pluginmanager.register(obj)`
+        // from inside another hook (e.g. pytest-randomly's own
+        // pytest_configure does `if pm.hasplugin("xdist"):
+        // pm.register(XdistHooks())`). The Python pluginmanager's own
+        // `_plugins` list does track that registration, so ask it directly
+        // and merge in anything session.py_hooks missed.
+        if let Ok(impls) = py
+            .import("pytest._pluginmanager")
+            .and_then(|m| m.getattr("pluginmanager"))
+            .and_then(|pm| pm.getattr("hook"))
+            .and_then(|h| h.getattr("pytest_configure_node"))
+            .and_then(|hc| hc.call_method0("get_hookimpls"))
+            && let Ok(iter) = impls.try_iter()
+        {
+            for impl_obj in iter.flatten() {
+                let Ok(func) = impl_obj.getattr("function") else {
+                    continue;
+                };
+                let already_known = configure_node_hooks
+                    .iter()
+                    .any(|existing| existing.bind(py).eq(&func).unwrap_or(false));
+                if !already_known {
+                    configure_node_hooks.push(func.unbind());
+                }
+            }
+        }
         let nodes: Vec<Option<Py<pyo3::PyAny>>> = (0..workers)
             .map(|index| {
                 let node =

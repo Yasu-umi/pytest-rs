@@ -832,6 +832,33 @@ pub fn xdist_auto_num_workers(py: Python<'_>, logical: bool) -> usize {
         })
 }
 
+/// Register a bare sentinel under the Python-visible plugin name "xdist" so
+/// `config.pluginmanager.hasplugin("xdist")` returns true, matching upstream
+/// (where pytest-xdist is a real, always-loaded entry-point plugin whenever
+/// it's installed). pytest-rs implements xdist natively with no Python
+/// plugin object at all, so third-party plugins that use the documented
+/// "optionally hook into xdist" pattern (`if pm.hasplugin("xdist"):
+/// pm.register(MyXdistHooks())`, e.g. pytest-randomly) would otherwise never
+/// see it and silently skip registering their own xdist-specific hooks
+/// (e.g. `pytest_configure_node`, which shares the seed across workers).
+/// The sentinel has no `pytest_*` methods of its own, so it's a no-op for
+/// hook dispatch; it exists purely so `hasplugin`/`_names` sees the name.
+/// Deliberately NOT reflected in the `plugins: ...` terminal header, which
+/// is driven by a separate `session.plugin_distinfo` list, not `_names`.
+pub fn register_xdist_marker_plugin(py: Python<'_>) {
+    let _ = (|| -> PyResult<()> {
+        let pm = py
+            .import("pytest._pluginmanager")?
+            .getattr("pluginmanager")?;
+        if pm.call_method1("hasplugin", ("xdist",))?.is_truthy()? {
+            return Ok(());
+        }
+        let sentinel = py.import("types")?.getattr("SimpleNamespace")?.call0()?;
+        pm.call_method1("register", (sentinel, "xdist"))?;
+        Ok(())
+    })();
+}
+
 /// Set the worker process title (the pytest-xdist[setproctitle] extra);
 /// best-effort no-op when setproctitle is not installed. Availability is
 /// probed once per process: the per-item call must stay free when the
