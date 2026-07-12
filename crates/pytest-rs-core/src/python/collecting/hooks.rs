@@ -284,7 +284,7 @@ pub fn collect_custom_files(
     py: Python<'_>,
     rootdir: &Path,
     files: &[PathBuf],
-    _hooks: &[crate::session::PyHook],
+    hooks: &[crate::session::PyHook],
     items: &mut Vec<TestItem>,
 ) -> PyResult<CustomCollectResult> {
     let mut skipped: Vec<(PathBuf, String)> = Vec::new();
@@ -300,12 +300,21 @@ pub fn collect_custom_files(
     let config = config.bind(py);
     // pytest_collect_file impls live on the shim pluginmanager (autoloaded
     // plugin modules + objects registered at configure, e.g. pytest-mypy);
-    // the hook relay reaches them all.
-    let collect_file = py
+    // the hook relay reaches them all. Conftest-defined impls are excluded
+    // from the relay and dispatched directly below instead (baseid-scoped
+    // to the conftest's own directory) — otherwise e.g. a sub1/conftest.py
+    // hook would fire for sub2's files too (test_pytest_collect_file_from_sister_dir).
+    let pluginmanager = py
         .import("pytest._pluginmanager")?
-        .getattr("pluginmanager")?
+        .getattr("pluginmanager")?;
+    let collect_file = pluginmanager
         .getattr("hook")?
         .getattr("pytest_collect_file")?;
+    let conftest_plugins = pluginmanager.getattr("_conftest_plugins")?;
+    let conftest_collect_hooks: Vec<&crate::session::PyHook> = hooks
+        .iter()
+        .filter(|h| h.name == "pytest_collect_file" && h.plugin_module.is_none())
+        .collect();
     let pathlib = py.import("pathlib")?.getattr("Path")?;
     let node_mod = py.import("pytest._node")?;
     let collector_cls = node_mod.getattr("Collector")?;
@@ -335,35 +344,89 @@ pub fn collect_custom_files(
                 kw
             }),
         )?;
-        // The relay returns a list of every plugin's result (collector|None).
+        // The relay returns a list of every non-conftest plugin's result
+        // (collector|None); conftest impls are excluded here and dispatched
+        // directly below with directory scoping.
         let kwargs = pyo3::types::PyDict::new(py);
         kwargs.set_item("file_path", &file_path)?;
         kwargs.set_item("parent", &parent)?;
-        let results = match collect_file.call((), Some(&kwargs)) {
-            Ok(r) => r,
-            // pytest.skip() in pytest_collect_file means "skip this file".
-            Err(ref err)
-                if err
-                    .get_type(py)
-                    .name()
-                    .map(|n| n == "Skipped")
-                    .unwrap_or(false) =>
-            {
-                let reason = err
-                    .value(py)
-                    .getattr("msg")
-                    .and_then(|m| m.extract::<String>())
-                    .unwrap_or_else(|_| "Skipped".to_string());
-                skipped.push((file.clone(), reason));
-                continue;
-            }
-            Err(e) => return Err(e),
-        };
-        let results_list: Vec<Bound<'_, PyAny>> = if results.is_none() {
+        let results =
+            match collect_file.call_method("call_excluding", (&conftest_plugins,), Some(&kwargs)) {
+                Ok(r) => r,
+                // pytest.skip() in pytest_collect_file means "skip this file".
+                Err(ref err)
+                    if err
+                        .get_type(py)
+                        .name()
+                        .map(|n| n == "Skipped")
+                        .unwrap_or(false) =>
+                {
+                    let reason = err
+                        .value(py)
+                        .getattr("msg")
+                        .and_then(|m| m.extract::<String>())
+                        .unwrap_or_else(|_| "Skipped".to_string());
+                    skipped.push((file.clone(), reason));
+                    continue;
+                }
+                Err(e) => return Err(e),
+            };
+        let mut results_list: Vec<Bound<'_, PyAny>> = if results.is_none() {
             Vec::new()
         } else {
             results.try_iter()?.collect::<PyResult<_>>()?
         };
+        // Conftest-defined pytest_collect_file impls only apply to files
+        // under their own conftest's directory (baseid), mirroring
+        // call_ignore_collect_hooks's scoping.
+        let file_dir = file.parent().unwrap_or(rootdir);
+        let mut hook_skipped = false;
+        for hook in &conftest_collect_hooks {
+            let hook_dir = if hook.baseid.is_empty() {
+                rootdir.to_path_buf()
+            } else {
+                rootdir.join(&hook.baseid)
+            };
+            if !file_dir.starts_with(&hook_dir) {
+                continue;
+            }
+            let result = call_py_hook_raw(
+                py,
+                &hook.func,
+                &[
+                    ("file_path", file_path.clone().unbind()),
+                    ("parent", parent.clone().unbind()),
+                ],
+            );
+            match result {
+                Ok(r) => {
+                    let r = r.bind(py);
+                    if !r.is_none() {
+                        results_list.push(r.clone());
+                    }
+                }
+                Err(ref err)
+                    if err
+                        .get_type(py)
+                        .name()
+                        .map(|n| n == "Skipped")
+                        .unwrap_or(false) =>
+                {
+                    let reason = err
+                        .value(py)
+                        .getattr("msg")
+                        .and_then(|m| m.extract::<String>())
+                        .unwrap_or_else(|_| "Skipped".to_string());
+                    skipped.push((file.clone(), reason));
+                    hook_skipped = true;
+                    break;
+                }
+                Err(e) => return Err(e),
+            }
+        }
+        if hook_skipped {
+            continue;
+        }
         for collector in results_list {
             if collector.is_none() {
                 continue;

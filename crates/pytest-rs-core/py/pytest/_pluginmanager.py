@@ -212,7 +212,11 @@ class HookCaller:
         firstresult = self._pm._specs.get(self._name, {}).get("firstresult", False)
         impls = []
         for plugin in reversed(self._pm._plugins):
-            if plugin in exclude:
+            # Identity comparison (not `plugin in exclude`): some registered
+            # plugins are bare `types.SimpleNamespace` sentinels (e.g. the
+            # "xdist" marker plugin), which are unhashable and would raise
+            # on a set membership test.
+            if any(plugin is excluded for excluded in exclude):
                 continue
             func = getattr(plugin, self._name, None)
             if callable(func):
