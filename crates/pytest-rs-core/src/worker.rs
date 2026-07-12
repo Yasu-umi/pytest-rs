@@ -700,6 +700,18 @@ impl Engine {
                 &paths,
                 self.config.get_flag("collect-in-virtualenv"),
             );
+            // Unlike a standard test file (which ensure_collected always
+            // loads the conftest chain for first), a file only reached
+            // through pytest_collect_file below never gets its own conftest
+            // ancestry imported first — so a conftest.py that is itself a
+            // custom-collector's check target (e.g. pytest-mypy checking a
+            // bare conftest.py) would see its own not-yet-executed
+            // pytest_configure mutations. Load each candidate's chain now.
+            for file in &candidate {
+                if let Err(msg) = self.ensure_conftest_chain(py, collection, file) {
+                    errors.push((crate::collect::file_nodeid(&self.config.rootdir, file), msg));
+                }
+            }
             let hooks = std::mem::take(&mut self.session.py_hooks);
             let result = python::collect_custom_files(
                 py,
@@ -751,6 +763,20 @@ impl Engine {
             for (index, item) in collection.items.iter().enumerate() {
                 collection.by_nodeid.insert(item.nodeid.clone(), index);
             }
+            // A custom-collected item's file was never marked "collected"
+            // (only the native-scan and native_fallback paths do that) —
+            // run_batch's ensure_collected() sees any dispatched nodeid it
+            // doesn't recognize as unfinished collection and tries to
+            // *import* the file as a real Python module before running it.
+            // For e.g. a MypyFile whose whole point is checking a .pyi file
+            // without ever importing it, that spuriously collides with the
+            // sibling .py module under the same import name ("import file
+            // mismatch"). Mark every surviving item's file as collected so
+            // that safety net is a no-op for files that only ever went
+            // through the custom-collector path.
+            for item in &collection.items {
+                collection.collected_files.insert(item.path.clone());
+            }
         }
         errors
     }
@@ -795,21 +821,22 @@ impl Engine {
         Ok(collected.saturating_sub(collection.items.len()))
     }
 
-    /// Import (once) everything needed to resolve a node ID: the conftest
-    /// chain, then the test module, then fixture-param expansion.
-    fn ensure_collected(
+    /// Import (once) the conftest.py chain from rootdir down to `path`'s
+    /// directory (rootdir-most first), firing `pytest_configure` for any
+    /// newly-loaded one. Shared by `ensure_collected` (a file reached via
+    /// the standard native scan) and `precollect_all`'s custom-collector
+    /// pass: a file only ever reached through `pytest_collect_file` (e.g. a
+    /// bare conftest.py that a plugin like pytest-mypy also treats as a
+    /// check target) otherwise never has its own conftest ancestry loaded
+    /// first, so a conftest's `pytest_configure` mutations (e.g. a plugin's
+    /// module-level config) aren't visible yet when that plugin's collector
+    /// runs against the very same file.
+    fn ensure_conftest_chain(
         &mut self,
         py: Python<'_>,
         collection: &mut WorkerCollection,
-        nodeid: &str,
+        path: &std::path::Path,
     ) -> Result<(), String> {
-        let file_part = nodeid.split("::").next().unwrap_or(nodeid);
-        let path = self.config.rootdir.join(file_part);
-        if collection.collected_files.contains(&path) {
-            return Ok(());
-        }
-
-        // Conftest chain (rootdir-most first), each loaded once per worker.
         let mut chain = Vec::new();
         let mut dir = path.parent();
         while let Some(d) = dir {
@@ -837,7 +864,25 @@ impl Engine {
             collection.loaded_conftests.insert(conftest);
         }
         self.fire_new_conftest_configure(py, &mut collection.configured_hooks)
-            .map_err(|err| python::format_exception(py, &err))?;
+            .map_err(|err| python::format_exception(py, &err))
+    }
+
+    /// Import (once) everything needed to resolve a node ID: the conftest
+    /// chain, then the test module, then fixture-param expansion.
+    fn ensure_collected(
+        &mut self,
+        py: Python<'_>,
+        collection: &mut WorkerCollection,
+        nodeid: &str,
+    ) -> Result<(), String> {
+        let file_part = nodeid.split("::").next().unwrap_or(nodeid);
+        let path = self.config.rootdir.join(file_part);
+        if collection.collected_files.contains(&path) {
+            return Ok(());
+        }
+
+        self.ensure_conftest_chain(py, collection, &path)?;
+        let import_mode = crate::collect::ImportMode::from_config(&self.config);
 
         let mut new_items = Vec::new();
         python::collect_module(
