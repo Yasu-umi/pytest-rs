@@ -255,6 +255,24 @@ impl Engine {
         // tests' side effects (warning filters, random seeds, monkey
         // patches) leak into later modules' import time.
         let collect_errors = self.precollect_all(py, &mut collection);
+        // Mirror the controller's post-collection selection phase
+        // (session.rs: apply_deselect -> fire_collection_modifyitems ->
+        // fire_py_deselected). Like real pytest-xdist, each worker collects
+        // and selects independently — without this, -k/-m/--deselect and
+        // conftest/plugin pytest_collection_modifyitems (e.g. anyio/asyncio's
+        // backend-parametrization expansion, pytest-split's group slicing,
+        // pytest-order's reordering) are silently ignored under -n, since
+        // this whole file never calls collect()'s equivalent pipeline.
+        let deselected = match self.apply_worker_selection(py, &mut collection) {
+            Ok(deselected) => deselected,
+            Err(err) => {
+                eprintln!(
+                    "INTERNAL ERROR: worker collection modifyitems failed: {}",
+                    python::format_exception(py, &err)
+                );
+                return exit_code::INTERNAL_ERROR;
+            }
+        };
         // Report the collected item set (and any errors) to the controller
         // so it can build work batches without importing test files itself.
         let (nodeids, xdist_groups): (Vec<_>, Vec<_>) = collection
@@ -266,6 +284,7 @@ impl Engine {
             nodeids,
             xdist_groups,
             errors: collect_errors,
+            deselected,
         });
         self.worker_loop(py, collection)
     }
@@ -734,6 +753,46 @@ impl Engine {
             }
         }
         errors
+    }
+
+    /// Mirror the controller's post-collection selection phase against this
+    /// worker's own collected items: `--deselect`, then conftest/plugin
+    /// `pytest_collection_modifyitems` (which may reorder, add marks, skip,
+    /// or expand items — e.g. anyio/asyncio's backend parametrization) and
+    /// `-k`/`-m`, then `pytest_deselected` hooks. Reuses the existing Engine
+    /// methods verbatim by lending `collection.items` to `self.session.items`
+    /// for the duration (those methods all operate through the session's
+    /// item list) rather than reimplementing any of this. Returns the
+    /// deselected count for the controller's summary line.
+    ///
+    /// Deliberately NOT handled here: `--strict-markers` validation (a
+    /// sibling gap: it also only runs against the controller's always-empty
+    /// `self.session.items` in dist mode). Surfacing a worker-side usage
+    /// error cleanly needs its own IPC error channel; out of scope here.
+    fn apply_worker_selection(
+        &mut self,
+        py: Python<'_>,
+        collection: &mut WorkerCollection,
+    ) -> PyResult<usize> {
+        let collected = collection.items.len();
+        self.session.items = std::mem::take(&mut collection.items);
+        let result = (|| -> PyResult<()> {
+            self.apply_deselect()
+                .map_err(pyo3::exceptions::PyRuntimeError::new_err)?;
+            self.fire_collection_modifyitems(py)?;
+            self.fire_py_deselected(py)?;
+            Ok(())
+        })();
+        collection.items = std::mem::take(&mut self.session.items);
+        result?;
+        // Items may have been removed, reordered, or expanded (anyio/asyncio
+        // parametrize over backends) — by_nodeid must reflect the final set,
+        // same as the rebuild after collect_custom_files above.
+        collection.by_nodeid.clear();
+        for (index, item) in collection.items.iter().enumerate() {
+            collection.by_nodeid.insert(item.nodeid.clone(), index);
+        }
+        Ok(collected.saturating_sub(collection.items.len()))
     }
 
     /// Import (once) everything needed to resolve a node ID: the conftest

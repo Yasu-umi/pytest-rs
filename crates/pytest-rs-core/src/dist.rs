@@ -63,6 +63,7 @@ enum Event {
         nodeids: Vec<String>,
         xdist_groups: Vec<Option<String>>,
         errors: Vec<(String, String)>,
+        deselected: usize,
     },
 }
 
@@ -565,6 +566,7 @@ impl Engine {
                     nodeids,
                     xdist_groups,
                     errors,
+                    deselected,
                 } => {
                     // Process collection errors: add to session and reports.
                     for (nodeid, err) in errors {
@@ -598,6 +600,11 @@ impl Engine {
                         first_collection_worker = worker;
                         all_nodeids = nodeids;
                         all_xdist_groups = xdist_groups;
+                        // Every worker selects independently but identically
+                        // (guaranteed by the mismatch check below) — take the
+                        // count from the first worker only, don't sum across
+                        // workers.
+                        self.session.deselected = deselected;
                     } else if nodeids != all_nodeids {
                         if line_open {
                             println!();
@@ -1222,6 +1229,7 @@ impl WorkerOwner {
                     nodeids: vec![],
                     xdist_groups: vec![],
                     errors: vec![],
+                    deselected: 0,
                 });
                 return;
             }
@@ -1229,7 +1237,8 @@ impl WorkerOwner {
 
         // Collection phase: read from the worker's stdout until it sends
         // WorkerMsg::Collection (after precollect_all) or EOF (crash).
-        // Returns Some((nodeids, groups, errors)) on success, None on crash.
+        // Returns Some((nodeids, groups, errors, deselected)) on success,
+        // None on crash.
         let collection_msg = loop {
             let Some(line) = proc.lines.next() else {
                 break None; // EOF: worker died during precollect
@@ -1245,7 +1254,8 @@ impl WorkerOwner {
                     nodeids,
                     xdist_groups,
                     errors,
-                }) => break Some((nodeids, xdist_groups, errors)),
+                    deselected,
+                }) => break Some((nodeids, xdist_groups, errors, deselected)),
                 Some(WorkerMsg::Bye) => {
                     // Bye before Collection: treat as empty collection + graceful shutdown.
                     let _ = self.sender.send(Event::Collection {
@@ -1253,6 +1263,7 @@ impl WorkerOwner {
                         nodeids: vec![],
                         xdist_groups: vec![],
                         errors: vec![],
+                        deselected: 0,
                     });
                     proc.handle.wait();
                     return;
@@ -1273,16 +1284,18 @@ impl WorkerOwner {
                     nodeids: vec![],
                     xdist_groups: vec![],
                     errors: vec![],
+                    deselected: 0,
                 });
                 self.handle_crash(&mut proc, vec![]);
                 return;
             }
-            Some((nodeids, xdist_groups, errors)) => {
+            Some((nodeids, xdist_groups, errors, deselected)) => {
                 let _ = self.sender.send(Event::Collection {
                     worker: self.index,
                     nodeids,
                     xdist_groups,
                     errors,
+                    deselected,
                 });
             }
         }
