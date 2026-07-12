@@ -150,7 +150,7 @@ Key structural rules:
   before parametrized-fixture expansion, so plugins can inject closure-affecting marks —
   anyio's usefixtures("anyio_backend") injection lands here, making the backend a normal
   outermost fixture-param axis exactly like upstream's makeitem-time injection.
-- **Plugin-provided fixtures** two ways (both landed in M6):
+- **Plugin-provided fixtures** two ways:
   - *PySource*: the plugin ships an embedded Python package written into the per-run shim dir
     and registered via `python::register_plugin_fixtures` — mock's `pytest_mock` package.
     Writing real files (not `PyModule::from_code`) keeps normal import machinery working
@@ -181,7 +181,7 @@ Key structural rules:
   shipping their own hookspecs (pytest-timeout's `pytest_timeout_set_timer`) dispatch and
   are overridable from conftests.
 
-### Multi-process execution (`-n N`, default 1) *(landed in M4)*
+### Multi-process execution (`-n N`, default 1)
 
 - `-n 0`/absent: everything in-process (no worker overhead at all). `-n auto`/`-n logical`
   resolve like upstream xdist: `PYTEST_XDIST_AUTO_NUM_WORKERS` env override, then conftest
@@ -242,9 +242,9 @@ Key structural rules:
 | **asyncio** | `asyncio_mode auto/strict`, loop cache per `loop_scope`, `LoopRunner` trait (asyncio now; trio/uvloop later). Owns running coroutines: async tests via `pytest_pyfunc_call`, async (gen) fixtures via `pytest_fixture_setup` + finalizer driving `__anext__` | pyfunc_call, fixture_setup, collection_modifyitems, sessionfinish |
 | **anyio** | `anyio_mode auto/strict` (strict default). The real anyio dist stays entry-point autoloaded (anyio_backend & friends register as plugin fixtures, incl. user conftest overrides); the crate ports only the runner glue from `anyio.pytest_plugin` (lease-counted `get_runner`, backend `TestRunner`s — asyncio, asyncio+uvloop and trio all work). anyio-marked coroutine tests get a usefixtures("anyio_backend") mark injected in `pytest_collection_preexpand` (function-level, so the backend expands as the outermost fixture-param axis with upstream-identical IDs and ordering); a clone-per-backend fallback remains in collection_modifyitems. The backend value reaches hooks via fixture kwargs → callspec → engine fixture cache → raw param. Async (gen) fixtures run per backend (`pytest_fixture_cache_key` suffix); asyncgen fixtures hold their runner lease open setup→teardown, so a module-scoped one shares its loop with the module's tests, like upstream | pyfunc_call, fixture_setup, fixture_cache_key, collection_preexpand, collection_modifyitems |
 | **mock** | Adapted upstream pytest-mock shim shipped as a real `pytest_mock` package in the shim dir (assert-rewritten, so `assert_called_*` introspection diffs match pytest). Fixtures: `mocker` + class/module/package/session variants; `stopall` via generator-fixture teardown; assert-method traceback wrapping (`mock_traceback_monkeypatch`) | configure (write package, wrap asserts, register fixtures), sessionfinish (unwrap) |
-| **cov** | `sys.monitoring` tool id 1 (COVERAGE_ID), LINE events, Rust `#[pyclass]` callback returning `DISABLE` (each line costs one callback ever). Hits in `HashMap<file, BTreeSet<u32>>` (roaring deferred to M4 merge work). Denominator from ruff AST executable-line analysis + `exclude_lines` regexes (.coveragerc / --cov-config / pyproject; default `# pragma: no cover`); observed-but-unanalyzed lines union into the denominator. Reports: term/term-missing (+skip-covered), Cobertura XML, lcov (HTML/JSON later; branch coverage deferred). `--cov-fail-under` forces exit code 1 | configure (start monitoring), sessionfinish (stop, build report, fail_under), terminal_summary |
+| **cov** | `sys.monitoring` tool id 1 (COVERAGE_ID), LINE events, Rust `#[pyclass]` callback returning `DISABLE` (each line costs one callback ever). Hits in `HashMap<file, BTreeSet<u32>>` (plain sets; roaring bitmaps proved unnecessary at this scale). Denominator from ruff AST executable-line analysis + `exclude_lines` regexes (.coveragerc / --cov-config / pyproject; default `# pragma: no cover`); observed-but-unanalyzed lines union into the denominator. Reports: term/term-missing (+skip-covered), Cobertura XML, lcov, HTML, JSON, annotate. Branch coverage (`--cov-branch`) landed (jump-target events, Branch/BrPart columns). `--cov-fail-under` forces exit code 1 | configure (start monitoring), sessionfinish (stop, build report, fail_under), terminal_summary |
 | **split** | `.test_durations` JSON (nodeid → seconds, legacy list format accepted), `--splits N --group K`, algorithms `duration_based_chunks` (order-preserving) / `least_duration` (LPT greedy), unknown tests get mean duration of the relevant cached set; `--store-durations` aggregates `TestReport.duration` per nodeid | addoption, configure (validation), collection_modifyitems, sessionfinish (store) |
-| **benchmark** | `benchmark` fixture: `#[pyclass]` backed by Rust; inner loop is a generated tiny Python `for` driven once per round (one FFI crossing per round, parity with pytest-benchmark numbers); `perf_counter` clock; calibration vs clock resolution, warmup, stats (min/max/mean/stddev/median/iqr/outliers/ops, `benchmark.stats.stats.min` API). `--benchmark-json`, `--benchmark-only/skip/disable`. pedantic mode with upstream call-count/validation parity (storage/compare/histogram/cprofile not reproduced) | addoption, configure, collection_modifyitems, fixture_setup (native claim), terminal_summary, sessionfinish (json) |
+| **benchmark** | `benchmark` fixture: `#[pyclass]` backed by Rust; inner loop is a generated tiny Python `for` driven once per round (one FFI crossing per round, parity with pytest-benchmark numbers); `perf_counter` clock; calibration vs clock resolution, warmup, stats (min/max/mean/stddev/median/iqr/outliers/ops, `benchmark.stats.stats.min` API). `--benchmark-json`, `--benchmark-only/skip/disable`, pedantic mode with upstream call-count/validation parity. Storage (`--benchmark-save`/`-autosave`/`-storage`), `--benchmark-cprofile` (profile table), `--help` group, and the xdist auto-disable warning all reproduced; `--benchmark-compare` announces the matched baseline file but doesn't compute per-stat regressions, and `--benchmark-histogram` writes a stub SVG | addoption, configure, collection_modifyitems, fixture_setup (native claim), report_header, help_group, terminal_summary, sessionfinish (json/save), worker_dump/load |
 
 ### Environment variables
 
@@ -268,48 +268,22 @@ upstream and are not listed here.)
 |---|---|
 | `PYTEST_RS_EXE` | Path the embedded interpreter reports as `sys.executable` / uses to re-exec workers (the binary embeds libpython, so `sys.executable` would otherwise be wrong). |
 | `PYTEST_RS_WORKERINPUT` | JSON `workerinput` handed to an `-n` worker (worker id, testrun uid, conftest-populated `configure_node` data). |
-| `PYTEST_RS_HOOK_RELAY` / `PYTEST_RS_LOG_RELAY` | Socket paths a subprocess uses to relay hook calls / log records back to the controller. |
+| `PYTEST_RS_HOOK_RELAY` / `PYTEST_RS_LOG_RELAY` | File paths a nested subprocess run writes recorded hook events (JSON) / captured log records (pickle) to, for the parent's `pytester` `HookRecorder` / `caplog` machinery to read back. |
 | `PYTEST_RS_FORWARDED_FILTERS` | Newline-separated warning filters forwarded from controller to child so captured warnings match. |
 | `PYTEST_RS_COV_*` (`CHILD`, `ACTIVE`, `PATHS`, `OUT`, `SOURCES`, `BRANCH`, `ROOT`, `SIGTERM`, `TOOL_ID`) | Coverage child-process wiring: tells a spawned/forked process to start `sys.monitoring` coverage and where/how to dump its hits for the parent to merge. |
 
-## Milestones
+## Status
 
-- **M0 — Foundations**: workspace re-org (core + plugin crate skeletons + binary), POC deleted,
-  pyo3 updated, ruff parser pinned, `python/interp.rs` (`Py<T>` handle store), shim
-  embed + load, `Plugin` trait + `PluginManager`.
-- **M1 — Minimal drop-in run** (single process): import-based collection with marker
-  introspection, node IDs, function-scope fixtures (yield + async), `request`, asyncio plugin
-  (pyfunc_call/fixture_setup), basic terminal report + exit codes.
-  Target: `sample/` rewritten to standard pytest runs; a small real pytest suite passes.
-- **M2 — Assertion rewriting**: meta_path hook, Rust rewriter, line-fidelity, rich failure output.
-- **M3 — Fixture engine completeness**: all scopes + teardown ordering, autouse, conftest.py
-  hierarchy + visibility, parametrize (test + fixture), `pytest.raises/approx/skip/xfail`.
-- **M4 — Multi-process workers** *(done)*: `-n N`, worker mode, IPC protocol, report/cov
-  merge, crashed-worker replacement, `--dist` modes. Upstream pytest-xdist acceptance tests:
-  60/102 at landing (execnet/DSession/looponfail internals excluded); enabling -n also lifted
-  pytest-cov's suite (xdist-variant tests) from 28 to 46 passing.
-- **M5 — Config & selection parity**: ini/toml/addopts, `-k`/`-m`, `--lf/--ff` cache,
-  `--collect-only`, `--tb` modes, junitxml, builtin fixtures (tmp_path, monkeypatch, capsys, caplog).
-- **M6 — Plugins** *(done)*: mock → cov → split → benchmark (asyncio already landed in M1).
-  Order rationale: mock validates plugin-provided fixtures with minimal surface; cov is the most
-  isolated; benchmark composes everything so it goes last. Landing M6 also pulled core parity
-  work the upstream suites depended on: `pytest_generate_tests` (metafunc), pytest's rootdir
-  algorithm (common ancestor of cwd + path-like args), `-k`/`-m` selection expressions,
-  builtin `pytestconfig`/`tmpdir`/`testdir`/`capsys` fixtures, pytester `inline_run`,
-  `==`-failure diff explanations (`_compare_eq_*`), and `-p no:NAME` plugin disabling.
-  Upstream-suite scores at landing: pytest-mock 89/90 (1 env skip), pytest-split 59/59
-  (3 internal-API files excluded), pytest-benchmark test_normal/test_sample green
-  (storage/cli internals excluded), pytest-cov 28/209 (the rest is branch coverage, xdist,
-  and html/json reports — deferred by design).
-- **Post-v1 — conformance-driven hardening** *(ongoing)*: work since M6 is steered by running
-  ever more of the upstream suites. Landmark pieces: entry-point autoload of third-party
-  `pytest11` plugins (16 plugin suites now run their own tests under pytest-rs — pytest-mypy,
-  -ruff, -subtests, -snapshot, -bdd, …); an in-process `pytester` backend (live `HookRecorder`
-  hook-call monitoring, `getitem`/`getmodulecol` returning real collector nodes, nested-run
-  global-state isolation); the collector-tree `pytest_collect_file`/`collect_directory`/
-  `collectstart`/`collectreport` hook surface; `--pyargs`, `--junitxml` in nested runs; and a
-  growing set of real-world suites (httpx, starlette, fastapi, werkzeug, pandas, scikit-learn)
-  as drop-in evidence.
+The initial build-out (foundations, drop-in single-process runs, assertion rewriting, the full
+fixture engine, config/selection parity, multi-process workers, and the bundled plugins) has
+landed. Development is now **conformance-driven**: steered by running ever more upstream test
+suites under pytest-rs unchanged (see below). Landmark capabilities beyond the original scope:
+entry-point autoload of third-party `pytest11` plugins (their own suites run under pytest-rs);
+an in-process `pytester` backend (live `HookRecorder`, `getitem`/`getmodulecol` returning real
+collector nodes, nested-run global-state isolation); the collector-tree `pytest_collect_file`/
+`collect_directory`/`collectstart`/`collectreport` hook surface; `--pyargs`/`--junitxml` in
+nested runs. Current per-suite pass rates are in `conformance/RESULTS.md` / the README table —
+the live scoreboard, not this doc, is the source of truth for status.
 
 ## Conformance testing
 
@@ -358,5 +332,5 @@ Harness (`conformance/runner.py`):
 2. **Assertion-rewrite line fidelity** — wrong line numbers poison every traceback; preserve line counts, snapshot-test failure output vs pytest.
 3. **ruff crates unpublished** — git pin, isolate behind `assertion/` + `prescan` so a parser swap is contained.
 4. **conftest/rootdir/import-mode semantics** — silent breakage of whole suites; implement `prepend` import mode first.
-5. **cov accuracy vs coverage.py** — executable-statement set parity (multiline stmts, decorators, match); accept documented deltas in v1, branch coverage deferred.
+5. **cov accuracy vs coverage.py** — executable-statement set parity (multiline stmts, decorators, match); accept documented deltas in v1. (Branch coverage has since landed.)
 6. **nodeid format parity** — split/cache/xdist all key on it; must match pytest exactly.
