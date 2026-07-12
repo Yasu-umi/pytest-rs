@@ -35,7 +35,7 @@ pytest-rs; they are not counted in the total.
 | pytest-benchmark | v5.1.0 | 122 | 0 | 0 | 1 | 0 | 0 | 123 | 100.0% | 6 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 42 | 0 | 0 | 1 | 0 | 0 | 43 | 100.0% | 1 | 1 | 0 |
 | anyio | 4.13.0 | 3120 | 0 | 0 | 42 | 0 | 0 | 3162 | 100.0% | 26 | 26 | 0 |
-| pytest-mypy | v1.0.1 | 53 | 23 | 0 | 2 | 0 | 0 | 78 | 70.5% | 0 | 1 | 0 |
+| pytest-mypy | v1.0.1 | 71 | 5 | 0 | 2 | 0 | 0 | 78 | 93.6% | 0 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-subtests | v0.14.2 | 32 | 0 | 0 | 0 | 0 | 0 | 32 | 100.0% | 1 | 1 | 0 |
 | pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
@@ -47,7 +47,7 @@ pytest-rs; they are not counted in the total.
 | pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
 | pytest-env | 1.6.0 | 69 | 6 | 0 | 0 | 0 | 0 | 75 | 92.0% | 2 | 3 | 0 |
 | pytest-rerunfailures | 9.1.1 | 47 | 0 | 0 | 1 | 0 | 0 | 48 | 100.0% | 1 | 1 | 0 |
-| pytest-randomly | 4.1.0 | 22 | 15 | 0 | 0 | 0 | 0 | 37 | 59.5% | 0 | 1 | 0 |
+| pytest-randomly | 4.1.0 | 36 | 1 | 0 | 0 | 0 | 0 | 37 | 97.3% | 0 | 1 | 0 |
 | click | 8.3.1 | 1314 | 0 | 0 | 21 | 0 | 0 | 1335 | 100.0% | 20 | 20 | 0 |
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
@@ -59,7 +59,7 @@ pytest-rs; they are not counted in the total.
 | starlette | 0.46.2 | 907 | 0 | 0 | 0 | 0 | 0 | 907 | 100.0% | 28 | 28 | 0 |
 | attrs | 25.3.0 | 1341 | 0 | 0 | 5 | 0 | 0 | 1346 | 100.0% | 22 | 24 | 0 |
 | more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 0 | 0 | 671 | 100.0% | 2 | 2 | 0 |
-| pytest-django | v4.9.0 | 210 | 5 | 0 | 1 | 0 | 0 | 216 | 97.7% | 8 | 13 | 0 |
+| pytest-django | v4.9.0 | 211 | 4 | 0 | 1 | 0 | 0 | 216 | 98.1% | 8 | 13 | 0 |
 | werkzeug | 3.1.3 | 922 | 0 | 0 | 1 | 25 | 0 | 948 | 97.4% | 24 | 25 | 0 |
 | fastapi | 0.115.12 | 2332 | 1 | 0 | 130 | 0 | 1 | 2464 | 99.9% | 303 | 310 | 0 |
 | packaging | 25.0 | 26948 | 0 | 0 | 0 | 0 | 0 | 26948 | 100.0% | 12 | 12 | 0 |
@@ -290,7 +290,7 @@ pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| tests/test_pytest_mypy.py | failed | 53 | 23 | 0 | 2 | 0 | 0 |
+| tests/test_pytest_mypy.py | failed | 71 | 5 | 0 | 2 | 0 | 0 |
 
 </details>
 
@@ -434,7 +434,7 @@ pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| tests/test_pytest_randomly.py | failed | 22 | 15 | 0 | 0 | 0 | 0 |
+| tests/test_pytest_randomly.py | failed | 36 | 1 | 0 | 0 | 0 | 0 |
 
 </details>
 
@@ -873,7 +873,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_environment.py | passed | 22 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_fixtures.py | passed | 52 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_initialization.py | failed | 0 | 1 | 0 | 0 | 0 | 0 |
-| tests/test_manage_py_scan.py | failed | 7 | 2 | 0 | 0 | 0 | 0 |
+| tests/test_manage_py_scan.py | failed | 8 | 1 | 0 | 0 | 0 | 0 |
 | tests/test_unittest.py | passed | 23 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_urls.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_without_django_loaded.py | passed | 7 | 0 | 0 | 0 | 0 | 0 |
