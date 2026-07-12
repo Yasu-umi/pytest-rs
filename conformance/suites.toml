@@ -124,6 +124,15 @@ tag = "v3.8.0"
 testpaths = ["testing"]
 local = "conformance/suites/pytest-xdist"
 deps = ["execnet==2.1.2", "filelock==3.29.1", "py==1.11.0"]
+# pytest-rs always loads the native benchmark plugin, which (like real
+# pytest-benchmark) warns to stderr whenever `-n` is active. This suite's own
+# tests spin up nested `-n` pytester runs and assert exact stdout/stderr, so
+# that warning would leak into them — but a real environment testing xdist
+# wouldn't have pytest-benchmark installed at all. Disable it here (env, not
+# extra_args, so it reaches the nested subprocess runs, which strip
+# PYTEST_ADDOPTS and don't inherit the outer CLI's args). See
+# conformance-native-plugin-isolation.
+env = { PYTEST_RS_DISABLE_PLUGINS = "benchmark" }
 # acceptance_test.py spins up real worker subprocesses for ~100 tests; near
 # the default timeout it sometimes runs only part of the file, drifting the
 # scoreboard run-to-run (which trips the release's no-drift gate).

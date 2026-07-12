@@ -626,30 +626,40 @@ impl Plugin for BenchmarkPlugin {
         let machine = report::machine_id(py)?;
         self.storage_dir = Some(storage_root.join(machine));
 
-        // XDist: auto-disable benchmarks. Deliberately NOT excluding
-        // workers here (a prior `&& !ctx.config.is_worker()` guard did, on
-        // the theory that "workers don't have -n"). They do: numprocesses
-        // is part of the inherited/re-parsed config either way, and under
-        // `-n` the controller itself never runs collection or resolves any
-        // fixture at all (run_dist in dist.rs only dispatches to workers
-        // and merges their reported results; worker.rs's run_worker has its
-        // own separate startup path, never calling the controller's
-        // collect()) — so a worker's own BenchmarkFixture is where
-        // benchmarks actually execute. With the old guard, workers alone
-        // never disabled and silently ran real benchmarks for real under
-        // `-n`, defeating the entire point of auto-disabling. Verified via
-        // direct repro: before this fix, `-n1` still printed real
-        // "Calibrating..."/"Running N rounds..." verbose output; after,
-        // fixture setup is a no-op plain call, matching non-xdist
-        // --benchmark-disable.
+        // XDist: auto-disable benchmarks. `disabled` is set on EVERY process
+        // (controller AND workers): under `-n` the controller never resolves
+        // a fixture at all (run_dist in dist.rs dispatches nodeids to workers
+        // and merges their results; worker.rs's run_worker has its own startup
+        // path that never calls the controller's collect()), so a worker's own
+        // BenchmarkFixture is where benchmarks would actually execute — a prior
+        // `&& !is_worker()` guard here meant workers never disabled and silently
+        // ran real timed benchmarks under `-n` (verified: `-n1 --benchmark-verbose`
+        // printed real "Calibrating..."/"Running N rounds..." output before this).
+        //
+        // The warning itself is emitted on the controller only (matching
+        // upstream's single line), to stderr — like upstream's Logger.warning,
+        // which even in non-verbose mode fires a warnings.warn during
+        // pytest_configure, outside pytest's warning-capture window, so it
+        // reaches stderr directly rather than the `-rw` summary. We eprintln
+        // the same one-line default-showwarning format instead of a real
+        // warnings.warn (which pytest-rs's capture DOES intercept here, unlike
+        // upstream's timing). Because this fires on ANY `-n` run — pytest-rs
+        // always loads the benchmark plugin, unlike a real env where you
+        // wouldn't have pytest-benchmark installed while testing xdist — a
+        // suite whose own nested runs assert exact output (pytest-xdist) must
+        // isolate it out via PYTEST_RS_DISABLE_PLUGINS (see plugin_is_disabled).
         if ctx.config.numprocesses_spec().is_some() {
             self.config.disabled = true;
-            if self.verbose {
+            if !ctx.config.is_worker() {
                 let msg = "Benchmarks are automatically disabled because xdist plugin is active.\
                            Benchmarks cannot be performed reliably in a parallelized environment.";
-                eprintln!("{}", "-".repeat(72));
-                eprintln!(" WARNING: {msg}");
-                eprintln!("{}", "-".repeat(72));
+                if self.verbose {
+                    eprintln!("{}", "-".repeat(72));
+                    eprintln!(" WARNING: {msg}");
+                    eprintln!("{}", "-".repeat(72));
+                } else {
+                    eprintln!("pytest_benchmark/logger.py:0: PytestBenchmarkWarning: {msg}");
+                }
             }
         }
 

@@ -92,17 +92,9 @@ pub fn run_inprocess(py: Python<'_>, args: Vec<String>) -> PyResult<i32> {
         }
     };
 
-    // `-p no:NAME` disables a bundled plugin (mirror of main.rs).
-    plugins.retain(|plugin| {
-        !config.plugin_opts.iter().any(|spec| {
-            spec.strip_prefix("no:").is_some_and(|disabled| {
-                disabled
-                    .trim_start_matches("pytest_")
-                    .trim_start_matches("pytest-")
-                    == plugin.name()
-            })
-        })
-    });
+    // `-p no:NAME` / PYTEST_RS_DISABLE_PLUGINS disable a bundled plugin
+    // (mirror of main.rs, via the shared helper).
+    plugins.retain(|plugin| !crate::plugin_is_disabled(plugin.name(), &config.plugin_opts));
 
     let mut engine = Engine::new(plugins, config);
     Ok(engine.run_nested(py))
