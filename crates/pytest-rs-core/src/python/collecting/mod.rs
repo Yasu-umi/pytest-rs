@@ -25,6 +25,7 @@ pub use hooks::has_collect_directory_hook;
 pub use hooks::has_collect_file_hook;
 pub use hooks::has_pycollect_makeitem_hook;
 pub use hooks::has_pycollect_makemodule_hook;
+pub use hooks::walk_collect_directories;
 
 pub use doctest::collect_doctests_from_module;
 pub use doctest::collect_doctests_from_textfile;

@@ -7,81 +7,180 @@ pub fn has_collect_directory_hook(_py: Python<'_>, hooks: &[crate::session::PyHo
     hooks.iter().any(|h| h.name == "pytest_collect_directory")
 }
 
-/// Result of firing `pytest_collect_directory`.
+/// Result of firing `pytest_collect_directory` for one directory.
 pub enum CollectDirResult {
-    /// Hook returned None: skip the directory entirely.
+    /// Every hookimpl (including the built-in default) yielded None overall —
+    /// only possible via a hookwrapper forcibly overriding the result (a
+    /// plain hookimpl declining falls through to the default instead, see
+    /// `ensure_default_collect_directory_registered`'s doc comment): skip the
+    /// directory entirely.
     Skip,
-    /// Hook returned the default Dir or a custom collector: let Rust handle
-    /// the files in this directory (custom directory collection requires
-    /// a Python-side `pytest_collect_file` implementation which is not yet
-    /// available).
-    Default,
+    /// The built-in default Dir/Package (no `pytest_collect_directory`
+    /// hookimpl claimed this directory, or one returned a bare `Dir`/
+    /// `Package` with no real `collect()` override): handle files here via
+    /// Rust's native scanning as usual. Carries the node object so it can
+    /// serve as `parent` for a deeper hook call on a subdirectory.
+    Default(Py<PyAny>),
+    /// A genuine custom collector (real `collect()` override, e.g.
+    /// `ManifestDirectory` from the customdirectory.rst example) determined
+    /// this directory's own file list itself. Carries the collector object
+    /// (as a potential `parent` for a subdirectory) and the file paths it
+    /// approved, in `.collect()`'s yield order.
+    Custom(Py<PyAny>, Vec<PathBuf>),
 }
 
-/// Fire the `pytest_collect_directory` hook via the pluginmanager relay.
-pub fn call_collect_directory_hook(py: Python<'_>, dir: &Path, rootdir: &Path) -> CollectDirResult {
+/// Fire the `pytest_collect_directory` hook via the pluginmanager relay for
+/// one directory, with `parent` (the Session for rootdir, or the previously
+/// resolved node for `dir`'s own parent directory — see
+/// `walk_collect_directories`) as the hook's `parent` argument, matching
+/// upstream's real Session → Dir/Package parent chain.
+pub fn call_collect_directory_hook(
+    py: Python<'_>,
+    dir: &Path,
+    parent: &Bound<'_, PyAny>,
+) -> CollectDirResult {
+    let none = || CollectDirResult::Default(py.None());
     let pm = match py
         .import("pytest._pluginmanager")
         .and_then(|m| m.getattr("pluginmanager"))
     {
         Ok(pm) => pm,
-        Err(_) => return CollectDirResult::Default,
+        Err(_) => return none(),
     };
     let hook_relay = match pm
         .getattr("hook")
         .and_then(|h| h.getattr("pytest_collect_directory"))
     {
         Ok(h) => h,
-        Err(_) => return CollectDirResult::Default,
+        Err(_) => return none(),
     };
+    let node_mod = match py.import("pytest._node") {
+        Ok(m) => m,
+        Err(_) => return none(),
+    };
+    // Ensure the trylast built-in default participates in this dispatch (see
+    // its doc comment for why a bare `None` from a declining conftest
+    // hookimpl must not be conflated with a wrapper-forced skip).
+    if node_mod
+        .call_method0("ensure_default_collect_directory_registered")
+        .is_err()
+    {
+        return none();
+    }
     let pathlib = match py.import("pathlib").and_then(|m| m.getattr("Path")) {
         Ok(p) => p,
-        Err(_) => return CollectDirResult::Default,
+        Err(_) => return none(),
     };
     let py_path = match pathlib.call1((dir.to_string_lossy().as_ref(),)) {
         Ok(p) => p,
-        Err(_) => return CollectDirResult::Default,
-    };
-    let config = crate::python::proxies::existing_py_config(py).map(|c| c.into_bound(py));
-    let node_mod = match py.import("pytest._node") {
-        Ok(m) => m,
-        Err(_) => return CollectDirResult::Default,
-    };
-    let collector_cls = match node_mod.getattr("Collector") {
-        Ok(c) => c,
-        Err(_) => return CollectDirResult::Default,
-    };
-    let parent = {
-        let kw = pyo3::types::PyDict::new(py);
-        let _ = kw.set_item("config", config.as_ref().map(|c| c.as_any()));
-        let root_path = pathlib.call1((rootdir.to_string_lossy().as_ref(),)).ok();
-        let _ = kw.set_item("path", root_path.as_ref());
-        let _ = kw.set_item("nodeid", "");
-        let _ = kw.set_item("name", "");
-        let session_proxy = config.as_ref().and_then(|c| {
-            node_mod
-                .getattr("_NodeSession")
-                .ok()?
-                .call1((c.as_any(),))
-                .ok()
-        });
-        let _ = kw.set_item("session", session_proxy.as_ref());
-        match collector_cls.call((), Some(&kw)) {
-            Ok(p) => p,
-            Err(_) => return CollectDirResult::Default,
-        }
+        Err(_) => return none(),
     };
     let kwargs = pyo3::types::PyDict::new(py);
     let _ = kwargs.set_item("path", &py_path);
-    let _ = kwargs.set_item("parent", &parent);
+    let _ = kwargs.set_item("parent", parent);
     let result = match hook_relay.call((), Some(&kwargs)) {
         Ok(r) => r,
-        Err(_) => return CollectDirResult::Default,
+        Err(_) => return none(),
     };
     if result.is_none() {
         return CollectDirResult::Skip;
     }
-    CollectDirResult::Default
+    let is_custom = result.hasattr("collect").unwrap_or(false);
+    if !is_custom {
+        return CollectDirResult::Default(result.unbind());
+    }
+    let approved: Vec<PathBuf> = node_mod
+        .call_method1("collect_custom_directory", (&result,))
+        .ok()
+        .and_then(|paths| paths.extract::<Vec<String>>().ok())
+        .map(|paths| paths.into_iter().map(PathBuf::from).collect())
+        .unwrap_or_default();
+    CollectDirResult::Custom(result.unbind(), approved)
+}
+
+/// Walk `pytest_collect_directory` top-down from `rootdir` to each file's
+/// immediate parent directory, building the real Session → Dir/Package
+/// parent chain the hook expects (upstream fires it once per directory
+/// level, with `parent` being the previous level's own resolved node).
+/// Returns the directories to drop entirely (`Skip`) and, per directory with
+/// a genuine custom collector, the approved file subset — both applied by
+/// the caller as filters over its own independently (natively) discovered
+/// file list. Matching upstream's full lazy walk (where the custom
+/// collector's own logic discovers files, rather than only narrowing an
+/// already-discovered set) is out of scope.
+pub fn walk_collect_directories(
+    py: Python<'_>,
+    rootdir: &Path,
+    files: &[PathBuf],
+) -> (
+    std::collections::HashSet<PathBuf>,
+    std::collections::HashMap<PathBuf, std::collections::HashSet<PathBuf>>,
+) {
+    use std::collections::{HashMap, HashSet};
+    let mut rejected: HashSet<PathBuf> = HashSet::new();
+    let mut custom_approved: HashMap<PathBuf, HashSet<PathBuf>> = HashMap::new();
+
+    let mut needed: HashSet<PathBuf> = HashSet::new();
+    for file in files {
+        let mut dir = file.parent();
+        while let Some(d) = dir {
+            if !needed.insert(d.to_path_buf()) {
+                break;
+            }
+            if d == rootdir {
+                break;
+            }
+            dir = d.parent();
+        }
+    }
+    let mut ordered: Vec<PathBuf> = needed.into_iter().collect();
+    ordered.sort_by_key(|p| p.components().count());
+
+    let Some(config) = crate::python::proxies::existing_py_config(py) else {
+        return (rejected, custom_approved);
+    };
+    let config = config.bind(py);
+    let Ok(node_mod) = py.import("pytest._node") else {
+        return (rejected, custom_approved);
+    };
+    let Ok(session_cls) = node_mod.getattr("Session") else {
+        return (rejected, custom_approved);
+    };
+    let Ok(session_obj) = session_cls.call_method1("from_config", (config,)) else {
+        return (rejected, custom_approved);
+    };
+
+    let mut resolved: HashMap<PathBuf, Py<PyAny>> = HashMap::new();
+    for dir in ordered {
+        let parent_obj: Py<PyAny> = if dir == rootdir {
+            session_obj.clone().unbind()
+        } else {
+            let Some(parent_dir) = dir.parent() else {
+                continue;
+            };
+            if rejected.contains(parent_dir) {
+                rejected.insert(dir);
+                continue;
+            }
+            match resolved.get(parent_dir) {
+                Some(obj) => obj.clone_ref(py),
+                None => continue,
+            }
+        };
+        match call_collect_directory_hook(py, &dir, parent_obj.bind(py)) {
+            CollectDirResult::Skip => {
+                rejected.insert(dir);
+            }
+            CollectDirResult::Default(obj) => {
+                resolved.insert(dir, obj);
+            }
+            CollectDirResult::Custom(obj, approved) => {
+                resolved.insert(dir.clone(), obj);
+                custom_approved.insert(dir, approved.into_iter().collect());
+            }
+        }
+    }
+    (rejected, custom_approved)
 }
 
 /// True when a `pytest_pycollect_makemodule` hook exists in conftest hooks.

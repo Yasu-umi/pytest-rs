@@ -312,26 +312,17 @@ impl Engine {
                 .and_then(|m| m.call_method1("set_pycollect_hooks", (makeitem_hooks,)));
         }
         // pytest_collect_directory: conftest hooks may reject directories
-        // (return None) to prevent collection. Pre-compute the set of rejected
-        // dirs so files in them are skipped.
-        let rejected_dirs: std::collections::HashSet<PathBuf> = {
-            let mut rejected = std::collections::HashSet::new();
+        // (return None, via a hookwrapper — see `CollectDirResult::Skip`'s
+        // doc comment) or hand back a genuine custom collector that narrows
+        // which of the already-discovered files in its directory it
+        // actually wants (e.g. `ManifestDirectory` from the
+        // customdirectory.rst example, reading its own manifest.json).
+        let (rejected_dirs, custom_approved) =
             if python::has_collect_directory_hook(py, &self.session.py_hooks) {
-                let mut checked: std::collections::HashSet<PathBuf> = Default::default();
-                for file in files {
-                    if let Some(parent) = file.parent() {
-                        let dir = parent.to_path_buf();
-                        if checked.insert(dir.clone())
-                            && let python::CollectDirResult::Skip =
-                                python::call_collect_directory_hook(py, &dir, rootdir)
-                        {
-                            rejected.insert(dir);
-                        }
-                    }
-                }
-            }
-            rejected
-        };
+                python::walk_collect_directories(py, rootdir, files)
+            } else {
+                Default::default()
+            };
 
         // Explicit non-Python, non-text-doctest file args that no collector handles.
         let mut not_found_files: Vec<PathBuf> = Vec::new();
@@ -340,6 +331,13 @@ impl Engine {
                 .parent()
                 .is_some_and(|parent| rejected_dirs.contains(parent))
             {
+                continue;
+            }
+            if file.parent().is_some_and(|parent| {
+                custom_approved
+                    .get(parent)
+                    .is_some_and(|approved| !approved.contains(file))
+            }) {
                 continue;
             }
             // --maxfail aborts collection once the budget is spent on

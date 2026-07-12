@@ -688,6 +688,89 @@ class Dir(Collector):
     """Directory-level collector for plain directories (no __init__.py)."""
 
 
+def make_default_directory_node(path, parent):
+    """The plain `Dir`/`Package` node for one directory level, used both as
+    the built-in `pytest_collect_directory` fallback and directly by the
+    Rust-side directory walker (`walk_collect_directories`, hooks.rs) when no
+    `pytest_collect_directory` hookimpl is registered at all."""
+    is_pkg = (path / "__init__.py").is_file()
+    cls = Package if is_pkg else Dir
+    return cls(name=path.name, path=path, nodeid="", parent=parent)
+
+
+class _DefaultCollectDirectory:
+    """Permanent low-priority (trylast) `pytest_collect_directory` participant.
+
+    pytest-rs has no built-in default for this hook otherwise — unlike
+    upstream, where `_pytest.main`'s own hookimpl always participates in the
+    same firstresult chain. Without a default participant here, a conftest
+    hookimpl that merely *declines* (returns `None`, not via a hookwrapper
+    forcing it) would make the overall hook_relay.call() result `None` too,
+    which Rust cannot distinguish from a real forced skip
+    (`test_directory_ignored_if_none`'s `@hookimpl(wrapper=True)` pattern) —
+    trylast ensures conftest-registered hookimpls (LIFO-prioritized ahead of
+    this) are tried first, so this only ever fires when nothing else claimed
+    the directory. Idempotently registered by
+    ensure_default_collect_directory_registered() (called from hooks.rs
+    before firing the hook) rather than at import time, to keep `_node.py`
+    free of a module-level pluginmanager dependency."""
+
+    @staticmethod
+    def pytest_collect_directory(path, parent):
+        return make_default_directory_node(path, parent)
+
+
+def ensure_default_collect_directory_registered():
+    from pytest._pluginmanager import pluginmanager
+
+    name = "_default_collect_directory"
+    if pluginmanager.getplugin(name) is None:
+        plugin = _DefaultCollectDirectory()
+        plugin.pytest_collect_directory.pytest_impl = {"trylast": True}
+        pluginmanager.register(plugin, name)
+
+
+def collect_custom_directory(collector):
+    """Call a custom `pytest.Directory` subclass's `.collect()` (the
+    documented customdirectory.rst pattern: a `pytest_collect_directory`
+    hookimpl returns e.g. a `ManifestDirectory` whose `collect()` reads its
+    own file list and delegates each one to `self.ihook.pytest_collect_file`).
+
+    pytest-rs has no default `pytest_collect_file` hookimpl registered
+    normally — standard file collection happens via native Rust scanning
+    instead, bypassing the hook entirely — so a custom `.collect()` that
+    delegates through the hook like the example above would otherwise get
+    nothing back. Temporarily register a minimal one (any `.py` file becomes
+    a bare `File`) for the duration of this one call.
+
+    Returns the file paths (str) the custom collector approved, in
+    call order. The caller intersects this against its own independently
+    (natively) discovered file list rather than trusting it to introduce new
+    files outright — matching upstream's full lazy, hook-aware directory walk
+    is out of scope; this only supports a custom collector *narrowing* which
+    already-discovered files get collected."""
+    from pytest._pluginmanager import pluginmanager
+
+    class _DefaultCollectFile:
+        @staticmethod
+        def pytest_collect_file(file_path, parent):
+            if file_path.suffix == ".py":
+                return File.from_parent(parent=parent, path=file_path)
+            return None
+
+    plugin = _DefaultCollectFile()
+    pluginmanager.register(plugin)
+    try:
+        paths = []
+        for node in collector.collect():
+            path = getattr(node, "path", None)
+            if path is not None:
+                paths.append(str(path))
+        return paths
+    finally:
+        pluginmanager.unregister(plugin)
+
+
 class DoctestNode:
     """Node subtype for doctest items; recognized by _pytest.doctest.DoctestItem."""
 
