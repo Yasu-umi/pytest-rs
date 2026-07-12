@@ -216,6 +216,16 @@ def run_inprocess(args, plugins=(), helper_plugin=None, forwarded_filter_marks=(
     cwd_before = os.getcwd()
     env_before = dict(os.environ)
 
+    # Every non-package conftest.py imports under the bare module name
+    # "conftest" (module_name_for). If the OUTER (already-running) session
+    # already loaded ITS OWN conftest.py under that same bare name, the inner
+    # run's own (different-file) conftest.py collides with it — import file
+    # mismatch — purely because this in-process nested run shares sys.modules
+    # with the outer one; a real subprocess wouldn't have this problem at
+    # all. Drop it here; modules_before/the restore below already puts the
+    # outer session's entry back afterward.
+    sys.modules.pop("conftest", None)
+
     # --runxfail monkeypatches pytest.xfail; save/restore so it doesn't
     # leak between nested and outer runs.
     old_xfail = pytest.xfail
