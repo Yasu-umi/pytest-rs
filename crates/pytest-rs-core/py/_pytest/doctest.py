@@ -20,8 +20,6 @@ import warnings
 from functools import cached_property
 from typing import Any
 
-import pytest
-
 from _pytest.outcomes import skip
 
 # ---------------------------------------------------------------------------
@@ -645,17 +643,6 @@ def _get_ignore_import_errors(config: Any) -> bool:
         return bool(config.getoption("doctest_ignore_import_errors"))
     except Exception:
         return False
-
-
-# ---------------------------------------------------------------------------
-# doctest_namespace fixture (session-scoped, injected by Rust)
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture(scope="session")
-def doctest_namespace() -> dict:
-    """Fixture providing a namespace dict injected into all doctests."""
-    return {}
 
 
 # ---------------------------------------------------------------------------

@@ -7,7 +7,12 @@ use crate::fixture::{FixtureDef, FixtureRegistry, Scope};
 use pyo3::types::PyModule;
 
 /// Register the shim's builtin fixtures (tmp_path, monkeypatch, pytester,
-/// doctest_namespace) with global visibility.
+/// doctest_namespace) with global visibility. `doctest_namespace` lives in
+/// `pytest._doctest_namespace` (re-exported from `pytest`), not
+/// `_pytest.doctest` — that module must stay unimported until doctest
+/// collection actually runs (`_pytest.doctest` eagerly imports the stdlib
+/// `doctest`/`pdb` modules, which a local file named e.g. `pdb.py` on
+/// sys.path can shadow and break; see test_pdb_can_be_rewritten).
 pub fn register_builtin_fixtures(
     py: Python<'_>,
     config: &crate::config::Config,
@@ -20,8 +25,6 @@ pub fn register_builtin_fixtures(
     }
     let pytest_module = py.import("pytest")?;
     register_fixtures_from_skip(py, &pytest_module, "", registry, &skip)?;
-    let doctest_module = py.import("_pytest.doctest")?;
-    register_fixtures_from_skip(py, &doctest_module, "", registry, &[])?;
     Ok(())
 }
 

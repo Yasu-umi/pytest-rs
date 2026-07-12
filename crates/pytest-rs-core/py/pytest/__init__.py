@@ -16,6 +16,7 @@ from pytest._capture import capfdbinary as capfdbinary
 from pytest._capture import capsys as capsys
 from pytest._capture import capsysbinary as capsysbinary
 from pytest._capture import capteesys as capteesys
+from pytest._doctest_namespace import doctest_namespace as doctest_namespace
 from pytest._fixtures import FixtureFunctionMarker as FixtureFunctionMarker
 from pytest._fixtures import FixtureLookupError as FixtureLookupError
 from pytest._fixtures import fixture as fixture
