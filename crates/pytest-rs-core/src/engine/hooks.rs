@@ -94,10 +94,28 @@ impl Engine {
                 .map(|hook| hook.func.clone_ref(py))
                 .collect()
         };
-        let mut hook_funcs = hook_for("pytest_collection_modifyitems");
+        // Conftest-defined impls only here — third-party plugin modules
+        // (e.g. pytest_randomly, pytest-order's OrderingPlugin instance)
+        // come exclusively from instance_hook_funcs below. session.py_hooks
+        // also holds an entry for entry-point-loaded plugin modules
+        // (bootstrap.rs's load_entrypoint_plugins tags them with
+        // plugin_module = Some(name)), so including those here too would
+        // fire the same third-party hookimpl twice per collection
+        // (test_entrypoint_injection: pytest-randomly's module-level
+        // pytest_collection_modifyitems reseeding twice instead of once).
+        let mut hook_funcs: Vec<Py<pyo3::PyAny>> = self
+            .session
+            .py_hooks
+            .iter()
+            .filter(|hook| {
+                hook.name == "pytest_collection_modifyitems" && hook.plugin_module.is_none()
+            })
+            .map(|hook| hook.func.clone_ref(py))
+            .collect();
         // Plugins registered at configure time via pluginmanager.register()
         // (e.g. pytest-order's OrderingPlugin) live in pluginmanager._plugins,
-        // not session.py_hooks — include their impls too.
+        // not session.py_hooks — include their impls (and every entry-point
+        // plugin module's) here.
         hook_funcs.extend(python::instance_hook_funcs(
             py,
             "pytest_collection_modifyitems",
