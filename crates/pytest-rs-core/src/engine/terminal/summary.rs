@@ -441,6 +441,24 @@ impl Engine {
         Ok(())
     }
 
+    /// `pytest_help_group` native-plugin hooks: each plugin with its own CLI
+    /// option group (e.g. pytest-benchmark's `benchmark:` section) renders
+    /// and returns its own text; printed as-is right after the core option
+    /// listing, before `Config::HELP_FOOTER`.
+    pub(crate) fn print_py_help_groups(&mut self, py: Python<'_>) -> PyResult<()> {
+        let mut ctx = HookContext {
+            py,
+            session: &mut self.session,
+            config: &self.config,
+        };
+        for plugin in &self.plugins {
+            if let Some(text) = plugin.pytest_help_group(&mut ctx)? {
+                print!("{text}");
+            }
+        }
+        Ok(())
+    }
+
     /// pytest_report_header py hooks: each returns a str or list of str,
     /// printed under the session header.
     pub(crate) fn print_py_report_header(&mut self, py: Python<'_>) -> PyResult<()> {

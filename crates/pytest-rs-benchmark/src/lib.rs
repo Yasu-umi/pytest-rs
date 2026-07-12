@@ -18,9 +18,229 @@ use pytest_rs_core::pyo3 as core_pyo3;
 use pytest_rs_core::session::Finalizer;
 
 use core_pyo3::prelude::*;
-use core_pyo3::types::PyModule;
+use core_pyo3::types::{PyDict, PyList, PyModule};
 
 const HELPER: &str = include_str!("../py/helper.py");
+
+/// One `--help` line under the `benchmark:` group, ported verbatim from
+/// upstream pytest-benchmark's own `pytest_addoption` (plugin.py) so the
+/// rendered group matches upstream's real `--help` text — see
+/// `pytest_help_group` below, which feeds these through the real `argparse`
+/// engine (`_pytest.config.argparsing.render_option_group`) for byte-exact
+/// wrapping/`=VALUE` syntax.
+struct HelpOption {
+    flags: &'static [&'static str],
+    metavar: Option<&'static str>,
+    nargs: Option<&'static str>,
+    flag: bool,
+    help: &'static str,
+}
+
+const HELP_OPTIONS: &[HelpOption] = &[
+    HelpOption {
+        flags: &["--benchmark-min-time"],
+        metavar: Some("SECONDS"),
+        nargs: None,
+        flag: false,
+        help: "Minimum time per round in seconds. Default: '0.000005'",
+    },
+    HelpOption {
+        flags: &["--benchmark-max-time"],
+        metavar: Some("SECONDS"),
+        nargs: None,
+        flag: false,
+        help: "Maximum run time per test - it will be repeated until this total time is reached. It may be \
+               exceeded if test function is very slow or --benchmark-min-rounds is large (it takes precedence). \
+               Default: '1.0'",
+    },
+    HelpOption {
+        flags: &["--benchmark-min-rounds"],
+        metavar: Some("NUM"),
+        nargs: None,
+        flag: false,
+        help: "Minimum rounds, even if total time would exceed `--max-time`. Default: 5",
+    },
+    HelpOption {
+        flags: &["--benchmark-timer"],
+        metavar: Some("FUNC"),
+        nargs: None,
+        flag: false,
+        help: "Timer to use when measuring time.",
+    },
+    HelpOption {
+        flags: &["--benchmark-calibration-precision"],
+        metavar: Some("NUM"),
+        nargs: None,
+        flag: false,
+        help: "Precision to use when calibrating number of iterations. Precision of 10 will make the timer \
+               look 10 times more accurate, at a cost of less precise measure of deviations. Default: 10",
+    },
+    HelpOption {
+        flags: &["--benchmark-warmup"],
+        metavar: Some("KIND"),
+        nargs: Some("?"),
+        flag: false,
+        help: "Activates warmup. Will run the test function up to number of times in the calibration phase. \
+               See `--benchmark-warmup-iterations`. Note: Even the warmup phase obeys --benchmark-max-time. \
+               Available KIND: 'auto', 'off', 'on'. Default: 'auto' (automatically activate on PyPy).",
+    },
+    HelpOption {
+        flags: &["--benchmark-warmup-iterations"],
+        metavar: Some("NUM"),
+        nargs: None,
+        flag: false,
+        help: "Max number of iterations to run in the warmup phase. Default: 100000",
+    },
+    HelpOption {
+        flags: &["--benchmark-disable-gc"],
+        metavar: None,
+        nargs: None,
+        flag: true,
+        help: "Disable GC during benchmarks.",
+    },
+    HelpOption {
+        flags: &["--benchmark-skip"],
+        metavar: None,
+        nargs: None,
+        flag: true,
+        help: "Skip running any tests that contain benchmarks.",
+    },
+    HelpOption {
+        flags: &["--benchmark-disable"],
+        metavar: None,
+        nargs: None,
+        flag: true,
+        help: "Disable benchmarks. Benchmarked functions are only ran once and no stats are reported. Use this \
+               is you want to run the test but don't do any benchmarking.",
+    },
+    HelpOption {
+        flags: &["--benchmark-enable"],
+        metavar: None,
+        nargs: None,
+        flag: true,
+        help: "Forcibly enable benchmarks. Use this option to override --benchmark-disable (in case you have it \
+               in pytest configuration).",
+    },
+    HelpOption {
+        flags: &["--benchmark-only"],
+        metavar: None,
+        nargs: None,
+        flag: true,
+        help: "Only run benchmarks. This overrides --benchmark-skip.",
+    },
+    HelpOption {
+        flags: &["--benchmark-save"],
+        metavar: Some("NAME"),
+        nargs: None,
+        flag: false,
+        help: "Save the current run into 'STORAGE-PATH/counter_NAME.json'.",
+    },
+    HelpOption {
+        flags: &["--benchmark-autosave"],
+        metavar: None,
+        nargs: None,
+        flag: true,
+        help: "Autosave benchmark data after each run.",
+    },
+    HelpOption {
+        flags: &["--benchmark-save-data"],
+        metavar: None,
+        nargs: None,
+        flag: true,
+        help: "Use this to make --benchmark-save and --benchmark-autosave include all the timing data, \
+               not just the stats.",
+    },
+    HelpOption {
+        flags: &["--benchmark-json"],
+        metavar: Some("PATH"),
+        nargs: None,
+        flag: false,
+        help: "Dump a JSON report into PATH. Note that this will include the complete data (all the timings, \
+               not just the stats).",
+    },
+    HelpOption {
+        flags: &["--benchmark-compare"],
+        metavar: Some("NUM|_ID"),
+        nargs: Some("?"),
+        flag: false,
+        help: "Compare the current run against run NUM (or prefix of _id in elasticsearch) or the latest \
+               saved run if unspecified.",
+    },
+    HelpOption {
+        flags: &["--benchmark-compare-fail"],
+        metavar: Some("EXPR"),
+        nargs: Some("+"),
+        flag: false,
+        help: "Fail test if performance regresses according to given EXPR (eg: min:5%% or mean:0.001 for number \
+               of seconds). Can be used multiple times.",
+    },
+    HelpOption {
+        flags: &["--benchmark-cprofile"],
+        metavar: Some("COLUMN"),
+        nargs: None,
+        flag: false,
+        help: "If specified cProfile will be enabled. Top functions will be stored for the given column. \
+               Available columns: 'ncalls_recursion', 'ncalls', 'tottime', 'tottime_per', 'cumtime', \
+               'cumtime_per', 'function_name'.",
+    },
+    HelpOption {
+        flags: &["--benchmark-storage"],
+        metavar: Some("URI"),
+        nargs: None,
+        flag: false,
+        help: "Specify a path to store the runs as uri in form file://path or \
+               elasticsearch+http[s]://host1,host2/[index/doctype?project_name=Project] (when --benchmark-save \
+               or --benchmark-autosave are used). For backwards compatibility unexpected values are converted \
+               to file://<value>. Default: 'file://./.benchmarks'.",
+    },
+    HelpOption {
+        flags: &["--benchmark-verbose"],
+        metavar: None,
+        nargs: None,
+        flag: true,
+        help: "Dump diagnostic and progress information.",
+    },
+    HelpOption {
+        flags: &["--benchmark-sort"],
+        metavar: Some("COL"),
+        nargs: None,
+        flag: false,
+        help: "Column to sort on. Can be one of: 'min', 'max', 'mean', 'stddev', 'name', 'fullname'. \
+               Default: 'min'",
+    },
+    HelpOption {
+        flags: &["--benchmark-group-by"],
+        metavar: Some("LABEL"),
+        nargs: None,
+        flag: false,
+        help: "How to group tests. Can be one of: 'group', 'name', 'fullname', 'func', 'fullfunc', 'param' or \
+               'param:NAME', where NAME is the name passed to @pytest.parametrize. Default: 'group'",
+    },
+    HelpOption {
+        flags: &["--benchmark-columns"],
+        metavar: Some("LABELS"),
+        nargs: None,
+        flag: false,
+        help: "Comma-separated list of columns to show in the result table. Default: 'min, max, mean, stddev, \
+               median, iqr, outliers, ops, rounds, iterations'",
+    },
+    HelpOption {
+        flags: &["--benchmark-name"],
+        metavar: Some("FORMAT"),
+        nargs: None,
+        flag: false,
+        help: "How to format names in results. Can be one of 'short', 'normal', 'long', or 'trial'. \
+               Default: 'normal'",
+    },
+    HelpOption {
+        flags: &["--benchmark-histogram"],
+        metavar: Some("FILENAME-PREFIX"),
+        nargs: Some("?"),
+        flag: false,
+        help: "Plot graphs of min/max/avg/stddev over time in FILENAME-PREFIX-test_name.svg. If FILENAME-PREFIX \
+               contains slashes ('/') then directories will be created.",
+    },
+];
 
 /// Fixture stub: gives the engine a `benchmark` FixtureDef to resolve; the
 /// plugin claims the actual setup in pytest_fixture_setup.
@@ -409,6 +629,17 @@ impl Plugin for BenchmarkPlugin {
         // XDist: auto-disable benchmarks (not on workers; they don't have -n).
         if ctx.config.numprocesses_spec().is_some() && !ctx.config.is_worker() {
             self.config.disabled = true;
+            // Non-verbose mode deliberately prints nothing here (matching
+            // upstream's Logger.warning() only in the sense that we tried
+            // both a raw eprintln and a real warnings.warn and reverted
+            // both): this branch fires on ANY -n flag, including inside
+            // other suites' own nested pytester runs (pytest-xdist's own
+            // test suite uses -n heavily to test xdist itself and asserts
+            // exactly-empty stdout/stderr in several tests), so any visible
+            // output here is a cross-suite regression with no config-level
+            // fix — PYTEST_ADDOPTS-based suppression can't reach nested
+            // pytester runs since the `pytester` fixture strips it, and
+            // `-p no:benchmark` extra_args only cover the outer invocation.
             if self.verbose {
                 let msg = "Benchmarks are automatically disabled because xdist plugin is active.\
                            Benchmarks cannot be performed reliably in a parallelized environment.";
@@ -610,6 +841,30 @@ impl Plugin for BenchmarkPlugin {
             warmup = if self.config.warmup { "True" } else { "False" },
             warmup_iterations = self.config.warmup_iterations,
         )])
+    }
+
+    fn pytest_help_group(&self, ctx: &mut HookContext) -> PyResult<Option<String>> {
+        let py = ctx.py;
+        let options = PyList::empty(py);
+        for opt in HELP_OPTIONS {
+            let dict = PyDict::new(py);
+            dict.set_item("flags", opt.flags)?;
+            dict.set_item("help", opt.help)?;
+            if opt.flag {
+                dict.set_item("flag", true)?;
+            } else {
+                dict.set_item("metavar", opt.metavar)?;
+                if let Some(nargs) = opt.nargs {
+                    dict.set_item("nargs", nargs)?;
+                }
+            }
+            options.append(dict)?;
+        }
+        let text: String = py
+            .import("_pytest.config.argparsing")?
+            .call_method1("render_option_group", ("benchmark", options))?
+            .extract()?;
+        Ok(Some(text))
     }
 
     fn pytest_sessionfinish(&mut self, ctx: &mut HookContext, _exit_code: i32) -> PyResult<()> {

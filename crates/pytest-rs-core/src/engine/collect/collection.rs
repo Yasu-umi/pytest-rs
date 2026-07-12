@@ -87,8 +87,11 @@ impl Engine {
         // -h/--help: matches upstream's pytest_cmdline_main, which calls
         // showhelp() right after config._do_configure() and returns without
         // ever reaching wrap_session (no session header, no collection).
-        if let Some(help_text) = &self.config.help_text {
+        if let Some(help_text) = self.config.help_text.clone() {
             print!("{help_text}");
+            if let Err(err) = self.print_py_help_groups(py) {
+                errors.push((rootdir.to_path_buf(), python::format_exception(py, &err)));
+            }
             print!("{}", crate::config::Config::HELP_FOOTER);
             // helpconfig.showhelp(): warnings recorded before this point (e.g.
             // a broken initial conftest, downgraded to a warning so --help

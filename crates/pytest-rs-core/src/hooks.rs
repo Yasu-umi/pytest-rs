@@ -156,6 +156,16 @@ pub trait Plugin: Send {
         Ok(Vec::new())
     }
 
+    /// A fully-rendered `--help` section this plugin's own CLI options
+    /// belong under (upstream's `parser.getgroup("name")`, e.g.
+    /// pytest-benchmark's own `"benchmark:"` heading) — `None` when the
+    /// plugin has no dedicated option group to show. Plugins own the exact
+    /// rendering (metavar/`=VALUE` syntax/wrapping) themselves; core only
+    /// prints whatever text comes back, right after the core option listing.
+    fn pytest_help_group(&self, _ctx: &mut HookContext) -> PyResult<Option<String>> {
+        Ok(None)
+    }
+
     fn pytest_sessionfinish(&mut self, _ctx: &mut HookContext, _exit_code: i32) -> PyResult<()> {
         Ok(())
     }

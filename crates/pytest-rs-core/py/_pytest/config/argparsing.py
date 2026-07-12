@@ -67,6 +67,33 @@ class DropShorterLongHelpFormatter(argparse.HelpFormatter):
         return lines
 
 
+def render_option_group(name, options):
+    """Render one `--help` option group (upstream's `parser.getgroup(name)`
+    section, e.g. pytest-benchmark's `benchmark:` heading) via the real
+    `argparse` engine + `DropShorterLongHelpFormatter`, so the `--opt=VALUE`
+    collapsing, line-wrapping, and same-line-vs-next-line help placement
+    match upstream exactly (both are upstream's own machinery).
+
+    `options` is a list of dicts, each either `{"flags": [...], "help": ...,
+    "flag": True}` (a store_true switch) or `{"flags": [...], "help": ...,
+    "metavar": ..., "nargs": "?"|"+"|None}` (a value-taking option).
+    """
+    parser = argparse.ArgumentParser(add_help=False, formatter_class=DropShorterLongHelpFormatter)
+    group = parser.add_argument_group(name)
+    for opt in options:
+        kwargs = {"help": opt["help"]}
+        if opt.get("flag"):
+            kwargs["action"] = "store_true"
+        else:
+            kwargs["metavar"] = opt["metavar"]
+            if opt.get("nargs"):
+                kwargs["nargs"] = opt["nargs"]
+        group.add_argument(*opt["flags"], **kwargs)
+    text = parser.format_help()
+    marker = f"{name}:\n"
+    return text[text.index(marker) :]
+
+
 def get_ini_default_for_type(type):
     """Used by addini to get the default value for a given config option
     type, when default is not supplied."""
