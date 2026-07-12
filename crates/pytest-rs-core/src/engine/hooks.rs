@@ -1035,11 +1035,18 @@ impl Engine {
         // Instance-registered plugin impls first (pytest-run-parallel's
         // runner is tryfirst: it wraps item.obj before reporters look).
         let mut hook_funcs = python::instance_hook_funcs(py, "pytest_collection_finish");
+        // Conftest-defined impls only here — third-party plugin modules
+        // (e.g. anyio's own pytest_plugin) are already covered by
+        // instance_hook_funcs above; session.py_hooks also carries an entry
+        // for entry-point-loaded plugin modules (plugin_module = Some(name)),
+        // so including those here too would fire the same hookimpl twice.
         hook_funcs.extend(
             self.session
                 .py_hooks
                 .iter()
-                .filter(|hook| hook.name == "pytest_collection_finish")
+                .filter(|hook| {
+                    hook.name == "pytest_collection_finish" && hook.plugin_module.is_none()
+                })
                 .map(|hook| hook.func.clone_ref(py)),
         );
         // Publish session.items / session.testscollected regardless of
@@ -1071,11 +1078,16 @@ impl Engine {
     /// hooks asking for it receive None).
     pub(crate) fn fire_py_sessionfinish(&mut self, py: Python<'_>, code: i32) -> PyResult<()> {
         let mut hook_funcs = python::instance_hook_funcs(py, "pytest_sessionfinish");
+        // Conftest-defined impls only here — third-party plugin modules
+        // (e.g. pytest-ruff) are already covered by instance_hook_funcs
+        // above; session.py_hooks also carries an entry for entry-point-
+        // loaded plugin modules (plugin_module = Some(name)), so including
+        // those here too would fire the same hookimpl twice.
         hook_funcs.extend(
             self.session
                 .py_hooks
                 .iter()
-                .filter(|hook| hook.name == "pytest_sessionfinish")
+                .filter(|hook| hook.name == "pytest_sessionfinish" && hook.plugin_module.is_none())
                 .map(|hook| hook.func.clone_ref(py)),
         );
         if hook_funcs.is_empty() {
