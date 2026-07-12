@@ -111,7 +111,7 @@ _linux (CI-verified)_
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2703 | 85 | 0 | 53 | 0 | 8 | 2849 | 96.7% | 26 | 54 | 61 |
+| pytest | 9.0.3 | 2706 | 82 | 0 | 53 | 0 | 8 | 2849 | 96.8% | 26 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 0 | 2 | 90 | 97.8% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 204 | 2 | 0 | 3 | 0 | 0 | 209 | 99.0% | 0 | 1 | 0 |
@@ -138,7 +138,7 @@ _linux (CI-verified)_
 | pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
 | pytest-env | 1.6.0 | 69 | 6 | 0 | 0 | 0 | 0 | 75 | 92.0% | 2 | 3 | 0 |
 | pytest-rerunfailures | 9.1.1 | 47 | 0 | 0 | 1 | 0 | 0 | 48 | 100.0% | 1 | 1 | 0 |
-| pytest-randomly | 4.1.0 | 36 | 1 | 0 | 0 | 0 | 0 | 37 | 97.3% | 0 | 1 | 0 |
+| pytest-randomly | 4.1.0 | 37 | 0 | 0 | 0 | 0 | 0 | 37 | 100.0% | 1 | 1 | 0 |
 | pytest-bdd | 8.1.0 | 124 | 14 | 0 | 1 | 0 | 0 | 139 | 89.9% | 28 | 35 | 0 |
 | pytest-django | v4.9.0 | 211 | 4 | 0 | 1 | 0 | 0 | 216 | 98.1% | 8 | 13 | 0 |
 
@@ -164,7 +164,7 @@ _linux (CI-verified)_
 | pydantic | v2.11.7 | 5338 | 14 | 0 | 921 | 0 | 0 | 6273 | 99.8% | 77 | 82 | 0 |
 | scikit-learn-1 | 1.9.0 | 8432 | 0 | 0 | 6624 | 0 | 0 | 15056 | 100.0% | 79 | 87 | 0 |
 | scikit-learn-2 | 1.9.0 | 5046 | 0 | 0 | 1892 | 0 | 0 | 6938 | 100.0% | 52 | 58 | 0 |
-| scikit-learn-3 | 1.9.0 | 9251 | 3 | 0 | 2530 | 0 | 0 | 11784 | 100.0% | 104 | 114 | 0 |
+| scikit-learn-3 | 1.9.0 | 9222 | 3 | 0 | 2530 | 0 | 0 | 11755 | 100.0% | 103 | 114 | 0 |
 <!-- conformance-results:end -->
 
 The suites are included as **shallow git submodules** under `conformance/suites/` at the pinned release tags. Initialize them once after cloning:

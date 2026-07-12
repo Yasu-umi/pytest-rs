@@ -8,10 +8,10 @@
   "files": [
     {
       "file": "tests/test_pytest_randomly.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 36,
-      "failed": 1,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 37,
+      "failed": 0,
       "skipped": 0,
       "errors": 0,
       "deselected": 0,
