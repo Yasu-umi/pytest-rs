@@ -801,11 +801,17 @@ impl Engine {
         // Upstream passes the full invocation args so plugins can call
         // parser.parse_known_args(args) to find plugin-defined flags like --ds.
         // We reconstruct it as plugin_args (unknown --flags) + paths (positionals).
+        // -h/--help is a recognized clap flag (not an "unknown" plugin arg), so
+        // it never lands in plugin_args — re-add it here or a plugin's own
+        // `if options.help: return` early-exit (e.g. pytest-django's Django
+        // project scan) never sees it and runs unwanted setup during --help.
         let full_args: Vec<&str> = self
             .config
-            .plugin_args
-            .iter()
-            .map(String::as_str)
+            .help_text
+            .is_some()
+            .then_some("--help")
+            .into_iter()
+            .chain(self.config.plugin_args.iter().map(String::as_str))
             .chain(self.config.paths.iter().map(String::as_str))
             .collect();
         let args = pyo3::types::PyList::new(py, &full_args)?

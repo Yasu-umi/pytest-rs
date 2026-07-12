@@ -155,6 +155,11 @@ fn build_py_config(
         "showcapture",
         config.get_value("show-capture").unwrap_or("all"),
     )?;
+    // -h/--help is a recognized clap flag, never routed through plugin_args'
+    // apply_cli_args reconstruction, so it needs setting here directly —
+    // plugins read config.getoption("help")/config.option.help to skip their
+    // own setup during --help (e.g. pytest-django's pytest_configure).
+    option_ns.setattr("help", config.help_text.is_some())?;
     option_ns.setattr("no_header", config.get_flag("no-header"))?;
     option_ns.setattr("no_summary", config.get_flag("no-summary"))?;
     option_ns.setattr("fulltrace", config.get_flag("full-trace"))?;

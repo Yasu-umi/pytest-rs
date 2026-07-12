@@ -27,6 +27,23 @@ flag_dests: dict[str, str] = {}
 # actions, e.g. --nomigrations=store_true / --migrations=store_false).
 flag_actions: dict[str, str | None] = {}
 
+# -h/--help is a Rust-native clap flag (Config::build_clap_command), never
+# registered via Parser.addoption — but plugins like pytest-django read
+# options.help off Parser.parse_known_args(args) during
+# pytest_load_initial_conftests to skip their own early setup, so it still
+# needs an entry here for that reflection to see it.
+option_specs["help"] = {
+    "default": False,
+    "type": None,
+    "action": "store_true",
+    "nargs": None,
+    "choices": None,
+}
+flag_dests["--help"] = "help"
+flag_dests["-h"] = "help"
+flag_actions["--help"] = "store_true"
+flag_actions["-h"] = "store_true"
+
 
 class Option:
     """Minimal Option wrapper for plugin compatibility.
@@ -379,8 +396,10 @@ CORE_OPTION_DEFAULTS: dict[str, Any] = {
     # helper reads config.option.assertmode to pick runpytest vs subprocess.
     "assertmode": "rewrite",
     # core flags plugins read off a parse_known_args namespace (pytest-django).
+    # "help" has its own option_specs entry (registered above) instead of a
+    # CORE_OPTION_DEFAULTS one, since it needs apply_cli_args to actually set
+    # it from argv, not just supply a static default.
     "version": 0,
-    "help": False,
     # --fixtures / --funcargs dest; the engine sets it true when either is given.
     "showfixtures": False,
 }
