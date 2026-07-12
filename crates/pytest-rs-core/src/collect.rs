@@ -822,7 +822,7 @@ pub fn display_file_path(rootdir: &Path, invocation_dir: &Path, path: &Path) -> 
 /// Rust equivalent of pytest's `bestrelpath(directory, dest)`: returns a
 /// relative path string from `directory` to `dest`.  Falls back to the
 /// absolute path string when the two share no common ancestor.
-fn bestrelpath(directory: &Path, dest: &Path) -> String {
+pub(crate) fn bestrelpath(directory: &Path, dest: &Path) -> String {
     // Find the longest common prefix component-by-component.
     let dir_parts: Vec<_> = directory.components().collect();
     let dest_parts: Vec<_> = dest.components().collect();

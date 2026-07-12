@@ -22,13 +22,24 @@ impl Engine {
         if self.session.items.is_empty() {
             return;
         }
-        let root_name = self
-            .config
-            .rootdir
-            .file_name()
-            .map(|name| name.to_string_lossy().to_string())
-            .unwrap_or_default();
-        println!("<Dir {root_name}>");
+        // --pyargs: the tree should only include parents in the import path
+        // (the package chain reaching the collected module), not every
+        // directory up to confcutdir/rootdir (upstream #11904) — so the
+        // usual enclosing `<Dir root_name>` root line is skipped and the
+        // topmost printed node is instead the import root itself, labeled
+        // with its bestrelpath from rootdir (falling back to an absolute
+        // path when unrelated, same as pytest's own bestrelpath).
+        let pyargs = self.config.get_flag("pyargs");
+        let base_indent = if pyargs { 0 } else { 1 };
+        if !pyargs {
+            let root_name = self
+                .config
+                .rootdir
+                .file_name()
+                .map(|name| name.to_string_lossy().to_string())
+                .unwrap_or_default();
+            println!("<Dir {root_name}>");
+        }
         // The open chain of (label) nodes above the current item.
         let mut open: Vec<String> = Vec::new();
         for item in &self.session.items {
@@ -37,16 +48,43 @@ impl Engine {
                 None => continue,
             };
             let mut labels: Vec<String> = Vec::new();
-            let mut dir_so_far = self.config.rootdir.clone();
             let segments: Vec<&str> = file_part.split('/').collect();
-            for dir in &segments[..segments.len().saturating_sub(1)] {
-                dir_so_far = dir_so_far.join(dir);
-                let kind = if dir_so_far.join("__init__.py").is_file() {
-                    "Package"
-                } else {
-                    "Dir"
-                };
-                labels.push(format!("<{kind} {dir}>"));
+            if pyargs {
+                // Walk up from the file's own directory while each ancestor
+                // is itself a package, to find the import root (the topmost
+                // package directory whose parent is not one).
+                let file_dir = item.path.parent().unwrap_or(&self.config.rootdir);
+                let is_package = file_dir.join("__init__.py").is_file();
+                let mut pkg_root = file_dir.to_path_buf();
+                if is_package {
+                    while let Some(parent) = pkg_root.parent() {
+                        if parent.join("__init__.py").is_file() {
+                            pkg_root = parent.to_path_buf();
+                        } else {
+                            break;
+                        }
+                    }
+                }
+                let kind = if is_package { "Package" } else { "Dir" };
+                let label_path = crate::collect::bestrelpath(&self.config.rootdir, &pkg_root);
+                labels.push(format!("<{kind} {label_path}>"));
+                if let Ok(rel) = file_dir.strip_prefix(&pkg_root) {
+                    for comp in rel.components() {
+                        let name = comp.as_os_str().to_string_lossy();
+                        labels.push(format!("<Package {name}>"));
+                    }
+                }
+            } else {
+                let mut dir_so_far = self.config.rootdir.clone();
+                for dir in &segments[..segments.len().saturating_sub(1)] {
+                    dir_so_far = dir_so_far.join(dir);
+                    let kind = if dir_so_far.join("__init__.py").is_file() {
+                        "Package"
+                    } else {
+                        "Dir"
+                    };
+                    labels.push(format!("<{kind} {dir}>"));
+                }
             }
             if let Some(module) = segments.last() {
                 let module_class = if item.collector_class.is_empty() {
@@ -80,7 +118,7 @@ impl Engine {
                 .min(labels.len() - 1);
             let last = labels.len() - 1;
             for (depth, label) in labels.iter().enumerate().skip(shared) {
-                let indent = "  ".repeat(depth + 1);
+                let indent = "  ".repeat(depth + base_indent);
                 println!("{indent}{label}");
                 // pytest prints each node's docstring (verbosity >= 1) on
                 // the following lines, indented one level deeper. We have
