@@ -166,6 +166,12 @@ pub struct Session {
     /// handled it: the shim TerminalReporter already rendered its reports, so
     /// run_items counts them without re-rendering.
     pub delegated_render: bool,
+    /// Total items collected across all workers in dist (-n) mode, set once
+    /// the merge loop receives every worker's Collection. `self.items` stays
+    /// empty in dist mode (the controller never collects locally), so this
+    /// is the only way finish_session can tell a zero-item dist run apart
+    /// from an ordinary all-passed one to return NO_TESTS_COLLECTED.
+    pub dist_total_items: Option<usize>,
 }
 
 impl Session {
@@ -202,6 +208,7 @@ impl Session {
             custom_reporter: None,
             plugin_distinfo: Vec::new(),
             delegated_render: false,
+            dist_total_items: None,
         }
     }
 

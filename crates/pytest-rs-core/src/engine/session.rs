@@ -355,6 +355,8 @@ impl Engine {
             .any(|r| r.outcome == Outcome::Failed);
         let mut code = if failed {
             exit_code::TESTS_FAILED
+        } else if self.session.dist_total_items == Some(0) {
+            exit_code::NO_TESTS_COLLECTED
         } else {
             exit_code::OK
         };

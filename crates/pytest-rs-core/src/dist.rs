@@ -440,8 +440,14 @@ impl Engine {
         // Merge loop: progress streams in arrival order (xdist-style).
         // `workers` is the initial collections_pending count; the loop
         // builds and pushes batches once all workers have reported.
-        let (reports, extras, failed, maxfail_hit) =
+        let (reports, extras, failed, maxfail_hit, total_items) =
             self.run_dist_merge_loop(py, receiver, &queue, &nodes, workers);
+        // Upstream: zero items collected across the whole distributed run is
+        // NO_TESTS_COLLECTED, same as the non-dist path's n_items==0 check —
+        // but the controller's own self.session.items is always empty in
+        // dist mode (workers collect, not the controller), so finish_session's
+        // ordinary failed-report check can't see this on its own.
+        self.session.dist_total_items = Some(total_items);
         for handle in handles {
             let _ = handle.join();
         }
@@ -506,7 +512,7 @@ impl Engine {
     /// Drain worker events in arrival order: stream progress, accumulate
     /// reports/extras, drive the delegated reporter, and honor the shared
     /// --maxfail budget. Returns (reports, plugin extras, failed count,
-    /// whether --maxfail tripped).
+    /// whether --maxfail tripped, total items collected across all workers).
     fn run_dist_merge_loop(
         &mut self,
         py: Python<'_>,
@@ -515,7 +521,7 @@ impl Engine {
         nodes: &[Option<Py<pyo3::PyAny>>],
         // Number of workers that must send Collection before batches are built.
         mut collections_pending: usize,
-    ) -> (Vec<TestReport>, Vec<(String, String)>, usize, bool) {
+    ) -> (Vec<TestReport>, Vec<(String, String)>, usize, bool, usize) {
         let mut reports: Vec<TestReport> = Vec::new();
         let mut extras: Vec<(String, String)> = Vec::new();
         let show_progress =
@@ -767,7 +773,7 @@ impl Engine {
             let body = " ".repeat(printed % 80);
             println!("{}", crate::runner::progress_suffix(&body, &msg, color));
         }
-        (reports, extras, failed, maxfail_hit)
+        (reports, extras, failed, maxfail_hit, total_items)
     }
 
     /// Partition nodeids (from worker Collections) into work batches for the
