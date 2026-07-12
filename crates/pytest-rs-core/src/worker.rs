@@ -651,6 +651,72 @@ impl Engine {
                 errors.push((rel, msg));
             }
         }
+        // Custom collectors (pytest-mypy / pytest-ruff): unlike the
+        // controller's collect() -> collect_extra_and_custom, this worker
+        // startup path only ever globbed python_files-pattern test files
+        // above, so pytest_collect_file hooks never ran here at all and
+        // every custom-collected item (including a bare conftest.py, which
+        // isn't itself a "test file") silently vanished under -n. Mirror
+        // collect_extra_and_custom's logic (reorder.rs) against the
+        // broader any-extension candidate set.
+        if python::has_collect_file_hook(py, &self.session.py_hooks) {
+            let candidate = crate::collect::collect_all_files(
+                &self.config.invocation_dir,
+                &paths,
+                self.config.get_flag("collect-in-virtualenv"),
+            );
+            let hooks = std::mem::take(&mut self.session.py_hooks);
+            let result = python::collect_custom_files(
+                py,
+                &self.config.rootdir,
+                &candidate,
+                &hooks,
+                &mut collection.items,
+            );
+            self.session.py_hooks = hooks;
+            match result {
+                Ok(collect_result) => {
+                    if !collect_result.skipped.is_empty() {
+                        let skipped_set: std::collections::HashSet<&PathBuf> =
+                            collect_result.skipped.iter().map(|(p, _)| p).collect();
+                        collection
+                            .items
+                            .retain(|item| !skipped_set.contains(&item.path));
+                    }
+                    for (path, longrepr) in collect_result.errors {
+                        errors.push((
+                            crate::collect::file_nodeid(&self.config.rootdir, &path),
+                            longrepr,
+                        ));
+                    }
+                    for file in collect_result.native_fallback {
+                        if collection.collected_files.contains(&file)
+                            || file.file_name().and_then(|n| n.to_str()) == Some("conftest.py")
+                        {
+                            continue;
+                        }
+                        let rel = crate::collect::file_nodeid(&self.config.rootdir, &file);
+                        if let Err(msg) = self.ensure_collected(py, collection, &rel) {
+                            errors.push((rel, msg));
+                        }
+                    }
+                }
+                Err(err) => {
+                    errors.push((
+                        self.config.rootdir.to_string_lossy().into_owned(),
+                        python::format_exception(py, &err),
+                    ));
+                }
+            }
+            // `collect_custom_files` pushed straight into collection.items
+            // (bypassing ensure_collected's own by_nodeid bookkeeping), and
+            // the skip-retain above may have shifted indices — rebuild once
+            // rather than tracking index ranges through both mutations.
+            collection.by_nodeid.clear();
+            for (index, item) in collection.items.iter().enumerate() {
+                collection.by_nodeid.insert(item.nodeid.clone(), index);
+            }
+        }
         errors
     }
 
