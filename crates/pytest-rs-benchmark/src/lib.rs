@@ -626,20 +626,24 @@ impl Plugin for BenchmarkPlugin {
         let machine = report::machine_id(py)?;
         self.storage_dir = Some(storage_root.join(machine));
 
-        // XDist: auto-disable benchmarks (not on workers; they don't have -n).
-        if ctx.config.numprocesses_spec().is_some() && !ctx.config.is_worker() {
+        // XDist: auto-disable benchmarks. Deliberately NOT excluding
+        // workers here (a prior `&& !ctx.config.is_worker()` guard did, on
+        // the theory that "workers don't have -n"). They do: numprocesses
+        // is part of the inherited/re-parsed config either way, and under
+        // `-n` the controller itself never runs collection or resolves any
+        // fixture at all (run_dist in dist.rs only dispatches to workers
+        // and merges their reported results; worker.rs's run_worker has its
+        // own separate startup path, never calling the controller's
+        // collect()) — so a worker's own BenchmarkFixture is where
+        // benchmarks actually execute. With the old guard, workers alone
+        // never disabled and silently ran real benchmarks for real under
+        // `-n`, defeating the entire point of auto-disabling. Verified via
+        // direct repro: before this fix, `-n1` still printed real
+        // "Calibrating..."/"Running N rounds..." verbose output; after,
+        // fixture setup is a no-op plain call, matching non-xdist
+        // --benchmark-disable.
+        if ctx.config.numprocesses_spec().is_some() {
             self.config.disabled = true;
-            // Non-verbose mode deliberately prints nothing here (matching
-            // upstream's Logger.warning() only in the sense that we tried
-            // both a raw eprintln and a real warnings.warn and reverted
-            // both): this branch fires on ANY -n flag, including inside
-            // other suites' own nested pytester runs (pytest-xdist's own
-            // test suite uses -n heavily to test xdist itself and asserts
-            // exactly-empty stdout/stderr in several tests), so any visible
-            // output here is a cross-suite regression with no config-level
-            // fix — PYTEST_ADDOPTS-based suppression can't reach nested
-            // pytester runs since the `pytester` fixture strips it, and
-            // `-p no:benchmark` extra_args only cover the outer invocation.
             if self.verbose {
                 let msg = "Benchmarks are automatically disabled because xdist plugin is active.\
                            Benchmarks cannot be performed reliably in a parallelized environment.";
