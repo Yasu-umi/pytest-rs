@@ -101,7 +101,9 @@ impl Engine {
                 return exit_code::INTERNAL_ERROR;
             }
         }
-        python::configure_debugging(py);
+        if !self.config.plugin_disabled("debugging") {
+            python::configure_debugging(py);
+        }
         python::set_assertion_verbosity(
             py,
             self.config.verbose,

@@ -198,7 +198,9 @@ impl Engine {
             );
         }
 
-        python::configure_debugging(py);
+        if !self.config.plugin_disabled("debugging") {
+            python::configure_debugging(py);
+        }
 
         self.run_session(py, started)
     }
