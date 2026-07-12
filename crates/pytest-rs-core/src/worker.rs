@@ -234,6 +234,22 @@ impl Engine {
         }
 
         let mut collection = WorkerCollection::default();
+        // pytest_configure must fire unconditionally (upstream guarantee),
+        // but this worker only otherwise fires it incrementally inside
+        // ensure_collected as conftests are discovered per file — if this
+        // worker's file set never triggers that (e.g. only a conftest.py,
+        // no test_*.py), an entry-point plugin's pytest_configure (which
+        // may conditionally register more hooks, e.g. pytest-mypy's
+        // pytest_collect_file collector) would otherwise never run at all.
+        // Firing it now, before any file is collected, also sets the
+        // configured_hooks cursor so this doesn't double-fire later.
+        if let Err(err) = self.fire_new_conftest_configure(py, &mut collection.configured_hooks) {
+            eprintln!(
+                "INTERNAL ERROR: worker configure failed: {}",
+                python::format_exception(py, &err)
+            );
+            return exit_code::INTERNAL_ERROR;
+        }
         // Like upstream xdist, import every test module during collection,
         // before any test runs: lazy per-batch imports would let earlier
         // tests' side effects (warning filters, random seeds, monkey
