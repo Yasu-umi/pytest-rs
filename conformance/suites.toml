@@ -359,6 +359,15 @@ deps = [
 # upstream, which shifts every verbose per-test PASSED/FAILED line off by one
 # and breaks fnmatch/outlines-index assertions across this suite.
 env = { PYTEST_RS_DISABLE_PLUGINS = "benchmark" }
+# Upstream's own tox.ini runs this suite with `-p no:randomly` so the outer
+# session doesn't dogfood the plugin under test on itself. Without it, the
+# outer session's own header print calls pytest_randomly._reseed(), which
+# lazily caches its module-level `entrypoint_reseeds` list from the real
+# (empty) importlib.metadata.entry_points() lookup before any nested
+# pytester run gets a chance to monkeypatch it — permanently short-circuiting
+# every later nested run's own entry-point injection for the rest of the
+# process (test_entrypoint_injection).
+extra_args = ["-p", "no:randomly"]
 category = "third-party"
 enabled = true
 
