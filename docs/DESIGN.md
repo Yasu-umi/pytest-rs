@@ -246,6 +246,32 @@ Key structural rules:
 | **split** | `.test_durations` JSON (nodeid → seconds, legacy list format accepted), `--splits N --group K`, algorithms `duration_based_chunks` (order-preserving) / `least_duration` (LPT greedy), unknown tests get mean duration of the relevant cached set; `--store-durations` aggregates `TestReport.duration` per nodeid | addoption, configure (validation), collection_modifyitems, sessionfinish (store) |
 | **benchmark** | `benchmark` fixture: `#[pyclass]` backed by Rust; inner loop is a generated tiny Python `for` driven once per round (one FFI crossing per round, parity with pytest-benchmark numbers); `perf_counter` clock; calibration vs clock resolution, warmup, stats (min/max/mean/stddev/median/iqr/outliers/ops, `benchmark.stats.stats.min` API). `--benchmark-json`, `--benchmark-only/skip/disable`. pedantic mode with upstream call-count/validation parity (storage/compare/histogram/cprofile not reproduced) | addoption, configure, collection_modifyitems, fixture_setup (native claim), terminal_summary, sessionfinish (json) |
 
+### Environment variables
+
+All pytest-rs-specific env vars are namespaced `PYTEST_RS_*`. Most are set by
+pytest-rs itself to wire up subprocesses/workers and are **not** meant to be
+set by users; a small number are knobs users or the conformance harness may
+set. (pytest's own `PYTEST_ADDOPTS`, `PYTEST_DEBUG_TEMPROOT`, etc. behave as
+upstream and are not listed here.)
+
+**User / harness knobs** (safe to set):
+
+| Var | Effect |
+|---|---|
+| `PYTEST_RS_DISABLE_PLUGINS` | Comma/space-separated native plugins to disable, matched like `-p no:NAME` (bare or `pytest_`/`pytest-` prefixed). Unlike `-p no:`, it survives into nested `pytester` subprocess runs (which strip `PYTEST_ADDOPTS` and don't inherit the outer CLI's args), so it's how the conformance harness isolates an always-on native plugin out of an unrelated suite. |
+| `PYTEST_RS_INLINE_INPROCESS` | Make `pytester`'s `runpytest`/`inline_run` execute in-process instead of spawning a subprocess. Used in conformance runs where the subprocess path masks failures. |
+| `PYTEST_RS_DIST_SPAWN` | Opt `-n` workers back into spawn-per-worker (a fresh process each) instead of the default fork-based workers. |
+
+**Internal plumbing** (set by pytest-rs; do not set by hand):
+
+| Var | Role |
+|---|---|
+| `PYTEST_RS_EXE` | Path the embedded interpreter reports as `sys.executable` / uses to re-exec workers (the binary embeds libpython, so `sys.executable` would otherwise be wrong). |
+| `PYTEST_RS_WORKERINPUT` | JSON `workerinput` handed to an `-n` worker (worker id, testrun uid, conftest-populated `configure_node` data). |
+| `PYTEST_RS_HOOK_RELAY` / `PYTEST_RS_LOG_RELAY` | Socket paths a subprocess uses to relay hook calls / log records back to the controller. |
+| `PYTEST_RS_FORWARDED_FILTERS` | Newline-separated warning filters forwarded from controller to child so captured warnings match. |
+| `PYTEST_RS_COV_*` (`CHILD`, `ACTIVE`, `PATHS`, `OUT`, `SOURCES`, `BRANCH`, `ROOT`, `SIGTERM`, `TOOL_ID`) | Coverage child-process wiring: tells a spawned/forked process to start `sys.monitoring` coverage and where/how to dump its hits for the parent to merge. |
+
 ## Milestones
 
 - **M0 — Foundations**: workspace re-org (core + plugin crate skeletons + binary), POC deleted,
