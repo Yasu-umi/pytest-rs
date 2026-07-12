@@ -32,7 +32,7 @@ pytest-rs; they are not counted in the total.
 | pytest-cov | v7.1.0 | 204 | 2 | 0 | 3 | 0 | 0 | 209 | 99.0% | 0 | 1 | 0 |
 | pytest-xdist | v3.8.0 | 97 | 0 | 0 | 1 | 0 | 0 | 98 | 100.0% | 1 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
-| pytest-benchmark | v5.1.0 | 119 | 3 | 0 | 1 | 0 | 0 | 123 | 97.6% | 5 | 7 | 6 |
+| pytest-benchmark | v5.1.0 | 122 | 0 | 0 | 1 | 0 | 0 | 123 | 100.0% | 6 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 42 | 0 | 0 | 1 | 0 | 0 | 43 | 100.0% | 1 | 1 | 0 |
 | anyio | 4.13.0 | 3120 | 0 | 0 | 42 | 0 | 0 | 3162 | 100.0% | 26 | 26 | 0 |
 | pytest-mypy | v1.0.1 | 53 | 23 | 0 | 2 | 0 | 0 | 78 | 70.5% | 0 | 1 | 0 |
@@ -229,7 +229,7 @@ pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| tests/test_benchmark.py | failed | 50 | 3 | 0 | 0 | 0 | 0 |
+| tests/test_benchmark.py | passed | 53 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_calibration.py | passed | 34 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_normal.py | passed | 10 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_pedantic.py | passed | 19 | 0 | 0 | 0 | 0 | 0 |
