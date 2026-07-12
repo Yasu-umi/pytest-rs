@@ -436,36 +436,47 @@ pub fn collect_custom_files(
                 .and_then(|c| c.getattr("__name__"))
                 .and_then(|n| n.extract())
                 .unwrap_or_else(|_| "Module".to_string());
-            // Update already-collected items for this file to use the custom
-            // collector class (e.g. MyModule replacing the default Module) —
-            // relabel first, regardless of whether collect() is a real
-            // override: a hook matching broadly (e.g. every ".py" file) may
-            // return a bare collector for a file the standard pipeline
-            // already scanned natively, and those items just need their
-            // display class updated, not re-collecting.
-            let pre_existing: std::collections::HashSet<String> = items
-                .iter_mut()
-                .filter_map(|it| {
-                    if it.path == *file {
-                        it.collector_class = collector_class.clone();
-                        Some(it.nodeid.clone())
-                    } else {
-                        None
-                    }
-                })
-                .collect();
+            let is_bare = is_bare_file_collector
+                .call1((&collector,))?
+                .extract::<bool>()?;
             // A bare File/Module (from_parent(...) with no collect() override)
-            // always yields [] via the base stub — real scanning for
-            // standard .py files happens natively in Rust and never calls
-            // this method. Only queue the native fallback when this file
-            // truly has no items yet (e.g. an unrecognized extension); a
-            // file the standard pipeline already collected just needed the
-            // relabel above.
-            if pre_existing.is_empty()
-                && is_bare_file_collector
-                    .call1((&collector,))?
-                    .extract::<bool>()?
-            {
+            // always yields [] via the base stub — it's a display-only
+            // substitution (e.g. a conftest handing back a plain
+            // `Module.from_parent(...)`), so every item the standard pipeline
+            // already scanned natively for this file adopts its class right
+            // away, since this collector's own collect() will never run to
+            // tell us which nodeids it "owns".
+            //
+            // A collector with a real collect() override is different: it
+            // may be a true sibling (e.g. issue88's MyFile, yielding its own
+            // MyItem alongside the native Module) rather than a replacement,
+            // so relabeling happens per-nodeid below, only for items this
+            // collector's own collect() actually re-yields — untouched
+            // siblings keep their native collector class.
+            let pre_existing: std::collections::HashSet<String> = if is_bare {
+                items
+                    .iter_mut()
+                    .filter_map(|it| {
+                        if it.path == *file {
+                            it.collector_class = collector_class.clone();
+                            Some(it.nodeid.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect()
+            } else {
+                items
+                    .iter()
+                    .filter(|it| it.path == *file)
+                    .map(|it| it.nodeid.clone())
+                    .collect()
+            };
+            // Only queue the native fallback when this file truly has no
+            // items yet (e.g. an unrecognized extension); a file the
+            // standard pipeline already collected just needed the relabel
+            // above.
+            if pre_existing.is_empty() && is_bare {
                 native_fallback.push(file.clone());
                 continue;
             }
@@ -502,6 +513,17 @@ pub fn collect_custom_files(
                 publish_item.call1((&item_obj,))?;
                 let nodeid: String = item_obj.getattr("nodeid")?.extract()?;
                 if pre_existing.contains(&nodeid) {
+                    // A real collect() override re-yielding a nodeid that
+                    // was already collected natively is reclaiming that
+                    // exact item (not adding a sibling) — relabel just this
+                    // one to the custom class.
+                    if !is_bare
+                        && let Some(it) = items
+                            .iter_mut()
+                            .find(|it| it.path == *file && it.nodeid == nodeid)
+                    {
+                        it.collector_class = collector_class.clone();
+                    }
                     continue;
                 }
                 let name: String = item_obj.getattr("name")?.extract()?;
