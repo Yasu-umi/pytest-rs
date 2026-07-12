@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use pyo3::prelude::*;
 
 use super::super::Engine;
@@ -40,6 +42,35 @@ impl Engine {
                 .unwrap_or_default();
             println!("<Dir {root_name}>");
         }
+        // Each `--pyargs` CLI argument's import root (upstream only ever
+        // parents that one node directly onto the Session — see
+        // `pyargs_anchor`'s doc comment); computed once up front by
+        // re-resolving the original dotted arguments, not per item.
+        let pyargs_anchors: Vec<PathBuf> = if pyargs {
+            self.config
+                .paths
+                .iter()
+                .filter_map(|arg| {
+                    let path_part = arg.split("::").next().unwrap_or(arg);
+                    let argpath = python::resolve_pyarg(py, path_part)?;
+                    Some(python::pyargs_anchor(&argpath, path_part))
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+        let push_dir_labels = |labels: &mut Vec<String>, start: &std::path::Path, dirs: &[&str]| {
+            let mut dir_so_far = start.to_path_buf();
+            for dir in dirs {
+                dir_so_far = dir_so_far.join(dir);
+                let kind = if dir_so_far.join("__init__.py").is_file() {
+                    "Package"
+                } else {
+                    "Dir"
+                };
+                labels.push(format!("<{kind} {dir}>"));
+            }
+        };
         // The open chain of (label) nodes above the current item.
         let mut open: Vec<String> = Vec::new();
         for item in &self.session.items {
@@ -49,42 +80,32 @@ impl Engine {
             };
             let mut labels: Vec<String> = Vec::new();
             let segments: Vec<&str> = file_part.split('/').collect();
-            if pyargs {
-                // Walk up from the file's own directory while each ancestor
-                // is itself a package, to find the import root (the topmost
-                // package directory whose parent is not one).
-                let file_dir = item.path.parent().unwrap_or(&self.config.rootdir);
-                let is_package = file_dir.join("__init__.py").is_file();
-                let mut pkg_root = file_dir.to_path_buf();
-                if is_package {
-                    while let Some(parent) = pkg_root.parent() {
-                        if parent.join("__init__.py").is_file() {
-                            pkg_root = parent.to_path_buf();
-                        } else {
-                            break;
-                        }
-                    }
-                }
-                let kind = if is_package { "Package" } else { "Dir" };
-                let label_path = crate::collect::bestrelpath(&self.config.rootdir, &pkg_root);
+            let file_dir = item.path.parent().unwrap_or(&self.config.rootdir);
+            let anchor = pyargs_anchors
+                .iter()
+                .filter(|a| file_dir.starts_with(a.as_path()))
+                .max_by_key(|a| a.as_os_str().len());
+            if let Some(anchor) = anchor {
+                let kind = if anchor.join("__init__.py").is_file() {
+                    "Package"
+                } else {
+                    "Dir"
+                };
+                let label_path = crate::collect::bestrelpath(&self.config.rootdir, anchor);
                 labels.push(format!("<{kind} {label_path}>"));
-                if let Ok(rel) = file_dir.strip_prefix(&pkg_root) {
-                    for comp in rel.components() {
-                        let name = comp.as_os_str().to_string_lossy();
-                        labels.push(format!("<Package {name}>"));
-                    }
+                if let Ok(rel) = file_dir.strip_prefix(anchor) {
+                    let dirs: Vec<&str> = rel
+                        .components()
+                        .map(|c| c.as_os_str().to_str().unwrap_or_default())
+                        .collect();
+                    push_dir_labels(&mut labels, anchor, &dirs);
                 }
             } else {
-                let mut dir_so_far = self.config.rootdir.clone();
-                for dir in &segments[..segments.len().saturating_sub(1)] {
-                    dir_so_far = dir_so_far.join(dir);
-                    let kind = if dir_so_far.join("__init__.py").is_file() {
-                        "Package"
-                    } else {
-                        "Dir"
-                    };
-                    labels.push(format!("<{kind} {dir}>"));
-                }
+                push_dir_labels(
+                    &mut labels,
+                    &self.config.rootdir,
+                    &segments[..segments.len().saturating_sub(1)],
+                );
             }
             if let Some(module) = segments.last() {
                 let module_class = if item.collector_class.is_empty() {

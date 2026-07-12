@@ -205,3 +205,31 @@ pub fn resolve_pyarg(py: Python<'_>, module_name: &str) -> Option<PathBuf> {
     let loc: String = sub_locs.get_item(0).ok()?.extract().ok()?;
     Some(PathBuf::from(loc))
 }
+
+/// The `--collect-only` tree's "import root" for one resolved `--pyargs`
+/// argument: the topmost ancestor of `argpath` whose name chain still spells
+/// out the tail of `module_name` (e.g. `pkg.sub.test_it` matches ancestors
+/// named "sub" then "pkg"). Mirrors upstream's `Session.collect()` (the loop
+/// building the `paths` list from `argpath.parents`, `main.py`) — that
+/// anchor is the only node upstream parents directly onto the Session,
+/// skipping any plain filesystem ancestors above it (e.g. a venv/site-packages
+/// prefix) entirely, which is why the tree display only ever shows one
+/// combined label for that span instead of one label per directory.
+pub fn pyargs_anchor(argpath: &Path, module_name: &str) -> PathBuf {
+    let parts: Vec<&str> = module_name.split('.').collect();
+    let mut anchor = argpath.to_path_buf();
+    for (i, parent) in (2..).zip(argpath.ancestors().skip(1)) {
+        if i > parts.len() {
+            break;
+        }
+        let stem = parent
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+        if stem != parts[parts.len() - i] {
+            break;
+        }
+        anchor = parent.to_path_buf();
+    }
+    anchor
+}

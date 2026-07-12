@@ -13,6 +13,7 @@ pub use introspect::async_flags;
 pub use introspect::num_mock_patch_args;
 pub use introspect::param_names;
 pub use introspect::param_names_with_positional_only;
+pub use introspect::pyargs_anchor;
 pub use introspect::resolve_pyarg;
 
 pub use hooks::CollectDirResult;
