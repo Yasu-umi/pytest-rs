@@ -198,8 +198,9 @@ impl Plugin for BenchmarkPlugin {
         parser.add_option(OptDef::value(
             "--benchmark-cprofile",
             None,
-            "Run the benchmarked function once more under cProfile (the \
-             profile table column to sort by upstream; table not rendered)",
+            "If specified cProfile will be enabled. Top functions will be stored for the \
+             given column. Available columns: 'ncalls_recursion', 'ncalls', 'tottime', \
+             'tottime_per', 'cumtime', 'cumtime_per', 'function_name'.",
         ));
         parser.add_option(OptDef::value(
             "--benchmark-timer",
@@ -299,8 +300,27 @@ impl Plugin for BenchmarkPlugin {
         if let Some(value) = ctx.config.get_value("benchmark-columns") {
             self.columns = Some(value.split(',').map(|s| s.trim().to_string()).collect());
         }
-        if ctx.config.get_value("benchmark-cprofile").is_some() {
+        if let Some(column) = ctx.config.get_value("benchmark-cprofile") {
+            const VALID_CPROFILE_COLUMNS: &[&str] = &[
+                "ncalls_recursion",
+                "ncalls",
+                "tottime",
+                "tottime_per",
+                "cumtime",
+                "cumtime_per",
+                "function_name",
+            ];
+            if !VALID_CPROFILE_COLUMNS.contains(&column) {
+                argparse_error(
+                    "--benchmark-cprofile",
+                    &format!(
+                        "invalid choice: '{column}' (choose from 'ncalls_recursion', 'ncalls', \
+                         'tottime', 'tottime_per', 'cumtime', 'cumtime_per', 'function_name')"
+                    ),
+                );
+            }
             self.config.cprofile = true;
+            self.config.cprofile_sort = column.to_string();
         }
         if ctx.config.get_flag("benchmark-disable-gc") {
             self.config.disable_gc = true;
@@ -558,6 +578,7 @@ impl Plugin for BenchmarkPlugin {
             &self.group_by,
             self.columns.as_deref(),
         ));
+        out.push_str(&report::render_cprofile(&results));
         Ok(())
     }
 

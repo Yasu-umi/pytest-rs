@@ -8,6 +8,7 @@ per-iteration overhead matches pytest-benchmark's generated runner.
 import cProfile
 import gc
 import importlib
+import pstats
 import time
 from time import perf_counter
 
@@ -130,11 +131,41 @@ def _stderr_writeorg(msg):
 
 def cprofile_call(func, args, kwargs, loops=1):
     """Invocations under cProfile (upstream profiles loops_range calls
-    after the timed rounds); returns the last call's result."""
+    after the timed rounds); returns (the last call's result, per-function
+    profile rows for the --benchmark-cprofile report section)."""
     profile = cProfile.Profile()
     result = None
     for _ in range(max(loops, 1)):
         result = profile.runcall(func, *args, **kwargs)
+    return result, _cprofile_functions(profile)
+
+
+def _cprofile_functions(profile):
+    """Port of pytest_benchmark.utils.get_cprofile_functions: pstats -> a
+    list of per-function dicts (ncalls_recursion/ncalls/tottime/tottime_per/
+    cumtime/cumtime_per/function_name), matching the --benchmark-cprofile
+    sort column choices."""
+    import os
+
+    stats = pstats.Stats(profile)
+    project_dir_parent = os.path.dirname(os.getcwd())
+    result = []
+    for (file_path, lineno, func_name), run_info in stats.stats.items():
+        if file_path.startswith(project_dir_parent):
+            file_path = file_path[len(project_dir_parent) :].lstrip("/")
+        pcalls, ncalls, tottime, cumtime = run_info[:4]
+        ncalls_recursion = str(pcalls) if pcalls == ncalls else f"{ncalls}/{pcalls}"
+        result.append(
+            {
+                "ncalls_recursion": ncalls_recursion,
+                "ncalls": ncalls,
+                "tottime": tottime,
+                "tottime_per": tottime / pcalls if pcalls else 0.0,
+                "cumtime": cumtime,
+                "cumtime_per": cumtime / pcalls if pcalls else 0.0,
+                "function_name": f"{file_path}:{lineno}({func_name})",
+            }
+        )
     return result
 
 

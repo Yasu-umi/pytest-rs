@@ -168,6 +168,63 @@ pub fn render_table(
     out
 }
 
+/// The `--benchmark-cprofile` report section (upstream's
+/// `TestResults.display_cprofile`): one `ncalls`/`tottime`/`cumtime` table
+/// per benchmark that captured profile rows, in original run order. Upstream
+/// doesn't print a group header here either, so results aren't re-grouped.
+pub fn render_cprofile(results: &[BenchResult]) -> String {
+    let mut out = String::new();
+    let mut section_started = false;
+    for result in results {
+        let Some(functions) = &result.cprofile else {
+            continue;
+        };
+        if !section_started {
+            out.push('\n');
+            out.push_str(&pytest_rs_core::engine::center_with(
+                "cProfile (time in s)",
+                '-',
+            ));
+            out.push('\n');
+            section_started = true;
+        }
+        out.push_str(&result.fullname);
+        out.push('\n');
+        out.push_str("ncalls\ttottime\tpercall\tcumtime\tpercall\tfilename:lineno(function)\n");
+        for function in functions {
+            let ncalls = function
+                .get("ncalls_recursion")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default();
+            let tottime = function
+                .get("tottime")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
+            let tottime_per = function
+                .get("tottime_per")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
+            let cumtime = function
+                .get("cumtime")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
+            let cumtime_per = function
+                .get("cumtime_per")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
+            let function_name = function
+                .get("function_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default();
+            out.push_str(&format!(
+                "{ncalls}\t{tottime:.4}\t{tottime_per:.4}\t{cumtime:.4}\t{cumtime_per:.4}\t{function_name}\n"
+            ));
+        }
+        out.push('\n');
+    }
+    out
+}
+
 /// One column in the benchmark result table.
 struct ColSpec {
     id: &'static str,

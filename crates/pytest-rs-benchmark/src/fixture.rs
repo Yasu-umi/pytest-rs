@@ -25,6 +25,11 @@ pub struct BenchResult {
     /// emits this key, `{}` when unused).
     #[serde(default)]
     pub extra_info: serde_json::Value,
+    /// Per-function profile rows (--benchmark-cprofile / marker), already
+    /// sorted by the configured column and capped to the top 25 like
+    /// upstream's default; `None` when cprofile wasn't enabled for this run.
+    #[serde(default)]
+    pub cprofile: Option<Vec<serde_json::Value>>,
 }
 
 /// `json.dumps` the object then reparse as `serde_json::Value` — `extra_info`
@@ -41,6 +46,31 @@ pub(crate) fn py_to_json(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<ser
 
 pub type ResultStore = Arc<Mutex<Vec<BenchResult>>>;
 
+/// Upstream's --benchmark-cprofile-top default (rows kept per benchmark).
+const CPROFILE_TOP: usize = 25;
+
+/// Sort profile rows descending by `column` (one of the seven
+/// --benchmark-cprofile choices), matching upstream's per-column type
+/// (numeric for the time/count columns, string for the two name columns).
+fn sort_cprofile_functions(functions: &mut [serde_json::Value], column: &str) {
+    functions.sort_by(|a, b| {
+        let ordering = match column {
+            "ncalls_recursion" | "function_name" => a
+                .get(column)
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .cmp(b.get(column).and_then(|v| v.as_str()).unwrap_or("")),
+            _ => a
+                .get(column)
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0)
+                .partial_cmp(&b.get(column).and_then(|v| v.as_f64()).unwrap_or(0.0))
+                .unwrap_or(std::cmp::Ordering::Equal),
+        };
+        ordering.reverse()
+    });
+}
+
 #[derive(Clone)]
 pub struct BenchConfig {
     pub disabled: bool,
@@ -53,6 +83,10 @@ pub struct BenchConfig {
     /// One extra invocation under cProfile after the timed rounds
     /// (--benchmark-cprofile / @pytest.mark.benchmark(cprofile=True)).
     pub cprofile: bool,
+    /// --benchmark-cprofile's COLUMN value (the report's sort column);
+    /// defaults to "cumtime" like upstream when cprofile is marker-enabled
+    /// without the CLI flag.
+    pub cprofile_sort: String,
     /// gc.disable() around the timed loops (--benchmark-disable-gc).
     pub disable_gc: bool,
     /// --benchmark-verbose: print calibration progress to stderr.
@@ -70,6 +104,7 @@ impl Default for BenchConfig {
             warmup: false,
             warmup_iterations: 100_000,
             cprofile: false,
+            cprofile_sort: "cumtime".to_string(),
             disable_gc: false,
             verbose: false,
         }
@@ -301,7 +336,30 @@ impl BenchmarkFixture {
                 params: self.params.clone(),
                 stats,
                 extra_info,
+                cprofile: None,
             });
+        Ok(())
+    }
+
+    /// Attach this run's --benchmark-cprofile rows (sorted by the
+    /// configured column, capped to the top `CPROFILE_TOP`) to the
+    /// `BenchResult` just pushed by `record`.
+    fn attach_cprofile(&self, py: Python<'_>, functions: &Bound<'_, PyAny>) -> PyResult<()> {
+        let json = py_to_json(py, functions)?;
+        let mut list = match json {
+            serde_json::Value::Array(items) => items,
+            _ => Vec::new(),
+        };
+        sort_cprofile_functions(&mut list, &self.config.cprofile_sort);
+        list.truncate(CPROFILE_TOP);
+        if let Some(last) = self
+            .results
+            .lock()
+            .expect("benchmark results lock poisoned")
+            .last_mut()
+        {
+            last.cprofile = Some(list);
+        }
         Ok(())
     }
 
@@ -445,13 +503,12 @@ impl BenchmarkFixture {
             // cprofile: the profiled invocations REPLACE the final plain
             // call (upstream profiles loops_range invocations).
             if self.config.cprofile {
-                let result = helper.getattr("cprofile_call")?.call1((
-                    func.bind(py),
-                    args.bind(py),
-                    &kwargs_obj,
-                    loops,
-                ))?;
-                return Ok(result.unbind());
+                let (result, functions): (Py<PyAny>, Py<PyAny>) = helper
+                    .getattr("cprofile_call")?
+                    .call1((func.bind(py), args.bind(py), &kwargs_obj, loops))?
+                    .extract()?;
+                self.attach_cprofile(py, functions.bind(py))?;
+                return Ok(result);
             }
         }
         // The caller's return value comes from one plain final call, like
@@ -638,16 +695,20 @@ impl BenchmarkFixture {
         }
         if !self.config.disabled {
             self.record(py, &times, iterations)?;
-        }
-        // cprofile: one more invocation under the profiler (with a fresh
-        // setup), like upstream's pedantic path.
-        if self.config.cprofile {
-            apply_setup(py, &mut call_args, &mut call_kwargs)?;
-            helper.getattr("cprofile_call")?.call1((
-                target.bind(py),
-                call_args.bind(py),
-                call_kwargs.bind(py),
-            ))?;
+            // cprofile: one more invocation under the profiler (with a
+            // fresh setup), like upstream's pedantic path. Gated on
+            // `!disabled` alongside `record` above: attach_cprofile targets
+            // the `BenchResult` `record` just pushed, so running it without
+            // a matching `record` call would attach these rows to a
+            // different (stale) benchmark's result.
+            if self.config.cprofile {
+                apply_setup(py, &mut call_args, &mut call_kwargs)?;
+                let (_, functions): (Py<PyAny>, Py<PyAny>) = helper
+                    .getattr("cprofile_call")?
+                    .call1((target.bind(py), call_args.bind(py), call_kwargs.bind(py)))?
+                    .extract()?;
+                self.attach_cprofile(py, functions.bind(py))?;
+            }
         }
         Ok(result)
     }
