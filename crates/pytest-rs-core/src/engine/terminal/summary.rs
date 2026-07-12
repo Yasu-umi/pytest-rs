@@ -293,11 +293,19 @@ impl Engine {
         if self.session.custom_reporter.is_none() {
             let mut funcs: Vec<Py<PyAny>> =
                 python::instance_hook_funcs(py, "pytest_terminal_summary");
+            // Conftest-defined impls only here — third-party plugin modules
+            // (e.g. pytest-rerunfailures) are already covered by
+            // instance_hook_funcs above; session.py_hooks also carries an
+            // entry for entry-point-loaded plugin modules (tagged
+            // plugin_module = Some(name)), so including those here too
+            // would print the same plugin's terminal summary section twice.
             funcs.extend(
                 self.session
                     .py_hooks
                     .iter()
-                    .filter(|hook| hook.name == "pytest_terminal_summary")
+                    .filter(|hook| {
+                        hook.name == "pytest_terminal_summary" && hook.plugin_module.is_none()
+                    })
                     .map(|hook| hook.func.clone_ref(py)),
             );
             if !funcs.is_empty() {
