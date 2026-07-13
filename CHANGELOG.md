@@ -3,6 +3,99 @@
 Notable changes per release. The release workflow uses the matching section
 as the GitHub release notes (auto-generated notes are the fallback).
 
+## v0.0.8 (2026-07-13)
+
+### Added
+
+- **`--import-mode=append` and `--import-mode=importlib`** collection import modes.
+- **Native `-f`/`--looponfail`** for xdist.
+- **Per-test dynamic coverage contexts** — pytest-cov's `--cov-context=test`.
+- **Richer assertion "where" explanations** — a recursive explain builder for
+  `BinOp`/`UnaryOp`/`Attribute`/nested `Call` expressions, with repr'd values
+  substituted for simple `Call` arguments.
+- **Long-style tracebacks show each frame's own call arguments**, truncated
+  unless `-vvv`.
+- `_pytest.config.argparsing.DropShorterLongHelpFormatter` shim, so `--help`
+  renders in real argparse style even when reached through a conftest/plugin's
+  own `pytest_addoption`.
+
+### Changed
+
+- **pytest's own suite** improves to 2 714/2 849 = 97.1% on Linux (from 92.6%).
+- **pytest-benchmark** reaches 122/123 = 100% (from 89.4%) — the xdist
+  auto-disable warning matches upstream wording and now applies to workers
+  (not just the controller), plus a `--benchmark-cprofile` report section, an
+  argparse-style `benchmark:` help group, `benchmark.weave`/`patch` via
+  `aspectlib`, and `pytest_benchmark_update_machine_info` firing before
+  `machine_info` is serialized.
+- **pytest-cov** improves to 204/209 = 99.0% (from 90.4%) — `[paths]` alias
+  remap is applied at hit-record time so xdist workers merge into one
+  canonical row, subprocess coverage dumps on `SIGTERM`, tracing is deferred
+  until after `-p` plugin loading (warning instead of silently reporting no
+  data), `@pytest.mark.no_cover` pauses measurement, `[report] fail_under` is
+  honored from config files, and `LocalPath.visit`/`__lt__` are implemented.
+- **pytest-mypy** improves to 75/78 = 98.7% (from 70.5%), with **pytest-django**
+  (98.6%) and **pytest-env** (96.0%) also firming up, after fixing third-party
+  plugin modules' hooks (`pytest_collection_finish`, `pytest_sessionfinish`,
+  `pytest_terminal_summary`, `pytest_collection_modifyitems`) firing twice.
+- **xdist worker-side collection hardened** — custom `pytest_collect_file`
+  collectors, `-k`/`-m` selection, and `pytest_collection_modifyitems` now run
+  in worker collection too; `pytest_configure` fires unconditionally at worker
+  startup; plain load-mode batches chunk like upstream and respect `--maxfail`
+  mid-chunk; `--rsyncdir` copies individual files, not just directories.
+- Terminal output: nodeids are shown invocation-dir-relative (not
+  rootdir-relative); streaming progress wraps at the terminal edge in the
+  `times` style; a duplicate consecutive `--collect-only` item shows its leaf
+  line.
+
+### Fixed
+
+- **Hook dispatch ordering** — `pytest_configure` fires in real pluggy LIFO
+  order within each priority tier, `pytest_load_initial_conftests` fires
+  before conftest loading, and `get_hookimpls()` synthesizes
+  `pytest_load_initial_conftests` hookimpls.
+- **`--pyargs` collection** resolves its import root per CLI argument instead
+  of by generic `__init__.py` climbing, and falls back to a literal path when
+  the module name doesn't resolve via `sys.path`.
+- **Custom collectors** — a `pytest_collect_directory` hook drives a real
+  top-down `Session`/`Dir` walk; a `pytest_collect_file` override adds a
+  sibling node instead of relabeling the native `Module`'s class; conftest
+  `pytest_collect_file` hooks are scoped to their own directory; a bare
+  `pytest_collect_file` collector falls back to native module scanning.
+- **Fixtures/parametrize** — usefixtures ordered into the scope-sorted closure
+  setup; indirect parametrize cached at its wider parametrize scope;
+  parametrization teardown bindings keyed on value, not index; a fixture with
+  `params=[]` collects one skipped item, not zero; `ids=` values and
+  parametrize argnames validated against the real fixture closure, with a
+  dedicated error for parametrizing a defaulted argument; package-scoped
+  fixtures cached per directory, not per module file.
+- Assertion rewriting applies to aliased conftests loaded from path; a
+  bare-`Name` assert (`assert x`) substitutes the runtime value; an exception
+  chain's `__cause__` shows even when `__suppress_context__` is set; conftest
+  `pytest_assertrepr_compare` is scoped to the running test's directory.
+- **Config/CLI** — a plugin option given no value via `addopts`/CLI raises a
+  proper `UsageError` with the usage synopsis prefixed; `--help` is deferred
+  until after plugin option validation; `invocation_params.plugins`/`.args`
+  populated correctly for every run; a blocked bundled plugin's CLI flags are
+  rejected with a real usage error; `-p no:debugging` stops `pdb` from being
+  eagerly imported.
+- **Reporting** — a mid-test `KeyboardInterrupt`'s traceback renders after the
+  summary (and the banner shows for a sessionstart abort too);
+  `INTERNALERROR` formats in long style under `--fulltrace`; unittest
+  subtests no longer fail their enclosing test, and non-failed subtests hide
+  from the summary under `verbosity_subtests==0`.
+- **pytester/in-process runs** — `runpytest_inprocess` always uses the
+  in-process backend; a stale bare `"conftest"` module is purged before a
+  nested run loads its own; a broken initial conftest warns instead of
+  aborting (including under `--help`); `makepyfile` joins list/tuple sources
+  line-by-line.
+- `sys_path_prepend` always moves the path to the front; conftest discovery
+  is restricted to explicit collection paths; an unmatched node-id forces
+  `USAGE_ERROR` even without a collection error (#134); a non-iterable
+  `pytest_plugins` is treated as no declaration (#3899); `pytest_configure`
+  exceptions route to `INTERNALERROR` on stderr (#49); a `getsourcelines`
+  failure surfaces "source code not available" (#553).
+
 ## v0.0.7 (2026-06-29)
 
 ### Added
