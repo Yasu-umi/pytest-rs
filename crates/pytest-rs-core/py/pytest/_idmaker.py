@@ -15,7 +15,7 @@ from collections import Counter, defaultdict
 
 from _pytest._io.saferepr import saferepr
 from _pytest.compat import NOTSET, ascii_escaped
-from _pytest.outcomes import fail
+from _pytest.outcomes import Failed, fail
 
 from pytest._marks import HIDDEN_PARAM
 from pytest._node import Collector
@@ -61,6 +61,20 @@ def idval_from_value_required(val, idx, error_prefix="", config=None):
         "enum, regex or anything with a __name__."
     )
     fail(msg, pytrace=False)
+
+
+def complain_multiple_hidden_parameter_sets(func_name):
+    """Raise the pytrace=True Failed for duplicate HIDDEN_PARAM ids (upstream's
+    Metafunc._complain_multiple_hidden_parameter_sets). Called directly by the
+    Rust collector so the raise happens in a frame with no __tracebackhide__ —
+    unlike pytest._outcomes.fail (which sets it locally), leaving at least one
+    visible frame for format_test_failure's traceback rendering."""
+    msg = (
+        f"In {func_name}: multiple instances of HIDDEN_PARAM "
+        "cannot be used in the same parametrize call, "
+        "because the tests names need to be unique."
+    )
+    raise Failed(msg)
 
 
 @dataclasses.dataclass(frozen=True)

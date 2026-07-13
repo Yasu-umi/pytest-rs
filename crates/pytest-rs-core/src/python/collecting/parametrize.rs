@@ -895,15 +895,26 @@ fn dedup_param_ids(
                 "In {func_name}: multiple instances of HIDDEN_PARAM cannot be used in \
                  the same parametrize call, because the tests names need to be unique."
             );
-            let failed_result: PyResult<PyErr> = (|| {
-                let cls = py.import("_pytest.outcomes")?.getattr("Failed")?;
-                let instance = cls.call1((&msg,))?;
-                instance.setattr("pytrace", false)?;
-                Ok(PyErr::from_value(instance))
+            // Upstream's fail() (via _complain_multiple_hidden_parameter_sets in
+            // _pytest/python.py) uses the default pytrace=True. Call
+            // pytest._idmaker.complain_multiple_hidden_parameter_sets, a plain
+            // (non-__tracebackhide__) Python function, so it actually raises
+            // with a visible frame — needed for format_test_failure's
+            // frame-based "E   Failed: ..." rendering. Calling
+            // pytest._outcomes.fail() directly would leave ONLY its own
+            // __tracebackhide__-hidden frame on the traceback (no Python
+            // caller frame exists, since the call originates from Rust),
+            // making _visible_frames() return empty and fall back to a bare
+            // native traceback dump.
+            let failed_result: PyResult<()> = (|| {
+                py.import("pytest._idmaker")?
+                    .getattr("complain_multiple_hidden_parameter_sets")?
+                    .call1((func_name,))?;
+                Ok(())
             })();
             return Err(match failed_result {
-                Ok(err) => err,
-                Err(_) => collect_error(py, &msg),
+                Err(err) => err,
+                Ok(()) => collect_error(py, &msg),
             });
         }
         let mut existing: std::collections::HashSet<String> =
