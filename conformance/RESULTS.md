@@ -25,7 +25,7 @@ pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2706 | 82 | 0 | 53 | 0 | 8 | 2849 | 96.8% | 26 | 54 | 61 |
+| pytest | 9.0.3 | 2714 | 74 | 0 | 53 | 0 | 8 | 2849 | 97.1% | 26 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 0 | 1 | 7 | 85.7% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 0 | 2 | 90 | 97.8% | 1 | 1 | 0 |
@@ -45,7 +45,7 @@ pytest-rs; they are not counted in the total.
 | pytest-order | v1.4.0 | 121 | 13 | 0 | 0 | 0 | 0 | 134 | 90.3% | 8 | 16 | 0 |
 | pytest-repeat | v0.9.4 | 16 | 0 | 0 | 0 | 0 | 0 | 16 | 100.0% | 1 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
-| pytest-env | 1.6.0 | 69 | 6 | 0 | 0 | 0 | 0 | 75 | 92.0% | 2 | 3 | 0 |
+| pytest-env | 1.6.0 | 72 | 3 | 0 | 0 | 0 | 0 | 75 | 96.0% | 2 | 3 | 0 |
 | pytest-rerunfailures | 9.1.1 | 47 | 0 | 0 | 1 | 0 | 0 | 48 | 100.0% | 1 | 1 | 0 |
 | pytest-randomly | 4.1.0 | 37 | 0 | 0 | 0 | 0 | 0 | 37 | 100.0% | 1 | 1 | 0 |
 | click | 8.3.1 | 1314 | 0 | 0 | 21 | 0 | 0 | 1335 | 100.0% | 20 | 20 | 0 |
@@ -59,7 +59,7 @@ pytest-rs; they are not counted in the total.
 | starlette | 0.46.2 | 907 | 0 | 0 | 0 | 0 | 0 | 907 | 100.0% | 28 | 28 | 0 |
 | attrs | 25.3.0 | 1341 | 0 | 0 | 5 | 0 | 0 | 1346 | 100.0% | 22 | 24 | 0 |
 | more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 0 | 0 | 671 | 100.0% | 2 | 2 | 0 |
-| pytest-django | v4.9.0 | 211 | 4 | 0 | 1 | 0 | 0 | 216 | 98.1% | 8 | 13 | 0 |
+| pytest-django | v4.9.0 | 212 | 3 | 0 | 1 | 0 | 0 | 216 | 98.6% | 9 | 13 | 0 |
 | werkzeug | 3.1.3 | 922 | 0 | 0 | 1 | 25 | 0 | 948 | 97.4% | 24 | 25 | 0 |
 | fastapi | 0.115.12 | 2332 | 1 | 0 | 130 | 0 | 1 | 2464 | 99.9% | 303 | 310 | 0 |
 | packaging | 25.0 | 26948 | 0 | 0 | 0 | 0 | 0 | 26948 | 100.0% | 12 | 12 | 0 |
@@ -68,7 +68,7 @@ pytest-rs; they are not counted in the total.
 | pydantic | v2.11.7 | 5338 | 14 | 0 | 921 | 0 | 0 | 6273 | 99.8% | 77 | 82 | 0 |
 | scikit-learn-1 | 1.9.0 | 8432 | 0 | 0 | 6624 | 0 | 0 | 15056 | 100.0% | 79 | 87 | 0 |
 | scikit-learn-2 | 1.9.0 | 5046 | 0 | 0 | 1892 | 0 | 0 | 6938 | 100.0% | 52 | 58 | 0 |
-| scikit-learn-3 | 1.9.0 | 9222 | 3 | 0 | 2530 | 0 | 0 | 11755 | 100.0% | 103 | 114 | 0 |
+| scikit-learn-3 | 1.9.0 | 9212 | 3 | 0 | 2530 | 0 | 0 | 11745 | 100.0% | 103 | 114 | 0 |
 
 ### pytest @ 9.0.3
 
@@ -93,10 +93,10 @@ pytest-rs; they are not counted in the total.
 | testing/test_cacheprovider.py | failed | 55 | 2 | 0 | 0 | 0 | 0 |
 | testing/test_capture.py | failed | 128 | 2 | 0 | 2 | 0 | 0 |
 | testing/test_collect_imported_tests.py | failed | 2 | 1 | 0 | 0 | 0 | 0 |
-| testing/test_collection.py | failed | 107 | 6 | 0 | 3 | 0 | 0 |
+| testing/test_collection.py | failed | 112 | 1 | 0 | 3 | 0 | 0 |
 | testing/test_compat.py | passed | 10 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_config.py | failed | 213 | 1 | 0 | 1 | 0 | 0 |
-| testing/test_conftest.py | failed | 47 | 6 | 0 | 1 | 0 | 0 |
+| testing/test_conftest.py | failed | 49 | 4 | 0 | 1 | 0 | 0 |
 | testing/test_doctest.py | passed | 139 | 0 | 0 | 1 | 0 | 0 |
 | testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_faulthandler.py | failed | 5 | 7 | 0 | 0 | 0 | 0 |
@@ -128,7 +128,7 @@ pytest-rs; they are not counted in the total.
 | testing/test_unraisableexception.py | passed | 11 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_warning_types.py | passed | 15 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_warnings.py | failed | 41 | 1 | 0 | 2 | 0 | 0 |
-| testing/acceptance_test.py | failed | 82 | 3 | 0 | 2 | 0 | 6 |
+| testing/acceptance_test.py | failed | 83 | 2 | 0 | 2 | 0 | 6 |
 | testing/deprecated_test.py | passed | 15 | 0 | 0 | 0 | 0 | 0 |
 
 </details>
@@ -412,7 +412,7 @@ pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| tests/test_env.py | failed | 58 | 6 | 0 | 0 | 0 | 0 |
+| tests/test_env.py | failed | 61 | 3 | 0 | 0 | 0 | 0 |
 | tests/test_verbose.py | passed | 10 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_version.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 
@@ -865,7 +865,7 @@ pytest-rs; they are not counted in the total.
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
 | tests/test_asserts.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_database.py | failed | 60 | 1 | 0 | 0 | 0 | 0 |
+| tests/test_database.py | passed | 61 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_db_access_in_repr.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_db_setup.py | passed | 14 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_django_configurations.py | no-tests | 0 | 0 | 0 | 1 | 0 | 0 |
@@ -2761,7 +2761,7 @@ pytest-rs; they are not counted in the total.
 |---|---|---:|---:|---:|---:|---:|---:|
 | sklearn/_loss/tests/test_link.py | passed | 18 | 0 | 0 | 75 | 0 | 0 |
 | sklearn/_loss/tests/test_loss.py | passed | 1834 | 0 | 0 | 379 | 0 | 0 |
-| sklearn/callback/tests/test_callback_context.py | timeout | 0 | 0 | 0 | 0 | 0 | 0 |
+| sklearn/callback/tests/test_callback_context.py | passed | 29 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/callback/tests/test_callback_support.py | passed | 20 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/callback/tests/test_pickle.py | passed | 2 | 0 | 0 | 4 | 0 | 0 |
 | sklearn/callback/tests/test_progressbar.py | passed | 1 | 0 | 0 | 47 | 0 | 0 |
@@ -2825,7 +2825,7 @@ pytest-rs; they are not counted in the total.
 | sklearn/feature_selection/tests/test_sequential.py | passed | 74 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/feature_selection/tests/test_variance_threshold.py | passed | 25 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/frozen/tests/test_frozen.py | passed | 46 | 0 | 0 | 0 | 0 | 0 |
-| sklearn/gaussian_process/tests/test_gpc.py | passed | 39 | 0 | 0 | 0 | 0 | 0 |
+| sklearn/gaussian_process/tests/test_gpc.py | timeout | 0 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/gaussian_process/tests/test_gpr.py | passed | 130 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/gaussian_process/tests/test_kernels.py | passed | 281 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/impute/tests/test_base.py | passed | 5 | 0 | 0 | 1 | 0 | 0 |
