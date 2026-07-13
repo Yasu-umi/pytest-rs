@@ -33,6 +33,15 @@ impl TempSuite {
             .expect("failed to run pytest-rs")
     }
 
+    fn run_with_env(&self, args: &[&str], env: &[(&str, &str)]) -> Output {
+        std::process::Command::new(env!("CARGO_BIN_EXE_pytest-rs-bin"))
+            .args(args)
+            .current_dir(&self.root)
+            .envs(env.iter().copied())
+            .output()
+            .expect("failed to run pytest-rs")
+    }
+
     fn path(&self) -> &Path {
         &self.root
     }
@@ -1249,4 +1258,48 @@ def test_via_request(fix):
     let out = stdout(&output);
     assert_eq!(output.status.code(), Some(0), "out: {out}");
     assert!(out.contains("2 passed"), "out: {out}");
+}
+
+#[test]
+fn virtualenv_pth_editable_install_is_importable() {
+    // Regression test for #9: modern editable installs (setuptools>=64,
+    // flit-core, ...) register importability via a .pth file that `import`s
+    // a generated finder module, rather than a plain directory line. The
+    // embedded interpreter never runs site.main() for a project venv on its
+    // own, so this only works if activate_virtualenv's site.addsitedir call
+    // actually processes .pth files (unlike a plain PYTHONPATH/sys.path append).
+    let suite = TempSuite::new("venv-pth");
+    let site_packages = "venv/lib/python3.13/site-packages";
+    suite.write(
+        &format!("{site_packages}/editable_finder.py"),
+        r#"
+import sys
+import types
+
+_mod = types.ModuleType("editable_pkg")
+_mod.VALUE = 42
+sys.modules["editable_pkg"] = _mod
+"#,
+    );
+    suite.write(
+        &format!("{site_packages}/editable_pkg.pth"),
+        "import editable_finder\n",
+    );
+    suite.write(
+        "test_editable.py",
+        r#"
+from editable_pkg import VALUE
+
+def test_it():
+    assert VALUE == 42
+"#,
+    );
+    let venv_abs = suite.path().join("venv");
+    let output = suite.run_with_env(
+        &["test_editable.py"],
+        &[("VIRTUAL_ENV", venv_abs.to_str().unwrap())],
+    );
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(out.contains("1 passed"), "out: {out}");
 }
