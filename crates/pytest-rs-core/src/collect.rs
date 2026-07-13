@@ -204,6 +204,43 @@ impl CollectIgnores {
     }
 }
 
+/// Canonicalize a path up to (but not through) its first symlink component,
+/// leaving that component and everything under it untouched. Resolves
+/// platform path-normalization quirks (e.g. macOS's /tmp → /private/tmp)
+/// without following symlinks the way `std::fs::canonicalize` does — matching
+/// upstream's `resolve_collection_argument`, which uses plain
+/// `os.path.abspath` and never resolves symlinks at all.
+fn canonicalize_preserving_symlinks(path: &Path) -> PathBuf {
+    let mut canonical_prefix = PathBuf::new();
+    let mut rest = PathBuf::new();
+    let mut past_symlink = false;
+    for component in path.components() {
+        if past_symlink {
+            rest.push(component);
+            continue;
+        }
+        canonical_prefix.push(component);
+        if std::fs::symlink_metadata(&canonical_prefix)
+            .map(|m| m.file_type().is_symlink())
+            .unwrap_or(false)
+        {
+            past_symlink = true;
+        }
+    }
+    if !past_symlink {
+        return std::fs::canonicalize(&canonical_prefix).unwrap_or(canonical_prefix);
+    }
+    // canonical_prefix currently includes the symlink itself; canonicalize
+    // only its parent, then re-append the symlink name and the untouched tail.
+    let symlink_name = canonical_prefix
+        .file_name()
+        .map(PathBuf::from)
+        .unwrap_or_default();
+    let parent = canonical_prefix.parent().unwrap_or(&canonical_prefix);
+    let canonical_parent = std::fs::canonicalize(parent).unwrap_or_else(|_| parent.to_path_buf());
+    canonical_parent.join(symlink_name).join(rest)
+}
+
 /// Expand CLI path arguments into the ordered list of test files.
 pub fn collect_test_files(
     invocation_dir: &Path,
@@ -232,29 +269,15 @@ pub fn collect_test_files(
         // Node-id args select within a file; only the path part is
         // collected here (the engine filters items afterwards).
         let path_arg = arg.split("::").next().unwrap_or(arg);
-        // For a symlink-to-file argument (e.g. symlink.py → real.py), preserve
-        // the symlink name for node-id purposes while only canonicalizing the
-        // parent (/tmp → /private/tmp on macOS).  For directory symlinks and
-        // regular paths (including paths through symlink dirs), use full
-        // canonicalization so files within resolve to paths that match rootdir.
+        // Canonicalize only the prefix before the first symlink component
+        // (e.g. /tmp → /private/tmp on macOS), preserving any symlink
+        // component and everything under it as-given — so a nodeid built
+        // through a symlinked dir (or a symlinked file) keeps the symlink's
+        // name rather than resolving to its target, matching upstream's
+        // resolve_collection_argument (plain os.path.abspath, no symlink
+        // resolution at all).
         let raw = invocation_dir.join(path_arg);
-        let is_file_symlink = std::fs::symlink_metadata(&raw)
-            .map(|m| m.file_type().is_symlink())
-            .unwrap_or(false)
-            && std::fs::metadata(&raw)
-                .map(|m| m.is_file())
-                .unwrap_or(false);
-        let path = if is_file_symlink {
-            if let (Some(parent), Some(name)) = (raw.parent(), raw.file_name()) {
-                let canonical_parent =
-                    std::fs::canonicalize(parent).unwrap_or_else(|_| parent.to_path_buf());
-                canonical_parent.join(name)
-            } else {
-                raw
-            }
-        } else {
-            std::fs::canonicalize(&raw).unwrap_or(raw)
-        };
+        let path = canonicalize_preserving_symlinks(&raw);
         // Upstream UsageError wording, with the argument as the user gave it.
         // Defer: don't error here so that conftest loading and
         // pytest_configure have a chance to fire first (issue #143).
