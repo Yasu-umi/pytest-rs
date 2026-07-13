@@ -25,7 +25,7 @@ pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2718 | 70 | 0 | 53 | 0 | 8 | 2849 | 97.3% | 30 | 54 | 61 |
+| pytest | 9.0.3 | 2717 | 71 | 0 | 53 | 0 | 8 | 2849 | 97.2% | 30 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 0 | 1 | 7 | 85.7% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 0 | 2 | 90 | 97.8% | 1 | 1 | 0 |
@@ -42,7 +42,7 @@ pytest-rs; they are not counted in the total.
 | pytest-snapshot | v0.9.0 | 102 | 5 | 0 | 0 | 0 | 0 | 107 | 95.3% | 0 | 3 | 0 |
 | pytest-icdiff | 0.5 | 10 | 2 | 0 | 0 | 0 | 0 | 12 | 83.3% | 0 | 1 | 0 |
 | pytest-socket | 0.7.0 | 60 | 5 | 0 | 0 | 0 | 0 | 65 | 92.3% | 3 | 6 | 0 |
-| pytest-order | v1.4.0 | 121 | 13 | 0 | 0 | 0 | 0 | 134 | 90.3% | 8 | 16 | 0 |
+| pytest-order | v1.4.0 | 129 | 5 | 0 | 0 | 0 | 0 | 134 | 96.3% | 13 | 16 | 0 |
 | pytest-repeat | v0.9.4 | 16 | 0 | 0 | 0 | 0 | 0 | 16 | 100.0% | 1 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
 | pytest-env | 1.6.0 | 72 | 3 | 0 | 0 | 0 | 0 | 75 | 96.0% | 2 | 3 | 0 |
@@ -93,7 +93,7 @@ pytest-rs; they are not counted in the total.
 | testing/test_cacheprovider.py | failed | 55 | 2 | 0 | 0 | 0 | 0 |
 | testing/test_capture.py | failed | 128 | 2 | 0 | 2 | 0 | 0 |
 | testing/test_collect_imported_tests.py | failed | 2 | 1 | 0 | 0 | 0 | 0 |
-| testing/test_collection.py | failed | 110 | 3 | 0 | 3 | 0 | 0 |
+| testing/test_collection.py | failed | 109 | 4 | 0 | 3 | 0 | 0 |
 | testing/test_compat.py | passed | 10 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_config.py | passed | 214 | 0 | 0 | 1 | 0 | 0 |
 | testing/test_conftest.py | failed | 50 | 3 | 0 | 1 | 0 | 0 |
@@ -368,21 +368,21 @@ pytest-rs; they are not counted in the total.
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
 | tests/test_class_marks.py | passed | 9 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_dependency.py | failed | 22 | 1 | 0 | 0 | 0 | 0 |
+| tests/test_dependency.py | passed | 23 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_marker_prefix.py | passed | 7 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_misc.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_multiple_ordering.py | failed | 0 | 4 | 0 | 0 | 0 | 0 |
+| tests/test_multiple_ordering.py | failed | 3 | 1 | 0 | 0 | 0 | 0 |
 | tests/test_order_group_scope.py | passed | 6 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_order_group_scope_dep.py | failed | 3 | 1 | 0 | 0 | 0 | 0 |
-| tests/test_order_group_scope_named_dep.py | failed | 3 | 1 | 0 | 0 | 0 | 0 |
-| tests/test_order_group_scope_relative.py | failed | 4 | 1 | 0 | 0 | 0 | 0 |
+| tests/test_order_group_scope_dep.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_order_group_scope_named_dep.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_order_group_scope_relative.py | passed | 5 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_order_scope.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_order_scope_level.py | passed | 5 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_ordering.py | passed | 19 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_ordering_options.py | failed | 0 | 2 | 0 | 0 | 0 | 0 |
 | tests/test_relative_ordering.py | failed | 19 | 2 | 0 | 0 | 0 | 0 |
 | tests/test_sparse_ordinals.py | passed | 16 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_xdist_handling.py | failed | 0 | 1 | 0 | 0 | 0 | 0 |
+| tests/test_xdist_handling.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 
 </details>
 
