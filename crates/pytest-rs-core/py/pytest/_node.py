@@ -698,6 +698,72 @@ def make_default_directory_node(path, parent):
     return cls(name=path.name, path=path, nodeid="", parent=parent)
 
 
+def _parent_chain_cache():
+    """Per-run cache of the File/Class/Session nodes built by
+    attach_parent_chain, keyed in _session_state so nested in-process runs
+    (run_inprocess's fresh-dict swap) get an isolated cache for free."""
+    return _session_state.setdefault("parent_chain", {"session": None, "files": {}, "classes": {}})
+
+
+def _parent_chain_session(config):
+    cache = _parent_chain_cache()
+    if cache["session"] is None:
+        cache["session"] = Session.from_config(config)
+    return cache["session"]
+
+
+def _parent_chain_file(key, path, config, module):
+    files = _parent_chain_cache()["files"]
+    node = files.get(key)
+    if node is None:
+        node = File(name=path.name if path is not None else key, path=path, config=config)
+        node.parent = _parent_chain_session(config)
+        node.obj = module
+        if module is not None:
+            from pytest._marks import get_unpacked_marks
+
+            node.own_markers = list(get_unpacked_marks(module))
+        files[key] = node
+    return node
+
+
+def _parent_chain_class(cls, config, file_node):
+    classes = _parent_chain_cache()["classes"]
+    node = classes.get(id(cls))
+    if node is None:
+        from pytest._marks import get_unpacked_marks
+
+        node = Class(
+            name=cls.__name__,
+            parent=file_node,
+            obj=cls,
+            nodeid=f"{file_node.nodeid}::{cls.__name__}",
+        )
+        node.own_markers = list(get_unpacked_marks(cls))
+        classes[id(cls)] = node
+    return node
+
+
+def attach_parent_chain(node):
+    """Populate node.parent with the (cached, run-scoped) enclosing
+    Class/File/Session chain so Node.getparent works for plugins that need it
+    (e.g. pytest-dependency's scope='class'/'module'/'session' lookups,
+    pytest-order's class-mark relative-ordering). No-op if a parent is
+    already set (custom pytest_pycollect_makeitem nodes keep their own) or
+    the node has no config to build a chain from."""
+    if getattr(node, "parent", None) is not None:
+        return
+    config = getattr(node, "config", None)
+    if config is None:
+        return
+    module = getattr(node, "module", None)
+    path = getattr(node, "path", None)
+    key = module.__name__ if module is not None else str(path)
+    file_node = _parent_chain_file(key, path, config, module)
+    cls = getattr(node, "cls", None)
+    node.parent = _parent_chain_class(cls, config, file_node) if cls is not None else file_node
+
+
 class _DefaultCollectDirectory:
     """Permanent low-priority (trylast) `pytest_collect_directory` participant.
 

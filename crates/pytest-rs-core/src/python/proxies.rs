@@ -407,6 +407,14 @@ pub fn make_node(py: Python<'_>, item: &TestItem) -> PyResult<Py<PyAny>> {
     if let Some(cls) = cls {
         node.setattr("cls", cls)?;
     }
+    // node.parent: build (or reuse, from a per-run cache) the enclosing
+    // Class/File/Session chain so Node.getparent works for plugins that walk
+    // it (pytest-dependency's scope lookups, pytest-order's class-mark
+    // relative ordering). No-op if a parent is already set (custom
+    // pytest_pycollect_makeitem nodes keep their own).
+    py.import("pytest._node")?
+        .getattr("attach_parent_chain")?
+        .call1((&node,))?;
     // node.location = (relpath, 0-based lineno, domain) — pytest-rerunfailures
     // passes it to pytest_runtest_logstart/logfinish.
     let file = item.nodeid.split("::").next().unwrap_or("");

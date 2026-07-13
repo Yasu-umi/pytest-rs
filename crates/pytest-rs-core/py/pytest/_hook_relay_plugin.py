@@ -155,6 +155,10 @@ class _HookRelayPlugin:
         self._events.append(event)
 
     def pytest_collection_finish(self, session):
+        from pytest._node import Class, Dir, File, Package
+        from pytest._node import Session as _SessionNode
+
+        _builtin_parents = (File, Class, _SessionNode, Dir, Package)
         skipped_raw = getattr(session, "_rs_skipped_modules", None) or []
         self._events.append(
             {
@@ -168,6 +172,7 @@ class _HookRelayPlugin:
                         "parent_class": (
                             type(i.parent).__name__
                             if getattr(i, "parent", None) is not None
+                            and not isinstance(i.parent, _builtin_parents)
                             else ""
                         ),
                     }
