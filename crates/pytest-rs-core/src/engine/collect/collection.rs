@@ -12,26 +12,9 @@ impl Engine {
         rootdir: &Path,
         errors: &mut Vec<(PathBuf, String)>,
     ) -> Result<bool, String> {
-        // pytest_load_initial_conftests (pytest-env sets os.environ here),
-        // after option specs are registered so getini resolves, before configure.
-        if let Err(err) = self.fire_py_load_initial_conftests(py) {
-            // Errors here are fatal plugin-init failures (e.g. ImportError from a
-            // bad DJANGO_SETTINGS_MODULE). Upstream lets them propagate to stderr
-            // as a fatal error; we replicate that by printing to stderr and exiting.
-            // UsageError is handled specially (exit code 4).
-            if python::is_usage_error(py, &err) {
-                let msg = python::format_exception(py, &err);
-                let usage_msg = msg
-                    .lines()
-                    .last()
-                    .and_then(|l| l.strip_prefix("pytest.UsageError: "))
-                    .unwrap_or(msg.trim());
-                eprintln!("ERROR: {usage_msg}");
-                return Err("\x00USAGE_ERROR\x00".to_string());
-            }
-            eprintln!("{}", python::format_exception(py, &err));
-            return Err("\x00USAGE_ERROR\x00".to_string());
-        }
+        // pytest_load_initial_conftests now fires earlier (Engine::collect,
+        // before any conftest.py loads — matching upstream, where conftest
+        // loading is that hookspec's own default implementation).
         // conftest pytest_configure hooks run once conftests are loaded.
         // Upstream fires this hook with no catch_warnings_for_item window at
         // all, so a warning raised directly in a conftest's pytest_configure

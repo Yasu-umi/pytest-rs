@@ -914,7 +914,11 @@ impl Engine {
     /// Deferred `--flag[=value]` tokens (unknown to clap) resolve against
     /// the python-plugin option specs onto config.option; unregistered
     /// leftovers usage-error like pytest's "unrecognized arguments".
-    pub(crate) fn apply_plugin_cli_args(&mut self, py: Python<'_>) -> PyResult<()> {
+    pub(crate) fn apply_plugin_cli_args(
+        &mut self,
+        py: Python<'_>,
+        raise_on_unknown: bool,
+    ) -> PyResult<()> {
         if self.config.plugin_args.is_empty() {
             return Ok(());
         }
@@ -926,6 +930,15 @@ impl Engine {
             .extract()?;
         if !positionals.is_empty() {
             self.config.paths.extend(positionals);
+        }
+        if !raise_on_unknown {
+            // Early pass (Engine::collect, before conftest loading): specs
+            // for conftest-defined options don't exist yet, so a token that's
+            // "unknown" here may just not have been registered yet — only
+            // the later, full pass (after every conftest has loaded) can
+            // tell a truly-unrecognized flag from one it just hasn't reached
+            // yet.
+            return Ok(());
         }
         // A genuinely unrecognized flag is only found by scanning every
         // token to the end (upstream: argparse's parse_known_args collects

@@ -210,7 +210,7 @@ impl Engine {
             );
             return exit_code::INTERNAL_ERROR;
         }
-        if let Err(err) = self.apply_plugin_cli_args(py) {
+        if let Err(err) = self.apply_plugin_cli_args(py, true) {
             if python::is_usage_error(py, &err) {
                 eprintln!("ERROR: {}", err.value(py));
                 return exit_code::USAGE_ERROR;

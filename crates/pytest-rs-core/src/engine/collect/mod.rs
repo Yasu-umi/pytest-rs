@@ -29,9 +29,53 @@ impl Engine {
         // start point).
         self.fire_plugins_registered(py)
             .map_err(|err| python::format_exception(py, &err))?;
-        let (start_dirs, conftests) = self.discover_conftests(&rootdir, &paths, &files);
 
         let mut errors = Vec::new();
+        // Register entry-point/-p plugins' CLI options, then fire
+        // pytest_load_initial_conftests, BEFORE any conftest.py loads.
+        // Upstream's own conftest-loading step IS that hookspec's default
+        // implementation, so a tryfirst hookimpl of the same hookspec (e.g.
+        // pytest-django's, which calls django.setup() after reading
+        // --ds/--dc) is guaranteed to run first and see those options
+        // already registered. fire_py_addoption_hooks fires again later
+        // (load_and_validate_config, once conftest-defined options exist
+        // too) — harmless, since it's an idempotent dict overwrite
+        // (OptionGroup.addoption in _parser.py), not a side-effecting hook.
+        if let Err(err) = self.fire_py_addoption_hooks(py) {
+            errors.push((rootdir.to_path_buf(), python::format_exception(py, &err)));
+        }
+        // Also resolve CLI tokens against those early specs (e.g. pytest's
+        // own test_early_config_cmdline: a `-p`/entry-point/PYTEST_PLUGINS
+        // plugin's pytest_load_initial_conftests hookimpl reading back a
+        // matching `--flag=value` from early_config.known_args_namespace) —
+        // but never raise on "unknown" here: conftest-defined options aren't
+        // registered yet, so a token this early pass can't resolve may
+        // simply not have reached its plugin yet, not be genuinely invalid.
+        // The later, full pass (pipeline.rs, after every conftest loads)
+        // still does the real "truly unrecognized" check.
+        if let Err(err) = self.apply_plugin_cli_args(py, false) {
+            errors.push((rootdir.to_path_buf(), python::format_exception(py, &err)));
+        }
+        if let Err(err) = self.fire_py_load_initial_conftests(py) {
+            // Errors here are fatal plugin-init failures (e.g. ImportError from a
+            // bad DJANGO_SETTINGS_MODULE). Upstream lets them propagate to stderr
+            // as a fatal error; we replicate that by printing to stderr and exiting.
+            // UsageError is handled specially (exit code 4).
+            if python::is_usage_error(py, &err) {
+                let msg = python::format_exception(py, &err);
+                let usage_msg = msg
+                    .lines()
+                    .last()
+                    .and_then(|l| l.strip_prefix("pytest.UsageError: "))
+                    .unwrap_or(msg.trim());
+                eprintln!("ERROR: {usage_msg}");
+                return Err("\x00USAGE_ERROR\x00".to_string());
+            }
+            eprintln!("{}", python::format_exception(py, &err));
+            return Err("\x00USAGE_ERROR\x00".to_string());
+        }
+        let (start_dirs, conftests) = self.discover_conftests(&rootdir, &paths, &files);
+
         if let Err(err) = self.load_and_validate_config(
             py,
             &rootdir,
