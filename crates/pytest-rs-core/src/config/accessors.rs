@@ -127,6 +127,11 @@ impl Config {
         self.ini_file.clone()
     }
 
+    /// Original TOML type tags for TOML-sourced ini values.
+    pub fn toml_types_clone(&self) -> HashMap<String, String> {
+        self.toml_types.clone()
+    }
+
     /// Plugin-contributed boolean option.
     pub fn get_flag(&self, name: &str) -> bool {
         self.flags.contains(name.trim_start_matches("--"))

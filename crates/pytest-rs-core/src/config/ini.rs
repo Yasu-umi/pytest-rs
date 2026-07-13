@@ -6,7 +6,11 @@ pub(crate) type ConfigResult = (
     Option<String>,
     HashMap<String, String>,
     Vec<String>,
+    HashMap<String, String>, // toml_types: key → original TOML type tag
 );
+
+/// (stringified ini values, key → original TOML type tag)
+type ParsedIni = (HashMap<String, String>, HashMap<String, String>);
 
 /// Find and parse the pytest config file: walk up from `start` looking for
 /// pytest.ini ([pytest]), pyproject.toml ([tool.pytest.ini_options]),
@@ -29,27 +33,36 @@ const CONFIG_NAMES: [&str; 7] = [
 /// as config when present, even when empty.
 /// Returns Err for parse errors or pyproject.toml conflicts (UsageError),
 /// Ok(None) when absent.
-fn load_config(dir: &Path, name: &str) -> Result<Option<HashMap<String, String>>, String> {
+fn load_config(dir: &Path, name: &str) -> Result<Option<ParsedIni>, String> {
     let Ok(content) = std::fs::read_to_string(dir.join(name)) else {
         return Ok(None);
     };
     let path = dir.join(name).to_string_lossy().into_owned();
     match name {
         "pytest.toml" | ".pytest.toml" => {
-            let values = parse_toml_pytest(&content, Some(&path))?;
-            Ok(Some(values.unwrap_or_default()))
+            let result = parse_toml_pytest(&content, Some(&path))?;
+            Ok(Some(
+                result.unwrap_or_else(|| (HashMap::new(), HashMap::new())),
+            ))
         }
         "pytest.ini" | ".pytest.ini" => {
             if let Some(line) = detect_missing_section_header(&content) {
                 return Err(format!("{}:{}: no section header defined", path, line));
             }
-            Ok(Some(
+            Ok(Some((
                 parse_ini_section(&content, "pytest").unwrap_or_default(),
-            ))
+                HashMap::new(),
+            )))
         }
         "pyproject.toml" => parse_pyproject(&content, Some(&path)),
-        "tox.ini" => Ok(parse_ini_section(&content, "pytest")),
-        "setup.cfg" => Ok(parse_ini_section(&content, "tool:pytest")),
+        "tox.ini" => Ok(Some((
+            parse_ini_section(&content, "pytest").unwrap_or_default(),
+            HashMap::new(),
+        ))),
+        "setup.cfg" => Ok(Some((
+            parse_ini_section(&content, "tool:pytest").unwrap_or_default(),
+            HashMap::new(),
+        ))),
         _ => Ok(None),
     }
 }
@@ -74,8 +87,9 @@ fn detect_missing_section_header(content: &str) -> Option<usize> {
 }
 
 /// Locate the winning config file. Returns (rootdir, basename, values,
-/// ignored), where `ignored` lists lower-priority config files in the same
-/// directory that also hold pytest config — pytest warns about these.
+/// ignored, toml_types), where `ignored` lists lower-priority config files
+/// in the same directory that also hold pytest config — pytest warns about
+/// these. `toml_types` maps key → original TOML type tag for TOML sources.
 ///
 /// Real pytest's `locate_config` fallback: if no file with pytest content is
 /// found but a `pyproject.toml` exists anywhere in the walk, the closest one
@@ -90,6 +104,7 @@ pub(crate) fn find_ini(
         Option<String>,
         HashMap<String, String>,
         Vec<String>,
+        HashMap<String, String>, // toml_types
     ),
     String,
 > {
@@ -100,13 +115,19 @@ pub(crate) fn find_ini(
             {
                 first_pyproject_dir = Some(dir.to_path_buf());
             }
-            if let Some(values) = load_config(dir, name)? {
+            if let Some((values, toml_types)) = load_config(dir, name)? {
                 let ignored = CONFIG_NAMES[i + 1..]
                     .iter()
                     .filter(|other| load_config(dir, other).ok().flatten().is_some())
                     .map(|other| other.to_string())
                     .collect();
-                return Ok((dir.to_path_buf(), Some(name.to_string()), values, ignored));
+                return Ok((
+                    dir.to_path_buf(),
+                    Some(name.to_string()),
+                    values,
+                    ignored,
+                    toml_types,
+                ));
             }
         }
     }
@@ -116,9 +137,16 @@ pub(crate) fn find_ini(
             Some("pyproject.toml".to_string()),
             HashMap::new(),
             Vec::new(),
+            HashMap::new(),
         ));
     }
-    Ok((start.to_path_buf(), None, HashMap::new(), Vec::new()))
+    Ok((
+        start.to_path_buf(),
+        None,
+        HashMap::new(),
+        Vec::new(),
+        HashMap::new(),
+    ))
 }
 
 /// Load pytest config from an explicit path (for -c/--config-file).
@@ -128,22 +156,30 @@ pub(crate) fn find_ini(
 /// - any other .toml (including pyproject.toml and custom names) → `[tool.pytest.ini_options]`
 /// - .cfg → `[tool:pytest]`
 /// - .ini and everything else → `[pytest]`
-pub(crate) fn load_config_from_path(path: &Path) -> Result<HashMap<String, String>, String> {
+pub(crate) fn load_config_from_path(path: &Path) -> Result<ParsedIni, String> {
     let Ok(content) = std::fs::read_to_string(path) else {
-        return Ok(HashMap::new());
+        return Ok((HashMap::new(), HashMap::new()));
     };
     let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
     let path_str = path.to_string_lossy().into_owned();
     match path.extension().and_then(|e| e.to_str()) {
         Some("toml") => {
             if matches!(name, "pytest.toml" | ".pytest.toml") {
-                Ok(parse_toml_pytest(&content, Some(&path_str))?.unwrap_or_default())
+                Ok(parse_toml_pytest(&content, Some(&path_str))?
+                    .unwrap_or_else(|| (HashMap::new(), HashMap::new())))
             } else {
-                Ok(parse_pyproject(&content, Some(&path_str))?.unwrap_or_default())
+                Ok(parse_pyproject(&content, Some(&path_str))?
+                    .unwrap_or_else(|| (HashMap::new(), HashMap::new())))
             }
         }
-        Some("cfg") => Ok(parse_ini_section(&content, "tool:pytest").unwrap_or_default()),
-        _ => Ok(parse_ini_section(&content, "pytest").unwrap_or_default()),
+        Some("cfg") => Ok((
+            parse_ini_section(&content, "tool:pytest").unwrap_or_default(),
+            HashMap::new(),
+        )),
+        _ => Ok((
+            parse_ini_section(&content, "pytest").unwrap_or_default(),
+            HashMap::new(),
+        )),
     }
 }
 
@@ -212,10 +248,7 @@ pub(crate) fn semver_ge(current: &str, required: &str) -> bool {
 /// keys other than ini_options) or [tool.pytest.ini_options] (ini mode).
 /// Returns Err when both styles are present simultaneously (upstream
 /// UsageError), Ok(None) when no pytest config is found.
-fn parse_pyproject(
-    content: &str,
-    path: Option<&str>,
-) -> Result<Option<HashMap<String, String>>, String> {
+fn parse_pyproject(content: &str, path: Option<&str>) -> Result<Option<ParsedIni>, String> {
     let document: toml::Table = match content.parse() {
         Ok(t) => t,
         Err(e) => {
@@ -240,24 +273,26 @@ fn parse_pyproject(
                 .to_string(),
         );
     }
-    let entries: Vec<(&String, &toml::Value)> = if has_native {
-        tool_pytest.iter().collect()
-    } else {
-        match tool_pytest.get("ini_options").and_then(|v| v.as_table()) {
-            Some(t) => t.iter().collect(),
-            None => return Ok(None),
-        }
-    };
-    Ok(Some(render_toml_entries(entries)))
+    if has_native {
+        return Ok(Some(render_toml_entries(tool_pytest.iter().collect())));
+    }
+    // [tool.pytest.ini_options]: upstream's INI mode — scalars stringify and
+    // types never get validated, unlike the native [tool.pytest] TOML mode
+    // above. render_toml_entries's stringified `values` map is exactly the
+    // INI-mode form; discard its toml_types (INI mode carries none).
+    match tool_pytest.get("ini_options").and_then(|v| v.as_table()) {
+        Some(t) => Ok(Some((
+            render_toml_entries(t.iter().collect()).0,
+            HashMap::new(),
+        ))),
+        None => Ok(None),
+    }
 }
 
 /// pytest config from a standalone pytest.toml / .pytest.toml: a top-level
 /// `[pytest]` table (pytest 9 toml mode). Returns None when no `[pytest]`
 /// table is present (the caller still treats the file as config, just empty).
-fn parse_toml_pytest(
-    content: &str,
-    path: Option<&str>,
-) -> Result<Option<HashMap<String, String>>, String> {
+fn parse_toml_pytest(content: &str, path: Option<&str>) -> Result<Option<ParsedIni>, String> {
     let document: toml::Table = match content.parse() {
         Ok(t) => t,
         Err(e) => {
@@ -273,27 +308,55 @@ fn parse_toml_pytest(
     Ok(Some(render_toml_entries(pytest.iter().collect())))
 }
 
+/// The TOML type tag for a scalar value ("string"/"int"/"float"/"bool"),
+/// used both for top-level values and for individual array items.
+fn toml_scalar_type_tag(value: &toml::Value) -> &'static str {
+    match value {
+        toml::Value::String(_) => "string",
+        toml::Value::Integer(_) => "int",
+        toml::Value::Float(_) => "float",
+        toml::Value::Boolean(_) => "bool",
+        toml::Value::Array(_) | toml::Value::Table(_) | toml::Value::Datetime(_) => "string",
+    }
+}
+
 /// Render TOML pytest entries into the engine's stringified ini form: scalar
-/// values become their string, arrays become newline-joined linelists.
-fn render_toml_entries(entries: Vec<(&String, &toml::Value)>) -> HashMap<String, String> {
+/// values become their string, arrays become NUL-joined linelists.
+/// Also returns a map of key → original TOML type tag for type validation.
+/// An array's tag is `"array:<item_type_0>\x00<item_type_1>..."` so
+/// `_coerce_ini` can report which index/type broke a strings-only list.
+fn render_toml_entries(entries: Vec<(&String, &toml::Value)>) -> ParsedIni {
     let mut values = HashMap::new();
+    let mut toml_types = HashMap::new();
     for (key, value) in entries {
-        let rendered = match value {
-            toml::Value::String(s) => s.clone(),
-            toml::Value::Array(items) => items
-                .iter()
-                .map(|item| match item {
-                    toml::Value::String(s) => s.clone(),
-                    other => other.to_string(),
-                })
-                .collect::<Vec<_>>()
-                // NUL-byte sentinel: signals to _coerce_ini that this is a
-                // pre-split TOML array (items may contain spaces), not an
-                // ini-file string that needs shlex.split().
-                .join("\x00"),
-            other => other.to_string(),
+        let (rendered, type_tag) = match value {
+            toml::Value::String(s) => (s.clone(), "string".to_string()),
+            toml::Value::Array(items) => {
+                let rendered_items: Vec<String> = items
+                    .iter()
+                    .map(|item| match item {
+                        toml::Value::String(s) => s.clone(),
+                        other => other.to_string(),
+                    })
+                    .collect();
+                let item_types: Vec<&str> = items.iter().map(toml_scalar_type_tag).collect();
+                (
+                    // NUL-byte sentinel: signals to _coerce_ini that this is a
+                    // pre-split TOML array (items may contain spaces), not an
+                    // ini-file string that needs shlex.split().
+                    rendered_items.join("\x00"),
+                    format!("array:{}", item_types.join("\x00")),
+                )
+            }
+            toml::Value::Integer(_) => (value.to_string(), "int".to_string()),
+            toml::Value::Float(_) => (value.to_string(), "float".to_string()),
+            toml::Value::Boolean(_) => (value.to_string(), "bool".to_string()),
+            toml::Value::Table(_) | toml::Value::Datetime(_) => {
+                (value.to_string(), "string".to_string())
+            }
         };
         values.insert(key.clone(), rendered);
+        toml_types.insert(key.clone(), type_tag);
     }
-    values
+    (values, toml_types)
 }

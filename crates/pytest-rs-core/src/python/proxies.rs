@@ -249,6 +249,7 @@ fn build_py_config(
             config.ini_snapshot(),
             config.ini_file_clone(),
             config.ini_overrides_clone(),
+            config.toml_types_clone(),
             option,
             strict,
         ),

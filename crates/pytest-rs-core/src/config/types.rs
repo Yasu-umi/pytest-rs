@@ -37,6 +37,9 @@ pub struct Config {
     pub(crate) ini_overrides: HashMap<String, String>,
     /// Values from pytest.ini / pyproject.toml / tox.ini / setup.cfg.
     pub(crate) ini_file: HashMap<String, String>,
+    /// Original TOML type tags for TOML-sourced ini values (key →
+    /// "string"/"int"/"float"/"bool"/"array"). Empty for non-TOML sources.
+    pub(crate) toml_types: HashMap<String, String>,
     /// The config file's basename, for the "configfile:" header line.
     pub config_file_name: Option<String>,
     /// Lower-priority config files in the rootdir that also hold pytest config

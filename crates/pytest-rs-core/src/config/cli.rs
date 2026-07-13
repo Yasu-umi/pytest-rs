@@ -498,7 +498,7 @@ impl Config {
         // Config-file search starts at the common ancestor of cwd and the
         // path-like args (pytest's rootdir algorithm); with no config file
         // anywhere, the ancestor itself is the rootdir.
-        let (rootdir, config_file_name, ini_file, ignored_config_files) =
+        let (rootdir, config_file_name, ini_file, ignored_config_files, toml_types) =
             if let Some(cf_arg) = explicit_config {
                 let cf_path = if Path::new(&cf_arg).is_absolute() {
                     PathBuf::from(&cf_arg)
@@ -510,25 +510,25 @@ impl Config {
                 // the closest std equivalent and the file must already exist
                 // to be loaded as an ini anyway.
                 let cf_path = std::fs::canonicalize(&cf_path).unwrap_or(cf_path);
-                let ini_file = load_config_from_path(&cf_path)?;
+                let (ini_file, toml_types) = load_config_from_path(&cf_path)?;
                 let rootdir = cf_path
                     .parent()
                     .map(|p| p.to_path_buf())
                     .unwrap_or_else(|| cwd.clone());
                 let file_name = cf_path.file_name().map(|n| n.to_string_lossy().to_string());
-                (rootdir, file_name, ini_file, Vec::new())
+                (rootdir, file_name, ini_file, Vec::new(), toml_types)
             } else {
                 let ancestor = common_ancestor(&dirs_from_args(cwd.as_ref(), argv));
-                let (rootdir, file_name, ini, ignored) = find_ini(&ancestor)?;
+                let (rootdir, file_name, ini, ignored, toml_types) = find_ini(&ancestor)?;
                 if file_name.is_none() {
                     // No config file found anywhere. pytest's determine_setup
                     // falls back to the common ancestor of the invocation dir
                     // and the args' ancestor, so e.g. `pytest a a/b` run from
                     // the parent roots at the invocation dir, not at `a`.
                     let rootdir = common_ancestor(&[cwd.clone(), ancestor]);
-                    (rootdir, file_name, ini, ignored)
+                    (rootdir, file_name, ini, ignored, HashMap::new())
                 } else {
-                    (rootdir, file_name, ini, ignored)
+                    (rootdir, file_name, ini, ignored, toml_types)
                 }
             };
 
@@ -597,7 +597,13 @@ impl Config {
         } else {
             rootdir
         };
-        Ok((rootdir, config_file_name, ini_file, ignored_config_files))
+        Ok((
+            rootdir,
+            config_file_name,
+            ini_file,
+            ignored_config_files,
+            toml_types,
+        ))
     }
 
     /// Split argv into the args clap parses (`kept`) and the long flags it
@@ -712,7 +718,7 @@ impl Config {
         let invocation_args = argv.get(1..).map(<[String]>::to_vec).unwrap_or_default();
         let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
         let cwd = std::fs::canonicalize(&cwd).unwrap_or(cwd);
-        let (rootdir, config_file_name, ini_file, ignored_config_files) =
+        let (rootdir, config_file_name, ini_file, ignored_config_files, toml_types) =
             Self::resolve_config_and_rootdir(&argv, &cwd)?;
 
         // addopts from the config file are prepended to the CLI args.
@@ -967,6 +973,7 @@ impl Config {
             ini_file,
             config_file_name,
             ignored_config_files,
+            toml_types,
             effective_args,
             plugin_args,
             invocation_args,

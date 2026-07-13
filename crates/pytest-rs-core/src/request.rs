@@ -31,6 +31,9 @@ pub struct PyConfig {
     /// (upstream behavior). Only parseconfig-built configs are strict; the
     /// session config stays lenient since the engine owns the core inis.
     strict: bool,
+    /// Original TOML type tags for TOML-sourced ini values (key →
+    /// "string"/"int"/"float"/"bool"/"array"). Empty for non-TOML sources.
+    toml_types: HashMap<String, String>,
     /// The argparse-namespace equivalent (`config.option`), mutable from
     /// Python so conftest hooks can stash flags on it.
     #[pyo3(get)]
@@ -70,6 +73,7 @@ impl PyConfig {
         ini: HashMap<String, String>,
         ini_file: HashMap<String, String>,
         ini_overrides: HashMap<String, String>,
+        toml_types: HashMap<String, String>,
         option: Py<PyAny>,
         strict: bool,
     ) -> Self {
@@ -81,6 +85,7 @@ impl PyConfig {
             ini: Mutex::new(ini),
             ini_file,
             ini_overrides: Mutex::new(ini_overrides),
+            toml_types,
             strict,
             option,
             stash: pyo3::sync::PyOnceLock::new(),
@@ -222,8 +227,13 @@ impl PyConfig {
                 overrides.set_item(key, value)?;
             }
         }
+        let toml_types = pyo3::types::PyDict::new(py);
+        for (key, value) in &self.toml_types {
+            toml_types.set_item(key, value)?;
+        }
         let kwargs = pyo3::types::PyDict::new(py);
         kwargs.set_item("overrides", &overrides)?;
+        kwargs.set_item("toml_types", &toml_types)?;
         Ok(py
             .import("pytest._parser")?
             .call_method(

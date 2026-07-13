@@ -260,10 +260,71 @@ def _split_str(value: str, shlex_split: bool) -> list:
     return [line.strip() for line in value.splitlines() if line.strip()]
 
 
-def _coerce_ini(type_: str | None, value: Any, rootpath: str | None, name: str = "") -> Any:
+#: TOML-native-value type names for each toml_type tag, keyed by what a
+#: mismatching value's Python type name would read as in a TypeError message.
+_TOML_TYPE_NAMES = {
+    "string": "str",
+    "int": "int",
+    "float": "float",
+    "bool": "bool",
+    "array": "list",
+}
+
+
+def _validate_toml_type(type_: str | None, toml_type: str, value: Any, name: str) -> None:
+    """Native pytest.toml/[tool.pytest] values keep their TOML type (str,
+    int, float, bool, list) with no coercion. Validate strictly against the
+    registered addini type, matching upstream's Config._getini_toml — a
+    type mismatch is a TypeError, not silently coerced.
+
+    ``toml_type`` for an array is ``"array:<item_type_0>\\x00<item_type_1>..."``
+    (see render_toml_entries in ini.rs), giving each item's native TOML type
+    without needing to re-inspect the already-stringified ``value``."""
+    base_type = toml_type.split(":", 1)[0]
+    got = _TOML_TYPE_NAMES.get(base_type, base_type)
+    if type_ in ("paths", "args", "linelist"):
+        if base_type != "array":
+            raise TypeError(
+                f"config option {name!r} expects a list for type {type_!r}, got {got}: {value!r}"
+            )
+        item_types = toml_type[len("array:") :].split("\x00") if ":" in toml_type else []
+        items = value.split("\x00") if isinstance(value, str) else value
+        for i, item_type in enumerate(item_types):
+            if item_type != "string":
+                item_type_name = _TOML_TYPE_NAMES.get(item_type, item_type)
+                item_repr = items[i] if i < len(items) else ""
+                raise TypeError(
+                    f"config option {name!r} expects a list of strings, "
+                    f"but item at index {i} is {item_type_name}: {item_repr!r}"
+                )
+    elif type_ == "bool":
+        if toml_type != "bool":
+            raise TypeError(f"config option {name!r} expects a bool, got {got}: {value!r}")
+    elif type_ == "int":
+        if toml_type != "int":
+            raise TypeError(f"config option {name!r} expects an int, got {got}: {value!r}")
+    elif type_ == "float":
+        if toml_type not in ("float", "int"):
+            raise TypeError(f"config option {name!r} expects a float, got {got}: {value!r}")
+    elif type_ in ("string", None):
+        if toml_type != "string":
+            raise TypeError(f"config option {name!r} expects a string, got {got}: {value!r}")
+
+
+def _coerce_ini(
+    type_: str | None,
+    value: Any,
+    rootpath: str | None,
+    name: str = "",
+    toml_type: str | None = None,
+) -> Any:
     """Coerce a raw ini value to its registered type (pytest INI-mode
     coercion). Values are strings from .ini files; toml linelists may already
-    be lists."""
+    be lists. ``toml_type`` (set only for values sourced from a native
+    pytest.toml/[tool.pytest] table) triggers strict type validation instead
+    of coercion, matching upstream's TOML-mode getini."""
+    if toml_type is not None:
+        _validate_toml_type(type_, toml_type, value, name)
     if type_ == "paths":
         base = Path(rootpath) if rootpath else Path.cwd()
         parts = _split_str(value, True) if isinstance(value, str) else list(value)
@@ -314,6 +375,7 @@ def getini(
     rootpath: str | None,
     strict: bool = False,
     overrides: dict[str, str] | None = None,
+    toml_types: dict[str, str] | None = None,
 ) -> Any:
     """config.getini(name): the typed, alias-resolved ini value. Registered
     options (parser.addini) supply type conversion and defaults.
@@ -325,7 +387,12 @@ def getini(
 
     ``overrides`` (the raw -o/--override-ini values) is checked before
     ``inicfg`` with full alias resolution so ``-o old_name=val`` wins over
-    ``new_name = from_file`` when old_name is registered as an alias."""
+    ``new_name = from_file`` when old_name is registered as an alias.
+
+    ``toml_types`` maps key -> original TOML type tag, populated only for
+    values sourced from a native pytest.toml/[tool.pytest] table (see
+    render_toml_entries in ini.rs); it triggers strict type validation
+    instead of ini-style string coercion (matches upstream's TOML mode)."""
     canonical = ini_aliases.get(name, name)
     spec = ini_specs.get(canonical)
     if spec is None:
@@ -342,7 +409,8 @@ def getini(
                 return _split_str(raw, False)
             return raw
     type_ = spec["type"]
-    # Override precedence: -o canonical first, then any alias.
+    # Override precedence: -o canonical first, then any alias. -o values are
+    # always plain CLI strings, never TOML-sourced, so no toml_type here.
     if overrides is not None:
         override_val = overrides.get(canonical)
         if override_val is None:
@@ -354,15 +422,18 @@ def getini(
             return _coerce_ini(type_, override_val, rootpath, canonical)
     # Value precedence: canonical name first, then any alias.
     value = inicfg.get(canonical)
+    matched_key = canonical if value is not None else None
     if value is None:
         for alias in spec.get("aliases", ()):
             if inicfg.get(alias) is not None:
                 value = inicfg[alias]
+                matched_key = alias
                 break
     if value is None:
         default = spec["default"]
         return _empty_for_type(type_) if default is _UNSET else default
-    return _coerce_ini(type_, value, rootpath, canonical)
+    toml_type = toml_types.get(matched_key) if toml_types and matched_key else None
+    return _coerce_ini(type_, value, rootpath, canonical, toml_type)
 
 
 #: Inis the bundled native plugins read (registered in Rust via the plugin's
