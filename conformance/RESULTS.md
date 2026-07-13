@@ -25,11 +25,11 @@ pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2714 | 74 | 0 | 53 | 0 | 8 | 2849 | 97.1% | 26 | 54 | 61 |
+| pytest | 9.0.3 | 2718 | 70 | 0 | 53 | 0 | 8 | 2849 | 97.3% | 30 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 0 | 1 | 7 | 85.7% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 0 | 2 | 90 | 97.8% | 1 | 1 | 0 |
-| pytest-cov | v7.1.0 | 204 | 2 | 0 | 3 | 0 | 0 | 209 | 99.0% | 0 | 1 | 0 |
+| pytest-cov | v7.1.0 | 205 | 1 | 0 | 3 | 0 | 0 | 209 | 99.5% | 0 | 1 | 0 |
 | pytest-xdist | v3.8.0 | 97 | 0 | 0 | 1 | 0 | 0 | 98 | 100.0% | 1 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 122 | 0 | 0 | 1 | 0 | 0 | 123 | 100.0% | 6 | 7 | 6 |
@@ -59,7 +59,7 @@ pytest-rs; they are not counted in the total.
 | starlette | 0.46.2 | 907 | 0 | 0 | 0 | 0 | 0 | 907 | 100.0% | 28 | 28 | 0 |
 | attrs | 25.3.0 | 1341 | 0 | 0 | 5 | 0 | 0 | 1346 | 100.0% | 22 | 24 | 0 |
 | more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 0 | 0 | 671 | 100.0% | 2 | 2 | 0 |
-| pytest-django | v4.9.0 | 213 | 2 | 0 | 1 | 0 | 0 | 216 | 99.1% | 10 | 13 | 0 |
+| pytest-django | v4.9.0 | 214 | 1 | 0 | 1 | 0 | 0 | 216 | 99.5% | 11 | 13 | 0 |
 | werkzeug | 3.1.3 | 922 | 0 | 0 | 1 | 25 | 0 | 948 | 97.4% | 24 | 25 | 0 |
 | fastapi | 0.115.12 | 2332 | 1 | 0 | 130 | 0 | 1 | 2464 | 99.9% | 303 | 310 | 0 |
 | packaging | 25.0 | 26948 | 0 | 0 | 0 | 0 | 0 | 26948 | 100.0% | 12 | 12 | 0 |
@@ -80,7 +80,7 @@ pytest-rs; they are not counted in the total.
 | testing/python/collect.py | passed | 82 | 0 | 0 | 0 | 0 | 0 |
 | testing/python/fixtures.py | failed | 205 | 1 | 0 | 2 | 0 | 2 |
 | testing/python/integration.py | failed | 13 | 3 | 0 | 4 | 0 | 0 |
-| testing/python/metafunc.py | failed | 111 | 1 | 0 | 0 | 0 | 0 |
+| testing/python/metafunc.py | passed | 112 | 0 | 0 | 0 | 0 | 0 |
 | testing/python/raises.py | passed | 31 | 0 | 0 | 0 | 0 | 0 |
 | testing/python/raises_group.py | failed | 26 | 3 | 0 | 0 | 0 | 0 |
 | testing/python/show_fixtures_per_test.py | passed | 8 | 0 | 0 | 0 | 0 | 0 |
@@ -93,16 +93,16 @@ pytest-rs; they are not counted in the total.
 | testing/test_cacheprovider.py | failed | 55 | 2 | 0 | 0 | 0 | 0 |
 | testing/test_capture.py | failed | 128 | 2 | 0 | 2 | 0 | 0 |
 | testing/test_collect_imported_tests.py | failed | 2 | 1 | 0 | 0 | 0 | 0 |
-| testing/test_collection.py | failed | 112 | 1 | 0 | 3 | 0 | 0 |
+| testing/test_collection.py | failed | 110 | 3 | 0 | 3 | 0 | 0 |
 | testing/test_compat.py | passed | 10 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_config.py | failed | 213 | 1 | 0 | 1 | 0 | 0 |
-| testing/test_conftest.py | failed | 49 | 4 | 0 | 1 | 0 | 0 |
+| testing/test_config.py | passed | 214 | 0 | 0 | 1 | 0 | 0 |
+| testing/test_conftest.py | failed | 50 | 3 | 0 | 1 | 0 | 0 |
 | testing/test_doctest.py | passed | 139 | 0 | 0 | 1 | 0 | 0 |
 | testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_faulthandler.py | failed | 5 | 7 | 0 | 0 | 0 | 0 |
 | testing/test_helpconfig.py | failed | 6 | 6 | 0 | 0 | 0 | 0 |
 | testing/test_junitxml.py | failed | 132 | 5 | 0 | 0 | 0 | 0 |
-| testing/test_link_resolve.py | failed | 0 | 1 | 0 | 0 | 0 | 0 |
+| testing/test_link_resolve.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_main.py | failed | 20 | 4 | 0 | 0 | 0 | 0 |
 | testing/test_mark.py | failed | 105 | 1 | 0 | 0 | 0 | 0 |
 | testing/test_monkeypatch.py | passed | 33 | 0 | 0 | 2 | 0 | 0 |
@@ -128,7 +128,7 @@ pytest-rs; they are not counted in the total.
 | testing/test_unraisableexception.py | passed | 11 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_warning_types.py | passed | 15 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_warnings.py | failed | 41 | 1 | 0 | 2 | 0 | 0 |
-| testing/acceptance_test.py | failed | 83 | 2 | 0 | 2 | 0 | 6 |
+| testing/acceptance_test.py | passed | 85 | 0 | 0 | 2 | 0 | 6 |
 | testing/deprecated_test.py | passed | 15 | 0 | 0 | 0 | 0 | 0 |
 
 </details>
@@ -199,7 +199,7 @@ pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| tests/test_pytest_cov.py | failed | 204 | 2 | 0 | 3 | 0 | 0 |
+| tests/test_pytest_cov.py | failed | 205 | 1 | 0 | 3 | 0 | 0 |
 
 </details>
 
@@ -873,7 +873,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_environment.py | passed | 22 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_fixtures.py | passed | 52 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_initialization.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_manage_py_scan.py | failed | 8 | 1 | 0 | 0 | 0 | 0 |
+| tests/test_manage_py_scan.py | passed | 9 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_unittest.py | passed | 23 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_urls.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_without_django_loaded.py | passed | 7 | 0 | 0 | 0 | 0 | 0 |

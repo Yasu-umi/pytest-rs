@@ -111,10 +111,10 @@ _linux (CI-verified)_
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2714 | 74 | 0 | 53 | 0 | 8 | 2849 | 97.1% | 26 | 54 | 61 |
+| pytest | 9.0.3 | 2718 | 70 | 0 | 53 | 0 | 8 | 2849 | 97.3% | 30 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 0 | 2 | 90 | 97.8% | 1 | 1 | 0 |
-| pytest-cov | v7.1.0 | 204 | 2 | 0 | 3 | 0 | 0 | 209 | 99.0% | 0 | 1 | 0 |
+| pytest-cov | v7.1.0 | 205 | 1 | 0 | 3 | 0 | 0 | 209 | 99.5% | 0 | 1 | 0 |
 | pytest-xdist | v3.8.0 | 97 | 0 | 0 | 1 | 0 | 0 | 98 | 100.0% | 1 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 122 | 0 | 0 | 1 | 0 | 0 | 123 | 100.0% | 6 | 7 | 6 |
@@ -140,7 +140,7 @@ _linux (CI-verified)_
 | pytest-rerunfailures | 9.1.1 | 47 | 0 | 0 | 1 | 0 | 0 | 48 | 100.0% | 1 | 1 | 0 |
 | pytest-randomly | 4.1.0 | 37 | 0 | 0 | 0 | 0 | 0 | 37 | 100.0% | 1 | 1 | 0 |
 | pytest-bdd | 8.1.0 | 124 | 14 | 0 | 1 | 0 | 0 | 139 | 89.9% | 28 | 35 | 0 |
-| pytest-django | v4.9.0 | 213 | 2 | 0 | 1 | 0 | 0 | 216 | 99.1% | 10 | 13 | 0 |
+| pytest-django | v4.9.0 | 214 | 1 | 0 | 1 | 0 | 0 | 216 | 99.5% | 11 | 13 | 0 |
 
 **Real-world projects** (their suites run unchanged, as drop-in evidence):
 
