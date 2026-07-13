@@ -811,43 +811,35 @@ impl Engine {
             return nodeids.chunks(chunk_size).map(<[String]>::to_vec).collect();
         }
         let per_module = matches!(dist_mode, "loadscope" | "loadfile" | "loadgroup");
+        // Insertion-ordered group-by keyed by scope, not by adjacency in
+        // `nodeids`: pytest-order and similar reordering plugins legitimately
+        // interleave same-scope items across other scopes (e.g. session-scope
+        // sorting can produce file_a, file_b, file_a, file_b, ...), and
+        // upstream xdist's own LoadFileScheduling/LoadScopeScheduling group by
+        // an OrderedDict keyed on scope regardless of position. Keys are
+        // namespaced ("group:"/"file:") so a group name can never collide
+        // with a file path that happens to be the same string.
         let mut group_batches: HashMap<String, usize> = HashMap::new();
         let mut batches: VecDeque<Vec<String>> = VecDeque::new();
 
         for (nodeid, xdist_group) in nodeids.iter().zip(xdist_groups.iter()) {
-            if dist_mode == "loadgroup"
+            let key = if dist_mode == "loadgroup"
                 && let Some(group) = xdist_group
             {
-                match group_batches.get(group) {
-                    Some(&index) => batches[index].push(nodeid.clone()),
-                    None => {
-                        group_batches.insert(group.clone(), batches.len());
-                        batches.push_back(vec![nodeid.clone()]);
-                    }
-                }
-                continue;
-            }
-            let file = nodeid.split("::").next().unwrap_or("");
-            let same_module = per_module
-                && batches.back().is_some_and(|batch: &Vec<String>| {
-                    batch.first().is_some_and(|first| {
-                        first.split("::").next().unwrap_or("") == file
-                            && !group_batches.contains_key(
-                                batches
-                                    .back()
-                                    .and_then(|b| b.first())
-                                    .map(|s| s.as_str())
-                                    .unwrap_or(""),
-                            )
-                    })
-                });
-            if same_module {
-                batches
-                    .back_mut()
-                    .expect("just checked")
-                    .push(nodeid.clone());
+                format!("group:{group}")
+            } else if per_module {
+                let file = nodeid.split("::").next().unwrap_or("");
+                format!("file:{file}")
             } else {
                 batches.push_back(vec![nodeid.clone()]);
+                continue;
+            };
+            match group_batches.get(&key) {
+                Some(&index) => batches[index].push(nodeid.clone()),
+                None => {
+                    group_batches.insert(key, batches.len());
+                    batches.push_back(vec![nodeid.clone()]);
+                }
             }
         }
 
