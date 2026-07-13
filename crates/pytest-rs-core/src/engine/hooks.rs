@@ -763,13 +763,31 @@ impl Engine {
     /// parser records option/ini specs so config.getoption()/getini() can
     /// resolve plugin-declared defaults (full CLI parsing stays Rust-side).
     pub(crate) fn fire_py_addoption_hooks(&mut self, py: Python<'_>) -> PyResult<()> {
-        let hook_funcs: Vec<Py<pyo3::PyAny>> = self
+        // Unlike the other hook names with a session.py_hooks/instance_hook_funcs
+        // split (e.g. pytest_collection_modifyitems), this one is NOT filtered
+        // to conftest-only: bootstrap.rs's load_named_plugins (a plain `-p
+        // NAME` module import, as opposed to its own entry-point sub-branch or
+        // load_entrypoint_plugins) never registers the module with
+        // pluginmanager, only scans its hooks into session.py_hooks — so
+        // instance_hook_funcs can't see it, and excluding plugin_module-tagged
+        // entries here would silently drop its pytest_addoption entirely
+        // (regressed test_config_preparse_plugin_option: `-p pytest_xyz
+        // --xyz=123` needs pytest_xyz's addoption to run so --xyz is a known
+        // flag). Calling addoption twice for a plugin that happens to be both
+        // module-scanned and instance-registered is harmless — addoption is a
+        // dict overwrite (OptionGroup.addoption in _parser.py), not a
+        // side-effecting action like a reseed callback.
+        let mut hook_funcs: Vec<Py<pyo3::PyAny>> = self
             .session
             .py_hooks
             .iter()
             .filter(|hook| hook.name == "pytest_addoption")
             .map(|hook| hook.func.clone_ref(py))
             .collect();
+        // Plugin INSTANCES registered directly (e.g. pytest.main(...,
+        // plugins=[MyPlugin()]) or Pytester's helper_plugin) never go through
+        // session.py_hooks' bootstrap-time module scan at all.
+        hook_funcs.extend(python::instance_hook_funcs(py, "pytest_addoption"));
         if hook_funcs.is_empty() {
             return Ok(());
         }
@@ -780,6 +798,37 @@ impl Engine {
             .import("pytest._pluginmanager")?
             .getattr("pluginmanager")?
             .unbind();
+        // -h/--help: Config::help_text (config/cli.rs) is rendered once, at
+        // initial CLI parsing, from only the native Rust plugins' options —
+        // long before conftest/plugin pytest_addoption hooks (this function)
+        // ever run, so it can't reflect their flags on its own. `pytest._parser`
+        // tracks every addoption() call in its module-level `flag_dests` dict,
+        // but that dict is a process-wide accumulator never cleared between
+        // nested runs (matching every other pytest._parser registry) — so
+        // diff its keys immediately before/after firing THIS run's own
+        // hookimpls, rather than dumping the whole (potentially
+        // cross-run-polluted) dict, and append just those as a plain listing.
+        let flag_dest_keys = |py: Python<'_>| -> std::collections::HashSet<String> {
+            let Ok(dict) = py
+                .import("pytest._parser")
+                .and_then(|m| m.getattr("flag_dests"))
+            else {
+                return Default::default();
+            };
+            let Ok(keys) = dict.call_method0("keys") else {
+                return Default::default();
+            };
+            let Ok(iter) = keys.try_iter() else {
+                return Default::default();
+            };
+            iter.filter_map(|k| k.ok()?.extract::<String>().ok())
+                .collect()
+        };
+        let before_flags = if self.config.help_text.is_some() {
+            flag_dest_keys(py)
+        } else {
+            Default::default()
+        };
         for func in &hook_funcs {
             python::call_py_hook(
                 py,
@@ -789,6 +838,19 @@ impl Engine {
                     ("pluginmanager", pluginmanager.clone_ref(py)),
                 ],
             )?;
+        }
+        if self.config.help_text.is_some() {
+            let after_flags = flag_dest_keys(py);
+            let mut new_flags: Vec<&String> = after_flags.difference(&before_flags).collect();
+            new_flags.sort();
+            if !new_flags.is_empty()
+                && let Some(text) = &mut self.config.help_text
+            {
+                text.push_str("\ncustom options:\n");
+                for flag in new_flags {
+                    text.push_str(&format!("  {flag}\n"));
+                }
+            }
         }
         Ok(())
     }
