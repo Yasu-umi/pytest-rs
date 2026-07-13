@@ -158,6 +158,10 @@ class _HookRelayPlugin:
         from pytest._node import Class, Dir, File, Package
         from pytest._node import Session as _SessionNode
 
+        # Exact type, not isinstance: a custom collector's parent is often a
+        # SUBCLASS of File/Class (e.g. pytest-mypy's MypyFile, or a
+        # conftest-defined pytest.File subclass) and must still report its
+        # own class name here, not get swallowed as "a builtin parent node".
         _builtin_parents = (File, Class, _SessionNode, Dir, Package)
         skipped_raw = getattr(session, "_rs_skipped_modules", None) or []
         self._events.append(
@@ -172,7 +176,7 @@ class _HookRelayPlugin:
                         "parent_class": (
                             type(i.parent).__name__
                             if getattr(i, "parent", None) is not None
-                            and not isinstance(i.parent, _builtin_parents)
+                            and type(i.parent) not in _builtin_parents
                             else ""
                         ),
                     }
