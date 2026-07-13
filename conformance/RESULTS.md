@@ -59,7 +59,7 @@ pytest-rs; they are not counted in the total.
 | starlette | 0.46.2 | 907 | 0 | 0 | 0 | 0 | 0 | 907 | 100.0% | 28 | 28 | 0 |
 | attrs | 25.3.0 | 1341 | 0 | 0 | 5 | 0 | 0 | 1346 | 100.0% | 22 | 24 | 0 |
 | more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 0 | 0 | 671 | 100.0% | 2 | 2 | 0 |
-| pytest-django | v4.9.0 | 212 | 3 | 0 | 1 | 0 | 0 | 216 | 98.6% | 9 | 13 | 0 |
+| pytest-django | v4.9.0 | 213 | 2 | 0 | 1 | 0 | 0 | 216 | 99.1% | 10 | 13 | 0 |
 | werkzeug | 3.1.3 | 922 | 0 | 0 | 1 | 25 | 0 | 948 | 97.4% | 24 | 25 | 0 |
 | fastapi | 0.115.12 | 2332 | 1 | 0 | 130 | 0 | 1 | 2464 | 99.9% | 303 | 310 | 0 |
 | packaging | 25.0 | 26948 | 0 | 0 | 0 | 0 | 0 | 26948 | 100.0% | 12 | 12 | 0 |
@@ -68,7 +68,7 @@ pytest-rs; they are not counted in the total.
 | pydantic | v2.11.7 | 5338 | 14 | 0 | 921 | 0 | 0 | 6273 | 99.8% | 77 | 82 | 0 |
 | scikit-learn-1 | 1.9.0 | 8432 | 0 | 0 | 6624 | 0 | 0 | 15056 | 100.0% | 79 | 87 | 0 |
 | scikit-learn-2 | 1.9.0 | 5046 | 0 | 0 | 1892 | 0 | 0 | 6938 | 100.0% | 52 | 58 | 0 |
-| scikit-learn-3 | 1.9.0 | 9212 | 3 | 0 | 2530 | 0 | 0 | 11745 | 100.0% | 103 | 114 | 0 |
+| scikit-learn-3 | 1.9.0 | 9251 | 3 | 0 | 2530 | 0 | 0 | 11784 | 100.0% | 104 | 114 | 0 |
 
 ### pytest @ 9.0.3
 
@@ -872,7 +872,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_django_settings_module.py | failed | 18 | 1 | 0 | 0 | 0 | 0 |
 | tests/test_environment.py | passed | 22 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_fixtures.py | passed | 52 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_initialization.py | failed | 0 | 1 | 0 | 0 | 0 | 0 |
+| tests/test_initialization.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_manage_py_scan.py | failed | 8 | 1 | 0 | 0 | 0 | 0 |
 | tests/test_unittest.py | passed | 23 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_urls.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
@@ -2825,7 +2825,7 @@ pytest-rs; they are not counted in the total.
 | sklearn/feature_selection/tests/test_sequential.py | passed | 74 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/feature_selection/tests/test_variance_threshold.py | passed | 25 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/frozen/tests/test_frozen.py | passed | 46 | 0 | 0 | 0 | 0 | 0 |
-| sklearn/gaussian_process/tests/test_gpc.py | timeout | 0 | 0 | 0 | 0 | 0 | 0 |
+| sklearn/gaussian_process/tests/test_gpc.py | passed | 39 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/gaussian_process/tests/test_gpr.py | passed | 130 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/gaussian_process/tests/test_kernels.py | passed | 281 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/impute/tests/test_base.py | passed | 5 | 0 | 0 | 1 | 0 | 0 |
