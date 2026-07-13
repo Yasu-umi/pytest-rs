@@ -87,22 +87,30 @@ portable across machines and CI. `RS_SPEC` is what to `uv pip install` (default
 `pytest-rs` from PyPI; set to a repo path/wheel for a local build). `PYVER`
 (default 3.13) and `REPS` (default 5) round out the knobs.
 
-To add a suite, append one line to `spec()` (`repo|tag|cov-source-path|parallel-flag|extra-deps`);
-it automatically gets all three modes. Pick suites with **several thousand fast
-unit tests** — that's where the framework layer is a real fraction of the wall
-clock. Avoid suites whose runtime is dominated by slow test bodies (property-based
-fuzzing, DB, network): the native engine can't speed up what runs inside a test.
+To add a suite, append one line to `spec()`
+(`repo|tag|cov-source-path|parallel-flag|extra-deps|testpath`, `testpath`
+optional, defaults to `tests`); it automatically gets all three modes. Pick
+suites with **several thousand fast unit tests** — that's where the framework
+layer is a real fraction of the wall clock. Avoid suites whose runtime is
+dominated by slow test bodies (property-based fuzzing, DB, network): the
+native engine can't speed up what runs inside a test.
 
 | suite | tag | `--cov` source path | parallel mode | test deps |
 |---|---|---|---|---|
 | marshmallow | 4.1.1 | `src/marshmallow` | `-n 3` (xdist) | `simplejson==4.1.1` |
 | click | 8.3.1 | `src/click` | `-n 3` (xdist) | — |
+| networkx | networkx-3.6.1 | `networkx` | `-n 3` (xdist) | `numpy==2.4.6 scipy==1.18.0 pandas==3.0.3` |
 
-These are mid-sized suites of fast unit tests, where the framework layer
-(startup, collection, coverage, parallel) is a real fraction of the wall clock.
-Suites dominated by slow test bodies make poor benchmarks: e.g. pydantic's full
-suite is `hypothesis` property-test bound (~40 s of fuzzing), so both runners
-land at ~1.0x — the native engine can't speed up what runs inside a test body.
+marshmallow/click are mid-sized suites of fast unit tests, where the framework
+layer (startup, collection, coverage, parallel) is a real fraction of the wall
+clock even in plain mode. networkx is a large suite (6890 tests, numeric-heavy)
+where plain mode is dominated by test-body cost (~1.0x) but `--cov`/`-n` show
+pytest-rs's biggest wins — its tests live scattered under `networkx/**/tests/`,
+so `testpath` is set to the whole `networkx` package rather than a single
+`tests/` dir. Suites dominated by slow test bodies without that contrast make
+poor benchmarks: e.g. pydantic's full suite is `hypothesis` property-test bound
+(~40 s of fuzzing), so both runners land at ~1.0x — the native engine can't
+speed up what runs inside a test body.
 
 Gotchas baked into the script (why pinned / why these targets):
 
