@@ -1025,6 +1025,15 @@ impl Engine {
             .iter()
             .filter(|hook| hook.name == name)
             .collect();
+        // pluggy LIFO: within one priority tier, the LAST-registered hookimpl
+        // fires FIRST. session.py_hooks accumulates in bootstrap order
+        // (native/-p/entry-point plugins, then conftest.py files, loaded
+        // later) — reverse that scan order before the tier sort so its own
+        // stability preserves LIFO within each tier (e.g. a conftest's
+        // normal-priority pytest_configure, registered after a `-p` plugin's,
+        // now correctly fires first — upstream's tests/test_initialization.py
+        // ::test_django_setup_order_and_uniqueness pins this exact ordering).
+        hooks.reverse();
         hooks.sort_by_key(|h| match (h.tryfirst, h.trylast) {
             (true, _) => 0,
             (_, true) => 2,
