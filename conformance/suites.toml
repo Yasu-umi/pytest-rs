@@ -286,7 +286,7 @@ enabled = true
 repo = "https://github.com/pytest-dev/pytest-order"
 tag = "v1.4.0"
 testpaths = ["tests"]
-deps = ["pytest-order==1.4.0", "pytest-mock"]
+deps = ["pytest-order==1.4.0", "pytest-mock", "pytest-dependency==0.6.1"]
 category = "third-party"
 enabled = true
 
