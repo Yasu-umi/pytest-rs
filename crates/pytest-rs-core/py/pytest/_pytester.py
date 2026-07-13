@@ -1362,7 +1362,10 @@ class Pytester:
         from _pytest.compat import getfuncargnames
 
         from pytest._marks import get_unpacked_marks
+        from pytest._metafunc import Metafunc
         from pytest._node import Class, File, Function, _ModuleCollector, _NodeSession
+        from pytest._outcomes import OutcomeException
+        from pytest._pluginmanager import instance_hook_impls
 
         # Scope-sorted fixture closure (request.fixturenames) for the collected
         # Function nodes, mirroring getfixtureclosure: autouse + requested seed,
@@ -1571,7 +1574,11 @@ class Pytester:
                 node.config = config
             try:
                 requested = list(getfuncargnames(func, name=node.name, cls=cls))
-            except Exception:
+            except (Exception, OutcomeException):
+                # getfuncargnames raises pytest.fail() (OutcomeException, a
+                # BaseException subclass, not Exception) for a method with
+                # no usable signature (e.g. missing self) — degrade to no
+                # requested args rather than letting it escape uncaught.
                 requested = []
             node.fixturenames = _closure_for(requested, cls)
             # The full fixturedef map (conftest+module, plus this item's class
@@ -1632,6 +1639,62 @@ class Pytester:
 
         _makeitem_impls = _gather_makeitem_impls(path)
 
+        def _gather_generate_tests_impls(src_path):
+            """Conftest-declared pytest_generate_tests along the path, plus
+            any registered plugin's own (e.g. pytest-order's, which splits a
+            function with multiple stacked @pytest.mark.order(...) into
+            parametrized items) — instance_hook_impls already excludes
+            conftest/internal modules, so it's the third-party-plugin half."""
+            root = self.path.resolve()
+            dirs, d = [], src_path.parent
+            while True:
+                dirs.append(d)
+                if d == root or d.parent == d:
+                    break
+                d = d.parent
+            dirs.reverse()
+            impls = []
+            for d in dirs:
+                cf = d / "conftest.py"
+                if not cf.is_file():
+                    continue
+                mod = Pytester._import_conftest_module(cf)
+                if mod is None:
+                    continue
+                fn = getattr(mod, "pytest_generate_tests", None)
+                if fn is not None:
+                    impls.append(fn)
+            impls.extend(instance_hook_impls("pytest_generate_tests"))
+            return impls
+
+        _generate_tests_impls = _gather_generate_tests_impls(path)
+
+        def _run_generate_tests(func, cls):
+            """Fire pytest_generate_tests and return any marks a hookimpl
+            added via metafunc.parametrize() — folded in by the caller
+            alongside the function's own (possibly hook-mutated, e.g.
+            pytest-order removes its own marks from func.pytestmark)
+            decorator marks, mirroring the real engine's push_test_items."""
+            if not _generate_tests_impls:
+                return []
+            try:
+                requested = list(getfuncargnames(func, name=func.__name__, cls=cls))
+            except (Exception, OutcomeException):
+                # getfuncargnames raises pytest.fail() (OutcomeException,
+                # a BaseException subclass, not Exception) for a method
+                # with no usable signature (e.g. missing self) — degrade to
+                # no requested args, matching make_item's own handling of
+                # the same call below.
+                requested = []
+            closure = _closure_for(requested, cls)
+            metafunc = Metafunc(func, closure, module, cls, config, list(get_unpacked_marks(func)))
+            for impl in _generate_tests_impls:
+                try:
+                    impl(metafunc)
+                except Exception:
+                    continue
+            return list(metafunc._parametrize_marks)
+
         def _try_makeitem(name, obj, parent=mod_node):
             """Fire pytest_pycollect_makeitem; return custom node list or None."""
             if not _makeitem_impls:
@@ -1672,7 +1735,7 @@ class Pytester:
                 return
             try:
                 func_params = set(getfuncargnames(func, name=func.__name__, cls=cls))
-            except Exception:
+            except (Exception, OutcomeException):
                 func_params = set()
             try:
                 all_params = set(_insp.signature(func).parameters.keys())
@@ -1729,9 +1792,20 @@ class Pytester:
                         custom_node._request = TopRequest(custom_node, _ispytest=True)
                         items.append(custom_node)
                     continue
-                _validate_parametrize_argnames(obj, get_unpacked_marks(obj))
+                # Run pytest_generate_tests BEFORE reading marks: a hookimpl
+                # (e.g. pytest-order's) may mutate obj.pytestmark in place
+                # (removing marks it consumed), so get_unpacked_marks must
+                # see the post-hook state. Its own extra_marks are excluded
+                # from _validate_parametrize_argnames — Metafunc.parametrize()
+                # already validated them against metafunc.fixturenames while
+                # the hook ran, which is where a hook registers any synthetic
+                # argname it introduces (e.g. pytest-order's own "order").
+                extra_marks = _run_generate_tests(obj, None)
+                decl_marks = get_unpacked_marks(obj)
+                _validate_parametrize_argnames(obj, decl_marks)
+                fn_marks = [*decl_marks, *extra_marks]
                 sub = Pytester._expand_params(
-                    get_unpacked_marks(obj),
+                    fn_marks,
                     module_marks,
                     name,
                     lambda nm, mks, _obj=obj: make_item(_obj, nm, mks, parent=mod_node),
@@ -1755,11 +1829,12 @@ class Pytester:
                         lineno = getattr(getattr(func, "__code__", None), "co_firstlineno", 0)
                         methods.append((lineno, mname, func))
                 for _ln, mname, func in sorted(methods):
-                    _validate_parametrize_argnames(
-                        func, [*get_unpacked_marks(func), *class_marks], cls=obj
-                    )
+                    extra_marks = _run_generate_tests(func, obj)
+                    decl_marks = [*get_unpacked_marks(func), *class_marks]
+                    _validate_parametrize_argnames(func, decl_marks, cls=obj)
+                    fn_marks = [*decl_marks, *extra_marks]
                     sub = Pytester._expand_params(
-                        [*get_unpacked_marks(func), *class_marks],
+                        fn_marks,
                         module_marks,
                         f"{name}::{mname}",
                         lambda nm, mks, _f=func, _cls=obj, _cn=cls_node: make_item(
