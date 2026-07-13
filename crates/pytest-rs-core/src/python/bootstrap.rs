@@ -295,6 +295,21 @@ pub(crate) fn register_pytest_plugins(
     )
 }
 
+/// True for pytest-rs's own internal shim modules (resolved via the
+/// `_pytest.{name}` fallback import, e.g. `-p pytester`/`pytest_plugins =
+/// ["pytester"]` resolving to `_pytest.pytester`). These lean on
+/// `_pytest._stub.__getattr__` for anything not explicitly implemented, so
+/// every attribute lookup — including any `pytest_*` hook name — returns a
+/// callable stub; `instance_hook_impls` already excludes them by this same
+/// name pattern when scanning `pluginmanager._plugins` for real hookimpls.
+/// Registering one anyway would make hook-caller sites that don't share that
+/// exclusion (`HookCaller.__call__`/`call_excluding`/`get_hookimpls`) treat
+/// every hook as implemented by it and invoke the stub, raising
+/// `NotImplementedError`.
+fn is_internal_shim_module_name(name: &str) -> bool {
+    name.contains("conftest") || name.starts_with("_pytest.") || name.starts_with("pytest.")
+}
+
 /// Import plugin modules by name (`-p NAME` / `pytest_plugins`) and register
 /// their fixtures and pytest_* hooks globally. `consider_entry_points`
 /// mirrors upstream's `import_plugin(modname, consider_entry_points=...)`:
@@ -370,6 +385,16 @@ result = next(((getattr(ep, 'module', None) or '', ep) for dist in importlib.met
                     for hook in &mut hooks[before..] {
                         hook.plugin_module = Some(module_name.clone());
                     }
+                    // Track the module in the shim pluginmanager (parity with
+                    // load_entrypoint_plugins) so instance_hook_impls/
+                    // instance_hook_funcs — the SOLE dispatch path for hooks
+                    // fired via pluginmanager instances rather than
+                    // session.py_hooks — see this plugin's hookimpls too.
+                    if !is_internal_shim_module_name(&module_name) {
+                        py.import("pytest._pluginmanager")?
+                            .getattr("pluginmanager")?
+                            .call_method1("register", (&module, name.as_str()))?;
+                    }
                     loaded_modules.push(module_name);
                     continue;
                 }
@@ -414,13 +439,31 @@ result = next(((getattr(ep, 'module', None) or '', ep) for dist in importlib.met
         }
         // Fixture/hook scanning only applies to real modules (non-module
         // plugin objects like test PseudoPlugins have no @pytest.fixture).
-        if let Ok(module) = plugin.cast::<pyo3::types::PyModule>() {
+        let module_name: Option<String> = if let Ok(module) = plugin.cast::<pyo3::types::PyModule>()
+        {
             register_fixtures_from(py, module, "", registry)?;
             let before = hooks.len();
             scan_py_hooks(module, "", hooks)?;
             for hook in &mut hooks[before..] {
                 hook.plugin_module = Some(name.clone());
             }
+            module
+                .getattr("__name__")
+                .ok()
+                .and_then(|n| n.extract().ok())
+        } else {
+            None
+        };
+        // Track in the shim pluginmanager (parity with load_entrypoint_plugins)
+        // regardless of module-ness, so a plain object plugin registered this
+        // way is still reachable via config.pluginmanager.getplugin(name) —
+        // except pytest-rs's own internal shim modules (see
+        // is_internal_shim_module_name), which the `name` resolution's
+        // `_pytest.{name}` fallback can reach (e.g. -p pytester).
+        if !module_name.is_some_and(|n| is_internal_shim_module_name(&n)) {
+            py.import("pytest._pluginmanager")?
+                .getattr("pluginmanager")?
+                .call_method1("register", (&plugin, name.as_str()))?;
         }
     }
     Ok(())
