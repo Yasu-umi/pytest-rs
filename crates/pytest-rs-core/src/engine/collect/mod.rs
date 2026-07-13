@@ -20,7 +20,8 @@ use crate::python;
 impl Engine {
     pub(crate) fn collect(&mut self, py: Python<'_>) -> Result<Vec<(PathBuf, String)>, String> {
         let rootdir = self.config.rootdir.clone();
-        let (paths, mut files) = self.resolve_collection_paths(py, &rootdir)?;
+        let (paths, mut files, deferred_not_found_args) =
+            self.resolve_collection_paths(py, &rootdir)?;
         self.load_cmdline_and_entrypoint_plugins(py)?;
         // `-p`/entry-point plugins have now imported (upstream loads them
         // during early config parsing, well before pytest_configure); let
@@ -99,6 +100,15 @@ impl Engine {
         if self.fire_configure_and_print_header(py, &rootdir, &mut errors)? {
             // --markers (or another short-circuit) handled output; skip collection.
             return Ok(errors);
+        }
+        // Deferred path-existence check: conftest pytest_configure hooks have
+        // now fired (issue #143 — ensure configure/unconfigure run even when
+        // a CLI arg references a non-existent file).
+        if !deferred_not_found_args.is_empty() {
+            for arg in &deferred_not_found_args {
+                eprintln!("ERROR: file or directory not found: {arg}");
+            }
+            return Err("\x00USAGE_ERROR\x00".to_string());
         }
         self.apply_collect_ignores(py, &rootdir, &paths, &conftests, &mut files);
         // Warnings issued during test collection are attributed to the "collect" phase.

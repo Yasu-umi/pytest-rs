@@ -213,7 +213,7 @@ pub fn collect_test_files(
     norecursedirs: &[String],
     keep_duplicates: bool,
     ignores: &CollectIgnores,
-) -> Result<Vec<PathBuf>, String> {
+) -> Result<(Vec<PathBuf>, Vec<String>), String> {
     let args: Vec<String> = if paths.is_empty() {
         vec![".".to_string()]
     } else {
@@ -227,6 +227,7 @@ pub fn collect_test_files(
     }
 
     let mut resolved = Vec::with_capacity(args.len());
+    let mut not_found_args = Vec::new();
     for arg in &args {
         // Node-id args select within a file; only the path part is
         // collected here (the engine filters items afterwards).
@@ -255,8 +256,12 @@ pub fn collect_test_files(
             std::fs::canonicalize(&raw).unwrap_or(raw)
         };
         // Upstream UsageError wording, with the argument as the user gave it.
-        let meta =
-            std::fs::metadata(&path).map_err(|_| format!("file or directory not found: {arg}"))?;
+        // Defer: don't error here so that conftest loading and
+        // pytest_configure have a chance to fire first (issue #143).
+        let Ok(meta) = std::fs::metadata(&path) else {
+            not_found_args.push(arg.clone());
+            continue;
+        };
         // --ignore applies to explicit args too (upstream
         // pytest_ignore_collect covers the whole collection tree).
         if ignores.is_ignored(&path) {
@@ -322,7 +327,7 @@ pub fn collect_test_files(
             files.push(ra.path.clone());
         }
     }
-    Ok(files)
+    Ok((files, not_found_args))
 }
 
 /// A virtual environment root: PEP-405 pyvenv.cfg, or a conda env

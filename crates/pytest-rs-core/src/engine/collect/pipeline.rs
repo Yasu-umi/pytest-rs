@@ -6,12 +6,15 @@ use super::super::Engine;
 use super::super::scan_nontoplevel_pytest_plugins;
 use crate::python;
 
+/// (cli_paths, test_files, deferred_not_found_args)
+type ResolvedPaths = (Vec<String>, Vec<PathBuf>, Vec<String>);
+
 impl Engine {
     pub(crate) fn resolve_collection_paths(
         &self,
         py: Python<'_>,
         rootdir: &Path,
-    ) -> Result<(Vec<String>, Vec<PathBuf>), String> {
+    ) -> Result<ResolvedPaths, String> {
         // No CLI paths: the `testpaths` ini (globbed against rootdir) decides
         // where collection starts; an empty glob warns and falls back to a
         // recursive search from the invocation dir, like pytest.
@@ -82,7 +85,7 @@ impl Engine {
         // invocation dir; rootdir only anchors node ids.
         let python_files = self.config.python_files_patterns();
         let norecursedirs = self.config.norecursedirs_patterns();
-        let files = crate::collect::collect_test_files(
+        let (files, not_found_args) = crate::collect::collect_test_files(
             &self.config.invocation_dir,
             &paths,
             self.config.get_flag("collect-in-virtualenv"),
@@ -91,7 +94,7 @@ impl Engine {
             self.config.get_flag("keep-duplicates"),
             &crate::collect::CollectIgnores::from_config(&self.config),
         )?;
-        Ok((paths, files))
+        Ok((paths, files, not_found_args))
     }
 
     /// Phase 2: load `-p NAME` / `PYTEST_PLUGINS` cmdline plugins, then
