@@ -536,9 +536,9 @@
     },
     {
       "file": "sklearn/decomposition/tests/test_sparse_pca.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 40,
       "failed": 0,
       "skipped": 0,
       "errors": 0,
