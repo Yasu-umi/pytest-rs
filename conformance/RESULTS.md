@@ -34,7 +34,7 @@ pytest-rs; they are not counted in the total.
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 122 | 0 | 0 | 1 | 0 | 0 | 123 | 100.0% | 6 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 42 | 0 | 0 | 1 | 0 | 0 | 43 | 100.0% | 1 | 1 | 0 |
-| anyio | 4.13.0 | 3119 | 1 | 0 | 42 | 0 | 0 | 3162 | 100.0% | 25 | 26 | 0 |
+| anyio | 4.13.0 | 3120 | 0 | 0 | 42 | 0 | 0 | 3162 | 100.0% | 26 | 26 | 0 |
 | pytest-mypy | v1.0.1 | 75 | 1 | 0 | 2 | 0 | 0 | 78 | 98.7% | 0 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-subtests | v0.14.2 | 32 | 0 | 0 | 0 | 0 | 0 | 32 | 100.0% | 1 | 1 | 0 |
@@ -68,7 +68,7 @@ pytest-rs; they are not counted in the total.
 | pydantic | v2.11.7 | 5338 | 0 | 0 | 921 | 0 | 14 | 6273 | 99.8% | 79 | 82 | 0 |
 | scikit-learn-1 | 1.9.0 | 8432 | 0 | 0 | 6624 | 0 | 0 | 15056 | 100.0% | 79 | 87 | 0 |
 | scikit-learn-2 | 1.9.0 | 5046 | 0 | 0 | 1892 | 0 | 0 | 6938 | 100.0% | 52 | 58 | 0 |
-| scikit-learn-3 | 1.9.0 | 9251 | 0 | 0 | 2530 | 0 | 3 | 11784 | 100.0% | 107 | 114 | 0 |
+| scikit-learn-3 | 1.9.0 | 9211 | 0 | 0 | 2530 | 0 | 3 | 11744 | 100.0% | 106 | 114 | 0 |
 
 ### pytest @ 9.0.3
 
@@ -272,7 +272,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_lowlevel.py | passed | 44 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_pytest_plugin.py | passed | 35 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_signals.py | passed | 12 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_sockets.py | failed | 1188 | 1 | 0 | 0 | 0 | 0 |
+| tests/test_sockets.py | passed | 1189 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_subprocesses.py | passed | 76 | 0 | 0 | 4 | 0 | 0 |
 | tests/test_synchronization.py | passed | 235 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_taskgroups.py | passed | 393 | 0 | 0 | 10 | 0 | 0 |
@@ -357,7 +357,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_doctest.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_precedence.py | passed | 10 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_restrict_hosts.py | failed | 27 | 1 | 0 | 0 | 0 | 0 |
-| tests/test_socket.py | timeout | 0 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_socket.py | failed | 19 | 3 | 0 | 0 | 0 | 0 |
 
 </details>
 
@@ -2807,7 +2807,7 @@ pytest-rs; they are not counted in the total.
 | sklearn/decomposition/tests/test_nmf.py | passed | 284 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/decomposition/tests/test_online_lda.py | passed | 55 | 0 | 0 | 2 | 0 | 0 |
 | sklearn/decomposition/tests/test_pca.py | passed | 386 | 0 | 0 | 220 | 0 | 0 |
-| sklearn/decomposition/tests/test_sparse_pca.py | passed | 40 | 0 | 0 | 0 | 0 | 0 |
+| sklearn/decomposition/tests/test_sparse_pca.py | timeout | 0 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/decomposition/tests/test_truncated_svd.py | passed | 46 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/experimental/tests/test_enable_hist_gradient_boosting.py | passed | 0 | 0 | 0 | 0 | 0 | 1 |
 | sklearn/experimental/tests/test_enable_iterative_imputer.py | passed | 0 | 0 | 0 | 0 | 0 | 1 |
