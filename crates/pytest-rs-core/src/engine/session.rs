@@ -191,6 +191,10 @@ impl Engine {
                 &mut self.session.deselected_items,
             );
         }
+        if let Err(err) = self.fire_deferred_modifyitems_wrappers(py) {
+            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+            return exit_code::INTERNAL_ERROR;
+        }
         if let Err(err) = self.fire_py_deselected(py) {
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
             return exit_code::INTERNAL_ERROR;

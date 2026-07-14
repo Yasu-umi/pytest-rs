@@ -16,6 +16,7 @@ impl Engine {
             session: Session::new(),
             config,
             cache: None,
+            pending_modifyitems_wrapper_hooks: Vec::new(),
         }
     }
 

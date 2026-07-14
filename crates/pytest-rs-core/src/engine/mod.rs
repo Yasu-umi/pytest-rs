@@ -29,6 +29,16 @@ pub struct Engine {
     pub config: Config,
     /// cacheprovider state (--lf/--ff/--nf, lastfailed persistence).
     cache: Option<crate::cache::CacheState>,
+    /// `pytest_collection_modifyitems` hookwrapper impls registered directly
+    /// on a plugin instance (e.g. pytest-order's `--order-after-ff`
+    /// OrderingPlugin) rather than as a conftest function. Deferred out of
+    /// `run_py_modifyitems` so they observe the item list *after* the native
+    /// --lf/--ff/--nf/--sw reorder (`cache.modify_items`), mirroring
+    /// upstream's true pluggy hookwrapper nesting where LFPlugin (itself a
+    /// tryfirst hookwrapper whose reorder is entirely post-yield) settles
+    /// first and an outer wrapper's post-yield mutation applies on top. See
+    /// `fire_deferred_modifyitems_wrappers` in `engine/hooks.rs`.
+    pending_modifyitems_wrapper_hooks: Vec<Py<PyAny>>,
 }
 
 mod collect;

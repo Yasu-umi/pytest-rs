@@ -119,12 +119,19 @@ impl Engine {
         // registration order; stable-sort by tryfirst/normal/trylast tier so
         // e.g. pytest-order's --indulgent-ordering (tryfirst) correctly runs
         // ahead of a normal-priority plugin registered later, matching pluggy.
-        // Wrapper/hookwrapper impls are deliberately left at the normal tier
-        // (not hoisted by their own tryfirst flag) since this sort doesn't
-        // implement true wrapper nesting — see pytest_order_ff_reorder_hookwrapper_ordering_gap.
         let mut instance_funcs = python::instance_hook_funcs(py, "pytest_collection_modifyitems");
         instance_funcs.sort_by_key(|func| Self::modifyitems_hookimpl_tier(py, func));
-        hook_funcs.extend(instance_funcs);
+        // Instance-registered hookwrapper impls (e.g. pytest-order's
+        // --order-after-ff OrderingPlugin) are deferred rather than run here:
+        // see `pending_modifyitems_wrapper_hooks` on Engine and
+        // `fire_deferred_modifyitems_wrappers` below for why. Conftest-level
+        // wrapper impls (e.g. a project's own conftest.py) are NOT affected —
+        // only plugin-instance-registered ones go through this split.
+        let (plain_instance_funcs, wrapper_instance_funcs): (Vec<_>, Vec<_>) = instance_funcs
+            .into_iter()
+            .partition(|func| !Self::modifyitems_hookimpl_is_wrapper(py, func));
+        hook_funcs.extend(plain_instance_funcs);
+        self.pending_modifyitems_wrapper_hooks = wrapper_instance_funcs;
         let itemcollected_funcs = hook_for("pytest_itemcollected");
         let collectstart_funcs = hook_for("pytest_collectstart");
         let recording = crate::engine::inprocess::recording();
@@ -324,30 +331,107 @@ impl Engine {
         Ok(())
     }
 
+    /// Reads a boolean flag out of the `pytest_impl` dict the
+    /// `pytest.hookimpl(...)` decorator shim attaches to a hook function;
+    /// absent means false.
+    fn hookimpl_flag(py: Python<'_>, func: &Py<pyo3::PyAny>, flag: &str) -> bool {
+        func.bind(py)
+            .getattr("pytest_impl")
+            .ok()
+            .and_then(|d| d.cast_into::<pyo3::types::PyDict>().ok())
+            .and_then(|d| d.get_item(flag).ok().flatten())
+            .and_then(|v| v.extract::<bool>().ok())
+            .unwrap_or(false)
+    }
+
+    /// True for a `wrapper=True`/`hookwrapper=True` hookimpl.
+    fn modifyitems_hookimpl_is_wrapper(py: Python<'_>, func: &Py<pyo3::PyAny>) -> bool {
+        Self::hookimpl_flag(py, func, "wrapper") || Self::hookimpl_flag(py, func, "hookwrapper")
+    }
+
     /// Sort key for a `pytest_collection_modifyitems` instance hook: 0 for a
     /// plain tryfirst impl, 2 for a plain trylast impl, 1 otherwise (normal
-    /// priority, and wrapper/hookwrapper impls left un-hoisted). Reads the
-    /// `pytest_impl` dict the `pytest.hookimpl(...)` decorator shim attaches
-    /// to the function; absent means normal priority.
+    /// priority, and wrapper/hookwrapper impls left un-hoisted — those are
+    /// split out separately, see `modifyitems_hookimpl_is_wrapper`).
     fn modifyitems_hookimpl_tier(py: Python<'_>, func: &Py<pyo3::PyAny>) -> u8 {
-        let get_bool_flag = |flag: &str| -> bool {
-            func.bind(py)
-                .getattr("pytest_impl")
-                .ok()
-                .and_then(|d| d.cast_into::<pyo3::types::PyDict>().ok())
-                .and_then(|d| d.get_item(flag).ok().flatten())
-                .and_then(|v| v.extract::<bool>().ok())
-                .unwrap_or(false)
-        };
-        if get_bool_flag("wrapper") || get_bool_flag("hookwrapper") {
+        if Self::modifyitems_hookimpl_is_wrapper(py, func) {
             1
-        } else if get_bool_flag("tryfirst") {
+        } else if Self::hookimpl_flag(py, func, "tryfirst") {
             0
-        } else if get_bool_flag("trylast") {
+        } else if Self::hookimpl_flag(py, func, "trylast") {
             2
         } else {
             1
         }
+    }
+
+    /// Run any `pytest_collection_modifyitems` hookwrapper impls that were
+    /// deferred by `run_py_modifyitems` (instance-registered wrappers only,
+    /// e.g. pytest-order's `--order-after-ff` OrderingPlugin). Called after
+    /// the native --lf/--ff/--nf/--sw reorder (`cache.modify_items`) so these
+    /// wrappers' post-yield mutation sees the settled item list — matching
+    /// upstream pluggy semantics where LFPlugin's own hookwrapper reorder
+    /// (also entirely post-yield) is innermost and any outer wrapper's
+    /// post-yield code runs after it. See
+    /// pytest_order_ff_reorder_hookwrapper_ordering_gap in project memory for
+    /// the full analysis.
+    pub(crate) fn fire_deferred_modifyitems_wrappers(&mut self, py: Python<'_>) -> PyResult<()> {
+        let funcs = std::mem::take(&mut self.pending_modifyitems_wrapper_hooks);
+        if funcs.is_empty() {
+            return Ok(());
+        }
+        let config_proxy = python::make_py_config(py, &self.config)?;
+        let mut items = std::mem::take(&mut self.session.items);
+        let nodes: Vec<Py<pyo3::PyAny>> = items
+            .iter()
+            .map(|item| python::make_node(py, item))
+            .collect::<PyResult<_>>()?;
+        let node_list = pyo3::types::PyList::new(py, nodes.iter().map(|n| n.bind(py)))?;
+        for func in &funcs {
+            if let Err(err) = python::call_py_hook(
+                py,
+                func,
+                &[
+                    ("config", config_proxy.clone_ref(py)),
+                    ("items", node_list.clone().unbind().into_any()),
+                    ("session", python::make_session_proxy(py, &self.config)?),
+                ],
+            ) {
+                self.session.items = items;
+                return Err(err);
+            }
+        }
+        // Read back order/membership (by nodeid) and any added markers —
+        // same reconciliation as run_py_modifyitems.
+        let mut by_nodeid: std::collections::HashMap<
+            String,
+            std::collections::VecDeque<crate::collect::TestItem>,
+        > = Default::default();
+        for item in items.drain(..) {
+            by_nodeid
+                .entry(item.nodeid.clone())
+                .or_default()
+                .push_back(item);
+        }
+        for node in node_list.iter() {
+            let nodeid: String = node.getattr("nodeid")?.extract()?;
+            if let Some(queue) = by_nodeid.get_mut(&nodeid)
+                && let Some(mut item) = queue.pop_front()
+            {
+                let mut marks = Vec::new();
+                for mark in node.getattr("own_markers")?.try_iter()? {
+                    let mark = mark?;
+                    marks.push(crate::collect::MarkData {
+                        name: mark.getattr("name")?.extract()?,
+                        obj: mark.unbind(),
+                    });
+                }
+                item.marks = marks;
+                items.push(item);
+            }
+        }
+        self.session.items = items;
+        Ok(())
     }
 
     /// Emit pytest_collectstart + pytest_make_collect_report +
