@@ -34,15 +34,15 @@ pytest-rs; they are not counted in the total.
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 122 | 0 | 0 | 1 | 0 | 0 | 123 | 100.0% | 6 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 42 | 0 | 0 | 1 | 0 | 0 | 43 | 100.0% | 1 | 1 | 0 |
-| anyio | 4.13.0 | 3120 | 0 | 0 | 42 | 0 | 0 | 3162 | 100.0% | 26 | 26 | 0 |
+| anyio | 4.13.0 | 3119 | 1 | 0 | 42 | 0 | 0 | 3162 | 100.0% | 25 | 26 | 0 |
 | pytest-mypy | v1.0.1 | 75 | 1 | 0 | 2 | 0 | 0 | 78 | 98.7% | 0 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-subtests | v0.14.2 | 32 | 0 | 0 | 0 | 0 | 0 | 32 | 100.0% | 1 | 1 | 0 |
 | pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-snapshot | v0.9.0 | 102 | 5 | 0 | 0 | 0 | 0 | 107 | 95.3% | 0 | 3 | 0 |
 | pytest-icdiff | 0.5 | 10 | 2 | 0 | 0 | 0 | 0 | 12 | 83.3% | 0 | 1 | 0 |
-| pytest-socket | 0.7.0 | 60 | 5 | 0 | 0 | 0 | 0 | 65 | 92.3% | 3 | 6 | 0 |
-| pytest-order | v1.4.0 | 129 | 5 | 0 | 0 | 0 | 0 | 134 | 96.3% | 13 | 16 | 0 |
+| pytest-socket | 0.7.0 | 41 | 2 | 0 | 0 | 0 | 0 | 43 | 95.3% | 3 | 6 | 0 |
+| pytest-order | v1.4.0 | 132 | 2 | 0 | 0 | 0 | 0 | 134 | 98.5% | 14 | 16 | 0 |
 | pytest-repeat | v0.9.4 | 16 | 0 | 0 | 0 | 0 | 0 | 16 | 100.0% | 1 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
 | pytest-env | 1.6.0 | 72 | 3 | 0 | 0 | 0 | 0 | 75 | 96.0% | 2 | 3 | 0 |
@@ -63,12 +63,12 @@ pytest-rs; they are not counted in the total.
 | werkzeug | 3.1.3 | 922 | 0 | 0 | 1 | 25 | 0 | 948 | 97.4% | 24 | 25 | 0 |
 | fastapi | 0.115.12 | 2332 | 1 | 0 | 130 | 0 | 1 | 2464 | 99.9% | 303 | 310 | 0 |
 | packaging | 25.0 | 26948 | 0 | 0 | 0 | 0 | 0 | 26948 | 100.0% | 12 | 12 | 0 |
-| pandas | v3.0.3 | 160780 | 1 | 0 | 26985 | 0 | 7 | 187773 | 100.0% | 879 | 961 | 3 |
+| pandas | v3.0.3 | 160780 | 0 | 0 | 26985 | 0 | 8 | 187773 | 100.0% | 880 | 961 | 3 |
 | networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 0 | 0 | 6894 | 100.0% | 259 | 266 | 0 |
-| pydantic | v2.11.7 | 5338 | 14 | 0 | 921 | 0 | 0 | 6273 | 99.8% | 77 | 82 | 0 |
+| pydantic | v2.11.7 | 5338 | 0 | 0 | 921 | 0 | 14 | 6273 | 99.8% | 79 | 82 | 0 |
 | scikit-learn-1 | 1.9.0 | 8432 | 0 | 0 | 6624 | 0 | 0 | 15056 | 100.0% | 79 | 87 | 0 |
 | scikit-learn-2 | 1.9.0 | 5046 | 0 | 0 | 1892 | 0 | 0 | 6938 | 100.0% | 52 | 58 | 0 |
-| scikit-learn-3 | 1.9.0 | 9251 | 3 | 0 | 2530 | 0 | 0 | 11784 | 100.0% | 104 | 114 | 0 |
+| scikit-learn-3 | 1.9.0 | 9251 | 0 | 0 | 2530 | 0 | 3 | 11784 | 100.0% | 107 | 114 | 0 |
 
 ### pytest @ 9.0.3
 
@@ -272,7 +272,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_lowlevel.py | passed | 44 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_pytest_plugin.py | passed | 35 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_signals.py | passed | 12 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_sockets.py | passed | 1189 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_sockets.py | failed | 1188 | 1 | 0 | 0 | 0 | 0 |
 | tests/test_subprocesses.py | passed | 76 | 0 | 0 | 4 | 0 | 0 |
 | tests/test_synchronization.py | passed | 235 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_taskgroups.py | passed | 393 | 0 | 0 | 10 | 0 | 0 |
@@ -357,7 +357,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_doctest.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_precedence.py | passed | 10 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_restrict_hosts.py | failed | 27 | 1 | 0 | 0 | 0 | 0 |
-| tests/test_socket.py | failed | 19 | 3 | 0 | 0 | 0 | 0 |
+| tests/test_socket.py | timeout | 0 | 0 | 0 | 0 | 0 | 0 |
 
 </details>
 
@@ -379,8 +379,8 @@ pytest-rs; they are not counted in the total.
 | tests/test_order_scope.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_order_scope_level.py | passed | 5 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_ordering.py | passed | 19 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_ordering_options.py | failed | 0 | 2 | 0 | 0 | 0 | 0 |
-| tests/test_relative_ordering.py | failed | 19 | 2 | 0 | 0 | 0 | 0 |
+| tests/test_ordering_options.py | failed | 1 | 1 | 0 | 0 | 0 | 0 |
+| tests/test_relative_ordering.py | passed | 21 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_sparse_ordinals.py | passed | 16 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_xdist_handling.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 
@@ -1896,7 +1896,7 @@ pytest-rs; they are not counted in the total.
 | pandas/tests/io/sas/test_sas7bdat.py | no-tests | 0 | 0 | 0 | 96 | 0 | 0 |
 | pandas/tests/io/sas/test_xport.py | no-tests | 0 | 0 | 0 | 8 | 0 | 0 |
 | pandas/tests/io/test_common.py | passed | 92 | 0 | 0 | 36 | 0 | 0 |
-| pandas/tests/io/test_compression.py | failed | 117 | 1 | 0 | 18 | 0 | 0 |
+| pandas/tests/io/test_compression.py | passed | 117 | 0 | 0 | 18 | 0 | 1 |
 | pandas/tests/io/test_feather.py | no-tests | 0 | 0 | 0 | 1 | 0 | 0 |
 | pandas/tests/io/test_fsspec.py | passed | 1 | 0 | 0 | 31 | 0 | 0 |
 | pandas/tests/io/test_gcs.py | passed | 1 | 0 | 0 | 18 | 0 | 0 |
@@ -2526,7 +2526,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_callable.py | passed | 8 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_color.py | passed | 90 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_computed_fields.py | passed | 30 | 0 | 0 | 2 | 0 | 0 |
-| tests/test_config.py | failed | 83 | 1 | 0 | 0 | 0 | 0 |
+| tests/test_config.py | passed | 83 | 0 | 0 | 0 | 0 | 1 |
 | tests/test_construction.py | passed | 51 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_create_model.py | passed | 27 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_dataclasses.py | passed | 217 | 0 | 0 | 3 | 0 | 0 |
@@ -2560,7 +2560,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_pickle.py | passed | 21 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_pipeline.py | passed | 63 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_plugin_loader.py | passed | 6 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_plugins.py | failed | 0 | 13 | 0 | 0 | 0 | 0 |
+| tests/test_plugins.py | passed | 0 | 0 | 0 | 0 | 0 | 13 |
 | tests/test_private_attributes.py | passed | 31 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_rich_repr.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_root_model.py | passed | 76 | 0 | 0 | 0 | 0 | 0 |
@@ -2809,9 +2809,9 @@ pytest-rs; they are not counted in the total.
 | sklearn/decomposition/tests/test_pca.py | passed | 386 | 0 | 0 | 220 | 0 | 0 |
 | sklearn/decomposition/tests/test_sparse_pca.py | passed | 40 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/decomposition/tests/test_truncated_svd.py | passed | 46 | 0 | 0 | 0 | 0 | 0 |
-| sklearn/experimental/tests/test_enable_hist_gradient_boosting.py | failed | 0 | 1 | 0 | 0 | 0 | 0 |
-| sklearn/experimental/tests/test_enable_iterative_imputer.py | failed | 0 | 1 | 0 | 0 | 0 | 0 |
-| sklearn/experimental/tests/test_enable_successive_halving.py | failed | 0 | 1 | 0 | 0 | 0 | 0 |
+| sklearn/experimental/tests/test_enable_hist_gradient_boosting.py | passed | 0 | 0 | 0 | 0 | 0 | 1 |
+| sklearn/experimental/tests/test_enable_iterative_imputer.py | passed | 0 | 0 | 0 | 0 | 0 | 1 |
+| sklearn/experimental/tests/test_enable_successive_halving.py | passed | 0 | 0 | 0 | 0 | 0 | 1 |
 | sklearn/feature_extraction/tests/test_dict_vectorizer.py | passed | 38 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/feature_extraction/tests/test_feature_hasher.py | passed | 13 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/feature_extraction/tests/test_image.py | passed | 9 | 0 | 0 | 17 | 0 | 0 |

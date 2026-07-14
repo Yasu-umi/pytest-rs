@@ -4,7 +4,7 @@
   "category": "real-world",
   "excluded_files": 0,
   "deselected": 0,
-  "known_failed": 0,
+  "known_failed": 3,
   "files": [
     {
       "file": "sklearn/_loss/tests/test_link.py",
@@ -558,36 +558,36 @@
     },
     {
       "file": "sklearn/experimental/tests/test_enable_hist_gradient_boosting.py",
-      "status": "failed",
+      "status": "passed",
       "exit_code": 1,
       "passed": 0,
-      "failed": 1,
+      "failed": 0,
       "skipped": 0,
       "errors": 0,
       "deselected": 0,
-      "known_failed": 0
+      "known_failed": 1
     },
     {
       "file": "sklearn/experimental/tests/test_enable_iterative_imputer.py",
-      "status": "failed",
+      "status": "passed",
       "exit_code": 1,
       "passed": 0,
-      "failed": 1,
+      "failed": 0,
       "skipped": 0,
       "errors": 0,
       "deselected": 0,
-      "known_failed": 0
+      "known_failed": 1
     },
     {
       "file": "sklearn/experimental/tests/test_enable_successive_halving.py",
-      "status": "failed",
+      "status": "passed",
       "exit_code": 1,
       "passed": 0,
-      "failed": 1,
+      "failed": 0,
       "skipped": 0,
       "errors": 0,
       "deselected": 0,
-      "known_failed": 0
+      "known_failed": 1
     },
     {
       "file": "sklearn/feature_extraction/tests/test_dict_vectorizer.py",

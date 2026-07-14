@@ -118,7 +118,7 @@ _linux (CI-verified)_
 | pytest-xdist | v3.8.0 | 97 | 0 | 0 | 1 | 0 | 0 | 98 | 100.0% | 1 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 122 | 0 | 0 | 1 | 0 | 0 | 123 | 100.0% | 6 | 7 | 6 |
-| anyio | 4.13.0 | 3120 | 0 | 0 | 42 | 0 | 0 | 3162 | 100.0% | 26 | 26 | 0 |
+| anyio | 4.13.0 | 3119 | 1 | 0 | 42 | 0 | 0 | 3162 | 100.0% | 25 | 26 | 0 |
 
 **Third-party plugins** (not reimplemented — their own upstream test suites run under pytest-rs, loaded via the `pytest11` entry-point shim):
 
@@ -132,8 +132,8 @@ _linux (CI-verified)_
 | pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-snapshot | v0.9.0 | 102 | 5 | 0 | 0 | 0 | 0 | 107 | 95.3% | 0 | 3 | 0 |
 | pytest-icdiff | 0.5 | 10 | 2 | 0 | 0 | 0 | 0 | 12 | 83.3% | 0 | 1 | 0 |
-| pytest-socket | 0.7.0 | 60 | 5 | 0 | 0 | 0 | 0 | 65 | 92.3% | 3 | 6 | 0 |
-| pytest-order | v1.4.0 | 129 | 5 | 0 | 0 | 0 | 0 | 134 | 96.3% | 13 | 16 | 0 |
+| pytest-socket | 0.7.0 | 41 | 2 | 0 | 0 | 0 | 0 | 43 | 95.3% | 3 | 6 | 0 |
+| pytest-order | v1.4.0 | 132 | 2 | 0 | 0 | 0 | 0 | 134 | 98.5% | 14 | 16 | 0 |
 | pytest-repeat | v0.9.4 | 16 | 0 | 0 | 0 | 0 | 0 | 16 | 100.0% | 1 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
 | pytest-env | 1.6.0 | 72 | 3 | 0 | 0 | 0 | 0 | 75 | 96.0% | 2 | 3 | 0 |
@@ -159,12 +159,12 @@ _linux (CI-verified)_
 | werkzeug | 3.1.3 | 922 | 0 | 0 | 1 | 25 | 0 | 948 | 97.4% | 24 | 25 | 0 |
 | fastapi | 0.115.12 | 2332 | 1 | 0 | 130 | 0 | 1 | 2464 | 99.9% | 303 | 310 | 0 |
 | packaging | 25.0 | 26948 | 0 | 0 | 0 | 0 | 0 | 26948 | 100.0% | 12 | 12 | 0 |
-| pandas | v3.0.3 | 160780 | 1 | 0 | 26985 | 0 | 7 | 187773 | 100.0% | 879 | 961 | 3 |
+| pandas | v3.0.3 | 160780 | 0 | 0 | 26985 | 0 | 8 | 187773 | 100.0% | 880 | 961 | 3 |
 | networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 0 | 0 | 6894 | 100.0% | 259 | 266 | 0 |
-| pydantic | v2.11.7 | 5338 | 14 | 0 | 921 | 0 | 0 | 6273 | 99.8% | 77 | 82 | 0 |
+| pydantic | v2.11.7 | 5338 | 0 | 0 | 921 | 0 | 14 | 6273 | 99.8% | 79 | 82 | 0 |
 | scikit-learn-1 | 1.9.0 | 8432 | 0 | 0 | 6624 | 0 | 0 | 15056 | 100.0% | 79 | 87 | 0 |
 | scikit-learn-2 | 1.9.0 | 5046 | 0 | 0 | 1892 | 0 | 0 | 6938 | 100.0% | 52 | 58 | 0 |
-| scikit-learn-3 | 1.9.0 | 9251 | 3 | 0 | 2530 | 0 | 0 | 11784 | 100.0% | 104 | 114 | 0 |
+| scikit-learn-3 | 1.9.0 | 9251 | 0 | 0 | 2530 | 0 | 3 | 11784 | 100.0% | 107 | 114 | 0 |
 <!-- conformance-results:end -->
 
 The suites are included as **shallow git submodules** under `conformance/suites/` at the pinned release tags. Initialize them once after cloning:

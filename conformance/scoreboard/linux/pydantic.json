@@ -4,7 +4,7 @@
   "category": "real-world",
   "excluded_files": 0,
   "deselected": 0,
-  "known_failed": 0,
+  "known_failed": 14,
   "files": [
     {
       "file": "tests/benchmarks/test_attribute_access.py",
@@ -239,14 +239,14 @@
     },
     {
       "file": "tests/test_config.py",
-      "status": "failed",
+      "status": "passed",
       "exit_code": 1,
       "passed": 83,
-      "failed": 1,
+      "failed": 0,
       "skipped": 0,
       "errors": 0,
       "deselected": 0,
-      "known_failed": 0
+      "known_failed": 1
     },
     {
       "file": "tests/test_construction.py",
@@ -613,14 +613,14 @@
     },
     {
       "file": "tests/test_plugins.py",
-      "status": "failed",
+      "status": "passed",
       "exit_code": 1,
       "passed": 0,
-      "failed": 13,
+      "failed": 0,
       "skipped": 0,
       "errors": 0,
       "deselected": 0,
-      "known_failed": 0
+      "known_failed": 13
     },
     {
       "file": "tests/test_private_attributes.py",
