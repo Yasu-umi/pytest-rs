@@ -948,8 +948,15 @@ pub fn warn_explicit_at(
     lineno: u32,
 ) -> PyResult<()> {
     let category = py.import("pytest")?.getattr(category)?;
-    py.import("warnings")?
-        .call_method1("warn_explicit", (message, category, filename, lineno))?;
+    // Mirrors pytest's Config.issue_config_time_warning: a scoped
+    // simplefilter("always", ...) so an ambient `filterwarnings = error`
+    // (from the enclosing session/ini) can't silently turn this
+    // config-time diagnostic into a swallowed exception, while a more
+    // specific ignore for this category (session ini/-W) still wins.
+    py.import("pytest._wcapture")?.call_method1(
+        "issue_config_time_warning_explicit",
+        (category, message, filename, lineno),
+    )?;
     Ok(())
 }
 

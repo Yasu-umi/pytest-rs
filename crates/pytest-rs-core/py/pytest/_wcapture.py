@@ -103,6 +103,25 @@ def _fire_config_time_warning(warning: Warning, stacklevel: int) -> None:
     _fire_warning_recorded(wm, location=location)
 
 
+def issue_config_time_warning_explicit(category, message, filename, lineno):
+    """pytest's Config.issue_config_time_warning, for callers (Rust) that
+    only have message/filename/lineno rather than a Warning instance.
+
+    Wraps the warning in a scoped simplefilter("always", category) so an
+    ambient `filterwarnings = error` can't silently swallow it, then
+    re-applies this session's own ini/-W filters on top (higher priority
+    than the escape hatch, since filterwarnings() prepends) so a specific
+    `ignore` for this category still wins, matching upstream exactly.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter("always", category)
+        for spec in _session_ini_specs:
+            _apply_filter(spec, escape=False)
+        for spec in _session_w_specs:
+            _apply_filter(spec, escape=True)
+        warnings.warn_explicit(message, category, filename, lineno)
+
+
 def _showwarning(message, category, filename, lineno, file=None, line=None):
     captured.append(
         {
@@ -242,6 +261,11 @@ def _apply_filter(spec, escape):
 # The session's filter specs (ini then -W), kept for pytester: upstream's
 # in-process nested runs inherit the outer session's warning filters.
 session_specs: list = []
+# ini/-W specs kept separately (with their escape mode) so a config-time
+# warning can re-apply them on top of its own simplefilter("always", ...)
+# escape hatch (see issue_config_time_warning).
+_session_ini_specs: list = []
+_session_w_specs: list = []
 
 
 def apply_session_filters(ini_specs, w_specs):
@@ -255,6 +279,8 @@ def apply_session_filters(ini_specs, w_specs):
         if spec.strip()
     ]
     session_specs[:] = [*forwarded, *ini_specs, *w_specs]
+    _session_ini_specs[:] = [*forwarded, *ini_specs]
+    _session_w_specs[:] = list(w_specs)
     for spec in forwarded:
         _apply_filter(spec, escape=False)
     for spec in ini_specs:

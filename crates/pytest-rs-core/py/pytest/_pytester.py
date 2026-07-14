@@ -296,7 +296,6 @@ def run_inprocess(args, plugins=(), helper_plugin=None, forwarded_filter_marks=(
     _wcapture.captured.clear()
     _wcapture.current_test = None
     _wcapture.current_when = "config"
-    warnings.filters[:] = []
     # Clear __warningregistry__ in all loaded modules so "default" filters
     # don't suppress warnings that were already shown in a previous inner run.
     for _mod in list(sys.modules.values()):
