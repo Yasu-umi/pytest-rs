@@ -163,6 +163,7 @@ jobs:
           name: scoreboard-${{ matrix.group }}
           path: conformance/scoreboard/linux/
           retention-days: 1
+          overwrite: true
 
   conformance-finish:
     name: conformance results
