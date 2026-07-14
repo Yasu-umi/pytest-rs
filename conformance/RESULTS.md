@@ -53,7 +53,7 @@ pytest-rs; they are not counted in the total.
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
 | rich | v14.2.0 | 855 | 0 | 0 | 25 | 0 | 0 | 880 | 100.0% | 60 | 62 | 0 |
 | sqlglot | v30.11.0 | 1120 | 0 | 0 | 0 | 0 | 0 | 1120 | 100.0% | 52 | 54 | 0 |
-| pytest-bdd | 8.1.0 | 133 | 5 | 0 | 1 | 0 | 0 | 139 | 96.4% | 32 | 35 | 0 |
+| pytest-bdd | 8.1.0 | 134 | 4 | 0 | 1 | 0 | 0 | 139 | 97.1% | 32 | 35 | 0 |
 | httpx | 0.28.1 | 1410 | 0 | 0 | 1 | 0 | 7 | 1418 | 99.5% | 31 | 31 | 0 |
 | httpx2 | v2.4.0 | 1426 | 0 | 0 | 1 | 0 | 0 | 1427 | 100.0% | 31 | 31 | 0 |
 | starlette | 0.46.2 | 907 | 0 | 0 | 0 | 0 | 0 | 907 | 100.0% | 28 | 28 | 0 |
@@ -61,7 +61,7 @@ pytest-rs; they are not counted in the total.
 | more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 0 | 0 | 671 | 100.0% | 2 | 2 | 0 |
 | pytest-django | v4.9.0 | 215 | 0 | 0 | 1 | 0 | 0 | 216 | 100.0% | 12 | 13 | 0 |
 | werkzeug | 3.1.3 | 922 | 0 | 0 | 1 | 25 | 0 | 948 | 97.4% | 24 | 25 | 0 |
-| fastapi | 0.115.12 | 2330 | 1 | 0 | 130 | 0 | 1 | 2462 | 99.9% | 302 | 310 | 0 |
+| fastapi | 0.115.12 | 2332 | 1 | 0 | 130 | 0 | 1 | 2464 | 99.9% | 303 | 310 | 0 |
 | packaging | 25.0 | 26948 | 0 | 0 | 0 | 0 | 0 | 26948 | 100.0% | 12 | 12 | 0 |
 | pandas | v3.0.3 | 160780 | 0 | 0 | 26985 | 0 | 8 | 187773 | 100.0% | 880 | 961 | 3 |
 | networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 0 | 0 | 6894 | 100.0% | 259 | 266 | 0 |
@@ -669,7 +669,7 @@ pytest-rs; they are not counted in the total.
 | tests/feature/test_cucumber_json.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/feature/test_description.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/feature/test_feature_base_dir.py | passed | 7 | 0 | 0 | 0 | 0 | 0 |
-| tests/feature/test_gherkin_terminal_reporter.py | failed | 12 | 2 | 0 | 0 | 0 | 0 |
+| tests/feature/test_gherkin_terminal_reporter.py | failed | 13 | 1 | 0 | 0 | 0 | 0 |
 | tests/feature/test_no_scenario.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/feature/test_outline.py | passed | 7 | 0 | 0 | 0 | 0 | 0 |
 | tests/feature/test_outline_empty_values.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
@@ -1218,7 +1218,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_tutorial/test_websockets/test_tutorial001.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_tutorial/test_websockets/test_tutorial002.py | passed | 30 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_tutorial/test_websockets/test_tutorial003.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_tutorial/test_websockets/test_tutorial003_py39.py | timeout | 0 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_tutorial/test_websockets/test_tutorial003_py39.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_tutorial/test_wsgi/test_tutorial001.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_typing_python39.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_union_body.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
