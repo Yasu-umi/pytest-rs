@@ -818,4 +818,12 @@ slow_files = [
     "sklearn/neighbors/tests/test_kd_tree.py",
     "sklearn/neighbors/tests/test_neighbors.py",
 ]
+known_failures = [
+    # subprocess-side `import pytest` — this venv has no real pytest package
+    # installed (pytest-rs is a from-scratch drop-in replacement), unrelated
+    # to which runner drives the outer test.
+    "sklearn/experimental/tests/test_enable_hist_gradient_boosting.py::test_import_raises_warning",
+    "sklearn/experimental/tests/test_enable_iterative_imputer.py::test_imports_strategies",
+    "sklearn/experimental/tests/test_enable_successive_halving.py::test_imports_strategies",
+]
 
