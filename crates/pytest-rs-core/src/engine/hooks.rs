@@ -115,11 +115,16 @@ impl Engine {
         // Plugins registered at configure time via pluginmanager.register()
         // (e.g. pytest-order's OrderingPlugin) live in pluginmanager._plugins,
         // not session.py_hooks — include their impls (and every entry-point
-        // plugin module's) here.
-        hook_funcs.extend(python::instance_hook_funcs(
-            py,
-            "pytest_collection_modifyitems",
-        ));
+        // plugin module's) here. instance_hook_impls returns them in plain
+        // registration order; stable-sort by tryfirst/normal/trylast tier so
+        // e.g. pytest-order's --indulgent-ordering (tryfirst) correctly runs
+        // ahead of a normal-priority plugin registered later, matching pluggy.
+        // Wrapper/hookwrapper impls are deliberately left at the normal tier
+        // (not hoisted by their own tryfirst flag) since this sort doesn't
+        // implement true wrapper nesting — see pytest_order_ff_reorder_hookwrapper_ordering_gap.
+        let mut instance_funcs = python::instance_hook_funcs(py, "pytest_collection_modifyitems");
+        instance_funcs.sort_by_key(|func| Self::modifyitems_hookimpl_tier(py, func));
+        hook_funcs.extend(instance_funcs);
         let itemcollected_funcs = hook_for("pytest_itemcollected");
         let collectstart_funcs = hook_for("pytest_collectstart");
         let recording = crate::engine::inprocess::recording();
@@ -317,6 +322,32 @@ impl Engine {
             }
         }
         Ok(())
+    }
+
+    /// Sort key for a `pytest_collection_modifyitems` instance hook: 0 for a
+    /// plain tryfirst impl, 2 for a plain trylast impl, 1 otherwise (normal
+    /// priority, and wrapper/hookwrapper impls left un-hoisted). Reads the
+    /// `pytest_impl` dict the `pytest.hookimpl(...)` decorator shim attaches
+    /// to the function; absent means normal priority.
+    fn modifyitems_hookimpl_tier(py: Python<'_>, func: &Py<pyo3::PyAny>) -> u8 {
+        let get_bool_flag = |flag: &str| -> bool {
+            func.bind(py)
+                .getattr("pytest_impl")
+                .ok()
+                .and_then(|d| d.cast_into::<pyo3::types::PyDict>().ok())
+                .and_then(|d| d.get_item(flag).ok().flatten())
+                .and_then(|v| v.extract::<bool>().ok())
+                .unwrap_or(false)
+        };
+        if get_bool_flag("wrapper") || get_bool_flag("hookwrapper") {
+            1
+        } else if get_bool_flag("tryfirst") {
+            0
+        } else if get_bool_flag("trylast") {
+            2
+        } else {
+            1
+        }
     }
 
     /// Emit pytest_collectstart + pytest_make_collect_report +
