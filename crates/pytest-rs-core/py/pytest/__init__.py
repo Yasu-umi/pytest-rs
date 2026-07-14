@@ -114,6 +114,38 @@ version_tuple = (9, 0, 3)
 __pytest_rs__ = True
 
 
+def _replay_django_settings_override() -> None:
+    """A bare `python script.py` that calls django.conf.settings.configure()
+    and then pytest.main() loses that in-memory Django state once main()
+    spawns a fresh pytest-rs-bin subprocess (see main() below) -- the child
+    never saw the configure() call. If the parent captured the override
+    kwargs into PYTEST_RS_DJANGO_SETTINGS_OVERRIDE, replay them here before
+    this process collects any test module: this module is imported very
+    early (install_shim, Rust side) -- well before collection starts."""
+    import os
+
+    blob = os.environ.pop("PYTEST_RS_DJANGO_SETTINGS_OVERRIDE", None)
+    if blob is None:
+        return
+    try:
+        from django.conf import settings as django_settings
+    except ModuleNotFoundError:
+        return
+    if django_settings.configured:
+        return
+    try:
+        import base64
+        import pickle
+
+        overrides = pickle.loads(base64.b64decode(blob))
+    except Exception:
+        return
+    django_settings.configure(**overrides)
+
+
+_replay_django_settings_override()
+
+
 class UsageError(Exception):
     """Errors in pytest usage or invocation."""
 
@@ -219,6 +251,25 @@ def main(args=None, plugins=None):
     env = os.environ.copy()
     for var, val in _RUNNER_LIBPATH.items():
         env.setdefault(var, val)
+
+    # Forward an already-configured Django settings state (see
+    # _replay_django_settings_override above) -- without this the child
+    # subprocess starts with a completely blank Django, even though this
+    # process configured it moments ago.
+    if "DJANGO_SETTINGS_MODULE" not in env:
+        django_conf = sys.modules.get("django.conf")
+        if django_conf is not None and django_conf.settings.configured:
+            try:
+                import base64
+                import pickle
+
+                wrapped = django_conf.settings._wrapped
+                overrides = {k: v for k, v in vars(wrapped).items() if k.isupper()}
+                env["PYTEST_RS_DJANGO_SETTINGS_OVERRIDE"] = base64.b64encode(
+                    pickle.dumps(overrides)
+                ).decode("ascii")
+            except Exception:
+                pass
 
     proc = subprocess.run([str(exe), *extra, *cli], env=env)
     return proc.returncode
