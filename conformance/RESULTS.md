@@ -35,7 +35,7 @@ pytest-rs; they are not counted in the total.
 | pytest-benchmark | v5.1.0 | 122 | 0 | 0 | 1 | 0 | 0 | 123 | 100.0% | 6 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 42 | 0 | 0 | 1 | 0 | 0 | 43 | 100.0% | 1 | 1 | 0 |
 | anyio | 4.13.0 | 3120 | 0 | 0 | 42 | 0 | 0 | 3162 | 100.0% | 26 | 26 | 0 |
-| pytest-mypy | v1.0.1 | 75 | 1 | 0 | 2 | 0 | 0 | 78 | 98.7% | 0 | 1 | 0 |
+| pytest-mypy | v1.0.1 | 76 | 0 | 0 | 2 | 0 | 0 | 78 | 100.0% | 1 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-subtests | v0.14.2 | 32 | 0 | 0 | 0 | 0 | 0 | 32 | 100.0% | 1 | 1 | 0 |
 | pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
@@ -53,7 +53,7 @@ pytest-rs; they are not counted in the total.
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
 | rich | v14.2.0 | 855 | 0 | 0 | 25 | 0 | 0 | 880 | 100.0% | 60 | 62 | 0 |
 | sqlglot | v30.11.0 | 1120 | 0 | 0 | 0 | 0 | 0 | 1120 | 100.0% | 52 | 54 | 0 |
-| pytest-bdd | 8.1.0 | 134 | 4 | 0 | 1 | 0 | 0 | 139 | 97.1% | 32 | 35 | 0 |
+| pytest-bdd | 8.1.0 | 136 | 2 | 0 | 1 | 0 | 0 | 139 | 98.6% | 33 | 35 | 0 |
 | httpx | 0.28.1 | 1410 | 0 | 0 | 1 | 0 | 7 | 1418 | 99.5% | 31 | 31 | 0 |
 | httpx2 | v2.4.0 | 1426 | 0 | 0 | 1 | 0 | 0 | 1427 | 100.0% | 31 | 31 | 0 |
 | starlette | 0.46.2 | 907 | 0 | 0 | 0 | 0 | 0 | 907 | 100.0% | 28 | 28 | 0 |
@@ -290,7 +290,7 @@ pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| tests/test_pytest_mypy.py | failed | 75 | 1 | 0 | 2 | 0 | 0 |
+| tests/test_pytest_mypy.py | passed | 76 | 0 | 0 | 2 | 0 | 0 |
 
 </details>
 
@@ -685,7 +685,7 @@ pytest-rs; they are not counted in the total.
 | tests/library/test_parent.py | passed | 5 | 0 | 0 | 0 | 0 | 0 |
 | tests/parser/test_errors.py | passed | 7 | 0 | 0 | 0 | 0 | 0 |
 | tests/parser/test_parser.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
-| tests/scripts/test_generate.py | failed | 1 | 2 | 0 | 0 | 0 | 0 |
+| tests/scripts/test_generate.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
 | tests/scripts/test_main.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
 | tests/scripts/test_migrate.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/steps/test_common.py | passed | 8 | 0 | 0 | 0 | 0 | 0 |
