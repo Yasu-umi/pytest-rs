@@ -257,16 +257,28 @@ def make_runner(cls, method_name):
         # setUp/method/tearDown loop bypasses. Call them when present.
         pre_setup = getattr(case, "_pre_setup", None)
         post_teardown = getattr(case, "_post_teardown", None)
+        # unittest.IsolatedAsyncioTestCase overrides _callSetUp/_callTestMethod/
+        # _callTearDown to run setUp/the test body/tearDown (plus async{Set,Tear}Down)
+        # inside its own asyncio runner/context; plain TestCase's versions are
+        # plain self.setUp()/method()/self.tearDown(). Routing through these hooks
+        # (instead of calling setUp/method/tearDown directly) makes async test
+        # methods actually get awaited, matching upstream's
+        # `TestCaseFunction.runtest`'s `is_async_function` branch, while regular
+        # sync TestCase subclasses behave exactly as before.
+        setup_asyncio_runner = getattr(case, "_setupAsyncioRunner", None)
+        teardown_asyncio_runner = getattr(case, "_tearDownAsyncioRunner", None)
+        if setup_asyncio_runner is not None:
+            setup_asyncio_runner()
         try:
             if pre_setup is not None:
                 pre_setup()
             try:
-                case.setUp()
+                case._callSetUp()
             except unittest.SkipTest as e:
                 raise Skipped(msg=str(e)) from None
             try:
                 try:
-                    method()
+                    case._callTestMethod(method)
                 except unittest.SkipTest as e:
                     # A whole-test skipTest() reports at the test method's def
                     # line (pytest's item location), not unittest/case.py.
@@ -292,13 +304,19 @@ def make_runner(cls, method_name):
                         failure.pytrace = False
                         raise failure
             finally:
-                case.tearDown()
+                case._callTearDown()
         except BaseException as exc:
             primary = exc
         finally:
             if post_teardown is not None:
                 try:
                     post_teardown()
+                except BaseException as texc:  # noqa: BLE001
+                    if primary is None:
+                        primary = texc
+            if teardown_asyncio_runner is not None:
+                try:
+                    teardown_asyncio_runner()
                 except BaseException as texc:  # noqa: BLE001
                     if primary is None:
                         primary = texc
