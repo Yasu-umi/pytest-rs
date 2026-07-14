@@ -4,7 +4,7 @@
   "category": "ecosystem",
   "excluded_files": 61,
   "deselected": 0,
-  "known_failed": 8,
+  "known_failed": 9,
   "files": [
     {
       "file": "testing/python/approx.py",
@@ -198,11 +198,11 @@
       "status": "failed",
       "exit_code": 1,
       "passed": 111,
-      "failed": 2,
+      "failed": 1,
       "skipped": 3,
       "errors": 0,
       "deselected": 0,
-      "known_failed": 0
+      "known_failed": 1
     },
     {
       "file": "testing/test_compat.py",
