@@ -199,17 +199,42 @@ impl Engine {
             // show_missing_code) prints via a plain TerminalWriter wrapping
             // `sys.stdout` at call time, so re-resume capturing first (this
             // run's own tmpfile) — run_session's cmdline_main_exit branch
-            // pops it to the correct fd via capture_session_end.
+            // pops it to the correct fd via capture_session_end. This hook
+            // fires on every run of a suite that merely has such a plugin
+            // loaded (not just when the plugin's own flag is set), so if
+            // nothing claims the exit, put capture's installed-flag back
+            // exactly as found — leaving it forced-on would desync the
+            // normal per-item capture bookkeeping for the rest of this run.
+            let globals = pyo3::types::PyDict::new(py);
             let _ = py.run(
                 c"import pytest._capture as _c
+was_installed = _c.state._installed
 if _c.state._capture is not None:
     _c.state._capture.resume_capturing()
     _c.state._installed = True
 ",
-                None,
+                Some(&globals),
                 None,
             );
-            match python::fire_cmdline_main(py) {
+            let was_installed: bool = globals
+                .get_item("was_installed")
+                .ok()
+                .flatten()
+                .and_then(|v| v.extract().ok())
+                .unwrap_or(false);
+            let cmdline_result = python::fire_cmdline_main(py);
+            if !matches!(cmdline_result, Ok(Some(_))) && !was_installed {
+                let _ = py.run(
+                    c"import pytest._capture as _c
+if _c.state._capture is not None:
+    _c.state._capture.suspend_capturing(in_=True)
+    _c.state._installed = False
+",
+                    None,
+                    None,
+                );
+            }
+            match cmdline_result {
                 Ok(Some(code)) => self.session.cmdline_main_exit = Some(code),
                 Ok(None) => {}
                 Err(err) => return Err(python::format_exception(py, &err)),
