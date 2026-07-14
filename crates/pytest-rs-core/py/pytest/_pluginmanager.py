@@ -288,12 +288,14 @@ class HookCaller:
             res = func(**_accepted_kwargs(func, kwargs))
             if res is not None:
                 if firstresult:
-                    results = res
+                    # A legitimate firstresult value (0, False, "", an empty
+                    # list/tuple) must survive as-is — only the "no impl
+                    # produced a non-None result" case collapses to None
+                    # (e.g. pytest_cmdline_main returning exit code 0).
+                    result = res
                     break
                 results.append(res)
-        if firstresult:
-            result = results if results else None
-        else:
+        if not firstresult:
             result = results
 
         # Unwind innermost-first. New-style wrappers receive the result at
