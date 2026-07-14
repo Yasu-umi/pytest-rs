@@ -168,6 +168,53 @@ impl Engine {
             .import("pytest._wcapture")
             .and_then(|m| m.call_method1("set_current_when", ("config",)));
         collect_result?;
+        // A plugin's pytest_cmdline_main hookimpl (firstresult) may claim the
+        // whole run (e.g. pytest-bdd's --generate-missing, which calls
+        // session.perform_collect() expecting the already-collected items
+        // back, then reads session._fixturemanager). Only pay the cost of
+        // building the item-proxy/fixturemanager stash when some plugin
+        // actually implements the hook — true for essentially no suite.
+        if python::has_cmdline_main_hook(py) {
+            let node_proxies: Vec<Py<PyAny>> = self
+                .session
+                .items
+                .iter()
+                .map(|item| python::make_node(py, item))
+                .collect::<PyResult<_>>()
+                .map_err(|err| python::format_exception(py, &err))?;
+            let items_list = pyo3::types::PyList::new(py, node_proxies)
+                .map_err(|err| python::format_exception(py, &err))?;
+            let fixturemanager =
+                crate::runner::build_fixturemanager_from_session(py, &self.session)
+                    .map_err(|err| python::format_exception(py, &err))?;
+            py.import("pytest._node")
+                .and_then(|m| m.call_method1("set_native_collection", (items_list, fixturemanager)))
+                .map_err(|err| python::format_exception(py, &err))?;
+            // Collection just finished, so per-file collect capture already
+            // suspended itself (collect_end, called for the last file) —
+            // while suspended, `sys.stdout` points at whatever it was
+            // *before this capture started*, which for a nested run is the
+            // outer session's own capture buffer, not this run's redirected
+            // fd. A plugin's pytest_cmdline_main impl (pytest-bdd's
+            // show_missing_code) prints via a plain TerminalWriter wrapping
+            // `sys.stdout` at call time, so re-resume capturing first (this
+            // run's own tmpfile) — run_session's cmdline_main_exit branch
+            // pops it to the correct fd via capture_session_end.
+            let _ = py.run(
+                c"import pytest._capture as _c
+if _c.state._capture is not None:
+    _c.state._capture.resume_capturing()
+    _c.state._installed = True
+",
+                None,
+                None,
+            );
+            match python::fire_cmdline_main(py) {
+                Ok(Some(code)) => self.session.cmdline_main_exit = Some(code),
+                Ok(None) => {}
+                Err(err) => return Err(python::format_exception(py, &err)),
+            }
+        }
         Ok(errors)
     }
 }

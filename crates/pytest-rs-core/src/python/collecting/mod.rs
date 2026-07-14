@@ -21,6 +21,8 @@ pub use hooks::CustomCollectResult;
 pub use hooks::call_collect_directory_hook;
 pub use hooks::call_pycollect_makemodule_hook;
 pub use hooks::collect_custom_files;
+pub use hooks::fire_cmdline_main;
+pub use hooks::has_cmdline_main_hook;
 pub use hooks::has_collect_directory_hook;
 pub use hooks::has_collect_file_hook;
 pub use hooks::has_pycollect_makeitem_hook;

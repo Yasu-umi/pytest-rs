@@ -512,6 +512,12 @@ class Session(Collector):
 
     def perform_collect(self, args=None, genitems=False):
         if not args or args == [self.nodeid] or args == [""]:
+            native = take_native_collection()
+            if native is not None:
+                items, fixturemanager = native
+                self.items = items
+                self._fixturemanager = fixturemanager
+                return list(items)
             return [self]
         results = []
         for arg in args:
@@ -1537,6 +1543,25 @@ _pycollect_makeitem_hooks: list = []
 def set_pycollect_hooks(hooks: list) -> None:
     global _pycollect_makeitem_hooks
     _pycollect_makeitem_hooks = list(hooks)
+
+
+# The already-collected (items, fixturemanager) pair handed to a
+# `pytest_cmdline_main` plugin (e.g. pytest-bdd's --generate-missing) via
+# Session.perform_collect() — set by the engine right before firing that
+# hook, consumed (and cleared) the first time perform_collect() is called.
+_native_collection: tuple | None = None
+
+
+def set_native_collection(items: list, fixturemanager: object) -> None:
+    global _native_collection
+    _native_collection = (items, fixturemanager)
+
+
+def take_native_collection() -> tuple | None:
+    global _native_collection
+    result = _native_collection
+    _native_collection = None
+    return result
 
 
 def fire_makeitem_for_function(

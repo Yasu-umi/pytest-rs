@@ -141,6 +141,39 @@ impl Engine {
         python::set_gc_enabled(py, true);
         let n_collect_errors = collect_errors.len();
 
+        // A plugin's pytest_cmdline_main hookimpl claimed the whole run
+        // (e.g. pytest-bdd's --generate-missing) — it already did its own
+        // collection/reporting via session.perform_collect(), so skip
+        // deselection/running/summary entirely and exit with its code.
+        if let Some(code) = self.session.cmdline_main_exit {
+            // The plugin's own printing (e.g. pytest-bdd's TerminalWriter
+            // output) went through the session-wide native capture that was
+            // still installed while pytest_cmdline_main fired during
+            // collect() — release it now (same call the normal end-of-run
+            // path makes) or it stays buffered until some later,
+            // unrelated capture_session_end and surfaces on the wrong
+            // stream (e.g. an outer nested run's own captured stdout).
+            python::capture_session_end(py);
+            // Real pytest's wrap_session fires pytest_sessionfinish, whose
+            // terminal reporter prints the closing "==== ... in X.XXs ===="
+            // line even when nothing ran (a plugin's own Session never ran
+            // the test protocol) — pytester's assert_outcomes needs that
+            // duration-bearing line to parse a (here, all-zero) outcome
+            // count instead of raising "summary report not found".
+            let summary = crate::runner::summary_line(
+                &[],
+                0,
+                0,
+                started.elapsed(),
+                self.config.global_verbosity(),
+            );
+            if !summary.is_empty() {
+                println!("{summary}");
+            }
+            let _ = flush_hook_output(py, || self.fire_py_hooks_simple(py, "pytest_unconfigure"));
+            return code;
+        }
+
         // --markers / -h,--help (and similar early-exit modes) printed their
         // output during collect and skipped item collection.  Return OK now
         // — falling through would reach handle_no_tests() → exit 5 ("no

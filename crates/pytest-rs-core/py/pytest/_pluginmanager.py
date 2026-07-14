@@ -413,6 +413,7 @@ class PluginManager:
             "pytest_pycollect_makeitem": {"firstresult": True},
             "pytest_pyfunc_call": {"firstresult": True},
             "pytest_make_parametrize_id": {"firstresult": True},
+            "pytest_cmdline_main": {"firstresult": True},
         }
         # (before, after) callbacks fired around every hook call (HookRecorder
         # registers itself here to record calls; see add_hookcall_monitoring).

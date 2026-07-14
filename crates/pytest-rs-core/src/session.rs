@@ -177,6 +177,10 @@ pub struct Session {
     /// is the only way finish_session can tell a zero-item dist run apart
     /// from an ordinary all-passed one to return NO_TESTS_COLLECTED.
     pub dist_total_items: Option<usize>,
+    /// Set when a plugin's `pytest_cmdline_main` hookimpl (firstresult)
+    /// claimed the run (e.g. pytest-bdd's `--generate-missing`) — the
+    /// engine skips deselection/running entirely and exits with this code.
+    pub cmdline_main_exit: Option<i32>,
 }
 
 impl Session {
@@ -215,6 +219,7 @@ impl Session {
             plugin_distinfo: Vec::new(),
             delegated_render: false,
             dist_total_items: None,
+            cmdline_main_exit: None,
         }
     }
 

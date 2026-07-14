@@ -275,26 +275,21 @@ pub(crate) fn current_fixturenames(py: Python<'_>) -> Option<Vec<String>> {
     Some(names)
 }
 
-/// Build a pytest-bdd-compatible FixtureManager view of the running item's
-/// fixture registry: `_arg2fixturedefs` seeded with a ShimFixtureDef per
-/// registered definition (carrying its func/baseid so pytest-bdd can match
-/// step fixtures by `_pytest_bdd_step_context` and alias them by name).
-#[allow(unsafe_code)]
-pub(crate) fn build_fixturemanager(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let session_ptr = RESOLVE_CTX.with(|stack| stack.borrow().last().map(|ctx| ctx.session));
-    let Some(session_ptr) = session_ptr else {
-        return Err(pyo3::exceptions::PyRuntimeError::new_err(
-            "_fixturemanager is only available while a test is running",
-        ));
-    };
-    // Safety: same invariant as getfixturevalue — the run_one frame below us
-    // owns this pointer and is suspended in the Python call that reached here.
-    let session = unsafe { &*session_ptr };
-    let instance = current_resolve_instance(py);
+/// Shared by `build_fixturemanager` (request-scoped) and
+/// `build_fixturemanager_from_session` (session-scoped, no running item):
+/// build the pytest-bdd-compatible FixtureManager view — `_arg2fixturedefs`
+/// seeded with a ShimFixtureDef per registered definition (carrying its
+/// func/baseid so pytest-bdd can match step fixtures by
+/// `_pytest_bdd_step_context` and alias them by name).
+fn build_fixturemanager_from_registry(
+    py: Python<'_>,
+    registry: &crate::fixture::FixtureRegistry,
+    instance: Option<&Py<PyAny>>,
+) -> PyResult<Py<PyAny>> {
     let entries = pyo3::types::PyList::empty(py);
-    for def in session.registry.all_defs() {
+    for def in registry.all_defs() {
         let func = if def.needs_instance
-            && let Some(inst) = instance.as_ref()
+            && let Some(inst) = instance
         {
             let bound = inst.bind(py);
             def.func
@@ -315,6 +310,36 @@ pub(crate) fn build_fixturemanager(py: Python<'_>) -> PyResult<Py<PyAny>> {
         .getattr("build_manager")?
         .call1((entries,))
         .map(|fm| fm.unbind())
+}
+
+/// Build a pytest-bdd-compatible FixtureManager view of the running item's
+/// fixture registry (see `build_fixturemanager_from_registry`).
+#[allow(unsafe_code)]
+pub(crate) fn build_fixturemanager(py: Python<'_>) -> PyResult<Py<PyAny>> {
+    let session_ptr = RESOLVE_CTX.with(|stack| stack.borrow().last().map(|ctx| ctx.session));
+    let Some(session_ptr) = session_ptr else {
+        return Err(pyo3::exceptions::PyRuntimeError::new_err(
+            "_fixturemanager is only available while a test is running",
+        ));
+    };
+    // Safety: same invariant as getfixturevalue — the run_one frame below us
+    // owns this pointer and is suspended in the Python call that reached here.
+    let session = unsafe { &*session_ptr };
+    let instance = current_resolve_instance(py);
+    build_fixturemanager_from_registry(py, &session.registry, instance.as_ref())
+}
+
+/// Same FixtureManager view as `build_fixturemanager`, but usable outside a
+/// running item — e.g. for `session._fixturemanager` handed to a
+/// `pytest_cmdline_main` plugin (pytest-bdd's `--generate-missing`) right
+/// after native collection finishes, with no RESOLVE_CTX/instance active.
+/// `needs_instance` defs get the unbound function, same as a plain module-
+/// level fixture — sufficient for pytest-bdd's step-fixture name matching.
+pub(crate) fn build_fixturemanager_from_session(
+    py: Python<'_>,
+    session: &Session,
+) -> PyResult<Py<PyAny>> {
+    build_fixturemanager_from_registry(py, &session.registry, None)
 }
 
 /// Resolve one fixture by name for an item, using the cache, recursing into

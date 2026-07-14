@@ -8,13 +8,37 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from pytest import (
-    ExitCode,  # noqa: F401
+    ExitCode,
     UsageError,
 )
 from pytest._node import Session as Session  # noqa: E402, F401
 
 from _pytest._stub import __getattr__  # noqa: E402, F401
 from _pytest.pathlib import absolutepath, safe_exists
+
+
+def wrap_session(config, doit):
+    """Minimal faithful port of upstream's wrap_session: build a Session,
+    run `doit(config, session)`, and return the resulting exit code.
+
+    Used by plugins whose `pytest_cmdline_main` hookimpl claims the whole
+    run (e.g. pytest-bdd's --generate-missing calls this directly). Real
+    pytest's wrap_session also fires pytest_sessionstart/pytest_sessionfinish
+    and installs faulthandler etc.; the engine already ran configure and
+    sessionstart natively before any pytest_cmdline_main plugin can reach
+    here (see Engine::collect's cmdline_main dispatch, fired after native
+    collection finishes), so those extra side effects are intentionally not
+    repeated.
+    """
+    session = Session.from_config(config)
+    session.exitstatus = ExitCode.OK
+    try:
+        session.exitstatus = doit(config, session) or 0
+    except Session.Failed:
+        session.exitstatus = ExitCode.TESTS_FAILED
+    except (KeyboardInterrupt, Session.Interrupted):
+        session.exitstatus = ExitCode.INTERRUPTED
+    return session.exitstatus
 
 
 def _in_venv(path) -> bool:

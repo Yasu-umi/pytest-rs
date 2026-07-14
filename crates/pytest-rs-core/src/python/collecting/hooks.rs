@@ -271,6 +271,51 @@ pub fn has_pycollect_makeitem_hook(_py: Python<'_>, hooks: &[crate::session::PyH
     hooks.iter().any(|h| h.name == "pytest_pycollect_makeitem")
 }
 
+/// True when some registered plugin (e.g. pytest-bdd, via its pytest11
+/// entry point) implements `pytest_cmdline_main` — gates the per-session
+/// item-proxy/fixturemanager stash in `Engine::collect` so the normal
+/// (overwhelmingly common) case building no plugin's cmdline_main impl
+/// pays zero extra cost.
+pub fn has_cmdline_main_hook(py: Python<'_>) -> bool {
+    (|| -> PyResult<bool> {
+        let impls = py
+            .import("pytest._pluginmanager")?
+            .getattr("pluginmanager")?
+            .getattr("hook")?
+            .getattr("pytest_cmdline_main")?
+            .call_method0("get_hookimpls")?;
+        Ok(impls.len()? > 0)
+    })()
+    .unwrap_or(false)
+}
+
+/// Fire `pytest_cmdline_main(config)` via the pluginmanager relay
+/// (firstresult). A non-None return means a plugin (e.g. pytest-bdd's
+/// `--generate-missing`) claimed the run entirely: the returned int is the
+/// process's exit code, and the engine must skip deselection/running.
+/// Unlike the other hook-firing helpers in this module, a Python exception
+/// here propagates rather than being swallowed — a plugin's
+/// pytest_cmdline_main impl raising is a real failure, not "no plugin
+/// claimed this", and silently falling through to normal collection would
+/// be actively misleading.
+pub fn fire_cmdline_main(py: Python<'_>) -> PyResult<Option<i32>> {
+    let Some(config) = crate::python::proxies::existing_py_config(py) else {
+        return Ok(None);
+    };
+    let hook_relay = py
+        .import("pytest._pluginmanager")?
+        .getattr("pluginmanager")?
+        .getattr("hook")?
+        .getattr("pytest_cmdline_main")?;
+    let kwargs = pyo3::types::PyDict::new(py);
+    kwargs.set_item("config", config.bind(py))?;
+    let result = hook_relay.call((), Some(&kwargs))?;
+    if result.is_none() {
+        return Ok(None);
+    }
+    result.extract::<Option<i32>>()
+}
+
 /// Fire `pytest_pycollect_makeitem(collector, name, obj)` for one namespace
 /// member via the pluginmanager relay (firstresult). When a conftest returns a
 /// custom node (or list of nodes) the result is `Some(vec![(class_name,
