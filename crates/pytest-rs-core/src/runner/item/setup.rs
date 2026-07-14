@@ -269,7 +269,7 @@ pub(crate) fn evaluate_item_prelude(
         Ok(Some((reason, module_level))) => {
             // Use invocation-dir-relative path so the SKIPPED summary shows
             // "tests/test_1.py:N" when rootdir is a subdirectory.
-            let file = crate::collect::file_nodeid(&config.invocation_dir, &item.path);
+            let file = crate::collect::file_nodeid(&config.invocation_dir, &item.path, &[]);
             // Marker skips report the item's definition site; module-level
             // pytestmark skips fold per file, without a line number.
             let location = if module_level {

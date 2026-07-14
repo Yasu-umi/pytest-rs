@@ -667,6 +667,8 @@ impl Engine {
                 paths = globbed;
             }
         }
+        self.session.initial_paths =
+            crate::collect::resolve_initial_paths(&self.config.invocation_dir, &paths);
         let python_files = self.config.python_files_patterns();
         let norecursedirs = self.config.norecursedirs_patterns();
         let Ok((files, _not_found)) = crate::collect::collect_test_files(
@@ -681,7 +683,7 @@ impl Engine {
             return errors;
         };
         for file in files {
-            let rel = crate::collect::file_nodeid(&self.config.rootdir, &file);
+            let rel = crate::collect::file_nodeid(&self.config.rootdir, &file, &[]);
             if let Err(msg) = self.ensure_collected(py, collection, &rel) {
                 errors.push((rel, msg));
             }
@@ -709,7 +711,10 @@ impl Engine {
             // pytest_configure mutations. Load each candidate's chain now.
             for file in &candidate {
                 if let Err(msg) = self.ensure_conftest_chain(py, collection, file) {
-                    errors.push((crate::collect::file_nodeid(&self.config.rootdir, file), msg));
+                    errors.push((
+                        crate::collect::file_nodeid(&self.config.rootdir, file, &[]),
+                        msg,
+                    ));
                 }
             }
             let hooks = std::mem::take(&mut self.session.py_hooks);
@@ -732,7 +737,7 @@ impl Engine {
                     }
                     for (path, longrepr) in collect_result.errors {
                         errors.push((
-                            crate::collect::file_nodeid(&self.config.rootdir, &path),
+                            crate::collect::file_nodeid(&self.config.rootdir, &path, &[]),
                             longrepr,
                         ));
                     }
@@ -742,7 +747,7 @@ impl Engine {
                         {
                             continue;
                         }
-                        let rel = crate::collect::file_nodeid(&self.config.rootdir, &file);
+                        let rel = crate::collect::file_nodeid(&self.config.rootdir, &file, &[]);
                         if let Err(msg) = self.ensure_collected(py, collection, &rel) {
                             errors.push((rel, msg));
                         }
@@ -859,6 +864,7 @@ impl Engine {
                 &mut self.session.registry,
                 &mut self.session.py_hooks,
                 import_mode,
+                &self.session.initial_paths,
             )
             .map_err(|err| python::format_exception(py, &err))?;
             collection.loaded_conftests.insert(conftest);
@@ -895,6 +901,7 @@ impl Engine {
             &python::NameFilters::from_config(py, &self.config),
             import_mode,
             &self.plugins,
+            &self.session.initial_paths,
         )
         .map_err(|err| python::format_test_failure(py, &err, "short"))?;
         {

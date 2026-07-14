@@ -676,7 +676,7 @@ fn print_verbose_report_line(
                 // and startpath is absolute — bestrelpath's "both paths must
                 // be the same kind" fallback then just returns fspath as-is.
                 // The practical result is the plain rootdir-relative path.
-                let co_file = crate::collect::file_nodeid(&config.rootdir, &canonical);
+                let co_file = crate::collect::file_nodeid(&config.rootdir, &canonical, &[]);
                 let item_file = item.nodeid.split("::").next().unwrap_or(&item.nodeid);
                 if co_file != item_file {
                     return format!(" <- {co_file}");

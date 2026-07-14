@@ -19,7 +19,11 @@ impl Engine {
         if n_collect_errors > 0 {
             // Collection errors still report as errors in the summary.
             for (path, err) in collect_errors {
-                let nodeid = crate::collect::file_nodeid(&self.config.rootdir, &path);
+                let nodeid = crate::collect::file_nodeid(
+                    &self.config.rootdir,
+                    &path,
+                    &self.session.initial_paths,
+                );
                 self.session
                     .collect_errors
                     .push((nodeid.clone(), err.clone()));

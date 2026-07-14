@@ -84,6 +84,7 @@ pub fn collect_module(
     filters: &NameFilters,
     mode: ImportMode,
     plugins: &[Box<dyn Plugin>],
+    initial_paths: &[std::path::PathBuf],
 ) -> PyResult<()> {
     let (module_name, module) = import_module_for(py, rootdir, path, mode)?;
     // pytest's import_path raises ImportPathMismatchError when a module of the
@@ -95,7 +96,7 @@ pub fn collect_module(
     if mode != ImportMode::Importlib {
         check_import_path_mismatch(py, &module, &module_name, path)?;
     }
-    let nodeid_base = file_nodeid(rootdir, path);
+    let nodeid_base = file_nodeid(rootdir, path, initial_paths);
 
     register_pytest_plugins(py, &module, registry, hooks)?;
     // Plugin/conftest pytest_generate_tests impls (e.g. pytest-repeat) run on
@@ -143,6 +144,7 @@ pub fn collect_module(
 
 /// Collect doctest items from an already-imported Python module.
 /// Returns items appended to `items`; `py_config` is the PyConfig proxy.
+#[allow(clippy::too_many_arguments)]
 pub fn collect_doctests_from_module(
     py: Python<'_>,
     rootdir: &Path,
@@ -150,12 +152,13 @@ pub fn collect_doctests_from_module(
     py_config: &Py<PyAny>,
     items: &mut Vec<TestItem>,
     mode: ImportMode,
+    initial_paths: &[std::path::PathBuf],
 ) -> PyResult<()> {
     // Ensures sys.path (prepend/append) or sys.modules (importlib) is set up
     // the same way as collect_module; the doctest shim below then finds the
     // module already cached under this exact name.
     let (module_name, _module) = import_module_for(py, rootdir, path, mode)?;
-    let nodeid_base = file_nodeid(rootdir, path);
+    let nodeid_base = file_nodeid(rootdir, path, initial_paths);
     let doctest_mod = py.import("_pytest.doctest")?;
     let results = doctest_mod.getattr("collect_module_doctests")?.call1((
         module_name.as_str(),
@@ -203,8 +206,9 @@ pub fn collect_doctests_from_textfile(
     path: &Path,
     py_config: &Py<PyAny>,
     items: &mut Vec<TestItem>,
+    initial_paths: &[std::path::PathBuf],
 ) -> PyResult<()> {
-    let nodeid_base = file_nodeid(rootdir, path);
+    let nodeid_base = file_nodeid(rootdir, path, initial_paths);
     let doctest_mod = py.import("_pytest.doctest")?;
     let results = doctest_mod.getattr("collect_textfile_doctests")?.call1((
         path.to_string_lossy().as_ref(),

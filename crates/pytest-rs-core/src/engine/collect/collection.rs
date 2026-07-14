@@ -237,7 +237,8 @@ impl Engine {
                     Some(None) => {} // ignored silently
                     Some(Some(reason)) => {
                         // pytest.skip() in the hook: emit a skip report for this file
-                        let nodeid = crate::collect::file_nodeid(rootdir, &f);
+                        let nodeid =
+                            crate::collect::file_nodeid(rootdir, &f, &self.session.initial_paths);
                         self.session.reports.push(crate::report::TestReport {
                             nodeid,
                             phase: crate::report::Phase::Setup,
@@ -345,6 +346,7 @@ impl Engine {
                             file,
                             &py_config,
                             &mut self.session.items,
+                            &self.session.initial_paths,
                         )
                     {
                         errors.push((file.clone(), python::format_exception(py, &err)));
@@ -378,6 +380,7 @@ impl Engine {
                 &python::NameFilters::from_config(py, &self.config),
                 crate::collect::ImportMode::from_config(&self.config),
                 &self.plugins,
+                &self.session.initial_paths,
             );
             let collect_sections = python::capture_collect_end(py);
             let with_sections = |mut message: String| {
@@ -408,7 +411,11 @@ impl Engine {
                     // a bare pytest.skip there is an error.
                     match python::module_level_skip(py, &err) {
                         Some(Ok(reason)) => {
-                            let nodeid = crate::collect::file_nodeid(rootdir, file);
+                            let nodeid = crate::collect::file_nodeid(
+                                rootdir,
+                                file,
+                                &self.session.initial_paths,
+                            );
                             // The skip call site (file:line), like pytest.
                             let location = python::raise_location(py, &err)
                                 .unwrap_or_else(|| format!("{nodeid}:1"));
@@ -482,7 +489,11 @@ impl Engine {
                             if self.config.get_flag("doctest-modules")
                                 && self.config.get_flag("doctest-ignore-import-errors")
                             {
-                                let nodeid = crate::collect::file_nodeid(rootdir, file);
+                                let nodeid = crate::collect::file_nodeid(
+                                    rootdir,
+                                    file,
+                                    &self.session.initial_paths,
+                                );
                                 let longrepr = format!(
                                     "unable to import module PosixPath('{}')",
                                     file.display()
@@ -521,6 +532,7 @@ impl Engine {
                     &py_config,
                     &mut self.session.items,
                     crate::collect::ImportMode::from_config(&self.config),
+                    &self.session.initial_paths,
                 ) {
                     Ok(()) => {
                         // The module's doctests run BEFORE its functions

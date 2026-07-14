@@ -22,6 +22,8 @@ impl Engine {
         let rootdir = self.config.rootdir.clone();
         let (paths, mut files, deferred_not_found_args) =
             self.resolve_collection_paths(py, &rootdir)?;
+        self.session.initial_paths =
+            crate::collect::resolve_initial_paths(&self.config.invocation_dir, &paths);
         self.load_cmdline_and_entrypoint_plugins(py)?;
         // `-p`/entry-point plugins have now imported (upstream loads them
         // during early config parsing, well before pytest_configure); let

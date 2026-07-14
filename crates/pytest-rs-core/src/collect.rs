@@ -217,7 +217,7 @@ impl CollectIgnores {
 /// without following symlinks the way `std::fs::canonicalize` does — matching
 /// upstream's `resolve_collection_argument`, which uses plain
 /// `os.path.abspath` and never resolves symlinks at all.
-fn canonicalize_preserving_symlinks(path: &Path) -> PathBuf {
+pub(crate) fn canonicalize_preserving_symlinks(path: &Path) -> PathBuf {
     let mut canonical_prefix = PathBuf::new();
     let mut rest = PathBuf::new();
     let mut past_symlink = false;
@@ -814,17 +814,61 @@ fn is_python_file(path: &Path) -> bool {
     path.extension().and_then(|e| e.to_str()) == Some("py")
 }
 
-/// Node id for a test file: path relative to rootdir with '/' separators,
-/// or the path as-is when it lives outside the rootdir.
-pub fn file_nodeid(rootdir: &Path, path: &Path) -> String {
-    match path.strip_prefix(rootdir) {
-        Ok(relative) => relative
+/// Resolves each CLI collection argument to a canonicalized filesystem path
+/// (stripping any `::nodeid` suffix), the same way `collect_test_files`
+/// resolves its own `args`. Mirrors pytest's `session._initialpaths`: the
+/// frozenset of resolved `CollectionArgument.path`s used as the fallback
+/// anchor for nodeids of files collected from outside `rootdir` (see
+/// `file_nodeid`'s `Err` branch). Non-existent arguments are dropped, like
+/// upstream's `resolve_collection_argument`.
+pub fn resolve_initial_paths(invocation_dir: &Path, paths: &[String]) -> Vec<PathBuf> {
+    let args: Vec<&str> = if paths.is_empty() {
+        vec!["."]
+    } else {
+        paths.iter().map(String::as_str).collect()
+    };
+    let mut initial = Vec::with_capacity(args.len());
+    for arg in args {
+        let path_arg = arg.split("::").next().unwrap_or(arg);
+        let raw = invocation_dir.join(path_arg);
+        let path = canonicalize_preserving_symlinks(&raw);
+        if std::fs::metadata(&path).is_ok() && !initial.contains(&path) {
+            initial.push(path);
+        }
+    }
+    initial
+}
+
+/// Node id for a test file: path relative to rootdir with '/' separators.
+///
+/// When the file lives outside `rootdir`, mirrors pytest's
+/// `_check_initialpaths_for_relpath` (`_pytest/nodes.py`): walk the file's
+/// ancestor directories and, if one matches a resolved CLI collection
+/// argument in `initial_paths`, return the path relative to that ancestor
+/// instead of falling back to the absolute path.
+pub fn file_nodeid(rootdir: &Path, path: &Path, initial_paths: &[PathBuf]) -> String {
+    if let Ok(relative) = path.strip_prefix(rootdir) {
+        return relative
             .components()
             .map(|c| c.as_os_str().to_string_lossy())
             .collect::<Vec<_>>()
-            .join("/"),
-        Err(_) => path.to_string_lossy().replace('\\', "/"),
+            .join("/");
     }
+    if initial_paths.iter().any(|p| p == path) {
+        return String::new();
+    }
+    for parent in path.ancestors().skip(1) {
+        if initial_paths.iter().any(|p| p == parent)
+            && let Ok(relative) = path.strip_prefix(parent)
+        {
+            return relative
+                .components()
+                .map(|c| c.as_os_str().to_string_lossy())
+                .collect::<Vec<_>>()
+                .join("/");
+        }
+    }
+    path.to_string_lossy().replace('\\', "/")
 }
 
 /// Display path for a test file in the progress output, matching pytest's
@@ -840,7 +884,7 @@ pub fn file_nodeid(rootdir: &Path, path: &Path) -> String {
 pub fn display_file_path(rootdir: &Path, invocation_dir: &Path, path: &Path) -> String {
     // Fast path: file is inside rootdir — display is invocation-dir-relative.
     if path.starts_with(rootdir) {
-        return file_nodeid(invocation_dir, path);
+        return file_nodeid(invocation_dir, path, &[]);
     }
     // File is outside rootdir: mimic pytest's write_fspath_result.
     // pytest nodeid for such a file = path.relative_to(initial_collection_path)

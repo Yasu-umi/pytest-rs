@@ -84,6 +84,11 @@ pub struct PyHook {
 pub struct Session {
     pub items: Vec<TestItem>,
     pub registry: FixtureRegistry,
+    /// Canonicalized CLI collection argument paths (pytest's
+    /// `session._initialpaths`), the fallback anchor for nodeids of files
+    /// collected from outside rootdir. Computed once from the resolved
+    /// `cli_paths` at the start of collection; see `collect::file_nodeid`.
+    pub initial_paths: Vec<std::path::PathBuf>,
     /// Cached fixture values, GIL-independent handles.
     pub fixture_cache: HashMap<CacheKey, CachedFixture>,
     /// LIFO stack of pending finalizers across all scopes.
@@ -179,6 +184,7 @@ impl Session {
         Self {
             items: Vec::new(),
             registry: FixtureRegistry::default(),
+            initial_paths: Vec::new(),
             fixture_cache: HashMap::new(),
             finalizers: Vec::new(),
             reports: Vec::new(),

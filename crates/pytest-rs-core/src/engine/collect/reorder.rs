@@ -34,10 +34,15 @@ impl Engine {
                         &py_config,
                         &mut self.session.items,
                         import_mode,
+                        &self.session.initial_paths,
                     ) {
                         // Import errors skip the module with --doctest-ignore-import-errors.
                         if self.config.get_flag("doctest-ignore-import-errors") {
-                            let nodeid = crate::collect::file_nodeid(rootdir, extra_file);
+                            let nodeid = crate::collect::file_nodeid(
+                                rootdir,
+                                extra_file,
+                                &self.session.initial_paths,
+                            );
                             let longrepr = format!(
                                 "unable to import module PosixPath('{}')",
                                 extra_file.display()
@@ -89,6 +94,7 @@ impl Engine {
                         &tf,
                         &py_config,
                         &mut self.session.items,
+                        &self.session.initial_paths,
                     )
                 {
                     errors.push((tf.clone(), python::format_exception(py, &err)));
@@ -128,7 +134,11 @@ impl Engine {
                         // counts it ("N skipped") instead of collapsing to
                         // "no tests ran".
                         for (file, reason) in &collect_result.skipped {
-                            let nodeid = crate::collect::file_nodeid(rootdir, file);
+                            let nodeid = crate::collect::file_nodeid(
+                                rootdir,
+                                file,
+                                &self.session.initial_paths,
+                            );
                             self.session
                                 .collect_file_skips
                                 .push((nodeid.clone(), reason.clone()));
@@ -182,6 +192,7 @@ impl Engine {
                             &filters,
                             mode,
                             &self.plugins,
+                            &self.session.initial_paths,
                         ) {
                             errors.push((file, python::format_exception(py, &err)));
                         }
@@ -284,7 +295,11 @@ impl Engine {
                         let path = std::fs::canonicalize(&path).unwrap_or(path);
                         ArgSel::NodeId(format!(
                             "{}::{}",
-                            crate::collect::file_nodeid(rootdir, &path),
+                            crate::collect::file_nodeid(
+                                rootdir,
+                                &path,
+                                &self.session.initial_paths
+                            ),
                             rest
                         ))
                     }

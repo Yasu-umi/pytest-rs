@@ -603,6 +603,7 @@ result = [(ep.name, getattr(ep, 'module', None) or '', dist_name(dist), getattr(
 
 /// Import a conftest.py; its fixtures and pytest_* hooks are visible to
 /// all items under its directory.
+#[allow(clippy::too_many_arguments)]
 pub fn collect_conftest(
     py: Python<'_>,
     rootdir: &Path,
@@ -610,6 +611,7 @@ pub fn collect_conftest(
     registry: &mut FixtureRegistry,
     hooks: &mut Vec<crate::session::PyHook>,
     mode: ImportMode,
+    initial_paths: &[std::path::PathBuf],
 ) -> PyResult<()> {
     let module = if mode == ImportMode::Importlib {
         // importlib mode's per-file dotted names are already unique across
@@ -631,7 +633,7 @@ pub fn collect_conftest(
             None => py.import(module_name.as_str())?,
         }
     };
-    let dir_nodeid = file_nodeid(rootdir, path.parent().unwrap_or(rootdir));
+    let dir_nodeid = file_nodeid(rootdir, path.parent().unwrap_or(rootdir), initial_paths);
     let baseid = if dir_nodeid.is_empty() || dir_nodeid == "." {
         String::new()
     } else {

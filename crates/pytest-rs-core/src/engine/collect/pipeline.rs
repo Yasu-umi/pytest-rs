@@ -162,6 +162,7 @@ impl Engine {
                 &mut self.session.registry,
                 &mut self.session.py_hooks,
                 crate::collect::ImportMode::from_config(&self.config),
+                &self.session.initial_paths,
             );
             let conftest_sections = python::capture_collect_end(py);
             if let Err(err) = conftest_result {
