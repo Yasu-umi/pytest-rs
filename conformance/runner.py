@@ -141,8 +141,8 @@ class Suite:
             return None
         target = CACHE / "deps" / self.name
         marker = target / ".deps.txt"
-        wanted = "\n".join(sorted(self.deps))
-        if marker.exists() and marker.read_text() == wanted:
+        if marker.exists() and marker.read_text() == "\n".join(sorted(self.deps)):
+            self._fix_console_script_shebangs(target)
             return target
         target.mkdir(parents=True, exist_ok=True)
         subprocess.run(
@@ -150,8 +150,34 @@ class Suite:
             check=True,
             capture_output=True,
         )
-        marker.write_text(wanted)
+        marker.write_text("\n".join(sorted(self.deps)))
+        self._fix_console_script_shebangs(target)
         return target
+
+    @staticmethod
+    def _fix_console_script_shebangs(target: Path) -> None:
+        """Repoint any console_scripts wrapper's `#!/path/to/python` shebang
+        at the CURRENT interpreter. `deps_dir()`'s --target install may be
+        served from a CI cache (keyed on the deps list, not the interpreter
+        path) restored across runs whose Python install lives at a different
+        absolute path — a subprocess exec of the stale shebang then fails
+        with FileNotFoundError regardless of PATH being set correctly."""
+        bin_dir = target / "bin"
+        if not bin_dir.is_dir():
+            return
+        current_shebang = f"#!{sys.executable}"
+        for script in bin_dir.iterdir():
+            if not script.is_file():
+                continue
+            try:
+                with script.open("r", encoding="utf-8", errors="strict") as f:
+                    first_line = f.readline()
+                    rest = f.read()
+            except (UnicodeDecodeError, OSError):
+                continue
+            if not first_line.startswith("#!") or first_line.rstrip("\n") == current_shebang:
+                continue
+            script.write_text(f"{current_shebang}\n{rest}", encoding="utf-8")
 
     def _install_package(self) -> None:
         """Install a PyPI wheel into the checkout dir (for suites whose tests
