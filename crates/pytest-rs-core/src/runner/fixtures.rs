@@ -19,6 +19,14 @@ pub(crate) struct ResolveCtx {
     config: *const Config,
     item: *const TestItem,
     class_instance: Option<Py<PyAny>>,
+    /// Fixture values injected for this item's run via pytest-bdd's
+    /// target_fixture mechanism (`ShimFixtureDef.cached_result`, see
+    /// pytest/_fixturemanager.py). Consulted by `resolve_fixture` for every
+    /// dependency name, so a fixture that merely *depends on* an injected
+    /// name (not just one resolved through request.getfixturevalue) sees
+    /// the override too. Scoped to the item's ResolveCtx frame — dropped
+    /// with it, no cross-item leakage.
+    injected: std::collections::HashMap<String, Py<PyAny>>,
 }
 
 thread_local! {
@@ -85,6 +93,7 @@ pub(crate) fn push_resolve_ctx(
             config,
             item,
             class_instance: None,
+            injected: std::collections::HashMap::new(),
         });
     });
     DYNAMIC_NAMES.with(|stack| stack.borrow_mut().push(Vec::new()));
@@ -112,6 +121,27 @@ pub(crate) fn current_resolve_instance(py: Python<'_>) -> Option<Py<PyAny>> {
             .borrow()
             .last()
             .and_then(|ctx| ctx.class_instance.as_ref().map(|obj| obj.clone_ref(py)))
+    })
+}
+
+/// Record an injected fixture value (pytest-bdd's target_fixture) for the
+/// current item's run. See `ResolveCtx::injected`.
+pub(crate) fn set_injected_fixture(py: Python<'_>, name: &str, value: Py<PyAny>) {
+    let _ = py;
+    RESOLVE_CTX.with(|stack| {
+        if let Some(ctx) = stack.borrow_mut().last_mut() {
+            ctx.injected.insert(name.to_string(), value);
+        }
+    });
+}
+
+/// The injected value for `name` in the current item's run, if any.
+pub(crate) fn get_injected_fixture(py: Python<'_>, name: &str) -> Option<Py<PyAny>> {
+    RESOLVE_CTX.with(|stack| {
+        stack
+            .borrow()
+            .last()
+            .and_then(|ctx| ctx.injected.get(name).map(|v| v.clone_ref(py)))
     })
 }
 
@@ -300,6 +330,13 @@ pub(crate) fn resolve_fixture(
     class_instance: Option<&Py<PyAny>>,
     stack: &mut Vec<std::sync::Arc<crate::fixture::FixtureDef>>,
 ) -> PyResult<Py<PyAny>> {
+    // pytest-bdd's target_fixture: a value injected via
+    // request._get_active_fixturedef(name).cached_result = ... for the
+    // current item's run wins outright, same as upstream's cached_result
+    // short-circuit — the fixture (if any) never runs.
+    if let Some(value) = get_injected_fixture(py, name) {
+        return Ok(value);
+    }
     // Direct (non-indirect) parametrize of a fixture name: the callspec
     // value replaces the fixture outright, its function never runs
     // (pytest's PseudoFixtureDef bypass).

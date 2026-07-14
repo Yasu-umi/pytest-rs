@@ -802,7 +802,7 @@ impl PyRequest {
             return Ok(None);
         }
         let def = defs.get_item(len - 1)?;
-        if def.hasattr("cached_result")? {
+        if def.getattr("_has_cached_result")?.extract::<bool>()? {
             let cached = def.getattr("cached_result")?;
             return Ok(Some(cached.get_item(0)?.unbind()));
         }
@@ -1052,9 +1052,16 @@ impl PyRequest {
 
     /// The active (most-recently-registered) ShimFixtureDef for `name`, which
     /// pytest-bdd's inject_fixture pins a `cached_result` on. Builds the
-    /// manager if needed.
-    fn _get_active_fixturedef(&self, py: Python<'_>, name: &str) -> PyResult<Py<PyAny>> {
-        let fm = self._fixturemanager(py)?;
+    /// manager if needed. The returned def's `owner` is set to this request
+    /// so its `cached_result` setter can propagate the injected value to the
+    /// Rust-native resolver's per-item override map (see
+    /// `ShimFixtureDef.cached_result` in pytest/_fixturemanager.py) — a
+    /// sibling fixture that merely depends on `name` (rather than calling
+    /// request.getfixturevalue on this same request) resolves natively and
+    /// would otherwise never see the override.
+    fn _get_active_fixturedef(slf: Bound<'_, Self>, name: &str) -> PyResult<Py<PyAny>> {
+        let py = slf.py();
+        let fm = slf.borrow()._fixturemanager(py)?;
         let defs = fm
             .bind(py)
             .getattr("_arg2fixturedefs")?
@@ -1063,9 +1070,20 @@ impl PyRequest {
             && let Ok(len) = defs.len()
             && len > 0
         {
-            return Ok(defs.get_item(len - 1)?.unbind());
+            let def = defs.get_item(len - 1)?;
+            def.setattr("owner", slf.clone().into_any())?;
+            return Ok(def.unbind());
         }
         Err(pyo3::exceptions::PyKeyError::new_err(name.to_string()))
+    }
+
+    /// Bridge for `ShimFixtureDef.cached_result`'s setter (Python side):
+    /// records an injected fixture value (pytest-bdd's target_fixture) in
+    /// the current item's override map, consulted by the Rust-native
+    /// fixture resolver (`resolve_fixture`) for every dependency, not just
+    /// ones resolved via request.getfixturevalue.
+    fn _set_injected_fixture(&self, py: Python<'_>, argname: String, value: Py<PyAny>) {
+        crate::runner::set_injected_fixture(py, &argname, value);
     }
 
     /// Apply a marker to the running item (pytest's request.applymarker);

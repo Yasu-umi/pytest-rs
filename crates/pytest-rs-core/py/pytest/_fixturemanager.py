@@ -39,6 +39,29 @@ class ShimFixtureDef:
         # The name to resolve in the Rust registry; None for purely injected
         # defs (target_fixture values), which instead get a cached_result.
         self.registry_name = registry_name
+        self._cached_result = None
+        self._has_cached_result = False
+        # Set by PyRequest._get_active_fixturedef on the def it returns, so
+        # the cached_result setter below can forward an injected value
+        # (pytest-bdd's target_fixture) to the Rust-native resolver's
+        # per-item override map. Without this, a *sibling* fixture that
+        # merely depends on the injected name (rather than resolving it via
+        # request.getfixturevalue on this same request) never sees the
+        # override — each FixtureRequest gets its own throwaway
+        # ShimFixtureManager, but native fixture-dependency resolution
+        # bypasses it entirely.
+        self.owner = None
+
+    @property
+    def cached_result(self):
+        return self._cached_result
+
+    @cached_result.setter
+    def cached_result(self, value):
+        self._cached_result = value
+        self._has_cached_result = True
+        if self.owner is not None and value is not None:
+            self.owner._set_injected_fixture(self.argname, value[0])
 
     def __repr__(self):
         return f"<ShimFixtureDef argname={self.argname!r} baseid={self.baseid!r}>"
