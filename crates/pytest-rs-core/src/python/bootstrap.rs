@@ -117,7 +117,15 @@ if not hasattr(_main, '__file__'):
     py.import("_pytest.fixtures")?;
     // Register a minimal plugin that provides pytest_runtest_makereport
     // default through the hook relay (plugins like pytest-subtests call
-    // item.ihook.pytest_runtest_makereport).
+    // item.ihook.pytest_runtest_makereport). Marked trylast so it only
+    // supplies the synthesized-from-scratch fallback when nothing else
+    // answers the firstresult hook — pytest._reporter's _CoreMakeReport
+    // (also trylast, registered later) returns the real Rust-built report
+    // proxy and must win whenever it's present, otherwise hookwrapper
+    // plugins that enrich the report (e.g. pytest-bdd's
+    // pytest_runtest_makereport wrapper) mutate a throwaway object instead
+    // of the one that actually reaches pytest_runtest_logreport/terminal
+    // output.
     py.run(
         c"import _pytest.runner as _r
 import pytest._pluginmanager as _pm
@@ -125,6 +133,7 @@ class _MakeReportPlugin:
     @staticmethod
     def pytest_runtest_makereport(item, call):
         return _r.pytest_runtest_makereport(item, call)
+_MakeReportPlugin.pytest_runtest_makereport.pytest_impl = {'trylast': True}
 _pm.pluginmanager.register(_MakeReportPlugin(), '_pytest.runner')
 ",
         None,
