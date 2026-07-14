@@ -932,9 +932,9 @@
     },
     {
       "file": "sklearn/linear_model/tests/test_sgd.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 267,
       "failed": 0,
       "skipped": 0,
       "errors": 0,

@@ -42,7 +42,7 @@ pytest-rs; they are not counted in the total.
 | pytest-snapshot | v0.9.0 | 102 | 5 | 0 | 0 | 0 | 0 | 107 | 95.3% | 0 | 3 | 0 |
 | pytest-icdiff | 0.5 | 10 | 2 | 0 | 0 | 0 | 0 | 12 | 83.3% | 0 | 1 | 0 |
 | pytest-socket | 0.7.0 | 60 | 5 | 0 | 0 | 0 | 0 | 65 | 92.3% | 3 | 6 | 0 |
-| pytest-order | v1.4.0 | 132 | 2 | 0 | 0 | 0 | 0 | 134 | 98.5% | 14 | 16 | 0 |
+| pytest-order | v1.4.0 | 134 | 0 | 0 | 0 | 0 | 0 | 134 | 100.0% | 16 | 16 | 0 |
 | pytest-repeat | v0.9.4 | 16 | 0 | 0 | 0 | 0 | 0 | 16 | 100.0% | 1 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
 | pytest-env | 1.6.0 | 72 | 3 | 0 | 0 | 0 | 0 | 75 | 96.0% | 2 | 3 | 0 |
@@ -59,16 +59,16 @@ pytest-rs; they are not counted in the total.
 | starlette | 0.46.2 | 907 | 0 | 0 | 0 | 0 | 0 | 907 | 100.0% | 28 | 28 | 0 |
 | attrs | 25.3.0 | 1341 | 0 | 0 | 5 | 0 | 0 | 1346 | 100.0% | 22 | 24 | 0 |
 | more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 0 | 0 | 671 | 100.0% | 2 | 2 | 0 |
-| pytest-django | v4.9.0 | 214 | 1 | 0 | 1 | 0 | 0 | 216 | 99.5% | 11 | 13 | 0 |
+| pytest-django | v4.9.0 | 215 | 0 | 0 | 1 | 0 | 0 | 216 | 100.0% | 12 | 13 | 0 |
 | werkzeug | 3.1.3 | 922 | 0 | 0 | 1 | 25 | 0 | 948 | 97.4% | 24 | 25 | 0 |
 | fastapi | 0.115.12 | 2332 | 1 | 0 | 130 | 0 | 1 | 2464 | 99.9% | 303 | 310 | 0 |
 | packaging | 25.0 | 26948 | 0 | 0 | 0 | 0 | 0 | 26948 | 100.0% | 12 | 12 | 0 |
 | pandas | v3.0.3 | 160780 | 0 | 0 | 26985 | 0 | 8 | 187773 | 100.0% | 880 | 961 | 3 |
 | networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 0 | 0 | 6894 | 100.0% | 259 | 266 | 0 |
 | pydantic | v2.11.7 | 5338 | 0 | 0 | 921 | 0 | 14 | 6273 | 99.8% | 79 | 82 | 0 |
-| scikit-learn-1 | 1.9.0 | 8165 | 0 | 0 | 6624 | 0 | 0 | 14789 | 100.0% | 78 | 87 | 0 |
+| scikit-learn-1 | 1.9.0 | 8432 | 0 | 0 | 6624 | 0 | 0 | 15056 | 100.0% | 79 | 87 | 0 |
 | scikit-learn-2 | 1.9.0 | 5046 | 0 | 0 | 1892 | 0 | 0 | 6938 | 100.0% | 52 | 58 | 0 |
-| scikit-learn-3 | 1.9.0 | 9211 | 0 | 0 | 2530 | 0 | 3 | 11744 | 100.0% | 106 | 114 | 0 |
+| scikit-learn-3 | 1.9.0 | 9251 | 0 | 0 | 2530 | 0 | 3 | 11784 | 100.0% | 107 | 114 | 0 |
 
 ### pytest @ 9.0.3
 
@@ -371,7 +371,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_dependency.py | passed | 23 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_marker_prefix.py | passed | 7 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_misc.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_multiple_ordering.py | failed | 3 | 1 | 0 | 0 | 0 | 0 |
+| tests/test_multiple_ordering.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_order_group_scope.py | passed | 6 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_order_group_scope_dep.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_order_group_scope_named_dep.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
@@ -379,7 +379,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_order_scope.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_order_scope_level.py | passed | 5 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_ordering.py | passed | 19 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_ordering_options.py | failed | 1 | 1 | 0 | 0 | 0 | 0 |
+| tests/test_ordering_options.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_relative_ordering.py | passed | 21 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_sparse_ordinals.py | passed | 16 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_xdist_handling.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
@@ -869,7 +869,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_db_access_in_repr.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_db_setup.py | passed | 14 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_django_configurations.py | no-tests | 0 | 0 | 0 | 1 | 0 | 0 |
-| tests/test_django_settings_module.py | failed | 18 | 1 | 0 | 0 | 0 | 0 |
+| tests/test_django_settings_module.py | passed | 19 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_environment.py | passed | 22 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_fixtures.py | passed | 52 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_initialization.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
@@ -2680,7 +2680,7 @@ pytest-rs; they are not counted in the total.
 | sklearn/linear_model/tests/test_ransac.py | passed | 27 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/linear_model/tests/test_ridge.py | passed | 1088 | 0 | 0 | 348 | 0 | 0 |
 | sklearn/linear_model/tests/test_sag.py | passed | 27 | 0 | 0 | 0 | 0 | 0 |
-| sklearn/linear_model/tests/test_sgd.py | timeout | 0 | 0 | 0 | 0 | 0 | 0 |
+| sklearn/linear_model/tests/test_sgd.py | passed | 267 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/linear_model/tests/test_sparse_coordinate_descent.py | passed | 159 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/linear_model/tests/test_theil_sen.py | passed | 16 | 0 | 0 | 0 | 0 | 0 |
 
@@ -2807,7 +2807,7 @@ pytest-rs; they are not counted in the total.
 | sklearn/decomposition/tests/test_nmf.py | passed | 284 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/decomposition/tests/test_online_lda.py | passed | 55 | 0 | 0 | 2 | 0 | 0 |
 | sklearn/decomposition/tests/test_pca.py | passed | 386 | 0 | 0 | 220 | 0 | 0 |
-| sklearn/decomposition/tests/test_sparse_pca.py | timeout | 0 | 0 | 0 | 0 | 0 | 0 |
+| sklearn/decomposition/tests/test_sparse_pca.py | passed | 40 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/decomposition/tests/test_truncated_svd.py | passed | 46 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/experimental/tests/test_enable_hist_gradient_boosting.py | passed | 0 | 0 | 0 | 0 | 0 | 1 |
 | sklearn/experimental/tests/test_enable_iterative_imputer.py | passed | 0 | 0 | 0 | 0 | 0 | 1 |
