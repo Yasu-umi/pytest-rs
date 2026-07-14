@@ -671,6 +671,10 @@ known_failures = [
     "tests/api/test_api.py::TestApi::test_api",
     # sqlalchemy version message change — also fails under real pytest.
     "tests/io/test_sql.py::test_con_string_import_error",
+    # subprocess-side `import pytest` — this venv has no real pytest package
+    # installed (pytest-rs is a from-scratch drop-in replacement), unrelated
+    # to which runner drives the outer test.
+    "tests/io/test_compression.py::test_with_missing_lzma_runtime",
 ]
 
 [networkx]
