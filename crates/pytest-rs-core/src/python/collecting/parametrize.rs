@@ -176,6 +176,7 @@ pub(crate) fn push_test_items(
             is_doctest: false,
             fixture_names: fixture_names.clone(),
             extra_fixture_names: extra_generated_fixtures.clone(),
+            injected_fixture_names: Vec::new(),
             marks: item_marks,
             callspec: variant.params,
             fixture_params: variant.indirect_params,

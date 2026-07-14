@@ -652,6 +652,7 @@ pub fn collect_custom_files(
                     is_doctest: false,
                     fixture_names: Vec::new(),
                     extra_fixture_names: Vec::new(),
+                    injected_fixture_names: Vec::new(),
                     marks,
                     callspec: Vec::new(),
                     fixture_params: Vec::new(),

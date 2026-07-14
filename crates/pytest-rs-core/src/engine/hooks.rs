@@ -289,6 +289,30 @@ impl Engine {
                     });
                 }
                 item.marks = marks;
+                // A hook may mutate node.fixturenames in place (e.g.
+                // pytest-order's --error-on-failed-ordering pushing a
+                // nonexistent name to force a setup error, matching
+                // upstream where item.fixturenames itself drives setup).
+                // Any name not already known is carried forward so setup
+                // attempts to resolve it and errors if unregistered. Custom
+                // collector items (make_node exposes the real pytest.Item
+                // subclass directly) may have no fixturenames attribute at
+                // all — skip those rather than erroring.
+                if let Ok(fixturenames) = node.getattr("fixturenames") {
+                    let mut known: std::collections::HashSet<String> = item
+                        .fixture_names
+                        .iter()
+                        .chain(item.extra_fixture_names.iter())
+                        .chain(item.injected_fixture_names.iter())
+                        .cloned()
+                        .collect();
+                    for name in fixturenames.try_iter()? {
+                        let name: String = name?.extract()?;
+                        if known.insert(name.clone()) {
+                            item.injected_fixture_names.push(name);
+                        }
+                    }
+                }
                 items.push(item);
             }
         }

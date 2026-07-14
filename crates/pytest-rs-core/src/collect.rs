@@ -29,6 +29,13 @@ pub struct TestItem {
     /// Pseudo-fixture names visible in request.fixturenames but never
     /// resolved or passed to the test (e.g. _asyncio_loop_factory).
     pub extra_fixture_names: Vec<String>,
+    /// Fixture names a `pytest_collection_modifyitems` hook injected into the
+    /// node's `fixturenames` list (e.g. pytest-order's `error-on-failed-ordering`
+    /// pushing a nonexistent name to force a setup error). Unlike
+    /// `extra_fixture_names`, these ARE attempted for resolution at setup and
+    /// raise "fixture 'X' not found" if unregistered, matching upstream where
+    /// `item.fixturenames` itself drives fixture setup.
+    pub injected_fixture_names: Vec<String>,
     pub marks: Vec<MarkData>,
     /// Direct parameters from @pytest.mark.parametrize, by argname.
     pub callspec: Vec<(String, Py<PyAny>)>,

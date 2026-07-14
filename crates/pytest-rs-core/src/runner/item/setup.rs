@@ -157,6 +157,11 @@ pub(crate) fn build_test_setup(
     // reappear here as cache hits.
     let mut requested: Vec<String> = usefixtures.clone();
     requested.extend(item.fixture_names.iter().cloned());
+    // Names a pytest_collection_modifyitems hook injected into
+    // node.fixturenames (e.g. pytest-order's --error-on-failed-ordering)
+    // are attempted here too, erroring if unregistered — matching upstream,
+    // where item.fixturenames itself drives fixture setup.
+    requested.extend(item.injected_fixture_names.iter().cloned());
     let initialnames = session.registry.initial_names(&item.nodeid, &requested);
     let closure = session
         .registry

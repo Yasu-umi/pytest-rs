@@ -454,6 +454,7 @@ impl Plugin for AnyioPlugin {
                         is_doctest: item.is_doctest,
                         fixture_names: item.fixture_names.clone(),
                         extra_fixture_names: item.extra_fixture_names.clone(),
+                        injected_fixture_names: item.injected_fixture_names.clone(),
                         marks: item
                             .marks
                             .iter()
