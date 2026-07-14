@@ -264,6 +264,12 @@ class Suite:
     def _launch_env(self, rel: str) -> dict[str, str]:
         """PYTHONPATH + per-suite env for running `rel` under pytest-rs."""
         env = dict(os.environ)
+        # Suite deps are installed into --target dirs (see deps_dir()), not a
+        # real venv, but pytest-rs-bin's own venv-activation logic still reads
+        # VIRTUAL_ENV if set — inheriting the parent `uv run`'s dev venv here
+        # would leak this repo's own dev-only deps (e.g. mypy) onto the
+        # suite's sys.path.
+        env.pop("VIRTUAL_ENV", None)
         deps_dir = self.deps_dir()
         extra_paths = [str(p) for p in [self.src_dir, deps_dir] if p is not None]
         extra_paths.extend(str((self.checkout / entry).resolve()) for entry in self.pythonpath)
