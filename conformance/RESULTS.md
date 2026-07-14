@@ -67,8 +67,8 @@ pytest-rs; they are not counted in the total.
 | networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 0 | 0 | 6894 | 100.0% | 259 | 266 | 0 |
 | pydantic | v2.11.7 | 5338 | 0 | 0 | 921 | 0 | 14 | 6273 | 99.8% | 79 | 82 | 0 |
 | scikit-learn-1 | 1.9.0 | 8432 | 0 | 0 | 6624 | 0 | 0 | 15056 | 100.0% | 79 | 87 | 0 |
-| scikit-learn-2 | 1.9.0 | 4925 | 0 | 0 | 1802 | 0 | 0 | 6727 | 100.0% | 51 | 58 | 0 |
-| scikit-learn-3 | 1.9.0 | 9251 | 0 | 0 | 2530 | 0 | 3 | 11784 | 100.0% | 107 | 114 | 0 |
+| scikit-learn-2 | 1.9.0 | 5046 | 0 | 0 | 1892 | 0 | 0 | 6938 | 100.0% | 52 | 58 | 0 |
+| scikit-learn-3 | 1.9.0 | 9212 | 0 | 0 | 2530 | 0 | 3 | 11745 | 100.0% | 106 | 114 | 0 |
 
 ### pytest @ 9.0.3
 
@@ -2741,7 +2741,7 @@ pytest-rs; they are not counted in the total.
 | sklearn/model_selection/tests/test_search.py | passed | 140 | 0 | 0 | 31 | 0 | 0 |
 | sklearn/model_selection/tests/test_split.py | passed | 226 | 0 | 0 | 45 | 0 | 0 |
 | sklearn/model_selection/tests/test_successive_halving.py | passed | 98 | 0 | 0 | 4 | 0 | 0 |
-| sklearn/model_selection/tests/test_validation.py | timeout | 0 | 0 | 0 | 0 | 0 | 0 |
+| sklearn/model_selection/tests/test_validation.py | passed | 121 | 0 | 0 | 90 | 0 | 0 |
 | sklearn/preprocessing/tests/test_common.py | passed | 9 | 0 | 0 | 9 | 0 | 0 |
 | sklearn/preprocessing/tests/test_data.py | passed | 450 | 0 | 0 | 279 | 0 | 0 |
 | sklearn/preprocessing/tests/test_discretization.py | passed | 99 | 0 | 0 | 0 | 0 | 0 |
@@ -2825,7 +2825,7 @@ pytest-rs; they are not counted in the total.
 | sklearn/feature_selection/tests/test_sequential.py | passed | 74 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/feature_selection/tests/test_variance_threshold.py | passed | 25 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/frozen/tests/test_frozen.py | passed | 46 | 0 | 0 | 0 | 0 | 0 |
-| sklearn/gaussian_process/tests/test_gpc.py | passed | 39 | 0 | 0 | 0 | 0 | 0 |
+| sklearn/gaussian_process/tests/test_gpc.py | timeout | 0 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/gaussian_process/tests/test_gpr.py | passed | 130 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/gaussian_process/tests/test_kernels.py | passed | 281 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/impute/tests/test_base.py | passed | 5 | 0 | 0 | 1 | 0 | 0 |
