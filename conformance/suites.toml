@@ -708,6 +708,31 @@ deps = [
 extra_args = ["-p", "pytest_run_parallel.plugin"]
 category = "real-world"
 enabled = true
+known_failures = [
+    # The conformance runner spawns one pytest-rs process per file (see
+    # runner.py's run_file()), unlike a normal single-process pytest run.
+    # test_plugins.py imports pydantic.plugin._loader's module-level `_plugins`
+    # (None until some other test module builds a BaseModel first) and crashes
+    # if it's the first/only file in the process — reproduces identically
+    # under real pytest given the same per-file isolation; not a pytest-rs bug.
+    "tests/test_plugins.py::test_on_validate_json_on_success",
+    "tests/test_plugins.py::test_on_validate_json_on_error",
+    "tests/test_plugins.py::test_on_validate_python_on_success",
+    "tests/test_plugins.py::test_on_validate_python_on_error",
+    "tests/test_plugins.py::test_stateful_plugin",
+    "tests/test_plugins.py::test_all_handlers",
+    "tests/test_plugins.py::test_plugin_path_dataclass",
+    "tests/test_plugins.py::test_plugin_path_type_adapter",
+    "tests/test_plugins.py::test_plugin_path_type_adapter_with_module",
+    "tests/test_plugins.py::test_plugin_path_type_adapter_without_name_in_globals",
+    "tests/test_plugins.py::test_plugin_path_validate_call",
+    "tests/test_plugins.py::test_plugin_path_create_model",
+    "tests/test_plugins.py::test_plugin_path_complex",
+    # Environment/dependency-version artifacts — reproduce identically under
+    # real pytest with the same pinned deps.
+    "tests/test_config.py::test_config_model_defer_build[True]",
+    "tests/test_version.py::test_version_info",
+]
 
 [scikit-learn-1]
 tag = "1.9.0"
