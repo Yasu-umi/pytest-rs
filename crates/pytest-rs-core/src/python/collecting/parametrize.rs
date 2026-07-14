@@ -102,12 +102,31 @@ pub(crate) fn push_test_items(
             mark_objs,
         ))?;
         hook.call1((&metafunc,))?;
+        // Normally hook-added parametrize marks are appended after the
+        // function's own decorator marks (inner-most dimension). But a hook
+        // that isn't trylast (see introspect_namespace's `prepend_marks`
+        // tagging) mirrors pluggy's LIFO ordering against the built-in
+        // decorator-processing hookimpl and must come first (outer-most) —
+        // e.g. pytest-order's plain-priority pytest_generate_tests. See
+        // pytest_generate_tests_hook_priority_merge_order_gap in MCP memory.
+        let prepend = hook
+            .getattr("prepend_marks")
+            .ok()
+            .and_then(|v| v.extract::<bool>().ok())
+            .unwrap_or(false);
+        let mut hook_marks: Vec<MarkData> = Vec::new();
         for mark in metafunc.getattr("_parametrize_marks")?.try_iter()? {
             let mark = mark?;
-            marks.push(MarkData {
+            hook_marks.push(MarkData {
                 name: "parametrize".to_string(),
                 obj: mark.unbind(),
             });
+        }
+        if prepend {
+            hook_marks.extend(marks);
+            marks = hook_marks;
+        } else {
+            marks.extend(hook_marks);
         }
         // A hook may append fixturenames (pytest-repeat adds its indirect
         // step fixture so its request.param is set up per repeat).

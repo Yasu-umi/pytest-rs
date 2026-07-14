@@ -21,6 +21,7 @@ pub(crate) fn introspect_namespace(
     items: &mut Vec<TestItem>,
     registry: &mut FixtureRegistry,
     extra_generate_hooks: &[Py<PyAny>],
+    hook_marks_prepend: bool,
     makeitem_hook: bool,
     filters: &NameFilters,
     plugins: &[Box<dyn Plugin>],
@@ -56,11 +57,18 @@ pub(crate) fn introspect_namespace(
     let generate_hook: Option<Bound<'_, PyAny>> = if gen_list.is_empty() {
         None
     } else {
-        Some(
-            py.import("pytest._metafunc")?
-                .getattr("combine_generate_hooks")?
-                .call1((gen_list,))?,
-        )
+        let combined = py
+            .import("pytest._metafunc")?
+            .getattr("combine_generate_hooks")?
+            .call1((gen_list,))?;
+        // Stamped directly on the combined callable (rather than threaded as
+        // a separate Rust parameter through push_test_items and every
+        // downstream call site) so class-level combination below can pick it
+        // up transparently by reusing this same object.
+        if hook_marks_prepend {
+            combined.setattr("prepend_marks", true)?;
+        }
+        Some(combined)
     };
 
     let inspect = py.import("inspect")?;
@@ -443,11 +451,18 @@ pub(crate) fn collect_class(
         let instance = cls.call0()?;
         let cls_hook = instance.getattr("pytest_generate_tests")?;
         gen_list.append(&cls_hook)?;
-        Some(
-            py.import("pytest._metafunc")?
-                .getattr("combine_generate_hooks")?
-                .call1((gen_list,))?,
-        )
+        let combined = py
+            .import("pytest._metafunc")?
+            .getattr("combine_generate_hooks")?
+            .call1((gen_list,))?;
+        // Carry over the module-level hook's prepend_marks tagging (see
+        // introspect_namespace) since this wraps it in a fresh callable.
+        if let Some(hook) = generate_hook
+            && let Ok(v) = hook.getattr("prepend_marks")
+        {
+            combined.setattr("prepend_marks", v)?;
+        }
+        Some(combined)
     } else {
         None
     };

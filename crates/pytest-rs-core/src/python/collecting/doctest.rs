@@ -104,11 +104,24 @@ pub fn collect_module(
     // hooks to this file's subtree (baseid is a directory prefix, "" for the
     // rootdir conftest) so a sibling directory's conftest doesn't also fire —
     // matches gethookproxy(fspath) upstream.
-    let extra_generate_hooks: Vec<Py<PyAny>> = hooks
+    let matching_generate_hooks: Vec<&crate::session::PyHook> = hooks
         .iter()
         .filter(|hook| {
             hook.name == "pytest_generate_tests" && nodeid_base.starts_with(&hook.baseid)
         })
+        .collect();
+    // Whether any contributing plugin/conftest pytest_generate_tests hookimpl
+    // is NOT trylast: if so, its metafunc.parametrize() calls should land
+    // BEFORE (outer to) the function's own decorator-based parametrize marks,
+    // mirroring pluggy's LIFO ordering against the built-in decorator handler
+    // (itself a normal-tier hookimpl registered very early). trylast hooks
+    // (e.g. pytest-repeat's) keep the current append-after behavior. See
+    // pytest_generate_tests_hook_priority_merge_order_gap in MCP memory for
+    // the full analysis; this only handles the single-hook case precisely —
+    // mixed tiers among multiple contributing hooks aren't modeled.
+    let hook_marks_prepend = matching_generate_hooks.iter().any(|hook| !hook.trylast);
+    let extra_generate_hooks: Vec<Py<PyAny>> = matching_generate_hooks
+        .iter()
         .map(|hook| hook.func.clone_ref(py))
         .collect();
     // pytest_pycollect_makemodule: a conftest may return a custom Module
@@ -130,6 +143,7 @@ pub fn collect_module(
         items,
         registry,
         &extra_generate_hooks,
+        hook_marks_prepend,
         makeitem_hook,
         filters,
         plugins,

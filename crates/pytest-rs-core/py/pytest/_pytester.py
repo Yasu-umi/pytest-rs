@@ -1673,9 +1673,19 @@ class Pytester:
             added via metafunc.parametrize() — folded in by the caller
             alongside the function's own (possibly hook-mutated, e.g.
             pytest-order removes its own marks from func.pytestmark)
-            decorator marks, mirroring the real engine's push_test_items."""
+            decorator marks, mirroring the real engine's push_test_items.
+
+            Returns (prepend_marks, append_marks): a trylast hookimpl (e.g.
+            pytest-repeat's) keeps its marks innermost, appended after the
+            decorator marks (previous always-append behavior). A hookimpl
+            with no explicit priority or tryfirst (e.g. pytest-order's plain
+            pytest_generate_tests) must come first/outermost instead, mirroring
+            pluggy's LIFO ordering against the built-in decorator-processing
+            hookimpl (itself a normal-tier hookimpl registered very early —
+            a later-registered same-tier plugin hookimpl runs before it). See
+            pytest_generate_tests_hook_priority_merge_order_gap in MCP memory."""
             if not _generate_tests_impls:
-                return []
+                return [], []
             try:
                 requested = list(getfuncargnames(func, name=func.__name__, cls=cls))
             except (Exception, OutcomeException):
@@ -1687,12 +1697,21 @@ class Pytester:
                 requested = []
             closure = _closure_for(requested, cls)
             metafunc = Metafunc(func, closure, module, cls, config, list(get_unpacked_marks(func)))
+            prepend_marks = []
+            append_marks = []
             for impl in _generate_tests_impls:
+                before = len(metafunc._parametrize_marks)
                 try:
                     impl(metafunc)
                 except Exception:
                     continue
-            return list(metafunc._parametrize_marks)
+                added = metafunc._parametrize_marks[before:]
+                opts = getattr(impl, "pytest_impl", None) or {}
+                if opts.get("trylast"):
+                    append_marks.extend(added)
+                else:
+                    prepend_marks.extend(added)
+            return prepend_marks, append_marks
 
         def _try_makeitem(name, obj, parent=mod_node):
             """Fire pytest_pycollect_makeitem; return custom node list or None."""
@@ -1799,10 +1818,10 @@ class Pytester:
                 # already validated them against metafunc.fixturenames while
                 # the hook ran, which is where a hook registers any synthetic
                 # argname it introduces (e.g. pytest-order's own "order").
-                extra_marks = _run_generate_tests(obj, None)
+                prepend_marks, append_marks = _run_generate_tests(obj, None)
                 decl_marks = get_unpacked_marks(obj)
                 _validate_parametrize_argnames(obj, decl_marks)
-                fn_marks = [*decl_marks, *extra_marks]
+                fn_marks = [*prepend_marks, *decl_marks, *append_marks]
                 sub = Pytester._expand_params(
                     fn_marks,
                     module_marks,
@@ -1828,10 +1847,10 @@ class Pytester:
                         lineno = getattr(getattr(func, "__code__", None), "co_firstlineno", 0)
                         methods.append((lineno, mname, func))
                 for _ln, mname, func in sorted(methods):
-                    extra_marks = _run_generate_tests(func, obj)
+                    prepend_marks, append_marks = _run_generate_tests(func, obj)
                     decl_marks = [*get_unpacked_marks(func), *class_marks]
                     _validate_parametrize_argnames(func, decl_marks, cls=obj)
-                    fn_marks = [*decl_marks, *extra_marks]
+                    fn_marks = [*prepend_marks, *decl_marks, *append_marks]
                     sub = Pytester._expand_params(
                         fn_marks,
                         module_marks,
