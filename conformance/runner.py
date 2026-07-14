@@ -275,6 +275,14 @@ class Suite:
         extra_paths.extend(str((self.checkout / entry).resolve()) for entry in self.pythonpath)
         if extra_paths:
             env["PYTHONPATH"] = ":".join(extra_paths)
+        # `uv pip install --target` drops console_scripts wrappers (e.g. the
+        # `pytest-bdd` CLI) into deps_dir/bin; tests that subprocess-exec them
+        # by name (pytester.run("pytest-bdd", "generate", ...)) need that dir
+        # on PATH, same as a real venv's bin/ would be.
+        if deps_dir is not None:
+            deps_bin = deps_dir / "bin"
+            if deps_bin.is_dir():
+                env["PATH"] = f"{deps_bin}:{env.get('PATH', '')}"
         env.update(self.env)
         return env
 
