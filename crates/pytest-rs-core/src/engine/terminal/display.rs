@@ -261,7 +261,7 @@ impl Engine {
         in_process
     }
 
-    pub(crate) fn print_header(&self, py: Python<'_>) {
+    pub(crate) fn print_header(&mut self, py: Python<'_>) {
         if self.config.quiet || self.config.no_terminal() {
             return;
         }
@@ -282,6 +282,17 @@ impl Engine {
         };
         let version = py.version().split_whitespace().next().unwrap_or("");
         println!("platform {platform} -- Python {version}, pytest-9.0.3, pluggy-1.6.0");
+        // Native plugins' pytest_report_header lines (e.g. pytest-benchmark's
+        // "benchmark: ...") print here, right after the platform line —
+        // matching where real pytest-benchmark's own hookimpl lands once
+        // pluggy's LIFO call order is reversed for display. This is the only
+        // native plugin implementing this hook today, so a fixed position is
+        // enough (no general hook-priority replication needed).
+        if let Ok(lines) = self.native_plugin_header_lines(py) {
+            for line in lines {
+                println!("{line}");
+            }
+        }
         // pytest shows the cachedir only when it is non-default or -v.
         let default_dir = std::env::var("TOX_ENV_DIR")
             .map(|tox| format!("{tox}/.pytest_cache"))

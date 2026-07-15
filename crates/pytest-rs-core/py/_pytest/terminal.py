@@ -661,6 +661,14 @@ class TerminalReporter:
             if self.verbosity > 0:
                 msg += " -- " + str(sys.executable)
             self.write_line(msg)
+            # The native (Rust) plugins' own header lines (e.g. pytest-
+            # benchmark's "benchmark: ..."), stashed by pytest._reporter.
+            # sessionstart — these never reach Python via the hook below.
+            # Printed here (right after the platform line, matching the
+            # native engine's print_header) so the replacement reporter's
+            # header equals the native one line-for-line.
+            for line in getattr(self, "_rs_native_header_lines", None) or []:
+                self.write_line(line)
             try:
                 from pytest._pluginmanager import pluginmanager
 
@@ -670,11 +678,6 @@ class TerminalReporter:
             except Exception:
                 lines = []
             self._write_report_lines_from_hooks(lines or [])
-            # The native (Rust) plugins' own header lines (e.g. pytest-
-            # benchmark's "benchmark: ..."), stashed by pytest._reporter.
-            # sessionstart — these never reach Python via the hook above.
-            for line in getattr(self, "_rs_native_header_lines", None) or []:
-                self.write_line(line)
 
     def _write_report_lines_from_hooks(self, lines):
         for line_or_lines in reversed(lines):

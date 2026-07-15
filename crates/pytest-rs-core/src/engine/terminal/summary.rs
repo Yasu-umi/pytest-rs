@@ -488,14 +488,13 @@ impl Engine {
         Ok(lines)
     }
 
-    /// pytest_report_header py hooks: each returns a str or list of str,
-    /// printed under the session header.
+    /// pytest_report_header py hooks (conftest-registered): each returns a
+    /// str or list of str, printed under the session header. Native
+    /// plugins' own contributions print earlier, from print_header (see
+    /// native_plugin_header_lines).
     pub(crate) fn print_py_report_header(&mut self, py: Python<'_>) -> PyResult<()> {
         if self.config.quiet || self.config.no_terminal() {
             return Ok(());
-        }
-        for line in self.native_plugin_header_lines(py)? {
-            println!("{line}");
         }
         let hook_funcs: Vec<Py<pyo3::PyAny>> = self
             .session

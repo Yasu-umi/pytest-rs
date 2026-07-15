@@ -277,6 +277,18 @@ fn parse_decimal(value: &str, option: &str) -> f64 {
     })
 }
 
+/// Upstream's min-time/max-time defaults are Python Decimal-backed and
+/// display with at least one fractional digit ("1.0", not Rust's plain "1")
+/// while still avoiding scientific notation for small values ("0.000005",
+/// which Rust's own Display already renders this way).
+fn format_seconds(value: f64) -> String {
+    if value.fract() == 0.0 {
+        format!("{value:.1}")
+    } else {
+        format!("{value}")
+    }
+}
+
 /// Parse a min-rounds integer; exit with argparse_error on bad input or <1.
 fn parse_min_rounds(value: &str, option: &str) -> usize {
     match value.parse::<i64>() {
@@ -849,8 +861,8 @@ impl Plugin for BenchmarkPlugin {
                 "False"
             },
             min_rounds = self.config.min_rounds,
-            min_time = self.config.min_time,
-            max_time = self.config.max_time,
+            min_time = format_seconds(self.config.min_time),
+            max_time = format_seconds(self.config.max_time),
             calibration_precision = self.config.calibration_precision,
             warmup = if self.config.warmup { "True" } else { "False" },
             warmup_iterations = self.config.warmup_iterations,

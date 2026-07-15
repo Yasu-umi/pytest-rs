@@ -45,6 +45,14 @@ DEPS = [
     "inline-snapshot==0.34.1",
     "pytest-run-parallel==0.9.1",
     "requests==2.34.2",
+    # pytest-rs always emulates pytest-benchmark natively (one of its 7 fixed
+    # native plugin reimplementations), so its own "benchmark: ..." header
+    # line (pytest_report_header) appears in every run, delegated reporters
+    # included. Installing the real plugin here makes the reference pytest
+    # process show the same line (NORMALIZERS below reconciles the two
+    # differing version numbers) instead of the byte-diff comparing against
+    # an incomplete reference environment that lacks it.
+    "pytest-benchmark==5.1.0",
 ]
 TIMEOUT_S = 120
 
@@ -59,6 +67,9 @@ NORMALIZERS = [
     (re.compile(r"pytest(?:-rs)?-[\d.]+(?:, pluggy-[\d.]+)?"), "pytest-X"),
     (re.compile(r"^plugins: .*$", re.MULTILINE), "plugins: X"),
     (re.compile(r"^rootdir: .*$", re.MULTILINE), "rootdir: X"),
+    # pytest-benchmark's own version differs from pytest-rs's native
+    # emulation's (its crate version) — normalize both away.
+    (re.compile(r"^benchmark: [\d.]+", re.MULTILINE), "benchmark: X"),
 ]
 
 
