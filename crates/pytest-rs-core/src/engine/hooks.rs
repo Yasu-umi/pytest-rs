@@ -980,14 +980,25 @@ impl Engine {
         }
         if self.config.help_text.is_some() {
             let after_flags = flag_dest_keys(py);
-            let mut new_flags: Vec<&String> = after_flags.difference(&before_flags).collect();
+            let mut new_flags: Vec<String> =
+                after_flags.difference(&before_flags).cloned().collect();
             new_flags.sort();
             if !new_flags.is_empty()
                 && let Some(text) = &mut self.config.help_text
             {
-                text.push_str("\ncustom options:\n");
-                for flag in new_flags {
-                    text.push_str(&format!("  {flag}\n"));
+                // Each flag renders under its own parser.getgroup("name")
+                // heading (matching upstream's per-plugin option groups) via
+                // argparse's own HelpFormatter, so wrapping/alignment
+                // matches upstream's argparse-rendered --help exactly; a
+                // bare parser.addoption() call falls into "custom options:".
+                if let Ok(rendered) = py
+                    .import("pytest._parser")
+                    .and_then(|m| m.call_method1("render_new_option_help", (new_flags,)))
+                    .and_then(|r| r.extract::<String>())
+                    && !rendered.is_empty()
+                {
+                    text.push('\n');
+                    text.push_str(&rendered);
                 }
             }
         }

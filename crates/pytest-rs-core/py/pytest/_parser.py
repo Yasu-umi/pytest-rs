@@ -26,6 +26,10 @@ flag_dests: dict[str, str] = {}
 # "--flag" -> action, per-flag (two flags can share a dest but have different
 # actions, e.g. --nomigrations=store_true / --migrations=store_false).
 flag_actions: dict[str, str | None] = {}
+# group name -> OptionGroup, so repeated parser.getgroup(name) calls (e.g.
+# from multiple pytest_addoption hookimpls) accumulate onto the same group
+# instead of each getting an independent, display-invisible copy.
+option_groups: dict[str, OptionGroup] = {}
 
 # -h/--help is a Rust-native clap flag (Config::build_clap_command), never
 # registered via Parser.addoption — but plugins like pytest-django read
@@ -62,8 +66,10 @@ class Option:
 
 
 class OptionGroup:
-    def __init__(self, parser: Parser) -> None:
+    def __init__(self, parser: Parser, name: str = "", description: str = "") -> None:
         self.parser = parser
+        self.name = name
+        self.description = description
         self.options: list[Option] = []
 
     def addoption(self, *opts: str, **attrs: Any) -> None:
@@ -100,10 +106,18 @@ class OptionGroup:
 
 class Parser:
     def getgroup(self, name: str, description: str = "", after: str | None = None) -> OptionGroup:
-        return OptionGroup(self)
+        existing = option_groups.get(name)
+        if existing is not None:
+            return existing
+        group = OptionGroup(self, name, description)
+        option_groups[name] = group
+        return group
 
     def addoption(self, *opts: str, **attrs: Any) -> None:
-        OptionGroup(self).addoption(*opts, **attrs)
+        # Routed through the "" (ungrouped) bucket in option_groups, same as
+        # a named getgroup(), so the Option (with its help text) survives
+        # for --help rendering instead of living only on a throwaway group.
+        self.getgroup("").addoption(*opts, **attrs)
 
     def parse_known_args(self, args, namespace=None):
         """argparse-style early parse: a namespace carrying the registered
@@ -140,6 +154,84 @@ class Parser:
 
 
 parser = Parser()
+
+
+class _PytestHelpFormatter(argparse.HelpFormatter):
+    """Matches upstream pytest's own --help formatting convention: a
+    long option taking a value is joined to its metavar with '=' (e.g.
+    '--allow-hosts=ALLOWED_HOSTS_CSV'), not argparse's default space-
+    separated '--allow-hosts ALLOWED_HOSTS_CSV'."""
+
+    def _format_action_invocation(self, action: argparse.Action) -> str:
+        if not action.option_strings or action.nargs == 0:
+            return super()._format_action_invocation(action)
+        default_metavar = self._get_default_metavar_for_optional(action)
+        (metavar,) = self._metavar_formatter(action, default_metavar)(1)
+        return ", ".join(
+            f"{opt}={metavar}" if opt.startswith("--") else opt for opt in action.option_strings
+        )
+
+
+# argparse kwargs Option.attrs() may carry that add_argument actually accepts;
+# plugins pass through arbitrary extra keys (pytest-socket etc. don't, but
+# nothing guarantees it), so this is an allowlist, not a denylist.
+_ARGPARSE_KWARGS = frozenset(
+    {
+        "action",
+        "default",
+        "type",
+        "choices",
+        "help",
+        "dest",
+        "nargs",
+        "metavar",
+        "const",
+        "required",
+    }
+)
+
+
+def render_new_option_help(new_flags: list[str]) -> str:
+    """--help text for flags added since a before/after `flag_dests` diff,
+    grouped under each plugin's own `parser.getgroup(name)` heading (bare
+    `parser.addoption()` calls render under 'custom options') — using
+    argparse's own HelpFormatter so wrapping/alignment matches upstream
+    pytest's --help output (which is itself argparse-rendered) exactly.
+    """
+    if not new_flags:
+        return ""
+    wanted = set(new_flags)
+    seen_dests: set[str] = set()
+    sections: list[str] = []
+    for name, group in option_groups.items():
+        matching = [opt for opt in group.options if any(n in wanted for n in opt.names())]
+        if not matching:
+            continue
+        p = argparse.ArgumentParser(add_help=False, prog="-", formatter_class=_PytestHelpFormatter)
+        title = name or "custom options"
+        target = p.add_argument_group(title)
+        for opt in matching:
+            names = [n for n in opt.names() if n in wanted]
+            if not names:
+                continue
+            dest = opt.attrs().get("dest") or names[0]
+            if dest in seen_dests:
+                continue
+            seen_dests.add(dest)
+            kwargs = {k: v for k, v in opt.attrs().items() if k in _ARGPARSE_KWARGS}
+            try:
+                target.add_argument(*names, **kwargs)
+            except (argparse.ArgumentError, TypeError, ValueError):
+                continue
+        # format_help() always includes a leading "usage: ...\n\n" line this
+        # throwaway single-group parser doesn't need; keep only the group's
+        # own rendered section (everything from its title onward).
+        text = p.format_help()
+        marker = f"{title}:"
+        idx = text.find(marker)
+        if idx != -1:
+            sections.append(text[idx:])
+    return "\n".join(sections)
 
 
 def _strtobool(value: str) -> bool:
