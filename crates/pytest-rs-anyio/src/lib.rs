@@ -78,6 +78,17 @@ impl AnyioPlugin {
                 .fixture_names
                 .iter()
                 .any(|name| name == "anyio_backend")
+            // Covers an autouse anyio_backend fixture the test never names
+            // directly (e.g. a module fixture doing
+            // `@pytest.fixture(autouse=True) def anyio_backend(): ...`) —
+            // extra_fixture_names is the item's full display fixture
+            // closure, matching upstream's funcargs-based reachability
+            // check (autouse fixtures are always resolved into funcargs
+            // regardless of the test's own signature).
+            || item
+                .extra_fixture_names
+                .iter()
+                .any(|name| name == "anyio_backend")
             || item
                 .fixture_params
                 .iter()
