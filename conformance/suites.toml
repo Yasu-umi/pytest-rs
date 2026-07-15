@@ -122,7 +122,15 @@ repo = "https://github.com/pytest-dev/pytest-cov"
 tag = "v7.1.0"
 testpaths = ["tests"]
 local = "conformance/suites/pytest-cov"
-deps = ["coverage==7.14.1", "process-tests==3.0.0"]
+# celery/testcontainers: test_celery spins up a real testcontainers-managed
+# Redis (needs Docker access) to run an actual celery worker/task through
+# --cov instrumentation — per upstream's own tox.ini.
+deps = [
+    "coverage==7.14.1",
+    "process-tests==3.0.0",
+    "celery==5.6.3",
+    "testcontainers[redis]==4.14.2",
+]
 # One 209-test file: long under full pool load, must not hit the timeout.
 slow_files = ["tests/test_pytest_cov.py"]
 enabled = true
