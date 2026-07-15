@@ -4,18 +4,18 @@
   "category": "third-party",
   "excluded_files": 0,
   "deselected": 0,
-  "known_failed": 0,
+  "known_failed": 3,
   "files": [
     {
       "file": "tests/test_env.py",
-      "status": "failed",
+      "status": "passed",
       "exit_code": 1,
       "passed": 61,
-      "failed": 3,
+      "failed": 0,
       "skipped": 0,
       "errors": 0,
       "deselected": 0,
-      "known_failed": 0
+      "known_failed": 3
     },
     {
       "file": "tests/test_verbose.py",

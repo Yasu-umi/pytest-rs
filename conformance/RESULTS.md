@@ -39,13 +39,13 @@ pytest-rs; they are not counted in the total.
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-subtests | v0.14.2 | 32 | 0 | 0 | 0 | 0 | 0 | 32 | 100.0% | 1 | 1 | 0 |
 | pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
-| pytest-snapshot | v0.9.0 | 102 | 5 | 0 | 0 | 0 | 0 | 107 | 95.3% | 0 | 3 | 0 |
+| pytest-snapshot | v0.9.0 | 103 | 4 | 0 | 0 | 0 | 0 | 107 | 96.3% | 1 | 3 | 0 |
 | pytest-icdiff | 0.5 | 10 | 2 | 0 | 0 | 0 | 0 | 12 | 83.3% | 0 | 1 | 0 |
-| pytest-socket | 0.7.0 | 60 | 5 | 0 | 0 | 0 | 0 | 65 | 92.3% | 3 | 6 | 0 |
+| pytest-socket | 0.7.0 | 63 | 0 | 0 | 0 | 0 | 2 | 65 | 96.9% | 6 | 6 | 0 |
 | pytest-order | v1.4.0 | 134 | 0 | 0 | 0 | 0 | 0 | 134 | 100.0% | 16 | 16 | 0 |
 | pytest-repeat | v0.9.4 | 16 | 0 | 0 | 0 | 0 | 0 | 16 | 100.0% | 1 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
-| pytest-env | 1.6.0 | 72 | 3 | 0 | 0 | 0 | 0 | 75 | 96.0% | 2 | 3 | 0 |
+| pytest-env | 1.6.0 | 72 | 0 | 0 | 0 | 0 | 3 | 75 | 96.0% | 3 | 3 | 0 |
 | pytest-rerunfailures | 9.1.1 | 47 | 0 | 0 | 1 | 0 | 0 | 48 | 100.0% | 1 | 1 | 0 |
 | pytest-randomly | 4.1.0 | 37 | 0 | 0 | 0 | 0 | 0 | 37 | 100.0% | 1 | 1 | 0 |
 | click | 8.3.1 | 1314 | 0 | 0 | 21 | 0 | 0 | 1335 | 100.0% | 20 | 20 | 0 |
@@ -332,7 +332,7 @@ pytest-rs; they are not counted in the total.
 |---|---|---:|---:|---:|---:|---:|---:|
 | tests/test_assert_match.py | failed | 35 | 3 | 0 | 0 | 0 | 0 |
 | tests/test_assert_match_dir.py | failed | 27 | 1 | 0 | 0 | 0 | 0 |
-| tests/test_misc.py | failed | 40 | 1 | 0 | 0 | 0 | 0 |
+| tests/test_misc.py | passed | 41 | 0 | 0 | 0 | 0 | 0 |
 
 </details>
 
@@ -352,12 +352,12 @@ pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| tests/test_async.py | failed | 1 | 1 | 0 | 0 | 0 | 0 |
+| tests/test_async.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_combinations.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_doctest.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_precedence.py | passed | 10 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_restrict_hosts.py | failed | 27 | 1 | 0 | 0 | 0 | 0 |
-| tests/test_socket.py | failed | 19 | 3 | 0 | 0 | 0 | 0 |
+| tests/test_restrict_hosts.py | passed | 28 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_socket.py | passed | 20 | 0 | 0 | 0 | 0 | 2 |
 
 </details>
 
@@ -412,7 +412,7 @@ pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| tests/test_env.py | failed | 61 | 3 | 0 | 0 | 0 | 0 |
+| tests/test_env.py | passed | 61 | 0 | 0 | 0 | 0 | 3 |
 | tests/test_verbose.py | passed | 10 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_version.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 
