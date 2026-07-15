@@ -34,7 +34,7 @@ pytest-rs; they are not counted in the total.
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 122 | 0 | 0 | 1 | 0 | 0 | 123 | 100.0% | 6 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 42 | 0 | 0 | 1 | 0 | 0 | 43 | 100.0% | 1 | 1 | 0 |
-| anyio | 4.13.0 | 3120 | 0 | 0 | 42 | 0 | 0 | 3162 | 100.0% | 26 | 26 | 0 |
+| anyio | 4.13.0 | 3011 | 0 | 0 | 42 | 0 | 0 | 3053 | 100.0% | 25 | 26 | 0 |
 | pytest-mypy | v1.0.1 | 76 | 0 | 0 | 2 | 0 | 0 | 78 | 100.0% | 1 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-subtests | v0.14.2 | 32 | 0 | 0 | 0 | 0 | 0 | 32 | 100.0% | 1 | 1 | 0 |
@@ -257,7 +257,7 @@ pytest-rs; they are not counted in the total.
 |---|---|---:|---:|---:|---:|---:|---:|
 | tests/streams/test_buffered.py | passed | 28 | 0 | 0 | 0 | 0 | 0 |
 | tests/streams/test_file.py | passed | 40 | 0 | 0 | 0 | 0 | 0 |
-| tests/streams/test_memory.py | passed | 109 | 0 | 0 | 0 | 0 | 0 |
+| tests/streams/test_memory.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
 | tests/streams/test_stapled.py | passed | 24 | 0 | 0 | 0 | 0 | 0 |
 | tests/streams/test_text.py | passed | 24 | 0 | 0 | 0 | 0 | 0 |
 | tests/streams/test_tls.py | passed | 68 | 0 | 0 | 0 | 0 | 0 |
