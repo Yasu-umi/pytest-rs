@@ -288,6 +288,60 @@ impl Engine {
                 .push_back(item);
         }
         for node in node_list.iter() {
+            // A hook may substitute this position with a foreign Item object
+            // instead of mutating one of the original proxies in place (e.g.
+            // pytest-bdd's own robustness test replaces `items` wholesale
+            // with an unrelated `pytest.Item` subclass whose own `runtest()`
+            // must run). Object identity against the pre-hook `nodes` this
+            // engine built distinguishes that from the overwhelmingly common
+            // case (reorder/deselect/mark an original proxy in place).
+            // Substituted nodes get the same TestItem shape
+            // `collect_custom_files` builds for pytest_collect_file-produced
+            // custom items, so the existing is_custom_item dispatch in
+            // runner/item/setup.rs drives its own runtest() automatically.
+            if !nodes.iter().any(|orig| orig.bind(py).is(&node)) {
+                let nodeid: String = node.getattr("nodeid")?.extract()?;
+                let name: String = node.getattr("name")?.extract()?;
+                let path = node
+                    .getattr("path")
+                    .ok()
+                    .and_then(|p| p.str().ok())
+                    .map(|s| std::path::PathBuf::from(s.to_string()))
+                    .unwrap_or_default();
+                let mut marks = Vec::new();
+                if let Ok(own) = node.getattr("own_markers") {
+                    for mark in own.try_iter()? {
+                        let mark = mark?;
+                        marks.push(crate::collect::MarkData {
+                            name: mark.getattr("name")?.extract()?,
+                            obj: mark.unbind(),
+                        });
+                    }
+                }
+                items.push(crate::collect::TestItem {
+                    nodeid,
+                    path,
+                    module_name: String::new(),
+                    func_name: name,
+                    func: node.clone().unbind(),
+                    cls: None,
+                    is_coroutine: false,
+                    is_doctest: false,
+                    fixture_names: Vec::new(),
+                    extra_fixture_names: Vec::new(),
+                    injected_fixture_names: Vec::new(),
+                    marks,
+                    callspec: Vec::new(),
+                    fixture_params: Vec::new(),
+                    lineno: 0,
+                    collector_class: String::new(),
+                    func_class: String::new(),
+                    py_node: None,
+                    max_param_scope: crate::fixture::Scope::Function,
+                    scope_sort_keys: Vec::new(),
+                });
+                continue;
+            }
             let nodeid: String = node.getattr("nodeid")?.extract()?;
             if let Some(queue) = by_nodeid.get_mut(&nodeid)
                 && let Some(mut item) = queue.pop_front()
@@ -414,6 +468,53 @@ impl Engine {
                 .push_back(item);
         }
         for node in node_list.iter() {
+            // Same foreign-substitution handling as run_py_modifyitems (see
+            // its comment) — object identity against the pre-hook `nodes`
+            // distinguishes a hook-substituted Item from an original proxy
+            // mutated in place.
+            if !nodes.iter().any(|orig| orig.bind(py).is(&node)) {
+                let nodeid: String = node.getattr("nodeid")?.extract()?;
+                let name: String = node.getattr("name")?.extract()?;
+                let path = node
+                    .getattr("path")
+                    .ok()
+                    .and_then(|p| p.str().ok())
+                    .map(|s| std::path::PathBuf::from(s.to_string()))
+                    .unwrap_or_default();
+                let mut marks = Vec::new();
+                if let Ok(own) = node.getattr("own_markers") {
+                    for mark in own.try_iter()? {
+                        let mark = mark?;
+                        marks.push(crate::collect::MarkData {
+                            name: mark.getattr("name")?.extract()?,
+                            obj: mark.unbind(),
+                        });
+                    }
+                }
+                items.push(crate::collect::TestItem {
+                    nodeid,
+                    path,
+                    module_name: String::new(),
+                    func_name: name,
+                    func: node.clone().unbind(),
+                    cls: None,
+                    is_coroutine: false,
+                    is_doctest: false,
+                    fixture_names: Vec::new(),
+                    extra_fixture_names: Vec::new(),
+                    injected_fixture_names: Vec::new(),
+                    marks,
+                    callspec: Vec::new(),
+                    fixture_params: Vec::new(),
+                    lineno: 0,
+                    collector_class: String::new(),
+                    func_class: String::new(),
+                    py_node: None,
+                    max_param_scope: crate::fixture::Scope::Function,
+                    scope_sort_keys: Vec::new(),
+                });
+                continue;
+            }
             let nodeid: String = node.getattr("nodeid")?.extract()?;
             if let Some(queue) = by_nodeid.get_mut(&nodeid)
                 && let Some(mut item) = queue.pop_front()
