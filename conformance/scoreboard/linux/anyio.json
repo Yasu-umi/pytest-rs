@@ -30,9 +30,9 @@
     },
     {
       "file": "tests/streams/test_memory.py",
-      "status": "error",
-      "exit_code": 3,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 109,
       "failed": 0,
       "skipped": 0,
       "errors": 0,

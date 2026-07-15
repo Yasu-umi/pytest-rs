@@ -4,18 +4,18 @@
   "category": "ecosystem",
   "excluded_files": 0,
   "deselected": 0,
-  "known_failed": 0,
+  "known_failed": 1,
   "files": [
     {
       "file": "tests/test_pytest_cov.py",
-      "status": "failed",
+      "status": "passed",
       "exit_code": 1,
       "passed": 205,
-      "failed": 1,
+      "failed": 0,
       "skipped": 3,
       "errors": 0,
       "deselected": 0,
-      "known_failed": 0
+      "known_failed": 1
     }
   ]
 }
