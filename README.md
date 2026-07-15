@@ -130,7 +130,7 @@ _linux (CI-verified)_
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-subtests | v0.14.2 | 32 | 0 | 0 | 0 | 0 | 0 | 32 | 100.0% | 1 | 1 | 0 |
 | pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
-| pytest-snapshot | v0.9.0 | 103 | 4 | 0 | 0 | 0 | 0 | 107 | 96.3% | 1 | 3 | 0 |
+| pytest-snapshot | v0.9.0 | 106 | 0 | 0 | 0 | 0 | 1 | 107 | 99.1% | 3 | 3 | 0 |
 | pytest-icdiff | 0.5 | 10 | 2 | 0 | 0 | 0 | 0 | 12 | 83.3% | 0 | 1 | 0 |
 | pytest-socket | 0.7.0 | 63 | 0 | 0 | 0 | 0 | 2 | 65 | 96.9% | 6 | 6 | 0 |
 | pytest-order | v1.4.0 | 134 | 0 | 0 | 0 | 0 | 0 | 134 | 100.0% | 16 | 16 | 0 |
@@ -139,7 +139,7 @@ _linux (CI-verified)_
 | pytest-env | 1.6.0 | 72 | 0 | 0 | 0 | 0 | 3 | 75 | 96.0% | 3 | 3 | 0 |
 | pytest-rerunfailures | 9.1.1 | 47 | 0 | 0 | 1 | 0 | 0 | 48 | 100.0% | 1 | 1 | 0 |
 | pytest-randomly | 4.1.0 | 37 | 0 | 0 | 0 | 0 | 0 | 37 | 100.0% | 1 | 1 | 0 |
-| pytest-bdd | 8.1.0 | 136 | 2 | 0 | 1 | 0 | 0 | 139 | 98.6% | 33 | 35 | 0 |
+| pytest-bdd | 8.1.0 | 138 | 0 | 0 | 1 | 0 | 0 | 139 | 100.0% | 35 | 35 | 0 |
 | pytest-django | v4.9.0 | 215 | 0 | 0 | 1 | 0 | 0 | 216 | 100.0% | 12 | 13 | 0 |
 
 **Real-world projects** (their suites run unchanged, as drop-in evidence):

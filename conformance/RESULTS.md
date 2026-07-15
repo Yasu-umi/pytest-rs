@@ -39,7 +39,7 @@ pytest-rs; they are not counted in the total.
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-subtests | v0.14.2 | 32 | 0 | 0 | 0 | 0 | 0 | 32 | 100.0% | 1 | 1 | 0 |
 | pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
-| pytest-snapshot | v0.9.0 | 103 | 4 | 0 | 0 | 0 | 0 | 107 | 96.3% | 1 | 3 | 0 |
+| pytest-snapshot | v0.9.0 | 106 | 0 | 0 | 0 | 0 | 1 | 107 | 99.1% | 3 | 3 | 0 |
 | pytest-icdiff | 0.5 | 10 | 2 | 0 | 0 | 0 | 0 | 12 | 83.3% | 0 | 1 | 0 |
 | pytest-socket | 0.7.0 | 63 | 0 | 0 | 0 | 0 | 2 | 65 | 96.9% | 6 | 6 | 0 |
 | pytest-order | v1.4.0 | 134 | 0 | 0 | 0 | 0 | 0 | 134 | 100.0% | 16 | 16 | 0 |
@@ -53,7 +53,7 @@ pytest-rs; they are not counted in the total.
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
 | rich | v14.2.0 | 855 | 0 | 0 | 25 | 0 | 0 | 880 | 100.0% | 60 | 62 | 0 |
 | sqlglot | v30.11.0 | 1120 | 0 | 0 | 0 | 0 | 0 | 1120 | 100.0% | 52 | 54 | 0 |
-| pytest-bdd | 8.1.0 | 136 | 2 | 0 | 1 | 0 | 0 | 139 | 98.6% | 33 | 35 | 0 |
+| pytest-bdd | 8.1.0 | 138 | 0 | 0 | 1 | 0 | 0 | 139 | 100.0% | 35 | 35 | 0 |
 | httpx | 0.28.1 | 1410 | 0 | 0 | 1 | 0 | 7 | 1418 | 99.5% | 31 | 31 | 0 |
 | httpx2 | v2.4.0 | 1426 | 0 | 0 | 1 | 0 | 0 | 1427 | 100.0% | 31 | 31 | 0 |
 | starlette | 0.46.2 | 907 | 0 | 0 | 0 | 0 | 0 | 907 | 100.0% | 28 | 28 | 0 |
@@ -330,8 +330,8 @@ pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| tests/test_assert_match.py | failed | 35 | 3 | 0 | 0 | 0 | 0 |
-| tests/test_assert_match_dir.py | failed | 27 | 1 | 0 | 0 | 0 | 0 |
+| tests/test_assert_match.py | passed | 37 | 0 | 0 | 0 | 0 | 1 |
+| tests/test_assert_match_dir.py | passed | 28 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_misc.py | passed | 41 | 0 | 0 | 0 | 0 | 0 |
 
 </details>
@@ -669,7 +669,7 @@ pytest-rs; they are not counted in the total.
 | tests/feature/test_cucumber_json.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/feature/test_description.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/feature/test_feature_base_dir.py | passed | 7 | 0 | 0 | 0 | 0 | 0 |
-| tests/feature/test_gherkin_terminal_reporter.py | failed | 13 | 1 | 0 | 0 | 0 | 0 |
+| tests/feature/test_gherkin_terminal_reporter.py | passed | 14 | 0 | 0 | 0 | 0 | 0 |
 | tests/feature/test_no_scenario.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/feature/test_outline.py | passed | 7 | 0 | 0 | 0 | 0 | 0 |
 | tests/feature/test_outline_empty_values.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
@@ -693,7 +693,7 @@ pytest-rs; they are not counted in the total.
 | tests/steps/test_given.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/steps/test_keyword.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/steps/test_unicode.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_hooks.py | failed | 3 | 1 | 0 | 0 | 0 | 0 |
+| tests/test_hooks.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
 
 </details>
 
