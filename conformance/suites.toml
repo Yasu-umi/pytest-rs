@@ -134,6 +134,13 @@ deps = [
 # One 209-test file: long under full pool load, must not hit the timeout.
 slow_files = ["tests/test_pytest_cov.py"]
 enabled = true
+# test_celery needs a reachable Docker daemon (testcontainers spins up a real
+# Redis container); confirmed absent both locally and in the CI conformance
+# job's own environment (docker.errors.DockerException: connection refused/
+# no such file). A ModuleNotFoundError gap was fixed via the deps above, but
+# this remaining piece is a Docker-availability constraint, not a pytest-rs
+# bug — real pytest fails identically here.
+known_failures = ["tests/test_pytest_cov.py::test_celery"]
 
 [pytest-xdist]
 repo = "https://github.com/pytest-dev/pytest-xdist"
