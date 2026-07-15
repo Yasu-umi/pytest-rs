@@ -278,6 +278,13 @@ deps = ["pytest-snapshot==0.9.0", "py==1.11.0"]
 pythonpath = ["."]
 category = "third-party"
 enabled = true
+known_failures = [
+    # Confirmed failing under genuine real pytest 9.0.3 too (verified
+    # directly): _pytest._io.pprint.PrettyPrinter wraps a bytes repr >4
+    # bytes in parens at the top level, but this test's fnmatch pattern
+    # (written for an older pytest) expects no parens. Not a pytest-rs bug.
+    "tests/test_assert_match.py::test_assert_match_failure_bytes",
+]
 
 [pytest-icdiff]
 repo = "https://github.com/hjwp/pytest-icdiff"
