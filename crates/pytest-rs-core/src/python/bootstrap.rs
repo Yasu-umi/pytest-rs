@@ -536,7 +536,10 @@ pub fn load_entrypoint_plugins(
         c"import importlib.metadata\n\
 bundled = {name.lower() for name in bundled}\n\
 dist_name = lambda dist: (getattr(dist, 'metadata', None) or {}).get('Name') or ''\n\
-result = [(ep.name, getattr(ep, 'module', None) or '', dist_name(dist), getattr(dist, 'version', None) or '', ep) for dist in importlib.metadata.distributions() for ep in dist.entry_points if ep.group == 'pytest11' if dist_name(dist).lower() not in bundled]\n",
+dists = [dist for dist in importlib.metadata.distributions() if any(ep.group == 'pytest11' for ep in dist.entry_points) if dist_name(dist).lower() not in bundled]\n\
+result = [(ep.name, getattr(ep, 'module', None) or '', dist_name(dist), getattr(dist, 'version', None) or '', ep) for dist in dists for ep in dist.entry_points if ep.group == 'pytest11']\n\
+from _pytest.config import _iter_rewritable_modules\n\
+rewrite_names = list({name for dist in dists for name in _iter_rewritable_modules(str(f) for f in (dist.files or []))})\n",
         Some(&globals),
         None,
     )?;
@@ -545,6 +548,23 @@ result = [(ep.name, getattr(ep, 'module', None) or '', dist_name(dist), getattr(
         .map(|result| result.extract())
         .transpose()?
         .unwrap_or_default();
+    // Upstream marks every pytest11-registering distribution's own top-level
+    // modules/packages for assertion rewrite BEFORE loading any of them
+    // (Config._mark_plugins_for_rewrite) — so a plugin's internal `assert`
+    // statements (e.g. pytest-snapshot's own equality check, whose message
+    // a raised AssertionError re-wraps) get the same rich diff a test file's
+    // asserts would, not a bare AssertionError. Must run before `ep.load()`
+    // below: rewriting only takes effect on a module's first import.
+    let rewrite_names: Vec<String> = globals
+        .get_item("rewrite_names")?
+        .map(|names| names.extract())
+        .transpose()?
+        .unwrap_or_default();
+    if !rewrite_names.is_empty() {
+        let py_names = pyo3::types::PyTuple::new(py, &rewrite_names)?;
+        py.import("pytest._rewrite")?
+            .call_method1("register_assert_rewrite", py_names)?;
+    }
 
     for (ep_name, module_name, dist_name, dist_version, ep) in entrypoints {
         if blocked.contains(&ep_name) || blocked.contains(&module_name) {
