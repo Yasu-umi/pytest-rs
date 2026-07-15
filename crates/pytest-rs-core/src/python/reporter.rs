@@ -81,13 +81,20 @@ pub fn reporter_replacement(py: Python<'_>) -> Option<Py<PyAny>> {
 }
 
 /// Drive the replacement reporter's pytest_sessionstart (it owns the
-/// session header in delegated mode).
-pub fn reporter_sessionstart(py: Python<'_>, config: &crate::config::Config) {
+/// session header in delegated mode). `native_header_lines` are the native
+/// (Rust) plugins' pytest_report_header contributions (e.g. pytest-
+/// benchmark's "benchmark: ..." line) that never reach Python otherwise —
+/// the replacement's header must equal the native one.
+pub fn reporter_sessionstart(
+    py: Python<'_>,
+    config: &crate::config::Config,
+    native_header_lines: &[String],
+) {
     let result = (|| -> PyResult<()> {
         let session = make_session_proxy(py, config)?;
         py.import("pytest._reporter")?
             .getattr("sessionstart")?
-            .call1((session,))?;
+            .call1((session, native_header_lines.to_vec()))?;
         Ok(())
     })();
     if let Err(err) = result {

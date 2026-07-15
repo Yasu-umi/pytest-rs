@@ -200,13 +200,17 @@ def _call(obj: Any, name: str, /, **kwargs: Any) -> None:
 # ---- engine-driven hook calls (no-ops unless a replacement registered) ----
 
 
-def sessionstart(session: Any) -> None:
+def sessionstart(session: Any, native_header_lines: list[str] | None = None) -> None:
     """Drive the replacement's pytest_sessionstart: it owns the session
-    header (the engine skipped its native one)."""
+    header (the engine skipped its native one). `native_header_lines` are
+    the native (Rust) plugins' pytest_report_header contributions (e.g.
+    pytest-benchmark's "benchmark: ..." line) — stashed on the reporter so
+    its header can include them, since it must equal the native one."""
     reporter = replacement()
     if reporter is None:
         return
     reporter._session = session
+    reporter._rs_native_header_lines = native_header_lines or []
     _call(reporter, "pytest_sessionstart", session=session)
 
 

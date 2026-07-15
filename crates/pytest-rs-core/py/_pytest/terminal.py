@@ -653,13 +653,11 @@ class TerminalReporter:
         self.write_sep("=", "test session starts", bold=True)
         if not self.no_header:
             verinfo = platform.python_version()
-            import pytest
 
-            # Match the native engine header ("pytest-rs-<crate version>", no
-            # pluggy): a replacement reporter's header must equal the native
-            # one — pytest-bdd's gherkin reporter test compares them line by line.
-            rs_version = getattr(pytest, "_rs_version", pytest.__version__)
-            msg = f"platform {sys.platform} -- Python {verinfo}, pytest-rs-{rs_version}"
+            # Match the native engine header exactly: a replacement
+            # reporter's header must equal the native one — pytest-bdd's
+            # gherkin reporter test compares them line by line.
+            msg = f"platform {sys.platform} -- Python {verinfo}, pytest-9.0.3, pluggy-1.6.0"
             if self.verbosity > 0:
                 msg += " -- " + str(sys.executable)
             self.write_line(msg)
@@ -672,6 +670,11 @@ class TerminalReporter:
             except Exception:
                 lines = []
             self._write_report_lines_from_hooks(lines or [])
+            # The native (Rust) plugins' own header lines (e.g. pytest-
+            # benchmark's "benchmark: ..."), stashed by pytest._reporter.
+            # sessionstart — these never reach Python via the hook above.
+            for line in getattr(self, "_rs_native_header_lines", None) or []:
+                self.write_line(line)
 
     def _write_report_lines_from_hooks(self, lines):
         for line_or_lines in reversed(lines):

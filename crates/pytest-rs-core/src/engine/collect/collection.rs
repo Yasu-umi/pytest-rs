@@ -125,7 +125,8 @@ impl Engine {
         // otherwise the native header plus pytest_report_header lines
         // (e.g. pytest-timeout's "timeout: 1.0s" block).
         if self.session.custom_reporter.is_some() {
-            python::reporter_sessionstart(py, &self.config);
+            let native_lines = self.native_plugin_header_lines(py).unwrap_or_default();
+            python::reporter_sessionstart(py, &self.config, &native_lines);
         } else {
             self.print_header(py);
             if let Err(err) = self.print_py_report_header(py) {

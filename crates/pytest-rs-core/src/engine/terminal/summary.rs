@@ -467,25 +467,35 @@ impl Engine {
         Ok(())
     }
 
+    /// The native (Rust-implemented) plugins' pytest_report_header
+    /// contributions (e.g. pytest-benchmark's "benchmark: ..." line) — these
+    /// never reach Python, so a replacement terminalreporter (delegated
+    /// mode) needs them passed in explicitly to match the native header.
+    pub(crate) fn native_plugin_header_lines(&mut self, py: Python<'_>) -> PyResult<Vec<String>> {
+        let mut ctx = HookContext {
+            py,
+            session: &mut self.session,
+            config: &self.config,
+        };
+        let mut lines = Vec::new();
+        for plugin in &self.plugins {
+            for block in plugin.pytest_report_header(&mut ctx)? {
+                for line in block.split('\n') {
+                    lines.push(line.to_string());
+                }
+            }
+        }
+        Ok(lines)
+    }
+
     /// pytest_report_header py hooks: each returns a str or list of str,
     /// printed under the session header.
     pub(crate) fn print_py_report_header(&mut self, py: Python<'_>) -> PyResult<()> {
         if self.config.quiet || self.config.no_terminal() {
             return Ok(());
         }
-        {
-            let mut ctx = HookContext {
-                py,
-                session: &mut self.session,
-                config: &self.config,
-            };
-            for plugin in &self.plugins {
-                for block in plugin.pytest_report_header(&mut ctx)? {
-                    for line in block.split('\n') {
-                        println!("{line}");
-                    }
-                }
-            }
+        for line in self.native_plugin_header_lines(py)? {
+            println!("{line}");
         }
         let hook_funcs: Vec<Py<pyo3::PyAny>> = self
             .session
