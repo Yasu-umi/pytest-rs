@@ -4,14 +4,91 @@ Long style shows the failing frame's function source with `>` on the
 failing line and `E` prefixed exception lines, like pytest.
 """
 
+import ast
 import inspect
 import linecache
 import os
+import tokenize
 import traceback
+import warnings
+from bisect import bisect_right
 
 # Set by the engine when terminal color is on; gates pygments highlighting
 # and the red/bold markup below.
 _color = False
+
+# Parsed-AST cache for _statement_end_lineno, keyed by filename: re-parsing
+# the whole file per traceback frame would be wasteful when many failures
+# share a file (e.g. a parametrized test). Cleared per run isn't needed —
+# source files don't change mid-process.
+_ast_cache: dict = {}
+
+
+def _get_statement_startend2(lineno, node):
+    """Port of upstream's _pytest._code.source.get_statement_startend2: the
+    (0-indexed start, exclusive end-or-None) line range of the smallest
+    statement covering 0-indexed `lineno`."""
+    values = []
+    for x in ast.walk(node):
+        if isinstance(x, ast.stmt | ast.ExceptHandler):
+            if isinstance(x, ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef):
+                for d in x.decorator_list:
+                    values.append(d.lineno - 1)
+            values.append(x.lineno - 1)
+            for name in ("finalbody", "orelse"):
+                val = getattr(x, name, None)
+                if val:
+                    values.append(val[0].lineno - 1 - 1)
+    values.sort()
+    insert_index = bisect_right(values, lineno)
+    start = values[insert_index - 1]
+    end = None if insert_index >= len(values) else values[insert_index]
+    return start, end
+
+
+def _statement_end_lineno(filename, lineno):
+    """Absolute 1-indexed end line (inclusive) of the smallest statement
+    covering absolute 1-indexed `lineno` in `filename` — matching upstream's
+    getstatementrange_ast, so a multi-line failing statement (e.g. a call
+    spanning several lines) shows its continuation lines as context instead
+    of being cut off right after `lineno`. Falls back to `lineno` (a single
+    displayed line, today's behavior) on any parse failure."""
+    try:
+        cached = _ast_cache.get(filename)
+        if cached is None:
+            lines = linecache.getlines(filename)
+            if not lines:
+                return lineno
+            stripped = [line.rstrip() for line in lines]
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                astnode = ast.parse("\n".join(stripped), filename, "exec")
+            cached = (stripped, astnode)
+            _ast_cache[filename] = cached
+        stripped, astnode = cached
+        start, end = _get_statement_startend2(lineno - 1, astnode)
+        if end is None:
+            end = len(stripped)
+        if end > start + 1:
+            block_finder = inspect.BlockFinder()
+            block_finder.started = bool(stripped[start]) and stripped[start][0].isspace()
+            it = (x + "\n" for x in stripped[start:end])
+            try:
+                for tok in tokenize.generate_tokens(lambda: next(it)):
+                    block_finder.tokeneater(*tok)
+            except (inspect.EndOfBlock, IndentationError):
+                end = block_finder.last + start
+            except Exception:
+                pass
+        while end:
+            line = stripped[end - 1].lstrip()
+            if line.startswith("#") or not line:
+                end -= 1
+            else:
+                break
+        return max(end, lineno)
+    except Exception:
+        return lineno
 
 
 def set_color(on):
@@ -240,9 +317,13 @@ def _source_block(frame, lineno):
                 i += 1
             return raw[i:]
 
+        # A multi-line failing statement (e.g. a call spanning several
+        # lines) has f_lineno at its first line but should still show its
+        # continuation lines as context, like upstream.
+        stmt_end = _statement_end_lineno(code.co_filename, lineno)
         for offset, raw in enumerate(source):
             current = start + offset
-            if current > lineno:
+            if current > stmt_end:
                 break
             content = strip_indent(raw.rstrip())
             if current == lineno:
