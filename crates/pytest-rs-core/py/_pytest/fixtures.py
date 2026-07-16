@@ -9,7 +9,23 @@ import pytest
 FixtureRequest = getattr(pytest, "FixtureRequest", object)
 
 
+from pytest._fixtures import (  # noqa: E402
+    FixtureFunctionDefinition as _RealFixtureFunctionDefinition,
+)
 from pytest._fixtures import FixtureLookupError as FixtureLookupError  # noqa: E402
+
+
+@pytest.fixture(scope="session")
+def pytestconfig(request):
+    """Session-scoped fixture that returns the session's :class:`pytest.Config` object."""
+    return request.config
+
+
+def getfixturemarker(obj):
+    """Return the fixture's FixtureFunctionMarker, or None if it isn't a fixture."""
+    if isinstance(obj, _RealFixtureFunctionDefinition):
+        return obj._fixture_function_marker
+    return None
 
 
 class FuncFixtureInfo:
