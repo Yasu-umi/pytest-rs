@@ -215,6 +215,12 @@ class ParamSpec:
 def param(*values, marks=(), id=None):
     if not isinstance(marks, list | tuple):
         marks = [marks]
+    normalized_marks = [m if isinstance(m, Mark) else m.mark for m in marks]
+    if any(m.name == "usefixtures" for m in normalized_marks):
+        raise ValueError(
+            "pytest.param cannot add pytest.mark.usefixtures; see "
+            "https://docs.pytest.org/en/stable/reference/reference.html#pytest-param"
+        )
     if id is not None and id is not HIDDEN_PARAM and not isinstance(id, str):
         raise TypeError(
             "Expected id to be a string or a `pytest.HIDDEN_PARAM` sentinel, "
@@ -222,6 +228,6 @@ def param(*values, marks=(), id=None):
         )
     return ParamSpec(
         values,
-        [m if isinstance(m, Mark) else m.mark for m in marks],
+        normalized_marks,
         id,
     )
