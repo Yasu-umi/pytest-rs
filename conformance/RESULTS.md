@@ -25,7 +25,7 @@ pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2736 | 51 | 0 | 53 | 0 | 9 | 2849 | 97.9% | 34 | 54 | 61 |
+| pytest | 9.0.3 | 2740 | 47 | 0 | 53 | 0 | 9 | 2849 | 98.0% | 35 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 0 | 1 | 7 | 85.7% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 0 | 2 | 90 | 97.8% | 1 | 1 | 0 |
@@ -67,7 +67,7 @@ pytest-rs; they are not counted in the total.
 | networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 0 | 0 | 6894 | 100.0% | 259 | 266 | 0 |
 | pydantic | v2.11.7 | 5338 | 0 | 0 | 921 | 0 | 14 | 6273 | 99.8% | 79 | 82 | 0 |
 | scikit-learn-1 | 1.9.0 | 8432 | 0 | 0 | 6624 | 0 | 0 | 15056 | 100.0% | 79 | 87 | 0 |
-| scikit-learn-2 | 1.9.0 | 5005 | 0 | 0 | 1892 | 0 | 0 | 6897 | 100.0% | 51 | 58 | 0 |
+| scikit-learn-2 | 1.9.0 | 5046 | 0 | 0 | 1892 | 0 | 0 | 6938 | 100.0% | 52 | 58 | 0 |
 | scikit-learn-3 | 1.9.0 | 9251 | 0 | 0 | 2530 | 0 | 3 | 11784 | 100.0% | 107 | 114 | 0 |
 
 ### pytest @ 9.0.3
@@ -103,12 +103,12 @@ pytest-rs; they are not counted in the total.
 | testing/test_helpconfig.py | failed | 7 | 5 | 0 | 0 | 0 | 0 |
 | testing/test_junitxml.py | failed | 134 | 3 | 0 | 0 | 0 | 0 |
 | testing/test_link_resolve.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_main.py | failed | 20 | 4 | 0 | 0 | 0 | 0 |
+| testing/test_main.py | failed | 21 | 3 | 0 | 0 | 0 | 0 |
 | testing/test_mark.py | failed | 105 | 1 | 0 | 0 | 0 | 0 |
 | testing/test_monkeypatch.py | passed | 33 | 0 | 0 | 2 | 0 | 0 |
 | testing/test_nodes.py | passed | 8 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_pastebin.py | passed | 8 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_pytester.py | failed | 48 | 3 | 0 | 1 | 0 | 0 |
+| testing/test_pytester.py | failed | 50 | 1 | 0 | 1 | 0 | 0 |
 | testing/test_python_path.py | failed | 4 | 2 | 0 | 0 | 0 | 0 |
 | testing/test_recwarn.py | passed | 63 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_runner.py | passed | 66 | 0 | 0 | 0 | 0 | 0 |
@@ -117,7 +117,7 @@ pytest-rs; they are not counted in the total.
 | testing/test_session.py | failed | 25 | 1 | 0 | 0 | 0 | 0 |
 | testing/test_setuponly.py | passed | 26 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_setupplan.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_skipping.py | failed | 91 | 1 | 0 | 0 | 0 | 0 |
+| testing/test_skipping.py | passed | 92 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_stash.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_stepwise.py | passed | 18 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_subtests.py | passed | 34 | 0 | 0 | 0 | 0 | 0 |
@@ -2734,7 +2734,7 @@ pytest-rs; they are not counted in the total.
 | sklearn/ensemble/tests/test_gradient_boosting.py | passed | 129 | 0 | 0 | 1 | 0 | 0 |
 | sklearn/ensemble/tests/test_iforest.py | passed | 32 | 0 | 0 | 1 | 0 | 0 |
 | sklearn/ensemble/tests/test_stacking.py | passed | 82 | 0 | 0 | 0 | 0 | 0 |
-| sklearn/ensemble/tests/test_voting.py | timeout | 0 | 0 | 0 | 0 | 0 | 0 |
+| sklearn/ensemble/tests/test_voting.py | passed | 41 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/ensemble/tests/test_weight_boosting.py | passed | 43 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/model_selection/tests/test_classification_threshold.py | passed | 61 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/model_selection/tests/test_plot.py | no-tests | 0 | 0 | 0 | 29 | 0 | 0 |
