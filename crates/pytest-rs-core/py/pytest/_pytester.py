@@ -919,6 +919,9 @@ class Pytester:
                 return None
             config._mark_as_parsed()
             self._fire_addoption(config, new_args)
+            from pytest._parser import parser as _shared_parser
+
+            config._parser = _shared_parser
         finally:
             for plugin in extra_plugins:
                 pluginmanager.unregister(plugin)
