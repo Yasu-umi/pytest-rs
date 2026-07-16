@@ -470,9 +470,9 @@
     },
     {
       "file": "sklearn/ensemble/tests/test_voting.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 41,
+      "status": "timeout",
+      "exit_code": null,
+      "passed": 0,
       "failed": 0,
       "skipped": 0,
       "errors": 0,
