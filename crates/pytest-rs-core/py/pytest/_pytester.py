@@ -196,6 +196,7 @@ def run_inprocess(args, plugins=(), helper_plugin=None, forwarded_filter_marks=(
     so a bare `import pytest; pytest.main()` is already running inside one
     engine session before this ever starts a second.
     """
+    import _pytest.pytester as _pytester_shim
     from _pytest.pytester import HookRecorder
 
     import pytest
@@ -209,10 +210,20 @@ def run_inprocess(args, plugins=(), helper_plugin=None, forwarded_filter_marks=(
 
     run_args = [str(arg) for arg in args]
 
-    # Snapshot module/path/cwd/env so the inner run does not pollute ours
-    # (a separate subprocess used to give this isolation for free).
-    modules_before = sys.modules.copy()
-    syspath_before = list(sys.path)
+    # Snapshot module/path/cwd/env so the inner run does not pollute ours (a
+    # separate subprocess used to give this isolation for free). Referenced
+    # through the _pytest.pytester module (not a top-level `from` import) so
+    # a test's monkeypatch.setattr(pytester_mod, "SysModulesSnapshot", ...)
+    # takes effect here too.
+    def _preserve_module(name):
+        # Some zope modules used by twisted-related tests keep internal state
+        # and can't be deleted; readline is preserved for the same reason
+        # upstream does (https://bugs.python.org/issue41033 — pexpect issues
+        # a SIGWINCH).
+        return name.startswith(("zope", "readline"))
+
+    sys_modules_snapshot = _pytester_shim.SysModulesSnapshot(preserve=_preserve_module)
+    sys_path_snapshot = _pytester_shim.SysPathsSnapshot()
     cwd_before = os.getcwd()
     env_before = dict(os.environ)
 
@@ -222,8 +233,8 @@ def run_inprocess(args, plugins=(), helper_plugin=None, forwarded_filter_marks=(
     # run's own (different-file) conftest.py collides with it — import file
     # mismatch — purely because this in-process nested run shares sys.modules
     # with the outer one; a real subprocess wouldn't have this problem at
-    # all. Drop it here; modules_before/the restore below already puts the
-    # outer session's entry back afterward.
+    # all. Drop it here; the snapshot restore below already puts the outer
+    # session's entry back afterward.
     sys.modules.pop("conftest", None)
 
     # --runxfail monkeypatches pytest.xfail; save/restore so it doesn't
@@ -474,11 +485,8 @@ def run_inprocess(args, plugins=(), helper_plugin=None, forwarded_filter_marks=(
         _unraisable._prev_hook = old_unraisable_prev
         sys.unraisablehook = old_unraisable_hook
         # Restore the module table, sys.path, cwd, and env.
-        for name in list(sys.modules):
-            if name not in modules_before:
-                del sys.modules[name]
-        sys.modules.update(modules_before)
-        sys.path[:] = syspath_before
+        sys_modules_snapshot.restore()
+        sys_path_snapshot.restore()
         os.chdir(cwd_before)
         # Restore env: add back removed vars, update changed ones, remove
         # new ones — but do NOT restore PYTEST_CURRENT_TEST (the inner
@@ -2437,8 +2445,20 @@ def _make_runner_dir(request, tmp_path_factory, cls, monkeypatch=None):
     # nested runs can include this dir name when rootdir lands on basetemp).
     # Upstream pytester names dirs after the bare function name (params and
     # truncation are tmp_path behaviors, not pytester's).
+    import _pytest.pytester as _pytester_shim
+
     name = request.node.name.split("[")[0]
     path = tmp_path_factory.mktemp(name, numbered=True)
+
+    # Snapshot sys.modules/sys.path before the test body can pollute them
+    # (e.g. resolve_collection_argument's importlib.util.find_spec implicitly
+    # importing a package) — restored at teardown so state doesn't leak into
+    # the next test, matching upstream Pytester.__init__/._finalize.
+    def _preserve_module(mod_name):
+        return mod_name.startswith(("zope", "readline"))
+
+    sys_modules_snapshot = _pytester_shim.SysModulesSnapshot(preserve=_preserve_module)
+    sys_path_snapshot = _pytester_shim.SysPathsSnapshot()
     old_cwd = os.getcwd()
     os.chdir(path)
     runner = cls(path, name, request)
@@ -2476,6 +2496,8 @@ def _make_runner_dir(request, tmp_path_factory, cls, monkeypatch=None):
     for entry in runner._syspaths:
         if entry in sys.path:
             sys.path.remove(entry)
+    sys_modules_snapshot.restore()
+    sys_path_snapshot.restore()
     os.chdir(old_cwd)
 
 
