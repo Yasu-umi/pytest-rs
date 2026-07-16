@@ -8,10 +8,10 @@
   "files": [
     {
       "file": "test_instafail.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 9,
-      "failed": 54,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 63,
+      "failed": 0,
       "skipped": 0,
       "errors": 0,
       "deselected": 0,

@@ -8,10 +8,10 @@
   "files": [
     {
       "file": "tests/test_fixtures.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 0,
-      "failed": 4,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 4,
+      "failed": 0,
       "skipped": 0,
       "errors": 0,
       "deselected": 0,

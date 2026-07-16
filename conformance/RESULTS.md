@@ -25,29 +25,29 @@ pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2734 | 53 | 0 | 53 | 0 | 9 | 2849 | 97.8% | 34 | 54 | 61 |
-| pytest-asyncio | v1.4.0 | 265 | 3 | 0 | 0 | 0 | 0 | 268 | 98.9% | 29 | 30 | 0 |
-| pytest-aiohttp | v1.1.1 | 2 | 4 | 0 | 0 | 0 | 1 | 7 | 28.6% | 1 | 2 | 0 |
-| pytest-mock | v3.15.1 | 85 | 2 | 0 | 1 | 0 | 2 | 90 | 95.6% | 0 | 1 | 0 |
+| pytest | 9.0.3 | 2733 | 54 | 0 | 53 | 0 | 9 | 2849 | 97.8% | 33 | 54 | 61 |
+| pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
+| pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 0 | 1 | 7 | 85.7% | 2 | 2 | 0 |
+| pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 0 | 2 | 90 | 97.8% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 205 | 0 | 0 | 3 | 0 | 1 | 209 | 99.5% | 1 | 1 | 0 |
 | pytest-xdist | v3.8.0 | 97 | 0 | 0 | 1 | 0 | 0 | 98 | 100.0% | 1 | 1 | 6 |
-| pytest-split | 0.9.0 | 54 | 5 | 0 | 0 | 0 | 0 | 59 | 91.5% | 0 | 1 | 3 |
+| pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 122 | 0 | 0 | 1 | 0 | 0 | 123 | 100.0% | 6 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 42 | 0 | 0 | 1 | 0 | 0 | 43 | 100.0% | 1 | 1 | 0 |
 | anyio | 4.13.0 | 3120 | 0 | 0 | 42 | 0 | 0 | 3162 | 100.0% | 26 | 26 | 0 |
 | pytest-mypy | v1.0.1 | 76 | 0 | 0 | 2 | 0 | 0 | 78 | 100.0% | 1 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-subtests | v0.14.2 | 32 | 0 | 0 | 0 | 0 | 0 | 32 | 100.0% | 1 | 1 | 0 |
-| pytest-metadata | v2.0.4 | 0 | 10 | 0 | 0 | 0 | 0 | 10 | 0.0% | 0 | 1 | 0 |
+| pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-snapshot | v0.9.0 | 106 | 0 | 0 | 0 | 0 | 1 | 107 | 99.1% | 3 | 3 | 0 |
 | pytest-icdiff | 0.5 | 10 | 2 | 0 | 0 | 0 | 0 | 12 | 83.3% | 0 | 1 | 0 |
 | pytest-socket | 0.7.0 | 63 | 0 | 0 | 0 | 0 | 2 | 65 | 96.9% | 6 | 6 | 0 |
 | pytest-order | v1.4.0 | 134 | 0 | 0 | 0 | 0 | 0 | 134 | 100.0% | 16 | 16 | 0 |
-| pytest-repeat | v0.9.4 | 0 | 16 | 0 | 0 | 0 | 0 | 16 | 0.0% | 0 | 1 | 0 |
-| pytest-instafail | v0.5.0 | 9 | 54 | 0 | 0 | 0 | 0 | 63 | 14.3% | 0 | 1 | 0 |
+| pytest-repeat | v0.9.4 | 16 | 0 | 0 | 0 | 0 | 0 | 16 | 100.0% | 1 | 1 | 0 |
+| pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
 | pytest-env | 1.6.0 | 72 | 0 | 0 | 0 | 0 | 3 | 75 | 96.0% | 3 | 3 | 0 |
-| pytest-rerunfailures | 9.1.1 | 0 | 47 | 0 | 1 | 0 | 0 | 48 | 2.1% | 0 | 1 | 0 |
-| pytest-randomly | 4.1.0 | 3 | 34 | 0 | 0 | 0 | 0 | 37 | 8.1% | 0 | 1 | 0 |
+| pytest-rerunfailures | 9.1.1 | 47 | 0 | 0 | 1 | 0 | 0 | 48 | 100.0% | 1 | 1 | 0 |
+| pytest-randomly | 4.1.0 | 37 | 0 | 0 | 0 | 0 | 0 | 37 | 100.0% | 1 | 1 | 0 |
 | click | 8.3.1 | 1314 | 0 | 0 | 21 | 0 | 0 | 1335 | 100.0% | 20 | 20 | 0 |
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
@@ -127,7 +127,7 @@ pytest-rs; they are not counted in the total.
 | testing/test_unittest.py | failed | 64 | 6 | 0 | 9 | 0 | 0 |
 | testing/test_unraisableexception.py | passed | 11 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_warning_types.py | passed | 15 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_warnings.py | passed | 42 | 0 | 0 | 2 | 0 | 0 |
+| testing/test_warnings.py | failed | 41 | 1 | 0 | 2 | 0 | 0 |
 | testing/acceptance_test.py | passed | 85 | 0 | 0 | 2 | 0 | 6 |
 | testing/deprecated_test.py | passed | 15 | 0 | 0 | 0 | 0 | 0 |
 
@@ -157,7 +157,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_asyncio_fixture.py | passed | 6 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_asyncio_mark.py | passed | 9 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_doctest.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_event_loop_fixture.py | failed | 0 | 3 | 0 | 0 | 0 | 0 |
+| tests/test_event_loop_fixture.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_fixture_loop_scopes.py | passed | 11 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_import.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_is_async_test.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
@@ -178,7 +178,7 @@ pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| tests/test_fixtures.py | failed | 0 | 4 | 0 | 0 | 0 | 0 |
+| tests/test_fixtures.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_switch_mode.py | passed | 2 | 0 | 0 | 0 | 0 | 1 |
 
 </details>
@@ -189,7 +189,7 @@ pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| tests/test_pytest_mock.py | failed | 85 | 2 | 0 | 1 | 0 | 2 |
+| tests/test_pytest_mock.py | passed | 87 | 0 | 0 | 1 | 0 | 2 |
 
 </details>
 
@@ -219,7 +219,7 @@ pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| tests/test_plugin.py | failed | 54 | 5 | 0 | 0 | 0 | 0 |
+| tests/test_plugin.py | passed | 59 | 0 | 0 | 0 | 0 | 0 |
 
 </details>
 
@@ -320,7 +320,7 @@ pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| tests/test_metadata.py | failed | 0 | 10 | 0 | 0 | 0 | 0 |
+| tests/test_metadata.py | passed | 10 | 0 | 0 | 0 | 0 | 0 |
 
 </details>
 
@@ -392,7 +392,7 @@ pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| test_repeat.py | failed | 0 | 16 | 0 | 0 | 0 | 0 |
+| test_repeat.py | passed | 16 | 0 | 0 | 0 | 0 | 0 |
 
 </details>
 
@@ -402,7 +402,7 @@ pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| test_instafail.py | failed | 9 | 54 | 0 | 0 | 0 | 0 |
+| test_instafail.py | passed | 63 | 0 | 0 | 0 | 0 | 0 |
 
 </details>
 
@@ -424,7 +424,7 @@ pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| test_pytest_rerunfailures.py | failed | 0 | 47 | 0 | 1 | 0 | 0 |
+| test_pytest_rerunfailures.py | passed | 47 | 0 | 0 | 1 | 0 | 0 |
 
 </details>
 
@@ -434,7 +434,7 @@ pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| tests/test_pytest_randomly.py | failed | 3 | 34 | 0 | 0 | 0 | 0 |
+| tests/test_pytest_randomly.py | passed | 37 | 0 | 0 | 0 | 0 | 0 |
 
 </details>
 
