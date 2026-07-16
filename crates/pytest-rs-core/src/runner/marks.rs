@@ -93,7 +93,25 @@ pub(crate) fn added_marks(py: Python<'_>) -> Vec<(String, Py<PyAny>)> {
 /// `raises=` kwarg: only a matching exception counts as an expected failure.
 pub(crate) fn xfail_raises_ok(py: Python<'_>, xfailed: &Option<XfailEval>, err: &PyErr) -> bool {
     match xfailed.as_ref().and_then(|xf| xf.raises.as_ref()) {
-        Some(raises) => err.matches(py, raises.bind(py)).unwrap_or(false),
+        Some(raises) => {
+            let raises = raises.bind(py);
+            // `raises=` may be an exception type/tuple (isinstance semantics)
+            // or an AbstractRaises instance (RaisesGroup/RaisesExc), which
+            // instead exposes its own `.matches(exc)` predicate.
+            let is_abstract_raises = py
+                .import("pytest._raises_group")
+                .and_then(|m| m.getattr("AbstractRaises"))
+                .and_then(|cls| raises.is_instance(&cls))
+                .unwrap_or(false);
+            if is_abstract_raises {
+                raises
+                    .call_method1("matches", (err.value(py),))
+                    .and_then(|res| res.is_truthy())
+                    .unwrap_or(false)
+            } else {
+                err.matches(py, raises).unwrap_or(false)
+            }
+        }
         None => true,
     }
 }
