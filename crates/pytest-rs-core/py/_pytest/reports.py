@@ -68,12 +68,17 @@ class _LongRepr(str, _ExceptionChainRepr):
 
     @property
     def reprcrash(self):
-        message = None
+        message_lines = []
+        collecting = False
         for line in self.splitlines():
             if line.startswith(("E ", "E\t")):
-                message = line[1:].strip()
+                collecting = True
+                message_lines.append(line[1:].strip())
+            elif collecting:
                 break
-        if message is None:
+        if message_lines:
+            message = "\n".join(message_lines)
+        else:
             lines = [line for line in self.splitlines() if line.strip()]
             message = lines[-1].strip() if lines else ""
         path, lineno, _ = self._location()
