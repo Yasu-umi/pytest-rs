@@ -633,12 +633,18 @@ class Pytester:
             return self._runpytest_subprocess_via_run(args, timeout=timeout)
         # An explicit `--runpytest subprocess` outranks the env-var-driven
         # in-process default below (upstream's Pytester._method, read from
-        # this same option, always governs the choice).
-        if (
-            self._request is not None
-            and self._request.config.getoption("runpytest", None) == "subprocess"
-        ):
-            return self._runpytest(args, timeout=timeout, forward_filters=True)
+        # this same option, always governs the choice). getoption() raises
+        # rather than falling back to a Python-level `None` default (its
+        # native default=None can't distinguish "unset" from "not passed"),
+        # so suites that never load pytester's own --runpytest option (no
+        # `-p pytester`) hit the ValueError branch here instead.
+        if self._request is not None:
+            try:
+                runpytest_option = self._request.config.getoption("runpytest")
+            except ValueError:
+                runpytest_option = None
+            if runpytest_option == "subprocess":
+                return self._runpytest(args, timeout=timeout, forward_filters=True)
         if os.environ.get("PYTEST_RS_INLINE_INPROCESS"):
             reprec = self._inline_run_inprocess(*args, plugins=plugins)
             return getattr(reprec, "_result", reprec)
