@@ -245,7 +245,12 @@ pub(crate) fn canonicalize_preserving_symlinks(path: &Path) -> PathBuf {
         .unwrap_or_default();
     let parent = canonical_prefix.parent().unwrap_or(&canonical_prefix);
     let canonical_parent = std::fs::canonicalize(parent).unwrap_or_else(|_| parent.to_path_buf());
-    canonical_parent.join(symlink_name).join(rest)
+    let rejoined = canonical_parent.join(symlink_name);
+    if rest.as_os_str().is_empty() {
+        rejoined
+    } else {
+        rejoined.join(rest)
+    }
 }
 
 /// Expand CLI path arguments into the ordered list of test files.
