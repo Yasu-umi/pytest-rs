@@ -194,6 +194,7 @@ fn build_py_config(
     if let Some(chars) = config.get_value("report-chars") {
         option_ns.setattr("reportchars", chars)?;
     }
+    option_ns.setattr("pastebin", config.get_value("pastebin"))?;
     // Populate doctest-related option attributes so getoption() works.
     option_ns.setattr("doctest_modules", config.get_flag("doctest-modules"))?;
     option_ns.setattr(

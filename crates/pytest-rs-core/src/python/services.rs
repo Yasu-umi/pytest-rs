@@ -1028,3 +1028,60 @@ pub fn instance_hook_funcs(py: Python<'_>, name: &str) -> Vec<Py<PyAny>> {
         .and_then(|impls| impls.extract())
         .unwrap_or_default()
 }
+
+/// `--pastebin=all`: post the whole captured session log and print the
+/// upstream-style "Sending information to Paste Service" / URL lines.
+/// `sessionlog` is passed as bytes, matching upstream (which pipes its own
+/// tee through a "w+b" tempfile, so its create_new_paste caller always
+/// hands it bytes, not str).
+pub fn pastebin_post_all(py: Python<'_>, sessionlog: &[u8]) {
+    // Printed unconditionally, like upstream's write_sep call before it ever
+    // invokes create_new_paste (whose result — even a monkeypatched None,
+    // as pytest's own conformance tests substitute — upstream just
+    // f-string-stringifies into the next line, never gating the banner on it).
+    println!(
+        "{}",
+        crate::engine::center_banner("Sending information to Paste Service")
+    );
+    let bytes = pyo3::types::PyBytes::new(py, sessionlog);
+    let url = pastebin_stringify_result(
+        py.import("_pytest.pastebin")
+            .and_then(|m| m.call_method1("create_new_paste", (bytes,))),
+    );
+    println!("pastebin session-log: {url}\n");
+}
+
+/// Upstream hands create_new_paste's return value straight to an f-string
+/// (`f"...{pastebinurl}"`), so any object stringifies fine — including a
+/// monkeypatched `None` (pytest's own pastebin tests replace create_new_paste
+/// with `list.append`, which returns None). Extracting straight to a Rust
+/// String would reject that; call Python's own str() instead.
+fn pastebin_stringify_result(result: PyResult<Bound<'_, PyAny>>) -> String {
+    result
+        .and_then(|obj| obj.str().map(|s| s.to_string()))
+        .unwrap_or_else(|_| "None".to_string())
+}
+
+/// `--pastebin=failed`: post each failed (call-phase) report's rendered
+/// traceback individually, mirroring upstream's pytest_terminal_summary.
+/// `failures` is (nodeid, longrepr text) — `_LongRepr.toterminal()` just
+/// writes `str(longrepr)` line by line, so the stored longrepr text alone is
+/// equivalent content without needing a full Python report proxy.
+pub fn pastebin_post_failed(py: Python<'_>, failures: &[(String, String)]) {
+    if failures.is_empty() {
+        return;
+    }
+    let Ok(pastebin_mod) = py.import("_pytest.pastebin") else {
+        return;
+    };
+    println!(
+        "{}",
+        crate::engine::center_banner("Sending information to Paste Service")
+    );
+    for (nodeid, content) in failures {
+        let url = pastebin_stringify_result(
+            pastebin_mod.call_method1("create_new_paste", (content.as_str(),)),
+        );
+        println!("{nodeid} --> {url}");
+    }
+}

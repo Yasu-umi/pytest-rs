@@ -106,6 +106,20 @@ impl Engine {
             return exit_code::USAGE_ERROR;
         }
 
+        // --pastebin=all: tee the whole session's real stdout so it can be
+        // posted at the very end (mirrors upstream's pytest_configure/
+        // pytest_unconfigure pair, but at the fd level since native mode
+        // never routes through a Python-visible TerminalReporter._tw). Must
+        // start before configure_capture(): CaptureState.configure() saves
+        // the current fd 1 as the destination its own per-test FDCapture
+        // resume/suspend cycle restores to between tests — starting after it
+        // would mean every per-test cycle restores fd 1 to the pre-tee
+        // destination instead, closing this pipe's write end early.
+        let pastebin_capture = if self.config.get_value("pastebin") == Some("all") {
+            crate::pastebin::PastebinCapture::start()
+        } else {
+            None
+        };
         // Global output capture: -s / --capture=no disable, default "fd"
         // (dup2-based, so os.write and C-level output are captured too).
         let capture_mode = if self.config.get_flag("capture-disable") {
@@ -203,6 +217,11 @@ impl Engine {
             python::configure_debugging(py);
         }
 
-        self.run_session(py, started)
+        let code = self.run_session(py, started);
+        if let Some(capture) = pastebin_capture {
+            let sessionlog = capture.stop();
+            python::pastebin_post_all(py, &sessionlog);
+        }
+        code
     }
 }

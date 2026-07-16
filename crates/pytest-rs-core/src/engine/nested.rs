@@ -29,6 +29,18 @@ impl Engine {
             let abs = self.config.rootdir.join(rel);
             let _ = python::sys_path_prepend(py, &abs);
         }
+        // --pastebin=all: same fd-level tee as the top-level run() (see
+        // crate::pastebin) — inline_run shares this process's fd space, so
+        // it works identically here. Must start before configure_capture()
+        // below: CaptureState.configure() saves the current fd 1 as what its
+        // own per-test FDCapture resume/suspend cycle restores to between
+        // tests, so starting after it would have every per-test cycle
+        // restore fd 1 to the pre-tee destination instead.
+        let pastebin_capture = if self.config.get_value("pastebin") == Some("all") {
+            crate::pastebin::PastebinCapture::start()
+        } else {
+            None
+        };
         // Capture: the caller pushed a fresh CaptureState; arm it for this run.
         let capture_mode = if self.config.get_flag("capture-disable") {
             "no"
@@ -153,6 +165,10 @@ impl Engine {
         python::set_fulltrace(py, self.config.get_flag("full-trace"));
         python::set_truncate_args(py, self.config.global_verbosity() <= 2);
         let result = self.run_session(py, started);
+        if let Some(capture) = pastebin_capture {
+            let sessionlog = capture.stop();
+            python::pastebin_post_all(py, &sessionlog);
+        }
         // Reset the junit state so the next nested run (or the outer run)
         // doesn't see a stale LogXML instance from this run.
         python::junit_reset(py);

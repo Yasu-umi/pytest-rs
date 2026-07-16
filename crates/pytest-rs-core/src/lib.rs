@@ -10,7 +10,9 @@ pub mod hooks;
 pub mod ipc;
 #[cfg(feature = "xdist")]
 pub mod looponfail;
+pub mod pastebin;
 pub mod python;
+
 pub mod report;
 pub mod request;
 pub mod runner;

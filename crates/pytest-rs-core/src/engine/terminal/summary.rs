@@ -270,6 +270,24 @@ impl Engine {
         }
     }
 
+    /// `--pastebin=failed`: post each call-phase failure's rendered
+    /// traceback to the paste service. Mirrors upstream's
+    /// pytest_terminal_summary, called at the same point in the summary
+    /// block as other plugin/conftest pytest_terminal_summary impls.
+    pub(crate) fn print_pastebin_failed(&self, py: Python<'_>) {
+        if self.config.get_value("pastebin") != Some("failed") {
+            return;
+        }
+        let failures: Vec<(String, String)> = self
+            .session
+            .reports
+            .iter()
+            .filter(|r| r.outcome == Outcome::Failed && r.phase == Phase::Call)
+            .map(|r| (r.nodeid.clone(), r.longrepr.clone().unwrap_or_default()))
+            .collect();
+        python::pastebin_post_failed(py, &failures);
+    }
+
     pub(crate) fn print_plugin_summaries(
         &mut self,
         py: Python<'_>,

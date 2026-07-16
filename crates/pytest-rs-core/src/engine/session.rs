@@ -483,6 +483,7 @@ impl Engine {
             if let Err(err) = self.print_plugin_summaries(py, code) {
                 eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
             }
+            self.print_pastebin_failed(py);
         }
         self.write_junit_xml(py);
         if let Some(banner) = &self.session.dist_banner {

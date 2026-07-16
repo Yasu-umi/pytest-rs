@@ -47,7 +47,7 @@ impl Config {
         "pyargs",                  // interpret args as python module paths
         "disable-plugin-autoload", // disable loading plugins from entry points
     ];
-    const CORE_VALUES: [(&str, Option<char>); 43] = [
+    const CORE_VALUES: [(&str, Option<char>); 44] = [
         ("confcutdir", None),
         ("deselect", None),
         ("log-level", None),
@@ -91,6 +91,7 @@ impl Config {
         ("tx", None),                 // xdist gateway specs ("2*popen", "popen//chdir=DIR")
         ("rsyncdir", None),           // accepted-but-inert: fork workers share the filesystem
         ("pdbcls", None),             // custom debugger class (modname:classname)
+        ("pastebin", None),           // "failed"|"all": post session/failure info to bpaste.net
     ];
 
     /// Bundled-plugin names blocked via `-p no:X`/`--plugin no:X`/`-pno:X`,
