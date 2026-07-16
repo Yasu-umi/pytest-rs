@@ -8,10 +8,10 @@
   "files": [
     {
       "file": "tests/test_pytest_mock.py",
-      "status": "passed",
+      "status": "failed",
       "exit_code": 1,
-      "passed": 87,
-      "failed": 0,
+      "passed": 85,
+      "failed": 2,
       "skipped": 1,
       "errors": 0,
       "deselected": 0,

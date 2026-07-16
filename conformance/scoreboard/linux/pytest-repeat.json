@@ -8,10 +8,10 @@
   "files": [
     {
       "file": "test_repeat.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 16,
-      "failed": 0,
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 0,
+      "failed": 16,
       "skipped": 0,
       "errors": 0,
       "deselected": 0,
