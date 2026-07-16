@@ -336,8 +336,26 @@ def run_inprocess(args, plugins=(), helper_plugin=None, forwarded_filter_marks=(
     # fd-level capture, so leave the Python streams untouched to avoid
     # bypassing it.
     _args_str = [str(a) for a in run_args]
+
+    # Short options that consume the rest of the cluster as their own value
+    # (e.g. "-rs" is "-r" with value "s", not "-r" clustered with "-s").
+    _VALUE_TAKING_SHORT_FLAGS = frozenset("rmkpcnoW")
+
+    def _is_short_flag_cluster_with_s(arg):
+        # Clustered short options (e.g. "-vs", "-sv") also disable capture,
+        # not just the standalone "-s" — but only up to the first
+        # value-taking flag in the cluster, which absorbs the remaining chars.
+        if not (arg.startswith("-") and not arg.startswith("--") and arg[1:].isalpha()):
+            return False
+        for ch in arg[1:]:
+            if ch == "s":
+                return True
+            if ch in _VALUE_TAKING_SHORT_FLAGS:
+                return False
+        return False
+
     capture_disabled = (
-        "-s" in _args_str
+        any(_is_short_flag_cluster_with_s(a) for a in _args_str)
         or "--capture=no" in _args_str
         or any(
             _args_str[i] == "--capture" and i + 1 < len(_args_str) and _args_str[i + 1] == "no"
