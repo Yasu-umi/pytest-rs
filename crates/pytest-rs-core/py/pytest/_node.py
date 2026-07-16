@@ -196,7 +196,7 @@ class _NodeBase:
 
     def _compute_nodeid(self):
         parent_id = getattr(self.parent, "nodeid", None)
-        if isinstance(self, Item) and parent_id:
+        if isinstance(self, Item) and parent_id is not None:
             return f"{parent_id}::{self.name}"
         if self.path is not None and self.config is not None:
             root = getattr(self.config, "rootpath", None) or getattr(self.config, "rootdir", None)
