@@ -64,9 +64,17 @@ _PYTHON_FILES_GLOBS: set = set()
 
 
 def register_assert_rewrite(*names):
-    # pytest-rs has its own rewriter (_RewriteLoader) that hooks into the
-    # import machinery via sys.meta_path; no need to warn about already-imported
-    # modules since rewriting is handled transparently at import time.
+    # The meta_path hook only rewrites modules imported *after* registration;
+    # a module already in sys.modules by now was loaded unrewritten and stays that way.
+    # Exception: a module whose loader is already _RewriteLoader was rewritten
+    # by an earlier registration (e.g. a prior nested in-process run sharing
+    # this interpreter's sys.modules) — nothing was actually missed.
+    import sys
+
+    for name in names:
+        mod = sys.modules.get(name)
+        if mod is not None and not isinstance(getattr(mod, "__loader__", None), _RewriteLoader):
+            _warn_already_imported(name)
     _REGISTERED_MODULES.update(names)
 
 
