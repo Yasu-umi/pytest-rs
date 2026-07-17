@@ -205,6 +205,14 @@ impl Engine {
             eprintln!("INTERNAL ERROR: {err}");
             return exit_code::INTERNAL_ERROR;
         }
+        if let Err(err) = self.check_pending_hooks(py) {
+            // Upstream pytest_internalerror: the traceback goes to the
+            // terminal (stdout), each line prefixed "INTERNALERROR> ".
+            for line in python::format_exception(py, &err).lines() {
+                println!("INTERNALERROR> {line}");
+            }
+            return exit_code::INTERNAL_ERROR;
+        }
         if let Err(err) = self.fire_collection_modifyitems(py) {
             if python::is_usage_error(py, &err) {
                 eprintln!("ERROR: {}", err.value(py));

@@ -923,7 +923,15 @@ pub fn scan_py_hooks(
         let Ok(name) = key.extract::<String>() else {
             continue;
         };
-        if name.starts_with("pytest_") && value.is_callable() {
+        // Upstream (pluggy's parse_hookimpl_opts) only ever considers a
+        // hookimpl candidate via inspect.isroutine(method) — a class named
+        // e.g. `pytest_something` (issue #3775) is callable but not a
+        // routine, so it's never treated as a hook at all, not even an
+        // unrecognized one.
+        if name.starts_with("pytest_")
+            && value.is_callable()
+            && !value.is_instance_of::<pyo3::types::PyType>()
+        {
             // Read @pytest.hookimpl(trylast=True/tryfirst=True) from the
             // function's pytest_impl dict (set by our hookimpl decorator).
             let get_bool_flag = |flag: &str| -> bool {
@@ -937,6 +945,7 @@ pub fn scan_py_hooks(
             };
             let trylast = get_bool_flag("trylast");
             let tryfirst = get_bool_flag("tryfirst");
+            let optionalhook = get_bool_flag("optionalhook");
             hooks.push(crate::session::PyHook {
                 name,
                 func: value.unbind(),
@@ -944,6 +953,7 @@ pub fn scan_py_hooks(
                 plugin_module: None,
                 trylast,
                 tryfirst,
+                optionalhook,
             });
         }
     }

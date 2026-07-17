@@ -78,6 +78,9 @@ pub struct PyHook {
     pub trylast: bool,
     /// @pytest.hookimpl(tryfirst=True): fires before non-tryfirst hooks.
     pub tryfirst: bool,
+    /// @pytest.hookimpl(optionalhook=True): exempts an unrecognized
+    /// `pytest_*` name from the unknown-hook validation (check_pending_hooks).
+    pub optionalhook: bool,
 }
 
 /// Mutable state shared by the engine and every hook for one test run.

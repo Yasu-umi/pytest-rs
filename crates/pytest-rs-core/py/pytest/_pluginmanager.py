@@ -400,6 +400,111 @@ class _RewriteHookProxy:
 
 
 class PluginManager:
+    # Every hookspec name upstream's _pytest/hookspec.py declares (transcribed
+    # from the real source, not derived from what pytest-rs's own scattered
+    # "hook.name == ..." dispatch sites happen to recognize — that set is
+    # demonstrably incomplete, and using it here would reject legitimate
+    # conftest/plugin hooks pytest-rs just hasn't wired up dispatch for yet).
+    # check_pending_hooks() only cares about the *name*, not whether
+    # pytest-rs actually dispatches it.
+    _CORE_HOOKSPEC_NAMES = frozenset(
+        {
+            "pytest_addhooks",
+            "pytest_plugin_registered",
+            "pytest_addoption",
+            "pytest_configure",
+            "pytest_cmdline_parse",
+            "pytest_load_initial_conftests",
+            "pytest_cmdline_main",
+            "pytest_collection",
+            "pytest_collection_modifyitems",
+            "pytest_collection_finish",
+            "pytest_ignore_collect",
+            "pytest_collect_directory",
+            "pytest_collect_file",
+            "pytest_collectstart",
+            "pytest_itemcollected",
+            "pytest_collectreport",
+            "pytest_deselected",
+            "pytest_make_collect_report",
+            "pytest_pycollect_makemodule",
+            "pytest_pycollect_makeitem",
+            "pytest_pyfunc_call",
+            "pytest_generate_tests",
+            "pytest_make_parametrize_id",
+            "pytest_runtestloop",
+            "pytest_runtest_protocol",
+            "pytest_runtest_logstart",
+            "pytest_runtest_logfinish",
+            "pytest_runtest_setup",
+            "pytest_runtest_call",
+            "pytest_runtest_teardown",
+            "pytest_runtest_makereport",
+            "pytest_runtest_logreport",
+            "pytest_report_to_serializable",
+            "pytest_report_from_serializable",
+            "pytest_fixture_setup",
+            "pytest_fixture_post_finalizer",
+            "pytest_sessionstart",
+            "pytest_sessionfinish",
+            "pytest_unconfigure",
+            "pytest_assertrepr_compare",
+            "pytest_assertion_pass",
+            "pytest_report_header",
+            "pytest_report_collectionfinish",
+            "pytest_report_teststatus",
+            "pytest_terminal_summary",
+            "pytest_warning_recorded",
+            "pytest_markeval_namespace",
+            "pytest_internalerror",
+            "pytest_keyboard_interrupt",
+            "pytest_exception_interact",
+            "pytest_enter_pdb",
+            "pytest_leave_pdb",
+        }
+    )
+
+    # Extra hookspec names belonging to native plugin reimplementations
+    # (pytest-xdist's xdist/newhooks.py, pytest-benchmark's
+    # pytest_benchmark/hookspec.py, pytest-asyncio's own PytestAsyncioSpecs)
+    # — see README/CLAUDE.md's fixed 7-native-plugin design: pytest-rs
+    # substitutes its own Rust implementation for these instead of loading
+    # the real Python package, so the real package's own pytest_addhooks/
+    # add_hookspecs call that would otherwise register these dynamically
+    # never runs. Kept separate from _CORE_HOOKSPEC_NAMES (which mirrors
+    # real _pytest/hookspec.py exactly, used by _pytest.hookspec's hasattr
+    # semantics too) since these names are NOT part of upstream pytest core.
+    _NATIVE_PLUGIN_HOOKSPEC_NAMES = frozenset(
+        {
+            "pytest_xdist_setupnodes",
+            "pytest_xdist_newgateway",
+            "pytest_xdist_rsyncstart",
+            "pytest_xdist_rsyncfinish",
+            "pytest_xdist_getremotemodule",
+            "pytest_configure_node",
+            "pytest_testnodeready",
+            "pytest_testnodedown",
+            "pytest_xdist_node_collection_finished",
+            "pytest_xdist_make_scheduler",
+            "pytest_xdist_auto_num_workers",
+            "pytest_handlecrashitem",
+            "pytest_benchmark_scale_unit",
+            "pytest_benchmark_generate_machine_info",
+            "pytest_benchmark_update_machine_info",
+            "pytest_benchmark_generate_commit_info",
+            "pytest_benchmark_update_commit_info",
+            "pytest_benchmark_group_stats",
+            "pytest_benchmark_generate_json",
+            "pytest_benchmark_update_json",
+            "pytest_benchmark_compare_machine_info",
+            # pytest-asyncio's own hookspec (pytest_asyncio/plugin.py's
+            # PytestAsyncioSpecs, registered via a real pluggy.HookspecMarker
+            # in pytest_addoption — bypassed entirely for the same
+            # native-reimplementation reason as xdist/benchmark above).
+            "pytest_asyncio_loop_factories",
+        }
+    )
+
     def __init__(self) -> None:
         self._plugins: list[Any] = []
         self._names: dict[str, Any] = {}
@@ -587,16 +692,20 @@ class PluginManager:
 
     def add_hookspecs(self, module_or_class: Any) -> None:
         """Record hookspec options (firstresult) declared via
-        @pytest.hookspec on the spec container's functions."""
+        @pytest.hookspec on the spec container's functions — falling back
+        to upstream's legacy leniency (_get_legacy_hook_marks) for an
+        undecorated `pytest_*`-named function/method: it still counts as
+        declaring a hookspec (opts defaulting to all-False), just with a
+        deprecation warning, not silently ignored."""
         for name in dir(module_or_class):
             func = getattr(module_or_class, name, None)
             if not name.startswith("pytest_") or not callable(func):
                 continue
             opts = getattr(func, "pytest_spec", None)
-            if isinstance(opts, dict):
-                self._specs[name] = opts
-            else:
+            if not isinstance(opts, dict):
                 self._warn_legacy_marking(func, name, "spec")
+                opts = {}
+            self._specs[name] = opts
 
     def _notify_plugin_registered(self, plugin: Any, name: str | None) -> None:
         """PYTEST_DEBUG: trace every plugin registration to stderr, like
@@ -701,6 +810,25 @@ class PluginManager:
 
     def trace(self, msg: str) -> None:
         pass
+
+    def check_pending_hooks(self, entries) -> None:
+        """Validate every scanned conftest/plugin hookimpl name against known
+        hookspecs (upstream's PluginManager.check_pending, called once after
+        collection, before pytest_collection_modifyitems): a `pytest_*`-named
+        function matching neither a core hookspec nor one dynamically
+        declared via pytest_addhooks (self._specs) is a typo/unknown hook,
+        unless marked @pytest.hookimpl(optionalhook=True).
+        entries: iterable of (name, optionalhook, baseid) tuples."""
+        for name, optionalhook, baseid in entries:
+            if (
+                optionalhook
+                or name in self._CORE_HOOKSPEC_NAMES
+                or name in self._NATIVE_PLUGIN_HOOKSPEC_NAMES
+                or name in self._specs
+            ):
+                continue
+            where = f"conftest.py ({baseid})" if baseid else "conftest.py"
+            raise Exception(f"unknown hook {name!r} in plugin {where!r}")
 
     def _get_directory(self, path: pathlib.Path) -> pathlib.Path:
         return path.parent if path.is_file() else path

@@ -1382,6 +1382,35 @@ impl Engine {
         Ok(false)
     }
 
+    /// Validate every scanned conftest/plugin hookimpl name against known
+    /// hookspecs (upstream's `check_pending()`, called right after
+    /// collection, before `pytest_collection_modifyitems`): a `pytest_*`
+    /// name that isn't a real hookspec (a typo, e.g. `pytest_hello`) is an
+    /// error unless marked `optionalhook`.
+    pub(crate) fn check_pending_hooks(&mut self, py: Python<'_>) -> PyResult<()> {
+        let entries = pyo3::types::PyList::empty(py);
+        for hook in &self.session.py_hooks {
+            // @pytest.hookimpl(specname="pytest_x") lets a hookimpl function
+            // be named anything (e.g. pytest-asyncio's
+            // pytest_pycollect_makeitem_convert_async_functions_to_subclass,
+            // implementing pytest_pycollect_makeitem) — validate against
+            // that declared name, not the function's own literal name.
+            let effective_name = hook
+                .func
+                .bind(py)
+                .getattr("pytest_impl")
+                .ok()
+                .and_then(|d| d.get_item("specname").ok())
+                .and_then(|v| v.extract::<String>().ok())
+                .unwrap_or_else(|| hook.name.clone());
+            entries.append((effective_name, hook.optionalhook, hook.baseid.as_str()))?;
+        }
+        py.import("pytest._pluginmanager")?
+            .getattr("pluginmanager")?
+            .call_method1("check_pending_hooks", (entries,))?;
+        Ok(())
+    }
+
     pub(crate) fn fire_py_sessionstart(&mut self, py: Python<'_>) -> PyResult<()> {
         let hook_funcs: Vec<Py<pyo3::PyAny>> = self
             .session
