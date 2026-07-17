@@ -191,6 +191,7 @@ impl TestStatus {
 pub(crate) fn fire_pyfunc_call_hooks(
     py: Python<'_>,
     session: &Session,
+    config: &crate::config::Config,
     item: &TestItem,
     callable: &mut Py<PyAny>,
     kwargs: &[(String, Py<PyAny>)],
@@ -206,8 +207,14 @@ pub(crate) fn fire_pyfunc_call_hooks(
     // Hooks registered on a plugin instance (e.g. --trace's PdbTrace, which
     // pytest._debugging.configure() registers via pm.register(...) rather
     // than as a module-level conftest/entry-point hook that session.py_hooks
-    // scans for).
-    funcs.extend(python::instance_hook_funcs(py, "pytest_pyfunc_call"));
+    // scans for) — PdbTrace is the only known instance-registered
+    // pytest_pyfunc_call impl and only ever gets registered when --trace is
+    // passed, so gate the (Python-side, O(registered plugins)) lookup behind
+    // that flag: this runs once per test item, and unconditionally scanning
+    // every plugin here measurably slowed down large suites.
+    if config.get_flag("trace") {
+        funcs.extend(python::instance_hook_funcs(py, "pytest_pyfunc_call"));
+    }
     if funcs.is_empty() {
         return Ok(false);
     }
