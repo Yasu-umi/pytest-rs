@@ -87,15 +87,33 @@ def _wrap_excinfo_or_fallback(rawexcinfo):
 
 
 class TestCaseFunction:
-    """Upstream TestCaseFunction's result-callback protocol
-    (_excinfo/addError/addFailure) as a mixin, for code that introspects a
-    unittest item directly — pytester.getitems() + isinstance/addError
-    calls (test_testcase_totally_incompatible_exception_info). NOT used by
-    the engine's main collection/execution path, which drives unittest
-    tests via make_runner()'s _ResultCollector instead (a plain Function
-    item, not this class)."""
+    """Upstream TestCaseFunction's full result-callback protocol as a mixin
+    — needed not just for code that introspects a unittest item directly
+    (pytester.getitems() + isinstance/addError calls,
+    test_testcase_totally_incompatible_exception_info) but also because
+    third-party plugins (e.g. pytest-subtests) monkeypatch individual
+    methods on the real _pytest.unittest.TestCaseFunction class at
+    pytest_configure time (`TestCaseFunction._originaladdSkip =
+    TestCaseFunction.addSkip`) and need the full upstream method set to
+    already exist as class attributes, independent of whether pytest-rs's
+    engine ever calls them. NOT used by the engine's main
+    collection/execution path, which drives unittest tests via
+    make_runner()'s _ResultCollector instead (a plain Function item, not
+    this class)."""
 
     _excinfo = None
+
+    def startTest(self, testcase):
+        pass
+
+    def stopTest(self, testcase):
+        pass
+
+    def addSuccess(self, testcase):
+        pass
+
+    def addDuration(self, testcase, elapsed):
+        pass
 
     def addError(self, testcase, rawexcinfo):
         from pytest._outcomes import exit as _exit
@@ -109,6 +127,43 @@ class TestCaseFunction:
 
     def addFailure(self, testcase, rawexcinfo):
         self._addexcinfo(rawexcinfo)
+
+    def addSkip(self, testcase, reason):
+        import sys
+
+        from pytest._outcomes import skip
+
+        try:
+            skip(str(reason))
+        except skip.Exception:
+            self._addexcinfo(sys.exc_info())
+
+    def addExpectedFailure(self, testcase, rawexcinfo, reason=""):
+        import sys
+
+        from pytest._outcomes import xfail
+
+        try:
+            xfail(str(reason))
+        except xfail.Exception:
+            self._addexcinfo(sys.exc_info())
+
+    def addUnexpectedSuccess(self, testcase, reason=None):
+        import sys
+
+        from pytest._outcomes import fail
+
+        msg = "Unexpected success"
+        if reason:
+            msg += f": {reason.reason}"
+        try:
+            fail(msg, pytrace=False)
+        except fail.Exception:
+            self._addexcinfo(sys.exc_info())
+
+    def addSubTest(self, test_case, test, exc_info):
+        if exc_info is not None:
+            self._addexcinfo(exc_info)
 
     def _addexcinfo(self, rawexcinfo):
         excinfo = _wrap_excinfo_or_fallback(rawexcinfo)
