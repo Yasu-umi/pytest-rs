@@ -25,7 +25,7 @@ pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2755 | 31 | 0 | 53 | 0 | 10 | 2849 | 98.6% | 37 | 54 | 61 |
+| pytest | 9.0.3 | 2757 | 29 | 0 | 53 | 0 | 10 | 2849 | 98.6% | 38 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 0 | 1 | 7 | 85.7% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 0 | 2 | 90 | 97.8% | 1 | 1 | 0 |
@@ -88,10 +88,10 @@ pytest-rs; they are not counted in the total.
 | testing/freeze/tests/test_trivial.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
 | testing/logging/test_fixture.py | passed | 27 | 0 | 0 | 0 | 0 | 0 |
 | testing/logging/test_formatter.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
-| testing/logging/test_reporting.py | failed | 48 | 4 | 0 | 0 | 0 | 0 |
+| testing/logging/test_reporting.py | passed | 52 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_assertion.py | passed | 160 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_cacheprovider.py | failed | 55 | 2 | 0 | 0 | 0 | 0 |
-| testing/test_capture.py | failed | 129 | 1 | 0 | 2 | 0 | 0 |
+| testing/test_capture.py | failed | 127 | 3 | 0 | 2 | 0 | 0 |
 | testing/test_collect_imported_tests.py | failed | 2 | 1 | 0 | 0 | 0 | 0 |
 | testing/test_collection.py | passed | 112 | 0 | 0 | 3 | 0 | 1 |
 | testing/test_compat.py | passed | 10 | 0 | 0 | 0 | 0 | 0 |
