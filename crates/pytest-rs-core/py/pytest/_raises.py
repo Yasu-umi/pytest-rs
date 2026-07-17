@@ -37,9 +37,25 @@ class ExceptionInfo[E: BaseException]:
         self._set(type(exception), exception, exception.__traceback__)
         return self
 
+    @classmethod
+    def from_exc_info(cls, exc_info, _ispytest=False):
+        """An ExceptionInfo from a (type, value, traceback) triple (upstream
+        API; used e.g. by unittest.TestCase result callbacks)."""
+        self = cls()
+        self._set(*exc_info)
+        return self
+
     def fill_unfilled(self, exc_info):
         """Fill from a (type, value, traceback) triple."""
         self._set(*exc_info)
+
+    @property
+    def _excinfo(self):
+        """The raw (type, value, traceback) triple (upstream's storage
+        attribute; some test code reads it directly instead of .type/.value/.tb)."""
+        if self.type is None:
+            return None
+        return (self.type, self.value, self.tb)
 
     @property
     def typename(self):

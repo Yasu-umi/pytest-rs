@@ -75,7 +75,11 @@ pub(crate) fn teardown_one(
     );
     python::log_start_phase(py, "teardown", log_level_cfg.as_deref());
     let teardown_started = TimeMark::now();
-    let mut errors = teardown_scope(
+    // A unittest tearDown/addCleanup failure (test.py's call-phase run
+    // already raised the primary entry; any further captured errors have no
+    // other phase to land in) — surface before fixture finalizer errors.
+    let mut errors = python::pop_unittest_extra_errors(py, config);
+    errors.extend(teardown_scope(
         py,
         plugins,
         session,
@@ -83,7 +87,7 @@ pub(crate) fn teardown_one(
         Scope::Function,
         &item.nodeid,
         item,
-    );
+    ));
 
     if let Err(err) = fire_runtest_py_hooks(py, session, item, "pytest_runtest_teardown") {
         errors.push(python::format_exception(py, &err));

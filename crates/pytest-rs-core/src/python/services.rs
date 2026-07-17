@@ -237,6 +237,27 @@ pub fn pop_subtest_reports(
     result.unwrap_or_default()
 }
 
+/// Drain unittest tearDown/cleanup errors recorded by `pytest._unittest`'s
+/// result collector after the call-phase outcome (its `entries[0]` becomes
+/// the call-phase exception; any further entries — a failing tearDown, or a
+/// failing addCleanup — are extras with nowhere else to go). Formats each
+/// into a pytest-style longrepr string for the teardown phase, mirroring
+/// upstream's `_excinfo.pop(0)` landing on the next phase's CallInfo.
+pub fn pop_unittest_extra_errors(py: Python<'_>, config: &crate::config::Config) -> Vec<String> {
+    let style = config.get_value("tb").unwrap_or("long").to_string();
+    (|| -> PyResult<Vec<String>> {
+        let module = py.import("pytest._unittest")?;
+        let extras = module.getattr("pop_extra_errors")?.call0()?;
+        let mut out = Vec::new();
+        for exc in extras.try_iter()? {
+            let err = PyErr::from_value(exc?);
+            out.push(format_test_failure(py, &err, &style));
+        }
+        Ok(out)
+    })()
+    .unwrap_or_default()
+}
+
 /// Whether the third-party pytest-subtests plugin is active. Its
 /// `pytest_report_teststatus` (v0.14) always counts/shows subtests — unlike
 /// pytest 9's builtin `_pytest.subtests`, which hides non-failed subtests
