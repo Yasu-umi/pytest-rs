@@ -660,6 +660,48 @@ pub fn configure_capture(py: Python<'_>, mode: &str) {
         .and_then(|m| m.call_method1("configure", (mode,)));
 }
 
+/// faulthandler_timeout/faulthandler_exit_on_timeout ini: enable stdlib
+/// faulthandler (dumping to a dup'd stderr fd, restored at unconfigure) so
+/// a hung test's traceback surfaces even on a real crash/signal, independent
+/// of the engine's own timeout handling.
+pub fn configure_faulthandler(py: Python<'_>, config: &crate::config::Config) {
+    let timeout: f64 = config
+        .get_ini("faulthandler_timeout")
+        .and_then(|v| v.trim().parse().ok())
+        .unwrap_or(0.0);
+    let exit_on_timeout = config
+        .ini_bool("faulthandler_exit_on_timeout")
+        .unwrap_or(false);
+    let _ = py
+        .import("pytest._faulthandler")
+        .and_then(|m| m.call_method1("configure", (timeout, exit_on_timeout)));
+}
+
+/// Session end (or a nested pytester run's end): disable faulthandler and
+/// restore whatever was active before configure_faulthandler.
+pub fn unconfigure_faulthandler(py: Python<'_>) {
+    let _ = py
+        .import("pytest._faulthandler")
+        .and_then(|m| m.call_method0("unconfigure"));
+}
+
+/// Arm the faulthandler timeout for the item about to run its whole
+/// setup/call/teardown protocol (a no-op when faulthandler_timeout is unset
+/// or the plugin is disabled, i.e. the stack is empty).
+pub fn faulthandler_start_timeout(py: Python<'_>) {
+    let _ = py
+        .import("pytest._faulthandler")
+        .and_then(|m| m.call_method0("start_timeout"));
+}
+
+/// Disarm the faulthandler timeout after an item's protocol finishes
+/// (always safe to call, even when nothing was scheduled).
+pub fn faulthandler_cancel_timeout(py: Python<'_>) {
+    let _ = py
+        .import("pytest._faulthandler")
+        .and_then(|m| m.call_method0("cancel_timeout"));
+}
+
 pub fn configure_debugging(py: Python<'_>) {
     if let Some(config) = super::existing_py_config(py) {
         let _ = py

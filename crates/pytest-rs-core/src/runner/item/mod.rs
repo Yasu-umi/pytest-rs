@@ -19,6 +19,40 @@ mod setup;
 pub(crate) use body::run_one_body;
 pub(crate) use setup::build_test_setup;
 
+/// A faulthandler_timeout dump-traceback-later timer, armed for the whole
+/// setup/call/teardown protocol (mirrors upstream's pytest_runtest_protocol
+/// hookwrapper, which spans all three phases). Cancelling on every return
+/// path — including the early-return error paths below — needs an RAII
+/// guard, not a plain call before `return`.
+struct FaulthandlerTimeoutGuard<'py>(Python<'py>);
+
+impl<'py> FaulthandlerTimeoutGuard<'py> {
+    /// Arms the timer only when faulthandler_timeout is actually set and the
+    /// plugin isn't disabled — checked here in Rust (a cheap ini-string
+    /// lookup) so the overwhelmingly common case (no timeout configured)
+    /// never pays for a Python call into pytest._faulthandler at all.
+    fn arm_if_active(py: Python<'py>, config: &Config) -> Option<Self> {
+        if config.plugin_disabled("faulthandler") {
+            return None;
+        }
+        let timeout: f64 = config
+            .get_ini("faulthandler_timeout")
+            .and_then(|v| v.trim().parse().ok())
+            .unwrap_or(0.0);
+        if timeout <= 0.0 {
+            return None;
+        }
+        python::faulthandler_start_timeout(py);
+        Some(Self(py))
+    }
+}
+
+impl Drop for FaulthandlerTimeoutGuard<'_> {
+    fn drop(&mut self) {
+        python::faulthandler_cancel_timeout(self.0);
+    }
+}
+
 #[allow(clippy::type_complexity)]
 pub(crate) fn run_one(
     py: Python<'_>,
@@ -30,6 +64,7 @@ pub(crate) fn run_one(
     pre_teardown: Option<&dyn Fn(&[TestReport])>,
 ) -> Vec<TestReport> {
     session.delegated_render = false;
+    let _faulthandler_guard = FaulthandlerTimeoutGuard::arm_if_active(py, config);
     // pytest_runtest_protocol hookwrappers (e.g. pytest-timeout's timer)
     // surround the whole setup/call/teardown protocol: their pre-yield part
     // runs now, the rest after the item finishes.

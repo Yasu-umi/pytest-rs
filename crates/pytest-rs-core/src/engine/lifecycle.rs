@@ -216,11 +216,18 @@ impl Engine {
         if !self.config.plugin_disabled("debugging") {
             python::configure_debugging(py);
         }
+        let faulthandler_enabled = !self.config.plugin_disabled("faulthandler");
+        if faulthandler_enabled {
+            python::configure_faulthandler(py, &self.config);
+        }
 
         let code = self.run_session(py, started);
         if let Some(capture) = pastebin_capture {
             let sessionlog = capture.stop();
             python::pastebin_post_all(py, &sessionlog);
+        }
+        if faulthandler_enabled {
+            python::unconfigure_faulthandler(py);
         }
         code
     }

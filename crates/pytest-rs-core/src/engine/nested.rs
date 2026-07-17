@@ -164,6 +164,18 @@ impl Engine {
         );
         python::set_fulltrace(py, self.config.get_flag("full-trace"));
         python::set_truncate_args(py, self.config.global_verbosity() <= 2);
+        // faulthandler_timeout: pytest._faulthandler.configure()/unconfigure()
+        // are LIFO-stack-based (unlike _logging.state's swap-instance
+        // pattern above), so nesting is safe without any caller-side
+        // snapshot/restore bracket in _pytester.py — this push/pop pair
+        // alone restores the outer run's faulthandler state exactly. Placed
+        // right before run_session (after every early-return-risk check
+        // above) so there is no path that configures without the matching
+        // unconfigure below.
+        let faulthandler_enabled = !self.config.plugin_disabled("faulthandler");
+        if faulthandler_enabled {
+            python::configure_faulthandler(py, &self.config);
+        }
         let result = self.run_session(py, started);
         if let Some(capture) = pastebin_capture {
             let sessionlog = capture.stop();
@@ -172,6 +184,9 @@ impl Engine {
         // Reset the junit state so the next nested run (or the outer run)
         // doesn't see a stale LogXML instance from this run.
         python::junit_reset(py);
+        if faulthandler_enabled {
+            python::unconfigure_faulthandler(py);
+        }
         crate::tw::set_enabled(outer_color);
         python::set_tb_color(py, outer_color);
         result

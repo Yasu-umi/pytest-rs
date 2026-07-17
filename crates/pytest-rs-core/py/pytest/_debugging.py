@@ -279,6 +279,13 @@ def maybe_interact(item_proxy, exc, longrepr="") -> None:
     if not getattr(pytestPDB._config.option, "usepdb", False):
         return
 
+    # Cancel any scheduled faulthandler traceback dump before the interactive
+    # session below (matches upstream's pytest_exception_interact/
+    # pytest_enter_pdb hookimpls, which do the same on tryfirst).
+    from pytest._faulthandler import cancel_timeout
+
+    cancel_timeout()
+
     import bdb
 
     from pytest._outcomes import Skipped
