@@ -4,7 +4,7 @@
   "category": "ecosystem",
   "excluded_files": 61,
   "deselected": 0,
-  "known_failed": 9,
+  "known_failed": 10,
   "files": [
     {
       "file": "testing/python/approx.py",
@@ -19,10 +19,10 @@
     },
     {
       "file": "testing/python/collect.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 82,
-      "failed": 0,
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 39,
+      "failed": 43,
       "skipped": 0,
       "errors": 0,
       "deselected": 0,
@@ -536,14 +536,14 @@
     },
     {
       "file": "testing/test_unittest.py",
-      "status": "failed",
+      "status": "passed",
       "exit_code": 1,
-      "passed": 64,
-      "failed": 6,
+      "passed": 69,
+      "failed": 0,
       "skipped": 9,
       "errors": 0,
       "deselected": 0,
-      "known_failed": 0
+      "known_failed": 1
     },
     {
       "file": "testing/test_unraisableexception.py",

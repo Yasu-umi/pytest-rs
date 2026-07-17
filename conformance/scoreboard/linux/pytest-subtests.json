@@ -8,9 +8,9 @@
   "files": [
     {
       "file": "tests/test_subtests.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 32,
+      "status": "error",
+      "exit_code": 3,
+      "passed": 0,
       "failed": 0,
       "skipped": 0,
       "errors": 0,
