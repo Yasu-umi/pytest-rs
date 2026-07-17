@@ -115,6 +115,19 @@ pub fn configure_logging(py: Python<'_>, config: &crate::config::Config) -> bool
         if config.get_value("log-cli-level").is_some() {
             settings.set_item("log_cli_level_from_cli", "1")?;
         }
+        // Upstream colorizes the "Captured log" report sections' levelname
+        // via ColoredLevelFormatter when --color is on (create_terminal_writer
+        // + LEVELNAME_FMT_REGEX); resolve the same yes/no decision main_color
+        // uses (engine/lifecycle.rs) so the Python side doesn't need to
+        // re-derive it from TTY/env detection.
+        settings.set_item(
+            "color",
+            if crate::tw::should_colorize(config.get_value("color")) {
+                "yes"
+            } else {
+                "no"
+            },
+        )?;
         let module = py.import("pytest._logging")?;
         module.getattr("configure")?.call1((settings,))?;
         module.getattr("log_cli_enabled")?.call0()?.extract()

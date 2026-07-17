@@ -296,11 +296,22 @@ class LoggingState:
             value = settings.get(key)
             return value if value not in (None, "") else None
 
+        color_enabled = get("color") == "yes"
+
+        def make_formatter(fmt, datefmt):
+            if color_enabled and ColoredLevelFormatter.LEVELNAME_FMT_REGEX.search(fmt):
+                from _pytest._io import TerminalWriter
+
+                tw = TerminalWriter()
+                tw.hasmarkup = True
+                return ColoredLevelFormatter(tw, fmt, datefmt=datefmt)
+            return DatetimeFormatter(fmt, datefmt=datefmt)
+
         log_level = _parse_level(get("log_level"))
         log_format = get("log_format") or DEFAULT_LOG_FORMAT
         log_date_format = get("log_date_format")
         # Captured-section formatter follows log_format/log_date_format ini.
-        self._report_formatter = DatetimeFormatter(log_format, datefmt=log_date_format)
+        self._report_formatter = make_formatter(log_format, log_date_format)
         self.formatter = self._report_formatter
         self.caplog_handler.setFormatter(self._report_formatter)
         self.report_handler.setFormatter(self._report_formatter)
@@ -337,7 +348,7 @@ class LoggingState:
             handler.setLevel(effective if effective is not None else logging.NOTSET)
             fmt = get("log_cli_format") or log_format
             datefmt = get("log_cli_date_format") or log_date_format
-            handler.setFormatter(DatetimeFormatter(fmt, datefmt=datefmt))
+            handler.setFormatter(make_formatter(fmt, datefmt))
             self.log_cli_handler = handler
             root.addHandler(handler)
             if effective is not None:
@@ -528,7 +539,7 @@ class LogCaptureFixture:
 
     @property
     def text(self):
-        return self.handler.stream.getvalue()
+        return _remove_ansi_escape_sequences(self.handler.stream.getvalue())
 
     @property
     def messages(self):
