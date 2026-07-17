@@ -134,6 +134,73 @@ class _LiveLogHandler(logging.StreamHandler):
             self.stream.flush()
 
 
+class _LiveLoggingStreamHandler(logging.StreamHandler):
+    """Upstream's live-logging handler, ported for API compatibility (e.g.
+    testing/logging/test_reporting.py::test_live_logging_suspends_capture
+    instantiates this directly with a mock capture manager and terminal —
+    it never runs the actual test suite). NOT the handler pytest-rs's own
+    native log_cli path uses (that's _LiveLogHandler above, which suspends
+    fd-level capture directly instead of going through a capture_manager
+    plugin object)."""
+
+    stream = None
+
+    def __init__(self, terminal_reporter, capture_manager):
+        super().__init__(stream=terminal_reporter)
+        self.capture_manager = capture_manager
+        self.reset()
+        self.set_when(None)
+        self._test_outcome_written = False
+
+    def reset(self):
+        """Reset the handler; should be called before the start of each test."""
+        self._first_record_emitted = False
+
+    def set_when(self, when):
+        """Prepare for the given test phase (setup/call/teardown)."""
+        self._when = when
+        self._section_name_shown = False
+        if when == "start":
+            self._test_outcome_written = False
+
+    def emit(self, record):
+        ctx_manager = (
+            self.capture_manager.global_and_fixture_disabled()
+            if self.capture_manager
+            else contextlib.nullcontext()
+        )
+        with ctx_manager:
+            if not self._first_record_emitted:
+                self.stream.write("\n")
+                self._first_record_emitted = True
+            elif self._when in ("teardown", "finish"):
+                if not self._test_outcome_written:
+                    self._test_outcome_written = True
+                    self.stream.write("\n")
+            if not self._section_name_shown and self._when:
+                self.stream.section("live log " + self._when, sep="-", bold=True)
+                self._section_name_shown = True
+            super().emit(record)
+
+    def handleError(self, record):
+        # Handled by LogCaptureHandler.
+        pass
+
+
+class _LiveLoggingNullHandler(logging.NullHandler):
+    """A logging handler used when live logging is disabled."""
+
+    def reset(self):
+        pass
+
+    def set_when(self, when):
+        pass
+
+    def handleError(self, record):
+        # Handled by LogCaptureHandler.
+        pass
+
+
 class _RelayHandler(logging.Handler):
     """PYTEST_RS_LOG_RELAY: pickle every record captured during a phase
     into the named file; the parent pytester run replays them into its own
