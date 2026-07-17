@@ -598,6 +598,24 @@ class PluginManager:
             else:
                 self._warn_legacy_marking(func, name, "spec")
 
+    def _notify_plugin_registered(self, plugin: Any, name: str | None) -> None:
+        """PYTEST_DEBUG: trace every plugin registration to stderr, like
+        upstream's pluggy tracing (enabled via enable_tracing()) does for
+        every hook call including pytest_plugin_registered. Narrower than
+        upstream's generic per-hook-call tracer — just enough to satisfy
+        code that greps stderr for registration activity when debugging."""
+        import os
+
+        if not os.environ.get("PYTEST_DEBUG"):
+            return
+        print(
+            f"pytest_plugin_registered [hook]\n"
+            f"    plugin: {plugin!r}\n"
+            f"    plugin_name: {name!r}\n"
+            f"    manager: {self!r}\n",
+            file=sys.stderr,
+        )
+
     def register(self, plugin: Any, name: str | None = None) -> Any:
         """Track the plugin for hook-relay dispatch; a plugin defining
         pytest_addhooks gets to register its hookspecs immediately (pluggy
@@ -631,6 +649,7 @@ class PluginManager:
         self._plugins.append(plugin)
         if name is not None:
             self._names[name] = plugin
+        self._notify_plugin_registered(plugin, name)
         plugin_dir = dir(plugin)
         addhooks = (
             getattr(plugin, "pytest_addhooks", None) if "pytest_addhooks" in plugin_dir else None
