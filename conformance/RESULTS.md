@@ -25,7 +25,7 @@ pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2702 | 84 | 0 | 53 | 0 | 10 | 2849 | 96.7% | 35 | 54 | 61 |
+| pytest | 9.0.3 | 2745 | 41 | 0 | 53 | 0 | 10 | 2849 | 98.2% | 36 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 0 | 1 | 7 | 85.7% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 0 | 2 | 90 | 97.8% | 1 | 1 | 0 |
@@ -37,11 +37,11 @@ pytest-rs; they are not counted in the total.
 | anyio | 4.13.0 | 3120 | 0 | 0 | 42 | 0 | 0 | 3162 | 100.0% | 26 | 26 | 0 |
 | pytest-mypy | v1.0.1 | 76 | 0 | 0 | 2 | 0 | 0 | 78 | 100.0% | 1 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
-| pytest-subtests | v0.14.2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | - | 0 | 1 | 0 |
+| pytest-subtests | v0.14.2 | 32 | 0 | 0 | 0 | 0 | 0 | 32 | 100.0% | 1 | 1 | 0 |
 | pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-snapshot | v0.9.0 | 106 | 0 | 0 | 0 | 0 | 1 | 107 | 99.1% | 3 | 3 | 0 |
 | pytest-icdiff | 0.5 | 10 | 2 | 0 | 0 | 0 | 0 | 12 | 83.3% | 0 | 1 | 0 |
-| pytest-socket | 0.7.0 | 43 | 0 | 0 | 0 | 0 | 0 | 43 | 100.0% | 5 | 6 | 0 |
+| pytest-socket | 0.7.0 | 63 | 0 | 0 | 0 | 0 | 2 | 65 | 96.9% | 6 | 6 | 0 |
 | pytest-order | v1.4.0 | 134 | 0 | 0 | 0 | 0 | 0 | 134 | 100.0% | 16 | 16 | 0 |
 | pytest-repeat | v0.9.4 | 16 | 0 | 0 | 0 | 0 | 0 | 16 | 100.0% | 1 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
@@ -77,7 +77,7 @@ pytest-rs; they are not counted in the total.
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
 | testing/python/approx.py | passed | 75 | 0 | 0 | 18 | 0 | 0 |
-| testing/python/collect.py | failed | 39 | 43 | 0 | 0 | 0 | 0 |
+| testing/python/collect.py | passed | 82 | 0 | 0 | 0 | 0 | 0 |
 | testing/python/fixtures.py | passed | 206 | 0 | 0 | 2 | 0 | 2 |
 | testing/python/integration.py | failed | 15 | 1 | 0 | 4 | 0 | 0 |
 | testing/python/metafunc.py | passed | 112 | 0 | 0 | 0 | 0 | 0 |
@@ -310,7 +310,7 @@ pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| tests/test_subtests.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_subtests.py | passed | 32 | 0 | 0 | 0 | 0 | 0 |
 
 </details>
 
@@ -357,7 +357,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_doctest.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_precedence.py | passed | 10 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_restrict_hosts.py | passed | 28 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_socket.py | timeout | 0 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_socket.py | passed | 20 | 0 | 0 | 0 | 0 | 2 |
 
 </details>
 
