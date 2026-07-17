@@ -128,6 +128,9 @@ pub fn configure_logging(py: Python<'_>, config: &crate::config::Config) -> bool
                 "no"
             },
         )?;
+        // A plugin/conftest calling set_log_path() with a relative path
+        // resolves it against rootpath, like upstream.
+        settings.set_item("rootpath", config.rootdir.to_string_lossy().to_string())?;
         let module = py.import("pytest._logging")?;
         module.getattr("configure")?.call1((settings,))?;
         module.getattr("log_cli_enabled")?.call0()?.extract()

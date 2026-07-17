@@ -285,6 +285,8 @@ class LoggingState:
         self.log_cli_enabled = False
         self.log_cli_handler = None
         self.log_file_handler = None
+        self.log_file_mode = "w"
+        self.rootpath = None
         self.relay_handler = None
         self._report_formatter = None
 
@@ -319,22 +321,26 @@ class LoggingState:
         root = logging.getLogger()
         explicit_levels = []
 
-        # --- log_file -----------------------------------------------------
-        log_file = get("log_file")
-        if log_file:
-            mode = get("log_file_mode") or "w"
+        # --- log_file -------------------------------------------------------
+        # Always build a handler (devnull when no log_file ini is set), like
+        # upstream — so a plugin/conftest calling set_log_path() later (e.g.
+        # to redirect logging to a per-test file) has something to rewire.
+        log_file = get("log_file") or os.devnull
+        self.log_file_mode = get("log_file_mode") or "w"
+        self.rootpath = get("rootpath")
+        if log_file != os.devnull:
             os.makedirs(os.path.dirname(os.path.abspath(log_file)), exist_ok=True)
-            handler = logging.FileHandler(log_file, mode=mode, encoding="utf-8")
-            file_level = _parse_level(get("log_file_level"))
-            effective = file_level if file_level is not None else log_level
-            handler.setLevel(effective if effective is not None else logging.NOTSET)
-            fmt = get("log_file_format") or log_format
-            datefmt = get("log_file_date_format") or log_date_format
-            handler.setFormatter(DatetimeFormatter(fmt, datefmt=datefmt))
-            self.log_file_handler = handler
-            root.addHandler(handler)
-            if effective is not None:
-                explicit_levels.append(effective)
+        handler = logging.FileHandler(log_file, mode=self.log_file_mode, encoding="utf-8")
+        file_level = _parse_level(get("log_file_level"))
+        effective = file_level if file_level is not None else log_level
+        handler.setLevel(effective if effective is not None else logging.NOTSET)
+        fmt = get("log_file_format") or log_format
+        datefmt = get("log_file_date_format") or log_date_format
+        handler.setFormatter(DatetimeFormatter(fmt, datefmt=datefmt))
+        self.log_file_handler = handler
+        root.addHandler(handler)
+        if effective is not None:
+            explicit_levels.append(effective)
 
         # --- log_cli ------------------------------------------------------
         cli_level = _parse_level(get("log_cli_level"))
@@ -372,6 +378,24 @@ class LoggingState:
         relay_path = os.environ.get("PYTEST_RS_LOG_RELAY")
         if relay_path:
             self.relay_handler = _RelayHandler(relay_path)
+
+    def set_log_path(self, fname):
+        """Redirect the log_file handler to a new path (upstream
+        LoggingPlugin.set_log_path — a plugin/conftest calling this via
+        config.pluginmanager.get_plugin("logging-plugin") mid-session, e.g.
+        to write a separate file per test)."""
+        import pathlib
+
+        fpath = pathlib.Path(fname)
+        if not fpath.is_absolute():
+            root = self.rootpath or os.getcwd()
+            fpath = pathlib.Path(root) / fpath
+        if not fpath.parent.exists():
+            fpath.parent.mkdir(exist_ok=True, parents=True)
+        stream = fpath.open(mode=self.log_file_mode, encoding="utf-8")
+        old_stream = self.log_file_handler.setStream(stream)
+        if old_stream:
+            old_stream.close()
 
     def _set_level_config(self, level):
         if level is None:
