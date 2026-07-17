@@ -25,12 +25,12 @@ pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2757 | 29 | 0 | 53 | 0 | 10 | 2849 | 98.6% | 38 | 54 | 61 |
+| pytest | 9.0.3 | 2759 | 27 | 0 | 53 | 0 | 10 | 2849 | 98.7% | 38 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 0 | 1 | 7 | 85.7% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 0 | 2 | 90 | 97.8% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 205 | 0 | 0 | 3 | 0 | 1 | 209 | 99.5% | 1 | 1 | 0 |
-| pytest-xdist | v3.8.0 | 97 | 0 | 0 | 1 | 0 | 0 | 98 | 100.0% | 1 | 1 | 6 |
+| pytest-xdist | v3.8.0 | 96 | 0 | 0 | 2 | 0 | 0 | 98 | 100.0% | 1 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 122 | 0 | 0 | 1 | 0 | 0 | 123 | 100.0% | 6 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 42 | 0 | 0 | 1 | 0 | 0 | 43 | 100.0% | 1 | 1 | 0 |
@@ -100,7 +100,7 @@ pytest-rs; they are not counted in the total.
 | testing/test_doctest.py | passed | 139 | 0 | 0 | 1 | 0 | 0 |
 | testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_faulthandler.py | passed | 12 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_helpconfig.py | failed | 7 | 5 | 0 | 0 | 0 | 0 |
+| testing/test_helpconfig.py | failed | 9 | 3 | 0 | 0 | 0 | 0 |
 | testing/test_junitxml.py | failed | 134 | 3 | 0 | 0 | 0 | 0 |
 | testing/test_link_resolve.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_main.py | failed | 21 | 3 | 0 | 0 | 0 | 0 |
@@ -209,7 +209,7 @@ pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| testing/acceptance_test.py | passed | 97 | 0 | 0 | 1 | 0 | 0 |
+| testing/acceptance_test.py | passed | 96 | 0 | 0 | 2 | 0 | 0 |
 
 </details>
 

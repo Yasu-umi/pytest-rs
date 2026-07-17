@@ -10,9 +10,9 @@
       "file": "testing/acceptance_test.py",
       "status": "passed",
       "exit_code": 0,
-      "passed": 97,
+      "passed": 96,
       "failed": 0,
-      "skipped": 1,
+      "skipped": 2,
       "errors": 0,
       "deselected": 0,
       "known_failed": 0
