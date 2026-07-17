@@ -292,18 +292,36 @@ impl Engine {
             return self.run_collect_only(py, started, n_collect_errors, n_items);
         }
 
+        // A conftest's own plain pytest_runtestloop hookimpl (firstresult,
+        // like pytest_runtest_protocol) may fully replace item-running —
+        // dispatch it before the native loop, matching upstream's
+        // `config.hook.pytest_runtestloop(session=session)` call in `_main`.
+        // Only the item-running step is skipped when one returns non-None;
+        // session-finish/no-tests handling below still runs unconditionally,
+        // matching upstream (that happens in `wrap_session`, outside
+        // pytest_runtestloop itself).
+        let loop_replaced = match flush_hook_output(py, || self.fire_py_runtestloop(py)) {
+            Ok(replaced) => replaced,
+            Err(err) => {
+                eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+                false
+            }
+        };
+
         #[cfg(feature = "xdist")]
         match self.resolve_numprocesses(py) {
             Some(workers) => {
                 // In dist mode workers collect themselves — n_items may be 0 here.
-                self.run_dist(py, workers);
+                if !loop_replaced {
+                    self.run_dist(py, workers);
+                }
             }
             None => {
                 if n_items == 0 {
                     let plugin_reports = python::drain_plugin_reports(py);
                     self.session.reports.extend(plugin_reports);
                     return self.handle_no_tests(py, started);
-                } else {
+                } else if !loop_replaced {
                     self.run_items(py);
                 }
             }
@@ -314,7 +332,7 @@ impl Engine {
                 let plugin_reports = python::drain_plugin_reports(py);
                 self.session.reports.extend(plugin_reports);
                 return self.handle_no_tests(py, started);
-            } else {
+            } else if !loop_replaced {
                 self.run_items(py);
             }
         }

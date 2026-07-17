@@ -1346,6 +1346,42 @@ impl Engine {
 
     /// pytest_sessionstart conftest/plugin hooks (sugar reads its theme
     /// config here, pretty stamps its wall-clock start).
+    /// A conftest's own plain (non-hookwrapper) `pytest_runtestloop` hookimpl
+    /// — firstresult, like `pytest_runtest_protocol`'s `delegate_protocol` —
+    /// may replace the native item-running loop entirely (returning
+    /// non-`None`) or just observe/log and fall through (`None`). Unlike
+    /// `delegate_protocol`, this doesn't support a *replacing* impl driving
+    /// items itself re-entrantly (no pinned conformance test needs that);
+    /// it only supports skipping pytest-rs's own native loop when one
+    /// returns non-`None`. Returns whether the loop was replaced.
+    pub(crate) fn fire_py_runtestloop(&mut self, py: Python<'_>) -> PyResult<bool> {
+        let isgenfunc = py.import("inspect")?.getattr("isgeneratorfunction")?;
+        let hook_funcs: Vec<Py<pyo3::PyAny>> = self
+            .session
+            .py_hooks
+            .iter()
+            .filter(|hook| hook.name == "pytest_runtestloop")
+            .map(|hook| hook.func.clone_ref(py))
+            .filter(|func| {
+                !isgenfunc
+                    .call1((func.bind(py),))
+                    .and_then(|v| v.extract::<bool>())
+                    .unwrap_or(false)
+            })
+            .collect();
+        if hook_funcs.is_empty() {
+            return Ok(false);
+        }
+        let session = python::make_session_proxy(py, &self.config)?;
+        for func in &hook_funcs {
+            let result = python::call_py_hook(py, func, &[("session", session.clone_ref(py))])?;
+            if !result.bind(py).is_none() {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
     pub(crate) fn fire_py_sessionstart(&mut self, py: Python<'_>) -> PyResult<()> {
         let hook_funcs: Vec<Py<pyo3::PyAny>> = self
             .session
