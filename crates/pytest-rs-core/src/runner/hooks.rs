@@ -192,10 +192,10 @@ pub(crate) fn fire_pyfunc_call_hooks(
     py: Python<'_>,
     session: &Session,
     item: &TestItem,
-    callable: &Py<PyAny>,
+    callable: &mut Py<PyAny>,
     kwargs: &[(String, Py<PyAny>)],
 ) -> PyResult<bool> {
-    let funcs: Vec<Py<PyAny>> = session
+    let mut funcs: Vec<Py<PyAny>> = session
         .py_hooks
         .iter()
         .filter(|hook| {
@@ -203,6 +203,11 @@ pub(crate) fn fire_pyfunc_call_hooks(
         })
         .map(|hook| hook.func.clone_ref(py))
         .collect();
+    // Hooks registered on a plugin instance (e.g. --trace's PdbTrace, which
+    // pytest._debugging.configure() registers via pm.register(...) rather
+    // than as a module-level conftest/entry-point hook that session.py_hooks
+    // scans for).
+    funcs.extend(python::instance_hook_funcs(py, "pytest_pyfunc_call"));
     if funcs.is_empty() {
         return Ok(false);
     }
@@ -219,6 +224,10 @@ pub(crate) fn fire_pyfunc_call_hooks(
             return Ok(true);
         }
     }
+    // A hook may not have claimed the call but still rebound pyfuncitem.obj
+    // (e.g. --trace wraps it in a pdb.runcall closure) — the native call
+    // below must use that wrapper, not the pre-hook callable.
+    *callable = node.bind(py).getattr("obj")?.unbind();
     Ok(false)
 }
 

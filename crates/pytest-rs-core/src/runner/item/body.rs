@@ -289,7 +289,7 @@ pub(crate) fn run_item_body(
     let setup_started = TimeMark::now();
     let setup_result = build_test_setup(py, plugins, session, config, item);
 
-    let (callable, kwargs, test_request) = match setup_result {
+    let (mut callable, kwargs, test_request) = match setup_result {
         Ok(setup) => setup,
         Err(err) => {
             let mut report = report_from_err(py, config, item, Phase::Setup, setup_started, &err);
@@ -450,7 +450,7 @@ pub(crate) fn run_item_body(
                     return Ok(true);
                 }
             }
-            if fire_pyfunc_call_hooks(py, session, item, &callable, &kwargs)? {
+            if fire_pyfunc_call_hooks(py, session, item, &mut callable, &kwargs)? {
                 return Ok(true);
             }
             Ok(false)
