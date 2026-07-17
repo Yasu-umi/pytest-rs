@@ -1440,6 +1440,33 @@ class Function(Node):
     def _fixtureinfo(self, value):
         self.__dict__["_fixtureinfo"] = value
 
+    @property
+    def _request(self):
+        """A TopRequest for this item (upstream's Function._initrequest,
+        built lazily instead of eagerly in __init__ since this class is
+        constructed for every collected test in every suite). Cached
+        separately from the pytester-attached explicit value (see the
+        setter) so a conftest merely reading item._request on a real
+        engine-driven item doesn't make setup()/teardown() (which check for
+        the *explicit* value only, via self.__dict__.get("_request")) treat
+        it as a pytester in-process item and try to resolve fixtures again."""
+        try:
+            return self.__dict__["_request"]
+        except KeyError:
+            pass
+        try:
+            return self.__dict__["_request_cache"]
+        except KeyError:
+            from _pytest.fixtures import TopRequest
+
+            request = TopRequest(self, _ispytest=True)
+            self.__dict__["_request_cache"] = request
+            return request
+
+    @_request.setter
+    def _request(self, value):
+        self.__dict__["_request"] = value
+
     def __eq__(self, other):
         # upstream Node has no __eq__ so comparison is identity-based;
         # _NodeBase overrides it with nodeid which breaks Function since two
@@ -1501,8 +1528,10 @@ class Function(Node):
             if fn is not None and not hasattr(fn, "_pytestfixturefunction"):
                 _call_optional_arg(fn, self.function)
         # Resolve the item's fixtures in-process, like pytest's Function.setup
-        # (only the pytester-collected nodes carry a resolving request).
-        request = getattr(self, "_request", None)
+        # (only the pytester-collected nodes carry a resolving request — read
+        # the explicit __dict__ slot directly, not the _request property,
+        # which would lazily build one for every real engine-driven item too).
+        request = self.__dict__.get("_request")
         fill = getattr(request, "_fillfixtures", None)
         if fill is not None:
             fill()

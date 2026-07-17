@@ -439,8 +439,10 @@ def _run_teardown(item) -> BaseException | None:
             teardown_fn(item.obj)
         except BaseException as exc:  # noqa: BLE001
             first_exc = exc
-    # Drain yield-fixture finalizers registered via TopRequest.addfinalizer().
-    request = getattr(item, "_request", None)
+    # Drain yield-fixture finalizers registered via TopRequest.addfinalizer()
+    # (the explicit __dict__ slot, not the _request property, which would
+    # lazily build one for every real engine-driven item too).
+    request = item.__dict__.get("_request")
     if request is not None:
         finalizers = getattr(request, "_finalizers", None)
         if finalizers is not None:
