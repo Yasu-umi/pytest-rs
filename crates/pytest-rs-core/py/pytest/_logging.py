@@ -531,6 +531,16 @@ class LogCaptureFixture:
 
 @fixture
 def caplog():
+    """Access and control log capturing.
+
+    Captured logs are available through the following properties/methods::
+
+    * caplog.messages        -> list of format-interpolated log messages
+    * caplog.text            -> string containing formatted log output
+    * caplog.records         -> list of logging.LogRecord instances
+    * caplog.record_tuples   -> list of (logger_name, level, message) tuples
+    * caplog.clear()         -> clear captured records and formatted log output string
+    """
     # The item proxy snapshots this item's stash (rebound per item by
     # start_phase("setup"), which always precedes fixture setup).
     capture = LogCaptureFixture(types.SimpleNamespace(stash=state.stash))

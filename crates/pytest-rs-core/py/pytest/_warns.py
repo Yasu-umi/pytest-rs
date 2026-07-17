@@ -177,6 +177,10 @@ def deprecated_call(func=None, *args, **kwargs):
 
 @fixture
 def recwarn():
+    """Return a :class:`WarningsRecorder` instance that records all warnings emitted by test functions.
+
+    See :ref:`warnings` for information on warning categories.
+    """
     wrec = WarningsRecorder(_ispytest=True)
     with wrec:
         _warnings.simplefilter("default")

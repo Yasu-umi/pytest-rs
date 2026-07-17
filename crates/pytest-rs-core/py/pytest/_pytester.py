@@ -2518,16 +2518,34 @@ class LineComp:
 
 @fixture
 def linecomp():
+    """A :class: `LineComp` instance for checking that an input linearly
+    contains a sequence of strings."""
     return LineComp()
 
 
 @fixture
 def pytester(request, tmp_path_factory, monkeypatch):
+    """
+    Facilities to write tests/configuration files, execute pytest in isolation, and match
+    against expected output, perfect for black-box testing of pytest plugins.
+
+    It attempts to isolate the test run from external factors as much as possible, modifying
+    the current working directory to ``path`` and environment variables during initialization.
+
+    It is particularly useful for testing plugins. It is similar to the :fixture:`tmp_path`
+    fixture but provides methods which aid in testing pytest itself.
+    """
     yield from _make_runner_dir(request, tmp_path_factory, Pytester, monkeypatch)
 
 
 @fixture
 def testdir(request, tmp_path_factory, monkeypatch):
+    """
+    Identical to :fixture:`pytester`, and provides an instance whose methods return
+    legacy ``LEGACY_PATH`` objects instead when applicable.
+
+    New code should avoid using :fixture:`testdir` in favor of :fixture:`pytester`.
+    """
     yield from _make_runner_dir(request, tmp_path_factory, Testdir, monkeypatch)
 
 
