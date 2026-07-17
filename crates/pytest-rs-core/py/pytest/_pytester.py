@@ -1408,6 +1408,7 @@ class Pytester:
         from pytest._node import Class, File, Function, _ModuleCollector, _NodeSession
         from pytest._outcomes import OutcomeException
         from pytest._pluginmanager import instance_hook_impls
+        from pytest._unittest import is_testcase_class
 
         # Scope-sorted fixture closure (request.fixturenames) for the collected
         # Function nodes, mirroring getfixtureclosure: autouse + requested seed,
@@ -1599,7 +1600,16 @@ class Pytester:
 
         def make_item(func, nodeid_name, all_marks, cls=None, parent=None):
             lineno = getattr(getattr(func, "__code__", None), "co_firstlineno", 0)
-            node = Function(
+            # A unittest.TestCase method: _pytest.unittest.TestCaseFunction
+            # (isinstance checks + direct addError/_excinfo access, e.g.
+            # test_testcase_totally_incompatible_exception_info), not the
+            # plain Function every other collected item gets.
+            node_cls = Function
+            if cls is not None and is_testcase_class(cls):
+                from _pytest.unittest import TestCaseFunction
+
+                node_cls = TestCaseFunction
+            node = node_cls(
                 f"{nodeid_file}::{nodeid_name}",
                 nodeid_name.rsplit("::", 1)[-1],
                 all_marks,
@@ -1872,7 +1882,7 @@ class Pytester:
                     lambda nm, mks, _obj=obj: make_item(_obj, nm, mks, parent=mod_node),
                 )
                 items.extend(sub)
-            elif _is_test_class(name) and isinstance(obj, type):
+            elif (_is_test_class(name) or is_testcase_class(obj)) and isinstance(obj, type):
                 class_marks = get_unpacked_marks(obj)
                 cls_node = Class(name=name, parent=mod_node, obj=obj)
                 cls_node.own_markers = list(class_marks)
