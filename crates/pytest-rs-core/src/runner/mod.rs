@@ -349,22 +349,6 @@ impl Engine {
                 current_file = file;
             }
 
-            // log_cli: the item header prints on its own line up front so
-            // live log records appear under it; pytest_runtest_logstart
-            // hooks log under a "live log start" section.
-            if session.live_logging {
-                if !config.no_terminal() && !config.quiet && config.verbose == 0 {
-                    println!("{} ", item.nodeid);
-                    let _ = std::io::stdout().flush();
-                }
-                session.live_progress = Some((done + 1, total));
-                python::log_set_live_when(py, "start");
-            }
-            let _ = fire_runtest_py_hooks(py, session, item, "pytest_runtest_logstart");
-            if !config.is_worker() {
-                python::reporter_logstart(py, item);
-            }
-
             // With -v and no capture, print "nodeid " before the test runs so
             // the test's own stdout appears after the ID line, then the outcome
             // word prints on its own line — matching upstream pytest's format.
@@ -384,7 +368,35 @@ impl Engine {
             python::set_subtest_fail_budget(py, maxfail.map(|m| m.saturating_sub(failed)));
             session.live_printed = 0;
             session.streamed_chars = 0;
-            let reports = run_one(py, plugins, session, config, item, items.get(idx + 1), None);
+            let reports = run_one(
+                py,
+                plugins,
+                session,
+                config,
+                item,
+                items.get(idx + 1),
+                None,
+                |py, session, config, item| {
+                    // log_cli: the item header prints on its own line up front
+                    // so live log records appear under it; pytest_runtest_logstart
+                    // hooks log under a "live log start" section. Only reached
+                    // on the native protocol path (see run_one's on_native_start
+                    // doc) — a replacing plain pytest_runtest_protocol hookimpl
+                    // owns its own nodeid-print/logstart, matching upstream.
+                    if session.live_logging {
+                        if !config.no_terminal() && !config.quiet && config.verbose == 0 {
+                            println!("{} ", item.nodeid);
+                            let _ = std::io::stdout().flush();
+                        }
+                        session.live_progress = Some((done + 1, total));
+                        python::log_set_live_when(py, "start");
+                    }
+                    let _ = fire_runtest_py_hooks(py, session, item, "pytest_runtest_logstart");
+                    if !config.is_worker() {
+                        python::reporter_logstart(py, item);
+                    }
+                },
+            );
             if inline_sub_chars {
                 let inline = python::pop_subtest_inline_count(py);
                 if inline > 0 {

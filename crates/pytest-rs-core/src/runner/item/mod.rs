@@ -53,7 +53,7 @@ impl Drop for FaulthandlerTimeoutGuard<'_> {
     }
 }
 
-#[allow(clippy::type_complexity)]
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub(crate) fn run_one(
     py: Python<'_>,
     plugins: &[Box<dyn Plugin>],
@@ -62,6 +62,7 @@ pub(crate) fn run_one(
     item: &TestItem,
     nextitem: Option<&TestItem>,
     pre_teardown: Option<&dyn Fn(&[TestReport])>,
+    on_native_start: impl FnOnce(Python<'_>, &mut Session, &Config, &TestItem),
 ) -> Vec<TestReport> {
     session.delegated_render = false;
     let _faulthandler_guard = FaulthandlerTimeoutGuard::arm_if_active(py, config);
@@ -83,10 +84,20 @@ pub(crate) fn run_one(
             }
         };
     // A plain pytest_runtest_protocol impl (pytest-rerunfailures) may replace
-    // the protocol; if one handles the item, use the reports it logged.
+    // the protocol; if one handles the item, use the reports it logged. A
+    // replacing impl owns its own nodeid-print/logstart (matching upstream:
+    // the builtin protocol impl is what does that, and a replacing impl that
+    // skips calling it also skips it) — so on_native_start (the nodeid
+    // print / live-log "start" label / pytest_runtest_logstart dispatch)
+    // only runs on the native (Ok(None)) path, and runs *before*
+    // run_one_body, mirroring upstream firing a conftest's plain
+    // pytest_runtest_protocol impl before the builtin one.
     let reports = match protocol::delegate_protocol(py, plugins, session, config, item, nextitem) {
         Ok(Some(reports)) => reports,
-        Ok(None) => run_one_body(py, plugins, session, config, item, pre_teardown),
+        Ok(None) => {
+            on_native_start(py, session, config, item);
+            run_one_body(py, plugins, session, config, item, pre_teardown)
+        }
         Err(err) => {
             let _ = finish_runtest_py_wrappers(py, &wrappers);
             if err.is_instance_of::<pyo3::exceptions::PyException>(py) {

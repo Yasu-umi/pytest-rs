@@ -581,12 +581,6 @@ impl Engine {
             let lineno = item.lineno;
             // xdist's [setproctitle] extra: the running item shows in ps.
             python::worker_set_title(py, &format!("[pytest-xdist running] {}", item.nodeid));
-            let _ = crate::runner::fire_runtest_py_hooks(
-                py,
-                &self.session,
-                item,
-                "pytest_runtest_logstart",
-            );
             // Track how many reports were streamed before teardown so we don't
             // double-send them (pre_teardown streams setup+call immediately so
             // a teardown crash doesn't swallow the call outcome).
@@ -604,6 +598,17 @@ impl Engine {
                         send(&WorkerMsg::Report { report: r.clone() });
                     }
                 }),
+                |py, session, _config, item| {
+                    // Workers don't print a nodeid line or set the live-log
+                    // "start" label (no terminal of their own) — only fire
+                    // pytest_runtest_logstart, on the native protocol path.
+                    let _ = crate::runner::fire_runtest_py_hooks(
+                        py,
+                        session,
+                        item,
+                        "pytest_runtest_logstart",
+                    );
+                },
             );
             collection.last_nodeid = Some(item.nodeid.clone());
             let pre_count = pre_teardown_count.get();
