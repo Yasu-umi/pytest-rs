@@ -155,8 +155,14 @@ pub(crate) fn report_from_proxy(py: Python<'_>, report: &Bound<'_, PyAny>) -> Py
 }
 
 /// If a plain (non-generator) `pytest_runtest_protocol` hook visible to this
-/// item handles it (returns non-None), drive it and return the reports it
-/// logged. Returns None when no hook claims the item (run the native body).
+/// item handles it (returns non-None), drive it and return `(reports,
+/// true)`. Returns `(reports, false)` when no hook claims the item (the
+/// caller must still run the native body) — `reports` is non-empty there
+/// only when a hookimpl returned `None` (declining) after already driving
+/// `runtestprotocol()` itself (e.g. a rerun helper that always re-runs the
+/// native protocol afterward too); those already-logged reports must not be
+/// silently dropped just because this particular hookimpl didn't claim the
+/// item.
 pub(crate) fn delegate_protocol(
     py: Python<'_>,
     plugins: &[Box<dyn Plugin>],
@@ -164,7 +170,7 @@ pub(crate) fn delegate_protocol(
     config: &Config,
     item: &TestItem,
     nextitem: Option<&TestItem>,
-) -> PyResult<Option<Vec<TestReport>>> {
+) -> PyResult<(Vec<TestReport>, bool)> {
     let isgenfunc = py.import("inspect")?.getattr("isgeneratorfunction")?;
     let hook_funcs: Vec<Py<PyAny>> = session
         .py_hooks
@@ -181,7 +187,7 @@ pub(crate) fn delegate_protocol(
         })
         .collect();
     if hook_funcs.is_empty() {
-        return Ok(None);
+        return Ok((Vec::new(), false));
     }
 
     let node = crate::python::make_node(py, item)?;
@@ -238,7 +244,9 @@ pub(crate) fn delegate_protocol(
     }
     // The shim TerminalReporter (driven by the plugin's ihook.logreport)
     // already rendered these reports; tell run_items to count without
-    // re-rendering.
+    // re-rendering. Only meaningful when handled — the caller still runs
+    // the native body (and its own normal rendering) otherwise, alongside
+    // whatever this un-claiming hookimpl already logged.
     session.delegated_render = handled;
-    Ok(handled.then_some(captured))
+    Ok((captured, handled))
 }

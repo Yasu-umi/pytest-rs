@@ -89,14 +89,24 @@ pub(crate) fn run_one(
     // the builtin protocol impl is what does that, and a replacing impl that
     // skips calling it also skips it) — so on_native_start (the nodeid
     // print / live-log "start" label / pytest_runtest_logstart dispatch)
-    // only runs on the native (Ok(None)) path, and runs *before*
-    // run_one_body, mirroring upstream firing a conftest's plain
-    // pytest_runtest_protocol impl before the builtin one.
+    // only runs on the not-handled path, and runs *before* run_one_body,
+    // mirroring upstream firing a conftest's plain pytest_runtest_protocol
+    // impl before the builtin one. An un-claiming hookimpl may have already
+    // driven runtestprotocol() itself (e.g. a rerun helper) — those reports
+    // are prepended, not discarded, alongside the native body's own.
     let reports = match protocol::delegate_protocol(py, plugins, session, config, item, nextitem) {
-        Ok(Some(reports)) => reports,
-        Ok(None) => {
+        Ok((reports, true)) => reports,
+        Ok((mut reports, false)) => {
             on_native_start(py, session, config, item);
-            run_one_body(py, plugins, session, config, item, pre_teardown)
+            reports.extend(run_one_body(
+                py,
+                plugins,
+                session,
+                config,
+                item,
+                pre_teardown,
+            ));
+            reports
         }
         Err(err) => {
             let _ = finish_runtest_py_wrappers(py, &wrappers);
