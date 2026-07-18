@@ -565,6 +565,62 @@ pub fn capture_session_end(py: Python<'_>) {
     }
 }
 
+/// Force this run's own capture back on — collection just suspended itself
+/// once the last file finished (see collect/mod.rs's identical pattern for
+/// pytest_cmdline_main), so without this a hook's `print()` here would land
+/// wherever `sys.stdout` pointed *before* this run's capture was installed
+/// (a nested run's outer session buffer), not this run's own captured
+/// stdout. Returns whether it was already installed, for `capture_restore`.
+pub fn capture_force_resume(py: Python<'_>) -> bool {
+    let globals = pyo3::types::PyDict::new(py);
+    let _ = py.run(
+        c"import pytest._capture as _c
+was_installed = _c.state._installed
+if _c.state._capture is not None:
+    _c.state._capture.resume_capturing()
+    _c.state._installed = True
+",
+        Some(&globals),
+        None,
+    );
+    globals
+        .get_item("was_installed")
+        .ok()
+        .flatten()
+        .and_then(|v| v.extract().ok())
+        .unwrap_or(false)
+}
+
+/// Undo `capture_force_resume`: put the installed flag back exactly as
+/// found (a no-op when it was already installed).
+pub fn capture_restore(py: Python<'_>, was_installed: bool) {
+    if was_installed {
+        return;
+    }
+    let _ = py.run(
+        c"import pytest._capture as _c
+if _c.state._capture is not None:
+    _c.state._capture.suspend_capturing(in_=True)
+    _c.state._installed = False
+",
+        None,
+        None,
+    );
+}
+
+/// Drain whatever the global capture buffered since it was last read (e.g.
+/// during a `capture_force_resume`-bracketed hook call). Read while capture
+/// is still active/resumed, but only `print!`/`eprint!` it to the real fds
+/// *after* the caller has restored/suspended capture (via `capture_restore`)
+/// — printing while still resumed would just feed straight back into the
+/// same capture buffer instead of reaching the real terminal.
+pub fn capture_read_now(py: Python<'_>) -> (String, String) {
+    py.import("pytest._capture")
+        .and_then(|m| m.call_method0("read_global_capture"))
+        .and_then(|result| result.extract::<(String, String)>())
+        .unwrap_or_default()
+}
+
 /// Recreate the global capture in a forked worker (the inherited one's
 /// saved fds point at the controller's terminal, not the IPC pipe).
 pub fn capture_reinit_post_fork(py: Python<'_>) {

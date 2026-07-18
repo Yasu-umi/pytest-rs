@@ -43,6 +43,34 @@ impl Engine {
     }
 
     pub(crate) fn fire_collection_modifyitems(&mut self, py: Python<'_>) -> PyResult<()> {
+        // Collection just finished, so per-file collect capture already
+        // suspended itself — resume it for the duration of this hook so a
+        // conftest's pytest_collection_modifyitems print() lands in this
+        // run's own captured buffer instead of leaking into the outer
+        // session's (see collect/mod.rs's identical pattern for
+        // pytest_cmdline_main). Read the buffered output back while still
+        // resumed, but only print it to the real fds *after* restoring
+        // capture below — printing while still resumed would just feed
+        // straight back into the same capture buffer instead of reaching
+        // the terminal — so it appears in real program order (e.g. before
+        // --collect-only's own native listing, which prints straight to
+        // the fd and would otherwise appear first even though it runs
+        // after this hook).
+        let was_installed = python::capture_force_resume(py);
+        let result = self.fire_collection_modifyitems_inner(py);
+        let (out, err) = python::capture_read_now(py);
+        python::capture_restore(py, was_installed);
+        if !out.is_empty() {
+            print!("{out}");
+            let _ = std::io::Write::flush(&mut std::io::stdout());
+        }
+        if !err.is_empty() {
+            eprint!("{err}");
+        }
+        result
+    }
+
+    fn fire_collection_modifyitems_inner(&mut self, py: Python<'_>) -> PyResult<()> {
         // Temporarily move items out so hooks can mutate the list while the
         // session stays borrowable.
         let mut items = std::mem::take(&mut self.session.items);

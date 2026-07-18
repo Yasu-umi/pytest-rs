@@ -61,7 +61,19 @@ impl Engine {
         if let Some(glob) = self.config.get_value("cache-show").map(str::to_string) {
             self.print_header(py);
             let glob = if glob.is_empty() { "*" } else { &glob };
-            return match python::cache_show(py, &self.config, glob) {
+            // configure_capture() starts this run's capture already
+            // suspended (only collection/each item's own resume calls turn
+            // it on); this early-return path never reaches either, so
+            // cache_show's print() would otherwise land wherever sys.stdout
+            // pointed *before* this run's capture was installed — a nested
+            // run's outer session buffer, not this run's own captured
+            // stdout. Resume first so it's actually captured, then flush
+            // (every normal exit path does the same before finishing; see
+            // finish_session/handle_no_tests).
+            let _ = python::capture_force_resume(py);
+            let result = python::cache_show(py, &self.config, glob);
+            python::capture_session_end(py);
+            return match result {
                 Ok(()) => exit_code::OK,
                 Err(err) => {
                     eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));

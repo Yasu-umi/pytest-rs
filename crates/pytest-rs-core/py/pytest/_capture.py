@@ -860,6 +860,14 @@ def resume_global():
         state._capture.resume_capturing()
 
 
+def read_global_capture():
+    """Drain whatever the global capture has buffered so far, without
+    suspending it — used by callers that force-resumed capturing around a
+    hook call and want its output to appear immediately (in program order)
+    rather than sit buffered until some later readouterr() call."""
+    return manager.read_global_capture()
+
+
 def collect_begin():
     state.collect_begin()
 
