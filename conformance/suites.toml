@@ -56,6 +56,10 @@ known_failures = [
     "testing/acceptance_test.py::TestDurations::test_with_deselected",
     # TestDurationsWithFixture: same mock_timing dependency
     "testing/acceptance_test.py::TestDurationsWithFixture::test_setup_function",
+    # test_timing_function: same mock_timing dependency (asserts an exact
+    # summed testcase duration from _pytest.timing.sleep(), which the
+    # nested pytester run's std::time::Instant-based clock doesn't honor).
+    "testing/test_junitxml.py::TestPython::test_timing_function",
     # tmp_path/tmp_path_factory are reimplemented in pytest/_tmp_path.py
     # (pytest-rs's own module tree), not physically defined in the
     # _pytest/tmpdir.py compat shim (a thin re-export, like every other
