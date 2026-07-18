@@ -4,7 +4,7 @@
   "category": "ecosystem",
   "excluded_files": 61,
   "deselected": 0,
-  "known_failed": 11,
+  "known_failed": 12,
   "files": [
     {
       "file": "testing/python/approx.py",
@@ -316,14 +316,14 @@
     },
     {
       "file": "testing/test_mark.py",
-      "status": "failed",
+      "status": "passed",
       "exit_code": 1,
       "passed": 105,
-      "failed": 1,
+      "failed": 0,
       "skipped": 0,
       "errors": 0,
       "deselected": 0,
-      "known_failed": 0
+      "known_failed": 1
     },
     {
       "file": "testing/test_monkeypatch.py",
@@ -514,10 +514,10 @@
     },
     {
       "file": "testing/test_threadexception.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 7,
-      "failed": 1,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 8,
+      "failed": 0,
       "skipped": 0,
       "errors": 0,
       "deselected": 0,
