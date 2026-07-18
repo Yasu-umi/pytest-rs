@@ -623,17 +623,30 @@ impl Engine {
                 code = crate::report::exit_code::TESTS_FAILED;
             }
         }
-        if let Err(err) = python::threadexception_session_cleanup(py) {
-            eprintln!("{}", python::format_exception(py, &err));
-            if code == 0 {
-                code = crate::report::exit_code::TESTS_FAILED;
-            }
-        }
         // pytest_unconfigure: mirrors upstream's config teardown (fired after
         // the terminal summary, just before the session returns). conftest and
         // plugin hooks observe it; in pytester inline runs the HookRecorder's
         // getcalls("pytest_unconfigure") sees the live config via record_hook.
+        // Must run before threadexception_session_cleanup below: upstream's
+        // own threadexception cleanup lives on the SAME `add_cleanup` stack
+        // drained here, after any test-registered cleanup (LIFO) — a thread
+        // spawned by a `request.config.add_cleanup()` callback (as opposed to
+        // one spawned during a test's setup/call/teardown, drained per-phase
+        // in runner/item/body.rs) only exists once this drain runs, so
+        // checking for it any earlier always finds nothing.
         let _ = self.fire_py_hooks_simple(py, "pytest_unconfigure");
+        if let Err(err) = python::threadexception_session_cleanup(py) {
+            eprintln!("{}", python::format_exception(py, &err));
+            // Unlike a thread exception discovered during a test's own
+            // setup/call/teardown (drained per-phase, becoming a normal test
+            // failure — TESTS_FAILED), anything still here happened after
+            // every test's own reporting window already closed — genuinely
+            // unattributable to any test, matching upstream's real behavior
+            // of an uncaught exception escaping session teardown entirely
+            // (an INTERNALERROR, not a test outcome, and overriding whatever
+            // exit status the test run itself produced).
+            code = crate::report::exit_code::INTERNAL_ERROR;
+        }
         code
     }
 }
