@@ -25,7 +25,7 @@ pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2766 | 19 | 0 | 53 | 0 | 11 | 2849 | 98.9% | 40 | 54 | 61 |
+| pytest | 9.0.3 | 2767 | 18 | 0 | 53 | 0 | 11 | 2849 | 99.0% | 41 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 0 | 1 | 7 | 85.7% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 0 | 2 | 90 | 97.8% | 1 | 1 | 0 |
@@ -41,7 +41,7 @@ pytest-rs; they are not counted in the total.
 | pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-snapshot | v0.9.0 | 106 | 0 | 0 | 0 | 0 | 1 | 107 | 99.1% | 3 | 3 | 0 |
 | pytest-icdiff | 0.5 | 10 | 2 | 0 | 0 | 0 | 0 | 12 | 83.3% | 0 | 1 | 0 |
-| pytest-socket | 0.7.0 | 43 | 0 | 0 | 0 | 0 | 0 | 43 | 100.0% | 5 | 6 | 0 |
+| pytest-socket | 0.7.0 | 63 | 0 | 0 | 0 | 0 | 2 | 65 | 96.9% | 6 | 6 | 0 |
 | pytest-order | v1.4.0 | 134 | 0 | 0 | 0 | 0 | 0 | 134 | 100.0% | 16 | 16 | 0 |
 | pytest-repeat | v0.9.4 | 16 | 0 | 0 | 0 | 0 | 0 | 16 | 100.0% | 1 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
@@ -66,8 +66,8 @@ pytest-rs; they are not counted in the total.
 | pandas | v3.0.3 | 160780 | 0 | 0 | 26985 | 0 | 8 | 187773 | 100.0% | 880 | 961 | 3 |
 | networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 0 | 0 | 6894 | 100.0% | 259 | 266 | 0 |
 | pydantic | v2.11.7 | 5338 | 0 | 0 | 921 | 0 | 14 | 6273 | 99.8% | 79 | 82 | 0 |
-| scikit-learn-1 | 1.9.0 | 8432 | 0 | 0 | 6624 | 0 | 0 | 15056 | 100.0% | 79 | 87 | 0 |
-| scikit-learn-2 | 1.9.0 | 5046 | 0 | 0 | 1892 | 0 | 0 | 6938 | 100.0% | 52 | 58 | 0 |
+| scikit-learn-1 | 1.9.0 | 8417 | 0 | 0 | 6622 | 0 | 0 | 15039 | 100.0% | 78 | 87 | 0 |
+| scikit-learn-2 | 1.9.0 | 4925 | 0 | 0 | 1802 | 0 | 0 | 6727 | 100.0% | 51 | 58 | 0 |
 | scikit-learn-3 | 1.9.0 | 9251 | 0 | 0 | 2530 | 0 | 3 | 11784 | 100.0% | 107 | 114 | 0 |
 
 ### pytest @ 9.0.3
@@ -93,7 +93,7 @@ pytest-rs; they are not counted in the total.
 | testing/test_cacheprovider.py | failed | 55 | 2 | 0 | 0 | 0 | 0 |
 | testing/test_capture.py | passed | 130 | 0 | 0 | 2 | 0 | 0 |
 | testing/test_collect_imported_tests.py | failed | 2 | 1 | 0 | 0 | 0 | 0 |
-| testing/test_collection.py | failed | 111 | 1 | 0 | 3 | 0 | 1 |
+| testing/test_collection.py | passed | 112 | 0 | 0 | 3 | 0 | 1 |
 | testing/test_compat.py | passed | 10 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_config.py | passed | 214 | 0 | 0 | 1 | 0 | 0 |
 | testing/test_conftest.py | failed | 51 | 2 | 0 | 1 | 0 | 0 |
@@ -357,7 +357,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_doctest.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_precedence.py | passed | 10 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_restrict_hosts.py | passed | 28 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_socket.py | timeout | 0 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_socket.py | passed | 20 | 0 | 0 | 0 | 0 | 2 |
 
 </details>
 
@@ -2643,7 +2643,7 @@ pytest-rs; they are not counted in the total.
 | sklearn/utils/tests/test_multiclass.py | passed | 13 | 0 | 0 | 36 | 0 | 0 |
 | sklearn/utils/tests/test_murmurhash.py | passed | 6 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/utils/tests/test_optimize.py | passed | 5 | 0 | 0 | 15 | 0 | 0 |
-| sklearn/utils/tests/test_parallel.py | passed | 15 | 0 | 0 | 2 | 0 | 0 |
+| sklearn/utils/tests/test_parallel.py | timeout | 0 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/utils/tests/test_param_validation.py | passed | 147 | 0 | 0 | 1 | 0 | 0 |
 | sklearn/utils/tests/test_plotting.py | passed | 80 | 0 | 0 | 28 | 0 | 0 |
 | sklearn/utils/tests/test_pprint.py | passed | 13 | 0 | 0 | 0 | 0 | 0 |
@@ -2741,7 +2741,7 @@ pytest-rs; they are not counted in the total.
 | sklearn/model_selection/tests/test_search.py | passed | 140 | 0 | 0 | 31 | 0 | 0 |
 | sklearn/model_selection/tests/test_split.py | passed | 226 | 0 | 0 | 45 | 0 | 0 |
 | sklearn/model_selection/tests/test_successive_halving.py | passed | 98 | 0 | 0 | 4 | 0 | 0 |
-| sklearn/model_selection/tests/test_validation.py | passed | 121 | 0 | 0 | 90 | 0 | 0 |
+| sklearn/model_selection/tests/test_validation.py | timeout | 0 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/preprocessing/tests/test_common.py | passed | 9 | 0 | 0 | 9 | 0 | 0 |
 | sklearn/preprocessing/tests/test_data.py | passed | 450 | 0 | 0 | 279 | 0 | 0 |
 | sklearn/preprocessing/tests/test_discretization.py | passed | 99 | 0 | 0 | 0 | 0 | 0 |

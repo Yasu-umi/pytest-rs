@@ -195,10 +195,10 @@
     },
     {
       "file": "testing/test_collection.py",
-      "status": "failed",
+      "status": "passed",
       "exit_code": 1,
-      "passed": 111,
-      "failed": 1,
+      "passed": 112,
+      "failed": 0,
       "skipped": 3,
       "errors": 0,
       "deselected": 0,

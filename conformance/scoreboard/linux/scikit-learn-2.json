@@ -547,11 +547,11 @@
     },
     {
       "file": "sklearn/model_selection/tests/test_validation.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 121,
+      "status": "timeout",
+      "exit_code": null,
+      "passed": 0,
       "failed": 0,
-      "skipped": 90,
+      "skipped": 0,
       "errors": 0,
       "deselected": 0,
       "known_failed": 0
