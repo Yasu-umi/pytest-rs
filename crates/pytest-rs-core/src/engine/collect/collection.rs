@@ -409,9 +409,21 @@ impl Engine {
                     return Err("\x00KEYBOARD_INTERRUPT\x00".to_string());
                 }
                 Err(ref err) if err.is_instance_of::<pyo3::exceptions::PySystemExit>(py) => {
-                    // SystemExit during collection is an INTERNALERROR.
+                    // SystemExit during collection is an INTERNALERROR: print
+                    // the banner, fire pytest_internalerror (a hookimpl may
+                    // raise Exit to override the exit code), and hand the
+                    // caller the already-resolved code.
                     let msg = python::format_exception(py, err);
-                    return Err(format!("\x00INTERNAL\x00{msg}"));
+                    for line in msg.lines() {
+                        println!("INTERNALERROR> {line}");
+                    }
+                    python::junit_internal_error(py, &msg);
+                    let code = python::notify_internal_error(
+                        py,
+                        err,
+                        crate::report::exit_code::INTERNAL_ERROR,
+                    );
+                    return Err(format!("\x00INTERNAL_DONE\x00{code}"));
                 }
                 Err(err) => {
                     // pytest.skip(..., allow_module_level=True) or

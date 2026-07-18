@@ -315,6 +315,11 @@ enabled = true
 repo = "https://github.com/miketheman/pytest-socket"
 tag = "0.7.0"
 testpaths = ["tests"]
+# tests/test_socket.py made real outbound network requests (see
+# known_failures below) and timed out ("1 file died") once on Linux CI while
+# unrelated local runs stayed at a clean 63/65 — network latency, not a
+# pytest-rs regression, but give it slack rather than risk collateral flakes.
+slow_files = ["tests/test_socket.py"]
 # pytest-httpbin provides the local-server `httpbin` fixture the restrict-hosts
 # tests connect to; starlette/httpx/anyio back the async tests.
 deps = [
