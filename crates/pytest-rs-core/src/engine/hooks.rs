@@ -708,8 +708,17 @@ impl Engine {
         let mut dirs: Vec<String> = Vec::new();
         {
             let mut seen: std::collections::HashSet<String> = Default::default();
-            seen.insert(".".to_string());
-            dirs.push(".".to_string());
+            // Only the runs that actually visit the rootdir as a collection
+            // root (no args, or an explicit "." / rootdir arg) get a Dir(".")
+            // collectreport, matching upstream's Session.collect(): passing a
+            // narrower directory (e.g. "tests") never constructs a collector
+            // for the rootdir itself.
+            let rootdir_canon =
+                crate::collect::canonicalize_preserving_symlinks(self.config.rootdir.as_path());
+            if self.session.initial_paths.contains(&rootdir_canon) {
+                seen.insert(".".to_string());
+                dirs.push(".".to_string());
+            }
             let all_files = passing_modules
                 .iter()
                 .map(|s| s.as_str())
