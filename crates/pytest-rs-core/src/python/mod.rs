@@ -47,6 +47,66 @@ pub fn shim_root() -> PathBuf {
     ))
 }
 
+/// Split a raw ini string the way upstream's `_getini` handles `type="paths"`
+/// / `type="args"` values: `shlex.split(value)` on the whole string (not
+/// per-line — a multi-line ini value's embedded `\n`s are just more
+/// whitespace to shlex). Falls back to a plain whitespace split if `shlex`
+/// itself errors (e.g. unbalanced quotes), matching Python's own behavior of
+/// letting `shlex.split` raise rather than silently mangling input — but a
+/// hard error here would be an odd place to surface a ValueError, so this
+/// degrades gracefully instead.
+pub fn shlex_split(py: Python<'_>, value: &str) -> Vec<String> {
+    py.import("shlex")
+        .and_then(|m| m.call_method1("split", (value,)))
+        .and_then(|v| v.extract::<Vec<String>>())
+        .unwrap_or_else(|_| value.split_whitespace().map(str::to_string).collect())
+}
+
+/// The `pythonpath` ini's entries resolved to absolute paths — the same
+/// list both the add side (`Engine::run`/`run_nested`, prepending each to
+/// `sys.path`) and the remove side (session teardown) need, so they can
+/// never drift apart.
+pub fn pythonpath_entries(py: Python<'_>, config: &crate::config::Config) -> Vec<PathBuf> {
+    let Some(raw) = config.get_ini("pythonpath") else {
+        return vec![];
+    };
+    let rels: Vec<String> = if raw.contains('\x00') {
+        raw.split('\x00')
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+            .collect()
+    } else {
+        shlex_split(py, raw)
+    };
+    rels.into_iter()
+        .map(|rel| config.rootdir.join(rel))
+        .collect()
+}
+
+/// Remove every `pythonpath` entry previously prepended to `sys.path`
+/// (upstream's `Config._unconfigure_python_path`, run as a cleanup callback
+/// at session teardown so a nested/second run starts with a clean slate and
+/// doesn't just accumulate entries).
+pub fn pythonpath_cleanup(py: Python<'_>, config: &crate::config::Config) {
+    let sys_path = match py.import("sys").and_then(|m| m.getattr("path")) {
+        Ok(p) => p,
+        Err(_) => return,
+    };
+    let Ok(sys_path) = sys_path.cast::<PyList>() else {
+        return;
+    };
+    for path in pythonpath_entries(py, config) {
+        let entry = path.to_string_lossy().to_string();
+        if let Some(i) = sys_path
+            .iter()
+            .position(|e| e.extract::<String>().ok().as_deref() == Some(&entry))
+        {
+            let _ = sys_path.del_item(i);
+        }
+    }
+}
+
 pub fn sys_path_prepend(py: Python<'_>, path: &Path) -> PyResult<()> {
     let sys_path = py.import("sys")?.getattr("path")?;
     let sys_path = sys_path.cast::<PyList>().map_err(PyErr::from)?;

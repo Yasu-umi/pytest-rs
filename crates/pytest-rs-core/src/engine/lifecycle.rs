@@ -46,10 +46,15 @@ impl Engine {
         }
         // pythonpath ini: add paths relative to rootdir to sys.path early,
         // before conftest/plugin imports (mirrors _pytest/python_path.py).
-        for rel in self.config.get_ini_lines("pythonpath") {
-            let abs = self.config.rootdir.join(rel);
+        // A single ini line can itself list several whitespace-separated
+        // entries (`pythonpath = a b`), so this needs shlex-style splitting,
+        // not the plain newline-per-entry split get_ini_lines does.
+        for abs in python::pythonpath_entries(py, &self.config) {
             if let Err(err) = python::sys_path_prepend(py, &abs) {
-                eprintln!("INTERNAL ERROR: failed to add pythonpath entry {rel}: {err}");
+                eprintln!(
+                    "INTERNAL ERROR: failed to add pythonpath entry {}: {err}",
+                    abs.display()
+                );
             }
         }
         let _debug_guard = super::install_debug_guard(py, &self.config);

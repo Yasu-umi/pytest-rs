@@ -1248,36 +1248,62 @@ impl Engine {
         Ok(())
     }
 
+    /// Only ever called for "pytest_unconfigure" (every call site in
+    /// session.rs passes that literal name) — also drains `config`'s
+    /// `add_cleanup` stack afterward (upstream's `Config._ensure_unconfigure`
+    /// fires `pytest_unconfigure` then drains `_cleanup_stack`; pytest-rs
+    /// splits the same two steps across this function and
+    /// `PyConfig::_ensure_unconfigure`), so `config.add_cleanup(...)`
+    /// registrations (e.g. `_configure_python_path`'s sys.path cleanup, or a
+    /// conftest/fixture's own `request.config.add_cleanup`) actually run in a
+    /// real session — previously only reachable from the `parseconfig`-style
+    /// standalone Config paths.
     pub(crate) fn fire_py_hooks_simple(&mut self, py: Python<'_>, name: &str) -> PyResult<()> {
         // Respect @pytest.hookimpl(tryfirst/trylast) ordering: tryfirst before
         // normal, normal next, trylast last (mirrors pluggy's call ordering).
+        // Conftest-defined impls only from py_hooks — third-party plugin
+        // modules (entry-point/`-p` loaded) come exclusively from
+        // instance_hook_funcs below; session.py_hooks also carries an entry
+        // for those (bootstrap.rs tags it with plugin_module), so including
+        // both would fire the same third-party hookimpl twice (same
+        // precedent as run_py_modifyitems above).
         let mut hooks: Vec<_> = self
             .session
             .py_hooks
             .iter()
-            .filter(|hook| hook.name == name)
+            .filter(|hook| hook.name == name && hook.plugin_module.is_none())
             .collect();
         hooks.sort_by_key(|h| match (h.tryfirst, h.trylast) {
             (true, _) => 0,
             (_, true) => 2,
             _ => 1,
         });
-        let hook_funcs: Vec<Py<pyo3::PyAny>> = hooks.iter().map(|h| h.func.clone_ref(py)).collect();
+        let mut hook_funcs: Vec<Py<pyo3::PyAny>> =
+            hooks.iter().map(|h| h.func.clone_ref(py)).collect();
+        // Plugin instances registered via pluginmanager.register() (e.g.
+        // pytest.main(..., plugins=[MyPlugin()])) never go through
+        // session.py_hooks' bootstrap-time module scan at all.
+        hook_funcs.extend(python::instance_hook_funcs(py, name));
         // pluggy fires the HookCaller even with zero implementations, so an
         // in-process HookRecorder records the (empty) call regardless. Skip
-        // only on the outer run when there is nothing to call and no recorder
-        // to notify.
-        if hook_funcs.is_empty() && !crate::engine::inprocess::recording() {
-            return Ok(());
-        }
+        // only the hook-firing loop when there's nothing to call and no
+        // recorder to notify — the cleanup-stack drain below still needs to
+        // run unconditionally (pythonpath cleanup has no hookimpl to trigger
+        // it).
+        let skip_hooks = hook_funcs.is_empty() && !crate::engine::inprocess::recording();
         let config_proxy = python::make_py_config(py, &self.config)?;
-        // Record the hook call so an in-process HookRecorder's getcalls sees
-        // it (the native engine dispatches conftest/plugin hooks directly,
-        // bypassing pluggy's HookCaller that the monitoring wraps).
-        python::record_hook(py, name, &[("config", config_proxy.clone_ref(py))]);
-        for func in &hook_funcs {
-            python::call_py_hook(py, func, &[("config", config_proxy.clone_ref(py))])?;
+        if !skip_hooks {
+            // Record the hook call so an in-process HookRecorder's getcalls
+            // sees it (the native engine dispatches conftest/plugin hooks
+            // directly, bypassing pluggy's HookCaller that the monitoring
+            // wraps).
+            python::record_hook(py, name, &[("config", config_proxy.clone_ref(py))]);
+            for func in &hook_funcs {
+                python::call_py_hook(py, func, &[("config", config_proxy.clone_ref(py))])?;
+            }
         }
+        python::pythonpath_cleanup(py, &self.config);
+        let _ = config_proxy.bind(py).call_method0("_ensure_unconfigure");
         Ok(())
     }
 
