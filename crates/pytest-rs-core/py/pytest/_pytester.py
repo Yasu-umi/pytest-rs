@@ -1081,6 +1081,21 @@ class Pytester:
             pass
         return InlineRunResult(result, hook_events)
 
+    def _ensure_basetemp(self, args):
+        """Upstream's Pytester._ensure_basetemp: give the nested run its own
+        basetemp (unless the caller already passed one) so its tmp_path
+        fixtures land in a fresh directory instead of falling back to
+        whatever ambient PYTEST_DEBUG_TEMPROOT scheme produces — which, for
+        a run nested inside another pytester fixture, is the OUTER run's own
+        basetemp, silently double-nesting one pytest-of-user tree inside
+        the other."""
+        args = list(args)
+        for arg in args:
+            if str(arg).startswith("--basetemp"):
+                return args
+        args.append(f"--basetemp={self.path.parent / 'basetemp'}")
+        return args
+
     def _inline_run_inprocess(self, *args, plugins=()):
         # In-process nested run: the native engine runs a whole session in
         # this process and fires its hooks through the monitored plugin
@@ -1097,7 +1112,7 @@ class Pytester:
                 if mark.args
             ]
         return run_inprocess(
-            args,
+            self._ensure_basetemp(args),
             plugins=plugins,
             helper_plugin=PytesterHelperPlugin(),
             forwarded_filter_marks=forwarded_filter_marks,
