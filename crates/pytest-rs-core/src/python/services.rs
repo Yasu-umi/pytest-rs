@@ -1112,6 +1112,16 @@ pub fn render_ini_help(py: Python<'_>, columns: u32) -> PyResult<String> {
         .extract()
 }
 
+/// `--help`'s core CLI option listing (`pytest._parser.render_core_option_help`),
+/// argparse-rendered to match upstream's real (also argparse-based) grouping
+/// and wrapping — replaces clap's own `.hide(true)`-heavy rendering of the
+/// same options on the full-help path.
+pub fn render_core_option_help(py: Python<'_>, columns: u32) -> PyResult<String> {
+    py.import("pytest._parser")?
+        .call_method1("render_core_option_help", (columns,))?
+        .extract()
+}
+
 /// Emit a warning of a pytest category attributed to an explicit
 /// file/line (registry=None: never deduplicated).
 pub fn warn_explicit_at(

@@ -1121,9 +1121,7 @@ impl Engine {
             let mut new_flags: Vec<String> =
                 after_flags.difference(&before_flags).cloned().collect();
             new_flags.sort();
-            if !new_flags.is_empty()
-                && let Some(text) = &mut self.config.help_text
-            {
+            if !new_flags.is_empty() && self.config.help_text.is_some() {
                 // Each flag renders under its own parser.getgroup("name")
                 // heading (matching upstream's per-plugin option groups) via
                 // argparse's own HelpFormatter, so wrapping/alignment
@@ -1135,8 +1133,8 @@ impl Engine {
                     .and_then(|r| r.extract::<String>())
                     && !rendered.is_empty()
                 {
-                    text.push('\n');
-                    text.push_str(&rendered);
+                    self.config.plugin_option_help.push('\n');
+                    self.config.plugin_option_help.push_str(&rendered);
                 }
             }
         }

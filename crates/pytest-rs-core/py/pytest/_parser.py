@@ -173,6 +173,59 @@ class _PytestHelpFormatter(argparse.HelpFormatter):
         )
 
 
+class _CoreHelpFormatter(argparse.HelpFormatter):
+    """Port of upstream's `_pytest.config.argparsing.DropShorterLongHelpFormatter`,
+    used for pytest-rs's own core --help option section (`render_core_option_help`).
+
+    Given argparse's modern (3.13+) single-trailing-metavar invocation format
+    (e.g. `-o, --override-ini OVERRIDE_INI`, or `--lfnf, --last-failed-no-failures
+    {all,none}` for multiple long aliases), this:
+    - Collapses long options that differ only by extra hyphens (e.g.
+      `--fulltrace`/`--full-trace`) down to the longer, more-hyphenated spelling —
+      not needed here since `_CORE_OPTIONS` only ever declares the one upstream
+      displays, but kept for parity with upstream's real formatter.
+    - Joins a long-only option's metavar with '=' instead of a space (turning
+      `--durations N` into `--durations=N`), by replacing the first space in
+      each comma-split invocation piece — which, thanks to the modern single-
+      trailing-metavar format, is always the flag/metavar separator, never the
+      ", " between two flags (already split away by the time this runs).
+    - Leaves any invocation containing a short flag untouched (already correct
+      as `-o, --override-ini OVERRIDE_INI` from stock argparse).
+    """
+
+    def _format_action_invocation(self, action: argparse.Action) -> str:
+        orgstr = super()._format_action_invocation(action)
+        if orgstr and orgstr[0] != "-":
+            return orgstr
+        options = orgstr.split(", ")
+        if len(options) == 2 and (len(options[0]) == 2 or len(options[1]) == 2):
+            return orgstr
+        short_long: dict[str, str] = {}
+        for option in options:
+            if len(option) == 2 or option[2] == " ":
+                continue
+            xxoption = option[2:]
+            shortened = xxoption.replace("-", "")
+            if shortened not in short_long or len(short_long[shortened]) < len(xxoption):
+                short_long[shortened] = xxoption
+        return_list = []
+        for option in options:
+            if len(option) == 2 or option[2] == " ":
+                return_list.append(option)
+            if option[2:] == short_long.get(option.replace("-", "")):
+                return_list.append(option.replace(" ", "=", 1))
+        return ", ".join(return_list)
+
+    def _split_lines(self, text: str, width: int) -> list[str]:
+        """Wrap each already-newline-separated line independently, so a help
+        string with explicit '\\n's (e.g. an example on its own line) keeps
+        those breaks instead of being rejoined and rewrapped as one paragraph."""
+        lines = []
+        for line in text.splitlines():
+            lines.extend(textwrap.wrap(line.strip(), width))
+        return lines
+
+
 # argparse kwargs Option.attrs() may carry that add_argument actually accepts;
 # plugins pass through arbitrary extra keys (pytest-socket etc. don't, but
 # nothing guarantees it), so this is an allowlist, not a denylist.
@@ -233,6 +286,589 @@ def render_new_option_help(new_flags: list[str]) -> str:
         if idx != -1:
             sections.append(text[idx:])
     return "\n".join(sections)
+
+
+#: pytest-rs's own core CLI options (as opposed to conftest/plugin-registered
+#: ones, rendered by `render_new_option_help`) — group title, argparse option
+#: strings, argparse kwargs, help text. Copied verbatim from upstream's own
+#: `pytest_addoption` calls (`_pytest/main.py`, `debugging.py`,
+#: `terminal.py`, `cacheprovider.py`, `main.py`'s collection group,
+#: `config/__init__.py`'s debugconfig group, `logging.py`), in upstream's
+#: exact group/registration order, restricted to options pytest-rs actually
+#: implements (a clap arg exists for it) — e.g. `--disable-warnings` and
+#: `--code-highlight` have no pytest-rs equivalent yet and are omitted rather
+#: than fabricated; xdist's own options (`-n`, `--dist`, ...) are omitted too
+#: since bundled xdist has no `pytest_help_group` section of its own yet
+#: (only pytest-rs-benchmark does) — matching a real pytest-xdist-less
+#: `--help`, which is what a bare nested `pytester.runpytest()` session (no
+#: plugins requested) shows upstream.
+_CORE_OPTIONS: list[tuple[str, tuple[str, ...], dict[str, Any], str]] = [
+    (
+        "general",
+        ("-k",),
+        {"metavar": "EXPRESSION"},
+        "Only run tests which match the given substring expression. An "
+        "expression is a Python evaluable expression where all names are "
+        "substring-matched against test names and their parent classes. "
+        "Example: -k 'test_method or test_other' matches all test functions "
+        "and classes whose name contains 'test_method' or 'test_other', "
+        "while -k 'not test_method' matches those that don't contain "
+        "'test_method' in their names. -k 'not test_method and not "
+        "test_other' will eliminate the matches. Additionally keywords are "
+        "matched to classes and functions containing extra names in their "
+        "'extra_keyword_matches' set, as well as functions which have names "
+        "assigned directly to them. The matching is case-insensitive.",
+    ),
+    (
+        "general",
+        ("-m",),
+        {"metavar": "MARKEXPR"},
+        "Only run tests matching given mark expression. For example: -m 'mark1 and not mark2'.",
+    ),
+    (
+        "general",
+        ("--markers",),
+        {"action": "store_true"},
+        "show markers (builtin, plugin and per-project ones).",
+    ),
+    (
+        "general",
+        ("-x", "--exitfirst"),
+        {"action": "store_true"},
+        "Exit instantly on first error or failed test",
+    ),
+    (
+        "general",
+        ("--maxfail",),
+        {"metavar": "num"},
+        "Exit after first num failures or errors",
+    ),
+    (
+        "general",
+        ("--strict-config",),
+        {"action": "store_true"},
+        "Enables the strict_config option",
+    ),
+    (
+        "general",
+        ("--strict-markers",),
+        {"action": "store_true"},
+        "Enables the strict_markers option",
+    ),
+    ("general", ("--strict",), {"action": "store_true"}, "Enables the strict option"),
+    (
+        "general",
+        ("--fixtures", "--funcargs"),
+        {"action": "store_true"},
+        "Show available fixtures, sorted by plugin appearance (fixtures "
+        "with leading '_' are only shown with '-v')",
+    ),
+    (
+        "general",
+        ("--fixtures-per-test",),
+        {"action": "store_true"},
+        "Show fixtures per test",
+    ),
+    (
+        "general",
+        ("--pdb",),
+        {"action": "store_true"},
+        "Start the interactive Python debugger on errors or KeyboardInterrupt",
+    ),
+    (
+        "general",
+        ("--pdbcls",),
+        {"metavar": "modulename:classname"},
+        "Specify a custom interactive Python debugger for use with "
+        "--pdb.For example: --pdbcls=IPython.terminal.debugger:TerminalPdb",
+    ),
+    (
+        "general",
+        ("--trace",),
+        {"action": "store_true"},
+        "Immediately break when running each test",
+    ),
+    (
+        "general",
+        ("--capture",),
+        {"metavar": "method"},
+        "Per-test capturing method: one of fd|sys|no|tee-sys",
+    ),
+    ("general", ("-s",), {"action": "store_true"}, "Shortcut for --capture=no"),
+    (
+        "general",
+        ("--runxfail",),
+        {"action": "store_true"},
+        "Report the results of xfail tests as if they were not marked",
+    ),
+    (
+        "general",
+        ("--lf", "--last-failed"),
+        {"action": "store_true"},
+        "Rerun only the tests that failed at the last run (or all if none failed)",
+    ),
+    (
+        "general",
+        ("--ff", "--failed-first"),
+        {"action": "store_true"},
+        "Run all tests, but run the last failures first. This may re-order "
+        "tests and thus lead to repeated fixture setup/teardown.",
+    ),
+    (
+        "general",
+        ("--nf", "--new-first"),
+        {"action": "store_true"},
+        "Run tests from new files first, then the rest of the tests sorted by file mtime",
+    ),
+    (
+        "general",
+        ("--cache-show",),
+        {"nargs": "?", "metavar": "CACHESHOW"},
+        "Show cache contents, don't perform collection or tests. Optional "
+        "argument: glob (default: '*').",
+    ),
+    (
+        "general",
+        ("--cache-clear",),
+        {"action": "store_true"},
+        "Remove all cache contents at start of test run",
+    ),
+    (
+        "general",
+        ("--lfnf", "--last-failed-no-failures"),
+        {"choices": ("all", "none")},
+        "With ``--lf``, determines whether to execute tests when there are "
+        "no previously (known) failures or when no cached ``lastfailed`` "
+        "data was found. ``all`` (the default) runs the full test suite "
+        "again. ``none`` just emits a message about no known failures and "
+        "exits successfully.",
+    ),
+    (
+        "general",
+        ("--sw", "--stepwise"),
+        {"action": "store_true"},
+        "Exit on test failure and continue from last failing test next time",
+    ),
+    (
+        "general",
+        ("--sw-skip", "--stepwise-skip"),
+        {"action": "store_true"},
+        "Ignore the first failing test but stop on the next failing test. "
+        "Implicitly enables --stepwise.",
+    ),
+    (
+        "general",
+        ("--sw-reset", "--stepwise-reset"),
+        {"action": "store_true"},
+        "Resets stepwise state, restarting the stepwise workflow. Implicitly enables --stepwise.",
+    ),
+    (
+        "Reporting",
+        ("--durations",),
+        {"metavar": "N"},
+        "Show N slowest setup/test durations (N=0 for all)",
+    ),
+    (
+        "Reporting",
+        ("--durations-min",),
+        {"metavar": "N"},
+        "Minimal duration in seconds for inclusion in slowest list. "
+        "Default: 0.005 (or 0.0 if -vv is given).",
+    ),
+    ("Reporting", ("-v", "--verbose"), {"action": "count"}, "Increase verbosity"),
+    ("Reporting", ("--no-header",), {"action": "store_true"}, "Disable header"),
+    ("Reporting", ("--no-summary",), {"action": "store_true"}, "Disable summary"),
+    (
+        "Reporting",
+        ("--no-fold-skipped",),
+        {"action": "store_true"},
+        "Do not fold skipped tests in short summary.",
+    ),
+    (
+        "Reporting",
+        ("--force-short-summary",),
+        {"action": "store_true"},
+        "Force condensed summary output regardless of verbosity level.",
+    ),
+    ("Reporting", ("-q", "--quiet"), {"action": "count"}, "Decrease verbosity"),
+    (
+        "Reporting",
+        ("--verbosity",),
+        {"metavar": "VERBOSE"},
+        "Set verbosity. Default: 0.",
+    ),
+    (
+        "Reporting",
+        ("-r",),
+        {"metavar": "chars"},
+        "Show extra test summary info as specified by chars: (f)ailed, "
+        "(E)rror, (s)kipped, (x)failed, (X)passed, (p)assed, (P)assed with "
+        "output, (a)ll except passed (p/P), or (A)ll. (w)arnings are "
+        "enabled by default (see --disable-warnings), 'N' can be used to "
+        "reset the list. (default: 'fE').",
+    ),
+    (
+        "Reporting",
+        ("-l", "--showlocals"),
+        {"action": "store_true"},
+        "Show locals in tracebacks (disabled by default)",
+    ),
+    (
+        "Reporting",
+        ("--no-showlocals",),
+        {"action": "store_true"},
+        "Hide locals in tracebacks (negate --showlocals passed through addopts)",
+    ),
+    (
+        "Reporting",
+        ("--tb",),
+        {"metavar": "style"},
+        "Traceback print mode (auto/long/short/line/native/no)",
+    ),
+    (
+        "Reporting",
+        ("--xfail-tb",),
+        {"action": "store_true"},
+        "Show tracebacks for xfail (as long as --tb != no)",
+    ),
+    (
+        "Reporting",
+        ("--show-capture",),
+        {"choices": ("no", "stdout", "stderr", "log", "all")},
+        "Controls how captured stdout/stderr/log is shown on failed tests. Default: all.",
+    ),
+    (
+        "Reporting",
+        ("--full-trace",),
+        {"action": "store_true"},
+        "Don't cut any tracebacks (default is to cut)",
+    ),
+    (
+        "Reporting",
+        ("--color",),
+        {"metavar": "color"},
+        "Color terminal output (yes/no/auto)",
+    ),
+    (
+        "Reporting",
+        ("--pastebin",),
+        {"metavar": "mode"},
+        "Send failed|all info to bpaste.net pastebin service",
+    ),
+    (
+        "Reporting",
+        ("--junitxml", "--junit-xml"),
+        {"metavar": "path"},
+        "Create junit-xml style report file at given path",
+    ),
+    (
+        "Reporting",
+        ("--junitprefix", "--junit-prefix"),
+        {"metavar": "str"},
+        "Prepend prefix to classnames in junit-xml output",
+    ),
+    (
+        "pytest-warnings",
+        ("-W", "--pythonwarnings"),
+        {"metavar": "PYTHONWARNINGS"},
+        "Set which warnings to report, see -W option of Python itself",
+    ),
+    (
+        "collection",
+        ("--collect-only", "--co"),
+        {"action": "store_true"},
+        "Only collect tests, don't execute them",
+    ),
+    (
+        "collection",
+        ("--pyargs",),
+        {"action": "store_true"},
+        "Try to interpret all arguments as Python packages",
+    ),
+    (
+        "collection",
+        ("--ignore",),
+        {"metavar": "path"},
+        "Ignore path during collection (multi-allowed)",
+    ),
+    (
+        "collection",
+        ("--ignore-glob",),
+        {"metavar": "path"},
+        "Ignore path pattern during collection (multi-allowed)",
+    ),
+    (
+        "collection",
+        ("--deselect",),
+        {"metavar": "nodeid_prefix"},
+        "Deselect item (via node id prefix) during collection (multi-allowed)",
+    ),
+    (
+        "collection",
+        ("--confcutdir",),
+        {"metavar": "dir"},
+        "Only load conftest.py's relative to specified dir",
+    ),
+    (
+        "collection",
+        ("--noconftest",),
+        {"action": "store_true"},
+        "Don't load any conftest.py files",
+    ),
+    (
+        "collection",
+        ("--keep-duplicates",),
+        {"action": "store_true"},
+        "Keep duplicate tests",
+    ),
+    (
+        "collection",
+        ("--collect-in-virtualenv",),
+        {"action": "store_true"},
+        "Don't ignore tests in a local virtualenv directory",
+    ),
+    (
+        "collection",
+        ("--continue-on-collection-errors",),
+        {"action": "store_true"},
+        "Force test execution even if collection errors occur",
+    ),
+    (
+        "collection",
+        ("--import-mode",),
+        {"choices": ("prepend", "append", "importlib")},
+        "Prepend/append to sys.path when importing test modules and "
+        "conftest files. Default: prepend.",
+    ),
+    (
+        "collection",
+        ("--doctest-modules",),
+        {"action": "store_true"},
+        "Run doctests in all .py modules",
+    ),
+    (
+        "collection",
+        ("--doctest-report",),
+        {"choices": ("none", "cdiff", "ndiff", "udiff", "only_first_failure")},
+        "Choose another output format for diffs on doctest failure",
+    ),
+    (
+        "collection",
+        ("--doctest-glob",),
+        {"metavar": "pat"},
+        "Doctests file matching pattern, default: test*.txt",
+    ),
+    (
+        "collection",
+        ("--doctest-ignore-import-errors",),
+        {"action": "store_true"},
+        "Ignore doctest collection errors",
+    ),
+    (
+        "collection",
+        ("--doctest-continue-on-failure",),
+        {"action": "store_true"},
+        "For a given doctest, continue to run after the first failure",
+    ),
+    (
+        "test session debugging and configuration",
+        ("-c", "--config-file"),
+        {"metavar": "FILE"},
+        "Load configuration from `FILE` instead of trying to locate one of "
+        "the implicit configuration files.",
+    ),
+    (
+        "test session debugging and configuration",
+        ("--rootdir",),
+        {"metavar": "ROOTDIR"},
+        "Define root directory for tests. Can be relative path: "
+        "'root_dir', './root_dir', 'root_dir/another_dir/'; absolute path: "
+        "'/home/user/root_dir'; path with variables: '$HOME/root_dir'.",
+    ),
+    (
+        "test session debugging and configuration",
+        ("--basetemp",),
+        {"metavar": "dir"},
+        "Base temporary directory for this test run. (Warning: this "
+        "directory is removed if it exists.)",
+    ),
+    (
+        "test session debugging and configuration",
+        ("-V", "--version"),
+        {"action": "count"},
+        "Display pytest version and information about plugins. When given "
+        "twice, also display information about plugins.",
+    ),
+    (
+        "test session debugging and configuration",
+        ("-h", "--help"),
+        {"action": "store_true"},
+        "Show help message and configuration info",
+    ),
+    (
+        "test session debugging and configuration",
+        ("-p",),
+        {"metavar": "name"},
+        "Early-load given plugin module name or entry point (multi-"
+        "allowed). To avoid loading of plugins, use the `no:` prefix, e.g. "
+        "`no:doctest`. See also --disable-plugin-autoload.",
+    ),
+    (
+        "test session debugging and configuration",
+        ("--disable-plugin-autoload",),
+        {"action": "store_true"},
+        "Disable plugin auto-loading through entry point packaging "
+        "metadata. Only plugins explicitly specified in -p or env var "
+        "PYTEST_PLUGINS will be loaded.",
+    ),
+    (
+        "test session debugging and configuration",
+        ("--trace-config",),
+        {"action": "store_true"},
+        "Trace considerations of conftest.py files",
+    ),
+    (
+        "test session debugging and configuration",
+        ("--debug",),
+        {"nargs": "?", "metavar": "DEBUG_FILE_NAME"},
+        "Store internal tracing debug information in this log file. This "
+        "file is opened with 'w' and truncated as a result, care advised. "
+        "Default: pytestdebug.log.",
+    ),
+    (
+        "test session debugging and configuration",
+        ("-o", "--override-ini"),
+        {"metavar": "OVERRIDE_INI"},
+        'Override configuration option with "option=value" style, e.g. '
+        "`-o strict_xfail=True -o cache_dir=cache`.",
+    ),
+    (
+        "test session debugging and configuration",
+        ("--assert",),
+        {"metavar": "MODE", "choices": ("rewrite", "plain")},
+        "Control assertion debugging tools.\n"
+        "'plain' performs no assertion debugging.\n"
+        "'rewrite' (the default) rewrites assert statements in test "
+        "modules on import to provide assert expression information.",
+    ),
+    (
+        "test session debugging and configuration",
+        ("--setup-only",),
+        {"action": "store_true"},
+        "Only setup fixtures, do not execute tests",
+    ),
+    (
+        "test session debugging and configuration",
+        ("--setup-show",),
+        {"action": "store_true"},
+        "Show setup of fixtures while executing tests",
+    ),
+    (
+        "test session debugging and configuration",
+        ("--setup-plan",),
+        {"action": "store_true"},
+        "Show what fixtures and tests would be executed but don't execute anything",
+    ),
+    (
+        "logging",
+        ("--log-level",),
+        {"metavar": "LEVEL"},
+        "Level of messages to catch/display. Not set by default, so it "
+        "depends on the root/parent log handler's effective level, where "
+        'it is "WARNING" by default.',
+    ),
+    (
+        "logging",
+        ("--log-format",),
+        {"metavar": "LOG_FORMAT"},
+        "Log format used by the logging module",
+    ),
+    (
+        "logging",
+        ("--log-date-format",),
+        {"metavar": "LOG_DATE_FORMAT"},
+        "Log date format used by the logging module",
+    ),
+    (
+        "logging",
+        ("--log-cli-level",),
+        {"metavar": "LOG_CLI_LEVEL"},
+        "CLI logging level",
+    ),
+    (
+        "logging",
+        ("--log-cli-format",),
+        {"metavar": "LOG_CLI_FORMAT"},
+        "Log format used by the logging module",
+    ),
+    (
+        "logging",
+        ("--log-cli-date-format",),
+        {"metavar": "LOG_CLI_DATE_FORMAT"},
+        "Log date format used by the logging module",
+    ),
+    (
+        "logging",
+        ("--log-file",),
+        {"metavar": "LOG_FILE"},
+        "Path to a file when logging will be written to",
+    ),
+    ("logging", ("--log-file-mode",), {"choices": ("w", "a")}, "Log file open mode"),
+    (
+        "logging",
+        ("--log-file-level",),
+        {"metavar": "LOG_FILE_LEVEL"},
+        "Log file logging level",
+    ),
+    (
+        "logging",
+        ("--log-file-format",),
+        {"metavar": "LOG_FILE_FORMAT"},
+        "Log format used by the logging module",
+    ),
+    (
+        "logging",
+        ("--log-file-date-format",),
+        {"metavar": "LOG_FILE_DATE_FORMAT"},
+        "Log date format used by the logging module",
+    ),
+    (
+        "logging",
+        ("--log-auto-indent",),
+        {"metavar": "LOG_AUTO_INDENT"},
+        "Auto-indent multiline messages passed to the logging module. "
+        "Accepts true|on, false|off or an integer.",
+    ),
+    (
+        "logging",
+        ("--log-disable",),
+        {"metavar": "LOGGER_DISABLE"},
+        "Disable a logger by name. Can be passed multiple times.",
+    ),
+]
+
+
+def render_core_option_help(columns: int) -> str:
+    """pytest-rs's own core `--help` option section (the clap-parsed CLI
+    surface), argparse-rendered via `_CoreHelpFormatter` so wrapping/grouping
+    matches upstream's real (also argparse-based) `--help` byte-for-byte —
+    see `_CORE_OPTIONS`."""
+
+    def make_formatter(prog: str) -> _CoreHelpFormatter:
+        return _CoreHelpFormatter(prog, width=columns)
+
+    p = argparse.ArgumentParser(add_help=False, prog="pytest-rs", formatter_class=make_formatter)
+    groups: dict[str, Any] = {}
+    for title, names, kwargs, help_text in _CORE_OPTIONS:
+        target = groups.get(title)
+        if target is None:
+            target = p.add_argument_group(title)
+            groups[title] = target
+        target.add_argument(*names, help=help_text, **kwargs)
+    text = p.format_help()
+    marker = "general:"
+    idx = text.find(marker)
+    return text[idx:] if idx != -1 else text
 
 
 def _strtobool(value: str) -> bool:

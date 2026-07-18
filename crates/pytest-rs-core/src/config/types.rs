@@ -67,6 +67,14 @@ pub struct Config {
     /// a reduced "minimal help" form, when that happens) — so printing is
     /// deferred to after `load_and_validate_config` succeeds or fails.
     pub help_text: Option<String>,
+    /// Conftest/plugin-registered CLI options' `--help` text (each under its
+    /// own `parser.getgroup()` heading, or "custom options:" for a bare
+    /// `parser.addoption()`), appended by `fire_py_addoption` once those
+    /// hookimpls run — kept separate from `help_text` (which is only ever
+    /// clap's own core-options render) so the full-help path can print its
+    /// own argparse-rendered core-options section instead without losing
+    /// this. Empty when no conftest/plugin registered a new flag.
+    pub plugin_option_help: String,
 }
 
 /// pytest's rootdir-discovery inputs: explicit filesystem path args, falling

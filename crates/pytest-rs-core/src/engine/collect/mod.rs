@@ -95,6 +95,7 @@ impl Engine {
             // reporting (stderr message, exit code) still happens.
             if let Some(help_text) = &self.config.help_text {
                 print!("{help_text}");
+                print!("{}", self.config.plugin_option_help);
                 print!("\nNOTE: displaying only minimal help due to UsageError.\n\n");
             }
             return Err(err);

@@ -71,7 +71,29 @@ impl Engine {
         // showhelp() right after config._do_configure() and returns without
         // ever reaching wrap_session (no session header, no collection).
         if let Some(help_text) = self.config.help_text.clone() {
-            print!("{help_text}");
+            // The usage/positional-arguments prelude stays clap-rendered;
+            // the core option listing itself (previously clap's own "options:"
+            // section, mostly `.hide(true)` with no upstream-matching group
+            // headings) is replaced wholesale by an argparse-rendered,
+            // upstream-accurate one (see `render_core_option_help`) — the
+            // minimal-help path (a UsageError before this point) still uses
+            // the raw `help_text` unchanged (see `engine/collect/mod.rs`).
+            match help_text.split_once("\noptions:\n") {
+                Some((prelude, _)) => println!("{prelude}"),
+                None => print!("{help_text}"),
+            }
+            match python::render_core_option_help(py, crate::runner::term_width() as u32) {
+                Ok(text) => print!("{text}"),
+                Err(err) => {
+                    errors.push((rootdir.to_path_buf(), python::format_exception(py, &err)));
+                }
+            }
+            // Conftest/plugin-registered flags (e.g. a --confcutdir'd
+            // subdirectory conftest's own pytest_addoption) — previously
+            // appended straight onto the clap-rendered `help_text` string
+            // (see `plugin_option_help`'s doc), now tracked separately since
+            // `help_text`'s own options section is discarded above.
+            print!("{}", self.config.plugin_option_help);
             if let Err(err) = self.print_py_help_groups(py) {
                 errors.push((rootdir.to_path_buf(), python::format_exception(py, &err)));
             }

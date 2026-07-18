@@ -980,6 +980,7 @@ impl Config {
             invocation_args,
             reporter_delegated: std::sync::atomic::AtomicBool::new(false),
             help_text,
+            plugin_option_help: String::new(),
         })
     }
 
