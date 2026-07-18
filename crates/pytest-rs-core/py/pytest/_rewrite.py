@@ -17,7 +17,7 @@ import types
 # tag, so it can never be confused with CPython's own (non-rewritten) bytecode
 # for the same file. Bump _CACHE_VERSION whenever _AssertRewriter's output
 # changes, to invalidate any stale rewritten pyc left on disk.
-_CACHE_VERSION = 7
+_CACHE_VERSION = 8
 _PYC_TAIL = f".{sys.implementation.cache_tag}-pytestrs{_CACHE_VERSION}.pyc"
 
 _OPS = {
@@ -593,6 +593,21 @@ class _AssertRewriter(ast.NodeTransformer):
             desc = [ast.Constant(_UNARY_PREFIXES[type(expr.op)]), *operand_desc]
             return ast.Name(id=tmp, ctx=ast.Load()), desc
 
+        if isinstance(expr, ast.NamedExpr) and isinstance(expr.target, ast.Name):
+            # `(m := expr)`: evaluate and bind to the walrus target itself
+            # (so a later plain reference to that name, e.g. in a
+            # comma-separated assert message, sees the same value) and
+            # describe it exactly like its assigned value — the walrus
+            # wrapper itself carries no explanatory text of its own.
+            value_ref, desc = self._decompose_and_explain(expr.value, stmts)
+            assign = ast.Assign(
+                targets=[ast.Name(id=expr.target.id, ctx=ast.Store())], value=value_ref
+            )
+            ast.copy_location(assign, expr)
+            ast.copy_location(assign.targets[0], expr)
+            stmts.append(assign)
+            return ast.Name(id=expr.target.id, ctx=ast.Load()), desc
+
         # Fallback: node types outside this function's recursive coverage.
         # Still single-eval into a temp for correctness (object identity /
         # side effects), but only show its own repr or unparsed source.
@@ -729,12 +744,21 @@ class _AssertRewriter(ast.NodeTransformer):
         return statements
 
     def _rewrite_generic(self, node):
-        """Keep the assert but add the source text to the message."""
+        """Keep the assert but add the source text to the message. A
+        top-level Call/Attribute test instead shows its own runtime value
+        (inline repr) plus a "where" breakdown of how it was derived —
+        matching how _child_display treats a Call/Attribute reached while
+        explaining a parent expression (upstream's real assertion rewriter
+        explains a Call/Attribute's VALUE, not its static source text;
+        e.g. `assert obj.method(arg)` shows "assert False", not the
+        literal source, when the call returns a falsy value)."""
         test = node.test
         if isinstance(test, ast.Name) and isinstance(test.ctx, ast.Load):
             return self._rewrite_name(node, test)
+        if isinstance(test, (ast.Call, ast.Attribute)) and not self._is_approx_call(test):
+            return self._rewrite_call_or_attribute(node, test)
         try:
-            source = ast.unparse(node.test)
+            source = ast.unparse(test)
         except Exception:
             return node
         message = ast.JoinedStr(
@@ -756,6 +780,52 @@ class _AssertRewriter(ast.NodeTransformer):
         for child in ast.walk(check):
             ast.copy_location(child, node)
         return check
+
+    def _rewrite_call_or_attribute(self, node, test):
+        """`assert obj.method(arg)` / `assert obj.attr`: show the runtime
+        value's inline repr as the summary ("assert False") plus a "where"
+        block decomposing how it was derived — the same treatment
+        _child_display gives a Call/Attribute reached while explaining a
+        parent expression, just applied at the top level."""
+        pre_stmts = []
+        value_ref, desc_parts = self._decompose_and_explain(test, pre_stmts)
+        where_values = [ast.Constant(""), *self._wrap_block(value_ref, desc_parts)]
+        values = [
+            *self._user_msg_prefix(node),
+            ast.Constant("assert "),
+            self._repr_formatted(value_ref),
+            ast.FormattedValue(
+                value=self._module_helper_call(
+                    "_format_where", [ast.JoinedStr(values=where_values)]
+                ),
+                conversion=-1,
+                format_spec=None,
+            ),
+        ]
+        message = ast.JoinedStr(values=values)
+        raise_stmt = ast.Raise(
+            exc=ast.Call(
+                func=ast.Name(id="AssertionError", ctx=ast.Load()),
+                args=[message],
+                keywords=[],
+            ),
+            cause=None,
+        )
+        check = ast.If(
+            test=ast.UnaryOp(op=ast.Not(), operand=value_ref),
+            body=[raise_stmt],
+            orelse=[],
+        )
+        clear_names = [assign.targets[0].id for assign in pre_stmts]
+        statements = [*pre_stmts, check]
+        if clear_names:
+            statements.append(
+                ast.Delete(targets=[ast.Name(id=n, ctx=ast.Del()) for n in clear_names])
+            )
+        for statement in statements:
+            for child in ast.walk(statement):
+                ast.copy_location(child, node)
+        return statements
 
     def _rewrite_name(self, node, name):
         """`assert x` on a bare Name: pytest shows the name's runtime repr
