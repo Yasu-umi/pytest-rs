@@ -747,6 +747,10 @@ impl PyConfig {
 pub struct PyRequest {
     param: Option<Py<PyAny>>,
     node: Py<PyAny>,
+    /// The underlying test item, always the leaf `Function`/`Item` regardless
+    /// of `scope` — matches upstream's `FixtureRequest._pyfuncitem`, which
+    /// (unlike `.node`) never follows the fixture's scope up the parent chain.
+    pyfuncitem: Py<PyAny>,
     fixturename: Option<String>,
     scope: crate::fixture::Scope,
     finalizers: Mutex<Vec<Py<PyAny>>>,
@@ -756,15 +760,20 @@ pub struct PyRequest {
 }
 
 impl PyRequest {
+    /// `node` and `pyfuncitem` diverge for module/class/package/session-scoped
+    /// fixtures: `node` is the scope's ancestor collector while `pyfuncitem`
+    /// stays the leaf item (see the `pyfuncitem` field doc).
     pub fn new(
         param: Option<Py<PyAny>>,
         node: Py<PyAny>,
+        pyfuncitem: Py<PyAny>,
         fixturename: Option<String>,
         scope: crate::fixture::Scope,
     ) -> Self {
         Self {
             param,
             node,
+            pyfuncitem,
             fixturename,
             scope,
             finalizers: Mutex::new(Vec::new()),
@@ -904,12 +913,11 @@ impl PyRequest {
     }
 
     /// pytest's `request._pyfuncitem`: the underlying test Function item.
-    /// Conftests reach for it to drive the fixture manager. For the common
-    /// function-scoped request this is `request.node`; higher-scope requests
-    /// expose their collector as `node` but the shim keeps the same handle.
+    /// Conftests reach for it to drive the fixture manager. Unlike `node`,
+    /// this never follows the fixture's scope up the parent chain.
     #[getter]
     fn _pyfuncitem(&self, py: Python<'_>) -> Py<PyAny> {
-        self.node.clone_ref(py)
+        self.pyfuncitem.clone_ref(py)
     }
 
     /// Names of all fixtures visible to this request's item, in pytest's

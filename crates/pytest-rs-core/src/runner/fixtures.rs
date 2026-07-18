@@ -65,6 +65,34 @@ pub(crate) fn item_node(py: Python<'_>, item: &TestItem) -> PyResult<Py<PyAny>> 
     })
 }
 
+/// The node a fixture's `request.node` should expose for its (parametrize-widened,
+/// see `cache_scope`) scope, mirroring upstream's `FixtureRequest.node` /
+/// `get_scope_node`: function scope is the leaf item itself; wider scopes walk
+/// the `attach_parent_chain`-populated parent chain (already built into every
+/// `item_node`) up to the nearest Class/File/Session ancestor. Falls back to the
+/// leaf item if no such ancestor exists (e.g. class scope on a bare function).
+fn resolve_scope_ancestor(py: Python<'_>, leaf: &Py<PyAny>, scope: Scope) -> PyResult<Py<PyAny>> {
+    let cls_name = match scope {
+        Scope::Function => return Ok(leaf.clone_ref(py)),
+        Scope::Class => "Class",
+        Scope::Module | Scope::Package => "File",
+        Scope::Session => "Session",
+    };
+    let bound = leaf.bind(py);
+    // DoctestNode (a standalone stub, not part of the Node/getparent hierarchy)
+    // has no parent chain to walk; keep its pre-existing leaf-node behavior.
+    if !bound.hasattr("getparent")? {
+        return Ok(leaf.clone_ref(py));
+    }
+    let target_cls = py.import("pytest._node")?.getattr(cls_name)?;
+    let parent = bound.call_method1("getparent", (target_cls,))?;
+    if parent.is_none() {
+        Ok(leaf.clone_ref(py))
+    } else {
+        Ok(parent.unbind())
+    }
+}
+
 /// Pops the context pushed by `push_resolve_ctx` (kept alive for the whole
 /// item run, teardown included).
 pub(crate) struct ResolveCtxGuard(());
@@ -454,10 +482,11 @@ fn fire_fixture_lifecycle_hooks(
     if setup_funcs.is_empty() && final_funcs.is_empty() {
         return Ok(());
     }
-    let node = item_node(py, item)?;
+    let leaf = item_node(py, item)?;
+    let node = resolve_scope_ancestor(py, &leaf, scope)?;
     let request = Py::new(
         py,
-        crate::request::PyRequest::new(None, node, Some(def.name.clone()), scope),
+        crate::request::PyRequest::new(None, node, leaf, Some(def.name.clone()), scope),
     )?;
     let fixturedef = py
         .import("pytest._fixturemanager")?
@@ -809,12 +838,14 @@ pub(crate) fn resolve_fixture_def(
         let mut kwargs = Vec::new();
         for dep in &def.param_names {
             if dep == "request" {
-                let node = item_node(py, item)?;
+                let leaf = item_node(py, item)?;
+                let node = resolve_scope_ancestor(py, &leaf, cache_scope)?;
                 let req = Py::new(
                     py,
                     crate::request::PyRequest::new(
                         fixture_param.as_ref().map(|(_, value)| value.clone_ref(py)),
                         node,
+                        leaf,
                         Some(def.name.clone()),
                         cache_scope,
                     ),

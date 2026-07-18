@@ -192,7 +192,13 @@ pub(crate) fn build_test_setup(
             let node = crate::runner::item_node(py, item)?;
             let req = Py::new(
                 py,
-                crate::request::PyRequest::new(None, node, None, crate::fixture::Scope::Function),
+                crate::request::PyRequest::new(
+                    None,
+                    node.clone_ref(py),
+                    node,
+                    None,
+                    crate::fixture::Scope::Function,
+                ),
             )?;
             kwargs.push((name.clone(), req.clone_ref(py).into_any()));
             test_request = Some(req);
@@ -225,6 +231,7 @@ pub(crate) fn build_test_setup(
             py,
             crate::request::PyRequest::new(
                 None,
+                node.clone_ref(py),
                 node.clone_ref(py),
                 None,
                 crate::fixture::Scope::Function,
