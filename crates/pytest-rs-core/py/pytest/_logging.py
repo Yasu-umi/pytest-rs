@@ -289,10 +289,12 @@ class LoggingState:
         self.rootpath = None
         self.relay_handler = None
         self._report_formatter = None
+        self._session_handlers_armed = False
 
     def configure(self, settings):
         """Wire session handlers from CLI/ini settings (a str->str dict with
         keys like log_cli, log_cli_level, log_file, log_disable...)."""
+        self._session_handlers_armed = False
 
         def get(key):
             value = settings.get(key)
@@ -338,7 +340,7 @@ class LoggingState:
         datefmt = get("log_file_date_format") or log_date_format
         handler.setFormatter(DatetimeFormatter(fmt, datefmt=datefmt))
         self.log_file_handler = handler
-        root.addHandler(handler)
+        # NOT attached to root here — see arm_session_handlers().
         if effective is not None:
             explicit_levels.append(effective)
 
@@ -356,7 +358,7 @@ class LoggingState:
             datefmt = get("log_cli_date_format") or log_date_format
             handler.setFormatter(make_formatter(fmt, datefmt))
             self.log_cli_handler = handler
-            root.addHandler(handler)
+            # NOT attached to root here — see arm_session_handlers().
             if effective is not None:
                 explicit_levels.append(effective)
             sys.stdout.flush()
@@ -378,6 +380,22 @@ class LoggingState:
         relay_path = os.environ.get("PYTEST_RS_LOG_RELAY")
         if relay_path:
             self.relay_handler = _RelayHandler(relay_path)
+
+    def arm_session_handlers(self):
+        """Attach the session-wide log_file/log_cli handlers to the root
+        logger (upstream only ever attaches them from pytest_sessionstart's
+        hookwrapper onward — never before, so a conftest's own
+        `logging.basicConfig()` at *import time* still sees an empty root
+        logger and installs a real handler, exactly like plain Python).
+        Called once, right after initial conftest.py loading finishes.
+        Idempotent — a nested inprocess run re-configures and re-arms."""
+        if self._session_handlers_armed:
+            return
+        self._session_handlers_armed = True
+        root = logging.getLogger()
+        root.addHandler(self.log_file_handler)
+        if self.log_cli_enabled:
+            root.addHandler(self.log_cli_handler)
 
     def set_log_path(self, fname):
         """Redirect the log_file handler to a new path (upstream
@@ -497,6 +515,10 @@ state = LoggingState()
 
 def configure(settings):
     state.configure(settings)
+
+
+def arm_session_handlers():
+    state.arm_session_handlers()
 
 
 def set_live_when(when):

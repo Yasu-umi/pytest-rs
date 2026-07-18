@@ -99,6 +99,12 @@ impl Engine {
             }
             return Err(err);
         }
+        // Now that every conftest.py has loaded (and had its chance to
+        // install its own logging handlers, e.g. via logging.basicConfig()),
+        // attach pytest-rs's own session-wide log_file/log_cli handlers —
+        // matching upstream, which never touches the root logger before
+        // pytest_configure/pytest_sessionstart.
+        python::logging_arm_session_handlers(py);
         if self.fire_configure_and_print_header(py, &rootdir, &mut errors)? {
             // --markers (or another short-circuit) handled output; skip collection.
             return Ok(errors);

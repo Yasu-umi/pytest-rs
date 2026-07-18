@@ -138,6 +138,18 @@ pub fn configure_logging(py: Python<'_>, config: &crate::config::Config) -> bool
     result.unwrap_or(false)
 }
 
+/// Attach the session-wide log_file/log_cli handlers to the root logger.
+/// Called once initial conftest.py loading finishes — matching upstream,
+/// which only ever attaches its own logging handlers from pytest_sessionstart
+/// onward. Before this point the root logger stays untouched, so a
+/// conftest's own `logging.basicConfig()` at import time still sees an empty
+/// root logger and installs a real handler, exactly like plain Python.
+pub fn logging_arm_session_handlers(py: Python<'_>) {
+    let _ = py
+        .import("pytest._logging")
+        .and_then(|m| m.call_method0("arm_session_handlers"));
+}
+
 /// Relabel the live (log_cli) section header (start/finish/collection).
 pub fn log_set_live_when(py: Python<'_>, when: &str) {
     let _ = (|| -> PyResult<()> {
