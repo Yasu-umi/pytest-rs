@@ -27,7 +27,7 @@ pytest-rs; they are not counted in the total.
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | pytest | 9.0.3 | 2782 | 2 | 0 | 53 | 0 | 12 | 2849 | 99.5% | 52 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
-| pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 0 | 1 | 7 | 85.7% | 2 | 2 | 0 |
+| pytest-aiohttp | v1.1.1 | 7 | 0 | 0 | 0 | 0 | 0 | 7 | 100.0% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 0 | 2 | 90 | 97.8% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 205 | 0 | 0 | 3 | 0 | 1 | 209 | 99.5% | 1 | 1 | 0 |
 | pytest-xdist | v3.8.0 | 96 | 0 | 0 | 2 | 0 | 0 | 98 | 100.0% | 1 | 1 | 6 |
@@ -179,7 +179,7 @@ pytest-rs; they are not counted in the total.
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
 | tests/test_fixtures.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_switch_mode.py | passed | 2 | 0 | 0 | 0 | 0 | 1 |
+| tests/test_switch_mode.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
 
 </details>
 
