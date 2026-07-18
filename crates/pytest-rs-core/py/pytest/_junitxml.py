@@ -593,6 +593,14 @@ class JunitState:
         self.log_xml.pytest_sessionfinish()
         return self.log_xml.logfile
 
+    def internal_error(self, excrepr):
+        """Record an INTERNALERROR testcase (LogXML.pytest_internalerror) —
+        junitxml isn't registered as a real hookimpl plugin object (see
+        log_report), so the engine calls this directly instead of relying on
+        hook dispatch to reach it."""
+        if self.log_xml is not None:
+            self.log_xml.pytest_internalerror(excrepr)
+
 
 state = JunitState()
 
@@ -603,6 +611,10 @@ def configure(xmlpath, prefix, settings):
 
 def log_report(report_data):
     state.log_report(report_data)
+
+
+def internal_error(excrepr):
+    state.internal_error(excrepr)
 
 
 def finish():

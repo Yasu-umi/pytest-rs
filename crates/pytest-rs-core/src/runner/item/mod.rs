@@ -117,14 +117,35 @@ pub(crate) fn run_one(
                     return vec![];
                 }
             }
-            return vec![report_from_err(
-                py,
-                config,
-                item,
-                Phase::Setup,
-                TimeMark::now(),
-                &err,
-            )];
+            // A worker reports results to the controller and doesn't own the
+            // process exit code — keep the pre-existing per-item error
+            // behavior there; escalating a worker-side internal error into a
+            // controller abort is a separate xdist-protocol change.
+            if config.is_worker() {
+                return vec![report_from_err(
+                    py,
+                    config,
+                    item,
+                    Phase::Setup,
+                    TimeMark::now(),
+                    &err,
+                )];
+            }
+            // A replacing pytest_runtest_protocol hookimpl raised. Upstream's
+            // pytest_runtestloop has no try/except around that hook call, so
+            // this propagates straight to wrap_session's INTERNAL_ERROR
+            // handler: banner to stdout, fire pytest_internalerror (records
+            // junitxml's "internal" testcase and may raise Exit to override
+            // the code), then abort the whole session.
+            let msg = python::format_internal_error(py, &err, config.get_flag("full-trace"));
+            for line in msg.lines() {
+                println!("INTERNALERROR> {line}");
+            }
+            python::junit_internal_error(py, &msg);
+            let code =
+                python::notify_internal_error(py, &err, crate::report::exit_code::INTERNAL_ERROR);
+            session.internal_error_exit_code = Some(code);
+            return vec![];
         }
     };
     if let Err(err) = finish_runtest_py_wrappers(py, &wrappers) {

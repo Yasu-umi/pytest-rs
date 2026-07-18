@@ -397,6 +397,15 @@ impl Engine {
                     }
                 },
             );
+            if session.internal_error_exit_code.is_some() {
+                // A replacing pytest_runtest_protocol hookimpl raised: the
+                // banner/junit/pytest_internalerror dispatch already ran in
+                // run_one. Upstream's pytest_runtestloop has no try/except
+                // around this hook call, so the exception blows straight
+                // through — no further scope teardowns, no summary line.
+                session.items = items;
+                return;
+            }
             if inline_sub_chars {
                 let inline = python::pop_subtest_inline_count(py);
                 if inline > 0 {

@@ -115,10 +115,17 @@ impl Engine {
                 return Err(format!("\x00EXIT\x00{code}"));
             }
             // An unexpected exception in pytest_sessionstart is an INTERNALERROR
-            // (exit 3), not a collection error (exit 2). Signal the caller with
-            // a sentinel prefix so it can print the INTERNALERROR banner.
+            // (exit 3), not a collection error (exit 2). Print the banner, fire
+            // pytest_internalerror (a hookimpl may raise Exit to override the
+            // exit code), and hand the caller the already-resolved code.
             let msg = python::format_internal_error(py, &err, self.config.get_flag("full-trace"));
-            return Err(format!("\x00INTERNAL\x00{msg}"));
+            for line in msg.lines() {
+                println!("INTERNALERROR> {line}");
+            }
+            python::junit_internal_error(py, &msg);
+            let code =
+                python::notify_internal_error(py, &err, crate::report::exit_code::INTERNAL_ERROR);
+            return Err(format!("\x00INTERNAL_DONE\x00{code}"));
         }
         // The session header: the replacement reporter's pytest_sessionstart
         // owns it in delegated mode (upstream prints it from that hook);

@@ -184,6 +184,14 @@ pub struct Session {
     /// claimed the run (e.g. pytest-bdd's `--generate-missing`) — the
     /// engine skips deselection/running entirely and exits with this code.
     pub cmdline_main_exit: Option<i32>,
+    /// Set when a replacing `pytest_runtest_protocol` hookimpl raised an
+    /// unexpected exception mid-run: upstream's `pytest_runtestloop` has no
+    /// try/except around that hook call, so the exception propagates into
+    /// `wrap_session`'s INTERNAL_ERROR handler. The banner, pytest_internalerror
+    /// dispatch, and junit "internal" node already ran at the failure site
+    /// (run_one); this carries the resolved exit code up so run_items breaks
+    /// out of the loop and run_session short-circuits with it.
+    pub internal_error_exit_code: Option<i32>,
 }
 
 impl Session {
@@ -223,6 +231,7 @@ impl Session {
             delegated_render: false,
             dist_total_items: None,
             cmdline_main_exit: None,
+            internal_error_exit_code: None,
         }
     }
 

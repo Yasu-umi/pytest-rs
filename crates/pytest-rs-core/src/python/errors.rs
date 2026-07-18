@@ -222,6 +222,58 @@ pub fn exit_msg(py: Python<'_>, err: &PyErr) -> String {
         .unwrap_or_default()
 }
 
+/// Fire the `pytest_internalerror` hook for an unhandled exception during the
+/// session lifecycle — upstream's `wrap_session`'s `except BaseException`
+/// branch calling `config.notify_exception(excinfo, option)`. Callers already
+/// print the "INTERNALERROR> ..." banner themselves (the terminal reporter
+/// isn't a real registered hookimpl in pytest-rs, see `_pytest/terminal.py`),
+/// so this only dispatches to conftest/plugin-registered `pytest_internalerror`
+/// hookimpls and resolves the final exit code exactly like `wrap_session`
+/// does around that call: unchanged, unless a hookimpl raises `Exit` (prints
+/// "Exit: {msg}" to stderr and overrides the code when one was given), or the
+/// original exception was itself `SystemExit` and no `Exit` was raised
+/// (prints "mainloop: caught unexpected SystemExit!").
+pub fn notify_internal_error(py: Python<'_>, err: &PyErr, default_code: i32) -> i32 {
+    let dispatch: PyResult<()> = (|| {
+        let exc_type = err.get_type(py);
+        let exc_value = err.value(py).clone();
+        let exc_tb = match err.traceback(py) {
+            Some(tb) => tb.into_any(),
+            None => py.None().into_bound(py),
+        };
+        let excinfo = py
+            .import("pytest._raises")?
+            .getattr("ExceptionInfo")?
+            .call_method1("from_exc_info", ((exc_type, exc_value, exc_tb), true))?;
+        let excrepr = excinfo.call_method0("getrepr")?;
+        let hook_caller = py
+            .import("pytest._pluginmanager")?
+            .getattr("pluginmanager")?
+            .getattr("hook")?
+            .getattr("pytest_internalerror")?;
+        let kwargs = pyo3::types::PyDict::new(py);
+        kwargs.set_item("excrepr", &excrepr)?;
+        kwargs.set_item("excinfo", &excinfo)?;
+        hook_caller.call((), Some(&kwargs))?;
+        Ok(())
+    })();
+    match dispatch {
+        Err(hook_err) => {
+            if let Some(code) = exit_returncode(py, &hook_err) {
+                eprintln!("Exit: {}", exit_msg(py, &hook_err));
+                return code.unwrap_or(default_code);
+            }
+            default_code
+        }
+        Ok(()) => {
+            if err.is_instance_of::<pyo3::exceptions::PySystemExit>(py) {
+                eprintln!("mainloop: caught unexpected SystemExit!");
+            }
+            default_code
+        }
+    }
+}
+
 /// Classify a module-import error as a module-level skip.
 /// Some(Ok(reason)): the whole module skips (allow_module_level=True or
 /// unittest.SkipTest). Some(Err(message)): pytest.skip misused at module

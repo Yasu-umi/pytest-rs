@@ -601,6 +601,16 @@ pub fn junit_reset(py: Python<'_>) {
         .and_then(|m| m.call_method0("reset"));
 }
 
+/// Record an INTERNALERROR testcase in the armed JUnit XML report (no-op if
+/// --junitxml isn't in use) — junitxml isn't registered as a real hookimpl
+/// plugin object to receive `pytest_internalerror` through hook dispatch (see
+/// `junit_write`), so callers reporting an internal error call this directly.
+pub fn junit_internal_error(py: Python<'_>, excrepr: &str) {
+    let _ = py
+        .import("pytest._junitxml")
+        .and_then(|m| m.call_method1("internal_error", (excrepr,)));
+}
+
 /// Stream every report through the junit LogXML and write the file;
 /// returns its absolute path for the "generated xml file" line.
 pub fn junit_write(py: Python<'_>, session: &crate::session::Session) -> PyResult<String> {

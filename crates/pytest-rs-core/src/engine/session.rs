@@ -76,13 +76,13 @@ impl Engine {
         let collect_errors = match self.collect(py) {
             Ok(errors) => errors,
             Err(message) => {
-                // Sentinel "\x00INTERNAL\x00" means an unexpected hook exception
-                // (e.g. conftest pytest_sessionstart raised) — print as INTERNALERROR.
-                if let Some(inner) = message.strip_prefix("\x00INTERNAL\x00") {
-                    for line in inner.lines() {
-                        println!("INTERNALERROR> {line}");
-                    }
-                    return exit_code::INTERNAL_ERROR;
+                // Sentinel "\x00INTERNAL_DONE\x00{code}" means an unexpected hook
+                // exception (e.g. conftest pytest_sessionstart raised) — the
+                // banner and pytest_internalerror dispatch already ran at the
+                // point of failure (collection.rs), carrying the resolved exit
+                // code (possibly overridden by an Exit raised from a hookimpl).
+                if let Some(code) = message.strip_prefix("\x00INTERNAL_DONE\x00") {
+                    return code.parse().unwrap_or(exit_code::INTERNAL_ERROR);
                 }
                 // Sentinel "\x00INTERNAL_STDERR\x00": unexpected exception in
                 // pytest_configure — print INTERNALERROR to stderr (upstream
@@ -343,6 +343,19 @@ impl Engine {
             } else if !loop_replaced {
                 self.run_items(py);
             }
+        }
+
+        if let Some(code) = self.session.internal_error_exit_code {
+            // A replacing pytest_runtest_protocol hookimpl raised mid-run
+            // (INTERNALERROR): the banner, pytest_internalerror dispatch, and
+            // junit "internal" node already ran in run_one. Mirror
+            // wrap_session's finally block (end capture, write --junitxml,
+            // run unconfigure) but skip the normal pass/fail terminal summary
+            // — upstream's terminal reporter prints no stats line here either.
+            python::capture_session_end(py);
+            self.write_junit_xml(py);
+            let _ = flush_hook_output(py, || self.fire_py_hooks_simple(py, "pytest_unconfigure"));
+            return code;
         }
 
         self.finish_session(py, started)
