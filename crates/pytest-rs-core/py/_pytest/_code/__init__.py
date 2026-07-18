@@ -19,16 +19,23 @@ class Source:
         if obj is None:
             self.lines = []
         elif isinstance(obj, str):
-            self.lines = textwrap.dedent(obj).strip().splitlines()
+            self.lines = textwrap.dedent(obj).splitlines()
         else:
-            self.lines = textwrap.dedent(inspect.getsource(obj)).strip().splitlines()
+            self.lines = textwrap.dedent(inspect.getsource(obj)).splitlines()
 
     def __str__(self):
         return "\n".join(self.lines)
 
     def strip(self):
-        """Return a Source with leading/trailing blank lines removed. Our
-        constructor already strips string input, so the lines are clean;
-        this exists so callers can write ``Source(x).strip().lines`` (the
-        shape LineMatcher._getlines relies on)."""
-        return self
+        """Return a Source with leading/trailing blank lines removed (matches
+        upstream's Source.strip(): only whitespace-only lines are trimmed —
+        a real content line's own leading/trailing whitespace, e.g. a
+        deliberately-indented first fnmatch_lines pattern, is preserved)."""
+        start, end = 0, len(self.lines)
+        while start < end and not self.lines[start].strip():
+            start += 1
+        while end > start and not self.lines[end - 1].strip():
+            end -= 1
+        stripped = Source()
+        stripped.lines = self.lines[start:end]
+        return stripped
