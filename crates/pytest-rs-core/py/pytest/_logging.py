@@ -525,6 +525,19 @@ def finish_item():
     state.finish_item()
 
 
+def begin_scope_teardown():
+    """Arm logging capture for a deferred module/class/session scope
+    teardown running between items (the runner defers them past
+    finish_item(), mirrors pytest._capture's begin_scope_teardown) —
+    teardown_module()/tearDownClass() etc. would otherwise log with no root
+    handler installed at all, since the last item's own "teardown" phase
+    (and its handlers) already closed before these deferred finalizers run.
+    Its output reports as "Captured log teardown", like pytest, where the
+    same finalizers run inside the last item's teardown."""
+    state.start_phase("setup")
+    state.when = "teardown"
+
+
 def failure_sections():
     return state.failure_sections()
 

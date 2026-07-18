@@ -491,10 +491,16 @@ pub fn log_finish_item(py: Python<'_>) {
 }
 
 /// Arm capture for a deferred module/class/session scope teardown (its
-/// output reports as "Captured stdout teardown", pytest parity).
+/// output reports as "Captured stdout teardown", pytest parity) — and
+/// logging capture likewise, so a teardown_module()/tearDownClass() log
+/// call has a root logger handler installed (reports as "Captured log
+/// teardown"), matching capture's own handling right above.
 pub fn capture_scope_teardown_begin(py: Python<'_>) {
     let _ = py
         .import("pytest._capture")
+        .and_then(|m| m.call_method0("begin_scope_teardown"));
+    let _ = py
+        .import("pytest._logging")
         .and_then(|m| m.call_method0("begin_scope_teardown"));
 }
 
