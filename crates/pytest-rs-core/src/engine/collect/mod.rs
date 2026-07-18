@@ -18,10 +18,61 @@ use super::Engine;
 use crate::python;
 
 impl Engine {
+    /// Warm the OS page cache for each file's source and its rewritten
+    /// `__pycache__` counterpart (if any), in parallel background threads,
+    /// well ahead of the sequential per-module import loop that actually
+    /// reads and validates them (`_RewriteLoader.get_code`/`_read_pyc` in
+    /// `pytest._rewrite`). That loader chose content-hash validation over
+    /// upstream's cheaper mtime+size specifically because pytester's
+    /// same-second in-place rewrites make mtime+size go stale (see
+    /// `a50f4100`) — so correctness requires reading and hashing every
+    /// file's real bytes on every run; this only makes sure those bytes are
+    /// already in the page cache by the time that happens. A profiling run
+    /// on a large real-world suite found ~57% of collection-phase samples in
+    /// that loader's own file reads. Purely a read-only I/O hint: results
+    /// are discarded, nothing here touches Python state or changes what
+    /// gets validated/returned, and a handful of files prefetched here but
+    /// later dropped by `--ignore`/collect-directory hooks is harmless waste,
+    /// not a correctness concern.
+    fn prefetch_rewrite_cache(&self, py: Python<'_>, files: &[PathBuf]) {
+        const MIN_FILES_TO_BOTHER: usize = 20;
+        if files.len() < MIN_FILES_TO_BOTHER {
+            return;
+        }
+        let Ok(pyc_tail) = py
+            .import("pytest._rewrite")
+            .and_then(|m| m.getattr("_PYC_TAIL"))
+            .and_then(|v| v.extract::<String>())
+        else {
+            return;
+        };
+        let workers = std::thread::available_parallelism()
+            .map(std::num::NonZeroUsize::get)
+            .unwrap_or(4)
+            .min(files.len());
+        let chunk_size = files.len().div_ceil(workers.max(1));
+        for chunk in files.chunks(chunk_size.max(1)) {
+            let chunk = chunk.to_vec();
+            let pyc_tail = pyc_tail.clone();
+            std::thread::spawn(move || {
+                for file in &chunk {
+                    let _ = std::fs::read(file);
+                    if let (Some(parent), Some(stem)) =
+                        (file.parent(), file.file_stem().and_then(|s| s.to_str()))
+                    {
+                        let pyc = parent.join("__pycache__").join(format!("{stem}{pyc_tail}"));
+                        let _ = std::fs::read(pyc);
+                    }
+                }
+            });
+        }
+    }
+
     pub(crate) fn collect(&mut self, py: Python<'_>) -> Result<Vec<(PathBuf, String)>, String> {
         let rootdir = self.config.rootdir.clone();
         let (paths, mut files, deferred_not_found_args) =
             self.resolve_collection_paths(py, &rootdir)?;
+        self.prefetch_rewrite_cache(py, &files);
         self.session.initial_paths =
             crate::collect::resolve_initial_paths(&self.config.invocation_dir, &paths);
         self.load_cmdline_and_entrypoint_plugins(py)?;
