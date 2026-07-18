@@ -111,7 +111,7 @@ _linux (CI-verified)_
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2759 | 27 | 0 | 53 | 0 | 10 | 2849 | 98.7% | 38 | 54 | 61 |
+| pytest | 9.0.3 | 2766 | 19 | 0 | 53 | 0 | 11 | 2849 | 98.9% | 40 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 0 | 2 | 90 | 97.8% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 205 | 0 | 0 | 3 | 0 | 1 | 209 | 99.5% | 1 | 1 | 0 |
@@ -132,7 +132,7 @@ _linux (CI-verified)_
 | pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-snapshot | v0.9.0 | 106 | 0 | 0 | 0 | 0 | 1 | 107 | 99.1% | 3 | 3 | 0 |
 | pytest-icdiff | 0.5 | 10 | 2 | 0 | 0 | 0 | 0 | 12 | 83.3% | 0 | 1 | 0 |
-| pytest-socket | 0.7.0 | 63 | 0 | 0 | 0 | 0 | 2 | 65 | 96.9% | 6 | 6 | 0 |
+| pytest-socket | 0.7.0 | 43 | 0 | 0 | 0 | 0 | 0 | 43 | 100.0% | 5 | 6 | 0 |
 | pytest-order | v1.4.0 | 134 | 0 | 0 | 0 | 0 | 0 | 134 | 100.0% | 16 | 16 | 0 |
 | pytest-repeat | v0.9.4 | 16 | 0 | 0 | 0 | 0 | 0 | 16 | 100.0% | 1 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |

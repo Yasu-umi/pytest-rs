@@ -4,7 +4,7 @@
   "category": "ecosystem",
   "excluded_files": 61,
   "deselected": 0,
-  "known_failed": 10,
+  "known_failed": 11,
   "files": [
     {
       "file": "testing/python/approx.py",
@@ -173,10 +173,10 @@
     },
     {
       "file": "testing/test_capture.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 127,
-      "failed": 3,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 130,
+      "failed": 0,
       "skipped": 2,
       "errors": 0,
       "deselected": 0,
@@ -195,10 +195,10 @@
     },
     {
       "file": "testing/test_collection.py",
-      "status": "passed",
+      "status": "failed",
       "exit_code": 1,
-      "passed": 112,
-      "failed": 0,
+      "passed": 111,
+      "failed": 1,
       "skipped": 3,
       "errors": 0,
       "deselected": 0,
@@ -283,14 +283,14 @@
     },
     {
       "file": "testing/test_junitxml.py",
-      "status": "failed",
+      "status": "passed",
       "exit_code": 1,
-      "passed": 134,
-      "failed": 3,
+      "passed": 136,
+      "failed": 0,
       "skipped": 0,
       "errors": 0,
       "deselected": 0,
-      "known_failed": 0
+      "known_failed": 1
     },
     {
       "file": "testing/test_link_resolve.py",
@@ -305,10 +305,10 @@
     },
     {
       "file": "testing/test_main.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 21,
-      "failed": 3,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 24,
+      "failed": 0,
       "skipped": 0,
       "errors": 0,
       "deselected": 0,
