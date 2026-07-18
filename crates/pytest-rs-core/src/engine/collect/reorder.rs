@@ -193,6 +193,7 @@ impl Engine {
                             mode,
                             &self.plugins,
                             &self.session.initial_paths,
+                            self.config.collect_imported_tests(),
                         ) {
                             errors.push((file, python::format_exception(py, &err)));
                         }

@@ -389,6 +389,7 @@ impl Engine {
                 crate::collect::ImportMode::from_config(&self.config),
                 &self.plugins,
                 &self.session.initial_paths,
+                self.config.collect_imported_tests(),
             );
             let collect_sections = python::capture_collect_end(py);
             let with_sections = |mut message: String| {

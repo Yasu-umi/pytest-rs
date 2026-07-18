@@ -907,6 +907,7 @@ impl Engine {
             import_mode,
             &self.plugins,
             &self.session.initial_paths,
+            self.config.collect_imported_tests(),
         )
         .map_err(|err| python::format_test_failure(py, &err, "short"))?;
         {

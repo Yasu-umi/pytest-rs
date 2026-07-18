@@ -85,6 +85,7 @@ pub fn collect_module(
     mode: ImportMode,
     plugins: &[Box<dyn Plugin>],
     initial_paths: &[std::path::PathBuf],
+    collect_imported_tests: bool,
 ) -> PyResult<()> {
     let (module_name, module) = import_module_for(py, rootdir, path, mode)?;
     // pytest's import_path raises ImportPathMismatchError when a module of the
@@ -147,6 +148,7 @@ pub fn collect_module(
         makeitem_hook,
         filters,
         plugins,
+        collect_imported_tests,
     )?;
     if let Some(class_name) = custom_module_class {
         for item in items.iter_mut().skip(module_items_start) {

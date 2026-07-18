@@ -25,6 +25,7 @@ pub(crate) fn introspect_namespace(
     makeitem_hook: bool,
     filters: &NameFilters,
     plugins: &[Box<dyn Plugin>],
+    collect_imported_tests: bool,
 ) -> PyResult<()> {
     register_fixtures_from(py, module, &format!("{nodeid_base}::"), registry)?;
 
@@ -73,6 +74,7 @@ pub(crate) fn introspect_namespace(
 
     let inspect = py.import("inspect")?;
     let isclass = inspect.getattr("isclass")?;
+    let isfunction = inspect.getattr("isfunction")?;
     let dict = module.dict();
     // Module dicts preserve definition order in CPython; keep it.
     for (key, value) in dict.iter() {
@@ -83,6 +85,29 @@ pub(crate) fn introspect_namespace(
         // python_functions=* / python_classes=* don't collect or warn on them.
         if filters.is_ignored(&name) {
             continue;
+        }
+        // collect_imported_tests=false: a function/class merely imported into
+        // this module (not defined here) is not collected — checked before
+        // even the makeitem hook, matching upstream's placement.
+        if !collect_imported_tests {
+            let is_importable = isfunction
+                .call1((&value,))
+                .and_then(|r| r.extract::<bool>())
+                .unwrap_or(false)
+                || isclass
+                    .call1((&value,))
+                    .and_then(|r| r.extract::<bool>())
+                    .unwrap_or(false);
+            if is_importable {
+                let defined_here = value
+                    .getattr("__module__")
+                    .ok()
+                    .and_then(|m| m.extract::<String>().ok())
+                    .is_some_and(|m| m == module_name);
+                if !defined_here {
+                    continue;
+                }
+            }
         }
         // pytest_pycollect_makeitem: a conftest may claim a namespace member
         // (even a non-`test`-named one) by returning a custom node, e.g.

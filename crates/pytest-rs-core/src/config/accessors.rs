@@ -106,6 +106,13 @@ impl Config {
         })
     }
 
+    /// `collect_imported_tests` ini (default true): when false, a Module's
+    /// own dict-scan skips functions/classes whose `__module__` isn't the
+    /// module itself (names merely imported into it, not defined there).
+    pub fn collect_imported_tests(&self) -> bool {
+        self.ini_bool("collect_imported_tests").unwrap_or(true)
+    }
+
     /// All effective ini values (file merged with -o overrides).
     pub fn ini_snapshot(&self) -> HashMap<String, String> {
         let mut merged = self.ini_file.clone();
