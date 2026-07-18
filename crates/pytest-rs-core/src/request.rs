@@ -188,8 +188,22 @@ impl PyConfig {
     }
 
     /// pytest's Config.issue_config_time_warning: a warning raised during
-    /// configure (no test to attribute it to); the session warning capture
-    /// records it for the warnings summary.
+    /// configure (no test to attribute it to). Upstream's real implementation
+    /// wraps `warnings.warn` in `catch_warnings(record=True)` — it never
+    /// raises even under `-W error`, only ever records — so this delegates to
+    /// `_wcapture._fire_config_time_warning`, the same "always record,
+    /// bypass the ambient (possibly-suspended) warnings filter/showwarning
+    /// state entirely" helper `_apply_filter` already uses for its own
+    /// config-time diagnostics; a bare `warnings.warn` here would otherwise
+    /// be silently dropped by Python's default "ignore" filter for e.g.
+    /// DeprecationWarning during `pytest_configure`, where pytest-rs's own
+    /// capture is still suspended (see `suspend_warning_capture`).
+    ///
+    /// `stacklevel` is one lower than the caller's value: from Python's
+    /// frame-stack perspective, `_fire_config_time_warning` is called
+    /// directly from Rust with no intervening Python frame for this method
+    /// itself (unlike upstream, where `Config.issue_config_time_warning` is
+    /// itself a Python frame between the caller and `warnings.warn`).
     #[pyo3(signature = (warning, stacklevel = 2))]
     fn issue_config_time_warning(
         &self,
@@ -197,10 +211,10 @@ impl PyConfig {
         warning: Py<PyAny>,
         stacklevel: i32,
     ) -> PyResult<()> {
-        let kwargs = pyo3::types::PyDict::new(py);
-        kwargs.set_item("stacklevel", stacklevel)?;
-        py.import("warnings")?
-            .call_method("warn", (warning,), Some(&kwargs))?;
+        py.import("pytest._wcapture")?.call_method1(
+            "_fire_config_time_warning",
+            (warning, (stacklevel - 1).max(1)),
+        )?;
         Ok(())
     }
 

@@ -501,6 +501,17 @@ impl Plugin for AsyncioPlugin {
         self.mode = match mode_value {
             None | Some("strict") => Mode::Strict,
             Some("auto") => Mode::Auto,
+            // Upstream pytest-asyncio never validates "legacy" as a mode at
+            // all (its own mode lookup is lazy, only run from collection
+            // onward) — pytest-aiohttp's own tryfirst `pytest_configure`
+            // hookimpl is what rewrites "legacy" to "auto" for backward
+            // compatibility, issuing its own deprecation warning, before
+            // pytest-asyncio's lazy check ever sees the option. pytest-rs
+            // instead resolves the mode eagerly right here, which would
+            // otherwise reject "legacy" before that downstream rewrite gets
+            // a chance to run — so accept it directly as an alias for Auto
+            // (the same value pytest-aiohttp rewrites it to).
+            Some("legacy") => Mode::Auto,
             Some(other) => {
                 return Err(pytest_rs_core::python::usage_error(
                     ctx.py,
@@ -563,10 +574,15 @@ impl Plugin for AsyncioPlugin {
 
         // Expose asyncio_mode on config.option so third-party plugins that call
         // config.getoption("asyncio_mode") (e.g. pytest-aiohttp) don't crash.
-        let mode_str = match self.mode {
+        // Use the raw value the user passed (e.g. "legacy"), not our own
+        // resolved Mode — pytest-aiohttp's own pytest_configure hookimpl
+        // checks for the literal string "legacy" to decide whether to issue
+        // its backward-compat deprecation warning, and would never see it if
+        // this were already normalized to "auto".
+        let mode_str = mode_value.unwrap_or(match self.mode {
             Mode::Auto => "auto",
             Mode::Strict => "strict",
-        };
+        });
         if let Ok(proxy) = pytest_rs_core::python::make_py_config(ctx.py, ctx.config)
             && let Ok(option) = proxy.bind(ctx.py).getattr("option")
         {
