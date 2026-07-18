@@ -1,4 +1,12 @@
+import re as _re
+
 from _pytest._code.code import ExceptionChainRepr as _ExceptionChainRepr  # noqa: F401
+
+# A local-variable line from pytest._tb._format_locals: "name<padding> = value"
+# (name isn't truncated past 10 chars, so only the leading padding is
+# fixed-width), indented 8 spaces for "short"-style tracebacks or 0 for
+# "long"-style (the default) — see _tb.py's two _format_locals call sites.
+_LOCALS_LINE_RE = _re.compile(r"^(?: {8})?\w+ *= ")
 
 
 class _ReprCrash:
@@ -30,6 +38,12 @@ class _ReprEntry:
     def __init__(self, reprfileloc):
         self.reprfileloc = reprfileloc
         self.lines: list[str] = []
+        self.reprlocals = None
+
+
+class _ReprLocals:
+    def __init__(self, lines):
+        self.lines = lines
 
 
 class _ReprTraceback:
@@ -62,8 +76,31 @@ class _LongRepr(str, _ExceptionChainRepr):
     @property
     def reprtraceback(self):
         lines = self.splitlines()
+        # _format_locals emits one contiguous block of "name = value" lines
+        # (pytest._tb._format_locals) — "long" style follows it with a blank
+        # line and the "file:line:" location line, so it isn't literally the
+        # last lines of the text; find the bottom-most such run (scanning
+        # backward, rather than matching anywhere) and split it off into
+        # reprlocals so code reading entries[0].reprlocals.lines sees it
+        # structured, matching upstream's ReprEntry/ReprLocals split.
+        split_start = split_end = len(lines)
+        i = len(lines)
+        while i > 0:
+            if _LOCALS_LINE_RE.match(lines[i - 1]):
+                split_end = i
+                split_start = i - 1
+                while split_start > 0 and _LOCALS_LINE_RE.match(lines[split_start - 1]):
+                    split_start -= 1
+                break
+            i -= 1
+        body_lines = lines[:split_start] + lines[split_end:]
+        locals_lines = lines[split_start:split_end]
         entry = _ReprEntry(_ReprFileLoc("", 0, ""))
-        entry.lines = list(lines)
+        entry.lines = body_lines
+        if locals_lines:
+            entry.reprlocals = _ReprLocals(
+                [line[8:] if line.startswith(" " * 8) else line for line in locals_lines]
+            )
         return _ReprTraceback([entry])
 
     @property
