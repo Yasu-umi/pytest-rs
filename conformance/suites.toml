@@ -93,6 +93,15 @@ known_failures = [
     # upstream). Not a pytest-rs bug in the unittest fixture itself — see
     # conformance-native-plugin-isolation memory.
     "testing/test_unittest.py::test_fixtures_setup_setUpClass_issue8394",
+    # Upstream's own stale `@pytest.mark.xfail` (unstrict-by-default but this
+    # ini sets xfail_strict=true), added 2013, unrelated to any pytest-rs
+    # patch — `git blame` on the pinned 9.0.3 checkout confirms it's upstream's
+    # own test author's marker. pytest-rs's clap parser already rejects
+    # `-k -mykeyword` as a UsageError (0 outcomes), exactly what the test's
+    # own assertion checks — it XPASSes, and xfail_strict turns that into a
+    # failure. Not a pytest-rs bug; self-corrects if upstream ever drops the
+    # marker.
+    "testing/test_mark.py::TestKeywordSelection::test_keyword_extra_dash",
 ]
 
 [pytest-asyncio]
