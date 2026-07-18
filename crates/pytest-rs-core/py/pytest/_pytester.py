@@ -662,7 +662,12 @@ class Pytester:
             if runpytest_option == "subprocess":
                 return self._runpytest(args, timeout=timeout, forward_filters=True)
         if os.environ.get("PYTEST_RS_INLINE_INPROCESS"):
-            reprec = self._inline_run_inprocess(*args, plugins=plugins)
+            # Matches upstream: _ensure_basetemp is applied by runpytest()
+            # itself, not by inline_run()/runpytest_inprocess() — a direct
+            # inline_run() call (e.g. test_invocation_args, which asserts the
+            # exact invocation_params.args tuple) must NOT see an injected
+            # --basetemp.
+            reprec = self._inline_run_inprocess(*self._ensure_basetemp(args), plugins=plugins)
             return getattr(reprec, "_result", reprec)
         return self._runpytest(args, timeout=timeout, forward_filters=True)
 
@@ -1112,7 +1117,7 @@ class Pytester:
                 if mark.args
             ]
         return run_inprocess(
-            self._ensure_basetemp(args),
+            args,
             plugins=plugins,
             helper_plugin=PytesterHelperPlugin(),
             forwarded_filter_marks=forwarded_filter_marks,
