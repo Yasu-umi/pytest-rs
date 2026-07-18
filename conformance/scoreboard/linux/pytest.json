@@ -4,7 +4,7 @@
   "category": "ecosystem",
   "excluded_files": 61,
   "deselected": 0,
-  "known_failed": 12,
+  "known_failed": 11,
   "files": [
     {
       "file": "testing/python/approx.py",
@@ -96,10 +96,10 @@
     },
     {
       "file": "testing/examples/test_issue519.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 0,
-      "failed": 1,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
       "skipped": 0,
       "errors": 0,
       "deselected": 0,
@@ -185,13 +185,13 @@
     {
       "file": "testing/test_collect_imported_tests.py",
       "status": "passed",
-      "exit_code": 1,
-      "passed": 2,
+      "exit_code": 0,
+      "passed": 3,
       "failed": 0,
       "skipped": 0,
       "errors": 0,
       "deselected": 0,
-      "known_failed": 1
+      "known_failed": 0
     },
     {
       "file": "testing/test_collection.py",
@@ -230,8 +230,8 @@
       "file": "testing/test_conftest.py",
       "status": "failed",
       "exit_code": 1,
-      "passed": 51,
-      "failed": 2,
+      "passed": 52,
+      "failed": 1,
       "skipped": 1,
       "errors": 0,
       "deselected": 0,
@@ -272,10 +272,10 @@
     },
     {
       "file": "testing/test_helpconfig.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 9,
-      "failed": 3,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 12,
+      "failed": 0,
       "skipped": 0,
       "errors": 0,
       "deselected": 0,

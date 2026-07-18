@@ -25,7 +25,7 @@ pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2775 | 9 | 0 | 53 | 0 | 12 | 2849 | 99.3% | 48 | 54 | 61 |
+| pytest | 9.0.3 | 2781 | 4 | 0 | 53 | 0 | 11 | 2849 | 99.5% | 50 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 6 | 0 | 0 | 0 | 0 | 1 | 7 | 85.7% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 0 | 2 | 90 | 97.8% | 1 | 1 | 0 |
@@ -84,7 +84,7 @@ pytest-rs; they are not counted in the total.
 | testing/python/raises.py | passed | 31 | 0 | 0 | 0 | 0 | 0 |
 | testing/python/raises_group.py | passed | 29 | 0 | 0 | 0 | 0 | 0 |
 | testing/python/show_fixtures_per_test.py | passed | 8 | 0 | 0 | 0 | 0 | 0 |
-| testing/examples/test_issue519.py | failed | 0 | 1 | 0 | 0 | 0 | 0 |
+| testing/examples/test_issue519.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | testing/freeze/tests/test_trivial.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
 | testing/logging/test_fixture.py | passed | 27 | 0 | 0 | 0 | 0 | 0 |
 | testing/logging/test_formatter.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
@@ -92,15 +92,15 @@ pytest-rs; they are not counted in the total.
 | testing/test_assertion.py | passed | 160 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_cacheprovider.py | passed | 57 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_capture.py | passed | 130 | 0 | 0 | 2 | 0 | 0 |
-| testing/test_collect_imported_tests.py | passed | 2 | 0 | 0 | 0 | 0 | 1 |
+| testing/test_collect_imported_tests.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_collection.py | passed | 112 | 0 | 0 | 3 | 0 | 1 |
 | testing/test_compat.py | passed | 10 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_config.py | passed | 214 | 0 | 0 | 1 | 0 | 0 |
-| testing/test_conftest.py | failed | 51 | 2 | 0 | 1 | 0 | 0 |
+| testing/test_conftest.py | failed | 52 | 1 | 0 | 1 | 0 | 0 |
 | testing/test_doctest.py | passed | 139 | 0 | 0 | 1 | 0 | 0 |
 | testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_faulthandler.py | passed | 12 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_helpconfig.py | failed | 9 | 3 | 0 | 0 | 0 | 0 |
+| testing/test_helpconfig.py | passed | 12 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_junitxml.py | passed | 136 | 0 | 0 | 0 | 0 | 1 |
 | testing/test_link_resolve.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_main.py | passed | 24 | 0 | 0 | 0 | 0 | 0 |
