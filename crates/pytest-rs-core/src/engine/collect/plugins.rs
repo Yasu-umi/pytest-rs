@@ -143,6 +143,26 @@ impl Engine {
                 }
             }
         }
+        // Upstream's _try_load_conftest additionally globs each directory
+        // anchor for "test*" subdirs and loads their conftest.py too (so
+        // e.g. a plain `pytest -h` from rootdir still picks up
+        // tests/conftest.py's pytest_addoption) — only one level deep, not
+        // recursive, and only for these initial anchors (not every dir
+        // discovered later from collected files).
+        let glob_dirs: Vec<PathBuf> = start_dirs
+            .iter()
+            .filter_map(|dir| std::fs::read_dir(dir).ok())
+            .flatten()
+            .filter_map(|entry| entry.ok())
+            .map(|entry| entry.path())
+            .filter(|p| p.is_dir())
+            .filter(|p| {
+                p.file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|n| n.starts_with("test"))
+            })
+            .collect();
+        start_dirs.extend(glob_dirs);
         // Only add parent dirs of files that are actually under one of the explicit
         // start_dirs. Files discovered via sys.path (e.g. editable installs) can
         // reside outside the intended collection scope; including their parents would
