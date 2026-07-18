@@ -365,16 +365,24 @@ def run_inprocess(args, plugins=(), helper_plugin=None, forwarded_filter_marks=(
                 return False
         return False
 
-    capture_disabled = (
-        any(_is_short_flag_cluster_with_s(a) for a in _args_str)
-        or "--capture=no" in _args_str
-        or any(
-            _args_str[i] == "--capture" and i + 1 < len(_args_str) and _args_str[i + 1] == "no"
-            for i in range(len(_args_str))
-        )
-    )
+    capture_mode = None
+    for i, a in enumerate(_args_str):
+        if a.startswith("--capture="):
+            capture_mode = a.split("=", 1)[1]
+        elif a == "--capture" and i + 1 < len(_args_str):
+            capture_mode = _args_str[i + 1]
+    if capture_mode is None:
+        capture_mode = "no" if any(_is_short_flag_cluster_with_s(a) for a in _args_str) else "fd"
+    # "fd" mode: the engine installs its own fd-level capture, so leave the
+    # Python streams alone (repointing them would bypass it). Every other
+    # mode ("no", "sys", "tee-sys") never touches fd 1/2 at all — point
+    # sys.stdout/stderr at the redirected fds so the inner run's output (raw
+    # print() under "no", or SysCapture/TeeCaptureIO's self._old under "sys"/
+    # "tee-sys", which tees straight through to whatever sys.stdout was) lands
+    # in out_f/err_f instead of leaking into whatever capture object the
+    # OUTER session happens to already have installed on sys.stdout/stderr.
     saved_sys_out = saved_sys_err = None
-    if capture_disabled:
+    if capture_mode != "fd":
         saved_sys_out, saved_sys_err = sys.stdout, sys.stderr
         sys.stdout = os.fdopen(os.dup(1), "w", buffering=1, errors="replace")
         sys.stderr = os.fdopen(os.dup(2), "w", buffering=1, errors="replace")
