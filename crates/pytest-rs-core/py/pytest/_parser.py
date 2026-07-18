@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import shlex
+import textwrap
 from pathlib import Path
 from typing import Any
 
@@ -148,7 +149,7 @@ class Parser:
             existing = ini_aliases.get(alias)
             if existing is not None and existing != name:
                 raise ValueError(f"{alias!r} is already an alias of {existing!r}")
-        ini_specs[name] = {"type": type, "default": default, "aliases": aliases}
+        ini_specs[name] = {"type": type, "default": default, "aliases": aliases, "help": help}
         for alias in aliases:
             ini_aliases[alias] = name
 
@@ -318,6 +319,292 @@ _CORE_INI_TYPES: dict[str, str | None] = {
     "verbosity_test_cases": "string",
     "xfail_strict": "bool",
 }
+
+
+#: Upstream's own builtin ini options, in the exact order/wording its own
+#: `parser.addini()` calls register them (so --help's ini listing matches
+#: byte-for-byte) — (name, display type label, help text). Deliberately
+#: excludes `pytester_example_dir` (`_pytest/pytester.py`): that ini is only
+#: registered when the `pytester` builtin plugin is loaded, which upstream
+#: does not do by default (it's in `builtin_plugins` but not
+#: `default_plugins`) — a nested `pytester.runpytest()` session, like the one
+#: `--help` conformance tests run under, never has it either.
+_CORE_INI_HELP: list[tuple[str, str, str]] = [
+    ("markers", "linelist", "Register new markers for test functions"),
+    ("empty_parameter_set_mark", "string", "Default marker for empty parametersets"),
+    (
+        "strict_config",
+        "bool",
+        "Any warnings encountered while parsing the `pytest` section of the "
+        "configuration file raise errors",
+    ),
+    (
+        "strict_markers",
+        "bool",
+        "Markers not registered in the `markers` section of the configuration file raise errors",
+    ),
+    (
+        "strict",
+        "bool",
+        "Enables all strictness options, currently: strict_config, "
+        "strict_markers, strict_xfail, strict_parametrization_ids",
+    ),
+    (
+        "filterwarnings",
+        "linelist",
+        "Each line specifies a pattern for warnings.filterwarnings. Processed "
+        "after -W/--pythonwarnings.",
+    ),
+    ("norecursedirs", "args", "Directory patterns to avoid for recursion"),
+    (
+        "testpaths",
+        "args",
+        "Directories to search for tests when no files or directories are "
+        "given on the command line",
+    ),
+    (
+        "collect_imported_tests",
+        "bool",
+        "Whether to collect tests in imported modules outside `testpaths`",
+    ),
+    (
+        "consider_namespace_packages",
+        "bool",
+        "Consider namespace packages when resolving module names during import",
+    ),
+    ("usefixtures", "args", "List of default fixtures to be used with this project"),
+    (
+        "python_files",
+        "args",
+        "Glob-style file patterns for Python test module discovery",
+    ),
+    (
+        "python_classes",
+        "args",
+        "Prefixes or glob names for Python test class discovery",
+    ),
+    (
+        "python_functions",
+        "args",
+        "Prefixes or glob names for Python test function and method discovery",
+    ),
+    (
+        "disable_test_id_escaping_and_forfeit_all_rights_to_community_support",
+        "bool",
+        "Disable string escape non-ASCII characters, might cause unwanted "
+        "side effects(use at your own risk)",
+    ),
+    (
+        "strict_parametrization_ids",
+        "bool",
+        "Emit an error if non-unique parameter set IDs are detected",
+    ),
+    (
+        "console_output_style",
+        "string",
+        'Console output: "classic", or with additional progress information '
+        '("progress" (percentage) | "count" | "progress-even-when-capture-no" '
+        "(forces progress even when capture=no)",
+    ),
+    (
+        "verbosity_test_cases",
+        "string",
+        "Specify a verbosity level for test case execution, overriding the "
+        "main level. Higher levels will provide more detailed information "
+        "about each test case executed.",
+    ),
+    (
+        "strict_xfail",
+        "bool",
+        "Default for the strict parameter of xfail markers when not given "
+        "explicitly (default: False) (alias: xfail_strict)",
+    ),
+    (
+        "tmp_path_retention_count",
+        "string",
+        "How many sessions should we keep the `tmp_path` directories, "
+        "according to `tmp_path_retention_policy`.",
+    ),
+    (
+        "tmp_path_retention_policy",
+        "string",
+        "Controls which directories created by the `tmp_path` fixture are "
+        "kept around, based on test outcome. (all/failed/none)",
+    ),
+    (
+        "enable_assertion_pass_hook",
+        "bool",
+        "Enables the pytest_assertion_pass hook. Make sure to delete any "
+        "previously generated pyc cache files.",
+    ),
+    (
+        "truncation_limit_lines",
+        "string",
+        "Set threshold of LINES after which truncation will take effect",
+    ),
+    (
+        "truncation_limit_chars",
+        "string",
+        "Set threshold of CHARS after which truncation will take effect",
+    ),
+    (
+        "verbosity_assertions",
+        "string",
+        "Specify a verbosity level for assertions, overriding the main level. "
+        "Higher levels will provide more detailed explanation when an "
+        "assertion fails.",
+    ),
+    ("junit_suite_name", "string", "Test suite name for JUnit report"),
+    (
+        "junit_logging",
+        "string",
+        "Write captured log messages to JUnit report: one of "
+        "no|log|system-out|system-err|out-err|all",
+    ),
+    (
+        "junit_log_passing_tests",
+        "bool",
+        "Capture log information for passing tests to JUnit report:",
+    ),
+    ("junit_duration_report", "string", "Duration time to report: one of total|call"),
+    ("junit_family", "string", "Emit XML for schema: one of legacy|xunit1|xunit2"),
+    ("doctest_optionflags", "args", "Option flags for doctests"),
+    ("doctest_encoding", "string", "Encoding used for doctest files"),
+    ("cache_dir", "string", "Cache directory path"),
+    ("log_level", "string", "Default value for --log-level"),
+    ("log_format", "string", "Default value for --log-format"),
+    ("log_date_format", "string", "Default value for --log-date-format"),
+    (
+        "log_cli",
+        "bool",
+        'Enable log display during test run (also known as "live logging")',
+    ),
+    ("log_cli_level", "string", "Default value for --log-cli-level"),
+    ("log_cli_format", "string", "Default value for --log-cli-format"),
+    ("log_cli_date_format", "string", "Default value for --log-cli-date-format"),
+    ("log_file", "string", "Default value for --log-file"),
+    ("log_file_mode", "string", "Default value for --log-file-mode"),
+    ("log_file_level", "string", "Default value for --log-file-level"),
+    ("log_file_format", "string", "Default value for --log-file-format"),
+    ("log_file_date_format", "string", "Default value for --log-file-date-format"),
+    ("log_auto_indent", "string", "Default value for --log-auto-indent"),
+    (
+        "faulthandler_timeout",
+        "string",
+        "Dump the traceback of all threads if a test takes more than TIMEOUT seconds to finish",
+    ),
+    (
+        "faulthandler_exit_on_timeout",
+        "bool",
+        "Exit the test process if a test takes more than faulthandler_timeout seconds to finish",
+    ),
+    (
+        "verbosity_subtests",
+        "string",
+        "Specify verbosity level for subtests. Higher levels will generate "
+        "output for passed subtests. Failed subtests are always reported.",
+    ),
+    ("addopts", "args", "Extra command line options"),
+    ("minversion", "string", "Minimally required pytest version"),
+    ("pythonpath", "paths", "Add paths to sys.path"),
+    ("required_plugins", "args", "Plugins that must be present for pytest to run"),
+]
+
+#: `showhelp`'s fixed `Environment variables:` block (helpconfig.py), name -> help.
+_ENV_VAR_HELP: list[tuple[str, str]] = [
+    (
+        "CI",
+        "When set to a non-empty value, pytest knows it is running in a CI "
+        "process and does not truncate summary info",
+    ),
+    ("BUILD_NUMBER", "Equivalent to CI"),
+    ("PYTEST_ADDOPTS", "Extra command line options"),
+    ("PYTEST_PLUGINS", "Comma-separated plugins to load during startup"),
+    ("PYTEST_DISABLE_PLUGIN_AUTOLOAD", "Set to disable plugin auto-loading"),
+    ("PYTEST_DEBUG", "Set to enable debug tracing of pytest's internals"),
+    ("PYTEST_DEBUG_TEMPROOT", "Override the system temporary directory"),
+    ("PYTEST_THEME", "The Pygments style to use for code output"),
+    ("PYTEST_THEME_MODE", "Set the PYTEST_THEME to be either 'dark' or 'light'"),
+]
+
+
+def render_ini_help(columns: int) -> str:
+    """The `[pytest] configuration options...` + `Environment variables:`
+    section of `--help`, matching upstream's `_pytest.helpconfig.showhelp`
+    algorithm exactly (including its open-line-buffer semantics: a spec with
+    no help text, like an empty-string `addini` help, leaves its line open
+    for the *next* write rather than emitting a blank line — significant for
+    byte-parity when it's immediately followed by `Environment variables:`).
+
+    Entries are `_CORE_INI_HELP` (upstream's own builtin inis, fixed order)
+    followed by `ini_specs` in registration order (conftest/plugin `addini`
+    calls) — deliberately never merged into `ini_specs` itself, since that
+    dict's presence/absence drives `getini`'s registered-vs-unregistered
+    return value (see `getini`'s docstring); this is a render-only view.
+
+    Raises TypeError, matching upstream, if a registered ini's help is None
+    (an `addini(name, None, ...)` call) — deferred to render time exactly
+    like upstream's showhelp, not validated at addini() call time.
+    """
+    lines: list[str] = []
+    current = ""
+
+    def write(s: str) -> None:
+        nonlocal current
+        current += s
+
+    def line(s: str = "") -> None:
+        nonlocal current
+        lines.append(current + s)
+        current = ""
+
+    line()
+    line(
+        "[pytest] configuration options in the first "
+        "pytest.toml|pytest.ini|tox.ini|setup.cfg|pyproject.toml file found:"
+    )
+    line()
+
+    indent_len = 24
+    indent = " " * indent_len
+    entries = list(_CORE_INI_HELP)
+    entries.extend(
+        (name, spec["type"] or "string", spec["help"]) for name, spec in ini_specs.items()
+    )
+    for name, type_, help_ in entries:
+        if help_ is None:
+            raise TypeError(f"help argument cannot be None for {name}")
+        spec = f"{name} ({type_}):"
+        write(f"  {spec}")
+        spec_len = len(spec)
+        if spec_len > (indent_len - 3):
+            line()
+            for wrapped_line in textwrap.wrap(
+                help_,
+                columns,
+                initial_indent=indent,
+                subsequent_indent=indent,
+                break_on_hyphens=False,
+            ):
+                line(wrapped_line)
+        else:
+            write(" " * (indent_len - spec_len - 2))
+            wrapped = textwrap.wrap(help_, columns - indent_len, break_on_hyphens=False)
+            if wrapped:
+                line(wrapped[0])
+                for wrapped_line in wrapped[1:]:
+                    line(indent + wrapped_line)
+
+    line()
+    line("Environment variables:")
+    for name, help_ in _ENV_VAR_HELP:
+        line(f"  {name:<24} {help_}")
+    line()
+    line()
+
+    if current:
+        lines.append(current)
+    return "\n".join(lines) + "\n"
 
 
 def _empty_for_type(type_: str | None) -> Any:

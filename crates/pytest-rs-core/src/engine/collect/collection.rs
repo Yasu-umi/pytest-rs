@@ -75,6 +75,20 @@ impl Engine {
             if let Err(err) = self.print_py_help_groups(py) {
                 errors.push((rootdir.to_path_buf(), python::format_exception(py, &err)));
             }
+            // helpconfig.showhelp()'s ini-options + "Environment variables:"
+            // section. A registered ini with `help=None` (addini(name, None,
+            // ...)) makes upstream's showhelp() raise TypeError uncaught,
+            // crashing with a raw traceback on stderr and exit 1 — not an
+            // INTERNALERROR (no "INTERNALERROR>" prefix, no pytest_internalerror
+            // hook dispatch), so print it directly rather than routing through
+            // the INTERNAL_STDERR sentinel.
+            match python::render_ini_help(py, crate::runner::term_width() as u32) {
+                Ok(text) => print!("{text}"),
+                Err(err) => {
+                    eprint!("{}", python::format_exception(py, &err));
+                    return Err("\x00INTERNAL_DONE\x001".to_string());
+                }
+            }
             print!("{}", crate::config::Config::HELP_FOOTER);
             // helpconfig.showhelp(): warnings recorded before this point (e.g.
             // a broken initial conftest, downgraded to a warning so --help

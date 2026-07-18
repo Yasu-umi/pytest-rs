@@ -1101,6 +1101,17 @@ pub fn showhelp_warning_lines(py: Python<'_>) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// `--help`'s `[pytest] configuration options...` + `Environment variables:`
+/// section (`pytest._parser.render_ini_help`), matching upstream's
+/// `helpconfig.showhelp`. Propagates a `TypeError` (an `addini(name, None,
+/// ...)` registration) as an `Err` so the caller can print it to stderr like
+/// upstream's uncaught exception, instead of swallowing it.
+pub fn render_ini_help(py: Python<'_>, columns: u32) -> PyResult<String> {
+    py.import("pytest._parser")?
+        .call_method1("render_ini_help", (columns,))?
+        .extract()
+}
+
 /// Emit a warning of a pytest category attributed to an explicit
 /// file/line (registry=None: never deduplicated).
 pub fn warn_explicit_at(
