@@ -77,10 +77,17 @@ pub struct FixtureDef {
 #[derive(Default)]
 pub struct FixtureRegistry {
     by_name: HashMap<String, Vec<Arc<FixtureDef>>>,
+    /// Names with at least one autouse definition anywhere in their override
+    /// chain, so `autouse_for` doesn't have to rescan every registered
+    /// fixture name (most of which are never autouse) on every lookup.
+    autouse_names: Vec<String>,
 }
 
 impl FixtureRegistry {
     pub fn register(&mut self, def: FixtureDef) {
+        if def.autouse && !self.autouse_names.contains(&def.name) {
+            self.autouse_names.push(def.name.clone());
+        }
         self.by_name
             .entry(def.name.clone())
             .or_default()
@@ -293,13 +300,15 @@ impl FixtureRegistry {
     /// Autouse fixtures visible from `nodeid`, most general first.
     pub fn autouse_for(&self, nodeid: &str) -> Vec<Arc<FixtureDef>> {
         let mut found: Vec<Arc<FixtureDef>> = self
-            .by_name
-            .values()
-            .filter_map(|defs| {
-                defs.iter()
-                    .rev()
-                    .find(|def| def.autouse && nodeid.starts_with(&def.baseid))
-                    .cloned()
+            .autouse_names
+            .iter()
+            .filter_map(|name| {
+                self.by_name.get(name).and_then(|defs| {
+                    defs.iter()
+                        .rev()
+                        .find(|def| def.autouse && nodeid.starts_with(&def.baseid))
+                        .cloned()
+                })
             })
             .collect();
         // Higher-scoped autouse first (pytest sets up session/module autouse
