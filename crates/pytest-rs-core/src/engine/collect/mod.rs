@@ -68,9 +68,19 @@ impl Engine {
         }
     }
 
-    pub(crate) fn collect(&mut self, py: Python<'_>) -> Result<Vec<(PathBuf, String)>, String> {
+    /// Imports and identity-independent bookkeeping only: interpreter is
+    /// already up, this brings in `-p`/entry-point plugins and every
+    /// reachable conftest, and fires only the hooks that must precede
+    /// conftest import (`pytest_plugins_registered`, `pytest_addoption`,
+    /// `pytest_load_initial_conftests`) — no `pytest_configure` yet. Split
+    /// out from `collect()` so a dist-mode fork point can sit right after
+    /// this returns: everything above is safe to inherit via fork (plain
+    /// imports), everything in `collect_configure_onward` is NOT (each
+    /// process must fire its own `pytest_configure` independently, same as
+    /// a spawned worker does).
+    pub(crate) fn collect_pre_configure(&mut self, py: Python<'_>) -> Result<PreConfigure, String> {
         let rootdir = self.config.rootdir.clone();
-        let (paths, mut files, deferred_not_found_args) =
+        let (paths, files, deferred_not_found_args) =
             self.resolve_collection_paths(py, &rootdir)?;
         self.prefetch_rewrite_cache(py, &files);
         self.session.initial_paths =
@@ -157,6 +167,42 @@ impl Engine {
         // matching upstream, which never touches the root logger before
         // pytest_configure/pytest_sessionstart.
         python::logging_arm_session_handlers(py);
+        // Cache now, before pytest_configure fires: resolve_numprocesses only
+        // reads CLI/ini flags and conftest pytest_xdist_auto_num_workers
+        // hooks (both already available), never pytest_configure state, so
+        // resolving here and reusing the value later is result-identical —
+        // but a dist-mode fork point needs the worker count before configure
+        // fires, and this is the last point before that happens.
+        #[cfg(feature = "xdist")]
+        {
+            self.session.dist_workers_resolved = Some(self.resolve_numprocesses(py));
+        }
+        Ok(PreConfigure {
+            rootdir,
+            paths,
+            files,
+            deferred_not_found_args,
+            conftests,
+            errors,
+        })
+    }
+
+    /// Everything that must run independently, once per process (controller
+    /// or a single worker — spawned or forked): `pytest_configure` onward,
+    /// then (controller-only in dist mode) module collection.
+    pub(crate) fn collect_configure_onward(
+        &mut self,
+        py: Python<'_>,
+        pre: PreConfigure,
+    ) -> Result<Vec<(PathBuf, String)>, String> {
+        let PreConfigure {
+            rootdir,
+            paths,
+            mut files,
+            deferred_not_found_args,
+            conftests,
+            mut errors,
+        } = pre;
         if self.fire_configure_and_print_header(py, &rootdir, &mut errors)? {
             // --markers (or another short-circuit) handled output; skip collection.
             return Ok(errors);
@@ -300,4 +346,23 @@ if _c.state._capture is not None:
         }
         Ok(errors)
     }
+
+    /// The controller's full collection pipeline: imports, then configure,
+    /// then (non-dist) module collection. `collect_pre_configure` +
+    /// `collect_configure_onward` split out so a dist-mode fork point can
+    /// sit between them; every other caller just wants this whole sequence.
+    pub(crate) fn collect(&mut self, py: Python<'_>) -> Result<Vec<(PathBuf, String)>, String> {
+        let pre = self.collect_pre_configure(py)?;
+        self.collect_configure_onward(py, pre)
+    }
+}
+
+/// State threaded from `collect_pre_configure` into `collect_configure_onward`.
+pub(crate) struct PreConfigure {
+    rootdir: PathBuf,
+    paths: Vec<String>,
+    files: Vec<PathBuf>,
+    deferred_not_found_args: Vec<String>,
+    conftests: Vec<PathBuf>,
+    errors: Vec<(PathBuf, String)>,
 }

@@ -190,6 +190,15 @@ pub struct Session {
     /// is the only way finish_session can tell a zero-item dist run apart
     /// from an ordinary all-passed one to return NO_TESTS_COLLECTED.
     pub dist_total_items: Option<usize>,
+    /// `resolve_numprocesses`'s result, cached at the tail of
+    /// `collect_pre_configure` (before `pytest_configure` fires) so a
+    /// dist-mode fork point can know the worker count without waiting for
+    /// `run_session`'s own later call to `resolve_numprocesses` (which reads
+    /// the identical, already-available state — CLI/ini flags and conftest
+    /// `pytest_xdist_auto_num_workers` hooks, nothing from `pytest_configure`
+    /// itself). Outer `Option` is "cached or not"; inner is the resolved
+    /// worker count (`None` means not distributing).
+    pub dist_workers_resolved: Option<Option<usize>>,
     /// Set when a plugin's `pytest_cmdline_main` hookimpl (firstresult)
     /// claimed the run (e.g. pytest-bdd's `--generate-missing`) — the
     /// engine skips deselection/running entirely and exits with this code.
@@ -241,6 +250,7 @@ impl Session {
             plugin_distinfo: Vec::new(),
             delegated_render: false,
             dist_total_items: None,
+            dist_workers_resolved: None,
             cmdline_main_exit: None,
             internal_error_exit_code: None,
         }

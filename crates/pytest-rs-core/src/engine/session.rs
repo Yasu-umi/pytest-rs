@@ -328,8 +328,16 @@ impl Engine {
             }
         };
 
+        // Cached by collect_pre_configure, before pytest_configure fired (a
+        // dist-mode fork point needs the worker count that early); falling
+        // back to a fresh call keeps this correct for any exit path that
+        // returned before collect_pre_configure ran (e.g. is_worker()).
         #[cfg(feature = "xdist")]
-        match self.resolve_numprocesses(py) {
+        match self
+            .session
+            .dist_workers_resolved
+            .unwrap_or_else(|| self.resolve_numprocesses(py))
+        {
             Some(workers) => {
                 // In dist mode workers collect themselves — n_items may be 0 here.
                 if !loop_replaced {
