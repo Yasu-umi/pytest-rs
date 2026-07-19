@@ -1303,3 +1303,56 @@ def test_it():
     assert_eq!(output.status.code(), Some(0), "out: {out}");
     assert!(out.contains("1 passed"), "out: {out}");
 }
+
+#[test]
+fn xdist_worker_sees_subdir_conftest_addoption() {
+    // Regression test: a conftest.py *below* the rootdir (not the rootdir's
+    // own conftest, reached only once precollect starts walking that
+    // subdirectory) that registers its own option in pytest_addoption, reads
+    // it back via config.getoption() in pytest_configure, and stashes it as
+    // a plain config attribute for pytest_collection_modifyitems to read —
+    // an extremely common real-world pattern (e.g. networkx's own conftest.py
+    // does exactly this with a --backend option). Under -n, a spawned worker
+    // only ever fired pytest_addoption once, early, against whatever -p/
+    // entry-point plugins had registered by then; this subdir conftest was
+    // only imported later, incrementally, as precollect_all reached its
+    // directory — so its own pytest_addoption never ran on the worker,
+    // config.getoption("--mode") raised ValueError: no option named "--mode",
+    // pytest_configure aborted before setting config.custom_mode, and
+    // pytest_collection_modifyitems crashed on the missing attribute
+    // (INTERNAL ERROR, "no tests ran"). Not caught by any existing
+    // conformance suite, since none of them run a real project's own
+    // conftest under -n (only pytest-xdist's own test suite, which doesn't
+    // exercise this pattern).
+    let suite = TempSuite::new("xdist-subdir-conftest-addoption");
+    suite.write(
+        "pkg/conftest.py",
+        r#"
+def pytest_addoption(parser):
+    parser.addoption("--mode", action="store", default="fast")
+
+def pytest_configure(config):
+    config.custom_mode = config.getoption("--mode")
+
+def pytest_collection_modifyitems(config, items):
+    assert config.custom_mode == "fast"
+"#,
+    );
+    suite.write(
+        "pkg/test_thing.py",
+        r#"
+def test_a():
+    assert 1 == 1
+
+def test_b():
+    assert 2 == 2
+"#,
+    );
+    let output = suite.run(&["-n", "2", "pkg"]);
+    let out = stdout(&output);
+    let err = String::from_utf8_lossy(&output.stderr);
+    assert!(!err.contains("INTERNAL ERROR"), "stderr: {err}\nout: {out}");
+    assert!(!out.contains("no tests ran"), "out: {out}");
+    assert_eq!(output.status.code(), Some(0), "out: {out}\nstderr: {err}");
+    assert!(out.contains("2 passed"), "out: {out}");
+}

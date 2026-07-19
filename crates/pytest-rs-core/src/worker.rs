@@ -201,8 +201,23 @@ impl Engine {
         // --itv and reads options.itv there, and stores the per-process db
         // blocker stash key the worker's test setup later reads). Skipping
         // these leaves plugin-defined options unregistered and per-process
-        // setup undone. (Conftest pytest_configure hooks fire incrementally
-        // during precollect below.)
+        // setup undone.
+        let mut collection = WorkerCollection::default();
+        let worker_paths = self.resolve_worker_test_paths(py);
+        // Every conftest.py reachable from the resolved test paths must
+        // import (and get its pytest_addoption chance) before addoption
+        // fires below — see discover_and_load_reachable_conftests's doc
+        // comment for why the previous incremental (during-precollect-only)
+        // loading broke any such conftest's own pytest_configure.
+        if let Err(err) =
+            self.discover_and_load_reachable_conftests(py, &mut collection, &worker_paths)
+        {
+            eprintln!(
+                "INTERNAL ERROR: worker conftest discovery failed: {}",
+                python::format_exception(py, &err)
+            );
+            return exit_code::INTERNAL_ERROR;
+        }
         if let Err(err) = self.fire_py_addoption_hooks(py) {
             eprintln!(
                 "INTERNAL ERROR: worker addoption failed: {}",
@@ -233,7 +248,6 @@ impl Engine {
             return exit_code::USAGE_ERROR;
         }
 
-        let mut collection = WorkerCollection::default();
         // pytest_configure must fire unconditionally (upstream guarantee),
         // but this worker only otherwise fires it incrementally inside
         // ensure_collected as conftests are discovered per file — if this
@@ -651,15 +665,9 @@ impl Engine {
         batch_failed
     }
 
-    /// Import every test module the session can reach, mirroring the
-    /// controller's discovery. Returns collection errors as (nodeid, message) pairs.
-    fn precollect_all(
-        &mut self,
-        py: Python<'_>,
-        collection: &mut WorkerCollection,
-    ) -> Vec<(String, String)> {
-        let mut errors = Vec::new();
-        // Mirror the controller's start paths (CLI args, else testpaths ini).
+    /// Mirror the controller's start paths (CLI args, else testpaths ini),
+    /// shared by the eager conftest discovery pass and `precollect_all`.
+    fn resolve_worker_test_paths(&mut self, py: Python<'_>) -> Vec<String> {
         let mut paths = self.config.paths.clone();
         if paths.is_empty()
             && let Some(testpaths) = self.config.get_ini("testpaths")
@@ -674,6 +682,75 @@ impl Engine {
         }
         self.session.initial_paths =
             crate::collect::resolve_initial_paths(&self.config.invocation_dir, &paths);
+        paths
+    }
+
+    /// Import every conftest.py reachable from `paths` (mirroring the
+    /// controller's own `discover_conftests` + `load_and_validate_config`
+    /// eager pass) *before* `pytest_addoption` fires. A spawned worker
+    /// otherwise only ever fires `pytest_addoption` once, early, against
+    /// whatever `-p`/entry-point plugins registered so far — any conftest
+    /// below the rootdir (reached only once its directory is actually
+    /// walked) had its `pytest_configure` fired later, incrementally, by
+    /// `ensure_conftest_chain`, but never got a chance to register its own
+    /// options first. A `pytest_configure` that reads back one of its own
+    /// conftest's options via `config.getoption(...)` then raised
+    /// `ValueError: no option named "..."`, silently aborting that
+    /// conftest's configure (surfaced only as a collection error on the
+    /// first file reached, since `ensure_conftest_chain` still marked the
+    /// conftest "loaded" before configure ran) — and anything the aborted
+    /// `pytest_configure` would have set on `config` (e.g. a plain
+    /// `config.foo = ...` attribute) was permanently missing for every
+    /// hook that read it back later, including `pytest_collection_modifyitems`.
+    fn discover_and_load_reachable_conftests(
+        &mut self,
+        py: Python<'_>,
+        collection: &mut WorkerCollection,
+        paths: &[String],
+    ) -> PyResult<()> {
+        let python_files = self.config.python_files_patterns();
+        let norecursedirs = self.config.norecursedirs_patterns();
+        let Ok((files, _not_found)) = crate::collect::collect_test_files(
+            &self.config.invocation_dir,
+            paths,
+            self.config.get_flag("collect-in-virtualenv"),
+            &python_files,
+            &norecursedirs,
+            self.config.get_flag("keep-duplicates"),
+            &crate::collect::CollectIgnores::from_config(&self.config),
+        ) else {
+            return Ok(());
+        };
+        let rootdir = self.config.rootdir.clone();
+        let (_start_dirs, conftests) = self.discover_conftests(&rootdir, paths, &files);
+        let import_mode = crate::collect::ImportMode::from_config(&self.config);
+        for conftest in conftests {
+            if collection.loaded_conftests.contains(&conftest) {
+                continue;
+            }
+            python::collect_conftest(
+                py,
+                &rootdir,
+                &conftest,
+                &mut self.session.registry,
+                &mut self.session.py_hooks,
+                import_mode,
+                &self.session.initial_paths,
+            )?;
+            collection.loaded_conftests.insert(conftest);
+        }
+        Ok(())
+    }
+
+    /// Import every test module the session can reach, mirroring the
+    /// controller's discovery. Returns collection errors as (nodeid, message) pairs.
+    fn precollect_all(
+        &mut self,
+        py: Python<'_>,
+        collection: &mut WorkerCollection,
+    ) -> Vec<(String, String)> {
+        let mut errors = Vec::new();
+        let paths = self.resolve_worker_test_paths(py);
         let python_files = self.config.python_files_patterns();
         let norecursedirs = self.config.norecursedirs_patterns();
         let Ok((files, _not_found)) = crate::collect::collect_test_files(
