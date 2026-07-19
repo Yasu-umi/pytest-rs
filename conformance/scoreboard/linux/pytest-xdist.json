@@ -8,10 +8,10 @@
   "files": [
     {
       "file": "testing/acceptance_test.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 96,
-      "failed": 0,
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 95,
+      "failed": 1,
       "skipped": 2,
       "errors": 0,
       "deselected": 0,
