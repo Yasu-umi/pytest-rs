@@ -66,7 +66,7 @@ A plugin that fails to import (e.g. it reaches into pytest/pluggy internals the 
 Startup, collection, fixture orchestration, coverage measurement, and parallel workers are native Rust code. The main wins:
 
 - **`--cov` runs** — coverage is collected via `sys.monitoring` (Python 3.12+ low-overhead instrumentation) instead of `coverage.py`'s tracing hooks. Typically **2–3x faster**, and the gap widens with suite size.
-- **`-n` parallel runs** — workers are forked (not spawned), so each worker inherits a warm interpreter with all imports already done. Startup per worker drops from seconds to milliseconds.
+- **`-n` parallel runs** — workers spawn as fresh subprocesses by default, matching upstream xdist's per-worker `pytest_configure`. Set `PYTEST_RS_DIST_FORK=1` (unix only) to fork workers off the already-warm parent interpreter instead, skipping per-worker interpreter/plugin/conftest import cost — each worker still collects and applies `pytest_collection_modifyitems` independently, but a plugin whose `pytest_configure` reads worker identity (e.g. a per-worker DB name) would see the parent's, so this stays opt-in.
 - **Large collections** — fixture resolution and parametrize expansion run in Rust; suites with thousands of tests see faster collection.
 
 Benchmarks on open-source projects (macOS arm64, median of 3 warm runs), reproducible with [`bench/suites.sh`](bench/README.md) — clones each suite at a pinned tag, installs pytest-rs into its venv, and times both runners.

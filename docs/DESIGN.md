@@ -191,22 +191,37 @@ Key structural rules:
   `[setproctitle]` extra also works: workers retitle per item ("[pytest-xdist running]
   nodeid" / idle), import-probed like upstream — extras need no special wiring, they are
   plain installed packages the embedded interpreter feature-detects the same way xdist does.
-- `-n N`: main process collects (import once, applies -k/-m/modifyitems), then starts N
-  workers. On unix the workers **fork off the already-imported parent** (after collection,
-  before any thread exists): imported test modules, conftests, and the fixture registry
-  arrive copy-on-write, so workers skip the per-process import cost upstream xdist pays.
-  Forked children reseed `random`/`numpy.random` (fork duplicates PRNG state) and clear
-  inherited collection-time warnings (the parent reports those). The parent sets
-  `PYTEST_XDIST_WORKER*` through `os.environ` right before each fork and restores after,
-  so the child holds its identity from its first instruction — visible to
-  `os.register_at_fork` callbacks. `PYTEST_RS_DIST_SPAWN=1` opts back into
-  spawn-per-worker; non-unix always
-  spawns — the same binary in a hidden `--worker` mode, which imports every test module up
-  front (xdist's collection phase, so test side effects cannot leak into module import
-  time). Work distribution over newline-delimited JSON IPC: parent→worker on a clean
-  stdin; worker→parent on stdout with a sentinel frame prefix (tests print via Python, so
-  worker `sys.stdout` is aliased to stderr and stray fd-1 output passes through
-  unmangled). Workers stream `TestReport`s back per phase.
+- `-n N`: the controller's own `collect()` already runs interpreter boot, `-p`/entry-point
+  plugin imports, every reachable conftest, and `pytest_configure` — dist mode's
+  `skip_module_import` just skips `collect_module` there (so an `os._exit` at module import
+  time can't kill the controller) — then N workers start. **Default: spawn**, matching
+  upstream xdist. Each worker is the same binary in a hidden `--worker` mode (a fresh
+  process): it mirrors the controller's plugin/conftest/configure pipeline itself, then
+  imports every test module up front (xdist's collection phase, so test side effects cannot
+  leak into module import time) and applies `pytest_collection_modifyitems`/deselection
+  independently — each worker collects on its own, like upstream (pytest-split's group
+  slicing, pytest-randomly's per-process reseed depend on this).
+  **Opt-in: `PYTEST_RS_DIST_FORK=1`** (unix only) forks all N workers off the parent right
+  after its own `collect()`, before any worker thread exists (CPython's and glibc's
+  fork-safety both assume a single-threaded parent at fork time). A forked child inherits
+  the warm interpreter, imported plugins/conftests, and already-fired `pytest_configure` —
+  skipping that per-worker cost — but still runs its own `precollect_all` +
+  `apply_worker_selection` afterward, exactly like a spawned worker, so per-worker
+  collection/modifyitems semantics are unchanged. Forked children reseed
+  `random`/`numpy.random` (fork duplicates PRNG state) and clear inherited collection-time
+  warnings (the parent reports those). The parent sets `PYTEST_XDIST_WORKER*` through
+  `os.environ` right before each fork and restores after, so the child holds its identity
+  from its first instruction — visible to `os.register_at_fork` callbacks and to
+  test-module-level code the child imports during its own (post-fork) collection. What fork
+  does *not* give a worker: `pytest_configure` already fired once, in the parent, before any
+  per-worker identity existed — a plugin whose `configure` hook reads worker identity (e.g. a
+  per-worker DB name keyed off `PYTEST_XDIST_WORKER`) sees the parent's (unset) value under
+  every forked worker, so such suites should stick to the default (spawn). Non-unix, and any
+  fork failure for a given slot, always falls back to spawn. Work distribution over
+  newline-delimited JSON IPC: parent→worker on a clean stdin; worker→parent on stdout with a
+  sentinel frame prefix (tests print via Python, so worker `sys.stdout` is aliased to stderr
+  and stray fd-1 output passes through unmangled). Workers stream `TestReport`s back per
+  phase.
 - Dispatch granularity follows `--dist` (xdist parity): per-test for `load`/`worksteal`
   (default), per-module for `loadscope`/`loadfile`/`loadgroup` (each module imported by one
   worker), duplicated per worker for `each`. The queue is work-stealing: idle workers wait on
@@ -226,12 +241,11 @@ Key structural rules:
 - Session-scoped fixtures are per-worker (same semantics as xdist). The `worker_id` /
   `testrun_uid` fixtures and `PYTEST_XDIST_WORKER*` env vars are provided for compatibility,
   plus an `xdist` import shim (`is_xdist_worker` etc.) and `config.workerinput`.
-- Known divergence: the parent imports test modules during collection (xdist collects in
-  workers), so module-level side effects run once in the parent too. Under fork mode this
-  cuts deeper: module-level code that reads `PYTEST_XDIST_WORKER` at import time captured
-  the parent's (unset) value — every worker would see the same snapshot. Such suites must
-  read worker identity lazily (the `worker_id` fixture, or env reads inside fixtures) or
-  run with `PYTEST_RS_DIST_SPAWN=1`.
+- Known divergence: under `PYTEST_RS_DIST_FORK=1`, `pytest_configure` fires once in the
+  parent instead of once per worker (see the fork caveat above) — a plugin/conftest that
+  reads worker identity from `configure` rather than lazily (the `worker_id` fixture, or an
+  env read inside a fixture/test) diverges from upstream xdist under fork; run with the
+  default (spawn) for such suites.
 - Architecture consequence for everything else: collection, execution, and reporting communicate
   through serializable types (node IDs in, `TestReport`s out) — never via shared Python state.
 
@@ -260,7 +274,7 @@ upstream and are not listed here.)
 |---|---|
 | `PYTEST_RS_DISABLE_PLUGINS` | Comma/space-separated native plugins to disable, matched like `-p no:NAME` (bare or `pytest_`/`pytest-` prefixed). Unlike `-p no:`, it survives into nested `pytester` subprocess runs (which strip `PYTEST_ADDOPTS` and don't inherit the outer CLI's args), so it's how the conformance harness isolates an always-on native plugin out of an unrelated suite. |
 | `PYTEST_RS_INLINE_INPROCESS` | Make `pytester`'s `runpytest`/`inline_run` execute in-process instead of spawning a subprocess. Used in conformance runs where the subprocess path masks failures. |
-| `PYTEST_RS_DIST_SPAWN` | Opt `-n` workers back into spawn-per-worker (a fresh process each) instead of the default fork-based workers. |
+| `PYTEST_RS_DIST_FORK` | Opt `-n` workers into fork-based startup (unix only) instead of the default spawn-per-worker (a fresh process each); see the fork caveat under "Multi-process execution". |
 
 **Internal plumbing** (set by pytest-rs; do not set by hand):
 
