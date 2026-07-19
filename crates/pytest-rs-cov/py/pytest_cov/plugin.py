@@ -9,17 +9,22 @@ try:
 except ModuleNotFoundError:
     _pytest = None
 
-try:
-    import coverage as _coverage_module
-except ModuleNotFoundError:
-    _coverage_module = None
-
 if _pytest is not None:
 
     @_pytest.fixture
     def cov():
         """Return the active Coverage instance, or None when not measuring."""
-        if not _os.environ.get("PYTEST_RS_COV_ACTIVE") or _coverage_module is None:
+        if not _os.environ.get("PYTEST_RS_COV_ACTIVE"):
+            return None
+        # Deferred: importing the real `coverage` package (a substantial
+        # module tree) unconditionally at plugin-module import time cost a
+        # measurable chunk of startup on every run, even the overwhelming
+        # majority that never request this fixture at all (this module is
+        # imported by pytest_configure regardless of --cov, so cov/no_cover
+        # exist for test_funcarg_not_active-style requests without --cov).
+        try:
+            import coverage as _coverage_module
+        except ModuleNotFoundError:
             return None
         return _coverage_module.Coverage()
 
