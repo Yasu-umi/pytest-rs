@@ -317,7 +317,6 @@ impl Engine {
     /// spawned entry) uses — instead of re-running configure or re-indexing
     /// inherited items.
     #[cfg(unix)]
-    #[allow(dead_code)]
     pub(crate) fn run_worker_forked(&mut self, py: Python<'_>) -> i32 {
         // The inherited config was parsed by the controller (no --worker
         // flag); plugins must still see this process as a worker (e.g. cov

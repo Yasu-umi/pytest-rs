@@ -417,6 +417,14 @@ impl Engine {
             .map(str::to_string)
             .collect();
 
+        // PYTEST_RS_DIST_FORK=1: fork all workers now, while this thread is
+        // still the only one running (a hard requirement — CPython's and
+        // glibc's fork-safety both assume a single-threaded parent at fork
+        // time). This must happen before any WorkerOwner thread below
+        // exists; a crashed worker is always replaced by spawn(), never a
+        // second fork, once those threads are live.
+        let mut forked = self.maybe_fork_workers(py, workers, &testrun_uid, &worker_inputs);
+
         let mut handles = Vec::new();
         for index in 0..workers {
             let owner = WorkerOwner {
@@ -434,7 +442,8 @@ impl Engine {
                     .flatten(),
                 rsyncdirs: rsyncdirs.clone(),
             };
-            handles.push(std::thread::spawn(move || owner.run()));
+            let initial = forked.get_mut(index).and_then(Option::take);
+            handles.push(std::thread::spawn(move || owner.run(initial)));
         }
         drop(sender);
 
@@ -859,6 +868,41 @@ impl Engine {
         batches
     }
 
+    /// `PYTEST_RS_DIST_FORK=1` opts into forking workers off the already-
+    /// warm parent interpreter (unix only) instead of spawning a fresh
+    /// subprocess per worker; unset (the default) always spawns, matching
+    /// upstream xdist's per-worker `pytest_configure`. Fork skips
+    /// interpreter/plugin/conftest import cost but fires `pytest_configure`
+    /// only once, in the parent — a plugin whose configure hook reads
+    /// worker identity (e.g. a per-worker DB name keyed off
+    /// `PYTEST_XDIST_WORKER`) would see the wrong (unset) value under fork,
+    /// so this stays opt-in rather than replacing spawn outright.
+    #[cfg(unix)]
+    fn maybe_fork_workers(
+        &mut self,
+        py: Python<'_>,
+        count: usize,
+        testrun_uid: &str,
+        worker_inputs: &[Option<String>],
+    ) -> Vec<Option<WorkerProc>> {
+        if std::env::var_os("PYTEST_RS_DIST_FORK").is_some() {
+            self.fork_workers(py, count, testrun_uid, worker_inputs)
+        } else {
+            (0..count).map(|_| None).collect()
+        }
+    }
+
+    #[cfg(not(unix))]
+    fn maybe_fork_workers(
+        &mut self,
+        _py: Python<'_>,
+        count: usize,
+        _testrun_uid: &str,
+        _worker_inputs: &[Option<String>],
+    ) -> Vec<Option<WorkerProc>> {
+        (0..count).map(|_| None).collect()
+    }
+
     /// Fork one child per worker slot off the already-imported parent
     /// interpreter. The parent sets the xdist worker env vars through
     /// os.environ right before each fork (and restores them after), so
@@ -868,7 +912,7 @@ impl Engine {
     /// they never return. A failed fork yields None and that slot spawns
     /// instead.
     #[cfg(unix)]
-    #[allow(unsafe_code, dead_code)]
+    #[allow(unsafe_code)]
     fn fork_workers(
         &mut self,
         py: Python<'_>,
@@ -1027,7 +1071,6 @@ impl Engine {
 enum WorkerHandle {
     Spawned(Child),
     #[cfg(unix)]
-    #[allow(dead_code)]
     Forked(libc::pid_t),
 }
 
@@ -1210,21 +1253,27 @@ impl WorkerOwner {
         }
     }
 
-    fn run(self) {
-        let mut proc = match self.spawn() {
-            Ok(proc) => proc,
-            Err(err) => {
-                eprintln!("ERROR: failed to spawn worker: {err}");
-                // Unblock the merge loop's collections_pending count.
-                let _ = self.sender.send(Event::Collection {
-                    worker: self.index,
-                    nodeids: vec![],
-                    xdist_groups: vec![],
-                    errors: vec![],
-                    deselected: 0,
-                });
-                return;
-            }
+    /// `initial`: a `WorkerProc` this slot already forked before any
+    /// `WorkerOwner` thread existed (see `Engine::maybe_fork_workers`).
+    /// `None` spawns a fresh subprocess instead, same as always.
+    fn run(self, initial: Option<WorkerProc>) {
+        let mut proc = match initial {
+            Some(proc) => proc,
+            None => match self.spawn() {
+                Ok(proc) => proc,
+                Err(err) => {
+                    eprintln!("ERROR: failed to spawn worker: {err}");
+                    // Unblock the merge loop's collections_pending count.
+                    let _ = self.sender.send(Event::Collection {
+                        worker: self.index,
+                        nodeids: vec![],
+                        xdist_groups: vec![],
+                        errors: vec![],
+                        deselected: 0,
+                    });
+                    return;
+                }
+            },
         };
 
         // Collection phase: read from the worker's stdout until it sends
