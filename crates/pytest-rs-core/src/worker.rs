@@ -303,10 +303,19 @@ impl Engine {
         self.worker_loop(py, collection)
     }
 
-    /// The forked-worker entry (-n on unix): the parent's interpreter
-    /// state — imported test modules, conftests, fixture registry, fired
-    /// configure hooks — arrived via fork, so collection reduces to
-    /// re-indexing the parent's collected items.
+    /// The forked-worker entry (-n on unix, `PYTEST_RS_DIST_FORK=1`): the
+    /// fork point sits right after the controller's own `Engine::collect()`
+    /// — interpreter boot, `-p`/entry-point plugin imports, every reachable
+    /// conftest, and `pytest_configure` have all already run once, in the
+    /// parent, before any worker exists. What collect() does NOT do in dist
+    /// mode is import test modules or run `pytest_collection_modifyitems` —
+    /// each xdist worker does that independently (upstream parity: e.g.
+    /// pytest-split's group slicing or pytest-randomly's per-process reseed
+    /// need a real, independent collection pass, not a shared inherited
+    /// snapshot). So this worker redoes exactly that tail — the same
+    /// `precollect_all` + `apply_worker_selection` steps `run_worker` (the
+    /// spawned entry) uses — instead of re-running configure or re-indexing
+    /// inherited items.
     #[cfg(unix)]
     #[allow(dead_code)]
     pub(crate) fn run_worker_forked(&mut self, py: Python<'_>) -> i32 {
@@ -345,20 +354,44 @@ impl Engine {
             None,
         );
 
+        // Every hook the parent's session already carries has already had
+        // its pytest_configure fired; only hooks registered after this
+        // cursor (there are none — this worker imports no new conftests)
+        // would need fire_new_conftest_configure to run again.
         let mut collection = WorkerCollection {
             configured_hooks: self.session.py_hooks.len(),
             ..WorkerCollection::default()
         };
-        for item in std::mem::take(&mut self.session.items) {
-            let file = item.nodeid.split("::").next().unwrap_or("");
-            collection
-                .collected_files
-                .insert(self.config.rootdir.join(file));
-            collection
-                .by_nodeid
-                .insert(item.nodeid.clone(), collection.items.len());
-            collection.items.push(item);
-        }
+        // Mark every conftest the parent already imported as loaded, so the
+        // precollect_all conftest-chain walk below finds nothing new to
+        // import (and does not re-fire their pytest_configure).
+        let paths = self.resolve_worker_test_paths(py);
+        collection
+            .loaded_conftests
+            .extend(self.reachable_conftests(&paths));
+
+        let collect_errors = self.precollect_all(py, &mut collection);
+        let deselected = match self.apply_worker_selection(py, &mut collection) {
+            Ok(deselected) => deselected,
+            Err(err) => {
+                eprintln!(
+                    "INTERNAL ERROR: worker collection modifyitems failed: {}",
+                    python::format_exception(py, &err)
+                );
+                return exit_code::INTERNAL_ERROR;
+            }
+        };
+        let (nodeids, xdist_groups): (Vec<_>, Vec<_>) = collection
+            .items
+            .iter()
+            .map(|item| (item.nodeid.clone(), xdist_group_of(py, item)))
+            .unzip();
+        send(&WorkerMsg::Collection {
+            nodeids,
+            xdist_groups,
+            errors: collect_errors,
+            deselected,
+        });
         self.worker_loop(py, collection)
     }
 
@@ -708,21 +741,8 @@ impl Engine {
         collection: &mut WorkerCollection,
         paths: &[String],
     ) -> PyResult<()> {
-        let python_files = self.config.python_files_patterns();
-        let norecursedirs = self.config.norecursedirs_patterns();
-        let Ok((files, _not_found)) = crate::collect::collect_test_files(
-            &self.config.invocation_dir,
-            paths,
-            self.config.get_flag("collect-in-virtualenv"),
-            &python_files,
-            &norecursedirs,
-            self.config.get_flag("keep-duplicates"),
-            &crate::collect::CollectIgnores::from_config(&self.config),
-        ) else {
-            return Ok(());
-        };
         let rootdir = self.config.rootdir.clone();
-        let (_start_dirs, conftests) = self.discover_conftests(&rootdir, paths, &files);
+        let conftests = self.reachable_conftests(paths);
         let import_mode = crate::collect::ImportMode::from_config(&self.config);
         for conftest in conftests {
             if collection.loaded_conftests.contains(&conftest) {
@@ -740,6 +760,29 @@ impl Engine {
             collection.loaded_conftests.insert(conftest);
         }
         Ok(())
+    }
+
+    /// Every conftest.py reachable from `paths` (rootdir down to each
+    /// collected file's directory), same computation
+    /// `discover_and_load_reachable_conftests` uses before importing —
+    /// factored out so a forked worker can seed its `loaded_conftests` set
+    /// with what the parent already imported, without importing anything.
+    fn reachable_conftests(&self, paths: &[String]) -> Vec<PathBuf> {
+        let python_files = self.config.python_files_patterns();
+        let norecursedirs = self.config.norecursedirs_patterns();
+        let Ok((files, _not_found)) = crate::collect::collect_test_files(
+            &self.config.invocation_dir,
+            paths,
+            self.config.get_flag("collect-in-virtualenv"),
+            &python_files,
+            &norecursedirs,
+            self.config.get_flag("keep-duplicates"),
+            &crate::collect::CollectIgnores::from_config(&self.config),
+        ) else {
+            return Vec::new();
+        };
+        let rootdir = self.config.rootdir.clone();
+        self.discover_conftests(&rootdir, paths, &files).1
     }
 
     /// Import every test module the session can reach, mirroring the
