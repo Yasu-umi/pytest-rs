@@ -38,7 +38,14 @@ enum Mode {
 
 pub struct AsyncioPlugin {
     mode: Mode,
-    helper: Option<Py<PyModule>>,
+    /// Lazily built on first actual use (a test/fixture that needs the
+    /// event-loop machinery), not eagerly in pytest_configure: building it
+    /// runs `import asyncio`, and pytest_configure fires on every pytest-rs
+    /// invocation regardless of whether the suite has any async tests at
+    /// all — paying that stdlib import cost unconditionally showed up as
+    /// ~12.5% of collection-phase profiling samples on a suite with zero
+    /// async tests.
+    helper: RefCell<Option<Py<PyModule>>>,
     /// Event loops cached per (loop scope, scope instance key).
     loops: RefCell<HashMap<(Scope, String), Py<PyAny>>>,
     current_module: RefCell<Option<String>>,
@@ -61,7 +68,7 @@ impl AsyncioPlugin {
     pub fn new() -> Self {
         Self {
             mode: Mode::Strict,
-            helper: None,
+            helper: RefCell::new(None),
             loops: RefCell::new(HashMap::new()),
             current_module: RefCell::new(None),
             default_fixture_loop_scope: None,
@@ -72,10 +79,17 @@ impl AsyncioPlugin {
     }
 
     fn helper<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyModule>> {
-        self.helper
-            .as_ref()
-            .map(|m| m.bind(py).clone())
-            .ok_or_else(|| PyRuntimeError::new_err("asyncio plugin not configured"))
+        if let Some(module) = self.helper.borrow().as_ref() {
+            return Ok(module.bind(py).clone());
+        }
+        let module = PyModule::from_code(
+            py,
+            CString::new(HELPER)?.as_c_str(),
+            c"pytest_rs_asyncio/helper.py",
+            c"_pytest_rs_asyncio",
+        )?;
+        *self.helper.borrow_mut() = Some(module.clone().unbind());
+        Ok(module)
     }
 
     /// The cached (or new) loop for a scope instance. A factory from the
@@ -544,14 +558,6 @@ impl Plugin for AsyncioPlugin {
                 }
             }
         }
-
-        let module = PyModule::from_code(
-            ctx.py,
-            CString::new(HELPER)?.as_c_str(),
-            c"pytest_rs_asyncio/helper.py",
-            c"_pytest_rs_asyncio",
-        )?;
-        self.helper = Some(module.unbind());
 
         // `import pytest_asyncio` in upstream suites resolves to our shim:
         // a real package in the shim dir (which leads sys.path), so
