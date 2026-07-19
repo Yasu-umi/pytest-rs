@@ -259,12 +259,7 @@ pub(crate) fn evaluate_item_prelude(
     config: &Config,
     item: &TestItem,
 ) -> ItemPrelude {
-    let is_custom_item = py
-        .import("pytest._node")
-        .and_then(|m| m.getattr("Item"))
-        .and_then(|cls| item.func.bind(py).is_instance(&cls))
-        .unwrap_or(false);
-    if is_custom_item {
+    if python::is_custom_item(py, &item.func) {
         return ItemPrelude::Done(run_custom_item(py, config, item));
     }
 

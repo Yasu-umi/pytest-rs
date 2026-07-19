@@ -11,6 +11,28 @@ static CAPTURE_START_PHASE_FN: pyo3::sync::PyOnceLock<Py<PyAny>> = pyo3::sync::P
 static CAPTURE_FINISH_ITEM_FN: pyo3::sync::PyOnceLock<Py<PyAny>> = pyo3::sync::PyOnceLock::new();
 static WCAPTURE_BEGIN_FILTERS_FN: pyo3::sync::PyOnceLock<Py<PyAny>> = pyo3::sync::PyOnceLock::new();
 static WCAPTURE_END_FILTERS_FN: pyo3::sync::PyOnceLock<Py<PyAny>> = pyo3::sync::PyOnceLock::new();
+static PYTEST_NODE_ITEM_CLASS: pyo3::sync::PyOnceLock<Py<PyAny>> = pyo3::sync::PyOnceLock::new();
+
+/// `pytest._node.Item`, resolved once and reused — every item's prelude
+/// (`evaluate_item_prelude`) and `make_node` both need an isinstance check
+/// against it to detect a custom-collector item, so this avoids repeating
+/// the module import + attribute lookup on every call.
+fn pytest_node_item_class(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+    PYTEST_NODE_ITEM_CLASS
+        .get_or_try_init(py, || {
+            Ok(py.import("pytest._node")?.getattr("Item")?.unbind())
+        })
+        .map(|cls| cls.bind(py).clone())
+}
+
+/// Whether `func` (an item's underlying callable) is itself a custom
+/// `pytest._node.Item` node (pytest-mypy/pytest-ruff-style custom
+/// collectors), rather than an ordinary test function.
+pub fn is_custom_item(py: Python<'_>, func: &Py<PyAny>) -> bool {
+    pytest_node_item_class(py)
+        .and_then(|cls| func.bind(py).is_instance(&cls))
+        .unwrap_or(false)
+}
 
 fn logging_start_phase_fn(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
     LOGGING_START_PHASE_FN
