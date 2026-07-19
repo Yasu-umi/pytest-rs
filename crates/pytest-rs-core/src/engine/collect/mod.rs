@@ -34,7 +34,7 @@ impl Engine {
     /// gets validated/returned, and a handful of files prefetched here but
     /// later dropped by `--ignore`/collect-directory hooks is harmless waste,
     /// not a correctness concern.
-    fn prefetch_rewrite_cache(&self, py: Python<'_>, files: &[PathBuf]) {
+    pub(crate) fn prefetch_rewrite_cache(&self, py: Python<'_>, files: &[PathBuf]) {
         const MIN_FILES_TO_BOTHER: usize = 20;
         if files.len() < MIN_FILES_TO_BOTHER {
             return;

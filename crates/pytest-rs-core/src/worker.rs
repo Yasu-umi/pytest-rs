@@ -687,6 +687,13 @@ impl Engine {
         ) else {
             return errors;
         };
+        // Same rationale as the controller's own prefetch (engine/collect/mod.rs):
+        // this worker is about to import every one of these files sequentially
+        // through the same content-hash-validated __pycache__ path, entirely
+        // independently of the controller's own prefetch/collection (workers
+        // never call Engine::collect at all) — so without this, -n mode pays
+        // the full per-worker cold-cache cost on every worker.
+        self.prefetch_rewrite_cache(py, &files);
         for file in files {
             let rel = crate::collect::file_nodeid(&self.config.rootdir, &file, &[]);
             if let Err(msg) = self.ensure_collected(py, collection, &rel) {
