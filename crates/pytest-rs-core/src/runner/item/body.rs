@@ -681,30 +681,24 @@ pub(crate) fn run_item_body(
             .count();
     reports.extend(sub_reports);
     reports.extend(plugin_reports);
-    let has_subtests_plugin = py
-        .eval(
-            pyo3::ffi::c_str!("'pytest_subtests' in __import__('sys').modules"),
-            None,
-            None,
-        )
-        .and_then(|v| v.extract::<bool>())
-        .unwrap_or(false);
-    let report =
-        if report.outcome == Outcome::Passed && failed_sub_count > 0 && !has_subtests_plugin {
-            let suffix = if failed_sub_count > 1 { "s" } else { "" };
-            TestReport {
-                outcome: Outcome::Failed,
-                longrepr: Some(format!(
-                    "contains {failed_sub_count} failed subtest{suffix}"
-                )),
-                reprcrash_message: Some(format!(
-                    "contains {failed_sub_count} failed subtest{suffix}"
-                )),
-                ..report
-            }
-        } else {
-            report
-        };
+    let report = if report.outcome == Outcome::Passed
+        && failed_sub_count > 0
+        && !python::has_subtests_plugin(py)
+    {
+        let suffix = if failed_sub_count > 1 { "s" } else { "" };
+        TestReport {
+            outcome: Outcome::Failed,
+            longrepr: Some(format!(
+                "contains {failed_sub_count} failed subtest{suffix}"
+            )),
+            reprcrash_message: Some(format!(
+                "contains {failed_sub_count} failed subtest{suffix}"
+            )),
+            ..report
+        }
+    } else {
+        report
+    };
     // Unraisable exceptions surfaced during a passed call (upstream's
     // trylast pytest_runtest_call hookimpl, which pluggy skips when the
     // test itself raised): an error filter fails the call.
