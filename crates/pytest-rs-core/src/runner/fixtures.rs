@@ -754,11 +754,7 @@ pub(crate) fn resolve_fixture_def(
         // fixtures still use the shared "" key (one instance per session).
         Scope::Session => match &fixture_param {
             Some((_, value)) => {
-                let repr = value
-                    .bind(py)
-                    .repr()
-                    .map(|r| r.to_string())
-                    .unwrap_or_else(|_| format!("{}", value.as_ptr() as usize));
+                let repr = session.param_repr(py, value);
                 format!("\x00session_param:{}:{}", def.name, repr)
             }
             None => String::new(),
@@ -803,13 +799,9 @@ pub(crate) fn resolve_fixture_def(
             None => def.name.clone(),
         }
     };
-    let param_cache_key: Option<String> = fixture_param.as_ref().map(|(_, value)| {
-        value
-            .bind(py)
-            .repr()
-            .map(|r| r.to_string())
-            .unwrap_or_else(|_| format!("<unhashable@{}>", value.as_ptr() as usize))
-    });
+    let param_cache_key: Option<String> = fixture_param
+        .as_ref()
+        .map(|(_, value)| session.param_repr(py, value));
     let cache_key = (
         cache_scope,
         keyed_name,

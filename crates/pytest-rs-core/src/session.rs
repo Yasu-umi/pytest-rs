@@ -94,6 +94,16 @@ pub struct Session {
     pub initial_paths: Vec<std::path::PathBuf>,
     /// Cached fixture values, GIL-independent handles.
     pub fixture_cache: HashMap<CacheKey, CachedFixture>,
+    /// `repr()` of a parametrized fixture's param value, memoized by the
+    /// value's Python object identity (`as_ptr()`), since every item sharing
+    /// a higher-scoped parametrized fixture holds a `clone_ref` of the same
+    /// underlying object — without this, each of those items' fixture_cache
+    /// lookup recomputes the same repr() (a Python round-trip) just to build
+    /// the cache key, even on a cache hit. Sound only because the value
+    /// stays alive for the session's duration (held by items' fixture_params
+    /// / callspec), so a pointer is never reused for a different object
+    /// while its entry lives here.
+    pub param_repr_cache: HashMap<usize, String>,
     /// LIFO stack of pending finalizers across all scopes.
     pub finalizers: Vec<PendingFinalizer>,
     pub reports: Vec<TestReport>,
@@ -201,6 +211,7 @@ impl Session {
             registry: FixtureRegistry::default(),
             initial_paths: Vec::new(),
             fixture_cache: HashMap::new(),
+            param_repr_cache: HashMap::new(),
             finalizers: Vec::new(),
             reports: Vec::new(),
             stash: HashMap::new(),
@@ -249,6 +260,22 @@ impl Session {
         self.stash
             .get_mut(&TypeId::of::<T>())
             .and_then(|b| b.downcast_mut())
+    }
+
+    /// `repr(value)`, memoized by the value's Python object identity — see
+    /// `param_repr_cache`.
+    pub fn param_repr(&mut self, py: Python<'_>, value: &Py<PyAny>) -> String {
+        let ptr = value.as_ptr() as usize;
+        if let Some(cached) = self.param_repr_cache.get(&ptr) {
+            return cached.clone();
+        }
+        let repr = value
+            .bind(py)
+            .repr()
+            .map(|r| r.to_string())
+            .unwrap_or_else(|_| format!("<unhashable@{ptr}>"));
+        self.param_repr_cache.insert(ptr, repr.clone());
+        repr
     }
 }
 
