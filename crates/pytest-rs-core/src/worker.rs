@@ -316,18 +316,19 @@ impl Engine {
     }
 
     /// The forked-worker entry (-n on unix, `PYTEST_RS_DIST_FORK=1`): the
-    /// fork point sits right after the controller's own `Engine::collect()`
-    /// — interpreter boot, `-p`/entry-point plugin imports, every reachable
-    /// conftest, and `pytest_configure` have all already run once, in the
-    /// parent, before any worker exists. What collect() does NOT do in dist
-    /// mode is import test modules or run `pytest_collection_modifyitems` —
-    /// each xdist worker does that independently (upstream parity: e.g.
-    /// pytest-split's group slicing or pytest-randomly's per-process reseed
-    /// need a real, independent collection pass, not a shared inherited
-    /// snapshot). So this worker redoes exactly that tail — the same
-    /// `precollect_all` + `apply_worker_selection` steps `run_worker` (the
-    /// spawned entry) uses — instead of re-running configure or re-indexing
-    /// inherited items.
+    /// fork point sits at the tail of the controller's own
+    /// `collect_pre_configure` — interpreter boot, `-p`/entry-point plugin
+    /// imports, and every reachable conftest have already run once, in the
+    /// parent, before any worker exists, but `pytest_configure` has NOT
+    /// fired anywhere yet. This worker blocks for its `workerinput` (only
+    /// knowable once the parent's own `pytest_configure` later fires — see
+    /// below), then runs the same `configure_and_collect` tail `run_worker`
+    /// (the spawned entry) uses: its own independent `pytest_configure`,
+    /// then `precollect_all` + `apply_worker_selection` (upstream parity:
+    /// e.g. pytest-split's group slicing or pytest-randomly's per-process
+    /// reseed need a real, independent collection pass, not a shared
+    /// inherited snapshot) — identical configure semantics to a spawned
+    /// worker, just without redoing the imports it already inherited.
     #[cfg(unix)]
     pub(crate) fn run_worker_forked(&mut self, py: Python<'_>) -> i32 {
         // The inherited config was parsed by the controller (no --worker
@@ -365,45 +366,58 @@ impl Engine {
             None,
         );
 
-        // Every hook the parent's session already carries has already had
-        // its pytest_configure fired; only hooks registered after this
-        // cursor (there are none — this worker imports no new conftests)
-        // would need fire_new_conftest_configure to run again.
-        let mut collection = WorkerCollection {
-            configured_hooks: self.session.py_hooks.len(),
-            ..WorkerCollection::default()
-        };
+        // Nothing has fired pytest_configure anywhere yet — that's the whole
+        // point of forking here rather than after the parent's own
+        // collect() (the old fork point): node.workerinput (computed by the
+        // parent's pytest_configure_node hooks) only exists once the
+        // parent's own pytest_configure has fired, which is strictly after
+        // this fork point, so this worker must block for it over IPC before
+        // it can fire its own pytest_configure. A spawned worker instead
+        // gets this via the PYTEST_RS_WORKERINPUT env var, already set
+        // before its process even started.
+        // Scoped so the stdin lock is released before configure_and_collect
+        // (via worker_loop) locks stdin again — std::io::Stdin's lock isn't
+        // reentrant within a thread, so holding both at once would deadlock.
+        {
+            let stdin = std::io::stdin();
+            let mut lines = stdin.lock().lines();
+            loop {
+                let Some(Ok(line)) = lines.next() else {
+                    // Controller died (or closed our stdin) before sending
+                    // our identity — nothing to configure or collect.
+                    return exit_code::INTERNAL_ERROR;
+                };
+                if line.trim().is_empty() {
+                    continue;
+                }
+                let Ok(msg) = serde_json::from_str::<ParentMsg>(&line) else {
+                    continue;
+                };
+                if let ParentMsg::Workerinput { payload } = msg {
+                    if let Some(json) = payload {
+                        let _ = py
+                            .import("os")
+                            .and_then(|os| os.getattr("environ"))
+                            .and_then(|environ| environ.set_item("PYTEST_RS_WORKERINPUT", json));
+                    }
+                    break;
+                }
+            }
+        }
+
         // Mark every conftest the parent already imported as loaded, so the
-        // precollect_all conftest-chain walk below finds nothing new to
-        // import (and does not re-fire their pytest_configure).
+        // shared tail's conftest-chain walk (inside precollect_all) finds
+        // nothing new to import — everything else (addoption, apply_cli,
+        // load_initial_conftests, pytest_configure, precollect_all,
+        // selection) it does itself, independently, exactly like a spawned
+        // worker (configured_hooks starts at 0: unlike the old fork point,
+        // no hook here has had its pytest_configure fired yet).
+        let mut collection = WorkerCollection::default();
         let paths = self.resolve_worker_test_paths(py);
         collection
             .loaded_conftests
             .extend(self.reachable_conftests(&paths));
-
-        let collect_errors = self.precollect_all(py, &mut collection);
-        let deselected = match self.apply_worker_selection(py, &mut collection) {
-            Ok(deselected) => deselected,
-            Err(err) => {
-                eprintln!(
-                    "INTERNAL ERROR: worker collection modifyitems failed: {}",
-                    python::format_exception(py, &err)
-                );
-                return exit_code::INTERNAL_ERROR;
-            }
-        };
-        let (nodeids, xdist_groups): (Vec<_>, Vec<_>) = collection
-            .items
-            .iter()
-            .map(|item| (item.nodeid.clone(), xdist_group_of(py, item)))
-            .unzip();
-        send(&WorkerMsg::Collection {
-            nodeids,
-            xdist_groups,
-            errors: collect_errors,
-            deselected,
-        });
-        self.worker_loop(py, collection)
+        self.configure_and_collect(py, collection)
     }
 
     /// The worker main loop; the exit code is informational (the parent
@@ -458,6 +472,10 @@ impl Engine {
                     send(&WorkerMsg::Done);
                 }
                 ParentMsg::Shutdown => break,
+                // Only ever sent once, before configure, to a forked worker
+                // (which consumes it directly, before entering this loop —
+                // see run_worker_forked); a stray one here is ignored.
+                ParentMsg::Workerinput { .. } => {}
             }
         }
 

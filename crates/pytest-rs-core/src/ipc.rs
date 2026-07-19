@@ -12,6 +12,14 @@ pub const FRAME_PREFIX: &str = "##pytest-rs-ipc##";
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum ParentMsg {
+    /// Sent once, only to a forked worker, before it fires its own
+    /// pytest_configure: node.workerinput as JSON (the same payload a
+    /// spawned worker instead receives pre-fork via the
+    /// PYTEST_RS_WORKERINPUT env var). A forked worker blocks reading this
+    /// before configuring, since pytest_configure_node (which computes it)
+    /// only runs in the parent after the parent's own configure fires —
+    /// strictly after the fork point.
+    Workerinput { payload: Option<String> },
     /// Run this batch of node IDs (module-affinity: usually one module).
     Run { nodeids: Vec<String> },
     /// No more work: tear down, dump plugin state, exit.

@@ -2,11 +2,18 @@
 //! node IDs from a shared queue (work stealing: fast workers pull more),
 //! and merge the streamed reports plus per-plugin state dumps.
 //!
-//! On unix, workers fork off the parent after collection — the imported
-//! test modules, conftests, and fixture registry arrive copy-on-write, so
-//! workers skip the per-process import cost that upstream xdist pays.
-//! PYTEST_RS_DIST_SPAWN=1 opts back into spawn-per-worker (each worker
-//! re-imports everything, xdist's model); non-unix always spawns.
+//! On unix, `PYTEST_RS_DIST_FORK=1` opts workers into forking off the
+//! parent at a checkpoint right after `collect_pre_configure` — imports
+//! (interpreter, `-p`/entry-point plugins, every reachable conftest) arrive
+//! copy-on-write, so workers skip that per-process cost upstream xdist
+//! pays. The checkpoint sits strictly *before* `pytest_configure` fires
+//! anywhere, so each forked child still independently fires its own
+//! `pytest_plugins_registered`-onward pipeline afterward (blocking first on
+//! a `ParentMsg::Workerinput` delivery — see `worker.rs::run_worker_forked`)
+//! — configure semantics identical to a spawned worker, just without
+//! redoing the imports. Unset (the default), or non-unix, always spawns:
+//! each worker is the same binary in a hidden `--worker` mode that
+//! re-imports and re-configures independently from scratch.
 //!
 //! Dispatch granularity follows --dist: per-test for load/worksteal (the
 //! default, xdist parity), per-module for loadscope/loadfile/loadgroup
@@ -311,14 +318,22 @@ impl Engine {
         let mut argv: Vec<String> = self.config.effective_args.iter().skip(1).cloned().collect();
         argv.extend(self.config.plugin_args.iter().cloned());
         // One uid for the whole distributed run (the testrun_uid fixture).
-        let testrun_uid = format!(
-            "{:032x}",
-            std::process::id() as u128
-                ^ std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|elapsed| elapsed.as_nanos())
-                    .unwrap_or(0)
-        );
+        // Generated (and, if forking, already handed to each child's
+        // pre-fork env) by the collect_pre_configure checkpoint — reused
+        // here so a forked child's env and this run's computed workerinput
+        // agree. Falls back to generating fresh only if the checkpoint
+        // somehow never ran (defensive; every path that reaches run_dist
+        // goes through collect_pre_configure first).
+        let testrun_uid = self.dist_testrun_uid.take().unwrap_or_else(|| {
+            format!(
+                "{:032x}",
+                std::process::id() as u128
+                    ^ std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|elapsed| elapsed.as_nanos())
+                        .unwrap_or(0)
+            )
+        });
 
         // xdist data exchange: one controller-side node per worker;
         // conftest pytest_configure_node hooks fill node.workerinput
@@ -417,13 +432,14 @@ impl Engine {
             .map(str::to_string)
             .collect();
 
-        // PYTEST_RS_DIST_FORK=1: fork all workers now, while this thread is
-        // still the only one running (a hard requirement — CPython's and
-        // glibc's fork-safety both assume a single-threaded parent at fork
-        // time). This must happen before any WorkerOwner thread below
-        // exists; a crashed worker is always replaced by spawn(), never a
-        // second fork, once those threads are live.
-        let mut forked = self.maybe_fork_workers(py, workers, &testrun_uid, &worker_inputs);
+        // Workers already forked (or not) at the collect_pre_configure
+        // checkpoint, strictly before any pytest_configure fired anywhere —
+        // stashed there since fork must happen before any WorkerOwner
+        // thread exists (CPython's/glibc's fork-safety both assume a
+        // single-threaded parent at fork time), which is long before this
+        // point. A crashed forked worker is always replaced by spawn(),
+        // never a second fork, once those threads are live.
+        let mut forked = std::mem::take(&mut self.forked_workers);
 
         let mut handles = Vec::new();
         for index in 0..workers {
@@ -868,49 +884,80 @@ impl Engine {
         batches
     }
 
-    /// `PYTEST_RS_DIST_FORK=1` opts into forking workers off the already-
-    /// warm parent interpreter (unix only) instead of spawning a fresh
-    /// subprocess per worker; unset (the default) always spawns, matching
-    /// upstream xdist's per-worker `pytest_configure`. Fork skips
-    /// interpreter/plugin/conftest import cost but fires `pytest_configure`
-    /// only once, in the parent — a plugin whose configure hook reads
-    /// worker identity (e.g. a per-worker DB name keyed off
-    /// `PYTEST_XDIST_WORKER`) would see the wrong (unset) value under fork,
-    /// so this stays opt-in rather than replacing spawn outright.
+    /// Called once from the tail of `collect_pre_configure`, before any
+    /// `pytest_configure` has fired anywhere: if `resolve_numprocesses`
+    /// resolved a nonzero worker count (cached in
+    /// `session.dist_workers_resolved`), generate this run's testrun_uid and
+    /// (when fork-eligible) fork all workers now, while this is still the
+    /// only running thread — the hard requirement fork has everywhere else
+    /// in this file. A no-op when not distributing.
+    #[cfg(feature = "xdist")]
+    pub(crate) fn fork_workers_at_checkpoint(&mut self, py: Python<'_>) {
+        let Some(Some(workers)) = self.session.dist_workers_resolved else {
+            return;
+        };
+        if workers == 0 {
+            return;
+        }
+        let testrun_uid = format!(
+            "{:032x}",
+            std::process::id() as u128
+                ^ std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|elapsed| elapsed.as_nanos())
+                    .unwrap_or(0)
+        );
+        self.forked_workers = self.maybe_fork_workers(py, workers, &testrun_uid);
+        self.dist_testrun_uid = Some(testrun_uid);
+    }
+
+    /// Called from `collect_pre_configure`'s checkpoint (before any
+    /// `pytest_configure` has fired anywhere). `PYTEST_RS_DIST_FORK=1` opts
+    /// into forking workers off the already-warm parent interpreter (unix
+    /// only) instead of spawning a fresh subprocess per worker; unset (the
+    /// default) always spawns, matching upstream xdist's per-worker
+    /// `pytest_configure`. A forked child still fires its own
+    /// `pytest_configure` independently, once identity/workerinput arrive
+    /// over IPC (see `worker.rs::run_worker_forked`) — this is what makes
+    /// fork safe to eventually promote to the default, once it has enough
+    /// runtime validation.
     #[cfg(unix)]
-    fn maybe_fork_workers(
+    pub(crate) fn maybe_fork_workers(
         &mut self,
         py: Python<'_>,
         count: usize,
         testrun_uid: &str,
-        worker_inputs: &[Option<String>],
     ) -> Vec<Option<WorkerProc>> {
         if std::env::var_os("PYTEST_RS_DIST_FORK").is_some() {
-            self.fork_workers(py, count, testrun_uid, worker_inputs)
+            self.fork_workers(py, count, testrun_uid)
         } else {
             (0..count).map(|_| None).collect()
         }
     }
 
     #[cfg(not(unix))]
-    fn maybe_fork_workers(
+    pub(crate) fn maybe_fork_workers(
         &mut self,
         _py: Python<'_>,
         count: usize,
         _testrun_uid: &str,
-        _worker_inputs: &[Option<String>],
     ) -> Vec<Option<WorkerProc>> {
         (0..count).map(|_| None).collect()
     }
 
     /// Fork one child per worker slot off the already-imported parent
-    /// interpreter. The parent sets the xdist worker env vars through
-    /// os.environ right before each fork (and restores them after), so
-    /// the child holds its identity from its first instruction — visible
-    /// to os.register_at_fork callbacks, not just later reads. Children
-    /// dup their pipe pair onto stdin/stdout and enter the worker loop;
-    /// they never return. A failed fork yields None and that slot spawns
-    /// instead.
+    /// interpreter. The parent sets the xdist worker identity env vars
+    /// through os.environ right before each fork (and restores them after),
+    /// so the child holds its identity from its first instruction — visible
+    /// to os.register_at_fork callbacks, not just later reads.
+    /// `node.workerinput` (from `pytest_configure_node`, computed only after
+    /// the parent's own `pytest_configure` fires — strictly after this
+    /// point) is NOT set here: it arrives later over the child's stdin pipe
+    /// (`ParentMsg::Workerinput`, sent by `WorkerOwner::run` once `run_dist`
+    /// computes it), and the child blocks reading it before configuring
+    /// itself. Children dup their pipe pair onto stdin/stdout and enter the
+    /// worker loop; they never return. A failed fork yields None and that
+    /// slot spawns instead.
     #[cfg(unix)]
     #[allow(unsafe_code)]
     fn fork_workers(
@@ -918,15 +965,13 @@ impl Engine {
         py: Python<'_>,
         count: usize,
         testrun_uid: &str,
-        worker_inputs: &[Option<String>],
     ) -> Vec<Option<WorkerProc>> {
         use std::os::fd::FromRawFd;
 
-        const ENV_KEYS: [&str; 4] = [
+        const ENV_KEYS: [&str; 3] = [
             "PYTEST_XDIST_WORKER",
             "PYTEST_XDIST_WORKER_COUNT",
             "PYTEST_XDIST_TESTRUNUID",
-            "PYTEST_RS_WORKERINPUT",
         ];
         // os.environ (not Rust setenv: the Python dict snapshots the C
         // environ at import, and __setitem__ writes through via putenv).
@@ -954,14 +999,6 @@ impl Engine {
                 let _ = environ.set_item(ENV_KEYS[0], format!("gw{index}"));
                 let _ = environ.set_item(ENV_KEYS[1], count.to_string());
                 let _ = environ.set_item(ENV_KEYS[2], testrun_uid);
-                match worker_inputs.get(index).and_then(Option::as_deref) {
-                    Some(json) => {
-                        let _ = environ.set_item(ENV_KEYS[3], json);
-                    }
-                    None => {
-                        let _ = environ.call_method1("pop", (ENV_KEYS[3], py.None()));
-                    }
-                }
             }
             // Flush both runtimes' stdio: buffered bytes would be
             // duplicated into the child, whose fd 1 becomes the protocol
@@ -1091,7 +1128,7 @@ impl WorkerHandle {
     }
 }
 
-struct WorkerProc {
+pub(crate) struct WorkerProc {
     handle: WorkerHandle,
     stdin: Box<dyn Write + Send>,
     lines: Lines<BufReader<Box<dyn Read + Send>>>,
@@ -1253,10 +1290,15 @@ impl WorkerOwner {
         }
     }
 
-    /// `initial`: a `WorkerProc` this slot already forked before any
-    /// `WorkerOwner` thread existed (see `Engine::maybe_fork_workers`).
-    /// `None` spawns a fresh subprocess instead, same as always.
+    /// `initial`: a `WorkerProc` this slot already forked at the
+    /// `collect_pre_configure` checkpoint (see
+    /// `Engine::fork_workers_at_checkpoint`), before `workerinput_json` was
+    /// even known — that child is blocked on its stdin waiting for it.
+    /// `None` spawns a fresh subprocess instead, same as always (workerinput
+    /// travels via env instead, since a spawned worker configures itself
+    /// only after re-parsing its own env on startup).
     fn run(self, initial: Option<WorkerProc>) {
+        let was_forked = initial.is_some();
         let mut proc = match initial {
             Some(proc) => proc,
             None => match self.spawn() {
@@ -1275,6 +1317,25 @@ impl WorkerOwner {
                 }
             },
         };
+
+        if was_forked {
+            let msg = serde_json::to_string(&ParentMsg::Workerinput {
+                payload: self.workerinput_json.clone(),
+            })
+            .expect("workerinput serializes");
+            if writeln!(proc.stdin, "{msg}").is_err() || proc.stdin.flush().is_err() {
+                // The child died before it could even receive its identity —
+                // same "unblock merge loop" treatment as a failed spawn.
+                let _ = self.sender.send(Event::Collection {
+                    worker: self.index,
+                    nodeids: vec![],
+                    xdist_groups: vec![],
+                    errors: vec![],
+                    deselected: 0,
+                });
+                return;
+            }
+        }
 
         // Collection phase: read from the worker's stdout until it sends
         // WorkerMsg::Collection (after precollect_all) or EOF (crash).

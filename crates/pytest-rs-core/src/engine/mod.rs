@@ -39,6 +39,15 @@ pub struct Engine {
     /// first and an outer wrapper's post-yield mutation applies on top. See
     /// `fire_deferred_modifyitems_wrappers` in `engine/hooks.rs`.
     pending_modifyitems_wrapper_hooks: Vec<Py<PyAny>>,
+    /// The testrun_uid for this dist run, generated at the
+    /// `collect_pre_configure` checkpoint (before any fork) and consumed by
+    /// `run_dist`. `None` when not distributing.
+    #[cfg(feature = "xdist")]
+    pub(crate) dist_testrun_uid: Option<String>,
+    /// Workers already forked at the `collect_pre_configure` checkpoint (or
+    /// left empty when spawning), consumed by `run_dist`.
+    #[cfg(feature = "xdist")]
+    pub(crate) forked_workers: Vec<Option<crate::dist::WorkerProc>>,
 }
 
 mod collect;

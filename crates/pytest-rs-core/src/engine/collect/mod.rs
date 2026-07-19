@@ -82,7 +82,21 @@ impl Engine {
         let rootdir = self.config.rootdir.clone();
         let (paths, files, deferred_not_found_args) =
             self.resolve_collection_paths(py, &rootdir)?;
-        self.prefetch_rewrite_cache(py, &files);
+        // In dist mode the controller never imports test modules itself
+        // (workers do, independently — skip_module_import below), so this
+        // prefetch buys the controller nothing; skip it so its detached
+        // background threads can never still be running at the dist-mode
+        // fork checkpoint a few lines below, which requires a
+        // single-threaded parent.
+        #[cfg(feature = "xdist")]
+        let requested_dist = self.config.numprocesses_spec().is_some_and(|s| s != "0")
+            || self.config.get_flag("dist-load")
+            || self.config.get_value("tx").is_some();
+        #[cfg(not(feature = "xdist"))]
+        let requested_dist = false;
+        if !requested_dist {
+            self.prefetch_rewrite_cache(py, &files);
+        }
         self.session.initial_paths =
             crate::collect::resolve_initial_paths(&self.config.invocation_dir, &paths);
         self.load_cmdline_and_entrypoint_plugins(py)?;
@@ -176,6 +190,10 @@ impl Engine {
         #[cfg(feature = "xdist")]
         {
             self.session.dist_workers_resolved = Some(self.resolve_numprocesses(py));
+            // The fork checkpoint: strictly before pytest_configure fires
+            // anywhere (controller or worker) — see fork_workers_at_checkpoint's
+            // own doc comment for why this exact point matters.
+            self.fork_workers_at_checkpoint(py);
         }
         Ok(PreConfigure {
             rootdir,
