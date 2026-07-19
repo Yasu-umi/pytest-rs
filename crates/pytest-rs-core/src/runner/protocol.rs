@@ -171,14 +171,20 @@ pub(crate) fn delegate_protocol(
     item: &TestItem,
     nextitem: Option<&TestItem>,
 ) -> PyResult<(Vec<TestReport>, bool)> {
-    let isgenfunc = py.import("inspect")?.getattr("isgeneratorfunction")?;
-    let hook_funcs: Vec<Py<PyAny>> = session
+    let named_funcs: Vec<Py<PyAny>> = session
         .py_hooks
         .iter()
         .filter(|hook| {
             hook.name == "pytest_runtest_protocol" && item.nodeid.starts_with(hook.baseid.as_str())
         })
         .map(|hook| hook.func.clone_ref(py))
+        .collect();
+    if named_funcs.is_empty() {
+        return Ok((Vec::new(), false));
+    }
+    let isgenfunc = py.import("inspect")?.getattr("isgeneratorfunction")?;
+    let hook_funcs: Vec<Py<PyAny>> = named_funcs
+        .into_iter()
         .filter(|func| {
             !isgenfunc
                 .call1((func.bind(py),))
