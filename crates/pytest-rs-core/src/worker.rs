@@ -218,6 +218,18 @@ impl Engine {
             );
             return exit_code::INTERNAL_ERROR;
         }
+        self.configure_and_collect(py, collection)
+    }
+
+    /// Shared tail for any worker (spawned or forked) that has already
+    /// imported (or, for a forked worker, inherited) its plugins and every
+    /// reachable conftest: fire the remaining pre-configure hooks, fire
+    /// `pytest_configure` for this process, then collect test modules and
+    /// apply per-worker selection. `collection` arrives with
+    /// `loaded_conftests` already populated by the caller (a real import for
+    /// a spawned worker, a seeded-but-not-imported set for a forked one), so
+    /// this never re-imports a conftest the caller already handled.
+    fn configure_and_collect(&mut self, py: Python<'_>, mut collection: WorkerCollection) -> i32 {
         if let Err(err) = self.fire_py_addoption_hooks(py) {
             eprintln!(
                 "INTERNAL ERROR: worker addoption failed: {}",
