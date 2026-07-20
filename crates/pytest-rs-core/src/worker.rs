@@ -384,6 +384,16 @@ impl Engine {
         // doc comment for why leaving it set makes this worker's own
         // pytest_runtest_logreport dispatch print real progress output.
         python::reporter_reinit_post_fork(py);
+        // Native plugins never get pytest_configure fired again in a
+        // forked worker (only Python-level pytest_configure hookimpls are
+        // re-fired, incrementally, inside configure_and_collect below) —
+        // give each one a chance to redo whatever it keyed on the
+        // controller's own pid (e.g. pytest-rs-cov's subprocess-coverage
+        // dump directory) before this worker's own pytest_configure phase
+        // starts using it.
+        for plugin in self.plugins.iter_mut() {
+            plugin.reinit_post_fork(py);
+        }
         // Fork duplicates the parent's PRNG state into every worker;
         // reseed so workers diverge like freshly spawned processes do.
         let _ = py.run(

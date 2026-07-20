@@ -40,6 +40,19 @@ pub trait Plugin: Send {
         Ok(())
     }
 
+    /// A forked xdist worker (see `worker.rs::run_worker_forked`) never
+    /// re-fires `pytest_configure` for native plugins — it inherits
+    /// whichever plugin state the controller's single, pre-fork call
+    /// already set up, via `fork()`'s copy-on-write. That's correct for
+    /// state that doesn't need to differ per-process, but wrong for
+    /// anything keyed on the controller's own pid (e.g. a temp directory
+    /// name): every forked sibling would otherwise share that one
+    /// controller-owned resource and race on it. Called once per forked
+    /// worker, right after fork, alongside the capture/reporter
+    /// `reinit_post_fork` calls — a no-op for plugins with nothing
+    /// pid-specific to redo.
+    fn reinit_post_fork(&mut self, _py: Python<'_>) {}
+
     /// Fires once `-p NAME` / entry-point plugins have been imported (their
     /// module-level code has already run), before conftest discovery and
     /// test collection. Upstream pytest imports `-p`/entry-point plugins

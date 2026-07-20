@@ -150,6 +150,22 @@ impl CovPlugin {
         }
     }
 
+    /// Create this process's own subprocess-coverage dump directory (keyed
+    /// on its pid) and point `PYTEST_RS_COV_OUT` at it. Called from
+    /// `pytest_configure` (the controller, or a spawned worker running its
+    /// own fresh `pytest_configure`) and again from `reinit_post_fork` (a
+    /// forked worker, which never re-fires `pytest_configure` at all — see
+    /// that method's doc comment).
+    fn arm_subprocess_coverage_out_dir(&self, py: Python<'_>) -> PyResult<std::path::PathBuf> {
+        let out_dir = std::env::temp_dir().join(format!("pytest-rs-cov-{}", std::process::id()));
+        std::fs::create_dir_all(&out_dir)
+            .map_err(|e| core_pyo3::exceptions::PyOSError::new_err(e.to_string()))?;
+        py.import("os")?
+            .getattr("environ")?
+            .set_item("PYTEST_RS_COV_OUT", out_dir.to_string_lossy())?;
+        Ok(out_dir)
+    }
+
     fn parse_reports(py: Python<'_>, specs: Option<Vec<&str>>) -> PyResult<Vec<ReportSpec>> {
         let Some(specs) = specs else {
             return Ok(vec![ReportSpec {
@@ -1075,6 +1091,26 @@ impl Plugin for CovPlugin {
         "cov"
     }
 
+    fn reinit_post_fork(&mut self, py: Python<'_>) {
+        // Only relevant once `pytest_configure` has actually run (coverage
+        // enabled at all) and set up a dump dir to begin with.
+        if self.child_out_dir.is_none() {
+            return;
+        }
+        // The inherited out_dir is the *controller's* pid-named directory —
+        // every forked sibling would otherwise point its own subprocess
+        // children (via the inherited PYTEST_RS_COV_OUT env var) at that
+        // one shared, controller-owned directory. Two siblings racing to
+        // read-then-delete it in their own pytest_sessionfinish (see that
+        // method below) is exactly how one sibling's subprocess coverage
+        // dump silently vanishes: whichever sessionfinish runs first reads
+        // (possibly) both dumps and removes the directory out from under
+        // the other. Point this worker at its own, freshly pid-named dir.
+        if let Ok(out_dir) = self.arm_subprocess_coverage_out_dir(py) {
+            self.child_out_dir = Some(out_dir);
+        }
+    }
+
     fn pytest_addoption(&self, parser: &mut OptionParser) {
         parser.add_option(OptDef::optional_value(
             "--cov",
@@ -1409,11 +1445,8 @@ impl Plugin for CovPlugin {
 
         // Subprocess coverage: python children self-measure via the site
         // .pth hook (a no-op without these env vars) and dump for merging.
-        let out_dir = std::env::temp_dir().join(format!("pytest-rs-cov-{}", std::process::id()));
-        std::fs::create_dir_all(&out_dir)
-            .map_err(|e| core_pyo3::exceptions::PyOSError::new_err(e.to_string()))?;
+        let out_dir = self.arm_subprocess_coverage_out_dir(py)?;
         let environ = py.import("os")?.getattr("environ")?;
-        environ.set_item("PYTEST_RS_COV_OUT", out_dir.to_string_lossy())?;
         environ.set_item(
             "PYTEST_RS_COV_CHILD",
             pytest_rs_core::python::shim_root()
