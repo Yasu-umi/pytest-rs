@@ -2,18 +2,18 @@
 //! node IDs from a shared queue (work stealing: fast workers pull more),
 //! and merge the streamed reports plus per-plugin state dumps.
 //!
-//! On unix, `PYTEST_RS_DIST_FORK=1` opts workers into forking off the
-//! parent at a checkpoint right after `collect_pre_configure` — imports
-//! (interpreter, `-p`/entry-point plugins, every reachable conftest) arrive
-//! copy-on-write, so workers skip that per-process cost upstream xdist
-//! pays. The checkpoint sits strictly *before* `pytest_configure` fires
-//! anywhere, so each forked child still independently fires its own
-//! `pytest_plugins_registered`-onward pipeline afterward (blocking first on
-//! a `ParentMsg::Workerinput` delivery — see `worker.rs::run_worker_forked`)
-//! — configure semantics identical to a spawned worker, just without
-//! redoing the imports. Unset (the default), or non-unix, always spawns:
-//! each worker is the same binary in a hidden `--worker` mode that
-//! re-imports and re-configures independently from scratch.
+//! On unix (the default), workers fork off the parent at a checkpoint
+//! right after `collect_pre_configure` — imports (interpreter, `-p`/
+//! entry-point plugins, every reachable conftest) arrive copy-on-write, so
+//! workers skip that per-process cost upstream xdist pays. The checkpoint
+//! sits strictly *before* `pytest_configure` fires anywhere, so each forked
+//! child still independently fires its own `pytest_plugins_registered`-
+//! onward pipeline afterward (blocking first on a `ParentMsg::Workerinput`
+//! delivery — see `worker.rs::run_worker_forked`) — configure semantics
+//! identical to a spawned worker, just without redoing the imports.
+//! `PYTEST_RS_DIST_SPAWN=1`, or non-unix, always spawns instead: each
+//! worker is the same binary in a hidden `--worker` mode that re-imports
+//! and re-configures independently from scratch (upstream xdist's model).
 //!
 //! Dispatch granularity follows --dist: per-test for load/worksteal (the
 //! default, xdist parity), per-module for loadscope/loadfile/loadgroup
@@ -922,15 +922,14 @@ impl Engine {
     }
 
     /// Called from `collect_pre_configure`'s checkpoint (before any
-    /// `pytest_configure` has fired anywhere). `PYTEST_RS_DIST_FORK=1` opts
-    /// into forking workers off the already-warm parent interpreter (unix
-    /// only) instead of spawning a fresh subprocess per worker; unset (the
-    /// default) always spawns, matching upstream xdist's per-worker
-    /// `pytest_configure`. A forked child still fires its own
-    /// `pytest_configure` independently, once identity/workerinput arrive
-    /// over IPC (see `worker.rs::run_worker_forked`) — this is what makes
-    /// fork safe to eventually promote to the default, once it has enough
-    /// runtime validation.
+    /// `pytest_configure` has fired anywhere). Workers fork off the
+    /// already-warm parent interpreter by default (unix only), skipping the
+    /// per-process interpreter/plugin/conftest import cost upstream xdist
+    /// pays; a forked child still fires its own `pytest_configure`
+    /// independently, once identity/workerinput arrive over IPC (see
+    /// `worker.rs::run_worker_forked`), so configure semantics match a
+    /// spawned worker exactly. `PYTEST_RS_DIST_SPAWN=1` opts back into a
+    /// fresh subprocess per worker (upstream xdist's own model) instead.
     #[cfg(unix)]
     pub(crate) fn maybe_fork_workers(
         &mut self,
@@ -938,10 +937,10 @@ impl Engine {
         count: usize,
         testrun_uid: &str,
     ) -> Vec<Option<WorkerProc>> {
-        if std::env::var_os("PYTEST_RS_DIST_FORK").is_some() {
-            self.fork_workers(py, count, testrun_uid)
-        } else {
+        if std::env::var_os("PYTEST_RS_DIST_SPAWN").is_some() {
             (0..count).map(|_| None).collect()
+        } else {
+            self.fork_workers(py, count, testrun_uid)
         }
     }
 

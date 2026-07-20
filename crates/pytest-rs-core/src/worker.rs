@@ -341,8 +341,9 @@ impl Engine {
         self.worker_loop(py, collection)
     }
 
-    /// The forked-worker entry (-n on unix, `PYTEST_RS_DIST_FORK=1`): the
-    /// fork point sits at the tail of the controller's own
+    /// The forked-worker entry (-n on unix, the default; `PYTEST_RS_DIST_SPAWN=1`
+    /// opts out to a fresh subprocess per worker instead): the fork point
+    /// sits at the tail of the controller's own
     /// `collect_pre_configure` — interpreter boot, `-p`/entry-point plugin
     /// imports, and every reachable conftest have already run once, in the
     /// parent, before any worker exists, but `pytest_configure` has NOT
