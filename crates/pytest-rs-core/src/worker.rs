@@ -378,6 +378,12 @@ impl Engine {
         // The inherited global capture saved the controller's terminal fds;
         // rebuild it against this worker's own fds (fd 1 is the IPC pipe).
         python::capture_reinit_post_fork(py);
+        // The inherited default-terminalreporter stand-in belongs to
+        // whichever session was running at fork time (the real outer
+        // session, or a nested one) — see reporter_reinit_post_fork's own
+        // doc comment for why leaving it set makes this worker's own
+        // pytest_runtest_logreport dispatch print real progress output.
+        python::reporter_reinit_post_fork(py);
         // Fork duplicates the parent's PRNG state into every worker;
         // reseed so workers diverge like freshly spawned processes do.
         let _ = py.run(
@@ -392,7 +398,6 @@ impl Engine {
             None,
             None,
         );
-
         // Nothing has fired pytest_configure anywhere yet — that's the whole
         // point of forking here rather than after the parent's own
         // collect() (the old fork point): node.workerinput (computed by the

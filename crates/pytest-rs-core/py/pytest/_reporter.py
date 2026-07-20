@@ -171,6 +171,26 @@ def setup(config: Any) -> None:
     pluginmanager.register(_default, "terminalreporter")
 
 
+def reinit_post_fork() -> None:
+    """A forked -n worker inherits _default (whatever TerminalReporter the
+    enclosing session — real or a nested in-process one — already had) even
+    though 'terminalreporter' is correctly left unregistered for it, same as
+    for a spawned worker (see replacement()'s own comment: a worker has "no
+    pytest-rs-managed default and no replacement to drive"). That mismatch —
+    _default set, but unregistered — breaks replacement()'s intended
+    short-circuit (`if _default is None: return None`, which a genuinely
+    fresh spawned worker hits immediately since setup() is never called
+    there): it falls through to getplugin("terminalreporter") instead, whose
+    fallback (PluginManager._get_terminalreporter) constructs a brand-new
+    real TerminalReporter on the spot, and replacement() then (wrongly)
+    treats that as an active pytest-sugar/pytest-pretty-style replacement
+    reporter to drive — printing real progress output over what is now this
+    worker's IPC pipe. Resetting _default to None here matches what a
+    spawned worker already has for free."""
+    global _default
+    _default = None
+
+
 def replacement() -> Any | None:
     """The non-default 'terminalreporter' plugin, or None when terminal
     output stays native."""

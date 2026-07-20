@@ -651,6 +651,16 @@ pub fn capture_reinit_post_fork(py: Python<'_>) {
         .and_then(|m| m.call_method0("reinit_post_fork"));
 }
 
+/// Discard the inherited default-terminalreporter stand-in in a forked
+/// worker (see `pytest._reporter.reinit_post_fork`'s own doc comment for
+/// why leaving it set breaks `replacement()`'s "no reporter for a worker"
+/// short-circuit).
+pub fn reporter_reinit_post_fork(py: Python<'_>) {
+    let _ = py
+        .import("pytest._reporter")
+        .and_then(|m| m.call_method0("reinit_post_fork"));
+}
+
 /// Close the collection-wide logging phase (pytest's catching_logs around
 /// pytest_collection).
 pub fn log_end_phase(py: Python<'_>) {
