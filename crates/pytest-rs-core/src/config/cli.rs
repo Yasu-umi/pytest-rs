@@ -607,6 +607,22 @@ impl Config {
         ))
     }
 
+    /// Rootdir-only re-derivation for a forked xdist worker that just
+    /// `chdir`'d (see `dist.rs`'s fork child branch): a spawned worker gets
+    /// this "for free" by re-running the whole config pipeline fresh from
+    /// the new cwd, but a forked child inherits an already-parsed `Config`
+    /// whose `ini`/addopts/etc. were correctly derived once, pre-fork, and
+    /// must not be re-derived or re-applied — only `rootdir` (which
+    /// `file_nodeid` computes paths relative to) needs to catch up with the
+    /// new cwd. Delegates to `resolve_config_and_rootdir` so this can never
+    /// drift from what the spawned sibling would compute, and discards
+    /// everything but the rootdir it returns.
+    pub(crate) fn recompute_rootdir(argv: &[String], cwd: &Path) -> Option<PathBuf> {
+        Self::resolve_config_and_rootdir(argv, cwd)
+            .ok()
+            .map(|t| t.0)
+    }
+
     /// Split argv into the args clap parses (`kept`) and the long flags it
     /// doesn't know, deferred for python-plugin pytest_addoption specs.
     fn partition_plugin_args(argv: Vec<String>, cmd: &clap::Command) -> (Vec<String>, Vec<String>) {

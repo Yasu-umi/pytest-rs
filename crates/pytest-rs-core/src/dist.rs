@@ -27,6 +27,8 @@ use std::io::{BufRead, BufReader, Lines, Read, Write};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Condvar, Mutex, mpsc};
 
+use crate::Config;
+
 use pyo3::prelude::*;
 
 use crate::engine::Engine;
@@ -1087,7 +1089,8 @@ impl Engine {
                     .map(|chdir| chdir.as_ref())
                 {
                     let _ = std::env::set_current_dir(dir);
-                    if let Ok(cwd) = std::env::current_dir() {
+                    let cwd = std::env::current_dir().ok();
+                    if let Some(cwd) = cwd.clone() {
                         self.config.invocation_dir = cwd;
                     }
                     let rsyncdirs: Vec<String> = self
@@ -1099,6 +1102,31 @@ impl Engine {
                         .collect();
                     if !rsyncdirs.is_empty() {
                         self.config.paths = rewrite_paths_for_rsync(&self.config.paths, &rsyncdirs);
+                    }
+                    // rootdir must catch up too, or file_nodeid (computed
+                    // relative to rootdir) disagrees with what a spawned
+                    // sibling in the same --tx slot would compute — breaking
+                    // cross-worker nodeid agreement whenever multiple --tx
+                    // chdirs point at different directories. Reconstruct the
+                    // same effective argv a spawned worker would parse
+                    // (effective_args + plugin_args, rsync-rewritten) and
+                    // recompute rootdir alone from it; every other Config
+                    // field the resolver would also produce is discarded —
+                    // this worker's ini/addopts/etc. were already correctly
+                    // derived once, pre-fork, and must not be re-derived.
+                    if let Some(cwd) = cwd {
+                        let mut argv: Vec<String> = vec![String::new()];
+                        argv.extend(self.config.effective_args.iter().skip(1).cloned());
+                        argv.extend(self.config.plugin_args.iter().cloned());
+                        if !rsyncdirs.is_empty() {
+                            let placeholder = argv[0].clone();
+                            let mut rewritten = rewrite_paths_for_rsync(&argv[1..], &rsyncdirs);
+                            argv = vec![placeholder];
+                            argv.append(&mut rewritten);
+                        }
+                        if let Some(rootdir) = Config::recompute_rootdir(&argv, &cwd) {
+                            self.config.rootdir = rootdir;
+                        }
                     }
                 }
                 let code = self.run_worker_forked(py);
