@@ -200,6 +200,30 @@ jobs:
           EOF
           ../smokevenv/bin/pytest-rs test_smoke.py
 
+      - name: smoke test (standalone `import pytest`, no engine)
+        # Proves the site-packages `pytest` package the wheel now ships
+        # (pyproject.toml's [tool.maturin] python-source/include) works with
+        # zero pytest-rs binary involvement -- the scenario a subprocess-based
+        # test (e.g. `import pytest; pytest.raises(...)`) actually needs.
+        run: |
+          smokevenv/bin/python -c "
+          import pytest
+
+          with pytest.raises(ValueError):
+              raise ValueError('x')
+          assert pytest.approx(1.0) == 1.0000001
+
+          @pytest.fixture
+          def num():
+              return 42
+
+          @pytest.mark.parametrize('x', [1, 2])
+          def test_x(x):
+              pass
+
+          print('standalone import pytest: OK')
+          "
+
       - uses: actions/upload-artifact@v7
         with:
           name: wheel-${{ matrix.platform.name }}-py${{ matrix.python-version }}
