@@ -144,6 +144,18 @@ patchsysdict = {0: "stdin", 1: "stdout", 2: "stderr"}
 class CaptureBase:
     EMPTY_BUFFER: str | bytes | None = None
 
+    def discard_after_fork(self):
+        """Release this capture's resources in a forked -n worker, without
+        ever touching targetfd (0/1/2) itself: by the time a forked worker
+        runs this, fd 1 has already been repurposed as its IPC pipe to the
+        controller, so anything that dup2s/closes targetfd itself (as a
+        plain .done() does, to restore the pre-capture fd) would sever that
+        pipe. This base implementation has no raw fd tricks to worry about
+        (see NoCapture/SysCaptureBase), so plain .done() already qualifies;
+        FDCaptureBase overrides this with a version that skips its unsafe
+        parts."""
+        self.done()
+
 
 class NoCapture(CaptureBase):
     EMPTY_BUFFER = ""
@@ -334,6 +346,27 @@ class FDCaptureBase(CaptureBase):
         self.tmpfile.close()
         self._state = "done"
 
+    def discard_after_fork(self):
+        """Like .done(), but never touches targetfd (0/1/2) itself — a
+        forked worker has already repurposed it as its IPC pipe to the
+        controller, so .done()'s dup2/close of targetfd would sever that
+        pipe. Only targetfd_save/targetfd_invalid (separate, unrelated fd
+        numbers this object privately owns) and the tmpfile need releasing;
+        left alone, they leak until Python's GC eventually finalizes them
+        at some unpredictable later point during this worker's own test
+        run, which pytest's own unraisableexception machinery then
+        faithfully (but spuriously) attributes to whatever test happens to
+        be running at that moment."""
+        self._assert_state("discard_after_fork", ("initialized", "started", "suspended", "done"))
+        if self._state == "done":
+            return
+        os.close(self.targetfd_save)
+        if self.targetfd_invalid is not None:
+            os.close(self.targetfd_invalid)
+        self.syscapture.done()
+        self.tmpfile.close()
+        self._state = "done"
+
     def suspend(self):
         self._assert_state("suspend", ("started", "suspended"))
         if self._state == "suspended":
@@ -455,6 +488,20 @@ class MultiCapture:
             self.err.done()
         if self.in_:
             self.in_.done()
+
+    def discard_after_fork(self):
+        """Like stop_capturing, but for a capture inherited into a forked -n
+        worker via fork() — see CaptureBase.discard_after_fork for why
+        targetfd itself must never be touched here."""
+        if self._state == "stopped":
+            return
+        self._state = "stopped"
+        if self.out:
+            self.out.discard_after_fork()
+        if self.err:
+            self.err.discard_after_fork()
+        if self.in_:
+            self.in_.discard_after_fork()
 
     def is_started(self):
         """Whether actively capturing -- not suspended or stopped."""
@@ -643,7 +690,16 @@ class CaptureState:
         """Forked workers inherit capture objects whose saved fds point at
         the controller's terminal, not this worker's IPC pipe: discard and
         re-create them against the current fds (never restoring the stale
-        saves)."""
+        saves). Explicitly releases the inherited capture's own resources
+        first (discard_after_fork, not stop_capturing/done — those try to
+        restore the saved fd onto targetfd, which by now is this worker's
+        IPC pipe): left merely dereferenced, its tempfile/saved-fd would
+        leak until Python's GC eventually finalizes them at some
+        unpredictable later point during this worker's own test run, which
+        pytest's unraisableexception machinery then attributes (spuriously)
+        to whatever test happens to be running at that moment."""
+        if self._capture is not None:
+            self._capture.discard_after_fork()
         self._capture = None
         self._installed = False
         self.when = None
