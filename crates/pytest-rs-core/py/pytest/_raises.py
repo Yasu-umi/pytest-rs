@@ -206,7 +206,7 @@ class RaisesContext:
         self.excinfo = ExceptionInfo()
         return self.excinfo
 
-    def __exit__(self, exc_type, exc_value, tb):
+    def __exit__(self, exc_type, exc_value, tb) -> bool:
         __tracebackhide__ = True
         if exc_type is None:
             desc = (
