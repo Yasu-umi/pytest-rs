@@ -218,7 +218,7 @@ impl Engine {
             );
             return exit_code::INTERNAL_ERROR;
         }
-        self.configure_and_collect(py, collection)
+        self.configure_and_collect(py, collection, true)
     }
 
     /// Shared tail for any worker (spawned or forked) that has already
@@ -229,35 +229,61 @@ impl Engine {
     /// `loaded_conftests` already populated by the caller (a real import for
     /// a spawned worker, a seeded-but-not-imported set for a forked one), so
     /// this never re-imports a conftest the caller already handled.
-    fn configure_and_collect(&mut self, py: Python<'_>, mut collection: WorkerCollection) -> i32 {
-        if let Err(err) = self.fire_py_addoption_hooks(py) {
-            eprintln!(
-                "INTERNAL ERROR: worker addoption failed: {}",
-                python::format_exception(py, &err)
-            );
-            return exit_code::INTERNAL_ERROR;
-        }
-        if let Err(err) = self.apply_plugin_cli_args(py, true) {
-            if python::is_usage_error(py, &err) {
-                eprintln!("ERROR: {}", err.value(py));
+    ///
+    /// `refire_pre_configure_hooks`: a spawned worker is a genuinely fresh
+    /// process, so `fire_py_addoption_hooks`/`apply_plugin_cli_args`/
+    /// `fire_py_load_initial_conftests` have never fired here and must
+    /// (`true`). A forked worker inherits a parent that already fired all
+    /// three, correctly, in `collect_pre_configure`'s shared pre-fork phase
+    /// (`false`) — re-firing them would be pure duplication for any hook
+    /// registered before the fork point (e.g. an entry-point plugin's
+    /// `pytest_load_initial_conftests`), and NOT a harmless one: unlike
+    /// `pytest_configure` (which this always fires exactly once, fresh, per
+    /// process — the actual fix for fork's identity-timing gap),
+    /// `pytest_load_initial_conftests` has no re-fire guard, so a
+    /// non-idempotent hookimpl (e.g. pytest-django's, which
+    /// `addinivalue_line`s marker registrations and calls Django setup) would
+    /// double-apply. Nothing here ever needed the identity that's still
+    /// unavailable at this exact point anyway (workerinput has been applied
+    /// to the environment by the time this runs) — plugins that read worker
+    /// identity read it lazily instead (the `worker_id` fixture, or a
+    /// fixture/test-time env read), which is unaffected either way.
+    fn configure_and_collect(
+        &mut self,
+        py: Python<'_>,
+        mut collection: WorkerCollection,
+        refire_pre_configure_hooks: bool,
+    ) -> i32 {
+        if refire_pre_configure_hooks {
+            if let Err(err) = self.fire_py_addoption_hooks(py) {
+                eprintln!(
+                    "INTERNAL ERROR: worker addoption failed: {}",
+                    python::format_exception(py, &err)
+                );
+                return exit_code::INTERNAL_ERROR;
+            }
+            if let Err(err) = self.apply_plugin_cli_args(py, true) {
+                if python::is_usage_error(py, &err) {
+                    eprintln!("ERROR: {}", err.value(py));
+                    return exit_code::USAGE_ERROR;
+                }
+                eprintln!("{}", python::format_exception(py, &err));
                 return exit_code::USAGE_ERROR;
             }
-            eprintln!("{}", python::format_exception(py, &err));
-            return exit_code::USAGE_ERROR;
-        }
-        if let Err(err) = self.fire_py_load_initial_conftests(py) {
-            if python::is_usage_error(py, &err) {
-                let msg = python::format_exception(py, &err);
-                let usage_msg = msg
-                    .lines()
-                    .last()
-                    .and_then(|l| l.strip_prefix("pytest.UsageError: "))
-                    .unwrap_or(msg.trim());
-                eprintln!("ERROR: {usage_msg}");
+            if let Err(err) = self.fire_py_load_initial_conftests(py) {
+                if python::is_usage_error(py, &err) {
+                    let msg = python::format_exception(py, &err);
+                    let usage_msg = msg
+                        .lines()
+                        .last()
+                        .and_then(|l| l.strip_prefix("pytest.UsageError: "))
+                        .unwrap_or(msg.trim());
+                    eprintln!("ERROR: {usage_msg}");
+                    return exit_code::USAGE_ERROR;
+                }
+                eprintln!("{}", python::format_exception(py, &err));
                 return exit_code::USAGE_ERROR;
             }
-            eprintln!("{}", python::format_exception(py, &err));
-            return exit_code::USAGE_ERROR;
         }
 
         // pytest_configure must fire unconditionally (upstream guarantee),
@@ -407,17 +433,21 @@ impl Engine {
 
         // Mark every conftest the parent already imported as loaded, so the
         // shared tail's conftest-chain walk (inside precollect_all) finds
-        // nothing new to import — everything else (addoption, apply_cli,
-        // load_initial_conftests, pytest_configure, precollect_all,
-        // selection) it does itself, independently, exactly like a spawned
-        // worker (configured_hooks starts at 0: unlike the old fork point,
-        // no hook here has had its pytest_configure fired yet).
+        // nothing new to import. addoption/apply_cli_args/
+        // load_initial_conftests already fired, correctly, in the parent's
+        // collect_pre_configure before this fork ever happened — refiring
+        // them here would just duplicate that (see configure_and_collect's
+        // doc comment for why that's not just wasteful but wrong for a
+        // non-idempotent hookimpl). Only pytest_configure needs a fresh,
+        // independent firing here (configured_hooks starts at 0: unlike the
+        // old fork point, no hook has had its pytest_configure fired yet) —
+        // then precollect_all + selection, exactly like a spawned worker.
         let mut collection = WorkerCollection::default();
         let paths = self.resolve_worker_test_paths(py);
         collection
             .loaded_conftests
             .extend(self.reachable_conftests(&paths));
-        self.configure_and_collect(py, collection)
+        self.configure_and_collect(py, collection, false)
     }
 
     /// The worker main loop; the exit code is informational (the parent
