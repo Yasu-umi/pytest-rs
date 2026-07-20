@@ -1,0 +1,5 @@
+# Upstream pytest-cov test files that must keep passing under pytest-rs.
+# This list only grows; a regression here fails CI.
+
+[files]
+"tests/test_pytest_cov.py" = "passed"
