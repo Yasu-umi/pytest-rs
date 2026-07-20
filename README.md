@@ -80,8 +80,9 @@ Benchmarks on open-source projects (macOS arm64, median of 3 warm runs), reprodu
 | click (1336) | `(plain)` | 1.25 s | 1.18 s | **1.1x** |
 | click (1336) | `--cov` | 2.08 s | 1.32 s | **1.6x** |
 | click (1336) | `-n 3 --cov` | 1.65 s | 1.19 s | **1.4x** |
-| networkx (6890) | `(plain)` | 31.77 s | 31.10 s | **1.0x** |
-| networkx (6890) | `--cov` | 127.61 s | 42.15 s | **3.0x** |
+| networkx (6890) | `(plain)` | 30.77 s | 28.96 s | **1.1x** |
+| networkx (6890) | `--cov` | 128.01 s | 42.38 s | **3.0x** |
+| networkx (6890) | `-n 3 --cov` | 48.79 s | 22.12 s | **2.2x** |
 <!-- perf-results:end -->
 
 Small-to-medium suites see a **1.3–1.4x** speedup even without coverage, thanks to lower startup overhead. On large suites where test bodies dominate, the plain-mode gap narrows; the bigger wins come from `--cov` and `-n` parallelism. Try it on your own suite:
