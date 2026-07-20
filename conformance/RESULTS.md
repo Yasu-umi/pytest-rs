@@ -25,11 +25,11 @@ pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2782 | 2 | 0 | 53 | 0 | 12 | 2849 | 99.5% | 52 | 54 | 61 |
+| pytest | 9.0.3 | 2778 | 6 | 0 | 53 | 0 | 12 | 2849 | 99.4% | 51 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 7 | 0 | 0 | 0 | 0 | 0 | 7 | 100.0% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 0 | 2 | 90 | 97.8% | 1 | 1 | 0 |
-| pytest-cov | v7.1.0 | 205 | 0 | 0 | 3 | 0 | 1 | 209 | 99.5% | 1 | 1 | 0 |
+| pytest-cov | v7.1.0 | 202 | 3 | 0 | 3 | 0 | 1 | 209 | 98.1% | 0 | 1 | 0 |
 | pytest-xdist | v3.8.0 | 96 | 0 | 0 | 2 | 0 | 0 | 98 | 100.0% | 1 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 122 | 0 | 0 | 1 | 0 | 0 | 123 | 100.0% | 6 | 7 | 6 |
@@ -61,7 +61,7 @@ pytest-rs; they are not counted in the total.
 | more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 0 | 0 | 671 | 100.0% | 2 | 2 | 0 |
 | pytest-django | v4.9.0 | 215 | 0 | 0 | 1 | 0 | 0 | 216 | 100.0% | 12 | 13 | 0 |
 | werkzeug | 3.1.3 | 922 | 0 | 0 | 1 | 25 | 0 | 948 | 97.4% | 24 | 25 | 0 |
-| fastapi | 0.115.12 | 2332 | 1 | 0 | 130 | 0 | 1 | 2464 | 99.9% | 303 | 310 | 0 |
+| fastapi | 0.115.12 | 2328 | 1 | 0 | 130 | 0 | 1 | 2460 | 99.9% | 301 | 310 | 0 |
 | packaging | 25.0 | 26948 | 0 | 0 | 0 | 0 | 0 | 26948 | 100.0% | 12 | 12 | 0 |
 | pandas | v3.0.3 | 160780 | 0 | 0 | 26985 | 0 | 8 | 187773 | 100.0% | 880 | 961 | 3 |
 | networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 0 | 0 | 6894 | 100.0% | 259 | 266 | 0 |
@@ -121,7 +121,7 @@ pytest-rs; they are not counted in the total.
 | testing/test_stash.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_stepwise.py | passed | 18 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_subtests.py | passed | 34 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_terminal.py | passed | 223 | 0 | 0 | 4 | 0 | 0 |
+| testing/test_terminal.py | failed | 219 | 4 | 0 | 4 | 0 | 0 |
 | testing/test_threadexception.py | passed | 8 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_tmpdir.py | passed | 39 | 0 | 0 | 1 | 0 | 0 |
 | testing/test_unittest.py | passed | 69 | 0 | 0 | 9 | 0 | 1 |
@@ -199,7 +199,7 @@ pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| tests/test_pytest_cov.py | passed | 205 | 0 | 0 | 3 | 0 | 1 |
+| tests/test_pytest_cov.py | failed | 202 | 3 | 0 | 3 | 0 | 1 |
 
 </details>
 
@@ -1217,8 +1217,8 @@ pytest-rs; they are not counted in the total.
 | tests/test_tutorial/test_testing_dependencies/test_tutorial001.py | passed | 35 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_tutorial/test_websockets/test_tutorial001.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_tutorial/test_websockets/test_tutorial002.py | passed | 30 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_tutorial/test_websockets/test_tutorial003.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_tutorial/test_websockets/test_tutorial003_py39.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_tutorial/test_websockets/test_tutorial003.py | timeout | 0 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_tutorial/test_websockets/test_tutorial003_py39.py | timeout | 0 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_tutorial/test_wsgi/test_tutorial001.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_typing_python39.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_union_body.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
