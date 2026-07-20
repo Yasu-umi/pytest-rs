@@ -61,7 +61,7 @@ pytest-rs; they are not counted in the total.
 | more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 0 | 0 | 671 | 100.0% | 2 | 2 | 0 |
 | pytest-django | v4.9.0 | 215 | 0 | 0 | 1 | 0 | 0 | 216 | 100.0% | 12 | 13 | 0 |
 | werkzeug | 3.1.3 | 922 | 0 | 0 | 1 | 25 | 0 | 948 | 97.4% | 24 | 25 | 0 |
-| fastapi | 0.115.12 | 2332 | 1 | 0 | 130 | 0 | 1 | 2464 | 99.9% | 303 | 310 | 0 |
+| fastapi | 0.115.12 | 2333 | 0 | 0 | 130 | 0 | 1 | 2464 | 100.0% | 304 | 310 | 0 |
 | packaging | 25.0 | 26948 | 0 | 0 | 0 | 0 | 0 | 26948 | 100.0% | 12 | 12 | 0 |
 | pandas | v3.0.3 | 160780 | 0 | 0 | 26985 | 0 | 8 | 187773 | 100.0% | 880 | 961 | 3 |
 | networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 0 | 0 | 6894 | 100.0% | 259 | 266 | 0 |
@@ -958,7 +958,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_enforce_once_required_parameter.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_exception_handlers.py | passed | 5 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_extra_routes.py | passed | 8 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_fastapi_cli.py | failed | 1 | 1 | 0 | 0 | 0 | 0 |
+| tests/test_fastapi_cli.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_filter_pydantic_sub_model/test_filter_pydantic_sub_model_pv1.py | no-tests | 0 | 0 | 0 | 3 | 0 | 0 |
 | tests/test_filter_pydantic_sub_model_pv2.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_forms_from_non_typing_sequences.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
