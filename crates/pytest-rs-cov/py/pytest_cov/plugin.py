@@ -3,13 +3,11 @@ upstream plugin classes exist only as raising stubs."""
 
 import os as _os
 import sys as _sys
-import types as _types
 
-_pytest: "_types.ModuleType | None"
 try:
     import pytest as _pytest
 except ModuleNotFoundError:
-    _pytest = None
+    _pytest = None  # type: ignore[assignment]
 
 if _pytest is not None:
 
