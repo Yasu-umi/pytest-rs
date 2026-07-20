@@ -23,7 +23,9 @@ pytest-rs -n 4                  # parallel workers (pytest-xdist compatible)
 pytest-rs --cov=mypkg           # native coverage (pytest-cov compatible)
 ```
 
-`pytest-rs` reads the same configuration pytest does (`pytest.ini`, `pyproject.toml` `[tool.pytest]` / `[tool.pytest.ini_options]`, `tox.ini`, `setup.cfg`) and understands the familiar flags (`-v`, `-x`, `-k`, `-m`, `--lf`, `--tb=...`, `-p no:NAME`, ...). It installs alongside pytest without conflict — the `pytest` command is untouched.
+`pytest-rs` reads the same configuration pytest does (`pytest.ini`, `pyproject.toml` `[tool.pytest]` / `[tool.pytest.ini_options]`, `tox.ini`, `setup.cfg`) and understands the familiar flags (`-v`, `-x`, `-k`, `-m`, `--lf`, `--tb=...`, `-p no:NAME`, ...). It leaves the `pytest` command itself untouched, but it does install an importable `pytest` package, so `import pytest` (fixtures, `pytest.raises`, `pytest.mark`, `pytest.approx`, ...) works standalone too — e.g. from a subprocess that never runs through the `pytest-rs` binary.
+
+> Don't install this alongside the real `pytest` package in the same environment: both distributions claim the same `pytest` import path, and pip/uv have no awareness that they conflict — installation order decides which files end up in `site-packages/pytest/`, and neither installer cleanly removes the other's.
 
 ### Requirements
 
