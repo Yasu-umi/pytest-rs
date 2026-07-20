@@ -571,6 +571,15 @@ impl Plugin for AsyncioPlugin {
             }
             std::fs::write(path, content).map_err(|e| PyOSError::new_err(e.to_string()))?;
         }
+        // Register for rewriting *before* importing (matches pytest-rs-mock):
+        // a test's own `pytest_plugins = 'pytest_asyncio'` directive re-registers
+        // this same name later, and that re-registration must see the module
+        // already carrying `_RewriteLoader` — otherwise it looks like a plain,
+        // unrewritten import and fires a spurious "already imported" warning.
+        ctx.py
+            .import("pytest")?
+            .getattr("register_assert_rewrite")?
+            .call1(("pytest_asyncio",))?;
         let plugin_module = ctx.py.import("pytest_asyncio.plugin")?;
         pytest_rs_core::python::register_plugin_fixtures(
             ctx.py,
