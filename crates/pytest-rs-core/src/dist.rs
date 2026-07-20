@@ -402,28 +402,6 @@ impl Engine {
 
         let worker_chdirs = self.config.tx_worker_chdirs();
 
-        // --rsyncdir: copy each specified directory or file into every worker's chdir.
-        if let Some(chdirs) = &worker_chdirs
-            && let Some(rsyncdirs) = self.config.get_values("rsyncdir")
-        {
-            let unique_chdirs: std::collections::HashSet<&str> =
-                chdirs.iter().flatten().map(String::as_str).collect();
-            for chdir in unique_chdirs {
-                let dest_base = std::path::Path::new(chdir);
-                for src_str in &rsyncdirs {
-                    let src = std::path::Path::new(src_str);
-                    let Some(name) = src.file_name() else {
-                        continue;
-                    };
-                    if src.is_dir() {
-                        let _ = copy_dir_recursive(src, &dest_base.join(name));
-                    } else if src.is_file() {
-                        let _ = std::fs::copy(src, dest_base.join(name));
-                    }
-                }
-            }
-        }
-
         let rsyncdirs: Vec<String> = self
             .config
             .get_values("rsyncdir")
@@ -887,10 +865,14 @@ impl Engine {
     /// Called once from the tail of `collect_pre_configure`, before any
     /// `pytest_configure` has fired anywhere: if `resolve_numprocesses`
     /// resolved a nonzero worker count (cached in
-    /// `session.dist_workers_resolved`), generate this run's testrun_uid and
-    /// (when fork-eligible) fork all workers now, while this is still the
-    /// only running thread — the hard requirement fork has everywhere else
-    /// in this file. A no-op when not distributing.
+    /// `session.dist_workers_resolved`), rsync `--rsyncdir` into every
+    /// worker's chdir (must land before ANY worker — forked or spawned —
+    /// might try to collect from it; a forked worker can start reading its
+    /// chdir immediately after this returns, long before `run_dist`'s own
+    /// sequential setup would otherwise get to it), generate this run's
+    /// testrun_uid, and (when fork-eligible) fork all workers now, while
+    /// this is still the only running thread — the hard requirement fork
+    /// has everywhere else in this file. A no-op when not distributing.
     #[cfg(feature = "xdist")]
     pub(crate) fn fork_workers_at_checkpoint(&mut self, py: Python<'_>) {
         let Some(Some(workers)) = self.session.dist_workers_resolved else {
@@ -899,6 +881,7 @@ impl Engine {
         if workers == 0 {
             return;
         }
+        self.rsync_worker_chdirs();
         let testrun_uid = format!(
             "{:032x}",
             std::process::id() as u128
@@ -909,6 +892,33 @@ impl Engine {
         );
         self.forked_workers = self.maybe_fork_workers(py, workers, &testrun_uid);
         self.dist_testrun_uid = Some(testrun_uid);
+    }
+
+    /// `--rsyncdir`: copy each specified directory or file into every
+    /// worker's `--tx popen//chdir=DIR`. A no-op when neither is set.
+    fn rsync_worker_chdirs(&self) {
+        let Some(chdirs) = self.config.tx_worker_chdirs() else {
+            return;
+        };
+        let Some(rsyncdirs) = self.config.get_values("rsyncdir") else {
+            return;
+        };
+        let unique_chdirs: std::collections::HashSet<&str> =
+            chdirs.iter().flatten().map(String::as_str).collect();
+        for chdir in unique_chdirs {
+            let dest_base = std::path::Path::new(chdir);
+            for src_str in &rsyncdirs {
+                let src = std::path::Path::new(src_str);
+                let Some(name) = src.file_name() else {
+                    continue;
+                };
+                if src.is_dir() {
+                    let _ = copy_dir_recursive(src, &dest_base.join(name));
+                } else if src.is_file() {
+                    let _ = std::fs::copy(src, dest_base.join(name));
+                }
+            }
+        }
     }
 
     /// Called from `collect_pre_configure`'s checkpoint (before any
@@ -1058,7 +1068,18 @@ impl Engine {
                         libc::close(*fd);
                     }
                 }
-                // --tx popen//chdir=DIR: this worker runs in DIR.
+                // --tx popen//chdir=DIR: this worker runs in DIR. A spawned
+                // worker gets this for free — its invocation_dir/paths are
+                // computed fresh from the OS's actual CWD, which
+                // Command::current_dir already set to DIR before that
+                // process's own Config ever parses anything. This child
+                // instead inherited an already-parsed Config (via fork)
+                // whose invocation_dir/paths still reflect the *parent's*
+                // original CWD — std::env::set_current_dir alone only moves
+                // the OS-level CWD, it doesn't retroactively fix values
+                // already computed from the old one, so both need an
+                // explicit update here or this worker would try to collect
+                // the original (pre-rsync) source tree while sitting in DIR.
                 if let Some(Some(dir)) = self
                     .config
                     .tx_worker_chdirs()
@@ -1067,6 +1088,19 @@ impl Engine {
                     .map(|chdir| chdir.as_ref())
                 {
                     let _ = std::env::set_current_dir(dir);
+                    if let Ok(cwd) = std::env::current_dir() {
+                        self.config.invocation_dir = cwd;
+                    }
+                    let rsyncdirs: Vec<String> = self
+                        .config
+                        .get_values("rsyncdir")
+                        .unwrap_or_default()
+                        .into_iter()
+                        .map(str::to_string)
+                        .collect();
+                    if !rsyncdirs.is_empty() {
+                        self.config.paths = rewrite_paths_for_rsync(&self.config.paths, &rsyncdirs);
+                    }
                 }
                 let code = self.run_worker_forked(py);
                 std::process::exit(code);
@@ -1152,6 +1186,40 @@ struct WorkerOwner {
     rsyncdirs: Vec<String>,
 }
 
+/// Rewrite each absolute path under one of `rsyncdirs` (a source directory
+/// that was rsync'd into the worker's chdir) to a path relative to that
+/// chdir pointing at the rsynced copy — e.g. `/src/pkg/test_a.py` with
+/// rsyncdir `/src/pkg` becomes `pkg/test_a.py`. Anything else (a flag, a
+/// path outside every rsyncdir) passes through unchanged. Shared by a
+/// spawned worker's argv (`WorkerOwner::rewrite_argv_for_rsync`, run once
+/// per worker in the controller before it builds the subprocess command
+/// line) and a forked worker's already-parsed `config.paths` (rewritten
+/// in-place in the child itself, right after it chdirs — see
+/// `Engine::fork_workers`'s child branch — since it has no argv to
+/// reconstruct, only the already-resolved path list it inherited via fork).
+fn rewrite_paths_for_rsync(paths: &[String], rsyncdirs: &[String]) -> Vec<String> {
+    paths
+        .iter()
+        .map(|arg| {
+            let path = std::path::Path::new(arg);
+            if path.is_absolute() {
+                for src_str in rsyncdirs {
+                    let src = std::path::Path::new(src_str);
+                    if let Ok(rel) = path.strip_prefix(src)
+                        && let Some(name) = src.file_name()
+                    {
+                        return std::path::Path::new(name)
+                            .join(rel)
+                            .to_string_lossy()
+                            .into_owned();
+                    }
+                }
+            }
+            arg.clone()
+        })
+        .collect()
+}
+
 impl WorkerOwner {
     /// Rewrite absolute test-path args that fall under an rsync'd directory
     /// to relative paths inside the worker's chdir, so the worker collects
@@ -1160,26 +1228,7 @@ impl WorkerOwner {
         if self.chdir.is_none() || self.rsyncdirs.is_empty() {
             return self.argv.clone();
         }
-        self.argv
-            .iter()
-            .map(|arg| {
-                let path = std::path::Path::new(arg);
-                if path.is_absolute() {
-                    for src_str in &self.rsyncdirs {
-                        let src = std::path::Path::new(src_str);
-                        if let Ok(rel) = path.strip_prefix(src)
-                            && let Some(name) = src.file_name()
-                        {
-                            return std::path::Path::new(name)
-                                .join(rel)
-                                .to_string_lossy()
-                                .into_owned();
-                        }
-                    }
-                }
-                arg.clone()
-            })
-            .collect()
+        rewrite_paths_for_rsync(&self.argv, &self.rsyncdirs)
     }
 
     fn spawn(&self) -> std::io::Result<WorkerProc> {
