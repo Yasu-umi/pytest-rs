@@ -734,9 +734,9 @@
     },
     {
       "file": "sklearn/gaussian_process/tests/test_gpc.py",
-      "status": "timeout",
-      "exit_code": null,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 39,
       "failed": 0,
       "skipped": 0,
       "errors": 0,

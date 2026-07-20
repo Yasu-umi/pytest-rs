@@ -68,7 +68,7 @@ pytest-rs; they are not counted in the total.
 | pydantic | v2.11.7 | 5338 | 0 | 0 | 921 | 0 | 14 | 6273 | 99.8% | 79 | 82 | 0 |
 | scikit-learn-1 | 1.9.0 | 8432 | 0 | 0 | 6624 | 0 | 0 | 15056 | 100.0% | 79 | 87 | 0 |
 | scikit-learn-2 | 1.9.0 | 5046 | 0 | 0 | 1892 | 0 | 0 | 6938 | 100.0% | 52 | 58 | 0 |
-| scikit-learn-3 | 1.9.0 | 9212 | 0 | 0 | 2530 | 0 | 3 | 11745 | 100.0% | 106 | 114 | 0 |
+| scikit-learn-3 | 1.9.0 | 9251 | 0 | 0 | 2530 | 0 | 3 | 11784 | 100.0% | 107 | 114 | 0 |
 
 ### pytest @ 9.0.3
 
@@ -2825,7 +2825,7 @@ pytest-rs; they are not counted in the total.
 | sklearn/feature_selection/tests/test_sequential.py | passed | 74 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/feature_selection/tests/test_variance_threshold.py | passed | 25 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/frozen/tests/test_frozen.py | passed | 46 | 0 | 0 | 0 | 0 | 0 |
-| sklearn/gaussian_process/tests/test_gpc.py | timeout | 0 | 0 | 0 | 0 | 0 | 0 |
+| sklearn/gaussian_process/tests/test_gpc.py | passed | 39 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/gaussian_process/tests/test_gpr.py | passed | 130 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/gaussian_process/tests/test_kernels.py | passed | 281 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/impute/tests/test_base.py | passed | 5 | 0 | 0 | 1 | 0 | 0 |
