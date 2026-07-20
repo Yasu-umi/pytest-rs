@@ -31,6 +31,9 @@ build-backend = "maturin"
 [tool.maturin]
 bindings = "bin"
 manifest-path = "crates/pytest-rs/Cargo.toml"
+python-source = "crates/pytest-rs-core/py"
+module-name = "pytest"
+include = [{ path = "crates/pytest-rs-core/py/_pytest/**/*.py", format = "wheel" }]
 
 [tool.uv]
 # Rebuild the wheel when Rust sources or the embedded Python shims change,
