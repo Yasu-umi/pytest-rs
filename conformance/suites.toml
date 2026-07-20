@@ -316,6 +316,24 @@ deps = ["pytest-icdiff==0.5", "icdiff==2.0.10", "pprintpp==0.4.0", "py==1.11.0"]
 pythonpath = ["."]
 category = "third-party"
 enabled = true
+# pytest-icdiff 0.5 is a stale plugin (~2018) whose own test suite already
+# fails under real pytest 9.0.3, not just pytest-rs (verified directly:
+# `python -m pytest tests/test_pytest_icdiff.py -k <name>` under real pytest
+# reproduces the identical failure).
+# - test_long_dict: icdiff wraps the 'default_UK_warehouse' value across a
+#   line boundary ("...xfor" / "ce',") at the ambient (non-tty) terminal
+#   width, splitting the substring the test's fnmatch expects contiguous.
+#   Same wrapping happens under real pytest.
+# - test_small_numbers_are_specialcased: pytest_icdiff.py's own hook bails
+#   for small numbers (`abs(left + right) < 19999`), deferring to core
+#   pytest's int-vs-int explanation -- but core `_compare_eq_any` (both in
+#   pytest-rs's shim and real pytest 9.0.3's own _pytest/assertion/util.py)
+#   has no int branch, so it never produced the "+404"/"-400" diff this test
+#   expects. The plugin's assumption about pytest's fallback is stale.
+known_failures = [
+    "tests/test_pytest_icdiff.py::test_long_dict",
+    "tests/test_pytest_icdiff.py::test_small_numbers_are_specialcased",
+]
 
 [pytest-socket]
 repo = "https://github.com/miketheman/pytest-socket"
