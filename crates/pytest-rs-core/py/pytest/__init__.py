@@ -234,11 +234,19 @@ def main(args=None, plugins=None):
         return reprec.ret
 
     import os
+    import shutil
     import subprocess
 
     from pytest._pytester import _RUNNER_LIBPATH
 
-    exe = os.environ.get("PYTEST_RS_EXE")
+    # A plain `pip install pytest-rs` puts a `pytest-rs` executable on PATH
+    # (maturin's bin bindings) but never sets PYTEST_RS_EXE -- that env var
+    # is only ever set by the engine itself once it's already running
+    # (bootstrap.rs). So a standalone process that only imported the
+    # site-packages `pytest` package (never ran through the engine) needs
+    # this PATH fallback to find the runner without the user having to
+    # export PYTEST_RS_EXE manually.
+    exe = os.environ.get("PYTEST_RS_EXE") or shutil.which("pytest-rs")
     if exe is None:
         raise RuntimeError("PYTEST_RS_EXE is not set; pytest.main() cannot find the runner")
 
