@@ -78,12 +78,17 @@ ignore = [
 "crates/pytest-rs-mock/py/pytest_mock/*" = ["UP", "E402"]
 # Ported upstream pytest code: keep its pre-PEP695 generics.
 "crates/pytest-rs-core/py/pytest/_raises_group.py" = ["UP"]
+# reveal_type() is a mypy-only pseudo-builtin (see conformance/typing_check.py).
+"conformance/typing/*" = ["F821"]
 
 [tool.mypy]
 python_version = "3.13"
 # The plugin py/ trees reuse top-level module names (helper.py), which one
 # mypy invocation cannot hold together; CI checks them with separate runs.
-files = ["crates/pytest-rs-core/py", "conformance/runner.py"]
+# conformance/typing/*.py is intentionally excluded: it's checked in
+# isolation by conformance/typing_check.py with its own MYPYPATH, and its
+# reveal_type() notes would otherwise be indistinguishable from real errors.
+files = ["crates/pytest-rs-core/py", "conformance/runner.py", "conformance/typing_check.py"]
 # The bundled shims import each other across crate py/ roots resolved only
 # at runtime (sys.path assembled by the engine).
 ignore_missing_imports = true

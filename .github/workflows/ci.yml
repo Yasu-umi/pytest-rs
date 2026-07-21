@@ -268,3 +268,6 @@ jobs:
           for tree in crates/pytest-rs-asyncio crates/pytest-rs-anyio crates/pytest-rs-benchmark crates/pytest-rs-cov crates/pytest-rs-mock; do
             uv run --no-sync mypy "$tree/py"
           done
+
+      - name: typing parity (reveal_type corpus)
+        run: uv run --no-sync python conformance/typing_check.py
