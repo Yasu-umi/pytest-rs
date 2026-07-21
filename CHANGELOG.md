@@ -3,6 +3,210 @@
 Notable changes per release. The release workflow uses the matching section
 as the GitHub release notes (auto-generated notes are the fallback).
 
+## v0.0.9 (2026-07-21)
+
+### Added
+
+- **Standalone importable `pytest` package** — the shim under
+  `crates/pytest-rs-core/py/{pytest,_pytest}` now ships as a real
+  site-packages package via maturin's `python-source`/`include`, with PEP 561
+  `py.typed` markers, a PATH-lookup fallback in `pytest.main()` when
+  `PYTEST_RS_EXE` is unset, and a CI smoke test that does a bare `import
+  pytest` with no engine involved.
+- **xdist `-n` workers default to fork on unix** — `PYTEST_RS_DIST_SPAWN=1`
+  is now the opt-out; spawn remains the only option on non-unix platforms.
+  This is a coordinated multi-commit rework (see "xdist fork-mode" below).
+- `_pytest.faulthandler` builtin plugin (`faulthandler_timeout`,
+  dump-traceback-later, `--pdb` cancellation).
+- `--pastebin=all/failed` via an OS-level fd tee, since native mode never
+  routes output through a Python `TerminalWriter`.
+- The `collect_imported_tests` ini option, to skip Module-collecting
+  functions/classes merely imported from elsewhere.
+- `pytest_internalerror` hook dispatch on session/protocol crashes (honoring
+  `Exit` overrides and recording junitxml's internal testcase) — previously
+  dead code that no Rust caller ever invoked.
+
+### Changed
+
+- **pytest's own suite** improves to 2 783/2 849 = 99.5% on Linux (from
+  97.1%), with all-pass files roughly doubling (26 → 53) — driven by the
+  hook-dispatch, collection, fixture, unittest, and `--help`/reporting fixes
+  below.
+- **pytest-order** reaches 134/134 = 100% (from 90.3%) — nested subprocess
+  `-p` dotted-path plugins now resolve, since the checkout root is added to
+  `PYTHONPATH` before spawning.
+- **pytest-django** reaches 216/216 = 100% (from 99.1%) — already-configured
+  Django settings are forwarded into a spawned subprocess.
+- **pytest-snapshot** improves to 106/107 = 99.1% (from 95.3%) — better
+  diff/assertion rendering fixed most failures; the one remaining
+  bytes-repr-parens gap is a verified known failure.
+- **pytest-cov** improves to 205/209 = 99.5% (from 99.0%) and is now pinned
+  against regression, after a forked-worker rootdir fix made
+  `--tx`-with-`--rsyncdir` nodeids consistent.
+- **fastapi** reaches 2 464/2 464 (2 333 passed + 130 skipped + 1 known
+  failure) = 100% (from 99.9%) — the missing `coverage` conformance dep for
+  `test_fastapi_cli`'s subprocess invocation is now installed.
+- **xdist worker collection**: fork is now the default; each forked worker
+  reinitializes its own capture state, terminalreporter stand-in, and (for
+  pytest-rs-cov) subprocess-coverage dump directory instead of inheriting the
+  parent's; `--tx=popen//chdir` workers rsync before the fork point and
+  recompute `rootdir`/`invocation_dir`/paths after the chdir;
+  loadscope/loadfile/loadgroup batches are grouped by scope, not nodeid
+  adjacency.
+- **`--help`** renders pytest-rs's own core CLI options through argparse,
+  matching upstream's grouping and wording, plus the ini-options listing and
+  Environment variables section.
+- **Assertion rewriting** shows a top-level `Call`/`Attribute` assert's
+  runtime value plus a where-breakdown instead of static source text.
+- **`unittest.TestCase`** gets the full upstream `TestCaseFunction` method
+  surface (`addSkip`, `addExpectedFailure`, `addUnexpectedSuccess`,
+  `addSubTest`, etc.) and independent `setUp`/call/`tearDown`/cleanup failure
+  capture.
+- **Performance**: source files and their rewritten `__pycache__` entries are
+  prefetched in parallel background threads ahead of the sequential import
+  loop (also applied to spawn-mode xdist workers' precollect pass);
+  `pytest_cov`/pytest-rs-asyncio helper imports are deferred until actually
+  needed; autouse fixture names and parametrized fixture `repr()` cache keys
+  are precomputed/memoized. The earlier `-n --cov` slowdown anomaly on
+  networkx is gone — `-n 3 --cov` is now a measured 2.2x speedup, following
+  from the fork-mode default.
+
+### Fixed
+
+**Hook dispatch**
+
+- Instance-registered `pytest_collection_modifyitems` hooks now run after
+  native `--lf`/`--ff`/`--nf`/`--sw` reorder, and are stable-sorted by
+  tryfirst/trylast tier.
+- `firstresult` preserves a legitimate falsy value (`0`, `False`, empty)
+  instead of collapsing it to `None`.
+- Conftest/plugin hookimpl names are validated against known hookspecs,
+  matching upstream's `check_pending()`.
+- A conftest's plain `pytest_runtest_protocol`/`pytest_runtestloop` hookimpl
+  fires before the native item-running loop, matching upstream ordering.
+- `--trace` consults instance-registered `pytest_pyfunc_call` hooks and
+  rereads the wrapped callable, instead of being a complete no-op.
+- `_MakeReportPlugin`'s makereport fallback is marked trylast so the real
+  report proxy wins the firstresult race.
+
+**Collection**
+
+- `item.parent` is populated with the enclosing Class/File/Session chain.
+- Hook-relay `parent_class` uses an exact type match, not `isinstance`.
+- Nodeids for collect-args outside rootdir are relativized against initial
+  collection paths.
+- Symlink components are preserved when canonicalizing CLI path args
+  (including the trailing-slash case where a symlink is the last component).
+- The path-not-found check is deferred until after `pytest_configure` fires.
+- Conftest discovery globs each anchor's `test*` subdirectories, not just
+  upward, matching upstream's `_try_load_conftest`.
+- `pytest_generate_tests` fires in pytester's in-process item collector.
+- The rootdir `Dir(".")` collectreport is only seeded in nested-run hook
+  recording when the rootdir was an actual collection root.
+- An empty-but-present parent nodeid is treated as a real parent.
+
+**Fixtures**
+
+- `request.node` resolves to the fixture's scope ancestor
+  (module/class/session) instead of the leaf item; `request._pyfuncitem`
+  keeps the true leaf.
+- `pythonpath` ini entries are shlex-split and cleaned up from `sys.path` at
+  teardown; `pytest_unconfigure` is now dispatched to instance-registered
+  plugins too.
+- `pytest_collection_modifyitems` fixturenames injection is synced into
+  setup.
+
+**unittest**
+
+- Async test methods are routed through `_callSetUp`/`_callTestMethod`/
+  `_callTearDown`.
+- `TestCase` methods are collected in `pytester.getitems()` regardless of
+  class name, as a real `TestCaseFunction`.
+- `setUp`/call/`tearDown`/cleanup failures are captured independently
+  instead of being lost to Python's finally-reraise.
+
+**Capture, logging, and reporting**
+
+- `--capture=sys`/`tee-sys` redirect `sys.stdout`/`stderr` to the dup'd fds
+  correctly, not just `-s`.
+- The global capture is resumed and flushed around early/hook-phase prints
+  (`--cache-show`, `pytest_collection_modifyitems`) so they land on the real
+  terminal in order instead of leaking into an outer capture buffer.
+- Logging capture is armed for deferred scope teardowns, mirroring capture's
+  own `begin_scope_teardown`.
+- Root logger handler attachment is deferred until after `conftest.py`
+  loads, matching upstream's `LoggingPlugin` timing.
+- `_LiveLoggingStreamHandler`/`_LiveLoggingNullHandler` ported for API
+  compatibility; the "Captured log"/live-cli levelname is colorized under
+  `--color=yes` and ANSI codes are stripped from `caplog.text`.
+- A multi-line failing statement's continuation lines are shown in
+  tracebacks; a traceback's trailing local-variable lines are split into
+  `ReprEntry.reprlocals`; all E-prefixed lines are joined in
+  `_LongRepr.reprcrash`.
+- A replacement terminalreporter's session header matches the native one;
+  the native benchmark header line position/format is fixed.
+
+**Session/error handling**
+
+- `SystemExit` during collection is routed through the same
+  `pytest_internalerror` dispatch and `INTERNAL_DONE` sentinel as
+  sessionstart failures.
+- `pytest_unconfigure` now runs before the session-end thread-exception
+  check, so an `add_cleanup`-spawned thread's exception is seen and mapped
+  to `INTERNAL_ERROR`.
+- An un-claiming `pytest_runtest_protocol` hookimpl's own
+  `runtestprotocol()` reports are merged into the native result instead of
+  discarded.
+
+**Plugin compatibility**
+
+- **pytest-bdd**: `pytest_cmdline_main` fires so `--generate-missing` works;
+  `target_fixture` override propagates to native dependency resolution;
+  capture's installed-flag is restored when `pytest_cmdline_main` doesn't
+  claim the run.
+- **anyio**: an autouse `anyio_backend` fixture is detected even when a test
+  never names it directly.
+- **pytest-asyncio**: `--asyncio-mode=legacy` is accepted as an alias for
+  `auto`, and config-time warnings fire through the always-record path so
+  they aren't dropped during configure; the already-imported assert-rewrite
+  warning is revived with corrected import ordering and gated on
+  `--assert=plain`.
+- Third-party plugin packages are marked for assertion rewrite before being
+  loaded; each plugin's own `parser.getgroup()` heading renders in
+  `--help`.
+
+**Config/CLI**
+
+- Native TOML config value types are validated in `getini`.
+- `-p NAME`-loaded plugin modules are registered with the shim
+  pluginmanager.
+- The shared `Parser` is attached to `Pytester.parseconfig()`'s `Config` as
+  `config._parser`.
+- Explicit `--runpytest subprocess` is honored in `Pytester.runpytest()`;
+  a `ValueError` when `--runpytest` is unregistered is fixed.
+- `register_assert_rewrite` warns when called on an already-imported
+  module.
+- A real `pytestconfig` fixture and `getfixturemarker()` are added to the
+  `_pytest.fixtures` shim.
+- Clustered short flags (e.g. `-vs`) are recognized as disabling capture in
+  nested pytester runs.
+- `sys.modules`/`sys.path` are restored via `SysModulesSnapshot`/
+  `SysPathsSnapshot` around pytester runs; `warnings.filters` is no longer
+  wiped for nested in-process runs.
+- In-process nested pytester runs get their own `--basetemp` instead of
+  falling back to the outer session's.
+- A lazy `Function._request` property is added so conftests reading
+  `item._request` no longer hit `AttributeError`.
+- Missing upstream docstrings ported for `monkeypatch`, `caplog`, `recwarn`,
+  `linecomp`, `pytester`, and `testdir`.
+
+**raises**
+
+- `AbstractRaises.matches()` is honored for
+  `xfail(raises=RaisesGroup/RaisesExc(...))`.
+- `pytest.mark.usefixtures` is rejected on `pytest.param()`, matching
+  upstream `ParameterSet.param()`.
+
 ## v0.0.8 (2026-07-13)
 
 ### Added
