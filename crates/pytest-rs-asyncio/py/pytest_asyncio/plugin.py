@@ -5,8 +5,45 @@ global)."""
 
 import contextlib
 import socket
+from typing import TYPE_CHECKING, Any, overload
 
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Awaitable, Callable, Iterable
+
+    from _pytest.config import Config
+    from _pytest.scope import _ScopeName
+
+
+#: Upstream (pytest_asyncio.plugin.FixtureFunction) claims the decorator
+#: preserves the wrapped function's own signature -- ergonomic parity for
+#: callers, even though at runtime the decorator actually returns whatever
+#: pytest.fixture() itself returns (FixtureFunctionDefinition).
+@overload
+def fixture[**P, R: "Awaitable[Any] | AsyncIterator[Any]"](
+    fixture_function: "Callable[P, R]",
+    *,
+    scope: "_ScopeName | Callable[[str, Config], _ScopeName]" = ...,
+    loop_scope: "_ScopeName | None" = ...,
+    params: "Iterable[object] | None" = ...,
+    autouse: bool = ...,
+    ids: "Iterable[str | float | int | bool | None] | Callable[[Any], object | None] | None" = ...,
+    name: str | None = ...,
+) -> "Callable[P, R]": ...
+
+
+@overload
+def fixture[**P, R: "Awaitable[Any] | AsyncIterator[Any]"](
+    fixture_function: None = ...,
+    *,
+    scope: "_ScopeName | Callable[[str, Config], _ScopeName]" = ...,
+    loop_scope: "_ScopeName | None" = ...,
+    params: "Iterable[object] | None" = ...,
+    autouse: bool = ...,
+    ids: "Iterable[str | float | int | bool | None] | Callable[[Any], object | None] | None" = ...,
+    name: str | None = ...,
+) -> "Callable[[Callable[P, R]], Callable[P, R]]": ...
 
 
 def fixture(fixture_function=None, *, loop_scope=None, **kwargs):
