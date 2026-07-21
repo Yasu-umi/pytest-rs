@@ -3,6 +3,8 @@
 import re as _re
 import sys
 import traceback
+from collections.abc import Callable
+from typing import overload
 
 from pytest._outcomes import fail
 
@@ -181,7 +183,7 @@ def _validate_exception(expected_exception):
     raise TypeError(f"Expected a BaseException type, but got '{type(expected_exception).__name__}'")
 
 
-class RaisesContext:
+class RaisesContext[E: BaseException]:
     def __init__(self, expected_exception, match=None, check=None):
         self.expected_exception = expected_exception
         if match is not None and match == "":
@@ -200,9 +202,9 @@ class RaisesContext:
             )
         self.match_expr = match
         self.check = check
-        self.excinfo = None
+        self.excinfo: ExceptionInfo[E] | None = None
 
-    def __enter__(self):
+    def __enter__(self) -> ExceptionInfo[E]:
         self.excinfo = ExceptionInfo()
         return self.excinfo
 
@@ -217,6 +219,7 @@ class RaisesContext:
             exc_type, self.expected_exception
         ):
             return False
+        assert self.excinfo is not None, "__enter__ must run before __exit__"
         self.excinfo._set(exc_type, exc_value, tb)
         if self.match_expr is not None:
             try:
@@ -231,6 +234,36 @@ class RaisesContext:
             if not self.check(exc_value):
                 fail(f"{self.check!r} did not return True for the raised exception")
         return True
+
+
+@overload
+def raises[E: BaseException](
+    expected_exception: type[E] | tuple[type[E], ...],
+    *,
+    match: str | _re.Pattern[str] | None = ...,
+    check: Callable[[E], bool] | None = ...,
+) -> RaisesContext[E]: ...
+
+
+@overload
+def raises(
+    *,
+    match: str | _re.Pattern[str],
+    check: Callable[[BaseException], bool] | None = ...,
+) -> RaisesContext[BaseException]: ...
+
+
+@overload
+def raises(*, check: Callable[[BaseException], bool]) -> RaisesContext[BaseException]: ...
+
+
+@overload
+def raises[E: BaseException, **P](
+    expected_exception: type[E] | tuple[type[E], ...],
+    func: Callable[P, object],
+    *args: P.args,
+    **kwargs: P.kwargs,
+) -> ExceptionInfo[E]: ...
 
 
 def raises(expected_exception=None, *args, **kwargs):
