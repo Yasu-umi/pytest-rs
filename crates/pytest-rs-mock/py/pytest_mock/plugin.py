@@ -3,14 +3,15 @@ possible; pytest-rs differences are limited to config access (getini returns
 None for unset options) and lifecycle (the Rust plugin calls
 _configure/_unconfigure instead of pluggy hook registration)."""
 
+import builtins
 import functools
 import inspect
 import itertools
 import unittest.mock
 import warnings
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
-from typing import Any, Union
+from typing import Any, TypeVar, Union, overload
 
 import pytest
 
@@ -65,6 +66,9 @@ class MockCache:
 
     def __iter__(self):
         return iter(self.cache)
+
+
+_T = TypeVar("_T")
 
 
 class MockerFixture:
@@ -345,6 +349,59 @@ class MockerFixture:
                 clear=clear,
                 **kwargs,
             )
+
+        @overload
+        def __call__(
+            self,
+            target: str,
+            new: None = ...,
+            spec: builtins.object | None = ...,
+            create: bool = ...,
+            spec_set: builtins.object | None = ...,
+            autospec: builtins.object | None = ...,
+            new_callable: None = ...,
+            **kwargs: Any,
+        ) -> MockType: ...
+
+        @overload
+        def __call__(
+            self,
+            target: str,
+            new: _T,
+            spec: builtins.object | None = ...,
+            create: bool = ...,
+            spec_set: builtins.object | None = ...,
+            autospec: builtins.object | None = ...,
+            new_callable: None = ...,
+            **kwargs: Any,
+        ) -> _T: ...
+
+        @overload
+        def __call__(
+            self,
+            target: str,
+            new: None,
+            spec: builtins.object | None,
+            create: bool,
+            spec_set: builtins.object | None,
+            autospec: builtins.object | None,
+            new_callable: Callable[[], _T],
+            **kwargs: Any,
+        ) -> _T: ...
+
+        @overload
+        def __call__(
+            self,
+            target: str,
+            new: None = ...,
+            spec: builtins.object | None = ...,
+            create: bool = ...,
+            spec_set: builtins.object | None = ...,
+            autospec: builtins.object | None = ...,
+            *,
+            new_callable: Callable[[], _T],
+            **kwargs: Any,
+        ) -> _T: ...
 
         def __call__(
             self,
