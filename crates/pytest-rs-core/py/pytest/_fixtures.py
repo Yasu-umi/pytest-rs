@@ -3,6 +3,13 @@
 import functools
 import inspect
 import warnings
+from typing import TYPE_CHECKING, Any, overload
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable, Sequence
+
+    from _pytest.config import Config
+    from _pytest.scope import _ScopeName
 
 
 class FixtureLookupError(LookupError):
@@ -17,7 +24,7 @@ class FixtureFunctionMarker:
         self.ids = ids
         self.name = name
 
-    def __call__(self, function):
+    def __call__(self, function: "Callable[..., object]") -> "FixtureFunctionDefinition":
         if inspect.isclass(function):
             raise ValueError("class fixtures not supported (maybe in the future)")
         if isinstance(function, FixtureFunctionDefinition):
@@ -77,6 +84,30 @@ class FixtureFunctionDefinition:
 
     def _get_wrapped_function(self):
         return self._fixture_function
+
+
+@overload
+def fixture(
+    fixture_function: "Callable[..., object]",
+    *,
+    scope: "_ScopeName | Callable[[str, Config], _ScopeName]" = ...,
+    params: "Iterable[object] | None" = ...,
+    autouse: bool = ...,
+    ids: "Sequence[object | None] | Callable[[Any], object | None] | None" = ...,
+    name: str | None = ...,
+) -> FixtureFunctionDefinition: ...
+
+
+@overload
+def fixture(
+    fixture_function: None = ...,
+    *,
+    scope: "_ScopeName | Callable[[str, Config], _ScopeName]" = ...,
+    params: "Iterable[object] | None" = ...,
+    autouse: bool = ...,
+    ids: "Sequence[object | None] | Callable[[Any], object | None] | None" = ...,
+    name: str | None = ...,
+) -> FixtureFunctionMarker: ...
 
 
 def fixture(
