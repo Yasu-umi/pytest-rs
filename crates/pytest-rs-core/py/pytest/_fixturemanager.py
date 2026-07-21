@@ -12,7 +12,23 @@ pytest FixtureManager surface:
 FixtureRequest.getfixturevalue (Rust) consults a request's manager for names
 not in the Rust registry: a ShimFixtureDef either carries a `cached_result`
 (an injected target_fixture value) or a `registry_name` aliasing a real
-collected fixture (a matched bdd step fixture)."""
+collected fixture (a matched bdd step fixture).
+
+ShimFixtureDef instances are also handed to *any* conftest/plugin
+`pytest_fixture_setup`/`pytest_fixture_post_finalizer` hookimpl as the
+`fixturedef` argument (see fire_fixture_lifecycle_hooks in the Rust engine) —
+not just pytest-bdd's own code — so it must carry the same commonly-read
+attributes as upstream's real `_pytest.fixtures.FixtureDef`, e.g. `argnames`
+(aiohttp's own pytest plugin reads `fixturedef.argnames`)."""
+
+import inspect
+
+
+def _func_argnames(func):
+    try:
+        return tuple(inspect.signature(func).parameters)
+    except (TypeError, ValueError):
+        return ()
 
 
 def _visible(baseid, nodeid):
@@ -29,12 +45,22 @@ class ShimFixtureDef:
     registry (registry_name) or an injected value (cached_result, set by the
     caller after construction)."""
 
-    def __init__(self, argname, func, baseid="", scope="function", params=None, registry_name=None):
+    def __init__(
+        self,
+        argname,
+        func,
+        baseid="",
+        scope="function",
+        params=None,
+        registry_name=None,
+        argnames=None,
+    ):
         self.argname = argname
         self.func = func
         self.baseid = baseid
         self.scope = scope
         self.params = params
+        self.argnames = tuple(argnames) if argnames is not None else _func_argnames(func)
         self.unittest = False
         # The name to resolve in the Rust registry; None for purely injected
         # defs (target_fixture values), which instead get a cached_result.

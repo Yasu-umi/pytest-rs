@@ -497,6 +497,11 @@ fn fire_fixture_lifecycle_hooks(
             def.baseid.as_str(),
             scope.as_str(),
         ))?;
+    // Rust already knows this fixture's actual dependency names; prefer them
+    // over the Python-side signature-inspection fallback (e.g. matches
+    // upstream FixtureDef.argnames exactly, including "request").
+    let argnames = pyo3::types::PyTuple::new(py, def.param_names.iter().map(|s| s.as_str()))?;
+    fixturedef.setattr("argnames", argnames)?;
     let fire = py
         .import("pytest._pluginmanager")?
         .getattr("fire_fixture_hooks")?;
