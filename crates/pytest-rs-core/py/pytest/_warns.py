@@ -4,9 +4,14 @@ _pytest/recwarn.py)."""
 import re as _re
 import warnings as _warnings
 from pprint import pformat as _pformat
+from typing import TYPE_CHECKING, overload
 
 from pytest._fixtures import fixture
 from pytest._outcomes import Exit, fail
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from typing import Self
 
 
 class WarningsRecorder(_warnings.catch_warnings):
@@ -50,7 +55,7 @@ class WarningsRecorder(_warnings.catch_warnings):
     def clear(self):
         self._list[:] = []
 
-    def __enter__(self):
+    def __enter__(self) -> "Self":  # type: ignore[override]
         if self._entered:
             __tracebackhide__ = True
             raise RuntimeError(f"Cannot enter {self!r} twice")
@@ -147,6 +152,23 @@ class WarningsChecker(WarningsRecorder):
                 )
 
 
+@overload
+def warns(
+    expected_warning: "type[Warning] | tuple[type[Warning], ...]" = ...,
+    *,
+    match: "str | _re.Pattern[str] | None" = ...,
+) -> WarningsChecker: ...
+
+
+@overload
+def warns[T, **P](
+    expected_warning: "type[Warning] | tuple[type[Warning], ...]",
+    func: "Callable[P, T]",
+    *args: "P.args",
+    **kwargs: "P.kwargs",
+) -> T: ...
+
+
 def warns(expected_warning=Warning, *args, match=None, **kwargs):
     __tracebackhide__ = True
     if not args:
@@ -162,6 +184,14 @@ def warns(expected_warning=Warning, *args, match=None, **kwargs):
         raise TypeError(f"{func!r} object (type: {type(func)}) must be callable")
     with WarningsChecker(expected_warning, _ispytest=True):
         return func(*args[1:], **kwargs)
+
+
+@overload
+def deprecated_call(*, match: "str | _re.Pattern[str] | None" = ...) -> WarningsRecorder: ...
+
+
+@overload
+def deprecated_call[T, **P](func: "Callable[P, T]", *args: "P.args", **kwargs: "P.kwargs") -> T: ...
 
 
 def deprecated_call(func=None, *args, **kwargs):
