@@ -2,8 +2,18 @@
 
 import enum
 import warnings
+from typing import TYPE_CHECKING, Any, TypeVar, overload
 
 from pytest._warning_types import PytestUnknownMarkWarning
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable, Sequence
+
+    from _pytest.scope import _ScopeName
+
+#: A callable or class being decorated with a mark, returned as-is by
+#: MarkDecorator.__call__ when applied directly (upstream Markable).
+Markable = TypeVar("Markable", bound="Callable[..., object] | type")
 
 
 class _HiddenParam(enum.Enum):
@@ -94,6 +104,14 @@ class MarkDecorator:
         other = Mark(self.mark.name, args, kwargs)
         return MarkDecorator(self.mark.combined_with(other))
 
+    # The overloads overlap with an incompatible return type; upstream
+    # accepts this too (mypy picks the first match, which is what we want).
+    @overload
+    def __call__(self, arg: Markable) -> Markable: ...  # type: ignore[overload-overlap]
+
+    @overload
+    def __call__(self, *args: object, **kwargs: object) -> "MarkDecorator": ...
+
     def __call__(self, *args, **kwargs):
         if args and not kwargs:
             func = args[0]
@@ -112,6 +130,23 @@ class MarkDecorator:
                 store_mark(unwrapped, self.mark)
                 return func
         return self.with_args(*args, **kwargs)
+
+
+if TYPE_CHECKING:
+
+    class _ParametrizeMarkDecorator(MarkDecorator):
+        def __call__(  # type: ignore[override]
+            self,
+            argnames: "str | Sequence[str]",
+            argvalues: "Iterable[ParamSpec | Sequence[object] | object]",
+            *,
+            indirect: "bool | Sequence[str]" = ...,
+            ids: (
+                "Iterable[None | str | float | int | bool | _HiddenParam] "
+                "| Callable[[Any], object | None] | None"
+            ) = ...,
+            scope: "_ScopeName | None" = ...,
+        ) -> MarkDecorator: ...
 
 
 def get_unpacked_marks(obj, *, consider_mro=True):
@@ -158,6 +193,13 @@ def store_mark(obj, mark, *, stacklevel=3):
 
 
 class MarkGenerator:
+    # Never actually set — __getattr__ resolves every attribute access at
+    # runtime. This exists purely so `mark.parametrize(...)` type-checks
+    # through _ParametrizeMarkDecorator's precise __call__ (upstream does
+    # the same for parametrize/skipif/usefixtures/etc.).
+    if TYPE_CHECKING:
+        parametrize: _ParametrizeMarkDecorator
+
     def __init__(self, *, _ispytest=False):
         self._config = None
         self._strict = False
@@ -212,9 +254,16 @@ class ParamSpec:
         self.id = id
 
 
-def param(*values, marks=(), id=None):
+def param(
+    *values: object,
+    marks: "MarkDecorator | Mark | Iterable[MarkDecorator | Mark]" = (),
+    id: "str | _HiddenParam | None" = None,
+) -> ParamSpec:
     if not isinstance(marks, list | tuple):
-        marks = [marks]
+        # mypy can't rule out an arbitrary non-list/tuple Iterable here, but
+        # we deliberately accept a single bare Mark/MarkDecorator too (more
+        # permissive than upstream's MarkDecorator-only special case).
+        marks = [marks]  # type: ignore[list-item]
     normalized_marks = [m if isinstance(m, Mark) else m.mark for m in marks]
     if any(m.name == "usefixtures" for m in normalized_marks):
         raise ValueError(

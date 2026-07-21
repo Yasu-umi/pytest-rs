@@ -240,8 +240,16 @@ class Metafunc:
         argnames_parsed = _parse_argnames(argnames)
         nodeid = getattr(self.definition, "nodeid", "")
         argvalues_list = list(argvalues)
+        # Metafunc.parametrize's own `ids` contract is intentionally broader
+        # than pytest.mark.parametrize's typed public surface (matches
+        # upstream _pytest.python.Metafunc.parametrize); this internal call
+        # is one layer inside that broader contract.
         decorator = _mark.parametrize(
-            argnames, argvalues_list, indirect=indirect, ids=ids, scope=scope
+            argnames,
+            argvalues_list,
+            indirect=indirect,
+            ids=ids,  # type: ignore[arg-type]
+            scope=scope,
         )
         self._parametrize_marks.append(decorator.mark)
 
