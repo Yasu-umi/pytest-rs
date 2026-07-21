@@ -64,12 +64,24 @@ for name in "${SUITES[@]}"; do
   tp="${tp:-tests}"
   dir="$WORK/$name"
   [ -d "$dir/.git" ] || git clone --depth 1 --branch "$tag" "$repo" "$dir" >/dev/null 2>&1
-  uv venv "$dir/.venv" --python "$PYVER" >/dev/null 2>&1
-  # Install pytest-rs the same way a user does, into the venv, so it self-locates.
-  # Editable install keeps the package source in-tree (so the cov path resolves).
+  # Separate venvs for the real-pytest baseline and pytest-rs: pytest-rs now
+  # ships its own `pytest`/`_pytest` packages into site-packages (maturin
+  # python-source), so installing both into ONE venv makes them fight over
+  # the same site-packages/pytest/ path -- whichever installs last wins,
+  # non-deterministically, silently corrupting whichever one loses (pip/uv
+  # have no cross-distribution awareness that they claim the same import
+  # path). Keeping them apart sidesteps this entirely; pytest-rs's own runs
+  # are unaffected either way since its binary always shadows site-packages
+  # with its embedded shim copy, but the baseline "$PY -m pytest" must be
+  # the genuine real pytest.
+  uv venv "$dir/.venv-py" --python "$PYVER" >/dev/null 2>&1
+  uv venv "$dir/.venv-rs" --python "$PYVER" >/dev/null 2>&1
   # pytest 9.0.3 = the version pytest-rs reproduces; xdist for real's `-n` baseline.
-  uv pip install -q --python "$dir/.venv/bin/python" "pytest==9.0.3" pytest-cov pytest-xdist "$RS_SPEC" -e "$dir" $extra >/dev/null 2>&1
-  PY="$dir/.venv/bin/python"; RS="$dir/.venv/bin/pytest-rs"
+  uv pip install -q --python "$dir/.venv-py/bin/python" "pytest==9.0.3" pytest-cov pytest-xdist -e "$dir" $extra >/dev/null 2>&1
+  # Install pytest-rs the same way a user does, into its own venv, so it self-locates.
+  # Editable install keeps the suite's source in-tree (so the cov path resolves).
+  uv pip install -q --python "$dir/.venv-rs/bin/python" "$RS_SPEC" -e "$dir" $extra >/dev/null 2>&1
+  PY="$dir/.venv-py/bin/python"; RS="$dir/.venv-rs/bin/pytest-rs"
   CFLAGS="-q -p no:cacheprovider -p no:randomly"
   cnt=$( { "$PY" -m pytest "$dir/$tp" --co -q -p no:cacheprovider 2>/dev/null || true; } | grep -oE '[0-9]+ tests collected' | head -1 | grep -oE '^[0-9]+' )
   [ -n "$cnt" ] || cnt='?'
