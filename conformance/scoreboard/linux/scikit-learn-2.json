@@ -63,9 +63,9 @@
     },
     {
       "file": "sklearn/tests/test_config.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 8,
+      "status": "timeout",
+      "exit_code": null,
+      "passed": 0,
       "failed": 0,
       "skipped": 0,
       "errors": 0,

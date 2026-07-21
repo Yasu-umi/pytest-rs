@@ -67,7 +67,7 @@ pytest-rs; they are not counted in the total.
 | networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 0 | 0 | 6894 | 100.0% | 259 | 266 | 0 |
 | pydantic | v2.11.7 | 5338 | 0 | 0 | 921 | 0 | 14 | 6273 | 99.8% | 79 | 82 | 0 |
 | scikit-learn-1 | 1.9.0 | 8432 | 0 | 0 | 6624 | 0 | 0 | 15056 | 100.0% | 79 | 87 | 0 |
-| scikit-learn-2 | 1.9.0 | 5046 | 0 | 0 | 1892 | 0 | 0 | 6938 | 100.0% | 52 | 58 | 0 |
+| scikit-learn-2 | 1.9.0 | 5038 | 0 | 0 | 1892 | 0 | 0 | 6930 | 100.0% | 51 | 58 | 0 |
 | scikit-learn-3 | 1.9.0 | 9251 | 0 | 0 | 2530 | 0 | 3 | 11784 | 100.0% | 107 | 114 | 0 |
 
 ### pytest @ 9.0.3
@@ -2697,7 +2697,7 @@ pytest-rs; they are not counted in the total.
 | sklearn/tests/test_calibration.py | passed | 97 | 0 | 0 | 137 | 0 | 0 |
 | sklearn/tests/test_check_build.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/tests/test_common.py | no-tests | 0 | 0 | 0 | 0 | 0 | 0 |
-| sklearn/tests/test_config.py | passed | 8 | 0 | 0 | 0 | 0 | 0 |
+| sklearn/tests/test_config.py | timeout | 0 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/tests/test_discriminant_analysis.py | passed | 56 | 0 | 0 | 0 | 0 | 0 |
 | sklearn/tests/test_docstring_parameters.py | no-tests | 0 | 0 | 0 | 212 | 0 | 0 |
 | sklearn/tests/test_docstring_parameters_consistency.py | no-tests | 0 | 0 | 0 | 4 | 0 | 0 |
