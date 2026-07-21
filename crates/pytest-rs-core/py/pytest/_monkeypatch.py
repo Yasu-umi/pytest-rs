@@ -1,13 +1,24 @@
 """MonkeyPatch and its fixture."""
 
 import contextlib
+import enum
 import inspect
 import os
 import sys
 import warnings
+from typing import overload
 
 from pytest._fixtures import fixture
 from pytest._warning_types import PytestWarning
+
+
+class _NotSetType(enum.Enum):
+    """Typing-only sentinel distinguishing "no value passed" from any real
+    value in MonkeyPatch.setattr's overloads (mirrors upstream's
+    _pytest.compat.NotSetType; unrelated to the runtime `_notset` sentinel
+    below, which overloads never see since their bodies are never run)."""
+
+    token = 0
 
 
 class MonkeyPatch:
@@ -56,6 +67,14 @@ class MonkeyPatch:
                 raise ImportError(f"import error in {used}: {ex}") from ex
             found = getattr(found, part)
         return found
+
+    @overload
+    def setattr(
+        self, target: str, name: object, value: _NotSetType = ..., raising: bool = ...
+    ) -> None: ...
+
+    @overload
+    def setattr(self, target: object, name: str, value: object, raising: bool = ...) -> None: ...
 
     def setattr(self, target, name, value=_notset, raising=True):
         if isinstance(target, str):
