@@ -309,12 +309,25 @@ def hookspec(function=None, **kwargs):
 # Upstream name for the plugin manager (config.pluginmanager's type).
 PytestPluginManager = PluginManager
 
+
+class FixtureRequest:
+    """Placeholder for typing/`hasattr` purposes only. The running engine
+    overwrites this with the real implementation (a pyo3 class) via
+    `pytest_module.setattr("FixtureRequest", ...)` at startup — see
+    bootstrap.rs. This stand-in is only ever seen when `pytest` is imported
+    outside the engine (mypy, or a standalone `import pytest`)."""
+
+
 # Report/terminal classes live in the _pytest shadow package; import them last
 # to avoid a circular import while pytest's own package is initializing.
+from _pytest.config import Config as Config  # noqa: E402
+from _pytest.fixtures import FixtureDef as FixtureDef  # noqa: E402
 from _pytest.reports import CollectReport as CollectReport  # noqa: E402
 from _pytest.reports import TestReport as TestReport  # noqa: E402
 from _pytest.terminal import TerminalProgressPlugin as TerminalProgressPlugin  # noqa: E402
 from _pytest.terminal import TerminalReporter as TerminalReporter  # noqa: E402
+
+from pytest._metafunc import Metafunc as Metafunc  # noqa: E402
 
 #: Public names (upstream curates this list; the public surface here is
 #: exactly the non-underscore module globals).
