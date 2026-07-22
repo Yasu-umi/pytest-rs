@@ -940,7 +940,7 @@ def reinit_post_fork():
     state.reinit_post_fork()
 
 
-class CaptureFixture:
+class CaptureFixture[AnyStr: (str, bytes)]:
     """The capsys/capfd/capsysbinary/capfdbinary backing object."""
 
     def __init__(self, captureclass, name, *, tee=False):
