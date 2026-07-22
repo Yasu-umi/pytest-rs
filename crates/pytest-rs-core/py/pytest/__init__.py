@@ -160,9 +160,17 @@ class ExitCode(_enum.IntEnum):
 
 
 def console_main() -> int:
-    """In-process invocation entry point (`python -m pytest`). pytest-rs
-    runs as its own binary; re-run via the `pytest-rs` executable instead."""
-    raise NotImplementedError("pytest.console_main is not supported by pytest-rs")
+    """Entry point for ``python -m pytest``.
+
+    Delegates to :func:`main`, which spawns the pytest-rs binary when called
+    from a standalone Python process (the common case for ``python -m pytest``).
+    """
+    try:
+        return main()
+    except KeyboardInterrupt:
+        return 2  # INTERRUPTED
+    except SystemExit as exc:
+        return exc.code if isinstance(exc.code, int) else 1
 
 
 def _resolve_string_plugin(name):
