@@ -26,6 +26,8 @@ pytest-rs --cov=mypkg           # native coverage (pytest-cov compatible)
 `pytest-rs` reads the same configuration pytest does (`pytest.ini`, `pyproject.toml` `[tool.pytest]` / `[tool.pytest.ini_options]`, `tox.ini`, `setup.cfg`) and understands the familiar flags (`-v`, `-x`, `-k`, `-m`, `--lf`, `--tb=...`, `-p no:NAME`, ...). It leaves the `pytest` command itself untouched, but it does install an importable `pytest` package, so `import pytest` (fixtures, `pytest.raises`, `pytest.mark`, `pytest.approx`, ...) works standalone too — e.g. from a subprocess that never runs through the `pytest-rs` binary.
 
 > Don't install this alongside the real `pytest` package in the same environment: both distributions claim the same `pytest` import path, and pip/uv have no awareness that they conflict — installation order decides which files end up in `site-packages/pytest/`, and neither installer cleanly removes the other's.
+>
+> When switching a project over, `pytest` itself, `pluggy`, and `iniconfig` are the only packages pytest-rs supersedes — safe to drop. Any other pytest plugin the project uses (`pytest-django`, `pytest-aiohttp`, ...) is a real, separately-installed package unless it's one of the plugins listed under [Bundled plugins](#bundled-plugins) below, and must stay installed for its fixtures/hooks to keep working.
 
 ### Requirements
 
