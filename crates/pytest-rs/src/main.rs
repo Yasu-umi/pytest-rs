@@ -92,13 +92,25 @@ fn main() {
 
     let mut engine = Engine::new(plugins, config);
     let code = Python::attach(|py| engine.run(py));
-    // Run Python atexit handlers (coverage writes its data here, etc.) and flush
-    // the Python streams, then terminate with libc::_exit. We deliberately skip
-    // C-level atexit / C++ static destructors: some native extension modules
-    // (e.g. duckdb) crash in those destructors under our embedded interpreter,
-    // which never runs Py_Finalize. _exit avoids them and the OS reclaims the
-    // process anyway. std::process::exit would run them and segfault.
+    // Run Python shutdown hooks in the same order CPython does during
+    // Py_Finalize: threading._shutdown() first (runs threading._register_atexit
+    // callbacks — e.g. loky's _python_exit which terminates joblib worker
+    // processes), then atexit._run_exitfuncs() (coverage writes its data here,
+    // multiprocessing.util._exit_function joins child processes, etc.). Calling
+    // them in the wrong order (or skipping threading._shutdown) causes
+    // multiprocessing.util._exit_function to block for minutes on os.waitpid
+    // waiting for workers that were never told to exit.
+    //
+    // After that, flush the Python streams, then terminate with libc::_exit.
+    // We deliberately skip C-level atexit / C++ static destructors: some native
+    // extension modules (e.g. duckdb) crash in those destructors under our
+    // embedded interpreter, which never runs Py_Finalize. _exit avoids them and
+    // the OS reclaims the process anyway. std::process::exit would run them and
+    // segfault.
     Python::attach(|py| {
+        if let Ok(m) = py.import("threading") {
+            let _ = m.call_method0("_shutdown");
+        }
         if let Ok(m) = py.import("atexit") {
             let _ = m.call_method0("_run_exitfuncs");
         }
