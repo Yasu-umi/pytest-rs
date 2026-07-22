@@ -6,7 +6,15 @@ import tomllib
 from dataclasses import KW_ONLY, dataclass
 from pathlib import Path
 
-import iniconfig
+try:
+    import iniconfig
+except ModuleNotFoundError:
+    # The shim is self-contained; real iniconfig may be absent (e.g. the
+    # standalone binary's embedded interpreter). This module exists only for
+    # upstream test suites that import it directly to unit-test these
+    # functions, and those always have iniconfig installed as a real pytest
+    # dependency.
+    iniconfig = None
 from pytest import UsageError
 from pytest._outcomes import fail
 
