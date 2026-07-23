@@ -3,6 +3,43 @@
 Notable changes per release. The release workflow uses the matching section
 as the GitHub release notes (auto-generated notes are the fallback).
 
+## v0.0.10 (2026-07-23)
+
+### Added
+
+- **Precise mypy typing** — the standalone `py.typed`-marked shim now carries
+  `@overload` signatures matching real pytest and the native plugin APIs:
+  `pytest.raises()`, `pytest.fixture()`, `pytest.mark.parametrize()` /
+  `pytest.param()`, `pytest.warns()` / `pytest.deprecated_call()`,
+  `MonkeyPatch.setattr()`, `pytest_asyncio.fixture()` (PEP 695 generic
+  syntax), and `mocker.patch()`. A `reveal_type`-based parity corpus
+  (`conformance/typing/`) gated in CI ensures the inferred types stay exact.
+- **`python -m pytest`** — `console_main()` now delegates to `main()`, which
+  spawns the `pytest-rs` binary, so the standard `python -m pytest` invocation
+  works as a drop-in replacement.
+
+### Fixed
+
+- **joblib / loky worker exit hang** — the process could hang for ~5 minutes
+  at exit after running suites that use `joblib.Parallel(backend="loky")`
+  (e.g. scikit-learn). pytest-rs now calls `threading._shutdown()` before
+  `atexit._run_exitfuncs()`, matching CPython's normal shutdown order so
+  loky's `_python_exit` terminates workers before `multiprocessing.util`'s
+  `_exit_function` tries to join them.
+- **`ShimFixtureDef.argnames`** — conftest/plugin `pytest_fixture_setup`
+  hooks reading `fixturedef.argnames` (e.g. aiohttp's pytest plugin) no
+  longer crash with `AttributeError`; the real dependency names are passed
+  from Rust.
+- **Missing re-exports** — `FixtureRequest`, `Config`, `Metafunc`, and
+  `FixtureDef` are now re-exported from the top-level `pytest` package, so
+  strict-mypy code using them in type annotations no longer gets
+  name-defined errors.
+- **`CaptureFixture`** is generic over `AnyStr`, matching upstream's
+  signature.
+- **Unguarded `iniconfig` import** in the `findpaths.py` shim could raise
+  `ModuleNotFoundError` when `iniconfig` is not installed; it is now
+  optionally imported.
+
 ## v0.0.9 (2026-07-21)
 
 ### Added
