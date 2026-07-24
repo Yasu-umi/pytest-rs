@@ -3,6 +3,23 @@
 Notable changes per release. The release workflow uses the matching section
 as the GitHub release notes (auto-generated notes are the fallback).
 
+## v0.0.11 (2026-07-24)
+
+### Fixed
+
+- **Native plugin shims now shipped in the wheel** — `pytest_mock`,
+  `pytest_asyncio`, and `pytest_cov` Python modules (with `py.typed` markers)
+  are included in the wheel so that `from pytest_mock import MockerFixture`
+  etc. resolve under mypy and standalone Python, not just inside the engine.
+- **`pastebin` monkeypatch regression** — moving `from urllib.request import
+  urlopen` to top-level broke `monkeypatch.setattr(urllib.request, ...)`;
+  switched to `import urllib.request` + `urllib.request.urlopen(...)`.
+
+### Changed
+
+- **Stdlib lazy imports moved to top-level** across all Python shims (19
+  files), eliminating per-call import overhead in hot paths.
+
 ## v0.0.10 (2026-07-23)
 
 ### Added
