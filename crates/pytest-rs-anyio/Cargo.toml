@@ -1,6 +1,6 @@
 [package]
 name = "pytest-rs-anyio"
-version = "0.0.10"
+version = "0.0.11"
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
