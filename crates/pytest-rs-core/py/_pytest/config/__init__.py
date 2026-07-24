@@ -2,7 +2,9 @@ import argparse
 import collections.abc
 import enum
 import os
+import pathlib
 import types
+from typing import Any, NoReturn
 
 from pytest import ExitCode, UsageError  # noqa: F401
 
@@ -85,6 +87,117 @@ class Config:
         for key, value in option_dict.items():
             setattr(config.option, key, value)
         return config
+
+    # Everything below this line is provided at run time by the Rust-built
+    # config proxy (crates/pytest-rs-core/src/request.rs `PyConfig`), which is
+    # what a plugin actually receives -- this class is the annotation target and
+    # the `Config.fromdictargs` entry point, and it used to expose none of the
+    # proxy's surface, so a caller annotating `config: pytest.Config` got an
+    # attr-defined error for `config.rootpath` and friends. They are declared as
+    # real members, not type-checker-only stubs, so this class never promises
+    # what it does not have: on a bare `Config()` each raises and says why, and
+    # AttributeError keeps `hasattr(config, "workerinput")` -- the standard way
+    # to ask "am I an xdist worker?" -- answering False instead of exploding.
+    def _from_proxy(self, name: str) -> NoReturn:
+        raise AttributeError(
+            f"{name}: only the running engine's config provides this "
+            "(this class is pytest-rs's annotation stand-in; a plugin receives "
+            "the engine's own config object instead)"
+        )
+
+    @property
+    def rootpath(self) -> pathlib.Path:
+        self._from_proxy("rootpath")
+
+    @property
+    def inipath(self) -> pathlib.Path | None:
+        self._from_proxy("inipath")
+
+    @property
+    def args(self) -> list[str]:
+        self._from_proxy("args")
+
+    @property
+    def args_source(self) -> "Config.ArgsSource":
+        self._from_proxy("args_source")
+
+    @property
+    def invocation_params(self) -> "Config.InvocationParams":
+        self._from_proxy("invocation_params")
+
+    @property
+    def inicfg(self) -> collections.abc.Mapping[str, Any]:
+        self._from_proxy("inicfg")
+
+    @property
+    def pluginmanager(self) -> "PytestPluginManager":
+        self._from_proxy("pluginmanager")
+
+    @property
+    def workerinput(self) -> dict[str, Any]:
+        self._from_proxy("workerinput")
+
+    @property
+    def workeroutput(self) -> dict[str, Any]:
+        self._from_proxy("workeroutput")
+
+    # `rootdir`/`inifile` are the legacy py.path spellings, `stash`/`hook`/
+    # `cache`/`trace` are engine objects with no shim type of their own.
+    @property
+    def rootdir(self) -> Any:
+        self._from_proxy("rootdir")
+
+    @property
+    def inifile(self) -> Any:
+        self._from_proxy("inifile")
+
+    @property
+    def stash(self) -> Any:
+        self._from_proxy("stash")
+
+    @property
+    def hook(self) -> Any:
+        self._from_proxy("hook")
+
+    @property
+    def cache(self) -> Any:
+        self._from_proxy("cache")
+
+    @property
+    def trace(self) -> Any:
+        self._from_proxy("trace")
+
+    def getini(self, name: str) -> Any:
+        self._from_proxy("getini")
+
+    def addinivalue_line(self, name: str, line: str) -> None:
+        self._from_proxy("addinivalue_line")
+
+    def getvalue(self, name: str, default: Any = None) -> Any:
+        self._from_proxy("getvalue")
+
+    def getvalueorskip(self, name: str) -> Any:
+        self._from_proxy("getvalueorskip")
+
+    def get_verbosity(self, verbosity_type: str | None = None) -> int:
+        self._from_proxy("get_verbosity")
+
+    def get_terminal_writer(self) -> Any:
+        self._from_proxy("get_terminal_writer")
+
+    def issue_config_time_warning(self, warning: Warning, stacklevel: int = 2) -> None:
+        self._from_proxy("issue_config_time_warning")
+
+    def notify_exception(self, excinfo: Any, option: Any = None) -> None:
+        self._from_proxy("notify_exception")
+
+    # Returns the callable it was handed (upstream returns None); annotated as
+    # what it does rather than as what upstream declares.
+    def add_cleanup(self, func: collections.abc.Callable[[], object]) -> Any:
+        self._from_proxy("add_cleanup")
+
+    def parse(self, args: list[str], addopts: bool = True) -> None:
+        self._from_proxy("parse")
 
     def getoption(self, name, default=_notset, skip=False):
         name = name.lstrip("-").replace("-", "_")

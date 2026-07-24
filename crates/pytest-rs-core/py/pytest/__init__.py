@@ -11,6 +11,8 @@ import pathlib
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable, MutableMapping
+from typing import Any, NoReturn
 
 from pytest._approx import approx as approx
 from pytest._cache import Cache as Cache
@@ -319,6 +321,87 @@ class FixtureRequest:
     `pytest_module.setattr("FixtureRequest", ...)` at startup — see
     bootstrap.rs. This stand-in is only ever seen when `pytest` is imported
     outside the engine (mypy, or a standalone `import pytest`)."""
+
+    # The pyo3 class's public surface (crates/pytest-rs-core/src/request.rs
+    # `PyRequest`). A `request: pytest.FixtureRequest` annotation is how test
+    # suites spell this parameter, so an empty placeholder made every
+    # `request.config` / `request.getfixturevalue(...)` in one an attr-defined
+    # error. These are real members rather than type-checker-only declarations
+    # (no `if TYPE_CHECKING:`) so the class cannot promise a caller something
+    # that is not there: outside a run each raises, telling you why, and
+    # `hasattr` still answers False exactly as it did when they were absent —
+    # AttributeError is also what the pyo3 getters themselves raise for a
+    # member the current fixture scope cannot supply.
+    def _outside_run(self, name: str) -> NoReturn:
+        raise AttributeError(
+            f"{name}: pytest.FixtureRequest is only usable inside a pytest-rs run "
+            "(the engine replaces this class with its own implementation at "
+            "startup); outside one it exists for annotations and isinstance only"
+        )
+
+    @property
+    def config(self) -> "Config":
+        self._outside_run("config")
+
+    @property
+    def function(self) -> Callable[..., object]:
+        self._outside_run("function")
+
+    @property
+    def cls(self) -> type | None:
+        self._outside_run("cls")
+
+    @property
+    def instance(self) -> object:
+        self._outside_run("instance")
+
+    @property
+    def fixturenames(self) -> list[str]:
+        self._outside_run("fixturenames")
+
+    @property
+    def fixturename(self) -> str | None:
+        self._outside_run("fixturename")
+
+    @property
+    def keywords(self) -> MutableMapping[str, object]:
+        self._outside_run("keywords")
+
+    @property
+    def scope(self) -> str:
+        self._outside_run("scope")
+
+    @property
+    def path(self) -> pathlib.Path:
+        self._outside_run("path")
+
+    # `param` raises on an unparametrized request, and `module`/`node`/`session`
+    # hand back engine objects with no shim type of their own, so Any is the
+    # honest annotation rather than a guess.
+    @property
+    def param(self) -> Any:
+        self._outside_run("param")
+
+    @property
+    def module(self) -> Any:
+        self._outside_run("module")
+
+    @property
+    def node(self) -> Any:
+        self._outside_run("node")
+
+    @property
+    def session(self) -> Any:
+        self._outside_run("session")
+
+    def getfixturevalue(self, argname: str) -> Any:
+        self._outside_run("getfixturevalue")
+
+    def applymarker(self, marker: Any) -> None:
+        self._outside_run("applymarker")
+
+    def addfinalizer(self, finalizer: Callable[[], object]) -> None:
+        self._outside_run("addfinalizer")
 
 
 # Report/terminal classes live in the _pytest shadow package; import them last

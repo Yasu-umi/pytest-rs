@@ -7,10 +7,14 @@ from typing import Any
 
 import pytest
 
-# Set on the pytest module by the Rust engine at startup (a pyo3 class).
-FixtureRequest = getattr(pytest, "FixtureRequest", object)
-
-
+# Re-exported, not aliased through getattr: `getattr(pytest, ...)` binds a
+# *variable* as far as a type checker is concerned, so `request:
+# _pytest.fixtures.FixtureRequest` (how upstream's own tests spell it) failed
+# with "Variable ... is not valid as a type". The import captures whatever
+# pytest.FixtureRequest is at this point -- the placeholder class, or the pyo3
+# class if the engine has already installed it -- exactly as the getattr did,
+# and pytest always defines the name, so the old `object` fallback was dead.
+from pytest import FixtureRequest as FixtureRequest  # noqa: E402
 from pytest._fixtures import (  # noqa: E402
     FixtureFunctionDefinition as _RealFixtureFunctionDefinition,
 )
