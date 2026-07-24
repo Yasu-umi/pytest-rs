@@ -23,6 +23,9 @@ class ExceptionInfo[E: BaseException]:
     _type: Any
     _value: Any
     _tb: Any
+    # Built lazily by the `traceback` property, and replaceable through its
+    # setter (upstream's is settable too).
+    _traceback: Any
 
     def __init__(self):
         self._set(None, None, None)
@@ -43,6 +46,7 @@ class ExceptionInfo[E: BaseException]:
         self._type = type_
         self._value = value
         self._tb = tb
+        self._traceback = None
 
     @classmethod
     def for_later(cls):
@@ -90,10 +94,53 @@ class ExceptionInfo[E: BaseException]:
     @property
     def traceback(self):
         """The captured exception's traceback as a _pytest._code.Traceback
-        (a list of TracebackEntry), for navigation/filtering by upstream tests."""
+        (a list of TracebackEntry), for navigation/filtering by upstream tests.
+
+        Cached on first access so that a `traceback` assigned below survives:
+        upstream's is settable, and pruning a traceback by writing the filtered
+        one back (`excinfo.traceback = excinfo.traceback.filter(...)`) is the
+        documented way to do it -- a read-only property made that an
+        AttributeError at run time, not just a mypy complaint."""
         from _pytest._code.code import Traceback
 
-        return Traceback(self.tb)
+        if self._traceback is None:
+            self._traceback = Traceback(self.tb)
+        return self._traceback
+
+    @traceback.setter
+    def traceback(self, value):
+        self._traceback = value
+
+    def group_contains(self, expected_exception, *, match=None, depth=None):
+        """Whether the captured exception group contains a matching exception
+        (upstream ExceptionInfo.group_contains)."""
+        assert isinstance(self.value, BaseExceptionGroup), (
+            "Captured exception is not an instance of `BaseExceptionGroup`"
+        )
+        assert (depth is None) or (depth >= 1), "`depth` must be >= 1 if specified"
+        return self._group_contains(self.value, expected_exception, match, depth)
+
+    def _group_contains(
+        self, exc_group, expected_exception, match, target_depth=None, current_depth=1
+    ):
+        if (target_depth is not None) and (current_depth > target_depth):
+            return False
+        for exc in exc_group.exceptions:
+            if isinstance(exc, BaseExceptionGroup) and self._group_contains(
+                exc, expected_exception, match, target_depth, current_depth + 1
+            ):
+                return True
+            if (target_depth is not None) and (current_depth != target_depth):
+                continue
+            if not isinstance(exc, expected_exception):
+                continue
+            if match is not None:
+                from pytest._raises_group import stringify_exception
+
+                if not _re.search(match, stringify_exception(exc)):
+                    continue
+            return True
+        return False
 
     def errisinstance(self, exc):
         """Whether the captured exception is an instance of exc (or any in a
