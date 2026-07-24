@@ -5,21 +5,44 @@ import sys
 import traceback
 import warnings
 from collections.abc import Callable
-from typing import overload
+from types import TracebackType
+from typing import Any, overload
 
 from pytest._outcomes import fail
 
 
 class ExceptionInfo[E: BaseException]:
+    # Filled by _set. Held privately and republished as the read-only
+    # properties below, which is both what upstream does and what the typing
+    # needs: `excinfo.value` must be `E`, not `Any | None`, or every
+    # `excinfo.value.<attr>` in a caller's suite becomes a union-attr error and
+    # every `# type: ignore` written against the real type reads as unused.
+    # Read-only also keeps E out of any mutable position, so E stays covariant
+    # (upstream spells that out with `TypeVar(..., covariant=True)`) -- an
+    # invariant E would reject RaisesGroup.__enter__'s overloads.
+    _type: Any
+    _value: Any
+    _tb: Any
+
     def __init__(self):
-        self.type = None
-        self.value = None
-        self.tb = None
+        self._set(None, None, None)
+
+    @property
+    def type(self) -> type[E]:
+        return self._type
+
+    @property
+    def value(self) -> E:
+        return self._value
+
+    @property
+    def tb(self) -> TracebackType:
+        return self._tb
 
     def _set(self, type_, value, tb):
-        self.type = type_
-        self.value = value
-        self.tb = tb
+        self._type = type_
+        self._value = value
+        self._tb = tb
 
     @classmethod
     def for_later(cls):

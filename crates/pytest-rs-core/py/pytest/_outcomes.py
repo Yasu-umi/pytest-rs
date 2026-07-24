@@ -2,6 +2,7 @@
 
 import importlib
 import warnings
+from typing import NoReturn
 
 
 class OutcomeException(BaseException):
@@ -18,9 +19,16 @@ class OutcomeException(BaseException):
 class Skipped(OutcomeException):
     __module__ = "builtins"
 
+    # Set by pytest.skip() on the instance it raises (declared for the typed
+    # callers below, not created at class level).
+    allow_module_level: bool
+
 
 class Failed(OutcomeException):
     __module__ = "builtins"
+
+    # Set by pytest.fail() on the instance it raises.
+    pytrace: bool
 
 
 class XFailed(Failed):
@@ -34,7 +42,11 @@ class _Skip:
 
     Exception = Skipped
 
-    def __call__(self, reason="", allow_module_level=False):
+    # NoReturn on this family (upstream types them the same way) is what lets a
+    # caller end a branch with `pytest.fail(...)` instead of a return: without
+    # it mypy reports a spurious "Missing return statement" for the enclosing
+    # function.
+    def __call__(self, reason: str = "", allow_module_level: bool = False) -> NoReturn:
         __tracebackhide__ = True
         exc = Skipped(msg=reason)
         exc.allow_module_level = allow_module_level
@@ -44,14 +56,14 @@ class _Skip:
 skip = _Skip()
 
 
-def fail(reason="", pytrace=True):
+def fail(reason: str = "", pytrace: bool = True) -> NoReturn:
     __tracebackhide__ = True
     exc = Failed(msg=reason)
     exc.pytrace = pytrace
     raise exc
 
 
-def xfail(reason=""):
+def xfail(reason: str = "") -> NoReturn:
     __tracebackhide__ = True
     raise XFailed(msg=reason)
 
@@ -65,7 +77,7 @@ class Exit(Exception):
         self.returncode = returncode
 
 
-def exit(reason="", returncode=None):
+def exit(reason: str = "", returncode: int | None = None) -> NoReturn:
     __tracebackhide__ = True
     raise Exit(reason, returncode)
 

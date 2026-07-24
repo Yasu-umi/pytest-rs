@@ -34,6 +34,27 @@ def check_raises_callable_form() -> None:
     reveal_type(exc_info)  # revealed: pytest._raises.ExceptionInfo[core.MyError]
 
 
+def check_excinfo_attributes() -> None:
+    """The captured exception is the raised type, not `Any | None`.
+
+    A test suite reads `excinfo.value.<attr>` constantly; an optional or Any
+    `value` turns each of those into a union-attr error downstream.
+    """
+    with pytest.raises(MyError) as exc_info:
+        raise MyError("x")
+    reveal_type(exc_info.value)  # revealed: core.MyError
+    reveal_type(exc_info.type)  # revealed: type[core.MyError]
+    reveal_type(exc_info.tb)  # revealed: types.TracebackType
+
+
+def check_outcomes_are_noreturn(flag: bool) -> int:
+    """A branch may end in skip/fail/xfail/exit instead of a return."""
+    if flag:
+        return 1
+    reveal_type(pytest.fail)  # revealed: def (reason: str =, pytrace: bool =) -> Never
+    pytest.fail("no value to return")
+
+
 @pytest.fixture
 def bare_fixture() -> int:
     return 1
