@@ -33,11 +33,11 @@ pub use services::*;
 ///
 /// Named after the package version and a build-time FNV-1a hash of all shim
 /// file contents, so the path is stable across invocations of the same binary.
-/// `install_shim` skips writing a file when it already exists at this path,
+/// `install_shim` skips writing a file already present here at full length,
 /// reducing startup from ~200+ file-writes per invocation to ~200 stat calls
 /// on warm runs (order-of-magnitude faster on most OSes).
 ///
-/// Plugin crates share the same root and apply the same skip-if-exists logic,
+/// Plugin crates share the same root and go through the same `write_shim_file`,
 /// so only the first invocation after a new build pays the extraction cost.
 pub fn shim_root() -> PathBuf {
     std::env::temp_dir().join(format!(
@@ -45,6 +45,48 @@ pub fn shim_root() -> PathBuf {
         env!("CARGO_PKG_VERSION"),
         SHIM_CONTENT_HASH
     ))
+}
+
+/// Extract one embedded shim file to `path` unless it is already there at full
+/// length, and never leave a partially written file behind.
+///
+/// A truncated shim file is not a harmless glitch: importing a `plugin.py`
+/// missing its tail is exactly how `AttributeError: module
+/// 'pytest_mock.plugin' has no attribute '_configure'` (an INTERNAL ERROR that
+/// aborts the whole run before collection) happens. Two things can produce one
+/// — a plain `fs::write` truncates in place, so a process that finds the path
+/// present can import what another is still writing, and a run killed
+/// mid-extraction leaves the stump on disk. Both matter here because the shim
+/// root is shared: it is named by version + content hash, so concurrent runs
+/// of the same binary write into it, a forked xdist worker configures native
+/// plugins independently of its controller, and the root outlives every run
+/// that reuses it.
+///
+/// So: rename a pid-unique sibling into place (POSIX rename within a directory
+/// is atomic — the destination only ever appears complete), and gate on the
+/// existing file's *length* rather than its mere existence, so a stump left by
+/// an older run heals instead of being skipped forever. Length is enough: a
+/// truncated write is the only corruption in play, and it always shortens the
+/// file. `metadata()` costs the same as the `exists()` stat it replaces, which
+/// matters for the ~200-file `install_shim` extraction on warm runs.
+pub fn write_shim_file(path: &Path, content: &str) -> std::io::Result<()> {
+    if std::fs::metadata(path).is_ok_and(|meta| meta.len() == content.len() as u64) {
+        return Ok(());
+    }
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("shim");
+    // Leading dot + .tmp suffix: never importable, so a sibling orphaned by a
+    // killed run cannot be picked up as a module.
+    let tmp = path.with_file_name(format!(".{name}.{}.tmp", std::process::id()));
+    std::fs::write(&tmp, content)?;
+    std::fs::rename(&tmp, path).inspect_err(|_| {
+        let _ = std::fs::remove_file(&tmp);
+    })
 }
 
 /// Split a raw ini string the way upstream's `_getini` handles `type="paths"`

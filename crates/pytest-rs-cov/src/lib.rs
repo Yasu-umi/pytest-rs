@@ -1177,14 +1177,8 @@ impl Plugin for CovPlugin {
         std::fs::create_dir_all(&package_root)
             .map_err(|e| core_pyo3::exceptions::PyOSError::new_err(e.to_string()))?;
         for (rel, content) in SHIM_FILES {
-            let path = package_root.join(rel);
-            let needs_write = std::fs::read(&path)
-                .map(|existing| existing != content.as_bytes())
-                .unwrap_or(true);
-            if needs_write {
-                std::fs::write(&path, content)
-                    .map_err(|e| core_pyo3::exceptions::PyOSError::new_err(e.to_string()))?;
-            }
+            pytest_rs_core::python::write_shim_file(&package_root.join(rel), content)
+                .map_err(|e| core_pyo3::exceptions::PyOSError::new_err(e.to_string()))?;
         }
 
         // Register cov/no_cover fixtures unconditionally — test_funcarg_not_active

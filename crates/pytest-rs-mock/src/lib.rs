@@ -61,11 +61,8 @@ impl Plugin for MockPlugin {
         let package_root = pytest_rs_core::python::shim_root().join("pytest_mock");
         std::fs::create_dir_all(&package_root).map_err(|e| PyOSError::new_err(e.to_string()))?;
         for (rel, content) in SHIM_FILES {
-            let path = package_root.join(rel);
-            if path.exists() {
-                continue;
-            }
-            std::fs::write(path, content).map_err(|e| PyOSError::new_err(e.to_string()))?;
+            pytest_rs_core::python::write_shim_file(&package_root.join(rel), content)
+                .map_err(|e| PyOSError::new_err(e.to_string()))?;
         }
 
         // Rewrite asserts inside the shim: introspection messages from

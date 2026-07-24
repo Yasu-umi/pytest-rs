@@ -67,16 +67,11 @@ pub fn install_shim(py: Python<'_>) -> PyResult<PathBuf> {
     let shim_root = shim_root();
     for (rel, content) in SHIM_FILES {
         let path = shim_root.join(rel);
-        // Skip if already present: shim_root is named by a build-time content
-        // hash, so an existing file is always the correct version.
-        if path.exists() {
-            continue;
-        }
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| pyo3::exceptions::PyOSError::new_err(e.to_string()))?;
-        }
-        std::fs::write(&path, content)
+        // write_shim_file skips a file already present at full length (shim_root
+        // is named by a build-time content hash, so same length == same
+        // content), heals a truncated one, and creates parent dirs only when it
+        // actually writes — keeping a warm run at one stat per file.
+        write_shim_file(&path, content)
             .map_err(|e| pyo3::exceptions::PyOSError::new_err(e.to_string()))?;
     }
     sys_path_prepend(py, &shim_root)?;
