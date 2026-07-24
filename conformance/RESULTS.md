@@ -25,7 +25,7 @@ pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2783 | 1 | 0 | 53 | 0 | 12 | 2849 | 99.5% | 53 | 54 | 61 |
+| pytest | 9.0.3 | 2778 | 6 | 0 | 53 | 0 | 12 | 2849 | 99.4% | 52 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 7 | 0 | 0 | 0 | 0 | 0 | 7 | 100.0% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 0 | 2 | 90 | 97.8% | 1 | 1 | 0 |
@@ -107,7 +107,7 @@ pytest-rs; they are not counted in the total.
 | testing/test_mark.py | passed | 105 | 0 | 0 | 0 | 0 | 1 |
 | testing/test_monkeypatch.py | passed | 33 | 0 | 0 | 2 | 0 | 0 |
 | testing/test_nodes.py | passed | 8 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_pastebin.py | passed | 8 | 0 | 0 | 0 | 0 | 0 |
+| testing/test_pastebin.py | failed | 3 | 5 | 0 | 0 | 0 | 0 |
 | testing/test_pytester.py | passed | 51 | 0 | 0 | 1 | 0 | 0 |
 | testing/test_python_path.py | passed | 6 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_recwarn.py | passed | 63 | 0 | 0 | 0 | 0 | 0 |
