@@ -25,9 +25,12 @@ const HELPER: &str = include_str!("../py/helper.py");
 const SHIM_FILES: &[(&str, &str)] = &[
     (
         "__init__.py",
-        include_str!("../py/pytest_asyncio/__init__.py"),
+        include_str!("../../pytest-rs-core/py/pytest_asyncio/__init__.py"),
     ),
-    ("plugin.py", include_str!("../py/pytest_asyncio/plugin.py")),
+    (
+        "plugin.py",
+        include_str!("../../pytest-rs-core/py/pytest_asyncio/plugin.py"),
+    ),
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

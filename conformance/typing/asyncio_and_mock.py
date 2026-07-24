@@ -1,8 +1,8 @@
 """reveal_type corpus: pytest-asyncio / pytest-mock overload precision.
 
 See core.py's module docstring for the `# revealed:` comment convention.
-Requires crates/pytest-rs-asyncio/py and crates/pytest-rs-mock/py on
-MYPYPATH alongside pytest-rs-core (typing_check.py sets this up).
+Requires crates/pytest-rs-core/py on MYPYPATH, which holds the shipped
+pytest_asyncio / pytest_mock shims too (typing_check.py sets this up).
 """
 
 import pytest_asyncio

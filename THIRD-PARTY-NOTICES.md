@@ -33,7 +33,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ## pytest-mock (MIT)
 
-Adapted code lives under `crates/pytest-rs-mock/py/pytest_mock/`.
+Adapted code lives under `crates/pytest-rs-core/py/pytest_mock/`.
 
 MIT License
 

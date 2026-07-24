@@ -32,14 +32,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 TYPING_DIR = ROOT / "conformance" / "typing"
 
-MYPYPATH = ":".join(
-    str(ROOT / rel)
-    for rel in (
-        "crates/pytest-rs-core/py",
-        "crates/pytest-rs-asyncio/py",
-        "crates/pytest-rs-mock/py",
-    )
-)
+# pytest / _pytest and the shipped plugin shims (pytest_asyncio, pytest_mock,
+# pytest_cov) all live under this one root — the same layout the wheel installs
+# into site-packages.
+MYPYPATH = str(ROOT / "crates/pytest-rs-core/py")
 
 REVEAL_CALL_RE = re.compile(r"reveal_type\(.*\)\s*#\s*revealed:\s*(.+?)\s*$")
 MYPY_NOTE_RE = re.compile(r"^(?P<file>.+):(?P<line>\d+): note: Revealed type is \"(?P<type>.+)\"$")

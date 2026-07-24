@@ -12,9 +12,18 @@ use pytest_rs_core::pyo3::prelude::*;
 use pytest_rs_core::pyo3::types::PyModule;
 
 const SHIM_FILES: &[(&str, &str)] = &[
-    ("__init__.py", include_str!("../py/pytest_mock/__init__.py")),
-    ("_util.py", include_str!("../py/pytest_mock/_util.py")),
-    ("plugin.py", include_str!("../py/pytest_mock/plugin.py")),
+    (
+        "__init__.py",
+        include_str!("../../pytest-rs-core/py/pytest_mock/__init__.py"),
+    ),
+    (
+        "_util.py",
+        include_str!("../../pytest-rs-core/py/pytest_mock/_util.py"),
+    ),
+    (
+        "plugin.py",
+        include_str!("../../pytest-rs-core/py/pytest_mock/plugin.py"),
+    ),
 ];
 
 pub struct MockPlugin {

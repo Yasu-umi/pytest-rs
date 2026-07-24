@@ -38,13 +38,18 @@ include = [
     { path = "crates/pytest-rs-core/py/_pytest/py.typed", format = "wheel" },
     # Natively-implemented plugin shims: shipped as site-packages modules so
     # that `from pytest_mock import MockerFixture` etc. work from mypy and
-    # standalone Python (not just inside the pytest-rs engine).
-    { path = "crates/pytest-rs-mock/py/pytest_mock/**/*.py", format = "wheel" },
-    { path = "crates/pytest-rs-mock/py/pytest_mock/py.typed", format = "wheel" },
-    { path = "crates/pytest-rs-asyncio/py/pytest_asyncio/**/*.py", format = "wheel" },
-    { path = "crates/pytest-rs-asyncio/py/pytest_asyncio/py.typed", format = "wheel" },
-    { path = "crates/pytest-rs-cov/py/pytest_cov/**/*.py", format = "wheel" },
-    { path = "crates/pytest-rs-cov/py/pytest_cov/py.typed", format = "wheel" },
+    # standalone Python (not just inside the pytest-rs engine). These live
+    # under `python-source` on purpose: maturin strips only that prefix from
+    # an `include` path, so a package kept in its own crate's py/ dir would
+    # be packaged as `site-packages/crates/<crate>/py/<pkg>/` — present in
+    # the wheel but not importable. Each crate still embeds its own copy via
+    # include_str! for the engine's per-run shim dir.
+    { path = "crates/pytest-rs-core/py/pytest_mock/**/*.py", format = "wheel" },
+    { path = "crates/pytest-rs-core/py/pytest_mock/py.typed", format = "wheel" },
+    { path = "crates/pytest-rs-core/py/pytest_asyncio/**/*.py", format = "wheel" },
+    { path = "crates/pytest-rs-core/py/pytest_asyncio/py.typed", format = "wheel" },
+    { path = "crates/pytest-rs-core/py/pytest_cov/**/*.py", format = "wheel" },
+    { path = "crates/pytest-rs-core/py/pytest_cov/py.typed", format = "wheel" },
 ]
 
 [tool.uv]
@@ -84,7 +89,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 # Vendored pytest-mock plugin: keep upstream's idioms.
-"crates/pytest-rs-mock/py/pytest_mock/*" = ["UP", "E402"]
+"crates/pytest-rs-core/py/pytest_mock/*" = ["UP", "E402"]
 # Ported upstream pytest code: keep its pre-PEP695 generics.
 "crates/pytest-rs-core/py/pytest/_raises_group.py" = ["UP"]
 # reveal_type() is a mypy-only pseudo-builtin (see conformance/typing_check.py).

@@ -36,9 +36,18 @@ const TOOL_ID: u8 = 1;
 /// `import pytest_cov` API surface (errors/warnings only; measurement is
 /// native).
 const SHIM_FILES: &[(&str, &str)] = &[
-    ("__init__.py", include_str!("../py/pytest_cov/__init__.py")),
-    ("plugin.py", include_str!("../py/pytest_cov/plugin.py")),
-    ("_child.py", include_str!("../py/pytest_cov/_child.py")),
+    (
+        "__init__.py",
+        include_str!("../../pytest-rs-core/py/pytest_cov/__init__.py"),
+    ),
+    (
+        "plugin.py",
+        include_str!("../../pytest-rs-core/py/pytest_cov/plugin.py"),
+    ),
+    (
+        "_child.py",
+        include_str!("../../pytest-rs-core/py/pytest_cov/_child.py"),
+    ),
 ];
 
 /// Site .pth hook for subprocess coverage: a no-op unless the running

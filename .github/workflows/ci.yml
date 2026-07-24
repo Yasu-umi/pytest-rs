@@ -265,7 +265,12 @@ jobs:
       - name: mypy
         run: |
           uv run --no-sync mypy
-          for tree in crates/pytest-rs-asyncio crates/pytest-rs-anyio crates/pytest-rs-benchmark crates/pytest-rs-cov crates/pytest-rs-mock; do
+          # Only the crates whose py/ still holds a module of its own (each a
+          # top-level helper.py, which one mypy invocation cannot hold
+          # together); the pytest_mock / pytest_asyncio / pytest_cov shim
+          # packages live under crates/pytest-rs-core/py and are covered by the
+          # plain `mypy` run above.
+          for tree in crates/pytest-rs-asyncio crates/pytest-rs-anyio crates/pytest-rs-benchmark; do
             uv run --no-sync mypy "$tree/py"
           done
 
