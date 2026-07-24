@@ -714,6 +714,7 @@ use_src = false
 category = "real-world"
 enabled = true
 slow_files = [
+    "tests/test_tutorial/test_websockets/test_tutorial003.py",
     "tests/test_tutorial/test_websockets/test_tutorial003_py39.py",
 ]
 # test_exception_handler_body_access fails under real pytest too (upstream
