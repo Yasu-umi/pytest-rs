@@ -1,4 +1,6 @@
 import re as _re
+from collections.abc import Mapping
+from typing import Any, Literal
 
 from _pytest._code.code import ExceptionChainRepr as _ExceptionChainRepr  # noqa: F401
 
@@ -134,6 +136,18 @@ class BaseReport:
     # sections list.
     sections: list = []
 
+    # The attributes every report carries, annotated the way upstream's
+    # BaseReport annotates them. They are set as real instance attributes by
+    # _set_report_attrs below (from the keywords the engine passes), but a
+    # `**kwargs` __init__ leaves a type checker with nothing to go on -- so a
+    # reporting plugin reading `report.when` or `report.longrepr`, which is
+    # what every one of them does, saw an attr-defined error.
+    when: str | None
+    location: tuple[str, int | None, str] | None
+    longrepr: Any
+    nodeid: str
+    outcome: Literal["passed", "failed", "skipped"]
+
     def __init__(self, **kwargs):
         _set_report_attrs(self, kwargs)
 
@@ -225,6 +239,19 @@ class TestReport(BaseReport):
     # Prevent collection of an imported `TestReport` as a test class (it has a
     # custom __init__); mirrors _pytest.reports.TestReport.__test__.
     __test__ = False
+
+    # Narrower than BaseReport's `when` (upstream types the phase this way, and
+    # its own typing_checks.py asserts exactly this), plus the timing/keyword
+    # attributes the engine passes for a test report. `wasxfail` is set only on
+    # an xfailed report -- as upstream, which declares it here all the same, so
+    # `hasattr(report, "wasxfail")` stays the way to ask.
+    when: Literal["setup", "call", "teardown"]
+    keywords: Mapping[str, Any]
+    duration: float
+    start: float
+    stop: float
+    user_properties: list[tuple[str, object]]
+    wasxfail: str
 
     def __init__(self, **kwargs):
         _set_report_attrs(self, kwargs)
