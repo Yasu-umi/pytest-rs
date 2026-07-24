@@ -12,6 +12,7 @@ import datetime
 import io
 import logging
 import os
+import pathlib
 import pickle
 import re as _re
 import sys
@@ -402,8 +403,6 @@ class LoggingState:
         LoggingPlugin.set_log_path — a plugin/conftest calling this via
         config.pluginmanager.get_plugin("logging-plugin") mid-session, e.g.
         to write a separate file per test)."""
-        import pathlib
-
         fpath = pathlib.Path(fname)
         if not fpath.is_absolute():
             root = self.rootpath or os.getcwd()

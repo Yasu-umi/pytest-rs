@@ -11,6 +11,7 @@ then inspects ._calls).
 from __future__ import annotations
 
 import dataclasses
+import inspect
 import itertools
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any
@@ -381,8 +382,6 @@ class Metafunc:
     def _validate_if_using_arg_names(
         self, argnames: list[str], indirect: bool | Sequence[str]
     ) -> None:
-        import inspect
-
         if isinstance(indirect, str):
             indirect = [indirect]
 

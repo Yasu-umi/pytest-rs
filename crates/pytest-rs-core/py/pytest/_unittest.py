@@ -1,5 +1,8 @@
 """unittest.TestCase integration: build zero-arg runners per test method."""
 
+import os
+import sys
+import traceback
 import unittest
 
 from pytest._outcomes import Skipped
@@ -18,8 +21,6 @@ def _skipped_at(msg, func):
     exc = Skipped(msg=msg)
     code = getattr(func, "__code__", None)
     if code is not None:
-        import os
-
         try:
             filename = os.path.relpath(code.co_filename)
         except ValueError:
@@ -63,8 +64,6 @@ def _wrap_excinfo_or_fallback(rawexcinfo):
         _ = excinfo.traceback
         return excinfo
     except TypeError:
-        import traceback
-
         from pytest._outcomes import fail
 
         try:
@@ -129,8 +128,6 @@ class TestCaseFunction:
         self._addexcinfo(rawexcinfo)
 
     def addSkip(self, testcase, reason):
-        import sys
-
         from pytest._outcomes import skip
 
         try:
@@ -139,8 +136,6 @@ class TestCaseFunction:
             self._addexcinfo(sys.exc_info())
 
     def addExpectedFailure(self, testcase, rawexcinfo, reason=""):
-        import sys
-
         from pytest._outcomes import xfail
 
         try:
@@ -149,8 +144,6 @@ class TestCaseFunction:
             self._addexcinfo(sys.exc_info())
 
     def addUnexpectedSuccess(self, testcase, reason=None):
-        import sys
-
         from pytest._outcomes import fail
 
         msg = "Unexpected success"

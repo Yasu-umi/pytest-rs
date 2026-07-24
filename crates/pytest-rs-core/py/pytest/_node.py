@@ -4,6 +4,8 @@ import inspect
 import pathlib
 import traceback
 import warnings
+from inspect import Parameter, signature
+from itertools import chain
 
 # Marks added at runtime (node.add_marker / request.applymarker) for the
 # currently running item; the engine re-evaluates xfail against these and
@@ -131,8 +133,6 @@ class _NodeBase:
         self.config = config if config is not None else getattr(parent, "config", None)
         self.session = session if session is not None else getattr(parent, "session", None)
         if path is None and fspath is not None:
-            import warnings
-
             from _pytest.deprecated import NODE_CTOR_FSPATH_ARG
 
             warnings.warn(
@@ -174,9 +174,6 @@ class _NodeBase:
             # Non-cooperative constructor: __init__ lacks **kwargs and raised on unknown kw.
             own_init = cls.__dict__.get("__init__")
             if own_init is not None:
-                import warnings
-                from inspect import Parameter, signature
-
                 from _pytest.warning_types import PytestDeprecationWarning
 
                 sig = signature(own_init)
@@ -604,8 +601,6 @@ class Class(Collector):
     def reportinfo(self):
         """(path, 0-based lineno, class name) — mirrors pytest's Class.reportinfo.
         inspect.getsourcelines returns the 1-based def line, so subtract 1."""
-        import inspect
-
         obj = self.obj
         try:
             lineno0 = inspect.getsourcelines(obj)[1] - 1
@@ -630,8 +625,6 @@ class Item(_NodeBase):
         setattr(cls, attr_name, True)
         problems = ", ".join(base.__name__ for base in cls.__bases__ if issubclass(base, Collector))
         if problems:
-            import warnings
-
             from _pytest.warning_types import PytestWarning
 
             warnings.warn(
@@ -1138,7 +1131,6 @@ class _CollectorProxy:
                 yield m
 
     def get_closest_marker(self, name):
-        from itertools import chain
 
         return next(chain(self.iter_markers(name), iter(())), None)
 
@@ -1617,7 +1609,6 @@ def fire_makeitem_for_function(
         return None
 
     func_node_name = nodeid.rsplit("::", 1)[-1]
-    import pathlib as _pathlib
 
     kwargs = {
         "name": func_name,
@@ -1669,7 +1660,7 @@ def fire_makeitem_for_function(
         result = plain_result
     elif is_test_func:
         plain_node = Function(
-            nodeid, func_node_name, [], [], callobj, _pathlib.Path(path_str), lineno
+            nodeid, func_node_name, [], [], callobj, pathlib.Path(path_str), lineno
         )
         result = [plain_node]
     else:

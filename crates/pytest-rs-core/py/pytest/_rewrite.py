@@ -6,12 +6,15 @@ CPython ast (locations copied node-by-node, so tracebacks stay exact).
 """
 
 import ast
+import fnmatch
 import importlib.machinery
 import importlib.util
 import marshal
 import os
+import pathlib
 import sys
 import types
+import warnings
 
 # Rewritten bytecode is cached in __pycache__ under a pytest-rs-specific pyc
 # tag, so it can never be confused with CPython's own (non-rewritten) bytecode
@@ -71,8 +74,6 @@ def register_assert_rewrite(*names):
     # this interpreter's sys.modules) — nothing was actually missed.
     # Under --assert=plain, nothing is ever rewritten regardless of
     # registration, so "missed a rewrite" doesn't apply — skip the warning.
-    import sys
-
     if _rewrite_enabled:
         for name in names:
             mod = sys.modules.get(name)
@@ -110,8 +111,6 @@ def _is_registered_module(name):
 
 
 def _is_rewrite_target(origin):
-    import fnmatch as _fnmatch
-
     basename = os.path.basename(origin)
     if basename == "conftest.py":
         return True
@@ -123,7 +122,7 @@ def _is_rewrite_target(origin):
     for pat in _PYTHON_FILES_GLOBS:
         # Bare filename glob (e.g. "test_*.py", "*.py"): match against basename.
         if os.sep not in pat and "/" not in pat:
-            if _fnmatch.fnmatch(basename, pat):
+            if fnmatch.fnmatch(basename, pat):
                 return True
         else:
             # Path-style glob (e.g. "testing/python/*.py"): normalize separators
@@ -132,11 +131,11 @@ def _is_rewrite_target(origin):
             # pattern prefix resolved as a suffix.
             norm_pat = pat.replace(os.sep, "/")
             norm_origin = origin.replace(os.sep, "/")
-            if _fnmatch.fnmatch(norm_origin, "*/" + norm_pat):
+            if fnmatch.fnmatch(norm_origin, "*/" + norm_pat):
                 return True
             # Also try a direct match against the full origin in case it's an
             # absolute pattern.
-            if _fnmatch.fnmatch(norm_origin, norm_pat):
+            if fnmatch.fnmatch(norm_origin, norm_pat):
                 return True
     return False
 
@@ -201,8 +200,6 @@ class _RewriteConfig:
         if not source or not self.hasmarkup:
             return source
         try:
-            import os
-
             from pygments import highlight as pygments_highlight
             from pygments.formatters.terminal import TerminalFormatter
 
@@ -252,8 +249,6 @@ def _format_assert(op, left, right):
         # win over the built-in comparison; first non-None explanation is used.
         expl = None
         try:
-            import pathlib
-
             from pytest import _wcapture
             from pytest._pluginmanager import pluginmanager
 
@@ -348,8 +343,6 @@ def _saferepr_or_repr(obj):
     10x the default limit at -v), and embedded newlines are escaped — the
     text is often embedded into _pytest.assertion.util.format_explanation's
     "{"/"}" mini-language, where raw newlines are significant."""
-    import types
-
     if isinstance(obj, types.MethodType):
         try:
             return obj.__name__
@@ -406,8 +399,6 @@ class _AssertRewriter(ast.NodeTransformer):
     def visit_Assert(self, node):
         test = node.test
         if isinstance(test, ast.Tuple) and test.elts:
-            import warnings
-
             from pytest._warning_types import PytestAssertRewriteWarning
 
             warnings.warn_explicit(

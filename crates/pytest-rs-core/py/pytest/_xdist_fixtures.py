@@ -6,6 +6,7 @@ a fresh uid without -n, the worker's values under -n.
 
 import os
 import uuid
+import warnings
 
 from pytest._fixtures import fixture
 
@@ -33,8 +34,6 @@ def auto_num_workers(logical):
         try:
             return int(env_var)
         except ValueError:
-            import warnings
-
             warnings.warn(
                 f"PYTEST_XDIST_AUTO_NUM_WORKERS is not a number: {env_var!r}. Ignoring it."
             )

@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import re
+from urllib.error import HTTPError
+from urllib.parse import urlencode
+from urllib.request import urlopen
+
 
 def create_new_paste(contents: str | bytes) -> str:
     """Create a new paste using the bpaste.net service.
@@ -9,11 +14,6 @@ def create_new_paste(contents: str | bytes) -> str:
     :contents: Paste contents string.
     :returns: URL to the pasted contents, or an error message.
     """
-    import re
-    from urllib.error import HTTPError
-    from urllib.parse import urlencode
-    from urllib.request import urlopen
-
     url = "https://bpa.st"
     if isinstance(contents, str):
         contents = contents.encode("utf-8")

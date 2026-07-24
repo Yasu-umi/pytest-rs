@@ -1,4 +1,5 @@
 import argparse
+import textwrap
 
 import _pytest._io
 from _pytest._stub import __getattr__  # noqa: F401
@@ -59,8 +60,6 @@ class DropShorterLongHelpFormatter(argparse.HelpFormatter):
 
         This allows to have explicit line breaks in the help text.
         """
-        import textwrap
-
         lines = []
         for line in text.splitlines():
             lines.extend(textwrap.wrap(line.strip(), width))

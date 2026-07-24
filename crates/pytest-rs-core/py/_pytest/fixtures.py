@@ -1,6 +1,8 @@
 import functools
 import inspect
+import sys
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -341,9 +343,6 @@ def fail_subrequest_no_param(nodeid, fixturefunc, argname, rootpath):
     nodeid, the fixture's definition location, and the call site. Run from the
     engine's resolver; the engine's Rust frames are invisible to Python, so the
     Python frame directly below this helper is the requesting code."""
-    import sys
-    from pathlib import Path
-
     from _pytest.outcomes import fail
 
     def _loc(filename, lineno):

@@ -4,6 +4,7 @@ exercise the runner itself."""
 import configparser
 import fnmatch
 import importlib.util
+import inspect
 import io
 import itertools
 import json
@@ -11,11 +12,13 @@ import logging
 import os
 import pathlib
 import pickle
+import platform
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import textwrap
 import threading
 import time
 import warnings
@@ -580,8 +583,6 @@ class Pytester:
             items.insert(0, (self._name, source))
         paths = []
         for basename, source in items:
-            import textwrap
-
             # with_suffix both appends and replaces ("pkg/test_1.py" stays
             # itself), matching upstream pytester.
             path = (self.path / basename).with_suffix(ext)
@@ -1800,9 +1801,7 @@ class Pytester:
                 return None
             for impl in _makeitem_impls:
                 try:
-                    import inspect as _inspect
-
-                    sig = _inspect.signature(impl)
+                    sig = inspect.signature(impl)
                     kw = {}
                     if "collector" in sig.parameters:
                         kw["collector"] = parent
@@ -1827,8 +1826,6 @@ class Pytester:
             return None
 
         def _validate_parametrize_argnames(func, marks, cls=None):
-            import inspect as _insp
-
             param_marks = [m for m in marks if m.name == "parametrize"]
             if not param_marks:
                 return
@@ -1837,7 +1834,7 @@ class Pytester:
             except (Exception, OutcomeException):
                 func_params = set()
             try:
-                all_params = set(_insp.signature(func).parameters.keys())
+                all_params = set(inspect.signature(func).parameters.keys())
             except (ValueError, TypeError):
                 all_params = set()
             func_params.add("request")
@@ -2423,10 +2420,8 @@ class Pytester:
         return self.spawn(cmd, expect_timeout=expect_timeout)
 
     def spawn(self, cmd, expect_timeout=10.0):
-        import platform as _platform
-
         pexpect = importorskip("pexpect", "3.0")
-        if hasattr(sys, "pypy_version_info") and "64" in _platform.machine():
+        if hasattr(sys, "pypy_version_info") and "64" in platform.machine():
             skip("pypy-64 bit not supported")
         if not hasattr(pexpect, "spawn"):
             skip("pexpect.spawn not available")

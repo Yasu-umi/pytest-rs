@@ -6,6 +6,9 @@ attribute access work correctly for the subset of the API our suites need.
 
 from __future__ import annotations
 
+import functools
+import inspect
+import linecache
 from collections.abc import Callable
 from pathlib import Path
 from types import TracebackType
@@ -156,9 +159,6 @@ class Code:
 
 
 def get_real_func(obj):
-    import functools
-    import inspect
-
     obj = inspect.unwrap(obj)
     if isinstance(obj, functools.partial):
         obj = obj.func
@@ -166,8 +166,6 @@ def get_real_func(obj):
 
 
 def getfslineno(obj):
-    import inspect
-
     obj = get_real_func(obj)
     if hasattr(obj, "place_as"):
         obj = obj.place_as
@@ -244,8 +242,6 @@ class TracebackEntry:
     def __str__(self) -> str:
         name = self.frame.code.raw.co_name
         try:
-            import linecache
-
             path = self.frame.code.raw.co_filename
             line = linecache.getline(path, self.lineno + 1).strip()
             if not line:

@@ -6,6 +6,11 @@ resolves fixtures or runs tests.
 """
 
 import enum as _enum
+import os
+import pathlib
+import shutil
+import subprocess
+import sys
 
 from pytest._approx import approx as approx
 from pytest._cache import Cache as Cache
@@ -122,8 +127,6 @@ def _replay_django_settings_override() -> None:
     kwargs into PYTEST_RS_DJANGO_SETTINGS_OVERRIDE, replay them here before
     this process collects any test module: this module is imported very
     early (install_shim, Rust side) -- well before collection starts."""
-    import os
-
     blob = os.environ.pop("PYTEST_RS_DJANGO_SETTINGS_OVERRIDE", None)
     if blob is None:
         return
@@ -182,7 +185,6 @@ def _resolve_string_plugin(name):
     arg, its failure must reach the caller as a real exception."""
     import importlib
     import importlib.metadata
-    import sys
 
     for dist in importlib.metadata.distributions():
         for ep in dist.entry_points:
@@ -204,20 +206,17 @@ def main(args=None, plugins=None):
     args: list of CLI arg strings, or a single path-like object, or None
           (defaults to sys.argv[1:]).
     plugins: list of plugin objects and/or strings (a string is resolved to
-             a plugin module the same way `-p NAME` is). Object plugins only
-             work when this call is already running inside the pytest-rs
-             embedded interpreter (see below) — from a bare `python` process
-             they are silently ignored, same as upstream document for a
-             foreign in-process caller.
+              a plugin module the same way `-p NAME` is). Object plugins only
+              work when this call is already running inside the pytest-rs
+              embedded interpreter (see below) — from a bare `python` process
+              they are silently ignored, same as upstream document for a
+              foreign in-process caller.
     """
-    import sys
-    from pathlib import Path
-
     if args is None:
         cli = list(sys.argv[1:])
     elif isinstance(args, (str, bytes)):
         raise TypeError(f"expected to be a list of strings, got: {args!r}")
-    elif isinstance(args, Path):
+    elif isinstance(args, pathlib.Path):
         cli = [str(args)]
     else:
         cli = [str(a) for a in args]
@@ -240,10 +239,6 @@ def main(args=None, plugins=None):
         ]
         reprec = run_inprocess(cli, plugins=resolved_plugins)
         return reprec.ret
-
-    import os
-    import shutil
-    import subprocess
 
     from pytest._pytester import _RUNNER_LIBPATH
 

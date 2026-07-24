@@ -3,6 +3,7 @@
 import re as _re
 import sys
 import traceback
+import warnings
 from collections.abc import Callable
 from typing import overload
 
@@ -187,8 +188,6 @@ class RaisesContext[E: BaseException]:
     def __init__(self, expected_exception, match=None, check=None):
         self.expected_exception = expected_exception
         if match is not None and match == "":
-            import warnings
-
             from _pytest.warning_types import PytestWarning
 
             warnings.warn(

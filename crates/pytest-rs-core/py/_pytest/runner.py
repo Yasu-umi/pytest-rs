@@ -2,7 +2,9 @@
 upstream runtestprotocol's report shape (setup/call/teardown) with
 skip/xfail mark semantics; no fixtures."""
 
+import inspect
 import sys
+import time
 import traceback
 
 from pytest._outcomes import Exit, Skipped, XFailed
@@ -39,8 +41,6 @@ class CallInfo:
 
     @classmethod
     def from_call(cls, func, when, reraise=None):
-        import time
-
         excinfo = None
         result = None
         start = time.time()
@@ -338,8 +338,6 @@ def runtestprotocol(item, log=True, nextitem=None):
         else:
             error = None
             try:
-                import inspect
-
                 funcargs = getattr(item, "funcargs", None) or {}
                 try:
                     sig = inspect.signature(item.obj)

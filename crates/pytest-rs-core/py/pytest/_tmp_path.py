@@ -3,6 +3,7 @@ port: pytest-of-{user} numbered basetemps with lock-driven retention)."""
 
 import fnmatch
 import getpass
+import hashlib
 import os
 import pathlib
 import re
@@ -415,8 +416,6 @@ class LocalPath:
         return [LocalPath(child) for child in entries]
 
     def computehash(self, hashtype="md5"):
-        import hashlib
-
         h = hashlib.new(hashtype)
         h.update(self._path.read_bytes())
         return h.hexdigest()

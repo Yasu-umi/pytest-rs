@@ -3,6 +3,9 @@ falls back to a self-contained implementation matching pytest 9.x behaviour."""
 
 from __future__ import annotations
 
+import itertools
+import sys
+
 
 # If the real pytest source is on PYTHONPATH (e.g. during conformance testing),
 # import everything from there so that assertion-rewriting isinstance checks
@@ -17,9 +20,7 @@ def _try_import_real_pytest():
 
         if not isinstance(getattr(_real_api, "ApproxBase", None), type):
             return False
-        import sys as _sys
-
-        _g = _sys.modules[__name__].__dict__
+        _g = sys.modules[__name__].__dict__
         for _name in (
             "ApproxBase",
             "ApproxDecimal",
@@ -177,8 +178,6 @@ if not _USING_REAL_PYTEST:
             return f"approx({list_scalars!r})"
 
         def _repr_compare(self, other_side) -> list:
-            import itertools
-
             def get_value_from_nested_list(nested_list, nd_index):
                 value = nested_list
                 for i in nd_index:

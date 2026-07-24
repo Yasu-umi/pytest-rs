@@ -5,6 +5,7 @@ accumulator; after the call phase the runner pops the records and turns
 them into individual reports (upstream pytest's builtin subtests plugin).
 """
 
+import sys
 import time
 from typing import Any
 
@@ -217,8 +218,6 @@ class _SubTestContextManager:
         _results.append(record)
 
         if _inline_chars:
-            import sys
-
             c = _PROGRESS_CHARS.get(record["outcome"])
             if c is not None:
                 global _inline_count

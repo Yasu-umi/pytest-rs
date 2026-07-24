@@ -10,6 +10,7 @@ drops into the debugger on failures.
 from __future__ import annotations
 
 import functools
+import io
 import os
 import sys
 from typing import Any
@@ -227,8 +228,6 @@ def _enter_pdb(node, excinfo, rep):
     longrepr = getattr(rep, "longrepr", None)
     if longrepr:
         if hasattr(longrepr, "toterminal"):
-            import io
-
             buf = io.StringIO()
 
             class _FakeWriter:
@@ -328,8 +327,6 @@ def maybe_interact(item_proxy, exc, longrepr="") -> None:
         from pytest._outcomes import Exit
 
         if isinstance(e, Exit):
-            import os
-
             os._exit(e.returncode if e.returncode is not None else 1)
         pass
 
