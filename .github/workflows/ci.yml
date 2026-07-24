@@ -276,3 +276,9 @@ jobs:
 
       - name: typing parity (reveal_type corpus)
         run: uv run --no-sync python conformance/typing_check.py
+
+      - name: typing parity (differential vs the real libraries)
+        # Clones each reimplemented plugin's checkout to reuse its own test
+        # suite as the corpus, so it is slower than the reveal_type step but
+        # covers surface nobody thought to write an assertion for.
+        run: uv run --no-sync python conformance/typing_parity.py --check
