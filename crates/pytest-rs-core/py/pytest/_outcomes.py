@@ -2,7 +2,7 @@
 
 import importlib
 import warnings
-from typing import NoReturn
+from typing import ClassVar, NoReturn
 
 
 class OutcomeException(BaseException):
@@ -40,7 +40,7 @@ class _Skip:
     Skipped is `_Skip.__call__` (upstream introspects co_qualname and expects
     the frame to be __tracebackhide__-hidden — test_skip_simple)."""
 
-    Exception = Skipped
+    Exception: ClassVar[type[Skipped]] = Skipped
 
     # NoReturn on this family (upstream types them the same way) is what lets a
     # caller end a branch with `pytest.fail(...)` instead of a return: without
@@ -56,16 +56,35 @@ class _Skip:
 skip = _Skip()
 
 
-def fail(reason: str = "", pytrace: bool = True) -> NoReturn:
-    __tracebackhide__ = True
-    exc = Failed(msg=reason)
-    exc.pytrace = pytrace
-    raise exc
+class _Fail:
+    """pytest.fail, a callable class for the same reasons as _Skip -- plus
+    `pytest.fail.Exception`, which upstream declares as a ClassVar. Setting that
+    attribute on a plain function (what this used to be) works at run time but
+    is invisible to a type checker, so every
+    `pytest.raises(pytest.fail.Exception)` in a caller's suite -- ten of them in
+    pytest's own -- was an attr-defined error."""
+
+    Exception: ClassVar[type[Failed]] = Failed
+
+    def __call__(self, reason: str = "", pytrace: bool = True) -> NoReturn:
+        __tracebackhide__ = True
+        exc = Failed(msg=reason)
+        exc.pytrace = pytrace
+        raise exc
 
 
-def xfail(reason: str = "") -> NoReturn:
-    __tracebackhide__ = True
-    raise XFailed(msg=reason)
+fail = _Fail()
+
+
+class _XFail:
+    Exception: ClassVar[type[XFailed]] = XFailed
+
+    def __call__(self, reason: str = "") -> NoReturn:
+        __tracebackhide__ = True
+        raise XFailed(msg=reason)
+
+
+xfail = _XFail()
 
 
 class Exit(Exception):
@@ -77,9 +96,15 @@ class Exit(Exception):
         self.returncode = returncode
 
 
-def exit(reason: str = "", returncode: int | None = None) -> NoReturn:
-    __tracebackhide__ = True
-    raise Exit(reason, returncode)
+class _Exit:
+    Exception: ClassVar[type[Exit]] = Exit
+
+    def __call__(self, reason: str = "", returncode: int | None = None) -> NoReturn:
+        __tracebackhide__ = True
+        raise Exit(reason, returncode)
+
+
+exit = _Exit()
 
 
 def importorskip(modname, minversion=None, reason=None, *, exc_type=None):
@@ -120,11 +145,3 @@ def importorskip(modname, minversion=None, reason=None, *, exc_type=None):
             skipped.allow_module_level = True
             raise skipped
     return mod
-
-
-# pytest parity: the raising helpers expose their exception type
-# (`with pytest.raises(pytest.fail.Exception): ...`). skip exposes it as a
-# class attribute on _Skip; fail/xfail are functions so set it here.
-fail.Exception = Failed  # type: ignore[attr-defined]
-xfail.Exception = XFailed  # type: ignore[attr-defined]
-exit.Exception = Exit  # type: ignore[attr-defined]
