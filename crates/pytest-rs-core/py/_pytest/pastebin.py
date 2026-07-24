@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import re
-from urllib.error import HTTPError
-from urllib.parse import urlencode
-from urllib.request import urlopen
+import urllib.error
+import urllib.parse
+import urllib.request
 
 
 def create_new_paste(contents: str | bytes) -> str:
@@ -19,8 +19,12 @@ def create_new_paste(contents: str | bytes) -> str:
         contents = contents.encode("utf-8")
     params = {"code": contents, "lexer": "text", "expiry": "1week"}
     try:
-        response = urlopen(url, data=urlencode(params).encode("ascii")).read().decode("utf-8")
-    except HTTPError as e:
+        response = (
+            urllib.request.urlopen(url, data=urllib.parse.urlencode(params).encode("ascii"))
+            .read()
+            .decode("utf-8")
+        )
+    except urllib.error.HTTPError as e:
         with e:
             return f"bad response: {e}"
     except OSError as e:
