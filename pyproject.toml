@@ -50,6 +50,8 @@ include = [
     { path = "crates/pytest-rs-core/py/pytest_asyncio/py.typed", format = "wheel" },
     { path = "crates/pytest-rs-core/py/pytest_cov/**/*.py", format = "wheel" },
     { path = "crates/pytest-rs-core/py/pytest_cov/py.typed", format = "wheel" },
+    { path = "crates/pytest-rs-core/py/pytest_benchmark/**/*.py", format = "wheel" },
+    { path = "crates/pytest-rs-core/py/pytest_benchmark/py.typed", format = "wheel" },
 ]
 
 [tool.uv]

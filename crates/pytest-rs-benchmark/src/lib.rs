@@ -22,6 +22,28 @@ use core_pyo3::types::{PyDict, PyList, PyModule};
 
 const HELPER: &str = include_str!("../py/helper.py");
 
+/// The `pytest_benchmark` shim, written to the per-run shim dir as a real
+/// package so `from pytest_benchmark.fixture import BenchmarkFixture` — the
+/// annotation a benchmark test writes for its fixture parameter — resolves.
+/// The same files ship in the wheel (pyproject.toml's [tool.maturin] include)
+/// for mypy and standalone Python; `pytest_configure` swaps the two annotation
+/// stand-ins for the real #[pyclass]es below, so inside a run the imported name
+/// *is* the class a test receives.
+const SHIM_FILES: &[(&str, &str)] = &[
+    (
+        "__init__.py",
+        include_str!("../../pytest-rs-core/py/pytest_benchmark/__init__.py"),
+    ),
+    (
+        "fixture.py",
+        include_str!("../../pytest-rs-core/py/pytest_benchmark/fixture.py"),
+    ),
+    (
+        "stats.py",
+        include_str!("../../pytest-rs-core/py/pytest_benchmark/stats.py"),
+    ),
+];
+
 /// One `--help` line under the `benchmark:` group, ported verbatim from
 /// upstream pytest-benchmark's own `pytest_addoption` (plugin.py) so the
 /// rendered group matches upstream's real `--help` text — see
@@ -489,6 +511,20 @@ impl Plugin for BenchmarkPlugin {
 
     fn pytest_configure(&mut self, ctx: &mut HookContext) -> PyResult<()> {
         let py = ctx.py;
+
+        // Importable pytest_benchmark, whether or not this run benchmarks
+        // anything (mirrors having pytest-benchmark installed), with the two
+        // annotation stand-ins replaced by the classes a test actually gets.
+        let package_root = pytest_rs_core::python::shim_root().join("pytest_benchmark");
+        for (rel, content) in SHIM_FILES {
+            pytest_rs_core::python::write_shim_file(&package_root.join(rel), content)
+                .map_err(|e| core_pyo3::exceptions::PyOSError::new_err(e.to_string()))?;
+        }
+        py.import("pytest_benchmark.fixture")?
+            .setattr("BenchmarkFixture", py.get_type::<BenchmarkFixture>())?;
+        py.import("pytest_benchmark.stats")?
+            .setattr("Stats", py.get_type::<fixture::PyStats>())?;
+
         self.only = ctx.config.get_flag("benchmark-only");
         self.skip = ctx.config.get_flag("benchmark-skip");
         self.config.disabled = ctx.config.get_flag("benchmark-disable");

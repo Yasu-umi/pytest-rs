@@ -234,7 +234,8 @@ jobs:
         # but not importable. This step is the regression detector for that.
         run: |
           smokevenv/bin/python -c "
-          import pytest_asyncio, pytest_cov, pytest_mock
+          import pytest_asyncio, pytest_benchmark, pytest_cov, pytest_mock
+          from pytest_benchmark.fixture import BenchmarkFixture
           from pytest_mock import MockerFixture
 
           assert hasattr(pytest_mock.plugin, '_configure')
