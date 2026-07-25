@@ -2,6 +2,18 @@
 # error a caller gets from the shipped shim but not from the real
 # library: an accepted typing-parity gap. shim_only shrinking is the
 # goal; a new entry is a regression the --check gate rejects.
+#
+# What stays here on purpose: internals that exist in pytest-rs only as
+# Rust (xdist.workermanage, pytest_benchmark.utils, FormattedExcinfo's
+# formatting methods, _pytest._code's Source/Frame navigation). Shipping
+# Python modules so an upstream test can import them would mean shipping
+# code nothing runs; a caller's own suite reaches none of them. Also
+# permanent: `import py`, whose compat module upstream bundles and
+# pytest-rs does not, and LEGACY_PATH, which upstream binds to
+# py.path.local -- there is no class here to point it at.
+#
+# real_only entries are the opposite (the shim is more permissive than
+# the real library); they cost a caller nothing and never gate.
 
 [pytest]
 shim_only = [
@@ -28,19 +40,15 @@ shim_only = [
     "testing/code/test_source.py: [attr-defined] \"Source\" has no attribute \"__iter__\"; maybe \"__str__\"? (not iterable)",
     "testing/code/test_source.py: [attr-defined] \"Source\" has no attribute \"getstatement\"",
     "testing/code/test_source.py: [attr-defined] \"Source\" has no attribute \"getstatementrange\"",
-    "testing/code/test_source.py: [call-overload] No overload variant of \"raises\" matches argument types \"type[SyntaxError]\", \"Callable[[], Any]\"",
     "testing/code/test_source.py: [index] Value of type \"Source\" is not indexable",
-    "testing/freeze/create_executable.py: [attr-defined] Module has no attribute \"freeze_includes\"",
     "testing/io/test_terminalwriter.py: [attr-defined] \"TerminalWriter\" has no attribute \"_write_source\"",
     "testing/python/collect.py: [attr-defined] \"Class\" has no attribute \"collect\"",
     "testing/python/collect.py: [attr-defined] \"File\" has no attribute \"obj\"",
     "testing/python/fixtures.py: [attr-defined] \"Function\" has no attribute \"funcargs\"",
     "testing/python/metafunc.py: [type-arg] \"FixtureDef\" expects no type arguments, but 1 given",
-    "testing/python/raises.py: [call-overload] No overload variant of \"raises\" matches argument types \"type[TypeError]\", \"type[int]\", \"str\"",
     "testing/python/raises_group.py: [return-value] Incompatible return value type (got \"RaisesContext[Failed]\", expected \"RaisesExc[Failed]\")",
     "testing/test_argcomplete.py: [import-not-found] Cannot find implementation or library stub for module named \"_pytest._argcomplete\"",
     "testing/test_assertrewrite.py: [attr-defined] \"AssertionRewritingHook\" has no attribute \"set_session\"",
-    "testing/test_capture.py: [call-overload] No overload variant of \"raises\" matches argument types \"type[TypeError]\", \"Callable[[str], int]\", \"bytes\"",
     "testing/test_capture.py: [type-arg] \"MultiCapture\" expects no type arguments, but 1 given",
     "testing/test_doctest.py: [arg-type] Argument 1 to \"_is_main_py\" has incompatible type \"Path\"; expected \"str\"",
     "testing/test_doctest.py: [arg-type] Argument 1 to \"_is_setup_py\" has incompatible type \"Path\"; expected \"str\"",
@@ -51,11 +59,7 @@ shim_only = [
     "testing/test_mark_expression.py: [arg-type] Argument 2 to \"evaluate\" has incompatible type \"def matcher(str, /, **kwargs: str | int | bool | None) -> bool\"; expected \"ExpressionMatcher\"",
     "testing/test_pluginmanager.py: [attr-defined] \"Callable[[str], None]\" has no attribute \"root\"",
     "testing/test_pluginmanager.py: [attr-defined] \"HookCaller\" has no attribute \"name\"; maybe \"_name\"?",
-    "testing/test_pluginmanager.py: [attr-defined] \"PluginManager\" has no attribute \"consider_module\"",
-    "testing/test_pluginmanager.py: [attr-defined] \"PluginManager\" has no attribute \"enable_tracing\"",
     "testing/test_pytester.py: [attr-defined] \"Pytester\" has no attribute \"_monkeypatch\"",
-    "testing/test_reports.py: [attr-defined] \"ExceptionChainRepr\" has no attribute \"addsection\"",
-    "testing/test_reports.py: [attr-defined] \"ExceptionChainRepr\" has no attribute \"sections\"",
     "testing/test_runner.py: [attr-defined] \"BaseReport\" has no attribute \"newthing\"",
     "testing/test_tmpdir.py: [attr-defined] \"Pytester\" has no attribute \"_test_tmproot\"",
     "testing/typing_checks.py: [assert-type] Expression is of type \"tuple[str, int | None, str] | None\", not \"tuple[str, int | None, str]\"",
@@ -94,7 +98,6 @@ shim_only = [
     "testing/test_workermanage.py: [import-not-found] Cannot find implementation or library stub for module named \"xdist._path\"",
     "testing/test_workermanage.py: [import-not-found] Cannot find implementation or library stub for module named \"xdist.remote\"",
     "testing/test_workermanage.py: [import-not-found] Cannot find implementation or library stub for module named \"xdist.workermanage\"",
-    "testing/test_workermanage.py: [name-defined] Name \"pytest.HookRecorder\" is not defined",
 ]
 real_only = []
 

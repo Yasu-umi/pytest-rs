@@ -170,6 +170,18 @@ def write_baseline(measured: dict[str, tuple[Findings, Findings]]) -> None:
         "# error a caller gets from the shipped shim but not from the real",
         "# library: an accepted typing-parity gap. shim_only shrinking is the",
         "# goal; a new entry is a regression the --check gate rejects.",
+        "#",
+        "# What stays here on purpose: internals that exist in pytest-rs only as",
+        "# Rust (xdist.workermanage, pytest_benchmark.utils, FormattedExcinfo's",
+        "# formatting methods, _pytest._code's Source/Frame navigation). Shipping",
+        "# Python modules so an upstream test can import them would mean shipping",
+        "# code nothing runs; a caller's own suite reaches none of them. Also",
+        "# permanent: `import py`, whose compat module upstream bundles and",
+        "# pytest-rs does not, and LEGACY_PATH, which upstream binds to",
+        "# py.path.local -- there is no class here to point it at.",
+        "#",
+        "# real_only entries are the opposite (the shim is more permissive than",
+        "# the real library); they cost a caller nothing and never gate.",
         "",
     ]
     for name, (shim_only, real_only) in measured.items():

@@ -345,6 +345,50 @@ Harness (`conformance/runner.py`):
   only grows; a regression fails CI. `[excluded]` entries are explicit and justified (tests
   of pytest/pluggy internals, packaging tests). The release gate additionally requires
   ci-green and a drift-free scoreboard.
+### Typing parity
+
+A drop-in runner has to be drop-in for the *type checker* too: an adopting project runs
+mypy over its suite, and a missing attribute on `pytest.FixtureRequest` or an
+`Any | None`-typed `excinfo.value` produces hundreds of errors that have nothing to do with
+the project's own code. Two checks cover it, both CI-gated:
+
+- `conformance/typing_check.py` — a `reveal_type(...)  # revealed: <type>` corpus under
+  `conformance/typing/`, for the precision of specific overloads (which `raises` form yields
+  which `ExceptionInfo[E]`, what a `@pytest.fixture`-decorated function becomes).
+- `conformance/typing_parity.py` — the same corpus problem attacked from the other end:
+  mypy runs twice over each reimplemented plugin's *own test suite*, swapping only
+  MYPYPATH between the real library's source (already checked out for the conformance run)
+  and `crates/pytest-rs-core/py`. Errors only the shim run reports are gaps, recorded in
+  `conformance/expected/typing_parity.toml`. The expectation is generated rather than
+  written by hand, which is the point: a hand-maintained corpus can only assert what
+  someone thought of, and the gaps that actually hurt were attributes nobody remembered to
+  declare. Two flags are load-bearing — no `--ignore-missing-imports` and
+  `--config-file /dev/null` — so that a shim which does not exist *at all* registers as a
+  gap instead of resolving to `Any` and looking like perfect parity.
+
+Accepted gaps stay in the baseline with a reason. The bulk of them are internals that exist
+here only as Rust (`xdist.workermanage`, `pytest_benchmark.utils`, `FormattedExcinfo`'s
+formatting methods): shipping Python modules purely so an upstream test can import them
+would mean shipping code nothing runs. The rule for what *is* declared: only what the
+engine's object really provides, so a type checker never promises an attribute that would
+fail at run time.
+
+### Shipped shim packages
+
+`pytest`, `_pytest`, `pytest_mock`, `pytest_asyncio`, `pytest_cov` and `pytest_benchmark`
+are installed into site-packages by the wheel, and written into a per-run temp dir by the
+engine. Two invariants matter:
+
+- They all live under `crates/pytest-rs-core/py` (maturin's `python-source`). maturin strips
+  only that prefix from an `include` path, so a package kept in its own crate's `py/` dir is
+  packaged as `site-packages/crates/<crate>/py/<pkg>/` — present in the wheel, not
+  importable. The release workflow imports each one from a fresh venv to catch a regression.
+- Extraction goes through `write_shim_file`, which renames a pid-unique sibling into place
+  and gates on the existing file's length. The shim root is shared (named by version +
+  content hash) across concurrent runs and forked workers, and a truncated `plugin.py` is
+  indistinguishable from a complete one to `exists()` — that combination produced an
+  INTERNAL ERROR at configure time before the writes became atomic.
+
 - `pytester` is supported (nested sessions run the pytest-rs binary as the sub-runner),
   which is what unlocked the bulk of upstream behavioral tests. Its in-process APIs largely
   landed too (`parseconfig(ure)`, `runitem`, `getnode`/`getitems`/`collect_by_name`, a real

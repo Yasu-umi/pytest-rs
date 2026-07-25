@@ -28,6 +28,8 @@ pytest-rs --cov=mypkg           # native coverage (pytest-cov compatible)
 > Don't install this alongside the real `pytest` package in the same environment: both distributions claim the same `pytest` import path, and pip/uv have no awareness that they conflict — installation order decides which files end up in `site-packages/pytest/`, and neither installer cleanly removes the other's.
 >
 > When switching a project over, `pytest` itself, `pluggy`, and `iniconfig` are the only packages pytest-rs supersedes — safe to drop. Any other pytest plugin the project uses (`pytest-django`, `pytest-aiohttp`, ...) is a real, separately-installed package unless it's one of the plugins listed under [Bundled plugins](#bundled-plugins) below, and must stay installed for its fixtures/hooks to keep working.
+>
+> Watch for `pytest` arriving *transitively*: every pytest plugin declares a dependency on it, so keeping one of the bundled plugins installed (`pytest-mock` for its `MockerFixture` annotation, say) pulls the real `pytest` back in behind your back. `uv tree --package pytest` / `pip show pytest` after a lock change is the quick check; the annotations those plugins are usually kept around for ship with pytest-rs itself (see [Type annotations](#type-annotations)).
 
 ### Requirements
 
@@ -51,6 +53,28 @@ At build time, when installing from source — bundled plugins are Cargo feature
 [tool.uv]
 config-settings-package = { pytest-rs = { build-args = "--no-default-features --features asyncio,mock" } }
 ```
+
+#### Type annotations
+
+A suite that annotates its fixture parameters keeps working: the wheel installs
+`pytest_mock`, `pytest_asyncio`, `pytest_cov` and `pytest_benchmark` as real,
+`py.typed` packages, so
+
+```python
+from pytest_benchmark.fixture import BenchmarkFixture
+from pytest_mock import MockerFixture
+
+def test_x(mocker: MockerFixture, benchmark: BenchmarkFixture) -> None: ...
+```
+
+type-checks and imports without the corresponding distributions installed — which
+is what keeps the real `pytest` out of the environment (see the note above). Each
+declares the surface pytest-rs's own fixture provides; where a bundled plugin is
+narrower than upstream, the missing attribute is left undeclared rather than
+typed and broken, so a type checker tells you before a run does.
+
+`pytest-split` has no importable API to mirror (`--splits`/`--group` are
+CLI-only), and the anyio layer uses the installed `anyio` package's own types.
 
 ### Third-party plugins (not reimplemented, loaded as-is)
 
