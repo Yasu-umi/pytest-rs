@@ -232,6 +232,18 @@ class SysCaptureBase(CaptureBase):
         self.tmpfile.close()
         self._state = "done"
 
+    def discard_after_fork(self):
+        """Restore the stream, but leave tmpfile open (see FDCaptureBase's
+        override for the reasoning): this object *is* what `sys.stdout` was
+        replaced with before the fork, so anything that bound `sys.stdout` at
+        import time still holds it."""
+        self._assert_state("discard_after_fork", ("initialized", "started", "suspended", "done"))
+        if self._state == "done":
+            return
+        setattr(sys, self.name, self._old)
+        del self._old
+        self._state = "done"
+
     def suspend(self):
         self._assert_state("suspend", ("started", "suspended"))
         setattr(sys, self.name, self._old)
@@ -356,15 +368,25 @@ class FDCaptureBase(CaptureBase):
         at some unpredictable later point during this worker's own test
         run, which pytest's own unraisableexception machinery then
         faithfully (but spuriously) attributes to whatever test happens to
-        be running at that moment."""
+        be running at that moment.
+
+        The tmpfile is the exception: it also *is* what `sys.stdout` was
+        replaced with before the fork, so a module that bound `sys.stdout` at
+        import time still holds it — alembic.config does, as the default
+        argument of `Config(stdout=sys.stdout)`, and conftest imports happen
+        pre-fork. Closing it turned those writes into `ValueError: I/O
+        operation on closed file` mid-test, which a spawned worker (importing
+        after installing its own capture) never sees. Leave it open: its
+        content goes nowhere the worker reads, but writing to it stays legal,
+        and holding it alive is also what keeps the GC from finalizing it at
+        an arbitrary later moment."""
         self._assert_state("discard_after_fork", ("initialized", "started", "suspended", "done"))
         if self._state == "done":
             return
         os.close(self.targetfd_save)
         if self.targetfd_invalid is not None:
             os.close(self.targetfd_invalid)
-        self.syscapture.done()
-        self.tmpfile.close()
+        self.syscapture.discard_after_fork()
         self._state = "done"
 
     def suspend(self):
