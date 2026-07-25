@@ -1386,6 +1386,23 @@ class Node(Item):
         record_added_mark(marker)
 
 
+def _direct_argnames(item):
+    """The fixture/param names an item's function takes as parameters, dropping
+    the bound `self`/`cls` -- upstream's getfuncargnames."""
+    import inspect
+
+    func = getattr(item, "obj", None)
+    if func is None:
+        return ()
+    try:
+        names = tuple(inspect.signature(func).parameters)
+    except (TypeError, ValueError):
+        return ()
+    if names and names[0] in ("self", "cls") and getattr(item, "cls", None) is not None:
+        names = names[1:]
+    return names
+
+
 class Function(Node):
     """Test-function node; the engine builds these for collected test items
     (conftest hooks isinstance-check pytest.Function)."""
@@ -1420,7 +1437,13 @@ class Function(Node):
 
             fixturenames = list(getattr(self, "fixturenames", []))
             fi = FuncFixtureInfo(
-                argnames=tuple(fixturenames),
+                # Only what the function asks for by parameter, which is what
+                # upstream means by argnames -- filling it with the whole
+                # closure breaks a plugin that pairs it with funcargs, since
+                # the closure holds names the test itself never receives
+                # (aiohttp's pytest_pyfunc_call builds its testargs exactly
+                # that way and raised KeyError: 'loop').
+                argnames=_direct_argnames(self),
                 initialnames=tuple(fixturenames),
                 names_closure=fixturenames,
                 name2fixturedefs={},
