@@ -51,7 +51,11 @@ def check_outcomes_are_noreturn(flag: bool) -> int:
     """A branch may end in skip/fail/xfail/exit instead of a return."""
     if flag:
         return 1
-    reveal_type(pytest.fail)  # revealed: def (reason: str =, pytrace: bool =) -> Never
+    # `.Exception` has to be visible statically (upstream declares it as a
+    # ClassVar on the callable class), and reaching the end of an `int`-returning
+    # function without a return only type-checks because fail is NoReturn.
+    reveal_type(pytest.fail.Exception)  # revealed: type[pytest._outcomes.Failed]
+    reveal_type(pytest.skip.Exception)  # revealed: type[pytest._outcomes.Skipped]
     pytest.fail("no value to return")
 
 
