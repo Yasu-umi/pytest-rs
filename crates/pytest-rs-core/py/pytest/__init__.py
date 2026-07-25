@@ -11,9 +11,13 @@ import pathlib
 import shutil
 import subprocess
 import sys
-from collections.abc import Callable, MutableMapping
-from typing import Any, NoReturn
+import types as _types
+from collections.abc import Callable as _Callable
+from collections.abc import MutableMapping as _MutableMapping
+from typing import Any as _Any
+from typing import NoReturn as _NoReturn
 
+from pytest import _debugging
 from pytest._approx import approx as approx
 from pytest._cache import Cache as Cache
 from pytest._cache import cache as cache
@@ -332,7 +336,7 @@ class FixtureRequest:
     # `hasattr` still answers False exactly as it did when they were absent —
     # AttributeError is also what the pyo3 getters themselves raise for a
     # member the current fixture scope cannot supply.
-    def _outside_run(self, name: str) -> NoReturn:
+    def _outside_run(self, name: str) -> _NoReturn:
         raise AttributeError(
             f"{name}: pytest.FixtureRequest is only usable inside a pytest-rs run "
             "(the engine replaces this class with its own implementation at "
@@ -344,7 +348,7 @@ class FixtureRequest:
         self._outside_run("config")
 
     @property
-    def function(self) -> Callable[..., object]:
+    def function(self) -> _Callable[..., object]:
         self._outside_run("function")
 
     @property
@@ -364,7 +368,7 @@ class FixtureRequest:
         self._outside_run("fixturename")
 
     @property
-    def keywords(self) -> MutableMapping[str, object]:
+    def keywords(self) -> _MutableMapping[str, object]:
         self._outside_run("keywords")
 
     @property
@@ -379,42 +383,68 @@ class FixtureRequest:
     # hand back engine objects with no shim type of their own, so Any is the
     # honest annotation rather than a guess.
     @property
-    def param(self) -> Any:
+    def param(self) -> _Any:
         self._outside_run("param")
 
     @property
-    def module(self) -> Any:
+    def module(self) -> _Any:
         self._outside_run("module")
 
     @property
-    def node(self) -> Any:
+    def node(self) -> _Any:
         self._outside_run("node")
 
     @property
-    def session(self) -> Any:
+    def session(self) -> _Any:
         self._outside_run("session")
 
-    def getfixturevalue(self, argname: str) -> Any:
+    def getfixturevalue(self, argname: str) -> _Any:
         self._outside_run("getfixturevalue")
 
-    def applymarker(self, marker: Any) -> None:
+    def applymarker(self, marker: _Any) -> None:
         self._outside_run("applymarker")
 
-    def addfinalizer(self, finalizer: Callable[[], object]) -> None:
+    def addfinalizer(self, finalizer: _Callable[[], object]) -> None:
         self._outside_run("addfinalizer")
 
 
 # Report/terminal classes live in the _pytest shadow package; import them last
 # to avoid a circular import while pytest's own package is initializing.
 from _pytest.config import Config as Config  # noqa: E402
+from _pytest.doctest import DoctestItem as DoctestItem  # noqa: E402
 from _pytest.fixtures import FixtureDef as FixtureDef  # noqa: E402
+from _pytest.freeze_support import freeze_includes as freeze_includes  # noqa: E402
+from _pytest.pytester import HookRecorder as HookRecorder  # noqa: E402
+from _pytest.pytester import RecordedHookCall as RecordedHookCall  # noqa: E402
 from _pytest.reports import CollectReport as CollectReport  # noqa: E402
 from _pytest.reports import TestReport as TestReport  # noqa: E402
+from _pytest.runner import CallInfo as CallInfo  # noqa: E402
 from _pytest.terminal import TerminalProgressPlugin as TerminalProgressPlugin  # noqa: E402
 from _pytest.terminal import TerminalReporter as TerminalReporter  # noqa: E402
+from _pytest.terminal import TestShortLogReport as TestShortLogReport  # noqa: E402
 
 from pytest._metafunc import Metafunc as Metafunc  # noqa: E402
+from pytest._parser import OptionGroup as OptionGroup  # noqa: E402
+from pytest._subtests import SubtestReport as SubtestReport  # noqa: E402
+from pytest._tmp_path import TempdirFactory as TempdirFactory  # noqa: E402
+
+#: `pytest.set_trace()` drops into the configured debugger, and `pytest.cmdline`
+#: is upstream's pre-3.0 alias namespace for `main`.
+set_trace = _debugging.pytestPDB.set_trace
+
+
+class cmdline:
+    """Compatibility namespace (upstream keeps it for `pytest.cmdline.main`)."""
+
+    main = staticmethod(main)
+
 
 #: Public names (upstream curates this list; the public surface here is
-#: exactly the non-underscore module globals).
-__all__ = sorted(name for name in globals() if not name.startswith("_"))
+#: every non-underscore global that is not a module -- the stdlib modules this
+#: file imports are implementation detail, and letting them through made
+#: `pytest.os` and friends part of the advertised API).
+__all__ = sorted(
+    name
+    for name, value in globals().items()
+    if not name.startswith("_") and not isinstance(value, _types.ModuleType)
+)

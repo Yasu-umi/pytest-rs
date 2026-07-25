@@ -17,8 +17,10 @@ import sys
 import textwrap
 import time
 import warnings
+from collections.abc import Mapping
 from functools import partial
 from pathlib import Path
+from typing import NamedTuple
 
 from _pytest._io import TerminalWriter
 from _pytest._io.wcwidth import wcswidth
@@ -1282,3 +1284,13 @@ class TerminalProgressPlugin:
 
 
 from _pytest._stub import __getattr__  # noqa: E402, F401
+
+
+class TestShortLogReport(NamedTuple):
+    """A plugin's `pytest_report_teststatus` return value: the result category,
+    its short progress letter and the verbose word (upstream's NamedTuple, e.g.
+    pytest-rerunfailures returns `("rerun", "R", ("RERUN", {"yellow": True}))`)."""
+
+    category: str
+    letter: str
+    word: str | tuple[str, Mapping[str, bool]]
