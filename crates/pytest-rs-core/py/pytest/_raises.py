@@ -327,11 +327,15 @@ def raises(*, check: Callable[[BaseException], bool]) -> RaisesContext[BaseExcep
 
 
 @overload
-def raises[E: BaseException, **P](
+def raises[E: BaseException](
     expected_exception: type[E] | tuple[type[E], ...],
-    func: Callable[P, object],
-    *args: P.args,
-    **kwargs: P.kwargs,
+    # Deliberately not a ParamSpec, matching upstream: binding one against the
+    # callable rejects perfectly good calls whose target is an overloaded
+    # constructor -- `pytest.raises(ValueError, int, "hello")`, straight out of
+    # pytest's own docs, was a call-overload error here for exactly that reason.
+    func: Callable[..., Any],
+    *args: Any,
+    **kwargs: Any,
 ) -> ExceptionInfo[E]: ...
 
 
