@@ -73,6 +73,13 @@ class ExceptionChainRepr:
         # Last traceback/crash in the chain (the innermost exception).
         self.reprtraceback = self.chain[-1][0] if self.chain else ReprTraceback()
         self.reprcrash = self.chain[-1][1] if self.chain else None
+        # Extra (name, content, sep) blocks a plugin attaches to a failure
+        # report through addsection -- upstream declares both on the shared
+        # ExceptionRepr base, and a report consumer reads `longrepr.sections`.
+        self.sections: list[tuple[str, str, str]] = []
+
+    def addsection(self, name: str, content: str, sep: str = "-") -> None:
+        self.sections.append((name, content, sep))
 
     @property
     def longreprtext(self):

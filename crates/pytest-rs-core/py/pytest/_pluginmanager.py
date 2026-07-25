@@ -11,6 +11,7 @@ import pathlib
 import sys
 import types
 import warnings
+from collections.abc import Callable
 from typing import Any
 
 # True only while `-p`/entry-point/conftest pytest_configure hooks that run
@@ -400,6 +401,10 @@ class _RewriteHookProxy:
 
 
 class PluginManager:
+    # Set by enable_tracing() (and read alongside PYTEST_DEBUG) — declared here
+    # because the engine keeps exactly one PluginManager per process.
+    _tracing_enabled = False
+
     # Every hookspec name upstream's _pytest/hookspec.py declares (transcribed
     # from the real source, not derived from what pytest-rs's own scattered
     # "hook.name == ..." dispatch sites happen to recognize — that set is
@@ -715,7 +720,7 @@ class PluginManager:
         code that greps stderr for registration activity when debugging."""
         import os
 
-        if not os.environ.get("PYTEST_DEBUG"):
+        if not (self._tracing_enabled or os.environ.get("PYTEST_DEBUG")):
             return
         print(
             f"pytest_plugin_registered [hook]\n"
@@ -992,6 +997,28 @@ class PluginManager:
 
     def consider_conftest(self, conftestmodule: types.ModuleType, registration_name: str) -> None:
         self.register(conftestmodule, name=registration_name)
+
+    def consider_module(self, mod: types.ModuleType) -> None:
+        """Import the plugins a module's `pytest_plugins` names (upstream's
+        PluginManager.consider_module)."""
+        spec = getattr(mod, "pytest_plugins", [])
+        names = [spec] if isinstance(spec, str) else list(spec)
+        for name in names:
+            self.import_plugin(name)
+
+    def enable_tracing(self) -> Callable[[], None]:
+        """Trace plugin registrations to stderr until the returned undo
+        callable is invoked (upstream's pluggy hook returns an undo the same
+        way). Narrower than pluggy's, which traces every hook call: this shim
+        dispatches hooks from Rust, so registration is the part it can report —
+        see _notify_plugin_registered, which the PYTEST_DEBUG env var also
+        switches on."""
+        self._tracing_enabled = True
+
+        def undo() -> None:
+            self._tracing_enabled = False
+
+        return undo
 
     _BUILTIN_PLUGINS = frozenset(
         {
