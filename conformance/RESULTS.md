@@ -61,7 +61,7 @@ pytest-rs; they are not counted in the total.
 | more-itertools | v10.7.0 | 670 | 0 | 0 | 1 | 0 | 0 | 671 | 100.0% | 2 | 2 | 0 |
 | pytest-django | v4.9.0 | 215 | 0 | 0 | 1 | 0 | 0 | 216 | 100.0% | 12 | 13 | 0 |
 | werkzeug | 3.1.3 | 922 | 0 | 0 | 1 | 25 | 0 | 948 | 97.4% | 24 | 25 | 0 |
-| fastapi | 0.115.12 | 2331 | 0 | 0 | 130 | 0 | 1 | 2462 | 100.0% | 303 | 310 | 0 |
+| fastapi | 0.115.12 | 2333 | 0 | 0 | 130 | 0 | 1 | 2464 | 100.0% | 304 | 310 | 0 |
 | packaging | 25.0 | 26948 | 0 | 0 | 0 | 0 | 0 | 26948 | 100.0% | 12 | 12 | 0 |
 | pandas | v3.0.3 | 160780 | 0 | 0 | 26985 | 0 | 8 | 187773 | 100.0% | 880 | 961 | 3 |
 | networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 0 | 0 | 6894 | 100.0% | 259 | 266 | 0 |
@@ -1218,7 +1218,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_tutorial/test_websockets/test_tutorial001.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_tutorial/test_websockets/test_tutorial002.py | passed | 30 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_tutorial/test_websockets/test_tutorial003.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_tutorial/test_websockets/test_tutorial003_py39.py | timeout | 0 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_tutorial/test_websockets/test_tutorial003_py39.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_tutorial/test_wsgi/test_tutorial001.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_typing_python39.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_union_body.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
