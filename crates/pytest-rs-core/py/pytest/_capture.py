@@ -236,12 +236,16 @@ class SysCaptureBase(CaptureBase):
         """Restore the stream, but leave tmpfile open (see FDCaptureBase's
         override for the reasoning): this object *is* what `sys.stdout` was
         replaced with before the fork, so anything that bound `sys.stdout` at
-        import time still holds it."""
+        import time still holds it. Since it must outlive this capture but
+        nothing else keeps it alive, hand it to the session state — otherwise
+        the GC finalizes it mid-run and its ResourceWarning surfaces as a
+        spurious unraisable-exception warning."""
         self._assert_state("discard_after_fork", ("initialized", "started", "suspended", "done"))
         if self._state == "done":
             return
         setattr(sys, self.name, self._old)
         del self._old
+        state._abandoned_after_fork.append(self.tmpfile)
         self._state = "done"
 
     def suspend(self):
@@ -386,6 +390,10 @@ class FDCaptureBase(CaptureBase):
         os.close(self.targetfd_save)
         if self.targetfd_invalid is not None:
             os.close(self.targetfd_invalid)
+        # Also registered here, not just by the delegated syscapture: for
+        # targetfd 0 and in tee-sys mode the syscapture holds a different
+        # stream (or none at all) than this object's tmpfile.
+        state._abandoned_after_fork.append(self.tmpfile)
         self.syscapture.discard_after_fork()
         self._state = "done"
 
@@ -639,6 +647,13 @@ class CaptureState:
         self._installed = False
         self._subtest_parent_out = []
         self._subtest_parent_err = []
+        # Capture streams a forked -n worker inherited and must not close (see
+        # FDCaptureBase.discard_after_fork). Nothing else references them once
+        # the capture object is dropped, so without this list the GC finalizes
+        # them mid-run and CPython's finalizer emits a ResourceWarning for each
+        # — which `filterwarnings = error` then turns into an error attributed
+        # to whichever test happened to be running.
+        self._abandoned_after_fork = []
 
     @property
     def fixture_name(self):
