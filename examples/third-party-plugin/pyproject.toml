@@ -1,0 +1,25 @@
+[project]
+name = "third-party-plugin-example"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = []
+
+[dependency-groups]
+# pytest-aiohttp is a real, separately-installed plugin: pytest-rs does not
+# reimplement it, it loads through the pytest11 entry point like any other.
+dev = ["pytest-rs>=0.0.12", "pytest-aiohttp==1.1.1"]
+
+[tool.uv]
+# pytest-aiohttp requires pytest, pytest-asyncio and aiohttp. The first two are
+# what pytest-rs itself provides, and installing them for real would drop the
+# upstream `pytest/` package on top of pytest-rs's own files — so drop those two
+# requirements with a marker that never matches. aiohttp is a normal dependency
+# and installs as usual.
+override-dependencies = [
+    "pytest ; sys_platform == 'never'",
+    "pytest-asyncio ; sys_platform == 'never'",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
