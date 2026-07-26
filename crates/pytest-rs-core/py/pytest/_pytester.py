@@ -398,6 +398,21 @@ def run_inprocess(args, plugins=(), helper_plugin=None, forwarded_filter_marks=(
         )
         _forwarded_env_set = True
     _pending_invocation_plugins[:] = invocation_plugins
+    # The parser registries are module-level, but upstream gives every run its
+    # own Parser: without this, options a nested run's conftest registers stay
+    # behind and the NEXT nested run sees them as pre-existing. The engine
+    # renders conftest-registered --help entries from a before/after diff of
+    # `flag_dests`, so a second run registering the same flag rendered nothing
+    # at all (pytest's own test_conftest_existing_junitxml, which passes alone
+    # and failed only after test_conftest_confcutdir had already registered
+    # --xyz in the same process). Same registries and rationale as
+    # Pytester._fire_addoption's snapshot.
+    from pytest import _parser as _parser_mod
+
+    _parser_snapshots = {
+        reg: dict(getattr(_parser_mod, reg))
+        for reg in ("ini_specs", "ini_aliases", "option_specs", "flag_dests", "flag_actions")
+    }
     try:
         try:
             ret = pytest._native_inline_run(run_args)
@@ -410,6 +425,10 @@ def run_inprocess(args, plugins=(), helper_plugin=None, forwarded_filter_marks=(
             else:
                 raise
     finally:
+        for _reg, _snap in _parser_snapshots.items():
+            _live = getattr(_parser_mod, _reg)
+            _live.clear()
+            _live.update(_snap)
         _pending_invocation_plugins.clear()
         sys.stdout.flush()
         sys.stderr.flush()
