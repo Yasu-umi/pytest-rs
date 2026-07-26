@@ -261,6 +261,14 @@ fn validate_parametrize_argnames(
     registry: &FixtureRegistry,
     test_nodeid: &str,
 ) -> PyResult<()> {
+    // Only the `parametrize` marks below consume any of this, and everything
+    // before that loop is pure computation — an `inspect.signature()` call plus
+    // a fixture-closure walk, both of which are wasted on the common case of a
+    // test with no parametrize mark at all (one signature() per collected test
+    // function, doubling what collection needs).
+    if !marks.iter().any(|m| m.name == "parametrize") {
+        return Ok(());
+    }
     let inspect = py.import("inspect")?;
     let parameters = inspect
         .call_method1("signature", (func,))
