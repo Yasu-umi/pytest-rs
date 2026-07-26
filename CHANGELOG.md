@@ -3,6 +3,61 @@
 Notable changes per release. The release workflow uses the matching section
 as the GitHub release notes (auto-generated notes are the fallback).
 
+## v0.0.12 (unreleased)
+
+### Fixed
+
+- **Plugin shims were in the wheel but not importable** — v0.0.11 shipped
+  `pytest_mock` / `pytest_asyncio` / `pytest_cov` under
+  `site-packages/crates/<crate>/py/`, because maturin strips only the
+  `python-source` prefix from an `include` path. They now install where an
+  import can find them, and the release workflow imports each from a fresh venv
+  to keep it that way.
+- **A truncated shim file broke runs permanently** — extraction used
+  `fs::write` plus a skip-if-present check, so a process could import a file
+  another was still writing (or a stump left by an interrupted run, forever
+  after): `AttributeError: module 'pytest_mock.plugin' has no attribute
+  '_configure'` at configure time. Extraction is now atomic (rename into place)
+  and heals a short file.
+- **A forked `-n` worker closed the stdout it inherited** — FD capture replaces
+  `sys.stdout` with its own object, and a forked worker discarded the inherited
+  capture by closing exactly that one, so anything that had bound `sys.stdout`
+  before the fork (conftest imports run pre-fork) hit `ValueError: I/O operation
+  on closed file` when it wrote later. alembic binds it as the default argument
+  of `Config(stdout=sys.stdout)`, which made an adopting project's alembic CLI
+  test fail under `-n` while passing under real pytest + xdist.
+- **`_fixtureinfo.argnames`** is the function's own parameters, as upstream
+  documents it, rather than the whole fixture closure.
+
+### Added
+
+- **Type annotations for the bundled plugins** — `pytest.FixtureRequest`,
+  `pytest.Config` and the report classes now carry the surface the engine
+  actually provides (they were bare stand-ins, so `request.config` or
+  `report.when` was an attr-defined error in a caller's strict-mypy run);
+  `ExceptionInfo.value` is typed `E` rather than `Any | None`;
+  `skip`/`fail`/`xfail`/`exit` expose `.Exception` statically and return
+  `NoReturn`; eleven missing public names are exported (`HookRecorder`,
+  `CallInfo`, `TestShortLogReport`, `set_trace`, ...). One adopting suite went
+  from 729 mypy errors to zero.
+- **`pytest_benchmark` shim** — importable so
+  `from pytest_benchmark.fixture import BenchmarkFixture` resolves, with the
+  engine's own classes installed into it at configure time.
+- **Differential typing-parity check** (`conformance/typing_parity.py`) — mypy
+  runs over each reimplemented plugin's own test suite twice, against the real
+  library and against the shim, and gates on the diff. This is what found the
+  gaps above; a hand-written corpus cannot assert an attribute nobody
+  remembered to declare.
+
+### Fixed (API surface)
+
+- `ExceptionInfo.traceback` is settable again (upstream's is), so
+  `excinfo.traceback = excinfo.traceback.filter(...)` no longer raises;
+  `ExceptionInfo.group_contains`, `PluginManager.consider_module` /
+  `enable_tracing`, and `longrepr.sections` / `addsection` were added.
+- `pytest.raises(ValueError, int, "hello")` type-checks — the callable form no
+  longer binds a ParamSpec that upstream deliberately avoids.
+
 ## v0.0.11 (2026-07-24)
 
 ### Fixed
