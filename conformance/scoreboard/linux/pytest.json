@@ -580,10 +580,10 @@
     },
     {
       "file": "testing/acceptance_test.py",
-      "status": "failed",
+      "status": "passed",
       "exit_code": 1,
-      "passed": 84,
-      "failed": 1,
+      "passed": 85,
+      "failed": 0,
       "skipped": 2,
       "errors": 0,
       "deselected": 0,

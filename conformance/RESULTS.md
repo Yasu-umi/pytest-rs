@@ -25,7 +25,7 @@ pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2782 | 2 | 0 | 53 | 0 | 12 | 2849 | 99.5% | 52 | 54 | 61 |
+| pytest | 9.0.3 | 2783 | 1 | 0 | 53 | 0 | 12 | 2849 | 99.5% | 53 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 7 | 0 | 0 | 0 | 0 | 0 | 7 | 100.0% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 0 | 2 | 90 | 97.8% | 1 | 1 | 0 |
@@ -128,7 +128,7 @@ pytest-rs; they are not counted in the total.
 | testing/test_unraisableexception.py | passed | 11 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_warning_types.py | passed | 15 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_warnings.py | passed | 42 | 0 | 0 | 2 | 0 | 0 |
-| testing/acceptance_test.py | failed | 84 | 1 | 0 | 2 | 0 | 6 |
+| testing/acceptance_test.py | passed | 85 | 0 | 0 | 2 | 0 | 6 |
 | testing/deprecated_test.py | passed | 15 | 0 | 0 | 0 | 0 | 0 |
 
 </details>
