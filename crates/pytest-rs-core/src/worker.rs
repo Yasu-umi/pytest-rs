@@ -336,6 +336,9 @@ impl Engine {
             nodeids,
             xdist_groups,
             errors: collect_errors,
+            // Reported per worker (every worker imports every module) and
+            // deduped by the controller.
+            skips: std::mem::take(&mut self.session.skipped_modules),
             deselected,
         });
         // Collection done: tests run from here on, so restore gc — the same
@@ -1106,7 +1109,7 @@ impl Engine {
         let import_mode = crate::collect::ImportMode::from_config(&self.config);
 
         let mut new_items = Vec::new();
-        python::collect_module(
+        if let Err(err) = python::collect_module(
             py,
             &self.config.rootdir,
             &path,
@@ -1118,8 +1121,35 @@ impl Engine {
             &self.plugins,
             &self.session.initial_paths,
             self.config.collect_imported_tests(),
-        )
-        .map_err(|err| python::format_test_failure(py, &err, "short"))?;
+        ) {
+            // Same split as the controller's own collect_module call
+            // (engine/collect/collection.rs): a module-level
+            // pytest.skip(allow_module_level=True) / unittest.SkipTest —
+            // which is what pytest.importorskip raises, so every suite with
+            // optional dependencies hits this — skips the whole module rather
+            // than erroring. Without this branch the same file that reports
+            // "1 skipped" sequentially reported "1 error" under -n, taking the
+            // exit code with it.
+            match python::module_level_skip(py, &err) {
+                Some(Ok(reason)) => {
+                    let nodeid = crate::collect::file_nodeid(
+                        &self.config.rootdir,
+                        &path,
+                        &self.session.initial_paths,
+                    );
+                    let location =
+                        python::raise_location(py, &err).unwrap_or_else(|| format!("{nodeid}:1"));
+                    self.session
+                        .skipped_modules
+                        .push((nodeid, reason, location));
+                    // Nothing else may retry importing this file.
+                    collection.collected_files.insert(path);
+                    return Ok(());
+                }
+                Some(Err(message)) => return Err(message),
+                None => return Err(python::format_test_failure(py, &err, "short")),
+            }
+        }
         {
             let mut ctx = HookContext {
                 py,

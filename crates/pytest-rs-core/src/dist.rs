@@ -72,6 +72,7 @@ enum Event {
         nodeids: Vec<String>,
         xdist_groups: Vec<Option<String>>,
         errors: Vec<(String, String)>,
+        skips: Vec<(String, String, String)>,
         deselected: usize,
     },
 }
@@ -563,6 +564,7 @@ impl Engine {
         // errors (each tries to import the failing module), so deduplicate
         // by (nodeid, message) to avoid multiplied output lines.
         let mut seen_errors: HashSet<(String, String)> = HashSet::new();
+        let mut seen_skips: HashSet<String> = HashSet::new();
         let workers = collections_pending;
         for event in receiver {
             match event {
@@ -571,8 +573,37 @@ impl Engine {
                     nodeids,
                     xdist_groups,
                     errors,
+                    skips,
                     deselected,
                 } => {
+                    // A module that skips at import time (pytest.importorskip,
+                    // skip(allow_module_level=True), unittest.SkipTest) is a
+                    // skip, not an error — every worker imports every module,
+                    // so dedupe the identical skip each of them reports.
+                    for (nodeid, reason, location) in skips {
+                        if !seen_skips.insert(nodeid.clone()) {
+                            continue;
+                        }
+                        self.session.skipped_modules.push((
+                            nodeid.clone(),
+                            reason.clone(),
+                            location.clone(),
+                        ));
+                        reports.push(TestReport {
+                            nodeid,
+                            phase: Phase::Setup,
+                            outcome: Outcome::Skipped,
+                            duration: std::time::Duration::ZERO,
+                            longrepr: Some(reason),
+                            location: Some(location),
+                            subtest_desc: None,
+                            sections: Vec::new(),
+                            rerun: false,
+                            xfail_longrepr: None,
+                            reprcrash_message: None,
+                            head_line: None,
+                        });
+                    }
                     // Process collection errors: add to session and reports.
                     for (nodeid, err) in errors {
                         if !seen_errors.insert((nodeid.clone(), err.clone())) {
@@ -1434,6 +1465,7 @@ impl WorkerOwner {
                         nodeids: vec![],
                         xdist_groups: vec![],
                         errors: vec![],
+                        skips: vec![],
                         deselected: 0,
                     });
                     return;
@@ -1454,6 +1486,7 @@ impl WorkerOwner {
                     nodeids: vec![],
                     xdist_groups: vec![],
                     errors: vec![],
+                    skips: vec![],
                     deselected: 0,
                 });
                 return;
@@ -1462,7 +1495,7 @@ impl WorkerOwner {
 
         // Collection phase: read from the worker's stdout until it sends
         // WorkerMsg::Collection (after precollect_all) or EOF (crash).
-        // Returns Some((nodeids, groups, errors, deselected)) on success,
+        // Returns Some((nodeids, groups, errors, skips, deselected)) on success,
         // None on crash.
         let collection_msg = loop {
             let Some(line) = proc.lines.next() else {
@@ -1479,8 +1512,9 @@ impl WorkerOwner {
                     nodeids,
                     xdist_groups,
                     errors,
+                    skips,
                     deselected,
-                }) => break Some((nodeids, xdist_groups, errors, deselected)),
+                }) => break Some((nodeids, xdist_groups, errors, skips, deselected)),
                 Some(WorkerMsg::Bye) => {
                     // Bye before Collection: treat as empty collection + graceful shutdown.
                     let _ = self.sender.send(Event::Collection {
@@ -1488,6 +1522,7 @@ impl WorkerOwner {
                         nodeids: vec![],
                         xdist_groups: vec![],
                         errors: vec![],
+                        skips: vec![],
                         deselected: 0,
                     });
                     let _ = proc.handle.wait();
@@ -1509,6 +1544,7 @@ impl WorkerOwner {
                     nodeids: vec![],
                     xdist_groups: vec![],
                     errors: vec![],
+                    skips: vec![],
                     deselected: 0,
                 });
                 // No replacement: this slot's (empty) collection already went to
@@ -1517,12 +1553,13 @@ impl WorkerOwner {
                 self.handle_crash(&mut proc, vec![], false);
                 return;
             }
-            Some((nodeids, xdist_groups, errors, deselected)) => {
+            Some((nodeids, xdist_groups, errors, skips, deselected)) => {
                 let _ = self.sender.send(Event::Collection {
                     worker: self.index,
                     nodeids,
                     xdist_groups,
                     errors,
+                    skips,
                     deselected,
                 });
             }

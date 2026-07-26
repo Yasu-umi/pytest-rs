@@ -59,6 +59,10 @@ pub enum WorkerMsg {
         nodeids: Vec<String>,
         xdist_groups: Vec<Option<String>>,
         errors: Vec<(String, String)>,
+        /// Modules skipped at import time (nodeid, reason, "file:line") — a
+        /// module-level `pytest.importorskip`/`skip(allow_module_level=True)`
+        /// is a skip, not a collect error, exactly as in a sequential run.
+        skips: Vec<(String, String, String)>,
         deselected: usize,
     },
 }
