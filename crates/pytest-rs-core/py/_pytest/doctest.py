@@ -7,7 +7,6 @@ and for text files matching --doctest-glob patterns.
 from __future__ import annotations
 
 import contextlib
-import doctest
 import fnmatch
 import importlib.util
 import inspect
@@ -18,9 +17,17 @@ import traceback as tb_mod
 import types
 import warnings
 from functools import cached_property
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from _pytest.outcomes import skip
+
+if TYPE_CHECKING:
+    import doctest
+
+# The stdlib `doctest` module is imported lazily inside every function that
+# needs it (as upstream pytest does): importing it also pulls in `pdb`, which a
+# local file named `pdb.py` on sys.path is meant to be able to shadow — see
+# pytest's own test_pdb_can_be_rewritten.
 
 # ---------------------------------------------------------------------------
 # Exceptions
@@ -89,6 +96,8 @@ class DoctestFailure(Exception):
         optionflags: int = 0,
         checker: Any = None,
     ) -> None:
+        import doctest
+
         self.dtest = dtest
         self.failure = failure
         self.optionflags = optionflags
@@ -162,6 +171,8 @@ def _format_unexpected(failure: doctest.UnexpectedException) -> str:
 
 
 def _format_one(f: Any) -> str:
+    import doctest
+
     if isinstance(f, DoctestFailure):
         return f._format()
     if isinstance(f, DoctestUnexpected):
@@ -189,45 +200,52 @@ class MultipleDoctestFailures(Exception):
 # Option flags
 # ---------------------------------------------------------------------------
 
-# Register pytest's extended flags (ALLOW_UNICODE / ALLOW_BYTES / NUMBER) into
-# the doctest module so inline +ALLOW_BYTES etc. comments are recognized.
-_ALLOW_UNICODE = 0
-_ALLOW_BYTES = 0
-_NUMBER = 0
 
-for _name, _bits in [("ALLOW_UNICODE", 1 << 16), ("ALLOW_BYTES", 1 << 17), ("NUMBER", 1 << 18)]:
-    if not hasattr(doctest, _name):
-        setattr(doctest, _name, _bits)
-        doctest.OPTIONFLAGS_BY_NAME[_name] = _bits
-    exec(f"_{_name} = doctest.{_name}")
+# pytest's extended flags (ALLOW_UNICODE / ALLOW_BYTES / NUMBER) are registered
+# with the doctest module on first use so inline +ALLOW_BYTES etc. comments are
+# recognized.  register_optionflag() is idempotent (setdefault), so calling
+# these repeatedly always yields the same bit.
+def _get_allow_unicode_flag() -> int:
+    import doctest
 
-_OPTION_FLAGS_NAMES = {
-    "DONT_ACCEPT_TRUE_FOR_1": doctest.DONT_ACCEPT_TRUE_FOR_1,
-    "DONT_ACCEPT_BLANKLINE": doctest.DONT_ACCEPT_BLANKLINE,
-    "NORMALIZE_WHITESPACE": doctest.NORMALIZE_WHITESPACE,
-    "ELLIPSIS": doctest.ELLIPSIS,
-    "SKIP": doctest.SKIP,
-    "IGNORE_EXCEPTION_DETAIL": doctest.IGNORE_EXCEPTION_DETAIL,
-    "REPORT_UDIFF": doctest.REPORT_UDIFF,
-    "REPORT_CDIFF": doctest.REPORT_CDIFF,
-    "REPORT_NDIFF": doctest.REPORT_NDIFF,
-    "REPORT_ONLY_FIRST_FAILURE": doctest.REPORT_ONLY_FIRST_FAILURE,
-    "ALLOW_UNICODE": _ALLOW_UNICODE,
-    "ALLOW_BYTES": _ALLOW_BYTES,
-    "NUMBER": _NUMBER,
-}
+    return doctest.register_optionflag("ALLOW_UNICODE")
 
-_REPORT_FLAG_MAP = {
-    "udiff": doctest.REPORT_UDIFF,
-    "cdiff": doctest.REPORT_CDIFF,
-    "ndiff": doctest.REPORT_NDIFF,
-    "only_first_failure": doctest.REPORT_ONLY_FIRST_FAILURE,
-    "none": 0,
-}
+
+def _get_allow_bytes_flag() -> int:
+    import doctest
+
+    return doctest.register_optionflag("ALLOW_BYTES")
+
+
+def _get_number_flag() -> int:
+    import doctest
+
+    return doctest.register_optionflag("NUMBER")
+
+
+def _get_flag_lookup() -> dict[str, int]:
+    import doctest
+
+    return {
+        "DONT_ACCEPT_TRUE_FOR_1": doctest.DONT_ACCEPT_TRUE_FOR_1,
+        "DONT_ACCEPT_BLANKLINE": doctest.DONT_ACCEPT_BLANKLINE,
+        "NORMALIZE_WHITESPACE": doctest.NORMALIZE_WHITESPACE,
+        "ELLIPSIS": doctest.ELLIPSIS,
+        "SKIP": doctest.SKIP,
+        "IGNORE_EXCEPTION_DETAIL": doctest.IGNORE_EXCEPTION_DETAIL,
+        "REPORT_UDIFF": doctest.REPORT_UDIFF,
+        "REPORT_CDIFF": doctest.REPORT_CDIFF,
+        "REPORT_NDIFF": doctest.REPORT_NDIFF,
+        "REPORT_ONLY_FIRST_FAILURE": doctest.REPORT_ONLY_FIRST_FAILURE,
+        "ALLOW_UNICODE": _get_allow_unicode_flag(),
+        "ALLOW_BYTES": _get_allow_bytes_flag(),
+        "NUMBER": _get_number_flag(),
+    }
 
 
 def get_optionflags(config: Any) -> int:
     flags = 0
+    flag_lookup = _get_flag_lookup()
     raw = config.getini("doctest_optionflags") if hasattr(config, "getini") else []
     # getini returns a string (space/newline-separated) or a list depending on the caller.
     if isinstance(raw, str):
@@ -237,7 +255,7 @@ def get_optionflags(config: Any) -> int:
     if not ini_flags:
         ini_flags = ["ELLIPSIS"]
     for name in ini_flags:
-        flag = _OPTION_FLAGS_NAMES.get(name)
+        flag = flag_lookup.get(name)
         if flag is not None:
             flags |= flag
     report_choice = _get_report_choice(config)
@@ -246,6 +264,8 @@ def get_optionflags(config: Any) -> int:
 
 
 def _get_report_choice(config: Any) -> int:
+    import doctest
+
     key = None
     try:
         key = config.getoption("doctest_report")
@@ -253,7 +273,14 @@ def _get_report_choice(config: Any) -> int:
         pass
     if key is None:
         key = "none"
-    return _REPORT_FLAG_MAP.get(str(key).lower(), 0)
+    report_flags = {
+        "udiff": doctest.REPORT_UDIFF,
+        "cdiff": doctest.REPORT_CDIFF,
+        "ndiff": doctest.REPORT_NDIFF,
+        "only_first_failure": doctest.REPORT_ONLY_FIRST_FAILURE,
+        "none": 0,
+    }
+    return report_flags.get(str(key).lower(), 0)
 
 
 def _get_continue_on_failure(config: Any) -> bool:
@@ -292,15 +319,17 @@ _NUMBER_RE = re.compile(
 
 
 def _init_checker_class() -> type:
+    import doctest
+
     class LiteralsOutputChecker(doctest.OutputChecker):
         _number_re = _NUMBER_RE
 
         def check_output(self, want: str, got: str, optionflags: int) -> bool:
             if doctest.OutputChecker.check_output(self, want, got, optionflags):
                 return True
-            allow_unicode = optionflags & _ALLOW_UNICODE
-            allow_bytes = optionflags & _ALLOW_BYTES
-            allow_number = optionflags & _NUMBER
+            allow_unicode = optionflags & _get_allow_unicode_flag()
+            allow_bytes = optionflags & _get_allow_bytes_flag()
+            allow_number = optionflags & _get_number_flag()
             if not (allow_unicode or allow_bytes or allow_number):
                 return False
             if allow_unicode:
@@ -359,6 +388,8 @@ def _remove_unwanted_precision(want: str, got: str) -> str:
 def _init_runner_class(
     continue_on_failure: bool, checker: Any, optionflags: int
 ) -> type[doctest.DebugRunner]:
+    import doctest
+
     class PytestDoctestRunner(doctest.DebugRunner):
         def __init__(self) -> None:
             super().__init__(checker=checker, verbose=False, optionflags=optionflags)
@@ -401,6 +432,8 @@ def _init_runner_class(
 
 
 def _make_finder(module: types.ModuleType) -> doctest.DocTestFinder:
+    import doctest
+
     class MockAwareDocTestFinder(doctest.DocTestFinder):
         def _find(self, tests, obj, name, module, source_lines, globs, seen):
             # Skip mock objects that lack __doc__
@@ -429,6 +462,8 @@ def _make_finder(module: types.ModuleType) -> doctest.DocTestFinder:
 
 
 def _check_all_skipped(test: doctest.DocTest) -> None:
+    import doctest
+
     all_skipped = all(x.options.get(doctest.SKIP, False) for x in test.examples)
     if test.examples and all_skipped:
         skip("all tests skipped by +SKIP option")
@@ -449,6 +484,8 @@ def _make_doctest_func(
     """Return a callable that runs `dtest`. Accepts doctest_namespace kwarg."""
 
     def run_doctest(doctest_namespace: dict | None = None, request: Any = None) -> None:
+        import doctest
+
         _check_all_skipped(dtest)
         if extra_globs:
             dtest.globs.update(extra_globs)
@@ -537,6 +574,8 @@ def collect_textfile_doctests(
 
     Called from Rust for files matching --doctest-glob patterns.
     """
+    import doctest
+
     optionflags = get_optionflags(config)
     continue_on_failure = _get_continue_on_failure(config)
     checker = _init_checker_class()()
@@ -725,6 +764,8 @@ class DoctestItem(metaclass=_DoctestItemMeta):
         return filename, lineno, f"[doctest] {name_part}"
 
     def _compute_lineno(self) -> int | None:
+        import doctest
+
         if not hasattr(self, "_pytester_path") or "::" not in self.name:
             return None
         relpath, dotname = self.name.split("::", 1)
