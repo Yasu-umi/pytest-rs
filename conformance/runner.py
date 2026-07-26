@@ -296,6 +296,14 @@ class Suite:
         # would leak this repo's own dev-only deps (e.g. mypy) onto the
         # suite's sys.path.
         env.pop("VIRTUAL_ENV", None)
+        # A developer terminal that exports FORCE_COLOR/COLORTERM/PY_COLORS makes
+        # the suite — and every nested pytester subprocess under it — emit ANSI
+        # escapes even though stdout is a pipe, which breaks each upstream
+        # `fnmatch_lines("* 1 passed in *")` that matches a plain summary line.
+        # CI has none of them set; drop them so a local run matches CI instead of
+        # reporting dozens of colour-only regressions across suites.
+        for colour_var in ("FORCE_COLOR", "COLORTERM", "PY_COLORS"):
+            env.pop(colour_var, None)
         deps_dir = self.deps_dir()
         extra_paths = [str(p) for p in [self.src_dir, deps_dir] if p is not None]
         extra_paths.extend(str((self.checkout / entry).resolve()) for entry in self.pythonpath)
