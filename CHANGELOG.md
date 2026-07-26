@@ -28,6 +28,31 @@ as the GitHub release notes (auto-generated notes are the fallback).
   test fail under `-n` while passing under real pytest + xdist.
 - **`_fixtureinfo.argnames`** is the function's own parameters, as upstream
   documents it, rather than the whole fixture closure.
+- **A `-n` worker ran its tests with the cyclic garbage collector off** — gc is
+  disabled during collection (its allocations trigger scans that free nothing)
+  and restored once tests begin, but a forked worker never passed that restore.
+  Anything a test left in a reference cycle therefore survived to the end of the
+  run, and worker memory grew with the number of tests executed instead of
+  levelling off. On a large suite this roughly halves peak memory.
+- **A crashed `-n` worker could hang the run instead of ending it** — the
+  replacement worker announces its own collection before accepting work, and on
+  the two paths where the slot was already finished with nobody read that frame,
+  so the replacement blocked writing it while the run waited for the
+  replacement. Those paths no longer start a replacement, the two that can use
+  one consume the frame, and the node-down line now reports how the worker died
+  (`signal: 9 (SIGKILL)`, `exit status: 3`, ...) instead of only that it did.
+- **A forked worker's abandoned capture streams triggered spurious warnings** —
+  the streams a worker must not close (see above) were left for the garbage
+  collector, whose finalizer then reported each as an unclosed file. Under
+  `filterwarnings = error` those unraisable warnings failed whichever test was
+  running. The worker now keeps them alive for its lifetime.
+- **`filterwarnings` had no effect on the benchmark plugin's xdist warning** —
+  it was written straight to stderr rather than emitted through the warnings
+  machinery, so neither `error` nor a targeted `ignore` applied. It is now a
+  real `PytestBenchmarkWarning` from `pytest_benchmark.logger` (a module the
+  shim now provides, so a filter naming that class matches), and — since
+  pytest-rs activates its benchmark plugin on every run — it is emitted only
+  when the real pytest-benchmark is part of the environment, as upstream would.
 
 ### Added
 
@@ -48,6 +73,9 @@ as the GitHub release notes (auto-generated notes are the fallback).
   library and against the shim, and gates on the diff. This is what found the
   gaps above; a hand-written corpus cannot assert an attribute nobody
   remembered to declare.
+- **How to install a third-party plugin** without its `pytest` dependency
+  reinstalling the real distribution over pytest-rs's files — documented in the
+  README, with a runnable `examples/third-party-plugin/`.
 
 ### Fixed (API surface)
 
