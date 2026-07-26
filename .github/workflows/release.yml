@@ -1,3 +1,9 @@
+# Release order matters: bump the version, commit, **push**, and only then tag
+# the commit that is now on origin/main and push the tag. Tagging before pushing
+# invites a `git pull --rebase` in between, which rewrites the release commit and
+# leaves the tag pointing at an orphan — published, but unreachable from main
+# (v0.0.11 shipped that way and had to be re-tagged). check-version enforces
+# this; it is cheaper to notice here than after PyPI has the artifact.
 name: release
 
 on:
@@ -10,10 +16,14 @@ permissions: {}
 
 jobs:
   check-version:
-    name: tag matches pyproject version
+    name: tag matches pyproject version and sits on main
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          # Enough history for the ancestry check below; the tag is normally a
+          # handful of commits behind main's tip by the time CI gets here.
+          fetch-depth: 0
 
       - name: check
         if: github.event_name == 'push'
@@ -22,6 +32,22 @@ jobs:
           version=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
           if [ "$tag" != "$version" ]; then
             echo "tag v$tag does not match pyproject version $version"
+            exit 1
+          fi
+
+      - name: the tagged commit must be reachable from main
+        if: github.event_name == 'push'
+        run: |
+          # Tagging before pushing, with a `git pull --rebase` in between,
+          # leaves the tag on the pre-rebase commit: published, but not an
+          # ancestor of main, so `git describe` and "changes since vX" stop
+          # working. v0.0.11 shipped that way. Catch it while the release can
+          # still be re-tagged.
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "tag $GITHUB_REF_NAME ($GITHUB_SHA) is not an ancestor of main."
+            echo "Push the release commit first, then tag the pushed commit:"
+            echo "  git push && git tag $GITHUB_REF_NAME <pushed sha> && git push origin $GITHUB_REF_NAME"
             exit 1
           fi
 
