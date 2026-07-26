@@ -685,29 +685,38 @@ impl Plugin for BenchmarkPlugin {
         // printed real "Calibrating..."/"Running N rounds..." output before this).
         //
         // The warning itself is emitted on the controller only (matching
-        // upstream's single line), to stderr — like upstream's Logger.warning,
-        // which even in non-verbose mode fires a warnings.warn during
-        // pytest_configure, outside pytest's warning-capture window, so it
-        // reaches stderr directly rather than the `-rw` summary. We eprintln
-        // the same one-line default-showwarning format instead of a real
-        // warnings.warn (which pytest-rs's capture DOES intercept here, unlike
-        // upstream's timing). Because this fires on ANY `-n` run — pytest-rs
-        // always loads the benchmark plugin, unlike a real env where you
-        // wouldn't have pytest-benchmark installed while testing xdist — a
-        // suite whose own nested runs assert exact output (pytest-xdist) must
-        // isolate it out via PYTEST_RS_DISABLE_PLUGINS (see plugin_is_disabled).
+        // upstream's single line) and goes through `warnings.warn_explicit`,
+        // exactly like upstream's Logger.warning, so the configured
+        // `filterwarnings`/-W filters govern it: `error` raises out of
+        // pytest_configure (INTERNALERROR, as upstream), `ignore` silences it.
+        // The engine suspends warning *recording* around the configure hooks
+        // (upstream's window there is `record=False`), so the surviving
+        // warning reaches stderr rather than the `-rw` summary.
+        //
+        // Emitted only when the real pytest-benchmark distribution is
+        // installed. pytest-rs loads its native benchmark plugin on every run,
+        // so warning unconditionally would inject a warning — fatal under
+        // `filterwarnings = error` — into `-n` runs of projects that never
+        // asked for benchmarking, where real pytest has no such plugin and
+        // says nothing. The shipped `pytest_benchmark` shim is a module inside
+        // pytest-rs's own wheel and carries no distribution metadata, so this
+        // is true only if the user installed the real package.
         if ctx.config.numprocesses_spec().is_some() {
             self.config.disabled = true;
-            if !ctx.config.is_worker() {
+            if !ctx.config.is_worker() && real_benchmark_dist_installed(py) {
                 let msg = "Benchmarks are automatically disabled because xdist plugin is active.\
                            Benchmarks cannot be performed reliably in a parallelized environment.";
                 if self.verbose {
                     eprintln!("{}", "-".repeat(72));
                     eprintln!(" WARNING: {msg}");
                     eprintln!("{}", "-".repeat(72));
-                } else {
-                    eprintln!("pytest_benchmark/logger.py:0: PytestBenchmarkWarning: {msg}");
                 }
+                let helper = self
+                    .helper
+                    .as_ref()
+                    .expect("helper module set above")
+                    .clone_ref(py);
+                warn_from_logger(py, helper.bind(py), msg)?;
             }
         }
 
@@ -1072,12 +1081,63 @@ impl Plugin for BenchmarkPlugin {
     }
 }
 
+/// The warning category to emit under.
+///
+/// Prefer the real `pytest_benchmark.logger.PytestBenchmarkWarning` when it is
+/// importable: `filterwarnings` entries that name a category by import path
+/// (`ignore::pytest_benchmark.logger.PytestBenchmarkWarning`) are matched by
+/// class identity, so emitting our own look-alike would leave such a filter
+/// silently ineffective — and the class name also shows up in error text.
+fn benchmark_warning_category<'py>(
+    py: Python<'py>,
+    helper: &Bound<'py, PyModule>,
+) -> PyResult<Bound<'py, PyAny>> {
+    py.import("pytest_benchmark.logger")
+        .and_then(|m| m.getattr("PytestBenchmarkWarning"))
+        .or_else(|_| helper.getattr("PytestBenchmarkWarning"))
+}
+
 /// Emit a `PytestBenchmarkWarning` via Python's warnings machinery.
 fn emit_benchmark_warning(py: Python<'_>, helper: &Bound<'_, PyModule>, msg: &str) -> PyResult<()> {
     let warnings = py.import("warnings")?;
-    let category = helper.getattr("PytestBenchmarkWarning")?;
+    let category = benchmark_warning_category(py, helper)?;
     warnings.call_method1("warn", (msg, category))?;
     Ok(())
+}
+
+/// Emit a `PytestBenchmarkWarning` attributed to upstream's `Logger.warning`.
+///
+/// Routed through `warn_outside_capture` because upstream reaches this from its
+/// own `pytest_configure`, where pytest's window records nothing: the configured
+/// filters still govern the warning (`error` aborts the run, `ignore` silences
+/// it) but it prints to stderr instead of joining the `-rw` summary.
+///
+/// The location is given explicitly rather than left to `warn`: the warning
+/// originates in Rust, so there is no Python frame to blame, and the location
+/// decides both the printed `file:line:` prefix and which `filterwarnings`
+/// module patterns match. Upstream's caller is `pytest_benchmark/logger.py`.
+fn warn_from_logger(py: Python<'_>, helper: &Bound<'_, PyModule>, msg: &str) -> PyResult<()> {
+    let category = benchmark_warning_category(py, helper)?;
+    py.import("pytest._wcapture")?.call_method1(
+        "warn_outside_capture",
+        (category, msg, "pytest_benchmark/logger.py", 0),
+    )?;
+    Ok(())
+}
+
+/// Whether the real `pytest-benchmark` distribution is installed.
+///
+/// pytest-rs bundles a native benchmark plugin plus an importable
+/// `pytest_benchmark` shim module, neither of which installs distribution
+/// metadata — so this answers "would real pytest have loaded the plugin at
+/// all?" rather than "can this process import pytest_benchmark?".
+fn real_benchmark_dist_installed(py: Python<'_>) -> bool {
+    let Ok(metadata) = py.import("importlib.metadata") else {
+        return false;
+    };
+    metadata
+        .call_method1("version", ("pytest-benchmark",))
+        .is_ok()
 }
 
 use core_pyo3::types::IntoPyDict;

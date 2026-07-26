@@ -20,6 +20,14 @@ impl Engine {
                 python::register_xdist_marker_plugin(py);
             }
         }
+        // Warning capture stays installed across native plugins' configure:
+        // each native plugin stands in for a real one whose emission point
+        // decides the destination, and most of them replace work upstream does
+        // in a *recorded* window (pytest-cov starts its engine from
+        // pytest_load_initial_conftests, whose warnings land in the summary).
+        // A plugin that instead mirrors an emission upstream makes with
+        // recording off asks for that explicitly, via
+        // `pytest._wcapture.warn_outside_capture`.
         if let Err(err) = self
             .fire_configure(py)
             .and_then(|()| self.fire_sessionstart(py))

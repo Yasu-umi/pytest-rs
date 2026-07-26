@@ -14,9 +14,14 @@ from time import perf_counter
 
 import pytest
 
+try:
+    # One class, so a user's `ignore::pytest_benchmark.logger.PytestBenchmarkWarning`
+    # filter (matched by class identity) governs what this plugin emits.
+    from pytest_benchmark.logger import PytestBenchmarkWarning
+except ImportError:  # pragma: no cover - shim always ships with the engine
 
-class PytestBenchmarkWarning(pytest.PytestWarning):
-    """Warning emitted by pytest-benchmark."""
+    class PytestBenchmarkWarning(pytest.PytestWarning):  # type: ignore[no-redef]
+        """Warning emitted by pytest-benchmark."""
 
 
 def make_runner(func, args, kwargs, timer=None, disable_gc=False):

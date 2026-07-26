@@ -122,6 +122,27 @@ def issue_config_time_warning_explicit(category, message, filename, lineno):
         warnings.warn_explicit(message, category, filename, lineno)
 
 
+def warn_outside_capture(category, message, filename, lineno):
+    """Emit a warning the way upstream's configure-stage window does.
+
+    That window is `catch_warnings_for_item(..., record=False)`: the ini/-W
+    filters decide the action — `error` raises out of the caller, `ignore`
+    silences — but nothing is recorded, so a surviving warning goes to whatever
+    handler was ambient before pytest installed its recorder (stderr, normally)
+    rather than into the `-rw` summary. Use this for a native plugin standing in
+    for an upstream emission made from `pytest_configure` itself; a plugin whose
+    upstream counterpart warns from a recorded window (collection, runtest,
+    `pytest_load_initial_conftests`) should warn normally instead.
+    """
+    saved = warnings.showwarning
+    if _original_showwarning is not None:
+        warnings.showwarning = _original_showwarning
+    try:
+        warnings.warn_explicit(message, category, filename, lineno)
+    finally:
+        warnings.showwarning = saved
+
+
 def _showwarning(message, category, filename, lineno, file=None, line=None):
     captured.append(
         {
