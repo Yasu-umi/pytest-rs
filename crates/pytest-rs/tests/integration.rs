@@ -25,17 +25,28 @@ impl TempSuite {
         self
     }
 
+    /// A developer terminal that exports FORCE_COLOR/COLORTERM/PY_COLORS makes
+    /// pytest-rs emit ANSI escapes even into a captured pipe, so assertions on
+    /// plain output text fail locally while passing in CI (which sets none of
+    /// them). Drop them so both agree.
+    fn command(args: &[&str]) -> std::process::Command {
+        let mut cmd = std::process::Command::new(env!("CARGO_BIN_EXE_pytest-rs-bin"));
+        cmd.args(args);
+        for var in ["FORCE_COLOR", "COLORTERM", "PY_COLORS"] {
+            cmd.env_remove(var);
+        }
+        cmd
+    }
+
     fn run(&self, args: &[&str]) -> Output {
-        std::process::Command::new(env!("CARGO_BIN_EXE_pytest-rs-bin"))
-            .args(args)
+        Self::command(args)
             .current_dir(&self.root)
             .output()
             .expect("failed to run pytest-rs")
     }
 
     fn run_with_env(&self, args: &[&str], env: &[(&str, &str)]) -> Output {
-        std::process::Command::new(env!("CARGO_BIN_EXE_pytest-rs-bin"))
-            .args(args)
+        Self::command(args)
             .current_dir(&self.root)
             .envs(env.iter().copied())
             .output()
@@ -1355,4 +1366,56 @@ def test_b():
     assert!(!out.contains("no tests ran"), "out: {out}");
     assert_eq!(output.status.code(), Some(0), "out: {out}\nstderr: {err}");
     assert!(out.contains("2 passed"), "out: {out}");
+}
+
+#[test]
+fn xdist_module_level_skip_is_skipped_not_error() {
+    // Regression test: a module that skips at import time — what
+    // pytest.importorskip() raises, so every suite with an optional
+    // dependency does this — must be reported as a skipped module, not a
+    // collect error. Under -n the worker turned any collect_module failure
+    // into an error string, so the same file that reported "1 skipped"
+    // sequentially reported "1 error" with -n and took the exit code with it
+    // (0/5 -> 1). Not caught by conformance: the runner drives each suite
+    // file-by-file without -n, and pytest-xdist's own suite has no
+    // optional-dependency module skip.
+    let suite = TempSuite::new("xdist-module-level-skip");
+    suite.write(
+        "test_optional_dep.py",
+        r#"
+import pytest
+
+pytest.importorskip("a_module_that_does_not_exist")
+
+def test_never_runs():
+    raise AssertionError("must not run")
+"#,
+    );
+    suite.write(
+        "test_plain.py",
+        r#"
+def test_ok():
+    assert True
+"#,
+    );
+    for workers in ["0", "2"] {
+        let output = suite.run(&["-n", workers, "-q", "--tb=no", "-rs"]);
+        let out = stdout(&output);
+        let err = String::from_utf8_lossy(&output.stderr);
+        assert!(!out.contains("error"), "-n {workers} out: {out}");
+        // One skip, even though every worker imports (and skips) the module.
+        assert!(
+            out.contains("1 passed, 1 skipped"),
+            "-n {workers} out: {out}"
+        );
+        assert!(
+            out.contains("SKIPPED [1] test_optional_dep.py:4"),
+            "-n {workers} out: {out}"
+        );
+        assert_eq!(
+            output.status.code(),
+            Some(0),
+            "-n {workers} out: {out}\nstderr: {err}"
+        );
+    }
 }
