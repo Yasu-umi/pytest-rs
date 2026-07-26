@@ -31,6 +31,36 @@ pytest-rs --cov=mypkg           # native coverage (pytest-cov compatible)
 >
 > Watch for `pytest` arriving *transitively*: every pytest plugin declares a dependency on it, so keeping one of the bundled plugins installed (`pytest-mock` for its `MockerFixture` annotation, say) pulls the real `pytest` back in behind your back. `uv tree --package pytest` / `pip show pytest` after a lock change is the quick check; the annotations those plugins are usually kept around for ship with pytest-rs itself (see [Type annotations](#type-annotations)).
 
+### Adding a third-party plugin without pulling `pytest` back in
+
+Because every plugin depends on `pytest`, the obvious `uv add --dev pytest-aiohttp` installs the real distribution on top of pytest-rs's files. Install the plugin *without its dependencies* instead — the ones pytest-rs supersedes are already in place — and add back only the dependencies it genuinely needs.
+
+Take `pytest-aiohttp==1.1.1`. It requires `pytest`, `pytest-asyncio`, and `aiohttp`: the first two are provided by pytest-rs, the third is a real package you still need.
+
+One-off (a CI step, or trying a plugin out):
+
+```sh
+uv pip install --no-deps pytest-aiohttp==1.1.1   # or: pip install --no-deps ...
+uv pip install aiohttp                           # its non-pytest dependencies, explicitly
+```
+
+For a locked project, keep the plugin in your dependency groups and override the requirements pytest-rs supersedes with a marker that never matches — uv then resolves the plugin but installs neither `pytest` nor `pytest-asyncio`:
+
+```toml
+[dependency-groups]
+dev = ["pytest-rs", "pytest-aiohttp==1.1.1"]
+
+[tool.uv]
+override-dependencies = [
+    "pytest ; sys_platform == 'never'",
+    "pytest-asyncio ; sys_platform == 'never'",
+]
+```
+
+`uv sync` on that project installs `pytest-rs`, `pytest-aiohttp`, and `aiohttp` (plus aiohttp's own deps) — and no `pytest`. Confirm with `uv pip list | grep -i pytest`: seeing a bare `pytest` line means the real distribution got in and has overwritten part of pytest-rs's `pytest/` directory.
+
+Which names to override is just "whichever of pytest-rs's own bundled distributions the plugin asks for": `pytest`, `pluggy`, `iniconfig`, plus any of the [bundled plugins](#bundled-plugins) — e.g. a plugin depending on `pytest-asyncio` (`pytest-aiohttp`) or on `pytest-xdist` (`pytest-split`-style plugins) needs that name overridden too. Everything else the plugin depends on is a normal package: leave it alone.
+
 ### Requirements
 
 - Linux or macOS (no Windows support yet)
@@ -88,6 +118,8 @@ Installed `pytest11` entry points load through the `pytest` API shim — plugins
 | not reimplemented yet | `pytest-html` (needs the report data model exposed); `syrupy` (serializer/extension framework) |
 
 A plugin that fails to import (e.g. it reaches into pytest/pluggy internals the shim doesn't provide) warns and is skipped without breaking the run. `-p no:NAME` and `PYTEST_DISABLE_PLUGIN_AUTOLOAD` opt out, like pytest.
+
+Installing one of these into a pytest-rs environment needs care, since the plugin's own `pytest` dependency would reinstall the real distribution — see [Adding a third-party plugin without pulling `pytest` back in](#adding-a-third-party-plugin-without-pulling-pytest-back-in).
 
 ## Performance
 
