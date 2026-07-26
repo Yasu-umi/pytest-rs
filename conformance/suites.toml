@@ -731,13 +731,6 @@ testpaths = ["tests"]
 deps = ["pretend==1.0.9"]
 category = "real-world"
 enabled = true
-# TestCPythonTags::test_all_args generates a different tag list on darwin
-# (includes abi3t tags) compared to what the test expects.  The test also
-# fails under real pytest on macOS (passes on Linux CI), so known_failures
-# lets it self-correct per platform instead of always hiding it.
-known_failures = [
-    "tests/test_tags.py::TestCPythonTags::test_all_args",
-]
 
 [pandas]
 tag = "v3.0.3"
