@@ -693,17 +693,21 @@ impl Plugin for BenchmarkPlugin {
         // (upstream's window there is `record=False`), so the surviving
         // warning reaches stderr rather than the `-rw` summary.
         //
-        // Emitted only when the real pytest-benchmark distribution is
-        // installed. pytest-rs loads its native benchmark plugin on every run,
-        // so warning unconditionally would inject a warning — fatal under
-        // `filterwarnings = error` — into `-n` runs of projects that never
-        // asked for benchmarking, where real pytest has no such plugin and
-        // says nothing. The shipped `pytest_benchmark` shim is a module inside
-        // pytest-rs's own wheel and carries no distribution metadata, so this
-        // is true only if the user installed the real package.
+        // Emitted only when the real pytest-benchmark is part of the
+        // environment. pytest-rs activates its native benchmark plugin on every
+        // run, so warning unconditionally would inject a warning — fatal under
+        // `filterwarnings = error` — into the `-n` runs of projects that never
+        // asked for benchmarking, where real pytest has no such plugin and says
+        // nothing at all.
         if ctx.config.numprocesses_spec().is_some() {
             self.config.disabled = true;
-            if !ctx.config.is_worker() && real_benchmark_dist_installed(py) {
+            let helper = self
+                .helper
+                .as_ref()
+                .expect("helper module set above")
+                .clone_ref(py);
+            let helper = helper.bind(py);
+            if !ctx.config.is_worker() && real_benchmark_plugin_present(helper) {
                 let msg = "Benchmarks are automatically disabled because xdist plugin is active.\
                            Benchmarks cannot be performed reliably in a parallelized environment.";
                 if self.verbose {
@@ -711,12 +715,7 @@ impl Plugin for BenchmarkPlugin {
                     eprintln!(" WARNING: {msg}");
                     eprintln!("{}", "-".repeat(72));
                 }
-                let helper = self
-                    .helper
-                    .as_ref()
-                    .expect("helper module set above")
-                    .clone_ref(py);
-                warn_from_logger(py, helper.bind(py), msg)?;
+                warn_from_logger(py, helper, msg)?;
             }
         }
 
@@ -1125,19 +1124,14 @@ fn warn_from_logger(py: Python<'_>, helper: &Bound<'_, PyModule>, msg: &str) -> 
     Ok(())
 }
 
-/// Whether the real `pytest-benchmark` distribution is installed.
-///
-/// pytest-rs bundles a native benchmark plugin plus an importable
-/// `pytest_benchmark` shim module, neither of which installs distribution
-/// metadata — so this answers "would real pytest have loaded the plugin at
-/// all?" rather than "can this process import pytest_benchmark?".
-fn real_benchmark_dist_installed(py: Python<'_>) -> bool {
-    let Ok(metadata) = py.import("importlib.metadata") else {
-        return false;
-    };
-    metadata
-        .call_method1("version", ("pytest-benchmark",))
-        .is_ok()
+/// Whether the real pytest-benchmark is part of this environment — i.e. whether
+/// real pytest would have loaded the plugin and warned at all. See
+/// `helper.real_plugin_present` for why this cannot be an import check.
+fn real_benchmark_plugin_present(helper: &Bound<'_, PyModule>) -> bool {
+    helper
+        .call_method0("real_plugin_present")
+        .and_then(|found| found.extract::<bool>())
+        .unwrap_or(false)
 }
 
 use core_pyo3::types::IntoPyDict;

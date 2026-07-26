@@ -24,6 +24,35 @@ except ImportError:  # pragma: no cover - shim always ships with the engine
         """Warning emitted by pytest-benchmark."""
 
 
+def real_plugin_present():
+    """Whether the *real* pytest-benchmark is part of this environment.
+
+    pytest-rs always activates its native benchmark plugin, so this is what
+    tells apart "the user has pytest-benchmark" from "the user only has
+    pytest-rs" — which decides whether upstream would have emitted a warning at
+    all. Importing is no help: pytest-rs's own `pytest_benchmark` shim shadows
+    the real package, so `pytest_benchmark.plugin` never resolves. Two checks
+    cover the two ways a project has the real thing: distribution metadata (a
+    normal or editable install) and, for a source checkout put on `sys.path`
+    without being installed, the presence of `plugin.py` — a module the shim
+    does not have.
+    """
+    import importlib.metadata
+    import pathlib
+    import sys
+
+    try:
+        importlib.metadata.version("pytest-benchmark")
+        return True
+    except importlib.metadata.PackageNotFoundError:
+        pass
+    return any(
+        (pathlib.Path(entry) / "pytest_benchmark" / "plugin.py").is_file()
+        for entry in sys.path
+        if entry
+    )
+
+
 def make_runner(func, args, kwargs, timer=None, disable_gc=False):
     timer = timer or perf_counter
     if args or kwargs:
