@@ -1292,13 +1292,49 @@ impl WorkerOwner {
         })
     }
 
+    /// Read past a freshly spawned replacement's own collection phase.
+    ///
+    /// A replacement is always a spawned process (re-forking is unsafe once the
+    /// owner threads exist), so it repeats the whole pipeline the crashed
+    /// worker went through and announces `WorkerMsg::Collection` before it will
+    /// accept work. That frame is *not* forwarded: the merge loop counted this
+    /// slot's collection once already, and a second `Event::Collection` would
+    /// double-count. Leaving it unread instead deadlocks — the worker blocks
+    /// writing it, the owner blocks waiting for a report.
+    /// Returns false if the replacement died before getting that far.
+    fn absorb_replacement_collection(&self, proc: &mut WorkerProc) -> bool {
+        loop {
+            let Some(Ok(line)) = proc.lines.next() else {
+                return false;
+            };
+            if line.trim().is_empty() {
+                continue;
+            }
+            match decode_frame(&line) {
+                Some(WorkerMsg::Collection { .. }) => return true,
+                Some(WorkerMsg::Bye) => return false,
+                None => {
+                    let _ = self.sender.send(Event::Output(line));
+                }
+                Some(_) => {}
+            }
+        }
+    }
+
     /// Crash bookkeeping: the running test fails, the unfinished remainder
     /// requeues, and the worker is replaced while the budget lasts.
     /// Returns the replacement, or None when this slot must stop.
+    /// `replace`: whether this slot can still use a replacement. False once
+    /// the slot is finished with regardless (a crash during the worker's own
+    /// collection — the merge loop has already been handed this slot's empty
+    /// collection, so a replacement's own `Collection` frame could never be
+    /// merged). Spawning one anyway leaks a process that blocks forever
+    /// writing that frame into a pipe nobody reads.
     fn handle_crash(
         &self,
         proc: &mut WorkerProc,
         mut remaining: Vec<String>,
+        replace: bool,
     ) -> Option<WorkerProc> {
         proc.handle.wait();
         let running = if remaining.is_empty() {
@@ -1339,13 +1375,14 @@ impl WorkerOwner {
         }
 
         match action {
-            CrashAction::Replace => {
+            CrashAction::Replace if replace => {
                 let _ = self.sender.send(Event::Output(format!(
                     "replacing crashed worker gw{}",
                     self.index
                 )));
                 self.spawn().ok()
             }
+            CrashAction::Replace => None,
             CrashAction::Abort => {
                 // Budget exhausted: stop dispatching new work (xdist shutdown).
                 let message = match self.max_restart {
@@ -1464,7 +1501,10 @@ impl WorkerOwner {
                     errors: vec![],
                     deselected: 0,
                 });
-                self.handle_crash(&mut proc, vec![]);
+                // No replacement: this slot's (empty) collection already went to
+                // the merge loop, so a replacement's own Collection frame could
+                // never be merged — and nothing was requeued for it to run.
+                self.handle_crash(&mut proc, vec![], false);
                 return;
             }
             Some((nodeids, xdist_groups, errors, deselected)) => {
@@ -1495,8 +1535,11 @@ impl WorkerOwner {
             })
             .expect("run message serializes");
             if writeln!(proc.stdin, "{msg}").is_err() || proc.stdin.flush().is_err() {
-                match self.handle_crash(&mut proc, batch) {
-                    Some(replacement) => {
+                match self.handle_crash(&mut proc, batch, true) {
+                    Some(mut replacement) => {
+                        if !self.absorb_replacement_collection(&mut replacement) {
+                            return;
+                        }
                         proc = replacement;
                         continue;
                     }
@@ -1509,8 +1552,11 @@ impl WorkerOwner {
             loop {
                 let Some(Ok(line)) = proc.lines.next() else {
                     // EOF mid-batch: the worker died (segfault, exit, ...).
-                    match self.handle_crash(&mut proc, remaining) {
-                        Some(replacement) => {
+                    match self.handle_crash(&mut proc, remaining, true) {
+                        Some(mut replacement) => {
+                            if !self.absorb_replacement_collection(&mut replacement) {
+                                return;
+                            }
                             proc = replacement;
                             continue 'work;
                         }
@@ -1597,8 +1643,10 @@ impl WorkerOwner {
         if graceful_shutdown {
             proc.handle.wait();
         } else {
-            // Worker died after the collection phase but before Bye.
-            self.handle_crash(&mut proc, vec![]);
+            // Worker died after the collection phase but before Bye. Its work
+            // is already drained, so a replacement would have nothing to run:
+            // record the crash without starting one.
+            self.handle_crash(&mut proc, vec![], false);
         }
     }
 }

@@ -9,6 +9,7 @@ __pycache__/
 /target-prof
 /target-iter
 /target-bisect
+/target-wheel
 CLAUDE.md
 .claude/
 
