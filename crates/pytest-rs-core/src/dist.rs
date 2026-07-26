@@ -1173,17 +1173,22 @@ enum WorkerHandle {
 }
 
 impl WorkerHandle {
+    /// Reap the worker, reporting how it died. A crashed worker writes nothing
+    /// about its own death, so the status is the only clue the controller has
+    /// (`signal: 11 (SIGSEGV)`, `exit status: 3`, ...).
     #[allow(unsafe_code)]
-    fn wait(&mut self) {
+    fn wait(&mut self) -> Option<std::process::ExitStatus> {
         match self {
-            WorkerHandle::Spawned(child) => {
-                let _ = child.wait();
-            }
+            WorkerHandle::Spawned(child) => child.wait().ok(),
             #[cfg(unix)]
             WorkerHandle::Forked(pid) => {
                 let mut status: libc::c_int = 0;
                 // SAFETY: reaping our own forked child.
-                unsafe { libc::waitpid(*pid, &mut status, 0) };
+                let reaped = unsafe { libc::waitpid(*pid, &mut status, 0) };
+                if reaped < 0 {
+                    return None;
+                }
+                Some(std::os::unix::process::ExitStatusExt::from_raw(status))
             }
         }
     }
@@ -1336,16 +1341,21 @@ impl WorkerOwner {
         mut remaining: Vec<String>,
         replace: bool,
     ) -> Option<WorkerProc> {
-        proc.handle.wait();
+        let status = proc.handle.wait();
         let running = if remaining.is_empty() {
             None
         } else {
             Some(remaining.remove(0))
         };
         let action = self.queue.crash(self.index, remaining);
-        // Upstream's pytest_testnodedown narration for a crashed node.
+        // Upstream's pytest_testnodedown narration for a crashed node, plus how
+        // the process actually died — upstream cannot know, we can.
+        let died = match &status {
+            Some(status) => format!(": {status}"),
+            None => String::new(),
+        };
         let _ = self.sender.send(Event::Output(format!(
-            "[gw{}] node down: Not properly terminated",
+            "[gw{}] node down: Not properly terminated{died}",
             self.index
         )));
         if let (Some(running), CrashAction::Replace | CrashAction::Abort) = (&running, &action) {
@@ -1480,7 +1490,7 @@ impl WorkerOwner {
                         errors: vec![],
                         deselected: 0,
                     });
-                    proc.handle.wait();
+                    let _ = proc.handle.wait();
                     return;
                 }
                 None => {
@@ -1641,7 +1651,7 @@ impl WorkerOwner {
             }
         }
         if graceful_shutdown {
-            proc.handle.wait();
+            let _ = proc.handle.wait();
         } else {
             // Worker died after the collection phase but before Bye. Its work
             // is already drained, so a replacement would have nothing to run:
