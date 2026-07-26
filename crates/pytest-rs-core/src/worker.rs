@@ -338,6 +338,14 @@ impl Engine {
             errors: collect_errors,
             deselected,
         });
+        // Collection done: tests run from here on, so restore gc — the same
+        // point the controller restores it at (see Engine::run_session). A
+        // forked worker inherits the collection-phase disable and never passes
+        // that call, so without this it runs every one of its tests with the
+        // cyclic collector off: anything the tests leave in a reference cycle
+        // then survives to the end of the run, and a worker's memory grows with
+        // the number of tests it executes instead of levelling off.
+        python::set_gc_enabled(py, true);
         self.worker_loop(py, collection)
     }
 
