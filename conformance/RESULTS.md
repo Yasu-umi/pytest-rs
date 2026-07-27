@@ -25,7 +25,7 @@ pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2783 | 1 | 0 | 53 | 0 | 12 | 2849 | 99.5% | 53 | 54 | 61 |
+| pytest | 9.0.3 | 2784 | 0 | 0 | 53 | 0 | 12 | 2849 | 99.6% | 54 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 7 | 0 | 0 | 0 | 0 | 0 | 7 | 100.0% | 2 | 2 | 0 |
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 0 | 2 | 90 | 97.8% | 1 | 1 | 0 |
@@ -96,7 +96,7 @@ pytest-rs; they are not counted in the total.
 | testing/test_collection.py | passed | 112 | 0 | 0 | 3 | 0 | 1 |
 | testing/test_compat.py | passed | 10 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_config.py | passed | 214 | 0 | 0 | 1 | 0 | 0 |
-| testing/test_conftest.py | failed | 52 | 1 | 0 | 1 | 0 | 0 |
+| testing/test_conftest.py | passed | 53 | 0 | 0 | 1 | 0 | 0 |
 | testing/test_doctest.py | passed | 139 | 0 | 0 | 1 | 0 | 0 |
 | testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_faulthandler.py | passed | 12 | 0 | 0 | 0 | 0 | 0 |
