@@ -104,6 +104,7 @@ pub(crate) fn run_one(
                 session,
                 config,
                 item,
+                nextitem,
                 pre_teardown,
             ));
             reports

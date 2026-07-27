@@ -758,6 +758,45 @@ def test_warns():
 }
 
 #[test]
+fn conftest_runtest_teardown_receives_nextitem() {
+    // Upstream's hookspec is `pytest_runtest_teardown(item, nextitem)`, so a
+    // plugin written against it asks for both. The engine offered only
+    // `item`, which made every teardown raise
+    // "missing 1 required positional argument: 'nextitem'" — one error per
+    // test, on any suite loading such a plugin.
+    let suite = TempSuite::new("teardown-nextitem");
+    suite.write(
+        "conftest.py",
+        r#"
+SEEN = []
+
+def pytest_runtest_teardown(item, nextitem):
+    SEEN.append((item.name, nextitem.name if nextitem is not None else None))
+
+def pytest_terminal_summary(terminalreporter):
+    terminalreporter.write_line(f"NEXTITEM {SEEN}")
+"#,
+    );
+    suite.write(
+        "test_pairs.py",
+        r#"
+def test_a():
+    pass
+
+def test_b():
+    pass
+"#,
+    );
+    let output = suite.run(&[]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(
+        out.contains("NEXTITEM [('test_a', 'test_b'), ('test_b', None)]"),
+        "out: {out}"
+    );
+}
+
+#[test]
 fn conftest_hooks_modifyitems_and_configure() {
     let suite = TempSuite::new("conftest-hooks");
     suite.write(

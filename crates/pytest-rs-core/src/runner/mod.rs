@@ -391,7 +391,8 @@ impl Engine {
                         session.live_progress = Some((done + 1, total));
                         python::log_set_live_when(py, "start");
                     }
-                    let _ = fire_runtest_py_hooks(py, session, item, "pytest_runtest_logstart");
+                    let _ =
+                        fire_runtest_py_hooks(py, session, item, None, "pytest_runtest_logstart");
                     if !config.is_worker() {
                         python::reporter_logstart(py, item);
                     }
@@ -522,7 +523,7 @@ impl Engine {
             if session.live_logging {
                 python::log_set_live_when(py, "finish");
             }
-            let _ = fire_runtest_py_hooks(py, session, item, "pytest_runtest_logfinish");
+            let _ = fire_runtest_py_hooks(py, session, item, None, "pytest_runtest_logfinish");
             if !config.is_worker() {
                 python::reporter_logfinish(py, item);
             }

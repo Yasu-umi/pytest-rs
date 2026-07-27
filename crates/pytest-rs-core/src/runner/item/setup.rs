@@ -28,7 +28,7 @@ pub(crate) fn build_test_setup(
             plugin.pytest_runtest_setup(&mut ctx, item)?;
         }
     }
-    fire_runtest_py_hooks(py, session, item, "pytest_runtest_setup")?;
+    fire_runtest_py_hooks(py, session, item, None, "pytest_runtest_setup")?;
     // A fresh class instance per test (pytest behavior). For
     // unittest.TestCase items the shim runner creates the case;
     // exposing it here lets @pytest.fixture METHODS on the TestCase

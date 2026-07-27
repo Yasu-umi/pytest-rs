@@ -16,12 +16,16 @@ use crate::session::{Finalizer, Session};
 
 use super::*;
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn teardown_one(
     py: Python<'_>,
     plugins: &[Box<dyn Plugin>],
     session: &mut Session,
     config: &Config,
     item: &TestItem,
+    // The item that runs after this one, for the `pytest_runtest_teardown`
+    // hookspec's second argument (None when this is the last).
+    nextitem: Option<&TestItem>,
     xfail: bool,
     reports: &mut Vec<TestReport>,
 ) {
@@ -89,7 +93,8 @@ pub(crate) fn teardown_one(
         item,
     ));
 
-    if let Err(err) = fire_runtest_py_hooks(py, session, item, "pytest_runtest_teardown") {
+    if let Err(err) = fire_runtest_py_hooks(py, session, item, nextitem, "pytest_runtest_teardown")
+    {
         errors.push(python::format_exception(py, &err));
     }
     let hook_result = (|| -> PyResult<()> {

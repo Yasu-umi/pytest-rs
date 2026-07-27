@@ -130,6 +130,7 @@ pub(crate) fn run_one_body(
     session: &mut Session,
     config: &Config,
     item: &TestItem,
+    nextitem: Option<&TestItem>,
     // Called with setup+call reports before teardown (worker mode: sends them
     // to the controller so a teardown crash doesn't swallow the call outcome).
     pre_teardown: Option<&dyn Fn(&[TestReport])>,
@@ -250,6 +251,7 @@ pub(crate) fn run_one_body(
         session,
         config,
         item,
+        nextitem,
         teardown_xfail,
         &mut reports,
     );

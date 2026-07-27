@@ -739,6 +739,7 @@ impl Engine {
                         py,
                         session,
                         item,
+                        None,
                         "pytest_runtest_logstart",
                     );
                 },
@@ -767,6 +768,7 @@ impl Engine {
                 py,
                 &self.session,
                 item,
+                None,
                 "pytest_runtest_logfinish",
             );
             // --maxfail/-x: a chunked batch can hold several items (xdist's

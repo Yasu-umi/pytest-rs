@@ -238,10 +238,16 @@ pub(crate) fn fire_pyfunc_call_hooks(
     Ok(false)
 }
 
+/// Fire the conftest/plugin impls of a per-item runtest hook.
+///
+/// `nextitem` is only consulted for `pytest_runtest_teardown`, whose upstream
+/// hookspec is `(item, nextitem)` — pass the item that runs after this one
+/// (None when it is the last). Every other hook here ignores it.
 pub(crate) fn fire_runtest_py_hooks(
     py: Python<'_>,
     session: &Session,
     item: &TestItem,
+    nextitem: Option<&TestItem>,
     name: &str,
 ) -> PyResult<()> {
     let funcs: Vec<Py<PyAny>> = session
@@ -254,11 +260,14 @@ pub(crate) fn fire_runtest_py_hooks(
     if funcs.is_empty() && !recording {
         return Ok(());
     }
-    // logstart/logfinish hookspecs take (nodeid, location); setup/teardown
-    // take (item). call_py_hook passes only what each impl's signature
-    // requests, so providing the right available kwargs per hook is enough.
+    // logstart/logfinish hookspecs take (nodeid, location); setup takes
+    // (item); teardown takes (item, nextitem). call_py_hook passes only what
+    // each impl's signature requests, so providing the right available kwargs
+    // per hook is enough — but an impl asking for a kwarg that isn't offered
+    // raises TypeError, so teardown must offer `nextitem` even though nothing
+    // in the engine itself needs it.
     let location_based = name == "pytest_runtest_logstart" || name == "pytest_runtest_logfinish";
-    let kwargs: Vec<(&str, Py<PyAny>)> = if location_based {
+    let mut kwargs: Vec<(&str, Py<PyAny>)> = if location_based {
         let location = python::item_location(py, item)?;
         vec![
             (
@@ -271,6 +280,13 @@ pub(crate) fn fire_runtest_py_hooks(
         let node = super::item_node(py, item)?;
         vec![("item", node)]
     };
+    if name == "pytest_runtest_teardown" {
+        let next_node = match nextitem {
+            Some(next) => super::item_node(py, next)?,
+            None => py.None(),
+        };
+        kwargs.push(("nextitem", next_node));
+    }
     for func in &funcs {
         python::call_py_hook(py, func, &kwargs)?;
     }

@@ -23,6 +23,10 @@ struct ProtocolCtx {
     session: *mut Session,
     config: *const Config,
     item: *const TestItem,
+    /// The item after `item`, null when it is the last: the delegated
+    /// protocol re-enters the phase runner, which still owes
+    /// `pytest_runtest_teardown` its `nextitem` argument.
+    nextitem: *const TestItem,
 }
 
 thread_local! {
@@ -49,9 +53,9 @@ pub(crate) fn run_item_phases(py: Python<'_>) -> PyResult<Py<PyAny>> {
         stack
             .borrow()
             .last()
-            .map(|c| (c.plugins, c.session, c.config, c.item))
+            .map(|c| (c.plugins, c.session, c.config, c.item, c.nextitem))
     });
-    let Some((plugins, session, config, item)) = ptrs else {
+    let Some((plugins, session, config, item, nextitem)) = ptrs else {
         return Err(pyo3::exceptions::PyRuntimeError::new_err(
             "runtestprotocol() is only available while a delegated protocol runs",
         ));
@@ -74,7 +78,10 @@ pub(crate) fn run_item_phases(py: Python<'_>) -> PyResult<Py<PyAny>> {
     session
         .fixture_cache
         .retain(|_, cached| cached.error.is_none());
-    let reports = super::run_one_body(py, plugins, session, config, item, None);
+    // SAFETY: same contract as the other pointers above — the context is only
+    // published while the frames owning these values are live on the stack.
+    let nextitem = (!nextitem.is_null()).then(|| unsafe { &*nextitem });
+    let reports = super::run_one_body(py, plugins, session, config, item, nextitem, None);
     let proxies = pyo3::types::PyList::empty(py);
     for report in &reports {
         let lineno = (report.phase == Phase::Call).then_some(item.lineno);
@@ -210,6 +217,7 @@ pub(crate) fn delegate_protocol(
             session,
             config,
             item,
+            nextitem: nextitem.map_or(std::ptr::null(), |next| next as *const TestItem),
         });
     });
     CAPTURE.with(|stack| stack.borrow_mut().push(Vec::new()));
