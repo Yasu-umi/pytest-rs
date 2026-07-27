@@ -53,7 +53,7 @@ pytest-rs; they are not counted in the total.
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
 | rich | v14.2.0 | 855 | 0 | 0 | 25 | 0 | 0 | 880 | 100.0% | 60 | 62 | 0 |
 | sqlglot | v30.11.0 | 1120 | 0 | 0 | 0 | 0 | 0 | 1120 | 100.0% | 52 | 54 | 0 |
-| pytest-bdd | 8.1.0 | 138 | 0 | 0 | 1 | 0 | 0 | 139 | 100.0% | 35 | 35 | 0 |
+| pytest-bdd | 8.1.0 | 134 | 4 | 0 | 1 | 0 | 0 | 139 | 97.1% | 32 | 35 | 0 |
 | httpx | 0.28.1 | 1410 | 0 | 0 | 1 | 0 | 7 | 1418 | 99.5% | 31 | 31 | 0 |
 | httpx2 | v2.4.0 | 1426 | 0 | 0 | 1 | 0 | 0 | 1427 | 100.0% | 31 | 31 | 0 |
 | starlette | 0.46.2 | 907 | 0 | 0 | 0 | 0 | 0 | 907 | 100.0% | 28 | 28 | 0 |
@@ -666,14 +666,14 @@ pytest-rs; they are not counted in the total.
 | tests/datatable/test_datatable.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
 | tests/feature/test_alias.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/feature/test_background.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
-| tests/feature/test_cucumber_json.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
+| tests/feature/test_cucumber_json.py | failed | 0 | 1 | 0 | 0 | 0 | 0 |
 | tests/feature/test_description.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/feature/test_feature_base_dir.py | passed | 7 | 0 | 0 | 0 | 0 | 0 |
-| tests/feature/test_gherkin_terminal_reporter.py | passed | 14 | 0 | 0 | 0 | 0 | 0 |
+| tests/feature/test_gherkin_terminal_reporter.py | failed | 12 | 2 | 0 | 0 | 0 | 0 |
 | tests/feature/test_no_scenario.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/feature/test_outline.py | passed | 7 | 0 | 0 | 0 | 0 | 0 |
 | tests/feature/test_outline_empty_values.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
-| tests/feature/test_report.py | passed | 1 | 0 | 0 | 1 | 0 | 0 |
+| tests/feature/test_report.py | failed | 0 | 1 | 0 | 1 | 0 | 0 |
 | tests/feature/test_rule_example_format.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/feature/test_same_function_name.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/feature/test_scenario.py | passed | 18 | 0 | 0 | 0 | 0 | 0 |
