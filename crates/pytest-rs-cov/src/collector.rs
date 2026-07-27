@@ -380,6 +380,14 @@ impl LineCollector {
 
     /// 3.13 single BRANCH event: DISABLE would silence both directions, so
     /// it is only returned once both destinations have been observed.
+    ///
+    /// A site that only ever resolves one way therefore stays armed for the
+    /// whole run and fires on every execution — tens of millions of times on
+    /// a branch-heavy suite. Recording an arc is idempotent (the same
+    /// offsets always fold to the same `(src, dst, direction)` triple in a
+    /// set), so only the first sighting of a destination does any work; the
+    /// repeats cost one lock and one set probe instead of three locks, two
+    /// `co_lines` scans and a filename allocation.
     fn branch_compat(
         &self,
         py: Python<'_>,
@@ -388,11 +396,15 @@ impl LineCollector {
         dst_offset: i64,
     ) -> PyResult<Py<PyAny>> {
         let key = code.as_ptr() as usize;
-        self.record_arc(key, src_offset, dst_offset, 0);
-        let mut seen = self.seen_dests.lock().expect("collector lock poisoned");
-        let dests = seen.entry((key, src_offset)).or_default();
-        dests.insert(dst_offset);
-        if dests.len() >= 2 {
+        let (fresh, complete) = {
+            let mut seen = self.seen_dests.lock().expect("collector lock poisoned");
+            let dests = seen.entry((key, src_offset)).or_default();
+            (dests.insert(dst_offset), dests.len() >= 2)
+        };
+        if fresh {
+            self.record_arc(key, src_offset, dst_offset, 0);
+        }
+        if complete {
             Ok(self.disable.clone_ref(py))
         } else {
             Ok(py.None())
