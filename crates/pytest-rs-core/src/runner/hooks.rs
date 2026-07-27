@@ -282,7 +282,13 @@ pub(crate) fn fire_runtest_py_hooks(
     };
     if name == "pytest_runtest_teardown" {
         let next_node = match nextitem {
-            Some(next) => super::item_node(py, next)?,
+            // Deliberately NOT `item_node`: that cache holds exactly one node,
+            // the *running* item's, so that attributes a plugin sets during the
+            // test (pytest-bdd's `__scenario_report__`) are still on the object
+            // makereport sees. Asking it for the next item would evict the
+            // running item's entry, and the next lookup would hand out a fresh
+            // node with none of those attributes.
+            Some(next) => python::make_node(py, next)?,
             None => py.None(),
         };
         kwargs.push(("nextitem", next_node));

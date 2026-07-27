@@ -770,8 +770,15 @@ fn conftest_runtest_teardown_receives_nextitem() {
         r#"
 SEEN = []
 
+def pytest_runtest_setup(item):
+    # Node identity must survive the teardown hook: plugins stash state on the
+    # item during the test and read it back later (pytest-bdd keeps its
+    # scenario report there). Resolving `nextitem` must not disturb that.
+    item.__stashed__ = item.name
+
+
 def pytest_runtest_teardown(item, nextitem):
-    SEEN.append((item.name, nextitem.name if nextitem is not None else None))
+    SEEN.append((getattr(item, "__stashed__", "LOST"), nextitem.name if nextitem is not None else None))
 
 def pytest_terminal_summary(terminalreporter):
     terminalreporter.write_line(f"NEXTITEM {SEEN}")
