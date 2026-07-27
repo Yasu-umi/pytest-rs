@@ -3,10 +3,15 @@
 Notable changes per release. The release workflow uses the matching section
 as the GitHub release notes (auto-generated notes are the fallback).
 
-## v0.0.12 (unreleased)
+## v0.0.12 (2026-07-27)
 
 ### Fixed
 
+- **`pytest_runtest_teardown` was called without `nextitem`** — upstream's
+  hookspec is `(item, nextitem)`, so a plugin or conftest written against it
+  raised `TypeError: missing 1 required positional argument: 'nextitem'` on
+  every single test. A suite loading such a plugin reported one error per test
+  while the tests themselves still passed, which is easy to miss.
 - **Plugin shims were in the wheel but not importable** — v0.0.11 shipped
   `pytest_mock` / `pytest_asyncio` / `pytest_cov` under
   `site-packages/crates/<crate>/py/`, because maturin strips only the
@@ -53,6 +58,18 @@ as the GitHub release notes (auto-generated notes are the fallback).
   shim now provides, so a filter naming that class matches), and — since
   pytest-rs activates its benchmark plugin on every run — it is emitted only
   when the real pytest-benchmark is part of the environment, as upstream would.
+
+### Performance
+
+- **Branch coverage on Python 3.13 no longer re-records the same arc** — 3.13's
+  `sys.monitoring` BRANCH event carries no direction, so a site is only
+  disabled once both destinations have been seen; a branch that always resolves
+  the same way therefore fires on every execution, tens of millions of times on
+  a branch-heavy suite. Recording is idempotent, so only the first sighting of
+  a destination now does any work. `--cov-branch` measured 46% faster on a
+  one-sided hot loop, with byte-identical coverage output.
+- **A cached `.pyc` is unmarshalled without copying it first**, and parametrize
+  argname validation is skipped for functions that carry no parametrize mark.
 
 ### Added
 
