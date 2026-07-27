@@ -199,7 +199,7 @@ _linux (CI-verified)_
 | pytest-env | 1.6.0 | 72 | 0 | 0 | 0 | 0 | 3 | 75 | 96.0% | 3 | 3 | 0 |
 | pytest-rerunfailures | 9.1.1 | 47 | 0 | 0 | 1 | 0 | 0 | 48 | 100.0% | 1 | 1 | 0 |
 | pytest-randomly | 4.1.0 | 37 | 0 | 0 | 0 | 0 | 0 | 37 | 100.0% | 1 | 1 | 0 |
-| pytest-bdd | 8.1.0 | 134 | 4 | 0 | 1 | 0 | 0 | 139 | 97.1% | 32 | 35 | 0 |
+| pytest-bdd | 8.1.0 | 138 | 0 | 0 | 1 | 0 | 0 | 139 | 100.0% | 35 | 35 | 0 |
 | pytest-django | v4.9.0 | 215 | 0 | 0 | 1 | 0 | 0 | 216 | 100.0% | 12 | 13 | 0 |
 
 **Real-world projects** (their suites run unchanged, as drop-in evidence):
