@@ -16,6 +16,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import tomllib
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -23,7 +24,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 CACHE = ROOT / ".tmp" / "conformance"
-BINARY = ROOT / "target" / "debug" / "pytest-rs-bin"
+# PYTEST_RS_BIN points the runner at a binary built for another Python
+# (e.g. CARGO_TARGET_DIR=target-py315); run the runner itself with that same
+# interpreter so the suite deps below get installed for it.
+BINARY = Path(os.environ.get("PYTEST_RS_BIN") or ROOT / "target" / "debug" / "pytest-rs-bin")
+# Installed suite deps / package wheels carry compiled extensions built for
+# one CPython minor, so their --target dirs are keyed by the interpreter the
+# runner runs under (the one the binary must embed; see _check_binary_python).
+PY_TAG = f"py{sys.version_info.major}.{sys.version_info.minor}"
 # Results are platform-scoped: counts differ between linux and darwin
 # (platform-specific skips, system deps), so each platform owns its
 # scoreboard; linux is canonical (regenerated and committed from CI).
@@ -129,7 +137,10 @@ class Suite:
         # suite (e.g. ["-p", "pytest_run_parallel.plugin"] to force-load a
         # plugin whose entry points are unreachable via PYTHONPATH deps).
         self.extra_args: list[str] = config.get("extra_args", [])
-        self.checkout = CACHE / f"{self.name}-{self.tag}"
+        # A `package` suite's checkout IS its wheel install target, so it
+        # is per-Python like deps_dir(); a git checkout is shared.
+        suffix = f"-{PY_TAG}" if self.package else ""
+        self.checkout = CACHE / f"{self.name}-{self.tag}{suffix}"
         self.src_dir: Path | None = None
 
     def deps_dir(self) -> Path | None:
@@ -139,14 +150,23 @@ class Suite:
             return self.checkout
         if not self.deps:
             return None
-        target = CACHE / "deps" / self.name
+        target = CACHE / "deps" / PY_TAG / self.name
         marker = target / ".deps.txt"
         if marker.exists() and marker.read_text() == "\n".join(sorted(self.deps)):
             self._fix_console_script_shebangs(target)
             return target
         target.mkdir(parents=True, exist_ok=True)
         subprocess.run(
-            ["uv", "pip", "install", "--target", str(target), *self.deps],
+            [
+                "uv",
+                "pip",
+                "install",
+                "--python",
+                sys.executable,
+                "--target",
+                str(target),
+                *self.deps,
+            ],
             check=True,
             capture_output=True,
         )
@@ -190,7 +210,16 @@ class Suite:
             return
         self.checkout.mkdir(parents=True, exist_ok=True)
         subprocess.run(
-            ["uv", "pip", "install", "--target", str(self.checkout), *all_pkgs],
+            [
+                "uv",
+                "pip",
+                "install",
+                "--python",
+                sys.executable,
+                "--target",
+                str(self.checkout),
+                *all_pkgs,
+            ],
             check=True,
             capture_output=True,
         )
@@ -816,6 +845,31 @@ def check_suite(suite: Suite, results: list[FileResult]) -> list[str]:
     return violations
 
 
+def _check_binary_python() -> None:
+    """Refuse to run when BINARY embeds a different CPython minor than the
+    one running this script: deps_dir() installs compiled wheels for
+    sys.executable, which the binary's interpreter would then fail to
+    import, and every suite would read as a wall of collection errors."""
+    with tempfile.TemporaryDirectory() as empty:
+        out = subprocess.run(
+            [str(BINARY), "--collect-only", "-p", "no:cacheprovider"],
+            cwd=empty,
+            capture_output=True,
+            text=True,
+            timeout=TIMEOUT_S,
+        ).stdout
+    match = re.search(r"Python (\d+)\.(\d+)", out)
+    if match is None:
+        sys.exit(f"could not read the Python version from {BINARY}'s header")
+    embedded = (int(match[1]), int(match[2]))
+    if embedded != sys.version_info[:2]:
+        sys.exit(
+            f"{BINARY} embeds Python {embedded[0]}.{embedded[1]} but the runner "
+            f"runs under {sys.version_info.major}.{sys.version_info.minor}; "
+            "run the runner with the interpreter the binary was built against"
+        )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--suite", default=None)
@@ -859,6 +913,7 @@ def main() -> None:
 
     if not BINARY.exists():
         sys.exit("build first: cargo build")
+    _check_binary_python()
 
     if args.test:
         suites = load_suites(args.suite)

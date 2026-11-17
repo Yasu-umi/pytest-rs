@@ -29,7 +29,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-BINARY = ROOT / "target" / "debug" / "pytest-rs-bin"
+BINARY = Path(os.environ.get("PYTEST_RS_BIN") or ROOT / "target" / "debug" / "pytest-rs-bin")
 DEMO = ROOT / "conformance" / "plugin-smoke"
 CACHE = ROOT / ".tmp" / "conformance"
 DEPS = [
@@ -76,13 +76,16 @@ NORMALIZERS = [
 def deps_dir() -> Path:
     """Install the smoke deps into a --target dir (PYTHONPATH for both the
     pytest-rs run and the real-pytest reference run)."""
-    target = CACHE / "deps" / "plugin-smoke"
+    # Keyed by CPython minor like runner.py's deps: the wheels are per-ABI.
+    target = (
+        CACHE / "deps" / f"py{sys.version_info.major}.{sys.version_info.minor}" / "plugin-smoke"
+    )
     marker = target / ".deps.txt"
     wanted = "\n".join(sorted(DEPS))
     if marker.exists() and marker.read_text() == wanted:
         return target
     subprocess.run(
-        ["uv", "pip", "install", "--target", str(target), *DEPS],
+        ["uv", "pip", "install", "--python", sys.executable, "--target", str(target), *DEPS],
         check=True,
         capture_output=True,
     )
