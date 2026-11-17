@@ -1426,6 +1426,17 @@ class Function(Node):
             self.__dict__["_fixtureinfo"] = fixtureinfo
 
     @property
+    def _obj(self):
+        """Upstream PyobjMixin's backing attribute for `obj`. Some suites read
+        it directly (pandas' extension tests: `request.node._obj` in an
+        autouse fixture), so alias it to `obj`."""
+        return self.obj
+
+    @_obj.setter
+    def _obj(self, value):
+        self.obj = value
+
+    @property
     def _fixtureinfo(self):
         """FuncFixtureInfo for this item. Plugins like anyio access this to
         build modified items with additional fixture closures (e.g. anyio_backend).
