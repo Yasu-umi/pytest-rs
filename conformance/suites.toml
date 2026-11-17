@@ -242,7 +242,10 @@ deps = [
     "trustme==1.2.1",
     "truststore==0.10.4",
     "uvloop==0.22.1",
-    "blockbuster==1.5.26",
+    # 1.5.26 cannot patch os.scandir's iterator on Python 3.15 (immutable
+    # type), which errors every test through tests/conftest.py's autouse
+    # fixture; 1.5.29 handles it.
+    "blockbuster==1.5.29",
 ]
 enabled = true
 
