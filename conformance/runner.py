@@ -40,13 +40,13 @@ SCOREBOARD = ROOT / "conformance" / "scoreboard"
 RESULTS_DOC = ROOT / "conformance" / "RESULTS.md"
 TIMEOUT_S = 120
 
-SUMMARY_RE = re.compile(
-    r"(?:(?P<failed>\d+) failed)?(?:, )?"
-    r"(?:(?P<passed>\d+) passed)?(?:, )?"
-    r"(?:(?P<skipped>\d+) skipped)?(?:, )?"
-    r"(?:(?P<errors>\d+) errors?)?(?:, )?"
-    r"(?:(?P<deselected>\d+) deselected)?"
-)
+# One "<count> <outcome>" item of the final summary line. Matched item by
+# item rather than as one fixed-order pattern: pytest prints xfailed /
+# xpassed / warnings *before* errors ("4 skipped, 4 xfailed, 1 warning,
+# 399 errors in 1.6s"), and a fixed order silently dropped the errors there,
+# so an all-erroring file read as passed. "xfailed" / "subtests passed" do
+# not match: the outcome word must directly follow the count.
+SUMMARY_ITEM_RE = re.compile(r"(\d+) (failed|passed|skipped|errors?|deselected)\b")
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
@@ -467,10 +467,12 @@ class Suite:
             # Acceptance test summaries can be long enough that pytest-rs
             # emits only "==" (2 equals) instead of "===="; accept 2+.
             if line.startswith("==") and (" in " in line or "no tests ran" in line):
-                body = line.strip("= ")
-                match = SUMMARY_RE.match(body)
-                if match:
-                    return {k: int(v) for k, v in match.groupdict().items() if v is not None}
+                body = line.strip("= ").rsplit(" in ", 1)[0]
+                counts: dict[str, int] = {}
+                for count, outcome in SUMMARY_ITEM_RE.findall(body):
+                    key = "errors" if outcome.startswith("error") else outcome
+                    counts[key] = int(count)
+                return counts
         return {}
 
 
