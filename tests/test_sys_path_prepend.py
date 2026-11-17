@@ -14,7 +14,8 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
-BINARY = ROOT / "target" / "debug" / "pytest-rs-bin"
+# PYTEST_RS_BIN selects a binary built for another Python (see conformance/runner.py).
+BINARY = Path(os.environ.get("PYTEST_RS_BIN") or ROOT / "target" / "debug" / "pytest-rs-bin")
 
 
 class TestSysPathPrepend(unittest.TestCase):
