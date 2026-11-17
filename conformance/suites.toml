@@ -507,7 +507,7 @@ enabled = true
 repo = "https://github.com/tobymao/sqlglot"
 tag = "v30.11.0"
 testpaths = ["tests"]
-deps = ["duckdb==1.5.4", "pandas==3.0.3", "python-dateutil==2.9.0.post0", "pytz==2026.2"]
+deps = ["duckdb==1.5.4", "pandas==3.0.6", "python-dateutil==2.9.0.post0", "pytz==2026.2"]
 # Flat package layout: the checkout root is the import path.
 pythonpath = ["."]
 category = "real-world"
@@ -536,14 +536,14 @@ tag = "0.28.1"
 testpaths = ["tests"]
 deps = [
     "httpx[brotli,cli,http2]==0.28.1",
-    "httpcore==1.0.7",
+    "httpcore==1.0.9",
     "anyio==4.13.0",
     "trio==0.33.0",
     "trustme==1.2.1",
     "chardet==7.4.3",
     "socksio==1.0.0",
-    "uvicorn==0.34.3",
-    "zstandard==0.23.0",
+    "uvicorn==0.36.1",
+    "zstandard==0.25.0",
 ]
 # httpx's own pyproject.toml sets addopts = "-rxXs" (no "f"/"E"), which
 # suppresses the "short test summary info" FAILED/ERROR lines the
@@ -586,8 +586,8 @@ deps = [
     "trustme==1.2.1",
     "chardet==6.0.0.post1",
     "socksio==1.0.0",
-    "uvicorn==0.35.0",
-    "zstandard==0.23.0",
+    "uvicorn==0.36.1",
+    "zstandard==0.25.0",
     "cryptography==46.0.7",
     "pytest-httpbin==2.0.0",
     "werkzeug==3.1.6",
@@ -687,18 +687,18 @@ deselect = [
 
 [fastapi]
 repo = "https://github.com/fastapi/fastapi"
-tag = "0.115.12"
+tag = "0.117.1"
 testpaths = ["tests"]
 deps = [
-    "fastapi[standard]==0.115.12",
+    "fastapi[standard]==0.117.1",
     "httpx==0.28.1",
     "anyio==4.13.0",
     "trio==0.33.0",
-    "pydantic==2.11.7",
-    "sqlmodel==0.0.24",
+    "pydantic==2.14.3",
+    "sqlmodel==0.0.50",
     "dirty-equals==0.9.0",
     "inline-snapshot==0.22.2",
-    "orjson==3.10.18",
+    "orjson==3.13.0",
     "ujson==5.10.0",
     "a2wsgi==1.10.8",
     "PyJWT==2.8.0",
@@ -733,8 +733,8 @@ category = "real-world"
 enabled = true
 
 [pandas]
-tag = "v3.0.3"
-package = "pandas==3.0.3"
+tag = "v3.0.6"
+package = "pandas==3.0.6"
 testpaths = ["pandas/tests"]
 deps = ["hypothesis>=6.116.0"]
 category = "real-world"
@@ -767,25 +767,27 @@ known_failures = [
 tag = "3.6.1"
 package = "networkx==3.6.1"
 testpaths = ["networkx"]
-deps = ["numpy==2.4.6", "scipy==1.18.0", "pandas==3.0.3"]
+deps = ["numpy==2.5.5", "scipy==1.18.1", "pandas==3.0.6"]
 category = "real-world"
 enabled = true
 
 [pydantic]
 repo = "https://github.com/pydantic/pydantic"
-tag = "v2.11.7"
+tag = "v2.14.3"
 testpaths = ["tests"]
 deps = [
-    "pydantic[email]==2.11.7",
+    "pydantic[email]==2.14.3",
     "dirty-equals==0.9.0",
     "jsonschema==4.24.0",
     "pytz==2025.2",
     "pytest-run-parallel==0.4.2",
     "pytest-benchmark==5.1.0",
-    "cloudpickle==3.1.1",
+    "cloudpickle==3.1.2",
     "faker==40.23.0",
     "eval-type-backport==0.2.2",
     "pytest-examples==0.0.18",
+    # tests/test_docs.py imports it (pydantic v2.14.3 dev deps).
+    "time-machine==3.6.0",
 ]
 # pytest-run-parallel registers the 'thread_unsafe' marker that pydantic's
 # conftest.py applies dynamically. The plugin is in deps/ (PYTHONPATH) so
@@ -814,6 +816,7 @@ known_failures = [
     "tests/test_plugins.py::test_plugin_path_validate_call",
     "tests/test_plugins.py::test_plugin_path_create_model",
     "tests/test_plugins.py::test_plugin_path_complex",
+    "tests/test_plugins.py::test_prebuilt_validator_used_for_nested_models",
     # Environment/dependency-version artifacts — reproduce identically under
     # real pytest with the same pinned deps.
     "tests/test_config.py::test_config_model_defer_build[True]",
@@ -821,8 +824,8 @@ known_failures = [
 ]
 
 [scikit-learn-1]
-tag = "1.9.0"
-package = "scikit-learn==1.9.0"
+tag = "1.9.1"
+package = "scikit-learn==1.9.1"
 testpaths = ["sklearn/metrics", "sklearn/utils", "sklearn/linear_model"]
 deps = ["hypothesis>=6.116.0"]
 category = "real-world"
@@ -837,8 +840,8 @@ slow_files = [
 ]
 
 [scikit-learn-2]
-tag = "1.9.0"
-package = "scikit-learn==1.9.0"
+tag = "1.9.1"
+package = "scikit-learn==1.9.1"
 testpaths = ["sklearn/tests", "sklearn/ensemble", "sklearn/model_selection", "sklearn/preprocessing"]
 deps = ["hypothesis>=6.116.0"]
 category = "real-world"
@@ -858,8 +861,8 @@ slow_files = [
 ]
 
 [scikit-learn-3]
-tag = "1.9.0"
-package = "scikit-learn==1.9.0"
+tag = "1.9.1"
+package = "scikit-learn==1.9.1"
 testpaths = [
     "sklearn/_loss",
     "sklearn/callback",
