@@ -2,8 +2,6 @@
 //! phase, outcome classification, and teardown handoff. `run_one` wraps
 //! `run_one_body`, which drives setup -> call -> outcome via run_item_body.
 
-use pyo3::prelude::*;
-
 use crate::collect::TestItem;
 use crate::config::Config;
 use crate::hooks::Plugin;

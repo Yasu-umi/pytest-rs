@@ -2,9 +2,6 @@
 //! package/session scope) and emit the resulting teardown reports.
 
 use super::TimeMark;
-use std::io::Write as _;
-
-use pyo3::prelude::*;
 
 use crate::collect::TestItem;
 use crate::config::Config;
