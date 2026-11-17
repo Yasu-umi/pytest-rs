@@ -107,9 +107,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # The expected/*.toml pins are recorded on 3.15, the one Python main
+      # CI's conformance job runs (see ci.yml).
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version: "3.15"
 
       - uses: astral-sh/setup-uv@v8.2.0
 
@@ -117,7 +119,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          key: py3.13
+          key: py3.15
 
       - name: build
         run: cargo build
@@ -142,7 +144,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.13", "3.14"]
+        python-version: ["3.13", "3.14", "3.15"]
         platform:
           - { name: linux-x86_64, runner: ubuntu-latest, manylinux: "2_28" }
           - { name: linux-aarch64, runner: ubuntu-24.04-arm, manylinux: "2_28" }

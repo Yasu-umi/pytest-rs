@@ -46,7 +46,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.13", "3.14"]
+        python-version: ["3.13", "3.14", "3.15"]
     steps:
       - uses: actions/checkout@v6
 
@@ -64,27 +64,30 @@ jobs:
         run: cargo build --release
 
       - name: upload binary
-        if: matrix.python-version == '3.13'
         uses: actions/upload-artifact@v7
         with:
-          name: pytest-rs-bin
+          name: pytest-rs-bin-py${{ matrix.python-version }}
           path: target/release/pytest-rs-bin
           retention-days: 1
 
   regression-tests:
-    name: regression tests
+    name: regression tests (python ${{ matrix.python-version }})
     needs: build
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.13", "3.14", "3.15"]
     steps:
       - uses: actions/checkout@v6
 
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version: ${{ matrix.python-version }}
 
       - uses: actions/download-artifact@v8
         with:
-          name: pytest-rs-bin
+          name: pytest-rs-bin-py${{ matrix.python-version }}
           path: target/debug
 
       - name: make binary executable
@@ -127,15 +130,18 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # Conformance runs on the newest supported Python only: it is the
+      # slowest job, and expected/*.toml + scoreboard/linux are recorded on
+      # it. 3.13 / 3.14 are covered by regression-tests.
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version: "3.15"
 
       - uses: astral-sh/setup-uv@v8.2.0
 
       - uses: actions/download-artifact@v8
         with:
-          name: pytest-rs-bin
+          name: pytest-rs-bin-py3.15
           path: target/debug
 
       - name: make binary executable
@@ -149,9 +155,9 @@ jobs:
           # paths into .tmp/conformance/deps/*/bin at install time (e.g. a
           # PATH/env fix), which a stale cache would keep serving unchanged
           # forever since suites.toml's deps list didn't move.
-          key: conformance-${{ matrix.group }}-${{ runner.os }}-${{ hashFiles('conformance/suites.toml', 'conformance/runner.py') }}
+          key: conformance-${{ matrix.group }}-${{ runner.os }}-py3.15-${{ hashFiles('conformance/suites.toml', 'conformance/runner.py') }}
           restore-keys: |
-            conformance-${{ matrix.group }}-${{ runner.os }}-
+            conformance-${{ matrix.group }}-${{ runner.os }}-py3.15-
 
       - name: run suites
         run: |
@@ -179,15 +185,18 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # Conformance runs on the newest supported Python only: it is the
+      # slowest job, and expected/*.toml + scoreboard/linux are recorded on
+      # it. 3.13 / 3.14 are covered by regression-tests.
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version: "3.15"
 
       - uses: astral-sh/setup-uv@v8.2.0
 
       - uses: actions/download-artifact@v8
         with:
-          name: pytest-rs-bin
+          name: pytest-rs-bin-py3.15
           path: target/debug
 
       - name: make binary executable
@@ -216,9 +225,9 @@ jobs:
         uses: actions/cache@v5
         with:
           path: .tmp/conformance
-          key: plugin-smoke-${{ runner.os }}-${{ hashFiles('conformance/plugin_smoke.py') }}
+          key: plugin-smoke-${{ runner.os }}-py3.15-${{ hashFiles('conformance/plugin_smoke.py') }}
           restore-keys: |
-            plugin-smoke-${{ runner.os }}-
+            plugin-smoke-${{ runner.os }}-py3.15-
 
       - name: plugin smoke (sugar/pretty byte-diff, fixture plugins)
         run: |
