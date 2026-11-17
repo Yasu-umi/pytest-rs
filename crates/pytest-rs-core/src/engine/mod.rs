@@ -105,7 +105,7 @@ impl Drop for DebugGuard {
     }
 }
 
-pub(crate) fn install_debug_guard(py: Python<'_>, config: &Config) -> DebugGuard {
+pub(crate) fn install_debug_guard(config: &Config) -> DebugGuard {
     let Some(name) = config.get_value("debug") else {
         return DebugGuard(None);
     };
@@ -117,7 +117,10 @@ pub(crate) fn install_debug_guard(py: Python<'_>, config: &Config) -> DebugGuard
              pytest_configure\n\
              pytest_sessionstart\n",
             env!("CARGO_PKG_VERSION"),
-            py.version().split_whitespace().next().unwrap_or("")
+            pyo3::Python::version_str()
+                .split_whitespace()
+                .next()
+                .unwrap_or("")
         ),
     );
     eprintln!("writing pytest debug information to {}", path.display());
