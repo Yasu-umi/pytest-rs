@@ -248,6 +248,15 @@ deps = [
     "blockbuster==1.5.29",
 ]
 enabled = true
+# Newer CPython patch releases (seen on 3.13.16 / 3.15.0 with OpenSSL 3.5.9;
+# 3.13.14 with OpenSSL 3.5.7 passes) reject server_hostname on a server-side
+# wrap_bio; real pytest fails these the same way there.
+known_failures = [
+    "tests/streams/test_tls.py::test_tls_connectable[asyncio]",
+    "tests/streams/test_tls.py::test_tls_connectable[asyncio+uvloop]",
+    "tests/streams/test_tls.py::test_tls_connectable[asyncio+eager]",
+    "tests/streams/test_tls.py::test_tls_connectable[trio]",
+]
 
 [pytest-mypy]
 repo = "https://github.com/realpython/pytest-mypy"
