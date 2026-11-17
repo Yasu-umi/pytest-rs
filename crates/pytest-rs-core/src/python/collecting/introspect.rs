@@ -81,9 +81,32 @@ pub fn param_names_with_positional_only(
     param_names_inner(py, func)
 }
 
+/// `inspect.signature(func)` without evaluating annotations, like upstream
+/// `_pytest.compat.signature`: since 3.14 annotations are deferred, and the
+/// default `Format.VALUE` evaluates them (3.15 does so eagerly while building
+/// the signature), so a fixture annotated with a name that only exists under
+/// `TYPE_CHECKING` would fail collection with NameError.
+pub(crate) fn signature<'py>(
+    py: Python<'py>,
+    func: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let inspect = py.import("inspect")?;
+    if py.version_info() >= (3, 14) {
+        let format = py
+            .import("annotationlib")?
+            .getattr("Format")?
+            .getattr("STRING")?;
+        let kwargs = pyo3::types::PyDict::new(py);
+        kwargs.set_item("annotation_format", format)?;
+        inspect.call_method("signature", (func,), Some(&kwargs))
+    } else {
+        inspect.call_method1("signature", (func,))
+    }
+}
+
 fn param_names_inner(py: Python<'_>, func: &Bound<'_, PyAny>) -> PyResult<(Vec<String>, bool)> {
     let inspect = py.import("inspect")?;
-    let signature = inspect.getattr("signature")?.call1((func,))?;
+    let signature = signature(py, func)?;
     let parameters = signature.getattr("parameters")?;
     let empty = inspect.getattr("Parameter")?.getattr("empty")?;
     let mut names = Vec::new();

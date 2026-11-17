@@ -3,7 +3,18 @@ import functools
 import inspect
 import os
 import sys
-from inspect import Parameter, signature
+from inspect import Parameter, Signature
+
+if sys.version_info >= (3, 14):
+    from annotationlib import Format
+
+
+def signature(obj) -> Signature:
+    """Return signature without evaluating annotations (upstream
+    _pytest.compat.signature)."""
+    if sys.version_info >= (3, 14):
+        return inspect.signature(obj, annotation_format=Format.STRING)
+    return inspect.signature(obj)
 
 
 def assert_never(value):
