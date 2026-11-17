@@ -450,10 +450,7 @@ pub(crate) fn run_item_body(
                     return Ok(true);
                 }
             }
-            if fire_pyfunc_call_hooks(py, session, config, item, &mut callable, &kwargs)? {
-                return Ok(true);
-            }
-            Ok(false)
+            fire_pyfunc_call_hooks(py, session, config, item, &mut callable, &kwargs)
         })()
     };
     // The original error wins over a wrapper-teardown one.
