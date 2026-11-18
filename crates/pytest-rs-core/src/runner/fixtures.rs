@@ -59,7 +59,10 @@ pub(crate) fn item_node(py: Python<'_>, item: &TestItem) -> PyResult<Py<PyAny>> 
         {
             return Ok(node.clone_ref(py));
         }
-        let node = python::make_node(py, item)?;
+        let node = match python::session_item_node(py, &item.nodeid) {
+            Some(node) => node,
+            None => python::make_node(py, item)?,
+        };
         *cell.borrow_mut() = Some((item.nodeid.clone(), node.clone_ref(py)));
         Ok(node)
     })

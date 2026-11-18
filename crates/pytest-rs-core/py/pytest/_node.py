@@ -966,6 +966,13 @@ def set_session_items(items):
     """Collected item proxies, published once collection finishes (the
     engine fires pytest_collection_finish with them on the session)."""
     _session_state["items"] = list(items)
+    _session_state["items_by_nodeid"] = {item.nodeid: item for item in items}
+
+
+def session_item_node(nodeid):
+    """The published session.items node for `nodeid`, or None. The engine
+    runs each item with this object, as upstream runs session.items."""
+    return _session_state.get("items_by_nodeid", {}).get(nodeid)
 
 
 def set_session_testscollected(n):
