@@ -632,25 +632,28 @@ known_failures = [
 
 [httpx2]
 repo = "https://github.com/pydantic/httpx2"
-tag = "v2.4.0"
+tag = "v2.16.2"
 testpaths = ["tests/httpx2"]
 deps = [
     # httpx's CLI extra (click==8.*), pinned: 8.5
     # deprecates CliRunner.isolated_filesystem, which test_main.py's
     # test_download turns into an error under filterwarnings=error.
-    "click==8.4.1",
-    "httpx2[brotli,cli,http2,socks,zstd]==2.4.0",
-    "httpcore2==2.4.0",
-    "anyio==4.13.0",
-    "trio==0.33.0",
+    "click==8.5.1",
+    "httpx2[brotli,cli,http2,socks,ws,zstd]==2.16.2",
+    "httpcore2[asyncio,trio,http2,socks]==2.16.2",
+    # tests/httpx2/websockets serves its endpoints with starlette.
+    "starlette==1.10.0",
+    "websockets==17.4",
+    "anyio==4.16.0",
+    "trio==0.35.0",
     "trustme==1.2.1",
-    "chardet==6.0.0.post1",
+    "chardet==7.7.0",
     "socksio==1.0.0",
-    "uvicorn==0.36.1",
+    "uvicorn==0.54.0",
     "zstandard==0.25.0",
-    "cryptography==46.0.7",
-    "pytest-httpbin==2.0.0",
-    "werkzeug==3.1.6",
+    "cryptography==50.0.2",
+    "pytest-httpbin==2.1.0",
+    "werkzeug==3.1.9",
 ]
 category = "real-world"
 enabled = true
@@ -658,6 +661,14 @@ slow_files = [
     "tests/httpx2/client/test_client.py",
     "tests/httpx2/client/test_event_hooks.py",
     "tests/httpx2/test_utils.py",
+]
+# The ini's `-rxXs` drops the FAILED summary lines known_failures matches on.
+extra_args = ["-ra"]
+# The ASGI websocket stream raises httpcore2.ReadError instead of returning
+# b"" once the peer closes mid-read; real pytest 9.0.3 fails these too.
+known_failures = [
+    "tests/httpx2/websockets/test_transport.py::TestASGIWebSocketAsyncNetworkStream::test_read_during_and_after_close[asyncio]",
+    "tests/httpx2/websockets/test_transport.py::TestASGIWebSocketAsyncNetworkStream::test_read_during_and_after_close[trio]",
 ]
 
 [starlette]
