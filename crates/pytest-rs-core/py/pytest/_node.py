@@ -873,6 +873,19 @@ class DoctestNode:
         return py.path.local(self.path)
 
     @property
+    def session(self):
+        """item.session shim, as on Item: plugins reach item.session.config
+        (pytest-rerunfailures reads its options there for every item)."""
+        pinned = getattr(self, "_session_obj", None)
+        if pinned is not None:
+            return pinned
+        return _NodeSession(getattr(self, "config", None))
+
+    @session.setter
+    def session(self, value):
+        self._session_obj = value
+
+    @property
     def ihook(self):
         """The shim pluginmanager's hook relay (upstream: the node's
         fspath-sensitive HookProxy)."""
