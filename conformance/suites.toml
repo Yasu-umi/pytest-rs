@@ -843,14 +843,14 @@ tag = "v2.14.3"
 testpaths = ["tests"]
 deps = [
     "pydantic[email]==2.14.3",
-    "dirty-equals==0.9.0",
-    "jsonschema==4.24.0",
-    "pytz==2025.2",
-    "pytest-run-parallel==0.4.2",
+    "dirty-equals==0.11",
+    "jsonschema==4.26.0",
+    "pytz==2026.6",
+    "pytest-run-parallel==0.10.0",
     "pytest-benchmark==5.1.0",
     "cloudpickle==3.1.2",
-    "faker==40.23.0",
-    "eval-type-backport==0.2.2",
+    "faker==40.54.0",
+    "eval-type-backport==0.4.0",
     "pytest-examples==0.0.18",
     # tests/test_docs.py imports it (pydantic v2.14.3 dev deps).
     "time-machine==3.6.0",
