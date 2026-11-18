@@ -1557,6 +1557,10 @@ impl Engine {
         let config_proxy = python::make_py_config(py, &self.config)?;
         let session_proxy = python::make_session_proxy(py, &self.config)?;
         let exitstatus = code.into_pyobject(py)?.unbind().into_any();
+        // Upstream returns `session.exitstatus` after this hook, so a plugin
+        // may override the exit code there (pytest-rerunfailures'
+        // --fail-on-flaky sets 7).
+        let _ = session_proxy.bind(py).setattr("exitstatus", code);
         for func in &hook_funcs {
             python::call_py_hook(
                 py,
@@ -1567,6 +1571,14 @@ impl Engine {
                     ("exitstatus", exitstatus.clone_ref(py)),
                 ],
             )?;
+        }
+        if let Ok(updated) = session_proxy
+            .bind(py)
+            .getattr("exitstatus")
+            .and_then(|v| v.extract::<i32>())
+            && updated != code
+        {
+            self.session.exit_code_override = Some(updated);
         }
         Ok(())
     }

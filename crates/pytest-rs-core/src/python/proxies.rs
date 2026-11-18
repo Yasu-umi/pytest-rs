@@ -508,6 +508,20 @@ pub fn set_session_items(py: Python<'_>, items: &[crate::collect::TestItem]) -> 
     Ok(())
 }
 
+/// The `session.items` node published for `nodeid`, so the item a test run
+/// hands to hooks is the object plugins find in `session.items`
+/// (pytest-rerunfailures reads its `execution_count` at sessionfinish).
+pub fn session_item_node(py: Python<'_>, nodeid: &str) -> Option<Py<PyAny>> {
+    py.import("pytest._node")
+        .ok()?
+        .getattr("session_item_node")
+        .ok()?
+        .call1((nodeid,))
+        .ok()
+        .filter(|node| !node.is_none())
+        .map(Bound::unbind)
+}
+
 /// Set the testscollected count override (xdist: items are empty on the
 /// controller, but the true count is known from worker reports).
 pub fn set_session_testscollected(py: Python<'_>, n: usize) -> PyResult<()> {

@@ -272,6 +272,7 @@ pub(crate) fn report_from_err(
     started: TimeMark,
     err: &PyErr,
 ) -> TestReport {
+    super::record_phase_exception(py, &item.nodeid, phase, err);
     // Raw unittest.SkipTest (e.g. from a plain test function) skips like
     // pytest.skip — upstream's makereport conversion (#13985).
     let mapped = python::map_skiptest(py, err.clone_ref(py));
@@ -418,7 +419,7 @@ pub fn summary_line_with_extras(
         match (report.phase, report.outcome) {
             (Phase::Call, Outcome::Passed) => passed += 1,
             (Phase::Call, Outcome::Failed) => failed += 1,
-            (Phase::Call, Outcome::Skipped) | (Phase::Setup, Outcome::Skipped) => skipped += 1,
+            (_, Outcome::Skipped) => skipped += 1,
             (Phase::Setup, Outcome::Failed) | (Phase::Teardown, Outcome::Failed) => errors += 1,
             (_, Outcome::XFailed) => xfailed += 1,
             (_, Outcome::XPassed) => xpassed += 1,

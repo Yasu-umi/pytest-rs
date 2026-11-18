@@ -111,19 +111,6 @@ class _CorePyCollectMakeModule:
         return node
 
 
-class _CallInfo:
-    """Minimal _pytest.runner.CallInfo stand-in for pytest_runtest_makereport
-    consumers (pytest-bdd reads only item/report; others may read when)."""
-
-    def __init__(self, when, excinfo=None):
-        self.when = when
-        self.excinfo = excinfo
-        self.result = None
-        self.start = 0.0
-        self.stop = 0.0
-        self.duration = 0.0
-
-
 _makereport_result: Any = None
 
 
@@ -139,16 +126,27 @@ class _CoreMakeReport:
         return _makereport_result
 
 
-def run_makereport(report: Any, node: Any, when: str) -> Any:
-    """Drive registered pytest_runtest_makereport hookwrappers over `report`
-    so plugins can enrich it (pytest-bdd's .scenario) before it is logged."""
+def run_makereport(report: Any, node: Any, when: str, exc: Any = None) -> Any:
+    """Fire pytest_runtest_makereport for a phase the engine just finished.
+
+    `report` is the engine-built report the core impl returns; `exc` is the
+    exception the phase raised, exposed as `call.excinfo`. Returns the hook's
+    result: hookwrappers may enrich the report (pytest-bdd's .scenario) or
+    replace it (pytest-rerunfailures' teardown of suspended finalizers)."""
     global _makereport_result
+    from _pytest.runner import CallInfo
+
+    from pytest._raises import ExceptionInfo
+
+    excinfo = None if exc is None else ExceptionInfo.from_exception(exc)
+    duration = getattr(report, "duration", 0) or 0
+    call = CallInfo(None, excinfo, duration=duration, when=when, _ispytest=True)
     _makereport_result = report
     try:
-        pluginmanager.hook.pytest_runtest_makereport(item=node, call=_CallInfo(when))
+        result = pluginmanager.hook.pytest_runtest_makereport(item=node, call=call)
     finally:
         _makereport_result = None
-    return report
+    return report if result is None else result
 
 
 def setup(config: Any) -> None:

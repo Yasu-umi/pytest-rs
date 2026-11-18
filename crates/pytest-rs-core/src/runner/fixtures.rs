@@ -59,7 +59,10 @@ pub(crate) fn item_node(py: Python<'_>, item: &TestItem) -> PyResult<Py<PyAny>> 
         {
             return Ok(node.clone_ref(py));
         }
-        let node = python::make_node(py, item)?;
+        let node = match python::session_item_node(py, &item.nodeid) {
+            Some(node) => node,
+            None => python::make_node(py, item)?,
+        };
         *cell.borrow_mut() = Some((item.nodeid.clone(), node.clone_ref(py)));
         Ok(node)
     })
@@ -125,10 +128,15 @@ pub(crate) fn push_resolve_ctx(
         });
     });
     DYNAMIC_NAMES.with(|stack| stack.borrow_mut().push(Vec::new()));
-    // New item run: drop the previous item's cached node so request.node and
-    // the report node for this item share a fresh object.
-    ITEM_NODE.with(|cell| *cell.borrow_mut() = None);
     ResolveCtxGuard(())
+}
+
+/// New item protocol: drop the previous item's cached node so request.node
+/// and the report node for this item share a fresh object. Called once per
+/// `run_one`, not per phase run — a delegated protocol (pytest-rerunfailures)
+/// re-runs the phases of one item, which upstream keeps as the same object.
+pub(crate) fn reset_item_node() {
+    ITEM_NODE.with(|cell| *cell.borrow_mut() = None);
 }
 
 /// Record the test's class instance once setup created it, so dynamically

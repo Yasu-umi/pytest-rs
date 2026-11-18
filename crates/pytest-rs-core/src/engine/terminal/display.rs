@@ -370,6 +370,7 @@ impl Engine {
             .iter()
             .filter(|r| {
                 r.outcome == Outcome::Failed
+                    && !r.rerun
                     && matches!(r.phase, Phase::Setup | Phase::Teardown)
                     && !self
                         .session

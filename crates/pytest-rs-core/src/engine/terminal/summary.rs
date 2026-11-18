@@ -161,6 +161,11 @@ impl Engine {
                 if hide && report.subtest_desc.is_some() && report.outcome != Outcome::Failed {
                     continue;
                 }
+                // A retried attempt is a "rerun", not a failure or an error
+                // (pytest-rerunfailures' own -rR section lists it).
+                if report.rerun {
+                    continue;
+                }
                 let word = match (c, report.phase, report.outcome) {
                     ('f', Phase::Call, Outcome::Failed) => "FAILED",
                     ('E', Phase::Setup | Phase::Teardown, Outcome::Failed) => "ERROR",
@@ -282,7 +287,7 @@ impl Engine {
             .session
             .reports
             .iter()
-            .filter(|r| r.outcome == Outcome::Failed && r.phase == Phase::Call)
+            .filter(|r| r.outcome == Outcome::Failed && r.phase == Phase::Call && !r.rerun)
             .map(|r| (r.nodeid.clone(), r.longrepr.clone().unwrap_or_default()))
             .collect();
         python::pastebin_post_failed(py, &failures);

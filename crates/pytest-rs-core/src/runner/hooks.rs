@@ -29,7 +29,10 @@ pub(crate) fn fire_logreport_hooks(
         .map(|hook| hook.func.clone_ref(py))
         .collect();
     let delegated = session.custom_reporter.is_some();
-    let proxy = match python::make_report_proxy(py, report, lineno) {
+    // The report pytest_runtest_makereport returned for this phase (which
+    // hookwrappers may have enriched, e.g. pytest-bdd's .scenario, or
+    // replaced) is the one upstream hands to pytest_runtest_logreport.
+    let proxy = match take_makereport_result(py, report, lineno) {
         Ok(proxy) => proxy,
         Err(err) => {
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
@@ -52,30 +55,6 @@ pub(crate) fn fire_logreport_hooks(
             Ok(())
         })();
     }
-    // Fire pytest_runtest_makereport hookwrappers so plugins enrich the report
-    // (pytest-bdd attaches .scenario for its gherkin reporter) before logging.
-    // Only when such a hook is registered for this item and we know its node.
-    if let Some(item) = item
-        && session.py_hooks.iter().any(|h| {
-            h.name == "pytest_runtest_makereport" && report.nodeid.starts_with(h.baseid.as_str())
-        })
-    {
-        let when = match report.phase {
-            crate::report::Phase::Setup => "setup",
-            crate::report::Phase::Call => "call",
-            crate::report::Phase::Teardown => "teardown",
-        };
-        let result = (|| -> PyResult<()> {
-            let node = super::item_node(py, item)?;
-            py.import("pytest._reporter")?
-                .getattr("run_makereport")?
-                .call1((proxy.bind(py), node, when))?;
-            Ok(())
-        })();
-        if let Err(err) = result {
-            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
-        }
-    }
     python::record_hook(
         py,
         "pytest_runtest_logreport",
@@ -95,6 +74,171 @@ pub(crate) fn fire_logreport_hooks(
             python::reporter_feed_default(py, proxy.bind(py));
         }
     }
+}
+
+thread_local! {
+    /// The exception each phase of the running item raised, recorded where
+    /// the engine turns it into a report: `pytest_runtest_makereport`'s
+    /// `call.excinfo` (pytest-rerunfailures matches `--only-rerun` against it).
+    static PHASE_EXCEPTIONS: std::cell::RefCell<Vec<(String, Phase, Py<PyAny>)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+    /// The reports `pytest_runtest_makereport` returned, in phase order, until
+    /// `pytest_runtest_logreport` (or a delegated `runtestprotocol`) takes them.
+    static MAKEREPORT_RESULTS: std::cell::RefCell<Vec<(String, Phase, Py<PyAny>)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Forget the previous item's recorded phase exceptions and unlogged
+/// makereport results (called as an item's protocol starts).
+pub(crate) fn reset_makereport_state() {
+    PHASE_EXCEPTIONS.with(|cell| cell.borrow_mut().clear());
+    MAKEREPORT_RESULTS.with(|cell| cell.borrow_mut().clear());
+}
+
+/// Record the exception a phase of `nodeid` raised, for that phase's
+/// `pytest_runtest_makereport` call info. The last one of a phase wins.
+pub(crate) fn record_phase_exception(py: Python<'_>, nodeid: &str, phase: Phase, err: &PyErr) {
+    let value = err.value(py).clone().into_any().unbind();
+    PHASE_EXCEPTIONS.with(|cell| {
+        let mut entries = cell.borrow_mut();
+        entries.retain(|(id, p, _)| !(id == nodeid && *p == phase));
+        entries.push((nodeid.to_string(), phase, value));
+    });
+}
+
+/// The exception recorded for `nodeid`'s `phase`, left in place for that
+/// phase's makereport.
+pub(crate) fn peek_phase_exception(py: Python<'_>, nodeid: &str, phase: Phase) -> Option<PyErr> {
+    PHASE_EXCEPTIONS.with(|cell| {
+        cell.borrow()
+            .iter()
+            .find(|(id, p, _)| id == nodeid && *p == phase)
+            .map(|(_, _, value)| PyErr::from_value(value.bind(py).clone()))
+    })
+}
+
+/// Forget the exception recorded for `nodeid`'s `phase` (a rerun attempt
+/// starting that phase afresh).
+pub(crate) fn clear_phase_exception(nodeid: &str, phase: Phase) {
+    PHASE_EXCEPTIONS.with(|cell| {
+        cell.borrow_mut()
+            .retain(|(id, p, _)| !(id == nodeid && *p == phase));
+    });
+}
+
+fn phase_name(phase: Phase) -> &'static str {
+    match phase {
+        Phase::Setup => "setup",
+        Phase::Call => "call",
+        Phase::Teardown => "teardown",
+    }
+}
+
+/// Fire `pytest_runtest_makereport(item, call)` for each report in
+/// `reports[*fired..]`, as the phase that produced it finishes (upstream's
+/// `call_and_report`), and advance `fired`. Plugins see every phase, setup
+/// included, before the next one runs — pytest-rerunfailures creates its
+/// per-attempt bookkeeping on the item from the setup report. The hook's
+/// result is kept for the phase's `pytest_runtest_logreport`, and an outcome
+/// a hook changed is carried back into the engine's report. A no-op unless a
+/// conftest or plugin registered the hook for this item.
+pub(crate) fn fire_makereport(
+    py: Python<'_>,
+    session: &Session,
+    item: &TestItem,
+    reports: &mut [TestReport],
+    fired: &mut usize,
+) {
+    let start = (*fired).min(reports.len());
+    *fired = reports.len();
+    let hooked = session.py_hooks.iter().any(|h| {
+        h.name == "pytest_runtest_makereport" && item.nodeid.starts_with(h.baseid.as_str())
+    });
+    if !hooked {
+        return;
+    }
+    for report in &mut reports[start..] {
+        // Subtest reports come from pytest-subtests' own makereport call.
+        if report.subtest_desc.is_some() || report.nodeid != item.nodeid {
+            continue;
+        }
+        let exc = PHASE_EXCEPTIONS.with(|cell| {
+            let mut entries = cell.borrow_mut();
+            entries
+                .iter()
+                .position(|(id, p, _)| id == &report.nodeid && *p == report.phase)
+                .map(|pos| entries.remove(pos).2)
+        });
+        let result = (|| -> PyResult<Py<PyAny>> {
+            let proxy = python::make_report_proxy(py, report, Some(item.lineno))?;
+            let node = super::item_node(py, item)?;
+            let result = py
+                .import("pytest._reporter")?
+                .getattr("run_makereport")?
+                .call1((
+                    proxy.bind(py),
+                    node,
+                    phase_name(report.phase),
+                    exc.as_ref().map_or_else(|| py.None(), |e| e.clone_ref(py)),
+                ))?;
+            Ok(result.unbind())
+        })();
+        match result {
+            Ok(result) => {
+                if let Ok(updated) = super::report_from_proxy(py, result.bind(py))
+                    && (updated.outcome != report.outcome || updated.rerun != report.rerun)
+                {
+                    report.outcome = updated.outcome;
+                    report.rerun = updated.rerun;
+                    if updated.longrepr.is_some() {
+                        report.longrepr = updated.longrepr;
+                        report.reprcrash_message = updated.reprcrash_message;
+                    }
+                }
+                MAKEREPORT_RESULTS.with(|cell| {
+                    cell.borrow_mut()
+                        .push((report.nodeid.clone(), report.phase, result));
+                });
+            }
+            Err(err) => eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err)),
+        }
+    }
+}
+
+/// The `pytest_runtest_makereport` result recorded for `report`'s phase, or a
+/// fresh report proxy when no hook produced one. A teardown whose outcome
+/// changed afterwards (a deferred scope teardown failed into it) carries the
+/// engine's final outcome.
+pub(crate) fn take_makereport_result(
+    py: Python<'_>,
+    report: &TestReport,
+    lineno: Option<u32>,
+) -> PyResult<Py<PyAny>> {
+    let cached = MAKEREPORT_RESULTS.with(|cell| {
+        let mut entries = cell.borrow_mut();
+        entries
+            .iter()
+            .position(|(id, p, _)| id == &report.nodeid && *p == report.phase)
+            .map(|pos| entries.remove(pos).2)
+    });
+    let fresh = || python::make_report_proxy(py, report, lineno);
+    let Some(cached) = cached else {
+        return fresh();
+    };
+    let synced = super::report_from_proxy(py, cached.bind(py))
+        .map(|r| r.outcome == report.outcome)
+        .unwrap_or(false);
+    if !synced {
+        let fresh = fresh()?;
+        for attr in ["outcome", "longrepr", "sections", "wasxfail"] {
+            if let Ok(value) = fresh.bind(py).getattr(attr) {
+                cached.bind(py).setattr(attr, value)?;
+            } else if attr == "wasxfail" {
+                let _ = cached.bind(py).delattr(attr);
+            }
+        }
+    }
+    Ok(cached)
 }
 
 /// A `pytest_report_teststatus` hook result: the verbose word and any

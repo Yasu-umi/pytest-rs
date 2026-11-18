@@ -873,6 +873,19 @@ class DoctestNode:
         return py.path.local(self.path)
 
     @property
+    def session(self):
+        """item.session shim, as on Item: plugins reach item.session.config
+        (pytest-rerunfailures reads its options there for every item)."""
+        pinned = getattr(self, "_session_obj", None)
+        if pinned is not None:
+            return pinned
+        return _NodeSession(getattr(self, "config", None))
+
+    @session.setter
+    def session(self, value):
+        self._session_obj = value
+
+    @property
     def ihook(self):
         """The shim pluginmanager's hook relay (upstream: the node's
         fspath-sensitive HookProxy)."""
@@ -966,6 +979,13 @@ def set_session_items(items):
     """Collected item proxies, published once collection finishes (the
     engine fires pytest_collection_finish with them on the session)."""
     _session_state["items"] = list(items)
+    _session_state["items_by_nodeid"] = {item.nodeid: item for item in items}
+
+
+def session_item_node(nodeid):
+    """The published session.items node for `nodeid`, or None. The engine
+    runs each item with this object, as upstream runs session.items."""
+    return _session_state.get("items_by_nodeid", {}).get(nodeid)
 
 
 def set_session_testscollected(n):

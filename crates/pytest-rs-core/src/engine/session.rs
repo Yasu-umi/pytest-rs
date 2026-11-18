@@ -480,7 +480,7 @@ impl Engine {
             .session
             .reports
             .iter()
-            .any(|r| r.outcome == Outcome::Failed);
+            .any(|r| r.outcome == Outcome::Failed && !r.rerun);
         let mut code = if failed {
             exit_code::TESTS_FAILED
         } else if self.session.dist_total_items == Some(0) {

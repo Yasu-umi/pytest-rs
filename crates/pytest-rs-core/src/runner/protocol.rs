@@ -84,8 +84,10 @@ pub(crate) fn run_item_phases(py: Python<'_>) -> PyResult<Py<PyAny>> {
     let reports = super::run_one_body(py, plugins, session, config, item, nextitem, None);
     let proxies = pyo3::types::PyList::empty(py);
     for report in &reports {
+        // The reports pytest_runtest_makereport returned, which the plugin's
+        // own makereport wrapper may have replaced.
         let lineno = (report.phase == Phase::Call).then_some(item.lineno);
-        proxies.append(crate::python::make_report_proxy(py, report, lineno)?)?;
+        proxies.append(super::take_makereport_result(py, report, lineno)?)?;
     }
     Ok(proxies.unbind().into_any())
 }
@@ -144,6 +146,11 @@ pub(crate) fn report_from_proxy(py: Python<'_>, report: &Bound<'_, PyAny>) -> Py
         .and_then(|d| d.extract::<f64>())
         .map(std::time::Duration::from_secs_f64)
         .unwrap_or_default();
+    // "Captured stdout/stderr/log {when}" sections the engine attached.
+    let sections: Vec<(String, String)> = report
+        .getattr("sections")
+        .and_then(|v| v.extract())
+        .unwrap_or_default();
     let _ = py;
     Ok(TestReport {
         nodeid,
@@ -153,7 +160,7 @@ pub(crate) fn report_from_proxy(py: Python<'_>, report: &Bound<'_, PyAny>) -> Py
         longrepr,
         location: None,
         subtest_desc: None,
-        sections: Vec::new(),
+        sections,
         rerun,
         xfail_longrepr: None,
         reprcrash_message,
@@ -203,7 +210,9 @@ pub(crate) fn delegate_protocol(
         return Ok((Vec::new(), false));
     }
 
-    let node = crate::python::make_node(py, item)?;
+    // The same node object the per-phase hooks (makereport, runtest_*) get,
+    // so attributes the plugin sets on `item` are visible to them.
+    let node = super::item_node(py, item)?;
     let nextnode = match nextitem {
         Some(next) => crate::python::make_node(py, next)?,
         None => py.None(),

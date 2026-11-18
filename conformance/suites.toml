@@ -476,15 +476,14 @@ known_failures = [
 
 [pytest-rerunfailures]
 repo = "https://github.com/pytest-dev/pytest-rerunfailures"
-tag = "9.1.1"
-testpaths = ["test_pytest_rerunfailures.py"]
-# Flat layout: the checkout root is the import path; the dist is installed
-# so its pytest11 entry point autoloads (the checkout shadows the import).
-# setuptools<81 still ships pkg_resources, which the test module imports
-# (removed in setuptools 81+). The `py` package backs the tests'
-# py.path.local temp-file flakiness toggles.
-deps = ["pytest-rerunfailures==9.1.1", "setuptools<81", "py==1.11.0"]
-pythonpath = ["."]
+tag = "16.7"
+testpaths = ["tests"]
+# src layout: the dist is installed so its pytest11 entry point autoloads
+# (the src/ checkout shadows the import at the same version). The `py`
+# package backs the tests' py.path.local temp-file flakiness toggles (real
+# pytest ships a `py` compat module; pytest-rs does not).
+deps = ["pytest-rerunfailures==16.7", "py==1.11.0"]
+pythonpath = ["src"]
 category = "third-party"
 enabled = true
 # The --reruns-delay tests monkeypatch time.sleep in the *parent* process and

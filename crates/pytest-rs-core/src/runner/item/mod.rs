@@ -63,6 +63,8 @@ pub(crate) fn run_one(
     on_native_start: impl FnOnce(Python<'_>, &mut Session, &Config, &TestItem),
 ) -> Vec<TestReport> {
     session.delegated_render = false;
+    reset_makereport_state();
+    reset_item_node();
     let _faulthandler_guard = FaulthandlerTimeoutGuard::arm_if_active(py, config);
     // pytest_runtest_protocol hookwrappers (e.g. pytest-timeout's timer)
     // surround the whole setup/call/teardown protocol: their pre-yield part
