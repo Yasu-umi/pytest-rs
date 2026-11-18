@@ -26,7 +26,7 @@ pytest-rs; they are not counted in the total.
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | pytest | 9.0.3 | 2782 | 0 | 0 | 55 | 0 | 12 | 2849 | 99.6% | 54 | 54 | 61 |
-| pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
+| pytest-asyncio | v1.5.0 | 271 | 0 | 0 | 0 | 0 | 0 | 271 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 7 | 0 | 0 | 0 | 0 | 0 | 7 | 100.0% | 2 | 2 | 0 |
 | pytest-mock | v3.17.0 | 158 | 0 | 0 | 1 | 0 | 2 | 161 | 98.8% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 205 | 0 | 0 | 3 | 0 | 1 | 209 | 99.5% | 1 | 1 | 0 |
@@ -51,7 +51,7 @@ pytest-rs; they are not counted in the total.
 | click | 8.5.1 | 2373 | 61 | 0 | 24 | 0 | 0 | 2458 | 97.5% | 42 | 43 | 0 |
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
 | marshmallow | 4.4.0 | 1192 | 0 | 0 | 0 | 0 | 0 | 1192 | 100.0% | 12 | 12 | 3 |
-| rich | v15.0.0 | 954 | 0 | 0 | 20 | 0 | 7 | 981 | 99.3% | 61 | 63 | 0 |
+| rich | v15.0.0 | 955 | 0 | 0 | 20 | 0 | 6 | 981 | 99.4% | 61 | 63 | 0 |
 | sqlglot | v30.33.0 | 1613 | 0 | 0 | 0 | 0 | 0 | 1613 | 100.0% | 58 | 60 | 0 |
 | pytest-bdd | 9.0.1 | 145 | 0 | 0 | 1 | 0 | 0 | 146 | 100.0% | 35 | 35 | 0 |
 | httpx | 0.28.1 | 1410 | 0 | 0 | 1 | 0 | 7 | 1418 | 99.5% | 31 | 31 | 0 |
@@ -133,7 +133,7 @@ pytest-rs; they are not counted in the total.
 
 </details>
 
-### pytest-asyncio @ v1.4.0
+### pytest-asyncio @ v1.5.0
 
 <details><summary>per-file detail (30 files)</summary>
 
@@ -143,10 +143,10 @@ pytest-rs; they are not counted in the total.
 | tests/async_fixtures/test_async_fixtures_contextvars.py | passed | 10 | 0 | 0 | 0 | 0 | 0 |
 | tests/async_fixtures/test_nested.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/async_fixtures/test_shared_module_fixture.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
-| tests/hypothesis/test_base.py | passed | 6 | 0 | 0 | 0 | 0 | 0 |
+| tests/hypothesis/test_base.py | passed | 5 | 0 | 0 | 0 | 0 | 0 |
 | tests/markers/test_class_scope.py | passed | 10 | 0 | 0 | 0 | 0 | 0 |
 | tests/markers/test_function_scope.py | passed | 12 | 0 | 0 | 0 | 0 | 0 |
-| tests/markers/test_invalid_arguments.py | passed | 8 | 0 | 0 | 0 | 0 | 0 |
+| tests/markers/test_invalid_arguments.py | passed | 9 | 0 | 0 | 0 | 0 | 0 |
 | tests/markers/test_mixed_scope.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/markers/test_module_scope.py | passed | 9 | 0 | 0 | 0 | 0 | 0 |
 | tests/markers/test_package_scope.py | passed | 8 | 0 | 0 | 0 | 0 | 0 |
@@ -158,7 +158,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_asyncio_mark.py | passed | 9 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_doctest.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_event_loop_fixture.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_fixture_loop_scopes.py | passed | 11 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_fixture_loop_scopes.py | passed | 14 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_import.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_is_async_test.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_loop_factory_parametrization.py | passed | 40 | 0 | 0 | 0 | 0 | 0 |
@@ -568,7 +568,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_color_triplet.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_columns.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_columns_align.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_console.py | passed | 99 | 0 | 0 | 0 | 0 | 1 |
+| tests/test_console.py | passed | 100 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_constrain.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_containers.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_control.py | passed | 7 | 0 | 0 | 0 | 0 | 0 |
