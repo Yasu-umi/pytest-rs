@@ -868,6 +868,12 @@ class _GlobalCaptureManager:
     to suspend the global capture so their output reaches the real
     terminal, and to read what the test captured so far."""
 
+    # Upstream's CaptureManager keeps its MultiCapture here. pytest-rs's
+    # capture lives in the engine, so there is none to hand out; None is
+    # upstream's own "not capturing" value, which plugins that peek at it
+    # (inline-snapshot's pytest_sessionfinish) already handle.
+    _global_capturing = None
+
     def suspend_global_capture(self, item=None, in_=False):
         if state.fixture is not None and state.fixture._capture is not None:
             if state.fixture._capture.is_started():
