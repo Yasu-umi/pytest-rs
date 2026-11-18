@@ -109,7 +109,7 @@ known_failures = [
 
 [pytest-asyncio]
 repo = "https://github.com/pytest-dev/pytest-asyncio"
-tag = "v1.4.0"
+tag = "v1.5.0"
 testpaths = ["tests"]
 local = "conformance/suites/pytest-asyncio"
 deps = ["hypothesis==6.155.1"]
