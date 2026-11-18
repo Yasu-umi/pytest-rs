@@ -673,18 +673,21 @@ known_failures = [
 
 [starlette]
 repo = "https://github.com/encode/starlette"
-tag = "0.46.2"
+tag = "1.10.0"
 testpaths = ["tests"]
 deps = [
-    "starlette==0.46.2",
-    "anyio==4.13.0",
-    "trio==0.33.0",
-    "httpx==0.28.1",
-    "python-multipart==0.0.20",
+    "starlette==1.10.0",
+    "anyio==4.16.0",
+    "trio==0.35.0",
+    # starlette 1.x's TestClient runs on httpx2 (its dev group pins it).
+    "httpx2[zstd]==2.16.2",
+    "blockbuster==1.5.29",
+    "opentelemetry-sdk==1.45.2",
+    "python-multipart==0.0.34",
     "jinja2==3.1.6",
     "itsdangerous==2.2.0",
-    "pyyaml==6.0.2",
-    "typing_extensions==4.14.0",
+    "pyyaml==6.0.3",
+    "typing_extensions==4.16.0",
 ]
 category = "real-world"
 enabled = true
