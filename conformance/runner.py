@@ -32,6 +32,13 @@ BINARY = Path(os.environ.get("PYTEST_RS_BIN") or ROOT / "target" / "debug" / "py
 # one CPython minor, so their --target dirs are keyed by the interpreter the
 # runner runs under (the one the binary must embed; see _check_binary_python).
 PY_TAG = f"py{sys.version_info.major}.{sys.version_info.minor}"
+# The pytest version pytest-rs reproduces. Suite deps that pull in pytest
+# transitively (most plugins declare `pytest>=X`) would otherwise get the
+# newest release, and plugins that branch on
+# `importlib.metadata.version("pytest")` (pytest-bdd's fixture-registry
+# compat, for one) would then take code paths for internals pytest-rs does
+# not emulate. Kept in sync with crates/pytest-rs-core/py/pytest/__init__.py.
+TARGET_PYTEST = "9.0.3"
 # Results are platform-scoped: counts differ between linux and darwin
 # (platform-specific skips, system deps), so each platform owns its
 # scoreboard; linux is canonical (regenerated and committed from CI).
@@ -152,27 +159,49 @@ class Suite:
             return None
         target = CACHE / "deps" / PY_TAG / self.name
         marker = target / ".deps.txt"
-        if marker.exists() and marker.read_text() == "\n".join(sorted(self.deps)):
+        wanted = self._install_marker(self.deps)
+        if marker.exists() and marker.read_text() == wanted:
             self._fix_console_script_shebangs(target)
             return target
         target.mkdir(parents=True, exist_ok=True)
-        subprocess.run(
-            [
-                "uv",
-                "pip",
-                "install",
-                "--python",
-                sys.executable,
-                "--target",
-                str(target),
-                *self.deps,
-            ],
-            check=True,
-            capture_output=True,
-        )
-        marker.write_text("\n".join(sorted(self.deps)))
+        self._uv_install(target, self.deps)
+        marker.write_text(wanted)
         self._fix_console_script_shebangs(target)
         return target
+
+    @staticmethod
+    def _install_marker(pkgs: list[str]) -> str:
+        """What an install target's marker records: the requested packages
+        plus the pytest constraint, so a TARGET_PYTEST change reinstalls."""
+        return "\n".join([*sorted(pkgs), f"constraint: pytest=={TARGET_PYTEST}"])
+
+    @staticmethod
+    def _uv_install(target: Path, pkgs: list[str]) -> None:
+        """`uv pip install --target` for sys.executable, with any transitive
+        pytest held at TARGET_PYTEST (a constraint: it pins pytest only when
+        something pulls it in, and fails loudly if a dep needs a newer one)."""
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
+            f.write(f"pytest=={TARGET_PYTEST}\n")
+            constraints = f.name
+        try:
+            subprocess.run(
+                [
+                    "uv",
+                    "pip",
+                    "install",
+                    "--python",
+                    sys.executable,
+                    "--target",
+                    str(target),
+                    "--constraint",
+                    constraints,
+                    *pkgs,
+                ],
+                check=True,
+                capture_output=True,
+            )
+        finally:
+            os.unlink(constraints)
 
     @staticmethod
     def _fix_console_script_shebangs(target: Path) -> None:
@@ -205,24 +234,11 @@ class Suite:
         marker = self.checkout / ".installed.txt"
         assert self.package is not None
         all_pkgs = [self.package] + self.deps
-        wanted = "\n".join(sorted(all_pkgs))
+        wanted = self._install_marker(all_pkgs)
         if marker.exists() and marker.read_text() == wanted:
             return
         self.checkout.mkdir(parents=True, exist_ok=True)
-        subprocess.run(
-            [
-                "uv",
-                "pip",
-                "install",
-                "--python",
-                sys.executable,
-                "--target",
-                str(self.checkout),
-                *all_pkgs,
-            ],
-            check=True,
-            capture_output=True,
-        )
+        self._uv_install(self.checkout, all_pkgs)
         marker.write_text(wanted)
 
     def fetch(self, use_local: bool) -> None:
