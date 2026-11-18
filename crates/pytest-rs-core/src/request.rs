@@ -99,6 +99,20 @@ impl PyConfig {
         }
     }
 
+    /// The `getoption` default when the caller passes none — upstream's
+    /// `notset`. pyo3 maps an explicit `default=None` to Rust `None`, so the
+    /// omitted case needs its own sentinel to tell the two apart.
+    fn getoption_notset() -> Option<Py<PyAny>> {
+        static NOTSET: pyo3::sync::PyOnceLock<Py<PyAny>> = pyo3::sync::PyOnceLock::new();
+        Python::attach(|py| {
+            Some(
+                NOTSET
+                    .get_or_init(py, || pyo3::types::PyList::empty(py).into_any().unbind())
+                    .clone_ref(py),
+            )
+        })
+    }
+
     /// Resolve a CLI name to its option dest: "-X" / "--foo" → "foo" via the
     /// registered flag_dests aliases; plain "foo" or unknown names fall back to
     /// stripping leading dashes and replacing `-` with `_`.
@@ -284,7 +298,7 @@ impl PyConfig {
         entry.push_str(line);
     }
 
-    #[pyo3(signature = (name, default = None, skip = false))]
+    #[pyo3(signature = (name, default = PyConfig::getoption_notset(), skip = false))]
     fn getoption(
         &self,
         py: Python<'_>,
@@ -292,6 +306,13 @@ impl PyConfig {
         default: Option<Py<PyAny>>,
         skip: bool,
     ) -> PyResult<Py<PyAny>> {
+        // None here is an explicit `default=None` (returned like any other
+        // default); the notset sentinel means no default was given.
+        let default = match default {
+            None => Some(py.None()),
+            Some(value) if Self::getoption_notset().is_some_and(|notset| value.is(&notset)) => None,
+            value => value,
+        };
         let dest = Self::opt2dest(py, name)?;
         let ns = self.option.bind(py);
         match ns.getattr(dest.as_str()) {
