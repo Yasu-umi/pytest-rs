@@ -4,7 +4,7 @@
   "category": "ecosystem",
   "excluded_files": 0,
   "deselected": 0,
-  "known_failed": 5,
+  "known_failed": 4,
   "files": [
     {
       "file": "tests/streams/test_buffered.py",
@@ -70,7 +70,7 @@
       "skipped": 0,
       "errors": 0,
       "deselected": 0,
-      "known_failed": 5
+      "known_failed": 4
     },
     {
       "file": "tests/test_all_attributes.py",
@@ -140,10 +140,10 @@
     },
     {
       "file": "tests/test_from_thread.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 194,
-      "failed": 1,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 195,
+      "failed": 0,
       "skipped": 4,
       "errors": 0,
       "deselected": 0,

@@ -34,15 +34,15 @@ pytest-rs; they are not counted in the total.
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 122 | 0 | 0 | 1 | 0 | 0 | 123 | 100.0% | 6 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 42 | 0 | 0 | 1 | 0 | 0 | 43 | 100.0% | 1 | 1 | 0 |
-| anyio | 4.13.0 | 3136 | 1 | 0 | 21 | 0 | 5 | 3163 | 99.8% | 25 | 26 | 0 |
+| anyio | 4.13.0 | 3137 | 0 | 0 | 21 | 0 | 4 | 3162 | 99.9% | 26 | 26 | 0 |
 | pytest-mypy | v1.1.0 | 76 | 0 | 0 | 2 | 0 | 0 | 78 | 100.0% | 1 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-subtests | v0.15.0 | 32 | 0 | 0 | 0 | 0 | 2 | 34 | 94.1% | 1 | 1 | 0 |
 | pytest-metadata | 3.1.1 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-snapshot | v0.9.0 | 106 | 0 | 0 | 0 | 0 | 1 | 107 | 99.1% | 3 | 3 | 0 |
 | pytest-icdiff | 0.5 | 10 | 0 | 0 | 0 | 0 | 2 | 12 | 83.3% | 1 | 1 | 0 |
-| pytest-socket | 0.7.0 | 63 | 0 | 0 | 0 | 0 | 2 | 65 | 96.9% | 6 | 6 | 0 |
-| pytest-order | v1.4.0 | 134 | 0 | 0 | 0 | 0 | 0 | 134 | 100.0% | 16 | 16 | 0 |
+| pytest-socket | 0.8.1 | 111 | 0 | 0 | 0 | 0 | 1 | 112 | 99.1% | 8 | 8 | 0 |
+| pytest-order | v1.5.0 | 142 | 0 | 0 | 0 | 0 | 0 | 142 | 100.0% | 17 | 17 | 0 |
 | pytest-repeat | v0.9.4 | 16 | 0 | 0 | 0 | 0 | 0 | 16 | 100.0% | 1 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
 | pytest-env | 1.6.0 | 72 | 0 | 0 | 0 | 0 | 3 | 75 | 96.0% | 3 | 3 | 0 |
@@ -53,7 +53,7 @@ pytest-rs; they are not counted in the total.
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
 | rich | v14.2.0 | 854 | 0 | 0 | 20 | 0 | 6 | 880 | 99.3% | 60 | 62 | 0 |
 | sqlglot | v30.11.0 | 1120 | 0 | 0 | 0 | 0 | 0 | 1120 | 100.0% | 52 | 54 | 0 |
-| pytest-bdd | 8.1.0 | 138 | 0 | 0 | 1 | 0 | 0 | 139 | 100.0% | 35 | 35 | 0 |
+| pytest-bdd | 9.0.1 | 145 | 0 | 0 | 1 | 0 | 0 | 146 | 100.0% | 35 | 35 | 0 |
 | httpx | 0.28.1 | 1410 | 0 | 0 | 1 | 0 | 7 | 1418 | 99.5% | 31 | 31 | 0 |
 | httpx2 | v2.4.0 | 1426 | 0 | 0 | 1 | 0 | 0 | 1427 | 100.0% | 31 | 31 | 0 |
 | starlette | 0.46.2 | 907 | 0 | 0 | 0 | 0 | 0 | 907 | 100.0% | 28 | 28 | 0 |
@@ -260,14 +260,14 @@ pytest-rs; they are not counted in the total.
 | tests/streams/test_memory.py | passed | 109 | 0 | 0 | 0 | 0 | 0 |
 | tests/streams/test_stapled.py | passed | 24 | 0 | 0 | 0 | 0 | 0 |
 | tests/streams/test_text.py | passed | 24 | 0 | 0 | 0 | 0 | 0 |
-| tests/streams/test_tls.py | passed | 64 | 0 | 0 | 0 | 0 | 5 |
+| tests/streams/test_tls.py | passed | 64 | 0 | 0 | 0 | 0 | 4 |
 | tests/test_all_attributes.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_contextmanagers.py | passed | 49 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_debugging.py | passed | 31 | 0 | 0 | 1 | 0 | 0 |
 | tests/test_deprecations.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_eventloop.py | passed | 17 | 0 | 0 | 1 | 0 | 0 |
 | tests/test_fileio.py | passed | 259 | 0 | 0 | 7 | 0 | 0 |
-| tests/test_from_thread.py | failed | 194 | 1 | 0 | 4 | 0 | 0 |
+| tests/test_from_thread.py | passed | 195 | 0 | 0 | 4 | 0 | 0 |
 | tests/test_functools.py | passed | 132 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_lowlevel.py | passed | 44 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_pytest_plugin.py | passed | 35 | 0 | 0 | 0 | 0 | 0 |
@@ -346,24 +346,26 @@ pytest-rs; they are not counted in the total.
 
 </details>
 
-### pytest-socket @ 0.7.0
+### pytest-socket @ 0.8.1
 
-<details><summary>per-file detail (6 files)</summary>
+<details><summary>per-file detail (8 files)</summary>
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
 | tests/test_async.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_benchmarks.py | passed | 12 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_combinations.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_dns.py | passed | 10 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_doctest.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_precedence.py | passed | 10 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_restrict_hosts.py | passed | 28 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_socket.py | passed | 20 | 0 | 0 | 0 | 0 | 2 |
+| tests/test_restrict_hosts.py | passed | 43 | 0 | 0 | 0 | 0 | 1 |
+| tests/test_socket.py | passed | 31 | 0 | 0 | 0 | 0 | 0 |
 
 </details>
 
-### pytest-order @ v1.4.0
+### pytest-order @ v1.5.0
 
-<details><summary>per-file detail (16 files)</summary>
+<details><summary>per-file detail (17 files)</summary>
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
@@ -378,9 +380,10 @@ pytest-rs; they are not counted in the total.
 | tests/test_order_group_scope_relative.py | passed | 5 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_order_scope.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_order_scope_level.py | passed | 5 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_order_transitive.py | passed | 5 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_ordering.py | passed | 19 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_ordering_options.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_relative_ordering.py | passed | 21 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_relative_ordering.py | passed | 24 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_sparse_ordinals.py | passed | 16 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_xdist_handling.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 
@@ -653,7 +656,7 @@ pytest-rs; they are not counted in the total.
 
 </details>
 
-### pytest-bdd @ 8.1.0
+### pytest-bdd @ 9.0.1
 
 <details><summary>per-file detail (35 files)</summary>
 
@@ -663,13 +666,13 @@ pytest-rs; they are not counted in the total.
 | tests/args/parse/test_args.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
 | tests/args/regex/test_args.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
 | tests/args/test_common.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
-| tests/datatable/test_datatable.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
+| tests/datatable/test_datatable.py | passed | 5 | 0 | 0 | 0 | 0 | 0 |
 | tests/feature/test_alias.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/feature/test_background.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
-| tests/feature/test_cucumber_json.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
+| tests/feature/test_cucumber_json.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
 | tests/feature/test_description.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/feature/test_feature_base_dir.py | passed | 7 | 0 | 0 | 0 | 0 | 0 |
-| tests/feature/test_gherkin_terminal_reporter.py | passed | 14 | 0 | 0 | 0 | 0 | 0 |
+| tests/feature/test_gherkin_terminal_reporter.py | passed | 16 | 0 | 0 | 0 | 0 | 0 |
 | tests/feature/test_no_scenario.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/feature/test_outline.py | passed | 7 | 0 | 0 | 0 | 0 | 0 |
 | tests/feature/test_outline_empty_values.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
@@ -689,8 +692,8 @@ pytest-rs; they are not counted in the total.
 | tests/scripts/test_main.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
 | tests/scripts/test_migrate.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/steps/test_common.py | passed | 8 | 0 | 0 | 0 | 0 | 0 |
-| tests/steps/test_docstring.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
-| tests/steps/test_given.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
+| tests/steps/test_docstring.py | passed | 5 | 0 | 0 | 0 | 0 | 0 |
+| tests/steps/test_given.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
 | tests/steps/test_keyword.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/steps/test_unicode.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_hooks.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |

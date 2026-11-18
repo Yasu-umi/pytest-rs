@@ -1,6 +1,6 @@
 {
   "suite": "pytest-order",
-  "tag": "v1.4.0",
+  "tag": "v1.5.0",
   "category": "third-party",
   "excluded_files": 0,
   "deselected": 0,
@@ -128,6 +128,17 @@
       "known_failed": 0
     },
     {
+      "file": "tests/test_order_transitive.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "deselected": 0,
+      "known_failed": 0
+    },
+    {
       "file": "tests/test_ordering.py",
       "status": "passed",
       "exit_code": 0,
@@ -153,7 +164,7 @@
       "file": "tests/test_relative_ordering.py",
       "status": "passed",
       "exit_code": 0,
-      "passed": 21,
+      "passed": 24,
       "failed": 0,
       "skipped": 0,
       "errors": 0,
