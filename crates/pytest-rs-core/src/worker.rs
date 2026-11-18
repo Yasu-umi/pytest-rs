@@ -1043,6 +1043,10 @@ impl Engine {
         for (index, item) in collection.items.iter().enumerate() {
             collection.by_nodeid.insert(item.nodeid.clone(), index);
         }
+        // An xdist worker's session.items is the full collected set, as
+        // upstream workers collect everything (pytest-django sets up the
+        // databases every item needs from it).
+        python::set_session_items(py, &collection.items)?;
         Ok(collected.saturating_sub(collection.items.len()))
     }
 
