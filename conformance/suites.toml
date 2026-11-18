@@ -491,8 +491,11 @@ enabled = true
 
 [click]
 repo = "https://github.com/pallets/click"
-tag = "8.3.1"
+tag = "8.5.1"
 testpaths = ["tests"]
+# Installed for its dist metadata (tests/test_deprecations.py reads
+# importlib.metadata.version("click")); the src/ checkout shadows the import.
+deps = ["click==8.5.1"]
 category = "real-world"
 enabled = true
 
