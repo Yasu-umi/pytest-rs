@@ -561,6 +561,10 @@ repo = "https://github.com/encode/httpx"
 tag = "0.28.1"
 testpaths = ["tests"]
 deps = [
+    # httpx's CLI extra (click==8.*), pinned: 8.5
+    # deprecates CliRunner.isolated_filesystem, which test_main.py's
+    # test_download turns into an error under filterwarnings=error.
+    "click==8.4.1",
     "httpx[brotli,cli,http2]==0.28.1",
     "httpcore==1.0.9",
     "anyio==4.13.0",
@@ -605,6 +609,10 @@ repo = "https://github.com/pydantic/httpx2"
 tag = "v2.4.0"
 testpaths = ["tests/httpx2"]
 deps = [
+    # httpx's CLI extra (click==8.*), pinned: 8.5
+    # deprecates CliRunner.isolated_filesystem, which test_main.py's
+    # test_download turns into an error under filterwarnings=error.
+    "click==8.4.1",
     "httpx2[brotli,cli,http2,socks,zstd]==2.4.0",
     "httpcore2==2.4.0",
     "anyio==4.13.0",
