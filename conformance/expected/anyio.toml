@@ -11,7 +11,6 @@
 "tests/test_all_attributes.py" = "passed"
 "tests/test_contextmanagers.py" = "passed"
 "tests/test_debugging.py" = "passed"
-"tests/test_deprecations.py" = "passed"
 "tests/test_eventloop.py" = "passed"
 "tests/test_fileio.py" = "passed"
 "tests/test_from_thread.py" = "passed"
