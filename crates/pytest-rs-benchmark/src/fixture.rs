@@ -91,6 +91,12 @@ pub struct BenchConfig {
     pub disable_gc: bool,
     /// --benchmark-verbose: print calibration progress to stderr.
     pub verbose: bool,
+    /// --benchmark-precision: stop the rounds once the mean's relative
+    /// margin of error falls below this fraction (5.3.0+). None = fixed
+    /// number of rounds.
+    pub precision: Option<f64>,
+    /// --benchmark-confidence: the confidence level of that margin.
+    pub confidence: Option<f64>,
 }
 
 impl Default for BenchConfig {
@@ -107,6 +113,8 @@ impl Default for BenchConfig {
             cprofile_sort: "cumtime".to_string(),
             disable_gc: false,
             verbose: false,
+            precision: None,
+            confidence: Some(0.99),
         }
     }
 }
@@ -129,6 +137,8 @@ impl BenchConfig {
                 "warmup_iterations" => self.warmup_iterations = value.extract()?,
                 "cprofile" => self.cprofile = value.extract()?,
                 "disable_gc" => self.disable_gc = value.extract()?,
+                "precision" => self.precision = value.extract()?,
+                "confidence" => self.confidence = value.extract()?,
                 "timer" | "group" => {
                     // Handled by the caller: group lands on the fixture,
                     // timer is a callable injected into it.
@@ -184,6 +194,8 @@ impl PyStats {
 #[pyclass(name = "BenchmarkFixture", module = "pytest_benchmark.fixture")]
 pub struct BenchmarkFixture {
     nodeid: String,
+    /// The test's name: the last node id part, with any parameter ids.
+    name: String,
     config: BenchConfig,
     helper: Py<PyModule>,
     results: ResultStore,
@@ -197,7 +209,7 @@ pub struct BenchmarkFixture {
     params: Vec<(String, String)>,
     /// Which mode already consumed the fixture ("benchmark(...)" or
     /// "benchmark.pedantic(...)"); a second use raises FixtureAlreadyUsed.
-    used: Mutex<Option<&'static str>>,
+    used: Mutex<Option<String>>,
     #[pyo3(get)]
     extra_info: Py<PyDict>,
     #[pyo3(get, set)]
@@ -216,7 +228,9 @@ impl BenchmarkFixture {
         results: ResultStore,
         params: Vec<(String, String)>,
     ) -> PyResult<Self> {
+        let name = nodeid.rsplit("::").next().unwrap_or(&nodeid).to_string();
         Ok(Self {
+            name,
             nodeid,
             config,
             helper,
@@ -236,7 +250,7 @@ impl BenchmarkFixture {
     /// benchmark per test, in one mode.
     fn mark_used(&self, py: Python<'_>, mode: &'static str) -> PyResult<()> {
         let mut used = self.used.lock().expect("used lock poisoned");
-        if let Some(previous) = *used {
+        if let Some(previous) = used.as_deref() {
             let exc = self
                 .helper
                 .bind(py)
@@ -246,7 +260,66 @@ impl BenchmarkFixture {
                 ),))?;
             return Err(PyErr::from_value(exc));
         }
-        *used = Some(mode);
+        *used = Some(mode.to_string());
+        Ok(())
+    }
+
+    /// The fraction and confidence of the precision stopping rule, when it
+    /// is on (upstream: `if precision and confidence`).
+    fn precision_target(&self) -> Option<(f64, f64)> {
+        match (self.config.precision, self.config.confidence) {
+            (Some(precision), Some(confidence)) if precision != 0.0 && confidence != 0.0 => {
+                Some((precision, confidence))
+            }
+            _ => None,
+        }
+    }
+
+    /// Upstream's `_run_until_precise`: take samples (each one round)
+    /// until the relative margin of error of the mean, at `confidence`,
+    /// is at most `precision` — no earlier than min_rounds (and two
+    /// samples), no later than `max_rounds`. Welford's online variance.
+    fn run_until_precise(
+        &self,
+        py: Python<'_>,
+        precision: f64,
+        confidence: f64,
+        max_rounds: usize,
+        mut sample: impl FnMut() -> PyResult<f64>,
+    ) -> PyResult<()> {
+        // Two-sided normal quantile, from the stdlib like upstream.
+        let z: f64 = py
+            .import("statistics")?
+            .getattr("NormalDist")?
+            .call0()?
+            .call_method1("inv_cdf", (0.5 + confidence / 2.0,))?
+            .extract()?;
+        let mut mean = 0.0_f64;
+        let mut m2 = 0.0_f64;
+        for n in 1..=max_rounds {
+            let duration = sample()?;
+            let delta = duration - mean;
+            mean += delta / n as f64;
+            m2 += delta * (duration - mean);
+            if n >= self.config.min_rounds && n >= 2 && mean > 0.0 {
+                let stddev = (m2 / (n - 1) as f64).sqrt();
+                let rel_margin = z * stddev / (n as f64).sqrt() / mean;
+                if rel_margin <= precision {
+                    if self.config.verbose {
+                        let msg = format!(
+                            "  Reached precision \u{b1}{:.2}% (target \u{b1}{:.2}%) after {n} rounds.",
+                            rel_margin * 100.0,
+                            precision * 100.0,
+                        );
+                        let _ = self
+                            .helper
+                            .bind(py)
+                            .call_method1("_stderr_writeorg", (msg,));
+                    }
+                    return Ok(());
+                }
+            }
+        }
         Ok(())
     }
 
@@ -493,7 +566,18 @@ impl BenchmarkFixture {
                 let msg = format!("  Running {} rounds x {} iterations ...", rounds, loops);
                 let _ = helper.call_method1("_stderr_writeorg", (msg,));
             }
-            let times = self.run_rounds(&runner, loops, duration)?;
+            let times = match self.precision_target() {
+                None => self.run_rounds(&runner, loops, duration)?,
+                Some((precision, confidence)) => {
+                    let mut times = Vec::new();
+                    self.run_until_precise(py, precision, confidence, rounds, || {
+                        let measured: f64 = runner.call1((loops,))?.extract()?;
+                        times.push(measured);
+                        Ok(measured)
+                    })?;
+                    times
+                }
+            };
             if self.config.verbose {
                 let total: f64 = times.iter().sum();
                 let msg = format!("  Ran for {:.10}s.", total);
@@ -549,6 +633,153 @@ impl BenchmarkFixture {
             .expect("min_time lock poisoned") = Some(value);
     }
 
+    /// Upstream's constructor, for code that builds a fixture by hand (its
+    /// own tests do, with a stand-in node). The engine creates the fixture
+    /// it hands to tests through `BenchmarkFixture::new` instead;
+    /// `add_stats`, `logger` and `warner` are accepted for signature
+    /// compatibility, results go to a store of this fixture's own.
+    #[new]
+    #[pyo3(signature = (node, disable_gc, timer, min_rounds, min_time, max_time, precision, confidence, warmup, warmup_iterations, calibration_precision, add_stats, logger, warner, disabled, cprofile, cprofile_loops, cprofile_dump, group = None))]
+    #[allow(clippy::too_many_arguments)]
+    fn py_new(
+        py: Python<'_>,
+        node: &Bound<'_, PyAny>,
+        disable_gc: bool,
+        timer: &Bound<'_, PyAny>,
+        min_rounds: usize,
+        min_time: f64,
+        max_time: f64,
+        precision: Option<f64>,
+        confidence: Option<f64>,
+        warmup: bool,
+        warmup_iterations: usize,
+        calibration_precision: usize,
+        add_stats: &Bound<'_, PyAny>,
+        logger: &Bound<'_, PyAny>,
+        warner: &Bound<'_, PyAny>,
+        disabled: bool,
+        cprofile: Option<&Bound<'_, PyAny>>,
+        cprofile_loops: Option<&Bound<'_, PyAny>>,
+        cprofile_dump: &Bound<'_, PyAny>,
+        group: Option<Py<PyAny>>,
+    ) -> PyResult<Self> {
+        let _ = (add_stats, logger, warner, cprofile_loops, cprofile_dump);
+        let precise = precision
+            .zip(confidence)
+            .filter(|(p, c)| *p != 0.0 && *c != 0.0);
+        let config = BenchConfig {
+            disabled,
+            min_time,
+            max_time,
+            min_rounds,
+            calibration_precision,
+            warmup,
+            warmup_iterations,
+            cprofile: cprofile.is_some_and(|value| value.is_truthy().unwrap_or(false)),
+            disable_gc,
+            precision: precise.map(|(p, _)| p),
+            confidence: precise.map(|(_, c)| c),
+            ..BenchConfig::default()
+        };
+        let helper = PyModule::from_code(
+            py,
+            std::ffi::CString::new(crate::HELPER)?.as_c_str(),
+            c"pytest_rs_benchmark/helper.py",
+            c"_pytest_rs_benchmark",
+        )?;
+        let mut fixture = Self::new(
+            py,
+            node.getattr("nodeid")?.extract()?,
+            config,
+            helper.unbind(),
+            Arc::new(Mutex::new(Vec::new())),
+            Vec::new(),
+        )?;
+        fixture.name = node.getattr("name")?.extract()?;
+        // Upstream stores `timer.target` (a NameWrapper) as `_timer`.
+        let target = timer.getattr("target").unwrap_or_else(|_| timer.clone());
+        fixture.timer = Mutex::new(Some(target.unbind()));
+        if let Some(group) = group {
+            fixture.group = group;
+        }
+        Ok(fixture)
+    }
+
+    /// The test's name (upstream: `node.name`).
+    #[getter]
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    /// The test's node id (upstream: `node.nodeid`).
+    #[getter]
+    fn fullname(&self) -> String {
+        self.nodeid.clone()
+    }
+
+    /// Upstream's `benchmark._mode`: which call consumed the fixture
+    /// (None while unused). Tests that drive internals directly set it to
+    /// mark the fixture as used.
+    #[getter(_mode)]
+    fn get_mode(&self) -> Option<String> {
+        self.used.lock().expect("used lock poisoned").clone()
+    }
+
+    #[setter(_mode)]
+    fn set_mode(&self, value: Option<String>) {
+        *self.used.lock().expect("used lock poisoned") = value;
+    }
+
+    #[getter(_min_rounds)]
+    fn get_min_rounds(&self) -> usize {
+        self.config.min_rounds
+    }
+
+    #[setter(_min_rounds)]
+    fn set_min_rounds(&mut self, value: usize) {
+        self.config.min_rounds = value;
+    }
+
+    #[getter(_precision)]
+    fn get_precision(&self) -> Option<f64> {
+        self.config.precision
+    }
+
+    #[setter(_precision)]
+    fn set_precision(&mut self, value: Option<f64>) {
+        self.config.precision = value;
+    }
+
+    #[getter(_confidence)]
+    fn get_confidence(&self) -> Option<f64> {
+        self.config.confidence
+    }
+
+    #[setter(_confidence)]
+    fn set_confidence(&mut self, value: Option<f64>) {
+        self.config.confidence = value;
+    }
+
+    /// Upstream's `_run_until_precise(runner, loops_range, stats,
+    /// max_rounds)`: each round is `runner(loops_range)`, fed to
+    /// `stats.update(...)`.
+    fn _run_until_precise(
+        &self,
+        py: Python<'_>,
+        runner: &Bound<'_, PyAny>,
+        loops_range: &Bound<'_, PyAny>,
+        stats: &Bound<'_, PyAny>,
+        max_rounds: usize,
+    ) -> PyResult<()> {
+        let precision = self.config.precision.unwrap_or(0.0);
+        let confidence = self.config.confidence.unwrap_or(0.0);
+        self.run_until_precise(py, precision, confidence, max_rounds, || {
+            let duration = runner.call1((loops_range,))?;
+            stats.call_method1("update", (&duration,))?;
+            duration.extract()
+        })
+    }
+
     /// Upstream's benchmark.weave (aspect mode): weaves `self(target, ...)`
     /// into `target` via aspectlib (requires the optional aspectlib extra;
     /// same ImportError as upstream without it). The rollback is deferred
@@ -599,7 +830,7 @@ impl BenchmarkFixture {
             .map(|stats| stats.clone_ref(py))
     }
 
-    #[pyo3(signature = (target, args = None, kwargs = None, setup = None, rounds = None, iterations = None, warmup_rounds = None))]
+    #[pyo3(signature = (target, args = None, kwargs = None, setup = None, teardown = None, rounds = None, iterations = None, warmup_rounds = None))]
     #[allow(clippy::too_many_arguments)]
     fn pedantic(
         &self,
@@ -608,6 +839,7 @@ impl BenchmarkFixture {
         args: Option<Py<PyAny>>,
         kwargs: Option<Py<PyAny>>,
         setup: Option<Py<PyAny>>,
+        teardown: Option<Py<PyAny>>,
         rounds: Option<Py<PyAny>>,
         iterations: Option<Py<PyAny>>,
         warmup_rounds: Option<Py<PyAny>>,
@@ -655,6 +887,22 @@ impl BenchmarkFixture {
             Ok(())
         };
 
+        // teardown (5.2.0+) gets the same arguments as the target, after
+        // every call of it that ran (warmup, timed, extra and profiled).
+        let apply_teardown =
+            |py: Python<'_>, call_args: &Py<PyAny>, call_kwargs: &Py<PyAny>| -> PyResult<()> {
+                if let Some(teardown) = &teardown {
+                    let args = call_args
+                        .bind(py)
+                        .try_iter()?
+                        .collect::<PyResult<Vec<_>>>()?;
+                    let args = PyTuple::new(py, args)?;
+                    let kwargs = call_kwargs.bind(py).cast::<PyDict>()?;
+                    teardown.bind(py).call(args, Some(kwargs))?;
+                }
+                Ok(())
+            };
+
         let timer = self.timer_obj(py);
         let make_result_runner = helper.getattr("make_result_runner")?;
         for _ in 0..warmup_rounds {
@@ -666,6 +914,7 @@ impl BenchmarkFixture {
                 timer.bind(py),
             ))?;
             runner.call1((iterations,))?;
+            apply_teardown(py, &call_args, &call_kwargs)?;
         }
 
         let mut times = Vec::with_capacity(rounds);
@@ -682,6 +931,7 @@ impl BenchmarkFixture {
                 runner.call1((iterations,))?.extract()?;
             times.push(duration);
             result = round_result;
+            apply_teardown(py, &call_args, &call_kwargs)?;
         }
         if iterations > 1 {
             // Upstream makes one extra plain call for the return value when
@@ -692,6 +942,7 @@ impl BenchmarkFixture {
                 .call1((target.bind(py), call_args.bind(py), call_kwargs.bind(py)))?
                 .extract()?;
             result = extra_result;
+            apply_teardown(py, &call_args, &call_kwargs)?;
         }
         if !self.config.disabled {
             self.record(py, &times, iterations)?;
@@ -707,6 +958,7 @@ impl BenchmarkFixture {
                     .getattr("cprofile_call")?
                     .call1((target.bind(py), call_args.bind(py), call_kwargs.bind(py)))?
                     .extract()?;
+                apply_teardown(py, &call_args, &call_kwargs)?;
                 self.attach_cprofile(py, functions.bind(py))?;
             }
         }
