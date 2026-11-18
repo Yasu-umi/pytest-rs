@@ -4,8 +4,10 @@ import inspect
 import pathlib
 import traceback
 import warnings
+from collections.abc import Generator
 from inspect import Parameter, signature
 from itertools import chain
+from typing import Any
 
 # Marks added at runtime (node.add_marker / request.applymarker) for the
 # currently running item; the engine re-evaluates xfail against these and
@@ -1649,7 +1651,7 @@ def fire_makeitem_for_function(
         "obj": callobj,
         "collector": None,
     }
-    wrappers = []
+    wrappers: list[tuple[Generator[Any, Any, Any], bool]] = []
     plain_result = None
     for func in _pycollect_makeitem_hooks:
         opts = getattr(func, "pytest_impl", None) or {}
@@ -1735,7 +1737,7 @@ def fire_makeitem_for_class(name: str) -> set:
         return node.extra_keyword_matches
 
     kwargs = {"name": name, "obj": None, "collector": None}
-    started = []
+    started: list[tuple[Generator[Any, Any, Any], bool]] = []
     for func in _pycollect_makeitem_hooks:
         opts = getattr(func, "pytest_impl", None) or {}
         old_style = bool(opts.get("hookwrapper"))
