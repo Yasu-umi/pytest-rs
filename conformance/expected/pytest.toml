@@ -23,6 +23,7 @@
 "testing/python/approx.py" = "passed"
 "testing/python/raises.py" = "passed"
 "testing/test_error_diffs.py" = "passed"
+"testing/test_config.py" = "passed"
 
 # Files intentionally not run: they test pytest's internal implementation,
 # which pytest-rs deliberately does not replicate. Behavior-level coverage
