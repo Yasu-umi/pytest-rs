@@ -232,13 +232,13 @@ enabled = true
 repo = "https://github.com/agronholm/anyio"
 # 4.13.0+: the re-entrant runner guard wording in pytest-rs-anyio matches
 # anyio master as of this tag.
-tag = "4.13.0"
+tag = "4.16.0"
 testpaths = ["tests"]
 # anyio itself is installed as a dep so its pytest11 entry point (the
 # upstream anyio plugin's fixtures) autoloads; the src/ checkout shadows
 # the import at the same version.
 deps = [
-    "anyio==4.13.0",
+    "anyio==4.16.0",
     "trio==0.33.0",
     "hypothesis==6.155.2",
     "psutil==7.2.2",
@@ -249,6 +249,8 @@ deps = [
     # type), which errors every test through tests/conftest.py's autouse
     # fixture; 1.5.29 handles it.
     "blockbuster==1.5.29",
+    # anyio's pyproject sets `timeout` and loads `-p timeout`.
+    "pytest-timeout==2.4.0",
 ]
 enabled = true
 # Newer CPython patch releases (seen on 3.13.16 / 3.15.0 with OpenSSL 3.5.9;
@@ -268,6 +270,19 @@ known_failures = [
     "tests/test_to_thread.py::test_cancel_wait_on_thread[asyncio+eager]",
     "tests/test_from_thread.py::test_thread_cancelled_and_abandoned[asyncio+eager]",
     "tests/test_to_thread.py::TestBlockingPortalProvider::test_single_thread[asyncio]",
+    # New in 4.14+: races the peer's RST against send() filling the socket
+    # buffers, so send() sometimes returns before the reset lands ("send()
+    # returned normally after reset"). Real pytest 9.0.3 fails it the same
+    # way under load (2-4 of 40-60 parallel runs on macOS / Python 3.15,
+    # across backends).
+    "tests/test_sockets.py::TestTCPStream::test_reset_during_send[asyncio-ipv4]",
+    "tests/test_sockets.py::TestTCPStream::test_reset_during_send[asyncio-ipv6]",
+    "tests/test_sockets.py::TestTCPStream::test_reset_during_send[asyncio+uvloop-ipv4]",
+    "tests/test_sockets.py::TestTCPStream::test_reset_during_send[asyncio+uvloop-ipv6]",
+    "tests/test_sockets.py::TestTCPStream::test_reset_during_send[asyncio+eager-ipv4]",
+    "tests/test_sockets.py::TestTCPStream::test_reset_during_send[asyncio+eager-ipv6]",
+    "tests/test_sockets.py::TestTCPStream::test_reset_during_send[trio-ipv4]",
+    "tests/test_sockets.py::TestTCPStream::test_reset_during_send[trio-ipv6]",
 ]
 
 [pytest-mypy]
