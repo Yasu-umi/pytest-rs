@@ -769,9 +769,10 @@ known_failures = [
 
 [packaging]
 repo = "https://github.com/pypa/packaging"
-tag = "25.0"
+tag = "26.3"
 testpaths = ["tests"]
-deps = ["pretend==1.0.9"]
+# packaging's `test` dependency group (pytest itself comes from pytest-rs).
+deps = ["pretend==1.0.9", "hypothesis==6.170.15", "pip==26.3", "tomli-w==1.2.0"]
 category = "real-world"
 enabled = true
 
