@@ -156,6 +156,11 @@ def setup(config: Any) -> None:
     fires pytest_configure into Python plugins)."""
     global _default
     if _default is not None:
+        # Reused across in-process nested runs, so undo a previous run's
+        # retyping (a conftest's pytest_plugin_registered may set
+        # `plugin.__class__` to a subclass) before it stands in for a fresh
+        # TerminalReporter again.
+        _default.__class__ = TerminalReporter
         _default.__init__(config)
         # A nested run's snapshot_pluginmanager guard unregisters
         # 'terminalreporter' so the nested config sees it as absent until now
