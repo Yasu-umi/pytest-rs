@@ -418,6 +418,12 @@ class Suite:
 
         out = ANSI_RE.sub("", proc.stdout)
         counts = self._parse_summary(out)
+        if not self._deselect_args(rel):
+            # Only suites.toml's own --deselect counts against the score
+            # (see the score definition); a suite's ini deselecting its own
+            # tests (click's `addopts = "-m 'not stress'"`) is upstream's
+            # choice of what runs, like a file outside testpaths.
+            counts.pop("deselected", None)
         known = self._known_failures_for(rel)
         if known:
             reclassified = 0
