@@ -4,7 +4,7 @@
   "category": "ecosystem",
   "excluded_files": 0,
   "deselected": 0,
-  "known_failed": 0,
+  "known_failed": 5,
   "files": [
     {
       "file": "tests/streams/test_buffered.py",
@@ -64,13 +64,13 @@
     {
       "file": "tests/streams/test_tls.py",
       "status": "passed",
-      "exit_code": 0,
-      "passed": 68,
+      "exit_code": 1,
+      "passed": 64,
       "failed": 0,
       "skipped": 0,
       "errors": 0,
       "deselected": 0,
-      "known_failed": 0
+      "known_failed": 5
     },
     {
       "file": "tests/test_all_attributes.py",
@@ -131,9 +131,9 @@
       "file": "tests/test_fileio.py",
       "status": "passed",
       "exit_code": 0,
-      "passed": 244,
+      "passed": 259,
       "failed": 0,
-      "skipped": 22,
+      "skipped": 7,
       "errors": 0,
       "deselected": 0,
       "known_failed": 0
@@ -230,9 +230,9 @@
       "file": "tests/test_taskgroups.py",
       "status": "passed",
       "exit_code": 0,
-      "passed": 393,
+      "passed": 399,
       "failed": 0,
-      "skipped": 10,
+      "skipped": 4,
       "errors": 0,
       "deselected": 0,
       "known_failed": 0

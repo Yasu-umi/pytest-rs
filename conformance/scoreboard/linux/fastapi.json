@@ -1,10 +1,10 @@
 {
   "suite": "fastapi",
-  "tag": "0.115.12",
+  "tag": "0.117.1",
   "category": "real-world",
   "excluded_files": 0,
   "deselected": 0,
-  "known_failed": 1,
+  "known_failed": 0,
   "files": [
     {
       "file": "tests/test_additional_properties.py",
@@ -164,7 +164,7 @@
       "file": "tests/test_compat.py",
       "status": "passed",
       "exit_code": 0,
-      "passed": 7,
+      "passed": 8,
       "failed": 0,
       "skipped": 2,
       "errors": 0,
@@ -436,6 +436,17 @@
       "known_failed": 0
     },
     {
+      "file": "tests/test_file_and_form_order_issue_9116.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "deselected": 0,
+      "known_failed": 0
+    },
+    {
       "file": "tests/test_filter_pydantic_sub_model/test_filter_pydantic_sub_model_pv1.py",
       "status": "no-tests",
       "exit_code": 0,
@@ -470,10 +481,10 @@
     },
     {
       "file": "tests/test_forms_single_model.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 4,
-      "failed": 0,
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 0,
+      "failed": 4,
       "skipped": 0,
       "errors": 0,
       "deselected": 0,
@@ -508,6 +519,17 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
+      "errors": 0,
+      "deselected": 0,
+      "known_failed": 0
+    },
+    {
+      "file": "tests/test_get_model_definitions_formfeed_escape.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 2,
       "errors": 0,
       "deselected": 0,
       "known_failed": 0
@@ -689,6 +711,17 @@
       "known_failed": 0
     },
     {
+      "file": "tests/test_openapi_model_description_trim_on_formfeed.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "deselected": 0,
+      "known_failed": 0
+    },
+    {
       "file": "tests/test_openapi_query_parameter_extension.py",
       "status": "passed",
       "exit_code": 0,
@@ -704,6 +737,17 @@
       "status": "passed",
       "exit_code": 0,
       "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "deselected": 0,
+      "known_failed": 0
+    },
+    {
+      "file": "tests/test_openapi_schema_type.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 4,
       "failed": 0,
       "skipped": 0,
       "errors": 0,
@@ -1008,6 +1052,17 @@
       "known_failed": 0
     },
     {
+      "file": "tests/test_response_model_default_factory.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "deselected": 0,
+      "known_failed": 0
+    },
+    {
       "file": "tests/test_response_model_include_exclude.py",
       "status": "passed",
       "exit_code": 0,
@@ -1034,6 +1089,17 @@
       "status": "passed",
       "exit_code": 0,
       "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "deselected": 0,
+      "known_failed": 0
+    },
+    {
+      "file": "tests/test_return_none_stringified_annotations.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 1,
       "failed": 0,
       "skipped": 0,
       "errors": 0,
@@ -1668,6 +1734,17 @@
       "known_failed": 0
     },
     {
+      "file": "tests/test_tutorial/test_behind_a_proxy/test_tutorial001_01.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "deselected": 0,
+      "known_failed": 0
+    },
+    {
       "file": "tests/test_tutorial/test_behind_a_proxy/test_tutorial002.py",
       "status": "passed",
       "exit_code": 0,
@@ -1901,13 +1978,13 @@
     {
       "file": "tests/test_tutorial/test_custom_request_and_route/test_tutorial002.py",
       "status": "passed",
-      "exit_code": 1,
-      "passed": 1,
+      "exit_code": 0,
+      "passed": 2,
       "failed": 0,
       "skipped": 0,
       "errors": 0,
       "deselected": 0,
-      "known_failed": 1
+      "known_failed": 0
     },
     {
       "file": "tests/test_tutorial/test_custom_request_and_route/test_tutorial003.py",
@@ -2397,7 +2474,7 @@
       "file": "tests/test_tutorial/test_header_params/test_tutorial003.py",
       "status": "passed",
       "exit_code": 0,
-      "passed": 15,
+      "passed": 20,
       "failed": 0,
       "skipped": 0,
       "errors": 0,
@@ -2881,7 +2958,7 @@
       "file": "tests/test_tutorial/test_response_model/test_tutorial003.py",
       "status": "passed",
       "exit_code": 0,
-      "passed": 2,
+      "passed": 4,
       "failed": 0,
       "skipped": 0,
       "errors": 0,
@@ -2925,18 +3002,7 @@
       "file": "tests/test_tutorial/test_response_model/test_tutorial003_04.py",
       "status": "passed",
       "exit_code": 0,
-      "passed": 1,
-      "failed": 0,
-      "skipped": 0,
-      "errors": 0,
-      "deselected": 0,
-      "known_failed": 0
-    },
-    {
-      "file": "tests/test_tutorial/test_response_model/test_tutorial003_04_py310.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 1,
+      "passed": 2,
       "failed": 0,
       "skipped": 0,
       "errors": 0,
@@ -2948,17 +3014,6 @@
       "status": "passed",
       "exit_code": 0,
       "passed": 6,
-      "failed": 0,
-      "skipped": 0,
-      "errors": 0,
-      "deselected": 0,
-      "known_failed": 0
-    },
-    {
-      "file": "tests/test_tutorial/test_response_model/test_tutorial003_py310.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 2,
       "failed": 0,
       "skipped": 0,
       "errors": 0,
@@ -3125,17 +3180,6 @@
       "exit_code": 0,
       "passed": 1,
       "failed": 0,
-      "skipped": 0,
-      "errors": 0,
-      "deselected": 0,
-      "known_failed": 0
-    },
-    {
-      "file": "tests/test_tutorial/test_settings/test_tutorial001_pv1.py",
-      "status": "no-tests",
-      "exit_code": 0,
-      "passed": 0,
-      "failed": 0,
       "skipped": 1,
       "errors": 0,
       "deselected": 0,
@@ -3144,7 +3188,7 @@
     {
       "file": "tests/test_tutorial/test_sql_databases/test_tutorial001.py",
       "status": "passed",
-      "exit_code": 0,
+      "exit_code": 1,
       "passed": 12,
       "failed": 0,
       "skipped": 0,
@@ -3154,10 +3198,10 @@
     },
     {
       "file": "tests/test_tutorial/test_sql_databases/test_tutorial002.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 12,
-      "failed": 0,
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 11,
+      "failed": 1,
       "skipped": 0,
       "errors": 0,
       "deselected": 0,
@@ -3234,6 +3278,17 @@
       "status": "passed",
       "exit_code": 0,
       "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "deselected": 0,
+      "known_failed": 0
+    },
+    {
+      "file": "tests/test_tutorial/test_testing/test_tutorial004.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 2,
       "failed": 0,
       "skipped": 0,
       "errors": 0,
@@ -3329,6 +3384,17 @@
       "known_failed": 0
     },
     {
+      "file": "tests/test_union_forms.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "deselected": 0,
+      "known_failed": 0
+    },
+    {
       "file": "tests/test_union_inherited_body.py",
       "status": "passed",
       "exit_code": 0,
@@ -3362,18 +3428,7 @@
       "known_failed": 0
     },
     {
-      "file": "tests/test_validate_response_recursive/test_validate_response_recursive_pv1.py",
-      "status": "no-tests",
-      "exit_code": 0,
-      "passed": 0,
-      "failed": 0,
-      "skipped": 1,
-      "errors": 0,
-      "deselected": 0,
-      "known_failed": 0
-    },
-    {
-      "file": "tests/test_validate_response_recursive/test_validate_response_recursive_pv2.py",
+      "file": "tests/test_validate_response_recursive/test_validate_response_recursive.py",
       "status": "passed",
       "exit_code": 0,
       "passed": 1,

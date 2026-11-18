@@ -197,9 +197,9 @@
       "file": "testing/test_collection.py",
       "status": "passed",
       "exit_code": 1,
-      "passed": 112,
+      "passed": 113,
       "failed": 0,
-      "skipped": 3,
+      "skipped": 2,
       "errors": 0,
       "deselected": 0,
       "known_failed": 1
@@ -263,9 +263,9 @@
       "file": "testing/test_faulthandler.py",
       "status": "passed",
       "exit_code": 0,
-      "passed": 12,
+      "passed": 9,
       "failed": 0,
-      "skipped": 0,
+      "skipped": 3,
       "errors": 0,
       "deselected": 0,
       "known_failed": 0
