@@ -557,9 +557,11 @@ known_failures = [
 
 [sqlglot]
 repo = "https://github.com/tobymao/sqlglot"
-tag = "v30.11.0"
+tag = "v30.33.0"
 testpaths = ["tests"]
-deps = ["duckdb==1.5.4", "pandas==3.0.6", "python-dateutil==2.9.0.post0", "pytz==2026.2"]
+# setuptools: tests/test_sqlglotc.py imports it to drive sqlglotc/setup.py
+# (present in some base interpreters, e.g. Homebrew 3.13, but not all).
+deps = ["duckdb==2.0.0", "pandas==3.1.1", "python-dateutil==4.0.0", "pytz==2026.6", "setuptools==84.2.1"]
 # Flat package layout: the checkout root is the import path.
 pythonpath = ["."]
 category = "real-world"
@@ -794,8 +796,8 @@ category = "real-world"
 enabled = true
 
 [pandas]
-tag = "v3.0.6"
-package = "pandas==3.0.6"
+tag = "v3.1.1"
+package = "pandas==3.1.1"
 testpaths = ["pandas/tests"]
 deps = ["hypothesis>=6.116.0"]
 category = "real-world"
@@ -825,10 +827,10 @@ known_failures = [
 ]
 
 [networkx]
-tag = "3.6.1"
-package = "networkx==3.6.1"
+tag = "3.7"
+package = "networkx==3.7"
 testpaths = ["networkx"]
-deps = ["numpy==2.5.5", "scipy==1.18.1", "pandas==3.0.6"]
+deps = ["numpy==2.5.5", "scipy==1.18.1", "pandas==3.1.1"]
 category = "real-world"
 enabled = true
 
