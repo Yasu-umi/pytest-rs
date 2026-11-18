@@ -34,8 +34,8 @@ pytest-rs; they are not counted in the total.
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 122 | 0 | 0 | 1 | 0 | 0 | 123 | 100.0% | 6 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 42 | 0 | 0 | 1 | 0 | 0 | 43 | 100.0% | 1 | 1 | 0 |
-| anyio | 4.13.0 | 3137 | 0 | 0 | 21 | 0 | 5 | 3163 | 99.8% | 26 | 26 | 0 |
-| pytest-mypy | v1.0.1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | - | 0 | 1 | 0 |
+| anyio | 4.13.0 | 3137 | 0 | 0 | 21 | 0 | 4 | 3162 | 99.9% | 26 | 26 | 0 |
+| pytest-mypy | v1.0.1 | 75 | 0 | 0 | 2 | 0 | 1 | 78 | 98.7% | 1 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-subtests | v0.14.2 | 32 | 0 | 0 | 0 | 0 | 0 | 32 | 100.0% | 1 | 1 | 0 |
 | pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
@@ -51,7 +51,7 @@ pytest-rs; they are not counted in the total.
 | click | 8.3.1 | 1314 | 0 | 0 | 21 | 0 | 0 | 1335 | 100.0% | 20 | 20 | 0 |
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
 | marshmallow | 4.1.1 | 1119 | 0 | 0 | 0 | 0 | 0 | 1119 | 100.0% | 12 | 12 | 3 |
-| rich | v14.2.0 | 854 | 0 | 0 | 20 | 0 | 6 | 880 | 99.3% | 60 | 62 | 0 |
+| rich | v14.2.0 | 853 | 1 | 0 | 20 | 0 | 6 | 880 | 99.2% | 59 | 62 | 0 |
 | sqlglot | v30.11.0 | 1120 | 0 | 0 | 0 | 0 | 0 | 1120 | 100.0% | 52 | 54 | 0 |
 | pytest-bdd | 8.1.0 | 138 | 0 | 0 | 1 | 0 | 0 | 139 | 100.0% | 35 | 35 | 0 |
 | httpx | 0.28.1 | 1410 | 0 | 0 | 1 | 0 | 7 | 1418 | 99.5% | 31 | 31 | 0 |
@@ -260,7 +260,7 @@ pytest-rs; they are not counted in the total.
 | tests/streams/test_memory.py | passed | 109 | 0 | 0 | 0 | 0 | 0 |
 | tests/streams/test_stapled.py | passed | 24 | 0 | 0 | 0 | 0 | 0 |
 | tests/streams/test_text.py | passed | 24 | 0 | 0 | 0 | 0 | 0 |
-| tests/streams/test_tls.py | passed | 64 | 0 | 0 | 0 | 0 | 5 |
+| tests/streams/test_tls.py | passed | 64 | 0 | 0 | 0 | 0 | 4 |
 | tests/test_all_attributes.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_contextmanagers.py | passed | 49 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_debugging.py | passed | 31 | 0 | 0 | 1 | 0 | 0 |
@@ -290,7 +290,7 @@ pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| tests/test_pytest_mypy.py | timeout | 0 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_pytest_mypy.py | passed | 75 | 0 | 0 | 2 | 0 | 1 |
 
 </details>
 
@@ -536,7 +536,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_color_triplet.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_columns.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_columns_align.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_console.py | passed | 99 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_console.py | failed | 98 | 1 | 0 | 0 | 0 | 0 |
 | tests/test_constrain.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_containers.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_control.py | passed | 7 | 0 | 0 | 0 | 0 | 0 |
