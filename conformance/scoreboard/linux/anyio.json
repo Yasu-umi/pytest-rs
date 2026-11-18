@@ -4,7 +4,7 @@
   "category": "ecosystem",
   "excluded_files": 0,
   "deselected": 0,
-  "known_failed": 4,
+  "known_failed": 5,
   "files": [
     {
       "file": "tests/streams/test_buffered.py",
@@ -70,7 +70,7 @@
       "skipped": 0,
       "errors": 0,
       "deselected": 0,
-      "known_failed": 4
+      "known_failed": 5
     },
     {
       "file": "tests/test_all_attributes.py",
