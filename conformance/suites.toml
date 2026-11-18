@@ -187,7 +187,7 @@ enabled = true
 
 [pytest-split]
 repo = "https://github.com/jerry-git/pytest-split"
-tag = "0.9.0"
+tag = "0.11.0"
 testpaths = ["tests"]
 local = "conformance/suites/pytest-split"
 enabled = true
