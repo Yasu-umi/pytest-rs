@@ -7,7 +7,6 @@ anyio is imported lazily so the plugin stays inert when it is not installed.
 """
 
 from contextlib import ExitStack, contextmanager
-from functools import wraps
 from inspect import iscoroutinefunction
 
 _current_runner = None
@@ -130,9 +129,13 @@ def hypothesis_async_inner(func):
 
 def hypothesis_wrap(inner, backend):
     """A sync inner_test driving each hypothesis example through the
-    backend's runner (upstream's run_with_hypothesis)."""
+    backend's runner (upstream's run_with_hypothesis).
 
-    @wraps(inner)
+    Deliberately not functools.wraps'd, like upstream: hypothesis's
+    differing_executors health check looks the inner test's __name__ up on
+    the test class, and a method name there would make every backend item
+    (each with its own class instance) look like a different executor."""
+
     def run_with_hypothesis(**kwargs):
         run_test(inner, backend, kwargs)
 
