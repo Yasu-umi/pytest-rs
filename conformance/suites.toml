@@ -517,9 +517,11 @@ enabled = true
 
 [rich]
 repo = "https://github.com/Textualize/rich"
-tag = "v14.2.0"
+tag = "v15.0.0"
 testpaths = ["tests"]
-deps = ["markdown-it-py==4.2.0", "pygments==2.20.0", "attrs==26.1.0"]
+# pygments held at 2.20.0: rich 15.0.0's syntax/markdown/card snapshots
+# differ from pygments 2.21's token styles (real pytest fails them too).
+deps = ["markdown-it-py==4.3.0", "pygments==2.20.0", "attrs==26.1.0"]
 # Flat package layout: the checkout root is the import path.
 pythonpath = ["."]
 category = "real-world"

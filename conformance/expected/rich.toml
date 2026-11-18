@@ -62,5 +62,6 @@
 "tests/test_tools.py" = "passed"
 "tests/test_traceback.py" = "passed"
 "tests/test_tree.py" = "passed"
+"tests/test_unicode_data.py" = "passed"
 "tests/test_win32_console.py" = "no-tests"
 "tests/test_windows_renderer.py" = "no-tests"
