@@ -249,7 +249,7 @@ uv run --no-project python conformance/runner.py           # re-clones from upst
 | [pytest-cov](https://github.com/pytest-dev/pytest-cov) | MIT | v7.1.0 |
 | [pytest-xdist](https://github.com/pytest-dev/pytest-xdist) | MIT | v3.8.0 |
 | [pytest-split](https://github.com/jerry-git/pytest-split) | MIT | 0.9.0 |
-| [pytest-benchmark](https://github.com/ionelmc/pytest-benchmark) | BSD-2-Clause | v5.1.0 |
+| [pytest-benchmark](https://github.com/ionelmc/pytest-benchmark) | BSD-2-Clause | v5.3.1 |
 
 pytest-rs reimplements the public APIs of these projects, plus [anyio](https://github.com/agronholm/anyio)'s pytest plugin (MIT). Parts of the bundled Python shims are ports of upstream code; see [THIRD-PARTY-NOTICES.md](https://github.com/Yasu-umi/pytest-rs/blob/main/THIRD-PARTY-NOTICES.md). Credit for the API design and the test suites belongs to their respective authors.
 

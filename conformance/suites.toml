@@ -206,7 +206,7 @@ extra_args = ["-p", "no:pytest_cov"]
 
 [pytest-benchmark]
 repo = "https://github.com/ionelmc/pytest-benchmark"
-tag = "v5.1.0"
+tag = "v5.3.1"
 testpaths = ["tests"]
 # benchmark_weave (aspect-oriented monkeypatching) needs the optional
 # aspectlib extra; without it test_with_testcase.py::test_foo2 errors on
@@ -215,6 +215,10 @@ deps = ["aspectlib==2.0.0"]
 # Wall-clock-bound calibration tests (warmup budgets of max_time=10s per
 # loop level); upstream pytest needs ~3m20s for the file, pytest-rs ~2m40s.
 slow_files = ["tests/test_calibration.py"]
+# Expects the default project name (the git remote's repo name,
+# "pytest-benchmark") to equal the checkout directory's name, which the
+# runner suffixes with the tag; real pytest fails it the same way here.
+known_failures = ["tests/test_utils.py::test_parse_elasticsearch_storage"]
 enabled = true
 
 [pytest-timeout]

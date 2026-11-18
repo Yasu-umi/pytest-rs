@@ -6,14 +6,15 @@
 "tests/test_sample.py" = "passed"
 "tests/test_pedantic.py" = "passed"
 "tests/test_calibration.py" = "passed"
-# test_benchmark.py itself still fails wholesale (storage/compare/usage
-# clusters), but its passing count is tracked in the scoreboard.
+"tests/test_fixture.py" = "passed"
+"tests/test_precision.py" = "passed"
+"tests/test_utils.py" = "passed"
+"tests/test_benchmark.py" = "passed"
 
 [excluded]
-# These import pytest_benchmark internals (stats/utils/storage/cli modules);
+# These import pytest_benchmark internals (stats/storage/cli modules);
 # pytest-rs implements benchmarking natively in Rust and does not ship them.
 "tests/test_stats.py" = "imports pytest_benchmark.stats (internal API)"
-"tests/test_utils.py" = "imports pytest_benchmark.utils (internal API)"
 "tests/test_storage.py" = "imports pytest_benchmark storage internals (save/compare not reproduced)"
 "tests/test_elasticsearch_storage.py" = "imports pytest_benchmark elasticsearch storage (not reproduced)"
 "tests/test_cli.py" = "tests the py.test-benchmark CLI tool (not reproduced)"
