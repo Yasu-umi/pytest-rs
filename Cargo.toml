@@ -36,10 +36,10 @@ thiserror = "2"
 regex = "1"
 libc = "0.2"
 
-ruff_python_parser = { git = "https://github.com/astral-sh/ruff", tag = "0.15.16" }
-ruff_python_ast = { git = "https://github.com/astral-sh/ruff", tag = "0.15.16" }
-ruff_source_file = { git = "https://github.com/astral-sh/ruff", tag = "0.15.16" }
-ruff_text_size = { git = "https://github.com/astral-sh/ruff", tag = "0.15.16" }
+ruff_python_parser = { git = "https://github.com/astral-sh/ruff", tag = "0.17.5" }
+ruff_python_ast = { git = "https://github.com/astral-sh/ruff", tag = "0.17.5" }
+ruff_source_file = { git = "https://github.com/astral-sh/ruff", tag = "0.17.5" }
+ruff_text_size = { git = "https://github.com/astral-sh/ruff", tag = "0.17.5" }
 
 # Distribution wheels: smaller binaries at some build-time cost.
 [profile.release]
