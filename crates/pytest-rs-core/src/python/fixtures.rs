@@ -422,16 +422,16 @@ pub(crate) fn register_fixture_def(
         return Err(PyErr::from_value(exc));
     }
     // When the inner function is a staticmethod descriptor (e.g. @pytest.fixture
-    // @staticmethod), unwrap it: staticmethod.__get__(None) returns the raw function.
+    // @staticmethod), unwrap it to the raw function via __func__
+    // (staticmethod.__get__(None, None) raises TypeError). Left wrapped, it is
+    // still callable, but an async one is not seen as a coroutine function.
     let is_inner_static = py
         .import("builtins")?
         .getattr("staticmethod")
         .and_then(|sm| unwrapped.is_instance(&sm))
         .unwrap_or(false);
     let unwrapped = if is_inner_static {
-        unwrapped
-            .call_method1("__get__", (py.None(), py.None()))
-            .unwrap_or(unwrapped)
+        unwrapped.getattr("__func__").unwrap_or(unwrapped)
     } else {
         unwrapped
     };
