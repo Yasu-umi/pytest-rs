@@ -38,12 +38,12 @@ DEPS = [
     "pytest==9.0.3",
     "pytest-sugar==1.1.1",
     "pytest-pretty==1.3.0",
-    "Faker==40.21.0",
-    "time-machine==3.2.0",
+    "Faker==40.54.0",
+    "time-machine==3.6.0",
     "requests-mock==1.12.1",
-    "pytest-randomly==4.1.0",
-    "inline-snapshot==0.34.1",
-    "pytest-run-parallel==0.9.1",
+    "pytest-randomly==5.1.0",
+    "inline-snapshot==0.36.2",
+    "pytest-run-parallel==0.10.0",
     "requests==2.34.2",
     # pytest-rs always emulates pytest-benchmark natively (one of its 7 fixed
     # native plugin reimplementations), so its own "benchmark: ..." header

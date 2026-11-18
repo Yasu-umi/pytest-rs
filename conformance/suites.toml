@@ -15,7 +15,10 @@ exclude = ["example_scripts"]
 # fixtures.py, metafunc.py, ...) are measured like upstream collects them.
 python_files = ["test_*.py", "*_test.py", "testing/python/*.py"]
 local = "conformance/suites/pytest"
-deps = ["packaging==26.2", "iniconfig==2.3.0", "pluggy==1.6.0", "xmlschema==4.3.1", "setuptools==82.0.1", "pygments==2.20.0", "attrs==26.1.0", "hypothesis==6.155.1"]
+# pluggy held at 1.6.0: pytest-rs prints a fixed "pluggy-1.6.0" in the
+# session header, and test_header_trailer_info compares it with the installed
+# pluggy's version.
+deps = ["packaging==26.3", "iniconfig==2.3.1", "pluggy==1.6.0", "xmlschema==4.3.2", "setuptools==84.2.1", "pygments==2.21.0", "attrs==26.1.0", "hypothesis==6.170.15"]
 # Files that intermittently time out under full-parallel load; give them the
 # 3x slow-file timeout so the scoreboard/CI stay stable.
 slow_files = [
@@ -148,10 +151,10 @@ local = "conformance/suites/pytest-cov"
 # Redis (needs Docker access) to run an actual celery worker/task through
 # --cov instrumentation — per upstream's own tox.ini.
 deps = [
-    "coverage==7.14.1",
+    "coverage==7.17.3",
     "process-tests==3.0.0",
-    "celery==5.6.3",
-    "testcontainers[redis]==4.14.2",
+    "celery==5.7.0",
+    "testcontainers[redis]==4.15.0",
 ]
 # One 209-test file: long under full pool load, must not hit the timeout.
 slow_files = ["tests/test_pytest_cov.py"]
@@ -169,7 +172,7 @@ repo = "https://github.com/pytest-dev/pytest-xdist"
 tag = "v3.8.0"
 testpaths = ["testing"]
 local = "conformance/suites/pytest-xdist"
-deps = ["execnet==2.1.2", "filelock==3.29.1", "py==1.11.0"]
+deps = ["execnet==2.1.2", "filelock==4.2.12", "py==1.11.0"]
 # pytest-rs always loads the native benchmark plugin, which (like real
 # pytest-benchmark) warns to stderr whenever `-n` is active. This suite's own
 # tests spin up nested `-n` pytester runs and assert exact stdout/stderr, so
@@ -288,7 +291,7 @@ tag = "v0.5"
 testpaths = ["tests"]
 # Custom collector (pytest_collect_file -> RuffFile/RuffItem). ruff provides
 # the binary, py backs node.fspath.mtime().
-deps = ["pytest-ruff==0.5", "ruff==0.15.16", "py==1.11.0"]
+deps = ["pytest-ruff==0.5", "ruff==0.17.5", "py==1.11.0"]
 pythonpath = ["."]
 category = "third-party"
 enabled = true
@@ -849,14 +852,14 @@ tag = "v2.14.3"
 testpaths = ["tests"]
 deps = [
     "pydantic[email]==2.14.3",
-    "dirty-equals==0.9.0",
-    "jsonschema==4.24.0",
-    "pytz==2025.2",
-    "pytest-run-parallel==0.4.2",
+    "dirty-equals==0.11",
+    "jsonschema==4.26.0",
+    "pytz==2026.6",
+    "pytest-run-parallel==0.10.0",
     "pytest-benchmark==5.1.0",
     "cloudpickle==3.1.2",
-    "faker==40.23.0",
-    "eval-type-backport==0.2.2",
+    "faker==40.54.0",
+    "eval-type-backport==0.4.0",
     "pytest-examples==0.0.18",
     # tests/test_docs.py imports it (pydantic v2.14.3 dev deps).
     "time-machine==3.6.0",
