@@ -322,6 +322,7 @@ pub(crate) fn collect_testcase(
                 &value,
                 &format!("{class_nodeid}::"),
                 true,
+                None,
                 registry,
             )?;
         }
@@ -349,6 +350,7 @@ pub(crate) fn collect_testcase(
                     &fixture,
                     &format!("{class_nodeid}::"),
                     needs_instance,
+                    None,
                     registry,
                 )?;
             }
@@ -555,7 +557,10 @@ pub(crate) fn collect_class(
                 let unwrapped = value
                     .getattr("_fixture_function")
                     .unwrap_or_else(|_| value.clone());
-                let inner_is_static = unwrapped.is_instance(&staticmethod_type)?;
+                // A @classmethod inside gets `cls` from binding to the class
+                // (register_fixture_def), so it has no `self` to validate.
+                let inner_is_static = unwrapped.is_instance(&staticmethod_type)?
+                    || unwrapped.is_instance(&classmethod_type)?;
                 if !inner_is_static {
                     let kwargs = pyo3::types::PyDict::new(py);
                     kwargs.set_item("cls", cls)?;
@@ -571,6 +576,7 @@ pub(crate) fn collect_class(
                 value,
                 &format!("{class_nodeid}::"),
                 !*is_static,
+                Some(cls),
                 registry,
             )?;
         }

@@ -298,7 +298,7 @@ pub(crate) fn register_fixtures_from_skip(
         if !value.is_callable() || !value.hasattr("_pytestfixturefunction").unwrap_or(false) {
             continue;
         }
-        register_fixture_def(py, &attr_name, &value, baseid, false, registry)?;
+        register_fixture_def(py, &attr_name, &value, baseid, false, None, registry)?;
     }
     Ok(())
 }
@@ -345,6 +345,7 @@ pub(crate) fn register_fixture_def(
     value: &Bound<'_, PyAny>,
     baseid: &str,
     needs_instance: bool,
+    owner: Option<&Bound<'_, PyAny>>,
     registry: &mut FixtureRegistry,
 ) -> PyResult<()> {
     let marker = value.getattr("_pytestfixturefunction")?;
@@ -434,6 +435,24 @@ pub(crate) fn register_fixture_def(
     } else {
         unwrapped
     };
+    // @pytest.fixture over @classmethod (anyio's TestFreePortFactory.families):
+    // bind it to the owning class, which then supplies `cls` the way an
+    // instance supplies `self`, so like a staticmethod it needs no instance.
+    let is_inner_classmethod = match owner {
+        Some(_) => py
+            .import("builtins")?
+            .getattr("classmethod")
+            .and_then(|cm| unwrapped.is_instance(&cm))
+            .unwrap_or(false),
+        None => false,
+    };
+    let unwrapped = match owner {
+        Some(owner) if is_inner_classmethod => {
+            unwrapped.call_method1("__get__", (py.None(), owner))?
+        }
+        _ => unwrapped,
+    };
+    let is_inner_static = is_inner_static || is_inner_classmethod;
     let flags = async_flags(py, &unwrapped)?;
     let mut param_names = param_names(py, &unwrapped)?;
     // Binding to the test instance consumes the first parameter whatever
