@@ -146,6 +146,11 @@ pub(crate) fn report_from_proxy(py: Python<'_>, report: &Bound<'_, PyAny>) -> Py
         .and_then(|d| d.extract::<f64>())
         .map(std::time::Duration::from_secs_f64)
         .unwrap_or_default();
+    // "Captured stdout/stderr/log {when}" sections the engine attached.
+    let sections: Vec<(String, String)> = report
+        .getattr("sections")
+        .and_then(|v| v.extract())
+        .unwrap_or_default();
     let _ = py;
     Ok(TestReport {
         nodeid,
@@ -155,7 +160,7 @@ pub(crate) fn report_from_proxy(py: Python<'_>, report: &Bound<'_, PyAny>) -> Py
         longrepr,
         location: None,
         subtest_desc: None,
-        sections: Vec::new(),
+        sections,
         rerun,
         xfail_longrepr: None,
         reprcrash_message,
