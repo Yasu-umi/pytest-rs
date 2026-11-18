@@ -84,7 +84,7 @@ impl Engine {
             .session
             .reports
             .iter()
-            .filter(|r| r.outcome == Outcome::Failed && r.phase == Phase::Call)
+            .filter(|r| r.outcome == Outcome::Failed && r.phase == Phase::Call && !r.rerun)
             .collect();
         if failures.is_empty() {
             return;
