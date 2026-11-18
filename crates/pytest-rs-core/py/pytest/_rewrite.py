@@ -9,7 +9,6 @@ import ast
 import fnmatch
 import importlib.machinery
 import importlib.util
-import marshal
 import os
 import pathlib
 import sys
@@ -869,64 +868,29 @@ class _RewriteLoader(importlib.machinery.SourceFileLoader):
         # correct under pytester's same-second, same-size in-place rewrites
         # (different content -> different hash -> recompile) while giving warm
         # runs the rewritten-bytecode reuse that uncached compilation forgoes.
+        # The cache I/O lives in _pytest.assertion.rewrite (see the note
+        # there): imported here, not at module level, so plain engine startup
+        # does not pull in the _pytest shim package.
+        # `import a.b.c as x`, not `from a.b import c`: _pytest.assertion's
+        # module __getattr__ would otherwise hand back an unsupported-internal
+        # stub for `rewrite` before the submodule is imported.
+        import _pytest.assertion.rewrite as _upstream_named
+
         path = self.get_filename(fullname)
         source = self.get_data(path)
         cache_path = self._cache_path(path)
-        code = self._read_pyc(source, cache_path)
+        code = _upstream_named._read_pyc(source, cache_path)
         if code is not None:
             return code
         code = self.source_to_code(source, path)
         if not sys.dont_write_bytecode:
-            self._write_pyc(code, source, cache_path)
+            _upstream_named._write_pyc(code, source, cache_path)
         return code
 
     @staticmethod
     def _cache_path(source_path):
         head, tail = os.path.split(source_path)
         return os.path.join(head, "__pycache__", tail[: -len(".py")] + _PYC_TAIL)
-
-    @staticmethod
-    def _read_pyc(source, cache_path):
-        """Return the cached code object iff the pyc's embedded source hash
-        matches `source`; otherwise None. The pytest-rs tag + CPython magic
-        guard means a stale interpreter or non-rewritten pyc is never reused."""
-        try:
-            with open(cache_path, "rb") as fp:
-                data = fp.read()
-        except OSError:
-            return None
-        if len(data) < 16 or data[:4] != importlib.util.MAGIC_NUMBER:
-            return None
-        if int.from_bytes(data[4:8], "little") != 0b11:  # hash-based, checked
-            return None
-        if data[8:16] != importlib.util.source_hash(source):
-            return None
-        try:
-            # A memoryview slice rather than `data[16:]`, which would copy the
-            # whole pyc once per imported module. Not `marshal.load(fp)`: that
-            # reads the body in small chunks through the file object and
-            # measured ~24% slower than parsing an in-memory buffer.
-            code = marshal.loads(memoryview(data)[16:])
-        except Exception:
-            return None
-        return code if isinstance(code, types.CodeType) else None
-
-    @staticmethod
-    def _write_pyc(code, source, cache_path):
-        header = bytearray(importlib.util.MAGIC_NUMBER)
-        header += (0b11).to_bytes(4, "little")  # hash-based + check_source flags
-        header += importlib.util.source_hash(source)  # 8 bytes
-        try:
-            os.makedirs(os.path.dirname(cache_path), exist_ok=True)
-            # Write to a process-unique temp then atomically rename, so parallel
-            # workers sharing a __pycache__ never observe a half-written pyc.
-            tmp = f"{cache_path}.{os.getpid()}"
-            with open(tmp, "wb") as fp:
-                fp.write(header)
-                fp.write(marshal.dumps(code))
-            os.replace(tmp, cache_path)
-        except OSError:
-            pass  # read-only dir etc.: skip caching, like upstream
 
     def source_to_code(self, data, path, *, _optimize=-1):
         tree = ast.parse(data, filename=path)
