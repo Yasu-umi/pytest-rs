@@ -1171,12 +1171,19 @@ impl Engine {
         // it never lands in plugin_args — re-add it here or a plugin's own
         // `if options.help: return` early-exit (e.g. pytest-django's Django
         // project scan) never sees it and runs unwanted setup during --help.
+        // `-VV` likewise (pytest-django sets Django up for it too).
+        let version_args: &[&str] = if self.config.version_text.is_some() {
+            &["--version", "--version"]
+        } else {
+            &[]
+        };
         let full_args: Vec<&str> = self
             .config
             .help_text
             .is_some()
             .then_some("--help")
             .into_iter()
+            .chain(version_args.iter().copied())
             .chain(self.config.plugin_args.iter().map(String::as_str))
             .chain(self.config.paths.iter().map(String::as_str))
             .collect();

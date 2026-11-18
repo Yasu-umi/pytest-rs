@@ -160,6 +160,7 @@ fn build_py_config(
     // plugins read config.getoption("help")/config.option.help to skip their
     // own setup during --help (e.g. pytest-django's pytest_configure).
     option_ns.setattr("help", config.help_text.is_some())?;
+    option_ns.setattr("version", if config.version_text.is_some() { 2 } else { 0 })?;
     option_ns.setattr("no_header", config.get_flag("no-header"))?;
     option_ns.setattr("no_summary", config.get_flag("no-summary"))?;
     option_ns.setattr("fulltrace", config.get_flag("full-trace"))?;

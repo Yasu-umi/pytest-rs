@@ -175,6 +175,13 @@ impl Engine {
             }
             return Err(err);
         }
+        // -VV: upstream's pytest_cmdline_main prints the version once the
+        // initial conftests have loaded, without pytest_configure or a
+        // session. The run is complete; exit 0.
+        if let Some(version_text) = &self.config.version_text {
+            print!("{version_text}");
+            return Err("\x00INTERNAL_DONE\x000".to_string());
+        }
         // Now that every conftest.py has loaded (and had its chance to
         // install its own logging handlers, e.g. via logging.basicConfig()),
         // attach pytest-rs's own session-wide log_file/log_cli handlers —
