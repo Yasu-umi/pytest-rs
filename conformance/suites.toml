@@ -356,7 +356,7 @@ known_failures = [
 
 [pytest-socket]
 repo = "https://github.com/miketheman/pytest-socket"
-tag = "0.7.0"
+tag = "0.8.1"
 testpaths = ["tests"]
 # tests/test_socket.py made real outbound network requests (see
 # known_failures below) and timed out ("1 file died") once on Linux CI while
@@ -366,12 +366,12 @@ slow_files = ["tests/test_socket.py"]
 # pytest-httpbin provides the local-server `httpbin` fixture the restrict-hosts
 # tests connect to; starlette/httpx/anyio back the async tests.
 deps = [
-    "pytest-socket==0.7.0",
+    "pytest-socket==0.8.1",
     "pytest-httpbin==2.1.0",
-    "starlette==1.2.1",
+    "starlette==1.10.0",
     "httpx==0.28.1",
-    "anyio==4.13.0",
-    "requests==2.32.3",
+    "anyio==4.16.0",
+    "requests==2.34.2",
 ]
 pythonpath = ["."]
 category = "third-party"
@@ -384,13 +384,20 @@ enabled = true
 known_failures = [
     "tests/test_socket.py::test_urllib_succeeds_by_default",
     "tests/test_socket.py::test_enabled_urllib_succeeds",
+    # pytest-rs gap: the test counts socket.getaddrinfo calls through a
+    # parent-side monkeypatch while pytester.inline_run executes, then reads
+    # getcalls("pytest_sessionfinish"). pytest-rs runs the nested session in
+    # a subprocess (the parent's patch never sees it) and relays no
+    # pytest_sessionfinish call; the in-process backend records no
+    # pytest_sessionfinish either. Passes under real pytest 9.0.3.
+    "tests/test_restrict_hosts.py::test_name_resolution_cached",
 ]
 
 [pytest-order]
 repo = "https://github.com/pytest-dev/pytest-order"
-tag = "v1.4.0"
+tag = "v1.5.0"
 testpaths = ["tests"]
-deps = ["pytest-order==1.4.0", "pytest-mock", "pytest-dependency==0.6.1"]
+deps = ["pytest-order==1.5.0", "pytest-mock", "pytest-dependency==0.6.1"]
 pythonpath = ["."]
 category = "third-party"
 enabled = true
@@ -545,9 +552,9 @@ enabled = true
 
 [pytest-bdd]
 repo = "https://github.com/pytest-dev/pytest-bdd"
-tag = "8.1.0"
+tag = "9.0.1"
 testpaths = ["tests"]
-deps = ["pytest-bdd==8.1.0", "Mako==1.3.12", "parse==1.22.1", "parse-type==0.6.6", "gherkin-official==29.0.0"]
+deps = ["pytest-bdd==9.0.1", "Mako==1.4.3", "parse==1.22.4", "parse-type==0.6.6", "gherkin-official==43.0.0"]
 use_src = false
 category = "third-party"
 enabled = true

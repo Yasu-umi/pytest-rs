@@ -538,6 +538,9 @@ class PluginManager:
         self._using_pyargs: bool = False
         self._configured: bool = False
         self._blocked_plugins: set[str] = set()
+        # Every pytest_plugin_registered call so far, replayed to plugins that
+        # register later (pluggy fires it with call_historic).
+        self._plugin_registered_history: list[dict[str, Any]] = []
 
     def add_hookcall_monitoring(self, before, after):
         """Register before(name, hook_impls, kwargs) / after(outcome, name,
@@ -730,6 +733,39 @@ class PluginManager:
             file=sys.stderr,
         )
 
+    def _fire_plugin_registered(self, plugin: Any, name: str | None) -> None:
+        """pluggy announces every register() through pytest_plugin_registered
+        as a historic hook: a newly registered plugin's own impl first gets
+        the calls for everything registered before it, then every impl
+        (itself included) gets this one. A conftest that retypes the
+        terminalreporter as it registers (pytest-bdd's compatibility check)
+        relies on it."""
+        kwargs = {
+            "plugin": plugin,
+            "plugin_name": name or getattr(plugin, "__name__", None) or str(id(plugin)),
+            "manager": self,
+        }
+        hook = "pytest_plugin_registered"
+        caller = getattr(self.hook, hook)
+        # Like pluggy's parse_hookimpl_opts, only look an impl up when the
+        # plugin lists it in dir(): a plugin object with a strict
+        # __getattr__ (pytest's own test_disable_plugin_autoload uses one)
+        # must not be probed for names it does not define.
+        own = getattr(plugin, hook) if hook in dir(plugin) else None
+        if callable(own):
+            for past in self._plugin_registered_history:
+                caller._call_impls([own], False, past)
+        self._plugin_registered_history.append(kwargs)
+        impls = [
+            impl
+            for registered in reversed(self._plugins)
+            if hook in dir(registered) and callable(impl := getattr(registered, hook))
+        ]
+        if self._call_monitors:
+            caller._call_monitored(self._call_monitors, impls, False, kwargs)
+        elif impls:
+            caller._call_impls(impls, False, kwargs)
+
     def register(self, plugin: Any, name: str | None = None) -> Any:
         """Track the plugin for hook-relay dispatch; a plugin defining
         pytest_addhooks gets to register its hookspecs immediately (pluggy
@@ -764,6 +800,7 @@ class PluginManager:
         if name is not None:
             self._names[name] = plugin
         self._notify_plugin_registered(plugin, name)
+        self._fire_plugin_registered(plugin, name)
         plugin_dir = dir(plugin)
         addhooks = (
             getattr(plugin, "pytest_addhooks", None) if "pytest_addhooks" in plugin_dir else None

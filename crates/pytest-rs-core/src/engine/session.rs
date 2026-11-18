@@ -235,6 +235,30 @@ impl Engine {
         }
         if let Err(err) = self.fire_collection_modifyitems(py) {
             if python::is_usage_error(py, &err) {
+                // Upstream's wrap_session still fires pytest_sessionfinish
+                // when a pytest_collection_modifyitems hookimpl raises
+                // UsageError, so the terminal shows the collected count and
+                // the closing "no tests ran in X.XXs" line before main
+                // reports the ERROR on stderr (pytester's assert_outcomes
+                // needs that line; pytest-order's --fail-all-on-failed-ordering
+                // tests check both).
+                let n_items = self.session.items.len();
+                self.print_collection_count(py, collected, n_collect_errors, 0, n_items);
+                let summary = crate::runner::summary_line(
+                    &[],
+                    0,
+                    0,
+                    started.elapsed(),
+                    self.config.global_verbosity(),
+                );
+                // -q/-qq have no collected line to end with a blank one, but
+                // upstream still prints one (alone, under -qq).
+                if self.config.global_verbosity() < 0 {
+                    println!();
+                }
+                if !summary.is_empty() {
+                    println!("{summary}");
+                }
                 eprintln!("ERROR: {}", err.value(py));
                 return exit_code::USAGE_ERROR;
             }
