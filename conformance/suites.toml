@@ -672,9 +672,9 @@ enabled = true
 
 [more-itertools]
 repo = "https://github.com/more-itertools/more-itertools"
-tag = "v10.7.0"
+tag = "v11.2.1"
 testpaths = ["tests"]
-deps = ["more-itertools==10.7.0"]
+deps = ["more-itertools==11.2.1"]
 category = "real-world"
 enabled = true
 
