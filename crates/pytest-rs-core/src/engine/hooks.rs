@@ -149,21 +149,34 @@ impl Engine {
         // ahead of a normal-priority plugin registered later, matching pluggy.
         let mut instance_funcs = python::instance_hook_funcs(py, "pytest_collection_modifyitems");
         instance_funcs.sort_by_key(|func| Self::modifyitems_hookimpl_tier(py, func));
-        // Instance-registered hookwrapper impls (e.g. pytest-order's
-        // --order-after-ff OrderingPlugin) are deferred rather than run here:
-        // see `pending_modifyitems_wrapper_hooks` on Engine and
-        // `fire_deferred_modifyitems_wrappers` below for why. Conftest-level
-        // wrapper impls (e.g. a project's own conftest.py) are NOT affected —
-        // only plugin-instance-registered ones go through this split.
-        let (plain_instance_funcs, wrapper_instance_funcs): (Vec<_>, Vec<_>) = instance_funcs
+        // Instance-registered hookwrapper impls (pytest-randomly,
+        // pytest-order's --order-after-ff OrderingPlugin) run up to their
+        // yield before the plain impls below and resume after the native
+        // reorder: see `pending_modifyitems_wrapper_hooks` on Engine and
+        // `fire_deferred_modifyitems_wrappers` below. Conftest-level wrapper
+        // impls (e.g. a project's own conftest.py) are NOT affected — only
+        // plugin-instance-registered ones go through this split.
+        let (plain_instance_funcs, mut wrapper_instance_funcs): (Vec<_>, Vec<_>) = instance_funcs
             .into_iter()
             .partition(|func| !Self::modifyitems_hookimpl_is_wrapper(py, func));
         hook_funcs.extend(plain_instance_funcs);
-        self.pending_modifyitems_wrapper_hooks = wrapper_instance_funcs;
+        // pluggy calls tryfirst wrappers first (outermost), trylast ones last.
+        wrapper_instance_funcs.sort_by_key(|func| {
+            if Self::hookimpl_flag(py, func, "tryfirst") {
+                0
+            } else if Self::hookimpl_flag(py, func, "trylast") {
+                2
+            } else {
+                1
+            }
+        });
+        self.pending_modifyitems_wrapper_hooks = Vec::new();
+        self.pending_modifyitems_list = None;
         let itemcollected_funcs = hook_for("pytest_itemcollected");
         let collectstart_funcs = hook_for("pytest_collectstart");
         let recording = crate::engine::inprocess::recording();
         if hook_funcs.is_empty()
+            && wrapper_instance_funcs.is_empty()
             && itemcollected_funcs.is_empty()
             && collectstart_funcs.is_empty()
             && !recording
@@ -243,6 +256,40 @@ impl Engine {
             for node in node_list.iter() {
                 python::call_py_hook(py, func, &[("item", node.clone().unbind())])?;
             }
+        }
+
+        // Plugin wrappers: run each up to its yield, outermost first.
+        if !wrapper_instance_funcs.is_empty() {
+            let next_fn = py.import("builtins")?.getattr("next")?;
+            for func in &wrapper_instance_funcs {
+                let wrapper_gen = python::call_py_hook_raw(
+                    py,
+                    func,
+                    &[
+                        ("config", config_proxy.clone_ref(py)),
+                        ("items", node_list.clone().unbind().into_any()),
+                        ("session", python::make_session_proxy(py, &self.config)?),
+                    ],
+                )?;
+                let is_gen: bool = py
+                    .import("inspect")?
+                    .getattr("isgenerator")?
+                    .call1((wrapper_gen.bind(py),))?
+                    .extract()?;
+                if !is_gen {
+                    continue;
+                }
+                match next_fn.call1((wrapper_gen.bind(py),)) {
+                    Ok(_) => {
+                        let old_style = Self::hookimpl_flag(py, func, "hookwrapper");
+                        self.pending_modifyitems_wrapper_hooks
+                            .push((wrapper_gen, old_style));
+                    }
+                    Err(err) if err.is_instance_of::<pyo3::exceptions::PyStopIteration>(py) => {}
+                    Err(err) => return Err(err),
+                }
+            }
+            self.pending_modifyitems_list = Some(node_list.clone().unbind());
         }
 
         for func in &hook_funcs {
@@ -458,29 +505,42 @@ impl Engine {
     /// pytest_order_ff_reorder_hookwrapper_ordering_gap in project memory for
     /// the full analysis.
     pub(crate) fn fire_deferred_modifyitems_wrappers(&mut self, py: Python<'_>) -> PyResult<()> {
-        let funcs = std::mem::take(&mut self.pending_modifyitems_wrapper_hooks);
-        if funcs.is_empty() {
+        let gens = std::mem::take(&mut self.pending_modifyitems_wrapper_hooks);
+        let held_list = self.pending_modifyitems_list.take();
+        let Some(held_list) = held_list.filter(|_| !gens.is_empty()) else {
             return Ok(());
-        }
-        let config_proxy = python::make_py_config(py, &self.config)?;
+        };
         let mut items = std::mem::take(&mut self.session.items);
         let nodes: Vec<Py<pyo3::PyAny>> = items
             .iter()
             .map(|item| python::make_node(py, item))
             .collect::<PyResult<_>>()?;
-        let node_list = pyo3::types::PyList::new(py, nodes.iter().map(|n| n.bind(py)))?;
-        for func in &funcs {
-            if let Err(err) = python::call_py_hook(
-                py,
-                func,
-                &[
-                    ("config", config_proxy.clone_ref(py)),
-                    ("items", node_list.clone().unbind().into_any()),
-                    ("session", python::make_session_proxy(py, &self.config)?),
-                ],
-            ) {
-                self.session.items = items;
-                return Err(err);
+        // The wrappers hold the list they were called with: refill it in
+        // place with the settled items, as upstream mutates one list.
+        let node_list = held_list.bind(py).clone();
+        let fresh = pyo3::types::PyList::new(py, nodes.iter().map(|n| n.bind(py)))?;
+        let all = pyo3::types::PySlice::full(py);
+        node_list.as_any().set_item(all, fresh)?;
+        // Resume innermost first.
+        let result_cls = py.import("pytest._pluginmanager")?.getattr("_Result")?;
+        for (wrapper_gen, old_style) in gens.iter().rev() {
+            let sent = if *old_style {
+                result_cls.call1((py.None(),))?.unbind()
+            } else {
+                py.None()
+            };
+            match wrapper_gen.bind(py).call_method1("send", (sent,)) {
+                Ok(_) => {
+                    self.session.items = items;
+                    return Err(pyo3::exceptions::PyRuntimeError::new_err(
+                        "pytest_collection_modifyitems wrapper yielded more than once",
+                    ));
+                }
+                Err(err) if err.is_instance_of::<pyo3::exceptions::PyStopIteration>(py) => {}
+                Err(err) => {
+                    self.session.items = items;
+                    return Err(err);
+                }
             }
         }
         // Read back order/membership (by nodeid) and any added markers —

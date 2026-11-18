@@ -29,16 +29,22 @@ pub struct Engine {
     pub config: Config,
     /// cacheprovider state (--lf/--ff/--nf, lastfailed persistence).
     cache: Option<crate::cache::CacheState>,
-    /// `pytest_collection_modifyitems` hookwrapper impls registered directly
-    /// on a plugin instance (e.g. pytest-order's `--order-after-ff`
-    /// OrderingPlugin) rather than as a conftest function. Deferred out of
-    /// `run_py_modifyitems` so they observe the item list *after* the native
-    /// --lf/--ff/--nf/--sw reorder (`cache.modify_items`), mirroring
-    /// upstream's true pluggy hookwrapper nesting where LFPlugin (itself a
-    /// tryfirst hookwrapper whose reorder is entirely post-yield) settles
-    /// first and an outer wrapper's post-yield mutation applies on top. See
+    /// `pytest_collection_modifyitems` hookwrapper impls registered on a
+    /// plugin (pytest-randomly's module, pytest-order's `--order-after-ff`
+    /// OrderingPlugin) rather than as a conftest function, suspended at their
+    /// `yield`: `run_py_modifyitems` runs their pre-yield part before every
+    /// plain impl (pluggy order — pytest-randomly shuffles there, ahead of
+    /// tryfirst sorts and stepwise), and the post-yield part resumes after
+    /// the native --lf/--ff/--nf/--sw reorder (`cache.modify_items`),
+    /// mirroring upstream's nesting where LFPlugin (itself a tryfirst
+    /// hookwrapper whose reorder is entirely post-yield) settles first and an
+    /// outer wrapper's post-yield mutation applies on top. Each entry is the
+    /// suspended generator and whether it is an old-style `hookwrapper`. See
     /// `fire_deferred_modifyitems_wrappers` in `engine/hooks.rs`.
-    pending_modifyitems_wrapper_hooks: Vec<Py<PyAny>>,
+    pending_modifyitems_wrapper_hooks: Vec<(Py<PyAny>, bool)>,
+    /// The `items` list the suspended wrappers above hold; refilled with the
+    /// final items before they resume.
+    pending_modifyitems_list: Option<Py<pyo3::types::PyList>>,
     /// The testrun_uid for this dist run, generated at the
     /// `collect_pre_configure` checkpoint (before any fork) and consumed by
     /// `run_dist`. `None` when not distributing.
