@@ -260,11 +260,11 @@ known_failures = [
 
 [pytest-mypy]
 repo = "https://github.com/realpython/pytest-mypy"
-tag = "v1.0.1"
+tag = "v1.1.0"
 testpaths = ["tests"]
 # Custom collector (pytest_collect_file -> MypyFile/MypyItem). mypy/filelock
 # back the checker and its cross-worker lock.
-deps = ["pytest-mypy==1.0.1", "mypy==2.1.0", "filelock==3.29.1"]
+deps = ["pytest-mypy==1.1.0", "mypy==2.4.1", "filelock==4.2.12"]
 use_src = false
 # Each item shells out to mypy (type-checking is slow); the whole file can
 # exceed the default timeout and time out wholesale, drifting the scoreboard
@@ -272,9 +272,6 @@ use_src = false
 slow_files = ["tests/test_pytest_mypy.py"]
 category = "third-party"
 enabled = true
-# On Python 3.15 mypy 2.1.0 emits a third EncodingWarning (modulefinder.py)
-# where the test hard-codes 2; real pytest on 3.15 reports the same 3.
-known_failures = ["tests/test_pytest_mypy.py::test_mypy_encoding_warnings"]
 
 [pytest-ruff]
 repo = "https://github.com/businho/pytest-ruff"
