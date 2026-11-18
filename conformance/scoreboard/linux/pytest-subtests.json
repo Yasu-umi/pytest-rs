@@ -1,21 +1,21 @@
 {
   "suite": "pytest-subtests",
-  "tag": "v0.14.2",
+  "tag": "v0.15.0",
   "category": "third-party",
   "excluded_files": 0,
   "deselected": 0,
-  "known_failed": 0,
+  "known_failed": 2,
   "files": [
     {
       "file": "tests/test_subtests.py",
       "status": "passed",
-      "exit_code": 0,
+      "exit_code": 1,
       "passed": 32,
       "failed": 0,
       "skipped": 0,
       "errors": 0,
       "deselected": 0,
-      "known_failed": 0
+      "known_failed": 2
     }
   ]
 }

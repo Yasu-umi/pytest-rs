@@ -178,7 +178,7 @@ _linux (CI-verified)_
 | pytest-xdist | v3.8.0 | 96 | 0 | 0 | 2 | 0 | 0 | 98 | 100.0% | 1 | 1 | 6 |
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 122 | 0 | 0 | 1 | 0 | 0 | 123 | 100.0% | 6 | 7 | 6 |
-| anyio | 4.13.0 | 3137 | 0 | 0 | 21 | 0 | 5 | 3163 | 99.8% | 26 | 26 | 0 |
+| anyio | 4.13.0 | 3136 | 1 | 0 | 21 | 0 | 5 | 3163 | 99.8% | 25 | 26 | 0 |
 
 **Third-party plugins** (not reimplemented — their own upstream test suites run under pytest-rs, loaded via the `pytest11` entry-point shim):
 
@@ -186,9 +186,9 @@ _linux (CI-verified)_
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | pytest-aiohttp | v1.1.1 | 7 | 0 | 0 | 0 | 0 | 0 | 7 | 100.0% | 2 | 2 | 0 |
 | pytest-timeout | 2.4.0 | 42 | 0 | 0 | 1 | 0 | 0 | 43 | 100.0% | 1 | 1 | 0 |
-| pytest-mypy | v1.0.1 | 75 | 0 | 0 | 2 | 0 | 1 | 78 | 98.7% | 1 | 1 | 0 |
+| pytest-mypy | v1.1.0 | 76 | 0 | 0 | 2 | 0 | 0 | 78 | 100.0% | 1 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
-| pytest-subtests | v0.14.2 | 32 | 0 | 0 | 0 | 0 | 0 | 32 | 100.0% | 1 | 1 | 0 |
+| pytest-subtests | v0.15.0 | 32 | 0 | 0 | 0 | 0 | 2 | 34 | 94.1% | 1 | 1 | 0 |
 | pytest-metadata | 3.1.1 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-snapshot | v0.9.0 | 106 | 0 | 0 | 0 | 0 | 1 | 107 | 99.1% | 3 | 3 | 0 |
 | pytest-icdiff | 0.5 | 10 | 0 | 0 | 0 | 0 | 2 | 12 | 83.3% | 1 | 1 | 0 |
