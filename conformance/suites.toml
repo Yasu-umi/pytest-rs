@@ -256,6 +256,15 @@ known_failures = [
     "tests/streams/test_tls.py::test_tls_connectable[asyncio+uvloop]",
     "tests/streams/test_tls.py::test_tls_connectable[asyncio+eager]",
     "tests/streams/test_tls.py::test_tls_connectable[trio]",
+    # Flaky under load, upstream too (each failed a few times in 40 parallel
+    # real-pytest 9.0.3 runs on Linux / Python 3.15; counted as passed
+    # whenever they pass). The first two abandon a worker thread on
+    # cancellation; when it finishes after the test's event loop has closed
+    # it raises "RuntimeError: Event loop is closed", reported as
+    # PytestUnhandledThreadExceptionWarning (an error here).
+    "tests/test_to_thread.py::test_cancel_wait_on_thread[asyncio+eager]",
+    "tests/test_from_thread.py::test_thread_cancelled_and_abandoned[asyncio+eager]",
+    "tests/test_to_thread.py::TestBlockingPortalProvider::test_single_thread[asyncio]",
 ]
 
 [pytest-mypy]
