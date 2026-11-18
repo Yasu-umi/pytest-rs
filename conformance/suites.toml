@@ -299,9 +299,9 @@ env = { "PYTEST_RS_INLINE_INPROCESS" = "1" }
 
 [pytest-metadata]
 repo = "https://github.com/pytest-dev/pytest-metadata"
-tag = "v2.0.4"
+tag = "3.1.1"
 testpaths = ["tests"]
-deps = ["pytest-metadata==2.0.4"]
+deps = ["pytest-metadata==3.1.1"]
 use_src = false
 category = "third-party"
 enabled = true
