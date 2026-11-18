@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, overload
 import pytest
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Awaitable, Callable, Iterable
+    from collections.abc import AsyncIterable, AsyncIterator, Awaitable, Callable, Iterable
 
     from _pytest.config import Config
     from _pytest.scope import _ScopeName
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 #: callers, even though at runtime the decorator actually returns whatever
 #: pytest.fixture() itself returns (FixtureFunctionDefinition).
 @overload
-def fixture[**P, R: "Awaitable[Any] | AsyncIterator[Any]"](
+def fixture[**P, R: "Awaitable[Any] | AsyncIterable[Any] | AsyncIterator[Any]"](
     fixture_function: "Callable[P, R]",
     *,
     scope: "_ScopeName | Callable[[str, Config], _ScopeName]" = ...,
@@ -34,7 +34,7 @@ def fixture[**P, R: "Awaitable[Any] | AsyncIterator[Any]"](
 
 
 @overload
-def fixture[**P, R: "Awaitable[Any] | AsyncIterator[Any]"](
+def fixture[**P, R: "Awaitable[Any] | AsyncIterable[Any] | AsyncIterator[Any]"](
     fixture_function: None = ...,
     *,
     scope: "_ScopeName | Callable[[str, Config], _ScopeName]" = ...,
