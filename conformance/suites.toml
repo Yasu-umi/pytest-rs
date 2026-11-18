@@ -496,6 +496,10 @@ testpaths = ["tests"]
 # Installed for its dist metadata (tests/test_deprecations.py reads
 # importlib.metadata.version("click")); the src/ checkout shadows the import.
 deps = ["click==8.5.1"]
+# tests/test_utils/test_echo_via_pager.py (61 failing) patches
+# click._termui_impl without importing it, relying on an earlier test file
+# in the same process having done so; the runner's one-process-per-file
+# isolation breaks that, and real pytest run on the file alone fails the same.
 category = "real-world"
 enabled = true
 
