@@ -744,9 +744,9 @@ enabled = true
 
 [pytest-django]
 repo = "https://github.com/pytest-dev/pytest-django"
-tag = "v4.9.0"
+tag = "v4.14.0"
 testpaths = ["tests"]
-deps = ["pytest-django==4.9.0", "Django==6.0.6"]
+deps = ["pytest-django==4.14.0", "Django==6.0.6"]
 pythonpath = ["."]
 use_src = false
 category = "third-party"
