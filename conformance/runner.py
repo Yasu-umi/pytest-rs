@@ -14,6 +14,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -163,6 +164,10 @@ class Suite:
         if marker.exists() and marker.read_text() == wanted:
             self._fix_console_script_shebangs(target)
             return target
+        # Start from an empty dir: `--target` only adds, so packages a
+        # previous deps list pulled in (e.g. a pytest11 plugin) would linger
+        # and keep autoloading after being dropped from suites.toml.
+        shutil.rmtree(target, ignore_errors=True)
         target.mkdir(parents=True, exist_ok=True)
         self._uv_install(target, self.deps)
         marker.write_text(wanted)
@@ -237,6 +242,8 @@ class Suite:
         wanted = self._install_marker(all_pkgs)
         if marker.exists() and marker.read_text() == wanted:
             return
+        # Same as deps_dir(): the install target is rebuilt, not added to.
+        shutil.rmtree(self.checkout, ignore_errors=True)
         self.checkout.mkdir(parents=True, exist_ok=True)
         self._uv_install(self.checkout, all_pkgs)
         marker.write_text(wanted)
