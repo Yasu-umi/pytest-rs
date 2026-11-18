@@ -7,7 +7,7 @@ use pyo3::types::{PyList, PyModule};
 use std::path::Path;
 
 use super::introspect::{
-    async_flags, first_lineno, num_mock_patch_args, param_names_with_positional_only,
+    async_flags, first_lineno, num_mock_patch_args, param_names_with_positional_only, signature,
 };
 use super::utils::{collect_error, id_for_value, user_id_from_value};
 
@@ -270,8 +270,7 @@ fn validate_parametrize_argnames(
         return Ok(());
     }
     let inspect = py.import("inspect")?;
-    let parameters = inspect
-        .call_method1("signature", (func,))
+    let parameters = signature(py, func)
         .and_then(|sig| sig.getattr("parameters"))
         .and_then(|params| params.call_method0("values"))
         .and_then(|values| values.try_iter())

@@ -5,7 +5,9 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .tmp/
+/target-py313
 /target-py314
+/target-py315
 /target-prof
 /target-iter
 /target-bisect

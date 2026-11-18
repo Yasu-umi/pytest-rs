@@ -3,6 +3,25 @@
 Notable changes per release. The release workflow uses the matching section
 as the GitHub release notes (auto-generated notes are the fallback).
 
+## Unreleased
+
+### Added
+
+- **Python 3.15 support** — wheels are built for CPython 3.15 alongside
+  3.13 / 3.14 (pyo3 0.30.1), and CI regression-tests all three.
+
+### Fixed
+
+- **Collection evaluated deferred annotations on Python 3.14+** — the engine
+  read test/fixture signatures with `inspect.signature()`'s default
+  `Format.VALUE`, which on 3.15 evaluates every annotation while building the
+  signature: a fixture annotated with a name that only exists under
+  `TYPE_CHECKING` failed collection with `NameError`. Signatures are now read
+  with `Format.STRING`, as upstream's `_pytest.compat.signature` does.
+- **`Function._obj` was missing** — upstream keeps a test's callable there and
+  some suites read it directly (pandas' extension-array tests do so in an
+  autouse fixture, erroring every test). It is now an alias of `obj`.
+
 ## v0.0.12 (2026-07-27)
 
 ### Fixed

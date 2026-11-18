@@ -8,7 +8,7 @@ pytest-rs is a re-implementation of the popular Python testing framework [pytest
 
 ## Installation
 
-Prebuilt wheels are published to PyPI for Linux (x86_64 / aarch64) and macOS (arm64) on CPython 3.13 / 3.14:
+Prebuilt wheels are published to PyPI for Linux (x86_64 / aarch64) and macOS (arm64) on CPython 3.13 / 3.14 / 3.15:
 
 ```sh
 uv add --dev pytest-rs    # or: pip install pytest-rs

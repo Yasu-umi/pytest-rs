@@ -242,9 +242,21 @@ deps = [
     "trustme==1.2.1",
     "truststore==0.10.4",
     "uvloop==0.22.1",
-    "blockbuster==1.5.26",
+    # 1.5.26 cannot patch os.scandir's iterator on Python 3.15 (immutable
+    # type), which errors every test through tests/conftest.py's autouse
+    # fixture; 1.5.29 handles it.
+    "blockbuster==1.5.29",
 ]
 enabled = true
+# Newer CPython patch releases (seen on 3.13.16 / 3.15.0 with OpenSSL 3.5.9;
+# 3.13.14 with OpenSSL 3.5.7 passes) reject server_hostname on a server-side
+# wrap_bio; real pytest fails these the same way there.
+known_failures = [
+    "tests/streams/test_tls.py::test_tls_connectable[asyncio]",
+    "tests/streams/test_tls.py::test_tls_connectable[asyncio+uvloop]",
+    "tests/streams/test_tls.py::test_tls_connectable[asyncio+eager]",
+    "tests/streams/test_tls.py::test_tls_connectable[trio]",
+]
 
 [pytest-mypy]
 repo = "https://github.com/realpython/pytest-mypy"
@@ -260,6 +272,9 @@ use_src = false
 slow_files = ["tests/test_pytest_mypy.py"]
 category = "third-party"
 enabled = true
+# On Python 3.15 mypy 2.1.0 emits a third EncodingWarning (modulefinder.py)
+# where the test hard-codes 2; real pytest on 3.15 reports the same 3.
+known_failures = ["tests/test_pytest_mypy.py::test_mypy_encoding_warnings"]
 
 [pytest-ruff]
 repo = "https://github.com/businho/pytest-ruff"
@@ -502,12 +517,23 @@ deps = ["markdown-it-py==4.2.0", "pygments==2.20.0", "attrs==26.1.0"]
 pythonpath = ["."]
 category = "real-world"
 enabled = true
+# Python 3.15 changed builtin signatures / int's method set and the
+# AttributeError message rich 14.2.0's expectations hard-code; these fail
+# under real pytest on 3.15 too (and pass on 3.13 / 3.14).
+known_failures = [
+    "tests/test_inspect.py::test_inspect_builtin_function_except_python311",
+    "tests/test_inspect.py::test_inspect_builtin_function_only_python311",
+    "tests/test_inspect.py::test_inspect_integer_with_methods_python38_and_python39",
+    "tests/test_inspect.py::test_inspect_integer_with_methods_python310only",
+    "tests/test_inspect.py::test_inspect_integer_with_methods_python311",
+    "tests/test_pretty.py::test_attrs_broken",
+]
 
 [sqlglot]
 repo = "https://github.com/tobymao/sqlglot"
 tag = "v30.11.0"
 testpaths = ["tests"]
-deps = ["duckdb==1.5.4", "pandas==3.0.3", "python-dateutil==2.9.0.post0", "pytz==2026.2"]
+deps = ["duckdb==1.5.4", "pandas==3.0.6", "python-dateutil==2.9.0.post0", "pytz==2026.2"]
 # Flat package layout: the checkout root is the import path.
 pythonpath = ["."]
 category = "real-world"
@@ -535,15 +561,19 @@ repo = "https://github.com/encode/httpx"
 tag = "0.28.1"
 testpaths = ["tests"]
 deps = [
+    # httpx's CLI extra (click==8.*), pinned: 8.5
+    # deprecates CliRunner.isolated_filesystem, which test_main.py's
+    # test_download turns into an error under filterwarnings=error.
+    "click==8.4.1",
     "httpx[brotli,cli,http2]==0.28.1",
-    "httpcore==1.0.7",
+    "httpcore==1.0.9",
     "anyio==4.13.0",
     "trio==0.33.0",
     "trustme==1.2.1",
     "chardet==7.4.3",
     "socksio==1.0.0",
-    "uvicorn==0.34.3",
-    "zstandard==0.23.0",
+    "uvicorn==0.36.1",
+    "zstandard==0.25.0",
 ]
 # httpx's own pyproject.toml sets addopts = "-rxXs" (no "f"/"E"), which
 # suppresses the "short test summary info" FAILED/ERROR lines the
@@ -579,6 +609,10 @@ repo = "https://github.com/pydantic/httpx2"
 tag = "v2.4.0"
 testpaths = ["tests/httpx2"]
 deps = [
+    # httpx's CLI extra (click==8.*), pinned: 8.5
+    # deprecates CliRunner.isolated_filesystem, which test_main.py's
+    # test_download turns into an error under filterwarnings=error.
+    "click==8.4.1",
     "httpx2[brotli,cli,http2,socks,zstd]==2.4.0",
     "httpcore2==2.4.0",
     "anyio==4.13.0",
@@ -586,8 +620,8 @@ deps = [
     "trustme==1.2.1",
     "chardet==6.0.0.post1",
     "socksio==1.0.0",
-    "uvicorn==0.35.0",
-    "zstandard==0.23.0",
+    "uvicorn==0.36.1",
+    "zstandard==0.25.0",
     "cryptography==46.0.7",
     "pytest-httpbin==2.0.0",
     "werkzeug==3.1.6",
@@ -687,18 +721,18 @@ deselect = [
 
 [fastapi]
 repo = "https://github.com/fastapi/fastapi"
-tag = "0.115.12"
+tag = "0.117.1"
 testpaths = ["tests"]
 deps = [
-    "fastapi[standard]==0.115.12",
+    "fastapi[standard]==0.117.1",
     "httpx==0.28.1",
     "anyio==4.13.0",
     "trio==0.33.0",
-    "pydantic==2.11.7",
-    "sqlmodel==0.0.24",
+    "pydantic==2.14.3",
+    "sqlmodel==0.0.50",
     "dirty-equals==0.9.0",
     "inline-snapshot==0.22.2",
-    "orjson==3.10.18",
+    "orjson==3.13.0",
     "ujson==5.10.0",
     "a2wsgi==1.10.8",
     "PyJWT==2.8.0",
@@ -733,8 +767,8 @@ category = "real-world"
 enabled = true
 
 [pandas]
-tag = "v3.0.3"
-package = "pandas==3.0.3"
+tag = "v3.0.6"
+package = "pandas==3.0.6"
 testpaths = ["pandas/tests"]
 deps = ["hypothesis>=6.116.0"]
 category = "real-world"
@@ -767,25 +801,27 @@ known_failures = [
 tag = "3.6.1"
 package = "networkx==3.6.1"
 testpaths = ["networkx"]
-deps = ["numpy==2.4.6", "scipy==1.18.0", "pandas==3.0.3"]
+deps = ["numpy==2.5.5", "scipy==1.18.1", "pandas==3.0.6"]
 category = "real-world"
 enabled = true
 
 [pydantic]
 repo = "https://github.com/pydantic/pydantic"
-tag = "v2.11.7"
+tag = "v2.14.3"
 testpaths = ["tests"]
 deps = [
-    "pydantic[email]==2.11.7",
+    "pydantic[email]==2.14.3",
     "dirty-equals==0.9.0",
     "jsonschema==4.24.0",
     "pytz==2025.2",
     "pytest-run-parallel==0.4.2",
     "pytest-benchmark==5.1.0",
-    "cloudpickle==3.1.1",
+    "cloudpickle==3.1.2",
     "faker==40.23.0",
     "eval-type-backport==0.2.2",
     "pytest-examples==0.0.18",
+    # tests/test_docs.py imports it (pydantic v2.14.3 dev deps).
+    "time-machine==3.6.0",
 ]
 # pytest-run-parallel registers the 'thread_unsafe' marker that pydantic's
 # conftest.py applies dynamically. The plugin is in deps/ (PYTHONPATH) so
@@ -814,6 +850,7 @@ known_failures = [
     "tests/test_plugins.py::test_plugin_path_validate_call",
     "tests/test_plugins.py::test_plugin_path_create_model",
     "tests/test_plugins.py::test_plugin_path_complex",
+    "tests/test_plugins.py::test_prebuilt_validator_used_for_nested_models",
     # Environment/dependency-version artifacts — reproduce identically under
     # real pytest with the same pinned deps.
     "tests/test_config.py::test_config_model_defer_build[True]",
@@ -821,8 +858,8 @@ known_failures = [
 ]
 
 [scikit-learn-1]
-tag = "1.9.0"
-package = "scikit-learn==1.9.0"
+tag = "1.9.1"
+package = "scikit-learn==1.9.1"
 testpaths = ["sklearn/metrics", "sklearn/utils", "sklearn/linear_model"]
 deps = ["hypothesis>=6.116.0"]
 category = "real-world"
@@ -837,8 +874,8 @@ slow_files = [
 ]
 
 [scikit-learn-2]
-tag = "1.9.0"
-package = "scikit-learn==1.9.0"
+tag = "1.9.1"
+package = "scikit-learn==1.9.1"
 testpaths = ["sklearn/tests", "sklearn/ensemble", "sklearn/model_selection", "sklearn/preprocessing"]
 deps = ["hypothesis>=6.116.0"]
 category = "real-world"
@@ -858,8 +895,8 @@ slow_files = [
 ]
 
 [scikit-learn-3]
-tag = "1.9.0"
-package = "scikit-learn==1.9.0"
+tag = "1.9.1"
+package = "scikit-learn==1.9.1"
 testpaths = [
     "sklearn/_loss",
     "sklearn/callback",

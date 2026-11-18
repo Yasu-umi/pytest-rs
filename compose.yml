@@ -1,6 +1,6 @@
-# CI-parity linux/py3.13 dev environment (see docker/dev.Dockerfile).
+# CI-parity linux/py3.15 dev environment (see docker/dev.Dockerfile).
 #
-# Reproduces the GitHub Actions `rust (python 3.13)` job locally, for the
+# Reproduces the GitHub Actions conformance job (python 3.15) locally, for the
 # conformance / plugin-smoke results that diverge from macOS. The target/ and
 # .tmp/ trees are named volumes so the linux build and linux-installed suite
 # deps never clobber the host (macOS) ones.

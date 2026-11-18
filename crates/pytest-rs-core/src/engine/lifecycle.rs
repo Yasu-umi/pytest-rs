@@ -61,7 +61,7 @@ impl Engine {
                 );
             }
         }
-        let _debug_guard = super::install_debug_guard(py, &self.config);
+        let _debug_guard = super::install_debug_guard(&self.config);
         let ini_filters: Vec<String> = self
             .config
             .get_ini_lines("filterwarnings")

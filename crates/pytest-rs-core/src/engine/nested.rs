@@ -23,7 +23,7 @@ impl Engine {
         let _pm_guard = python::snapshot_pluginmanager(py).ok();
         // --debug: same trace-file behavior as the top-level run() (a nested
         // pytester.runpytest("--debug") must also write/announce the file).
-        let _debug_guard = super::install_debug_guard(py, &self.config);
+        let _debug_guard = super::install_debug_guard(&self.config);
         // The nested config may declare its own pythonpath ini entries
         // (shlex-split, like the top-level run() — see pythonpath_entries).
         for abs in python::pythonpath_entries(py, &self.config) {

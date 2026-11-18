@@ -280,7 +280,10 @@ impl Engine {
             "windows" => "win32",
             other => other,
         };
-        let version = py.version().split_whitespace().next().unwrap_or("");
+        let version = pyo3::Python::version_str()
+            .split_whitespace()
+            .next()
+            .unwrap_or("");
         println!("platform {platform} -- Python {version}, pytest-9.0.3, pluggy-1.6.0");
         // Native plugins' pytest_report_header lines (e.g. pytest-benchmark's
         // "benchmark: ...") print here, right after the platform line —

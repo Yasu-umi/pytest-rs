@@ -1,8 +1,9 @@
-# CI-parity dev image: linux + Python 3.13 + Rust stable + uv.
+# CI-parity dev image: linux + Python 3.15 + Rust stable + uv.
 #
-# Lets you reproduce the linux/py3.13-only conformance and plugin-smoke results
+# Lets you reproduce the linux/py3.15 conformance and plugin-smoke results
 # locally (some reporter byte-diffs and pin checks diverge from macOS). Mirrors
-# the GitHub Actions `rust (python 3.13)` job: ubuntu-class base, Python 3.13
+# the GitHub Actions conformance job: ubuntu-class base, Python 3.15 (the one
+# CI's conformance runs on; override with --build-arg PYTHON_VERSION=3.13)
 # with a shared libpython, Rust stable with rustfmt+clippy, and uv for the
 # conformance runner's suite-dep installs.
 #
@@ -12,7 +13,9 @@
 #       -v pytest-rs-linux-target:/workspace/target \
 #       -v pytest-rs-linux-tmp:/workspace/.tmp \
 #       pytest-rs-dev bash -lc "cargo build && python conformance/plugin_smoke.py"
-FROM python:3.13-bookworm
+ARG PYTHON_VERSION=3.15
+FROM python:${PYTHON_VERSION}-bookworm
+ARG PYTHON_VERSION
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential curl git ca-certificates pkg-config \
@@ -29,6 +32,6 @@ ENV PATH="/root/.local/bin:${PATH}"
 
 # The pytest-rs binary embeds CPython and links libpython at runtime.
 ENV LD_LIBRARY_PATH="/usr/local/lib" \
-    PYO3_PYTHON="/usr/local/bin/python3.13" \
+    PYO3_PYTHON="/usr/local/bin/python${PYTHON_VERSION}" \
     PYTHONUNBUFFERED=1
 WORKDIR /workspace

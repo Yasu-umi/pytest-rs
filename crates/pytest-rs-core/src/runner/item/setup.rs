@@ -1,7 +1,5 @@
 use std::time::Duration;
 
-use pyo3::prelude::*;
-
 use super::super::*;
 use super::body::{SetupOk, run_custom_item};
 use crate::collect::TestItem;
