@@ -15,10 +15,7 @@ exclude = ["example_scripts"]
 # fixtures.py, metafunc.py, ...) are measured like upstream collects them.
 python_files = ["test_*.py", "*_test.py", "testing/python/*.py"]
 local = "conformance/suites/pytest"
-# pluggy held at 1.6.0: pytest-rs prints a fixed "pluggy-1.6.0" in the
-# session header, and test_header_trailer_info compares it with the installed
-# pluggy's version.
-deps = ["packaging==26.3", "iniconfig==2.3.1", "pluggy==1.6.0", "xmlschema==4.3.2", "setuptools==84.2.1", "pygments==2.21.0", "attrs==26.1.0", "hypothesis==6.170.15"]
+deps = ["packaging==26.3", "iniconfig==2.3.1", "pluggy==1.7.0", "xmlschema==4.3.2", "setuptools==84.2.1", "pygments==2.21.0", "attrs==26.1.0", "hypothesis==6.170.15"]
 # Files that intermittently time out under full-parallel load; give them the
 # 3x slow-file timeout so the scoreboard/CI stay stable.
 slow_files = [
