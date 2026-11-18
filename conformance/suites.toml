@@ -663,9 +663,9 @@ enabled = true
 
 [attrs]
 repo = "https://github.com/python-attrs/attrs"
-tag = "25.3.0"
+tag = "26.1.0"
 testpaths = ["tests"]
-deps = ["attrs==25.3.0", "hypothesis==6.155.1"]
+deps = ["attrs==26.1.0", "hypothesis==6.170.15"]
 use_src = true
 category = "real-world"
 enabled = true
