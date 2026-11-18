@@ -1,7 +1,7 @@
-"""Adapted from pytest-mock v3.15.1 (MIT). Kept as close to upstream as
+"""Adapted from pytest-mock v3.17.0 (MIT). Kept as close to upstream as
 possible; pytest-rs differences are limited to config access (getini returns
-None for unset options) and lifecycle (the Rust plugin calls
-_configure/_unconfigure instead of pluggy hook registration)."""
+None for unset options), per-scope fixture functions, and lifecycle (the Rust
+plugin calls _configure/_unconfigure instead of pluggy hook registration)."""
 
 import builtins
 import functools
@@ -9,66 +9,94 @@ import inspect
 import itertools
 import unittest.mock
 import warnings
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator, Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
-from typing import Any, TypeVar, Union, overload
+from typing import Any, TypeVar, cast, overload
 
 import pytest
 
+from ._util import get_mock_module, parse_ini_boolean
+
+_T = TypeVar("_T")
+
 AsyncMockType = unittest.mock.AsyncMock
-MockType = Union[
-    unittest.mock.MagicMock,
-    unittest.mock.AsyncMock,
-    unittest.mock.NonCallableMagicMock,
-]
+MockType = unittest.mock.MagicMock | unittest.mock.AsyncMock | unittest.mock.NonCallableMagicMock
+
+
+class SpyType(unittest.mock.Mock):
+    """
+    Type stub used to annotate the result of ``mocker.spy``.
+    """
+
+    spy_return: Any
+    spy_return_iter: Iterator[Any] | None
+    spy_return_list: list[Any]
+    spy_exception: BaseException | None
 
 
 class PytestMockWarning(UserWarning):
     """Base class for all warnings emitted by pytest-mock."""
 
 
-from ._util import get_mock_module, parse_ini_boolean
-
-
-@dataclass
+# eq=False keeps identity comparison: a generated __eq__ would compare the
+# mocks themselves, and a mock's __eq__ can return True or raise.
+@dataclass(eq=False)
 class MockCacheItem:
     mock: MockType
     patch: Any | None = None
+    # Whether ``mock`` was created by ``mocker.spy``.
+    is_spy: bool = False
+    # The ``side_effect`` a spy uses to call the spied code, restored by ``resetall``.
+    spy_side_effect: Callable[..., Any] | None = None
+    # The objects ``resetall`` resets instead of ``mock``, for patches such as
+    # ``patch.multiple`` whose ``mock`` is a dict of the patched values.
+    reset_mocks: tuple[Any, ...] | None = None
 
 
 @dataclass
 class MockCache:
-    """Cache MagicMock and Patcher instances so we can undo them later."""
+    """
+    Cache MagicMock and Patcher instances so we can undo them later.
+    """
 
-    cache: list = field(default_factory=list)
+    cache: list[MockCacheItem] = field(default_factory=list)
 
-    def _find(self, mock):
-        for mock_item in self.cache:
-            if mock_item.mock is mock:
-                return mock_item
+    def _find_index(self, mock: MockType) -> int:
+        for index in reversed(range(len(self.cache))):
+            if self.cache[index].mock is mock:
+                return index
         raise ValueError("This mock object is not registered")
 
-    def add(self, mock, **kwargs):
+    def add(self, mock: MockType, **kwargs: Any) -> MockCacheItem:
         self.cache.append(MockCacheItem(mock=mock, **kwargs))
         return self.cache[-1]
 
-    def remove(self, mock):
-        mock_item = self._find(mock)
+    def find(self, mock: MockType) -> MockCacheItem:
+        return self.cache[self._find_index(mock)]
+
+    def remove(self, mock: MockType) -> None:
+        index = self._find_index(mock)
+        mock_item = self.cache[index]
         if mock_item.patch:
             mock_item.patch.stop()
-        self.cache.remove(mock_item)
+        del self.cache[index]
 
-    def clear(self):
+    def clear(self) -> None:
         for mock_item in reversed(self.cache):
             if mock_item.patch is not None:
                 mock_item.patch.stop()
         self.cache.clear()
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[MockCacheItem]:
         return iter(self.cache)
 
 
-_T = TypeVar("_T")
+def _reset_spy(spy_obj: SpyType) -> None:
+    """Set the attributes recording a spy's calls to their initial values."""
+    spy_obj.spy_return = None
+    spy_obj.spy_return_iter = None
+    spy_obj.spy_return_list = []
+    spy_obj.spy_exception = None
 
 
 class MockerFixture:
@@ -80,7 +108,7 @@ class MockerFixture:
     def __init__(self, config: Any) -> None:
         self._mock_cache: MockCache = MockCache()
         self.mock_module = mock_module = get_mock_module(config)
-        self.patch = self._Patcher(self._mock_cache, mock_module)
+        self.patch = self._Patcher(self._mock_cache, mock_module)  # type: MockerFixture._Patcher
         # aliases for convenience
         self.Mock = mock_module.Mock
         self.MagicMock = mock_module.MagicMock
@@ -109,27 +137,36 @@ class MockerFixture:
         Call reset_mock() on all patchers started by this fixture.
 
         :param bool return_value: Reset the return_value of mocks.
-        :param bool side_effect: Reset the side_effect of mocks.
+        :param bool side_effect: Reset the side_effect of mocks. Spies go back to
+            calling the spied code.
         """
-        supports_reset_mock_with_args: tuple[type[Any], ...]
-        if hasattr(self, "AsyncMock"):
-            supports_reset_mock_with_args = (self.Mock, self.AsyncMock)
-        else:
-            supports_reset_mock_with_args = (self.Mock,)
-
         for mock_item in self._mock_cache:
-            # See issue #237.
-            if not hasattr(mock_item.mock, "reset_mock"):
-                continue
-            # NOTE: The mock may be a dictionary
-            if hasattr(mock_item.mock, "spy_return_list"):
-                mock_item.mock.spy_return_list = []
-            if hasattr(mock_item.mock, "spy_return_iter"):
-                mock_item.mock.spy_return_iter = None
-            if isinstance(mock_item.mock, supports_reset_mock_with_args):
-                mock_item.mock.reset_mock(return_value=return_value, side_effect=side_effect)
-            else:
-                mock_item.mock.reset_mock()
+            reset_mocks = mock_item.reset_mocks
+            if reset_mocks is None:
+                reset_mocks = (mock_item.mock,)
+            for mock in reset_mocks:
+                self._reset_mock(mock, return_value=return_value, side_effect=side_effect)
+            # Spies are flagged when created: checking the spy attributes with
+            # ``hasattr`` would also match any ``MagicMock``.
+            if mock_item.is_spy:
+                _reset_spy(cast(SpyType, mock_item.mock))
+            # A spy's ``side_effect`` is what calls the spied code, so resetting
+            # it means going back to that, not to ``None``.
+            if side_effect and mock_item.spy_side_effect is not None:
+                mock_item.mock.side_effect = mock_item.spy_side_effect
+
+    def _reset_mock(self, mock: Any, *, return_value: bool, side_effect: bool) -> None:
+        # See issue #237.
+        if not hasattr(mock, "reset_mock"):
+            return
+        # ``reset_mock`` is defined on ``NonCallableMock``, which is the base
+        # of every mock class. Autospecced *functions* are plain functions
+        # carrying a no-argument ``reset_mock`` closure, so they take the
+        # ``else`` branch.
+        if isinstance(mock, self.NonCallableMock):
+            mock.reset_mock(return_value=return_value, side_effect=side_effect)
+        else:
+            mock.reset_mock()
 
     def stopall(self) -> None:
         """
@@ -145,7 +182,7 @@ class MockerFixture:
         """
         self._mock_cache.remove(mock)
 
-    def spy(self, obj: object, name: str, duplicate_iterators: bool = False) -> MockType:
+    def spy(self, obj: object, name: str, duplicate_iterators: bool = False) -> SpyType:
         """
         Create a spy of method. It will run method normally, but it is now
         possible to use `mock` call features with it, like call count.
@@ -157,37 +194,36 @@ class MockerFixture:
         """
         method = getattr(obj, name)
 
-        def wrapper(*args, **kwargs):
+        def reset_last_call():
             spy_obj.spy_return = None
+            spy_obj.spy_return_iter = None
             spy_obj.spy_exception = None
+
+        def record_return(r):
+            if duplicate_iterators and isinstance(r, Iterator):
+                r, duplicated_iterator = itertools.tee(r, 2)
+                spy_obj.spy_return_iter = duplicated_iterator
+            spy_obj.spy_return = r
+            spy_obj.spy_return_list.append(r)
+            return r
+
+        def wrapper(*args, **kwargs):
+            reset_last_call()
             try:
                 r = method(*args, **kwargs)
             except BaseException as e:
                 spy_obj.spy_exception = e
                 raise
-            else:
-                if duplicate_iterators and isinstance(r, Iterator):
-                    r, duplicated_iterator = itertools.tee(r, 2)
-                    spy_obj.spy_return_iter = duplicated_iterator
-                else:
-                    spy_obj.spy_return_iter = None
-
-                spy_obj.spy_return = r
-                spy_obj.spy_return_list.append(r)
-            return r
+            return record_return(r)
 
         async def async_wrapper(*args, **kwargs):
-            spy_obj.spy_return = None
-            spy_obj.spy_exception = None
+            reset_last_call()
             try:
                 r = await method(*args, **kwargs)
             except BaseException as e:
                 spy_obj.spy_exception = e
                 raise
-            else:
-                spy_obj.spy_return = r
-                spy_obj.spy_return_list.append(r)
-            return r
+            return record_return(r)
 
         if inspect.iscoroutinefunction(method):
             wrapped = functools.update_wrapper(async_wrapper, method)
@@ -196,11 +232,14 @@ class MockerFixture:
 
         autospec = inspect.ismethod(method) or inspect.isfunction(method)
 
-        spy_obj = self.patch.object(obj, name, side_effect=wrapped, autospec=autospec)
-        spy_obj.spy_return = None
-        spy_obj.spy_return_iter = None
-        spy_obj.spy_return_list = []
-        spy_obj.spy_exception = None
+        spy_obj = cast(
+            SpyType,
+            self.patch.object(obj, name, side_effect=wrapped, autospec=autospec),
+        )
+        mock_item = self._mock_cache.find(spy_obj)
+        mock_item.is_spy = True
+        mock_item.spy_side_effect = wrapped
+        _reset_spy(spy_obj)
         return spy_obj
 
     def stub(self, name: str | None = None) -> unittest.mock.MagicMock:
@@ -211,17 +250,27 @@ class MockerFixture:
         :param name: the constructed stub's name as used in repr
         :return: Stub object.
         """
-        return self.mock_module.MagicMock(spec=lambda *args, **kwargs: None, name=name)
+        return cast(
+            unittest.mock.MagicMock,
+            self.mock_module.MagicMock(spec=lambda *args, **kwargs: None, name=name),
+        )
 
     def async_stub(self, name: str | None = None) -> AsyncMockType:
         """
-        Create a async stub method. It accepts any arguments. Ideal to register to
-        callbacks in tests.
+        Create an async stub method. It accepts any arguments. Ideal to register to
+        asynchronous callbacks in tests.
+
+        Calls and awaits are tracked separately: calling the stub is recorded
+        right away (``assert_called*``), while awaiting the result is recorded
+        only once it is awaited (``assert_awaited*``).
 
         :param name: the constructed stub's name as used in repr
-        :return: Stub object.
+        :return: Stub object, an ``AsyncMock``.
         """
-        return self.mock_module.AsyncMock(spec=lambda *args, **kwargs: None, name=name)
+        return cast(
+            AsyncMockType,
+            self.mock_module.AsyncMock(spec=lambda *args, **kwargs: None, name=name),
+        )
 
     class _Patcher:
         """
@@ -235,7 +284,9 @@ class MockerFixture:
             self.__mock_cache = mock_cache
             self.mock_module = mock_module
 
-        def _start_patch(self, mock_func, warn_on_mock_enter, *args, **kwargs) -> MockType:
+        def _start_patch(
+            self, mock_func: Any, warn_on_mock_enter: bool, *args: Any, **kwargs: Any
+        ) -> MockType:
             """Patches something by calling the given function from the mock
             module, registering the patch to stop it later and returns the
             mock object resulting from the mock call.
@@ -243,9 +294,9 @@ class MockerFixture:
             p = mock_func(*args, **kwargs)
             mocked: MockType = p.start()
             self.__mock_cache.add(mock=mocked, patch=p)
-            if hasattr(mocked, "reset_mock"):
-                # check if `mocked` is actually a mock object, as depending on
-                # autospec or target parameters `mocked` can be anything
+            if hasattr(mocked, "reset_mock"):  # noqa:SIM102
+                # check if `mocked` is actually a mock object, as depending on autospec or target
+                # parameters `mocked` can be anything
                 if hasattr(mocked, "__enter__") and warn_on_mock_enter:
                     mocked.__enter__.side_effect = lambda: warnings.warn(
                         "Mocks returned by pytest-mock do not need to be used as context managers. "
@@ -259,15 +310,15 @@ class MockerFixture:
 
         def object(
             self,
-            target,
-            attribute,
-            new=DEFAULT,
-            spec=None,
-            create=False,
-            spec_set=None,
-            autospec=None,
-            new_callable=None,
-            **kwargs,
+            target: object,
+            attribute: str,
+            new: object = DEFAULT,
+            spec: object | None = None,
+            create: bool = False,
+            spec_set: object | None = None,
+            autospec: object | None = None,
+            new_callable: object = None,
+            **kwargs: Any,
         ) -> MockType:
             """API to mock.patch.object"""
             if new is self.DEFAULT:
@@ -288,15 +339,15 @@ class MockerFixture:
 
         def context_manager(
             self,
-            target,
-            attribute,
-            new=DEFAULT,
-            spec=None,
-            create=False,
-            spec_set=None,
-            autospec=None,
-            new_callable=None,
-            **kwargs,
+            target: builtins.object,
+            attribute: str,
+            new: builtins.object = DEFAULT,
+            spec: builtins.object | None = None,
+            create: bool = False,
+            spec_set: builtins.object | None = None,
+            autospec: builtins.object | None = None,
+            new_callable: builtins.object = None,
+            **kwargs: Any,
         ) -> MockType:
             """This is equivalent to mock.patch.object except that the returned mock
             does not issue a warning when used as a context manager."""
@@ -318,16 +369,16 @@ class MockerFixture:
 
         def multiple(
             self,
-            target,
-            spec=None,
-            create=False,
-            spec_set=None,
-            autospec=None,
-            new_callable=None,
-            **kwargs,
-        ) -> dict:
+            target: builtins.object,
+            spec: builtins.object | None = None,
+            create: bool = False,
+            spec_set: builtins.object | None = None,
+            autospec: builtins.object | None = None,
+            new_callable: builtins.object | None = None,
+            **kwargs: Any,
+        ) -> dict[str, MockType]:
             """API to mock.patch.multiple"""
-            return self._start_patch(
+            mocked = self._start_patch(
                 self.mock_module.patch.multiple,
                 True,
                 target,
@@ -338,8 +389,24 @@ class MockerFixture:
                 new_callable=new_callable,
                 **kwargs,
             )
+            # The returned dict only holds the mocks created for ``DEFAULT``
+            # values, so the values passed explicitly are collected from the
+            # patchers.
+            mock_item = self.__mock_cache.find(mocked)
+            patchers = [mock_item.patch, *mock_item.patch.additional_patchers]
+            mock_item.reset_mocks = (
+                *mocked.values(),
+                *(p.new for p in patchers if p.new is not self.mock_module.DEFAULT),
+            )
+            return mocked
 
-        def dict(self, in_dict, values=(), clear=False, **kwargs) -> Any:
+        def dict(
+            self,
+            in_dict: Mapping[Any, Any] | str,
+            values: Mapping[Any, Any] | Iterable[tuple[Any, Any]] = (),
+            clear: bool = False,
+            **kwargs: Any,
+        ) -> Any:
             """API to mock.patch.dict"""
             return self._start_patch(
                 self.mock_module.patch.dict,
@@ -405,14 +472,14 @@ class MockerFixture:
 
         def __call__(
             self,
-            target,
-            new=DEFAULT,
-            spec=None,
-            create=False,
-            spec_set=None,
-            autospec=None,
-            new_callable=None,
-            **kwargs,
+            target: str,
+            new: builtins.object = DEFAULT,
+            spec: builtins.object | None = None,
+            create: bool = False,
+            spec_set: builtins.object | None = None,
+            autospec: builtins.object | None = None,
+            new_callable: Callable[[], Any] | None = None,
+            **kwargs: Any,
         ) -> Any:
             """API to mock.patch"""
             if new is self.DEFAULT:
@@ -431,11 +498,11 @@ class MockerFixture:
             )
 
 
-def _make_mocker():
+def _make_mocker() -> Callable[[Any], Generator[MockerFixture, None, None]]:
     # A fresh function object per scope: the pytest-rs fixture decorator
     # records its marker on the function itself, so the five scope variants
     # cannot share one function like upstream does.
-    def _mocker(pytestconfig):
+    def _mocker(pytestconfig: Any) -> Generator[MockerFixture, None, None]:
         """
         Return an object that has the same interface to the `mock` module, but
         takes care of automatically undoing all patches after each test method.
@@ -454,155 +521,168 @@ package_mocker = pytest.fixture(scope="package")(_make_mocker())
 session_mocker = pytest.fixture(scope="session")(_make_mocker())
 
 
-_mock_module_patches: list = []
-_mock_module_originals: dict = {}
+_mock_module_patches: list[Any] = []
+_mock_module_originals: dict[str, Any] = {}
 
 
-def assert_wrapper(__wrapped_mock_method__, *args, **kwargs):
+_CallArgs = tuple[tuple[Any, ...], dict[str, Any]]
+
+
+def _bind_to_spec(mock: Any, actual: _CallArgs, expected: _CallArgs) -> tuple[_CallArgs, _CallArgs]:
+    """
+    Bind the actual and expected arguments to the mock's spec signature, like
+    the mock does before comparing them, so ``f(1, b=2)`` and ``f(1, 2)`` are
+    not reported as different. Return them unchanged when the mock has no
+    signature or either side does not match it.
+    """
+    sig = getattr(mock, "_spec_signature", None)
+    if sig is None:
+        return actual, expected
+    try:
+        bound_actual = sig.bind(*actual[0], **actual[1])
+        bound_expected = sig.bind(*expected[0], **expected[1])
+    except TypeError:
+        return actual, expected
+    return (
+        (bound_actual.args, bound_actual.kwargs),
+        (bound_expected.args, bound_expected.kwargs),
+    )
+
+
+def assert_wrapper(
+    __wrapped_mock_method__: Callable[..., Any],
+    __call_args_attr__: str | None,
+    *args: Any,
+    **kwargs: Any,
+) -> None:
+    """
+    Call the wrapped assertion, hiding its frames from the traceback.
+
+    When ``__call_args_attr__`` is given, the failure message also gets
+    pytest's introspection of the differences between the arguments of the
+    mock's last call (or await) and the expected arguments.
+    """
     __tracebackhide__ = True
     try:
         __wrapped_mock_method__(*args, **kwargs)
         return
     except AssertionError as e:
-        if getattr(e, "_mock_introspection_applied", 0):
-            msg = str(e)
-        else:
+        msg = str(e)
+        if not getattr(e, "_mock_introspection_applied", 0) and __call_args_attr__ is not None:
             __mock_self = args[0]
-            msg = str(e)
-            if __mock_self.call_args is not None:
-                actual_args, actual_kwargs = __mock_self.call_args
+            call_args = getattr(__mock_self, __call_args_attr__)
+            if call_args is not None:
+                (actual_args, actual_kwargs), (expect_args, expect_kwargs) = _bind_to_spec(
+                    __mock_self, tuple(call_args), (args[1:], kwargs)
+                )
                 introspection = ""
                 try:
-                    assert actual_args == args[1:]
+                    assert actual_args == expect_args
                 except AssertionError as e_args:
-                    introspection += "\nArgs:\n" + str(e_args)
-                try:
-                    assert actual_kwargs == kwargs
-                except AssertionError as e_kwargs:
-                    introspection += "\nKwargs:\n" + str(e_kwargs)
-                if introspection:
-                    msg += "\n\npytest introspection follows:\n" + introspection
-        e = AssertionError(msg)
-        e._mock_introspection_applied = True
-        raise e
-
-
-def assert_has_calls_wrapper(__wrapped_mock_method__, *args, **kwargs):
-    __tracebackhide__ = True
-    try:
-        __wrapped_mock_method__(*args, **kwargs)
-        return
-    except AssertionError as e:
-        any_order = kwargs.get("any_order", False)
-        if getattr(e, "_mock_introspection_applied", 0) or any_order:
-            msg = str(e)
-        else:
-            __mock_self = args[0]
-            msg = str(e)
-            if __mock_self.call_args_list is not None:
-                actual_calls = list(__mock_self.call_args_list)
-                expect_calls = args[1]
-                introspection = ""
-
-                for actual_call, expect_call in itertools.zip_longest(actual_calls, expect_calls):
-                    if actual_call is not None:
-                        actual_args, actual_kwargs = actual_call
-                    else:
-                        actual_args = tuple()
-                        actual_kwargs = {}
-
-                    if expect_call is not None:
-                        _, expect_args, expect_kwargs = expect_call
-                    else:
-                        expect_args = tuple()
-                        expect_kwargs = {}
-
-                    try:
-                        assert actual_args == expect_args
-                    except AssertionError as e_args:
+                    # Without assertion rewriting the message is empty.
+                    if str(e_args):
                         introspection += "\nArgs:\n" + str(e_args)
-                    try:
-                        assert actual_kwargs == expect_kwargs
-                    except AssertionError as e_kwargs:
+                try:
+                    assert actual_kwargs == expect_kwargs
+                except AssertionError as e_kwargs:
+                    if str(e_kwargs):
                         introspection += "\nKwargs:\n" + str(e_kwargs)
                 if introspection:
                     msg += "\n\npytest introspection follows:\n" + introspection
         e = AssertionError(msg)
-        e._mock_introspection_applied = True
-        raise e
+        e._mock_introspection_applied = True  # type:ignore[attr-defined]
+        # Suppress the context, otherwise pytest shows the original error
+        # (and the mock frames) chained before this one.
+        raise e from None
 
 
-def wrap_assert_not_called(*args, **kwargs):
+def wrap_assert_not_called(*args: Any, **kwargs: Any) -> None:
     __tracebackhide__ = True
-    assert_wrapper(_mock_module_originals["assert_not_called"], *args, **kwargs)
+    assert_wrapper(_mock_module_originals["assert_not_called"], None, *args, **kwargs)
 
 
-def wrap_assert_called_with(*args, **kwargs):
+def wrap_assert_called_with(*args: Any, **kwargs: Any) -> None:
     __tracebackhide__ = True
-    assert_wrapper(_mock_module_originals["assert_called_with"], *args, **kwargs)
+    assert_wrapper(_mock_module_originals["assert_called_with"], "call_args", *args, **kwargs)
 
 
-def wrap_assert_called_once(*args, **kwargs):
+def wrap_assert_called_once(*args: Any, **kwargs: Any) -> None:
     __tracebackhide__ = True
-    assert_wrapper(_mock_module_originals["assert_called_once"], *args, **kwargs)
+    assert_wrapper(_mock_module_originals["assert_called_once"], None, *args, **kwargs)
 
 
-def wrap_assert_called_once_with(*args, **kwargs):
+def wrap_assert_called_once_with(*args: Any, **kwargs: Any) -> None:
     __tracebackhide__ = True
-    assert_wrapper(_mock_module_originals["assert_called_once_with"], *args, **kwargs)
+    # If the mock was not called exactly once, the failure is about the call
+    # count, not the arguments of the last call.
+    call_args_attr = "call_args" if args[0].call_count == 1 else None
+    assert_wrapper(
+        _mock_module_originals["assert_called_once_with"],
+        call_args_attr,
+        *args,
+        **kwargs,
+    )
 
 
-def wrap_assert_has_calls(*args, **kwargs):
+def wrap_assert_has_calls(*args: Any, **kwargs: Any) -> None:
     __tracebackhide__ = True
-    assert_has_calls_wrapper(_mock_module_originals["assert_has_calls"], *args, **kwargs)
+    assert_wrapper(_mock_module_originals["assert_has_calls"], None, *args, **kwargs)
 
 
-def wrap_assert_any_call(*args, **kwargs):
+def wrap_assert_any_call(*args: Any, **kwargs: Any) -> None:
     __tracebackhide__ = True
-    assert_wrapper(_mock_module_originals["assert_any_call"], *args, **kwargs)
+    assert_wrapper(_mock_module_originals["assert_any_call"], None, *args, **kwargs)
 
 
-def wrap_assert_called(*args, **kwargs):
+def wrap_assert_called(*args: Any, **kwargs: Any) -> None:
     __tracebackhide__ = True
-    assert_wrapper(_mock_module_originals["assert_called"], *args, **kwargs)
+    assert_wrapper(_mock_module_originals["assert_called"], None, *args, **kwargs)
 
 
-def wrap_assert_not_awaited(*args, **kwargs):
+def wrap_assert_not_awaited(*args: Any, **kwargs: Any) -> None:
     __tracebackhide__ = True
-    assert_wrapper(_mock_module_originals["assert_not_awaited"], *args, **kwargs)
+    assert_wrapper(_mock_module_originals["assert_not_awaited"], None, *args, **kwargs)
 
 
-def wrap_assert_awaited_with(*args, **kwargs):
+def wrap_assert_awaited_with(*args: Any, **kwargs: Any) -> None:
     __tracebackhide__ = True
-    assert_wrapper(_mock_module_originals["assert_awaited_with"], *args, **kwargs)
+    assert_wrapper(_mock_module_originals["assert_awaited_with"], "await_args", *args, **kwargs)
 
 
-def wrap_assert_awaited_once(*args, **kwargs):
+def wrap_assert_awaited_once(*args: Any, **kwargs: Any) -> None:
     __tracebackhide__ = True
-    assert_wrapper(_mock_module_originals["assert_awaited_once"], *args, **kwargs)
+    assert_wrapper(_mock_module_originals["assert_awaited_once"], None, *args, **kwargs)
 
 
-def wrap_assert_awaited_once_with(*args, **kwargs):
+def wrap_assert_awaited_once_with(*args: Any, **kwargs: Any) -> None:
     __tracebackhide__ = True
-    assert_wrapper(_mock_module_originals["assert_awaited_once_with"], *args, **kwargs)
+    # If the mock was not awaited exactly once, the failure is about the await
+    # count, not the arguments of the last await.
+    await_args_attr = "await_args" if args[0].await_count == 1 else None
+    assert_wrapper(
+        _mock_module_originals["assert_awaited_once_with"],
+        await_args_attr,
+        *args,
+        **kwargs,
+    )
 
 
-def wrap_assert_has_awaits(*args, **kwargs):
+def wrap_assert_has_awaits(*args: Any, **kwargs: Any) -> None:
     __tracebackhide__ = True
-    assert_wrapper(_mock_module_originals["assert_has_awaits"], *args, **kwargs)
+    assert_wrapper(_mock_module_originals["assert_has_awaits"], None, *args, **kwargs)
 
 
-def wrap_assert_any_await(*args, **kwargs):
+def wrap_assert_any_await(*args: Any, **kwargs: Any) -> None:
     __tracebackhide__ = True
-    assert_wrapper(_mock_module_originals["assert_any_await"], *args, **kwargs)
+    assert_wrapper(_mock_module_originals["assert_any_await"], None, *args, **kwargs)
 
 
-def wrap_assert_awaited(*args, **kwargs):
+def wrap_assert_awaited(*args: Any, **kwargs: Any) -> None:
     __tracebackhide__ = True
-    assert_wrapper(_mock_module_originals["assert_awaited"], *args, **kwargs)
+    assert_wrapper(_mock_module_originals["assert_awaited"], None, *args, **kwargs)
 
 
-def wrap_assert_methods(config) -> None:
+def wrap_assert_methods(config: Any) -> None:
     """
     Wrap assert methods of mock module so we can hide their traceback and
     add introspection information to specified argument asserts.
@@ -655,22 +735,12 @@ def wrap_assert_methods(config) -> None:
 
 def unwrap_assert_methods() -> None:
     for patcher in _mock_module_patches:
-        try:
-            patcher.stop()
-        except RuntimeError as e:
-            # a patcher might have been stopped by user code (#137)
-            # so we need to catch this error here and ignore it;
-            # unfortunately there's no public API to check if a patch
-            # has been started, so catching the error it is
-            if str(e) == "stop called on unstarted patcher":
-                pass
-            else:
-                raise
+        patcher.stop()
     _mock_module_patches[:] = []
     _mock_module_originals.clear()
 
 
-def pytest_addoption(parser) -> None:
+def pytest_addoption(parser: Any) -> None:
     parser.addini(
         "mock_traceback_monkeypatch",
         "Monkeypatch the mock library to improve reporting of the assert_called_... methods",
@@ -683,30 +753,22 @@ def pytest_addoption(parser) -> None:
     )
 
 
-def pytest_configure(config) -> None:
+def _traceback_monkeypatch_enabled(config: Any) -> bool:
+    # pytest-rs getini returns None for unset options.
+    value = config.getini("mock_traceback_monkeypatch")
+    return parse_ini_boolean(value if value is not None else True)
+
+
+def pytest_configure(config: Any) -> None:
     tb = config.getoption("--tb", default="auto")
-    if (
-        parse_ini_boolean(
-            config.getini("mock_traceback_monkeypatch")
-            if config.getini("mock_traceback_monkeypatch") is not None
-            else True
-        )
-        and tb != "native"
-    ):
+    if _traceback_monkeypatch_enabled(config) and tb != "native":
         wrap_assert_methods(config)
 
 
 # Entry points used by the Rust plugin (pytest_configure semantics without
 # pluggy registration).
-def _configure(config, tb) -> None:
-    if (
-        parse_ini_boolean(
-            config.getini("mock_traceback_monkeypatch")
-            if config.getini("mock_traceback_monkeypatch") is not None
-            else True
-        )
-        and tb != "native"
-    ):
+def _configure(config: Any, tb: str) -> None:
+    if _traceback_monkeypatch_enabled(config) and tb != "native":
         wrap_assert_methods(config)
 
 
