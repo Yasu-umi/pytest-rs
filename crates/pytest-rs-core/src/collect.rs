@@ -442,9 +442,12 @@ fn matches_norecurse(path: &Path, name: &str, patterns: &[String]) -> bool {
 /// python_files patterns (default test_*.py / *_test.py). conftest.py never
 /// collects as a test module, whatever the patterns say.
 pub fn is_test_file(path: &Path, python_files: &[String]) -> bool {
-    let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+    // A name that isn't valid UTF-8 (`test_\udcff.py` on Linux) still
+    // matches, like upstream's fnmatch on the surrogate-escaped str.
+    let Some(name) = path.file_name().map(|n| n.to_string_lossy()) else {
         return false;
     };
+    let name = name.as_ref();
     name != "conftest.py"
         && python_files
             .iter()

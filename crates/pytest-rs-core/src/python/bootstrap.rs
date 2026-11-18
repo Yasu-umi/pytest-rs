@@ -749,6 +749,13 @@ pub(crate) fn import_module_for<'py>(
             } else {
                 sys_path_append(py, &basedir)?;
             }
+            // A file name that isn't valid UTF-8 (`test_\udcff.py` on Linux)
+            // has no importable name a Rust string can spell: import it from
+            // its path under the lossy name instead.
+            if path.file_stem().is_some_and(|stem| stem.to_str().is_none()) {
+                let module = import_module_from_path(py, &module_name, path)?;
+                return Ok((module_name, module));
+            }
             let module = py.import(module_name.as_str())?;
             Ok((module_name, module))
         }
@@ -873,9 +880,13 @@ pub(crate) fn import_module_from_path<'py>(
         return existing.cast_into::<PyModule>().map_err(Into::into);
     }
     let util = py.import("importlib.util")?;
-    let spec = util
-        .getattr("spec_from_file_location")?
-        .call1((name, path.to_string_lossy().as_ref()))?;
+    let spec_from_file_location = util.getattr("spec_from_file_location")?;
+    let spec = match path.to_str() {
+        Some(location) => spec_from_file_location.call1((name, location))?,
+        // Not valid UTF-8: PyO3's path conversion decodes it with
+        // surrogateescape, like os.fsdecode, so the file is still found.
+        None => spec_from_file_location.call1((name, path))?,
+    };
     // spec_from_file_location bypasses sys.meta_path, so the assertion-rewrite
     // finder never sees modules loaded this way — notably the 2nd+ shadowed
     // conftest in an in-process run, imported under an alias (the plain
