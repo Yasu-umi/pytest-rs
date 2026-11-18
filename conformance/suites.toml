@@ -593,12 +593,12 @@ deps = [
     "click==8.4.1",
     "httpx[brotli,cli,http2]==0.28.1",
     "httpcore==1.0.9",
-    "anyio==4.13.0",
-    "trio==0.33.0",
+    "anyio==4.16.0",
+    "trio==0.35.0",
     "trustme==1.2.1",
-    "chardet==7.4.3",
+    "chardet==7.7.0",
     "socksio==1.0.0",
-    "uvicorn==0.36.1",
+    "uvicorn==0.54.0",
     "zstandard==0.25.0",
 ]
 # httpx's own pyproject.toml sets addopts = "-rxXs" (no "f"/"E"), which
