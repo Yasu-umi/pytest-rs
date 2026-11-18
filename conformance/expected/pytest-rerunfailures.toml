@@ -1,23 +1,22 @@
 # Upstream pytest-rerunfailures tests that must keep passing under pytest-rs.
 #
-# test_pytest_rerunfailures.py (~32/48 passing): pytest-rs now delegates a
-# plain pytest_runtest_protocol impl that replaces the protocol — the plugin
-# calls _pytest.runner.runtestprotocol() to re-run the engine phases, marks
-# reports "rerun", and drives the terminal via item.ihook. The rerun outcome
-# is rendered ('R'/RERUN) and counted in the summary.
+# tests/test_pytest_rerunfailures.py (235/248 at 16.7): the plugin replaces
+# pytest_runtest_protocol, re-runs the engine phases through
+# _pytest.runner.runtestprotocol(), and keeps its per-attempt bookkeeping on
+# the item from a pytest_runtest_makereport wrapper the engine fires as each
+# phase finishes. Not pinned until the whole file passes.
 
 [files]
 
 [excluded]
-# (single file; partial — tracked by the scoreboard, pinned once green)
 
-# Known per-test gaps in test_pytest_rerunfailures.py:
-#   test_reruns_with_delay[*] / test_reruns_with_delay_marker[*] — assert a
-#     parent-process mock.MagicMock() on time.sleep was called; this needs
-#     in-process pytester (pytest-rs runs nested sessions as subprocesses, so
-#     the parent's monkeypatch is not shared).
-#   test_error_when_run_with_pdb — --pdb is not implemented.
-#   test_only_rerun_flag[*-False] — only_rerun regex matched against
-#     report.longrepr.reprcrash.message (message granularity differs).
-#   test_rerun_on_setup_class_with_error_with_reruns — class-scope setup-error
-#     rerun bookkeeping.
+# Known per-test gaps in tests/test_pytest_rerunfailures.py:
+#   *subtest* (10) — pytest 9's built-in subtests: the plugin counts failed
+#     subtests through _pytest.subtests.failed_subtests_key and expects
+#     subtest reports to be logged during the call (not returned by
+#     runtestprotocol) and dropped from terminalreporter.stats on a rerun;
+#     pytest-rs's subtests implementation has none of these.
+#   test_terminal_teardown_error_* (3) — the plugin holds back module/class
+#     finalizers by editing item.session._setupstate.stack and later tears
+#     them down with _setupstate.teardown_exact(); pytest-rs has no SetupState
+#     and runs higher-scope teardowns when the next item starts.
