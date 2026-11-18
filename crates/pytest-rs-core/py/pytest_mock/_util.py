@@ -1,4 +1,4 @@
-"""Adapted from pytest-mock v3.15.1 (MIT)."""
+"""Adapted from pytest-mock v3.17.0 (MIT)."""
 
 _mock_module = None
 
@@ -34,4 +34,4 @@ def parse_ini_boolean(value: bool | str) -> bool:
         return True
     if value.lower() == "false":
         return False
-    raise ValueError("unknown string for bool: %r" % value)
+    raise ValueError(f"unknown string for bool: {value!r}")

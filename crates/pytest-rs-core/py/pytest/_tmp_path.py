@@ -336,9 +336,11 @@ class LocalPath:
         stripped = [str(p).lstrip("/\\") for p in parts]
         return LocalPath(parent.joinpath(*stripped))
 
-    def ensure(self, *parts, dir=False):
+    def ensure(self, *parts, **kwargs):
+        # Upstream takes **kwargs and only looks at `dir`; callers also pass
+        # e.g. `file=True` (the default).
         target = self._path.joinpath(*[str(part) for part in parts])
-        if dir:
+        if kwargs.get("dir", 0):
             target.mkdir(parents=True, exist_ok=True)
         else:
             target.parent.mkdir(parents=True, exist_ok=True)

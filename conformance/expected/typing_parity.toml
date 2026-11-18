@@ -105,13 +105,10 @@ real_only = []
 shim_only = [
     "tests/test_elasticsearch_storage.py: [import-not-found] Cannot find implementation or library stub for module named \"pytest_benchmark.plugin\"",
     "tests/test_elasticsearch_storage.py: [import-not-found] Cannot find implementation or library stub for module named \"pytest_benchmark.storage.elasticsearch\"",
-    "tests/test_elasticsearch_storage.py: [import-not-found] Cannot find implementation or library stub for module named \"pytest_benchmark.utils\"",
+    "tests/test_stats.py: [import-not-found] Cannot find implementation or library stub for module named \"pytest_benchmark.histogram\"",
     "tests/test_storage.py: [attr-defined] Module \"pytest_benchmark.stats\" has no attribute \"normalize_stats\"",
-    "tests/test_storage.py: [import-not-found] Cannot find implementation or library stub for module named \"py\"",
     "tests/test_storage.py: [import-not-found] Cannot find implementation or library stub for module named \"pytest_benchmark.plugin\"",
     "tests/test_storage.py: [import-not-found] Cannot find implementation or library stub for module named \"pytest_benchmark.session\"",
     "tests/test_storage.py: [import-not-found] Cannot find implementation or library stub for module named \"pytest_benchmark.storage.file\"",
-    "tests/test_storage.py: [import-not-found] Cannot find implementation or library stub for module named \"pytest_benchmark.utils\"",
-    "tests/test_utils.py: [import-not-found] Cannot find implementation or library stub for module named \"pytest_benchmark.utils\"",
 ]
 real_only = []

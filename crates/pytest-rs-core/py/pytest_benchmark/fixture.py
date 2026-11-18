@@ -41,6 +41,7 @@ class BenchmarkFixture:
         args: Sequence[Any] | None = None,
         kwargs: Mapping[str, Any] | None = None,
         setup: Callable[..., Any] | None = None,
+        teardown: Callable[..., Any] | None = None,
         rounds: int | None = None,
         iterations: int | None = None,
         warmup_rounds: int | None = None,
@@ -64,6 +65,14 @@ class BenchmarkFixture:
     @property
     def group(self) -> str | None:
         self._outside_run("group")
+
+    @property
+    def name(self) -> str:
+        self._outside_run("name")
+
+    @property
+    def fullname(self) -> str:
+        self._outside_run("fullname")
 
     @property
     def enabled(self) -> bool:

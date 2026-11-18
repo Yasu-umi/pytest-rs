@@ -20,7 +20,7 @@ use pytest_rs_core::session::Finalizer;
 use core_pyo3::prelude::*;
 use core_pyo3::types::{PyDict, PyList, PyModule};
 
-const HELPER: &str = include_str!("../py/helper.py");
+pub(crate) const HELPER: &str = include_str!("../py/helper.py");
 
 /// The `pytest_benchmark` shim, written to the per-run shim dir as a real
 /// package so `from pytest_benchmark.fixture import BenchmarkFixture` — the
@@ -41,6 +41,10 @@ const SHIM_FILES: &[(&str, &str)] = &[
     (
         "stats.py",
         include_str!("../../pytest-rs-core/py/pytest_benchmark/stats.py"),
+    ),
+    (
+        "utils.py",
+        include_str!("../../pytest-rs-core/py/pytest_benchmark/utils.py"),
     ),
 ];
 
@@ -81,6 +85,22 @@ const HELP_OPTIONS: &[HelpOption] = &[
         nargs: None,
         flag: false,
         help: "Minimum rounds, even if total time would exceed `--max-time`. Default: 5",
+    },
+    HelpOption {
+        flags: &["--benchmark-precision"],
+        metavar: Some("FRACTION"),
+        nargs: None,
+        flag: false,
+        help: "Run rounds until the relative margin of error of the mean (at --benchmark-confidence) is below \
+               this fraction, e.g. 0.02 for \u{b1}2%%. Bounded by --benchmark-min-rounds and --benchmark-max-time. \
+               Default: disabled (fixed number of rounds).",
+    },
+    HelpOption {
+        flags: &["--benchmark-confidence"],
+        metavar: Some("FRACTION"),
+        nargs: None,
+        flag: false,
+        help: "Confidence level for --benchmark-precision, e.g. 0.99 for a 99%% confidence interval. Default: 0.99",
     },
     HelpOption {
         flags: &["--benchmark-timer"],
@@ -299,6 +319,18 @@ fn parse_decimal(value: &str, option: &str) -> f64 {
     })
 }
 
+/// Upstream's `parse_fraction`: a float strictly between 0 and 1.
+fn parse_fraction(value: &str, option: &str) -> f64 {
+    match value.parse::<f64>() {
+        Ok(fraction) if fraction > 0.0 && fraction < 1.0 => fraction,
+        Ok(_) => argparse_error(option, "Value must be a fraction strictly between 0 and 1."),
+        Err(_) => argparse_error(
+            option,
+            &format!("could not convert string to float: '{value}'"),
+        ),
+    }
+}
+
 /// Upstream's min-time/max-time defaults are Python Decimal-backed and
 /// display with at least one fractional digit ("1.0", not Rust's plain "1")
 /// while still avoiding scientific notation for small values ("0.000005",
@@ -349,6 +381,11 @@ pub struct BenchmarkPlugin {
     storage_dir: Option<PathBuf>,
     helper: Option<Py<PyModule>>,
     results: ResultStore,
+    /// xdist auto-disabled benchmarks the user did not skip or disable.
+    xdist_warning: bool,
+    /// ... and this process collected a benchmark test (upstream's
+    /// `xdist_benchmark_found`).
+    xdist_benchmark_found: std::sync::atomic::AtomicBool,
 }
 
 impl BenchmarkPlugin {
@@ -371,7 +408,46 @@ impl BenchmarkPlugin {
             storage_dir: None,
             helper: None,
             results: Arc::new(Mutex::new(Vec::new())),
+            xdist_warning: false,
+            xdist_benchmark_found: std::sync::atomic::AtomicBool::new(false),
         }
+    }
+
+    /// Upstream's `note_xdist_benchmark`: only the controller (when it
+    /// collects) or the first worker reports, so the warning appears once.
+    fn note_xdist_benchmark(&self) {
+        let worker = std::env::var("PYTEST_XDIST_WORKER").ok();
+        if self.xdist_warning && matches!(worker.as_deref(), None | Some("gw0")) {
+            self.xdist_benchmark_found
+                .store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
+    /// The deferred xdist auto-disable warning (upstream emits it from
+    /// pytest_unconfigure). Only when the real pytest-benchmark is part of
+    /// the environment — see pytest_configure.
+    fn warn_xdist_disabled(&self, py: Python<'_>) -> PyResult<()> {
+        if !self
+            .xdist_benchmark_found
+            .load(std::sync::atomic::Ordering::Relaxed)
+        {
+            return Ok(());
+        }
+        let Some(helper) = &self.helper else {
+            return Ok(());
+        };
+        let helper = helper.bind(py);
+        if !real_benchmark_plugin_present(helper) {
+            return Ok(());
+        }
+        let msg = "Benchmarks are automatically disabled because xdist plugin is active. \
+                   Benchmarks cannot be performed reliably in a parallelized environment.";
+        if self.verbose {
+            eprintln!("{}", "-".repeat(72));
+            eprintln!(" WARNING: {msg}");
+            eprintln!("{}", "-".repeat(72));
+        }
+        warn_from_logger(py, helper, msg)
     }
 
     fn uses_benchmark(item: &TestItem) -> bool {
@@ -422,6 +498,16 @@ impl Plugin for BenchmarkPlugin {
             "--benchmark-max-time",
             Some("1.0"),
             "Maximum run time per test in seconds (soft cap)",
+        ));
+        parser.add_option(OptDef::value(
+            "--benchmark-precision",
+            None,
+            "Stop rounds once the mean's relative margin of error is below this fraction",
+        ));
+        parser.add_option(OptDef::value(
+            "--benchmark-confidence",
+            None,
+            "Confidence level for --benchmark-precision (default 0.99)",
         ));
         parser.add_option(OptDef::value(
             "--benchmark-calibration-precision",
@@ -540,6 +626,12 @@ impl Plugin for BenchmarkPlugin {
         }
         if let Some(value) = ctx.config.get_value("benchmark-max-time") {
             self.config.max_time = parse_decimal(value, "--benchmark-max-time");
+        }
+        if let Some(value) = ctx.config.get_value("benchmark-precision") {
+            self.config.precision = Some(parse_fraction(value, "--benchmark-precision"));
+        }
+        if let Some(value) = ctx.config.get_value("benchmark-confidence") {
+            self.config.confidence = Some(parse_fraction(value, "--benchmark-confidence"));
         }
         if let Some(value) = ctx.config.get_value("benchmark-calibration-precision") {
             self.config.calibration_precision =
@@ -699,24 +791,17 @@ impl Plugin for BenchmarkPlugin {
         // `filterwarnings = error` — into the `-n` runs of projects that never
         // asked for benchmarking, where real pytest has no such plugin and says
         // nothing at all.
+        //
+        // 5.3.0+ defers the warning until a benchmark test is collected, and
+        // skips it when --benchmark-skip / --benchmark-disable already say
+        // what happens to benchmarks: pytest_collection_modifyitems notes a
+        // collected benchmark (in the process that collects them — the
+        // first worker under -n), pytest_sessionfinish warns once.
+        self.xdist_warning = false;
+        self.xdist_benchmark_found = std::sync::atomic::AtomicBool::new(false);
         if ctx.config.numprocesses_spec().is_some() {
+            self.xdist_warning = !self.skip && !self.config.disabled;
             self.config.disabled = true;
-            let helper = self
-                .helper
-                .as_ref()
-                .expect("helper module set above")
-                .clone_ref(py);
-            let helper = helper.bind(py);
-            if !ctx.config.is_worker() && real_benchmark_plugin_present(helper) {
-                let msg = "Benchmarks are automatically disabled because xdist plugin is active.\
-                           Benchmarks cannot be performed reliably in a parallelized environment.";
-                if self.verbose {
-                    eprintln!("{}", "-".repeat(72));
-                    eprintln!(" WARNING: {msg}");
-                    eprintln!("{}", "-".repeat(72));
-                }
-                warn_from_logger(py, helper, msg)?;
-            }
         }
 
         self.config.verbose = self.verbose;
@@ -728,6 +813,9 @@ impl Plugin for BenchmarkPlugin {
         ctx: &mut HookContext,
         items: &mut Vec<TestItem>,
     ) -> PyResult<()> {
+        if items.iter().any(Self::uses_benchmark) {
+            self.note_xdist_benchmark();
+        }
         if self.skip && !self.only {
             // pytest-benchmark skips (not deselects) benchmark tests.
             let py = ctx.py;
@@ -938,6 +1026,7 @@ impl Plugin for BenchmarkPlugin {
     }
 
     fn pytest_sessionfinish(&mut self, ctx: &mut HookContext, _exit_code: i32) -> PyResult<()> {
+        self.warn_xdist_disabled(ctx.py)?;
         if ctx.config.is_worker() {
             return Ok(());
         }

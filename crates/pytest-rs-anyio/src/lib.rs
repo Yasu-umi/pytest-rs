@@ -25,7 +25,10 @@ enum Mode {
 }
 
 pub struct AnyioPlugin {
+    /// The `anyio_mode` ini, resolved (and validated) at configure time.
     mode: Mode,
+    /// The effective mode once `--anyio-mode` is known; see `mode()`.
+    cli_mode: std::sync::OnceLock<Mode>,
     helper: Option<Py<PyModule>>,
 }
 
@@ -39,6 +42,7 @@ impl AnyioPlugin {
     pub fn new() -> Self {
         Self {
             mode: Mode::Strict,
+            cli_mode: std::sync::OnceLock::new(),
             helper: None,
         }
     }
@@ -48,6 +52,27 @@ impl AnyioPlugin {
             .as_ref()
             .map(|m| m.bind(py).clone())
             .ok_or_else(|| PyRuntimeError::new_err("anyio plugin not configured"))
+    }
+
+    /// The effective mode: auto when either `--anyio-mode` or the ini says
+    /// so, like upstream's `_is_auto_mode`. The option is registered by the
+    /// upstream plugin's own pytest_addoption, which pytest-rs parses after
+    /// native plugins configure, so it is read lazily from the Python config
+    /// at collection time.
+    fn mode(&self, py: Python<'_>) -> PyResult<Mode> {
+        if let Some(mode) = self.cli_mode.get() {
+            return Ok(*mode);
+        }
+        let cli_auto = match pytest_rs_core::python::existing_py_config(py) {
+            Some(config) => config
+                .bind(py)
+                .call_method1("getoption", ("anyio_mode", py.None()))?
+                .extract::<Option<String>>()?
+                .is_some_and(|mode| mode.trim() == "auto"),
+            None => false,
+        };
+        let mode = if cli_auto { Mode::Auto } else { self.mode };
+        Ok(*self.cli_mode.get_or_init(|| mode))
     }
 
     /// Fixture names requested through @pytest.mark.usefixtures marks.
@@ -182,6 +207,7 @@ impl Plugin for AnyioPlugin {
     }
 
     fn pytest_configure(&mut self, ctx: &mut HookContext) -> PyResult<()> {
+        self.cli_mode = std::sync::OnceLock::new();
         self.mode = match ctx.config.get_ini("anyio_mode").map(str::trim) {
             None | Some("strict") => Mode::Strict,
             Some("auto") => Mode::Auto,
@@ -240,7 +266,7 @@ impl Plugin for AnyioPlugin {
         let py = ctx.py;
         for item in items.iter_mut() {
             let marked = item.get_closest_marker("anyio").is_some();
-            if self.mode == Mode::Strict && !marked {
+            if self.mode(py)? == Mode::Strict && !marked {
                 continue;
             }
             // Hypothesis wraps async tests in a sync shim; its coroutine
@@ -254,7 +280,7 @@ impl Plugin for AnyioPlugin {
             if !async_like {
                 continue;
             }
-            if self.mode == Mode::Auto && !marked {
+            if self.mode(py)? == Mode::Auto && !marked {
                 let mark = py
                     .import("pytest")?
                     .getattr("mark")?
@@ -329,7 +355,7 @@ impl Plugin for AnyioPlugin {
         let mut dispositions = Vec::new();
         for mut item in pre {
             let marked = item.get_closest_marker("anyio").is_some();
-            if self.mode == Mode::Strict && !marked {
+            if self.mode(py)? == Mode::Strict && !marked {
                 dispositions.push(Disposition::Keep(item));
                 continue;
             }
@@ -345,7 +371,7 @@ impl Plugin for AnyioPlugin {
                 dispositions.push(Disposition::Keep(item));
                 continue;
             }
-            if self.mode == Mode::Auto && !marked {
+            if self.mode(py)? == Mode::Auto && !marked {
                 let mark = py
                     .import("pytest")?
                     .getattr("mark")?
@@ -599,7 +625,7 @@ impl Plugin for AnyioPlugin {
         nodeid: &str,
     ) -> PyResult<Vec<String>> {
         let marked = marks.iter().any(|mark| mark.name == "anyio");
-        if self.mode == Mode::Strict && !marked {
+        if self.mode(py)? == Mode::Strict && !marked {
             return Ok(Vec::new());
         }
         let async_like = is_coroutine
