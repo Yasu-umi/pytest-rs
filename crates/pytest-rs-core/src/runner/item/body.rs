@@ -138,8 +138,13 @@ pub(crate) fn run_one_body(
     // no fixtures instead of calling it as a test function. Detect precisely
     // via isinstance(pytest.Item) — a hasattr("runtest") probe would also
     // match Mocks and other auto-attr objects used as test funcs.
+    // Reports whose pytest_runtest_makereport already fired.
+    let mut fired = 0usize;
     let (xfailed, runxfail) = match evaluate_item_prelude(py, session, config, item) {
-        ItemPrelude::Done(reports) => return reports,
+        ItemPrelude::Done(mut reports) => {
+            fire_makereport(py, session, item, &mut reports, &mut fired);
+            return reports;
+        }
         ItemPrelude::Run { xfailed, runxfail } => (xfailed, runxfail),
     };
     let mut reports = Vec::new();
@@ -174,6 +179,7 @@ pub(crate) fn run_one_body(
             TimeMark::now(),
             &err,
         ));
+        fire_makereport(py, session, item, &mut reports, &mut fired);
         return reports;
     }
 
@@ -208,6 +214,7 @@ pub(crate) fn run_one_body(
                 &err,
             ));
             python::end_item_context(py);
+            fire_makereport(py, session, item, &mut reports, &mut fired);
             return reports;
         }
     };
@@ -229,10 +236,12 @@ pub(crate) fn run_one_body(
         config,
         item,
         &mut reports,
+        &mut fired,
         xfailed,
         runxfail,
         xfail,
     );
+    fire_makereport(py, session, item, &mut reports, &mut fired);
     // Stream setup+call reports before teardown runs so a crash in teardown
     // doesn't swallow the call outcome (worker mode only, None otherwise).
     // Pytest's capfd capture redirects fd 1 during tests; suspend it so the
@@ -253,6 +262,7 @@ pub(crate) fn run_one_body(
         teardown_xfail,
         &mut reports,
     );
+    fire_makereport(py, session, item, &mut reports, &mut fired);
     close_item_filters(py);
     python::end_item_context(py);
     reports
@@ -270,6 +280,7 @@ pub(crate) fn run_item_body(
     config: &Config,
     item: &TestItem,
     reports: &mut Vec<TestReport>,
+    fired: &mut usize,
     mut xfailed: Option<XfailEval>,
     runxfail: bool,
     xfail: bool,
@@ -350,6 +361,8 @@ pub(crate) fn run_item_body(
         reprcrash_message: None,
         head_line: None,
     });
+    // The setup report's makereport fires before the call phase runs.
+    fire_makereport(py, session, item, reports, fired);
 
     if setup_show_active(config) {
         // Upstream's show_test_item: sorted(item.fixturenames), the item's

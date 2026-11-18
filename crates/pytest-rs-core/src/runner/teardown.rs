@@ -92,6 +92,7 @@ pub(crate) fn teardown_one(
 
     if let Err(err) = fire_runtest_py_hooks(py, session, item, nextitem, "pytest_runtest_teardown")
     {
+        super::record_phase_exception(py, &item.nodeid, Phase::Teardown, &err);
         errors.push(python::format_exception(py, &err));
     }
     let hook_result = (|| -> PyResult<()> {
@@ -276,6 +277,7 @@ pub(crate) fn teardown_scope(
             Finalizer::GenNext(generator) => python::finalize_generator(py, generator),
         };
         if let Err(err) = result {
+            super::record_phase_exception(py, &_item.nodeid, Phase::Teardown, &err);
             // pytest-style longrepr (source lines + E markers), like any
             // other failing phase.
             errors.push(python::format_test_failure(
