@@ -494,17 +494,19 @@ env = { PYTEST_RS_INLINE_INPROCESS = "1" }
 
 [pytest-randomly]
 repo = "https://github.com/pytest-dev/pytest-randomly"
-tag = "4.1.0"
+tag = "5.1.0"
 testpaths = ["tests"]
 # Installed as a dep so its pytest11 entry point autoloads; the src/
 # checkout shadows the import at the same version. factory-boy/faker/numpy/
-# model-bakery drive the optional reseed-integration tests.
+# model-bakery/polyfactory (upstream's own test dependency group) drive the
+# optional reseed-integration tests.
 deps = [
-    "pytest-randomly==4.1.0",
+    "pytest-randomly==5.1.0",
     "factory-boy==3.3.3",
     "faker==40.21.0",
     "numpy==2.4.6",
     "model-bakery==1.23.4",
+    "polyfactory==3.5.0",
 ]
 # pytest-randomly's own tests never use the benchmark fixture, but pytest-rs's
 # native benchmark plugin always prints its header line — one line more than

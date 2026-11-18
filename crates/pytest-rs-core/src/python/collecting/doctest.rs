@@ -29,29 +29,30 @@ fn check_import_path_mismatch(
     if std::env::var("PY_IGNORE_IMPORTMISMATCH").as_deref() == Ok("1") {
         return Ok(());
     }
-    let module_file: Option<String> = module
+    // Extracted as a path, not a str: a file name that isn't valid UTF-8
+    // (`test_\udcff.py` on Linux) only round-trips through os.fsencode.
+    let module_file: Option<std::path::PathBuf> = module
         .getattr("__file__")
         .ok()
-        .and_then(|f| f.extract::<String>().ok());
+        .and_then(|f| f.extract::<std::path::PathBuf>().ok());
     // Normalize like pytest: .pyc/.pyo -> source, and a package's __init__.py
     // collapses to its directory before comparison.
-    let normalized = module_file.as_ref().map(|mf| {
-        let mut mf = mf.clone();
-        if mf.ends_with(".pyc") || mf.ends_with(".pyo") {
-            mf.pop();
+    let normalized = module_file.map(|mf| {
+        let mf = match mf.extension().and_then(|e| e.to_str()) {
+            Some("pyc" | "pyo") => mf.with_extension("py"),
+            _ => mf,
+        };
+        match (mf.file_name().and_then(|n| n.to_str()), mf.parent()) {
+            (Some("__init__.py"), Some(dir)) => dir.to_path_buf(),
+            _ => mf,
         }
-        let init_suffix = format!("{}__init__.py", std::path::MAIN_SEPARATOR);
-        if let Some(stripped) = mf.strip_suffix(&init_suffix) {
-            mf = stripped.to_string();
-        }
-        mf
     });
     let is_same = match &normalized {
         // os.path.samefile(path, module_file); a missing file is not the same.
         Some(mf) => py
             .import("os")
             .and_then(|os| os.getattr("path"))
-            .and_then(|p| p.call_method1("samefile", (path, mf.as_str())))
+            .and_then(|p| p.call_method1("samefile", (path, mf)))
             .and_then(|r| r.extract::<bool>())
             .unwrap_or(false),
         None => false,
@@ -67,7 +68,7 @@ fn check_import_path_mismatch(
          which is not the same as the test file we want to collect:\n  \
          {}\n\
          HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules",
-        normalized.unwrap_or_default(),
+        normalized.unwrap_or_default().display(),
         path.display(),
     );
     Err(collect_error(py, &message))
