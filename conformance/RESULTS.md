@@ -31,10 +31,10 @@ pytest-rs; they are not counted in the total.
 | pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 0 | 2 | 90 | 97.8% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 205 | 0 | 0 | 3 | 0 | 1 | 209 | 99.5% | 1 | 1 | 0 |
 | pytest-xdist | v3.8.0 | 96 | 0 | 0 | 2 | 0 | 0 | 98 | 100.0% | 1 | 1 | 6 |
-| pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
+| pytest-split | 0.11.0 | 59 | 0 | 0 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 122 | 0 | 0 | 1 | 0 | 0 | 123 | 100.0% | 6 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 42 | 0 | 0 | 1 | 0 | 0 | 43 | 100.0% | 1 | 1 | 0 |
-| anyio | 4.13.0 | 3137 | 0 | 0 | 21 | 0 | 4 | 3162 | 99.9% | 26 | 26 | 0 |
+| anyio | 4.13.0 | 3137 | 0 | 0 | 21 | 0 | 5 | 3163 | 99.8% | 26 | 26 | 0 |
 | pytest-mypy | v1.1.0 | 76 | 0 | 0 | 2 | 0 | 0 | 78 | 100.0% | 1 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-subtests | v0.15.0 | 32 | 0 | 0 | 0 | 0 | 2 | 34 | 94.1% | 1 | 1 | 0 |
@@ -213,7 +213,7 @@ pytest-rs; they are not counted in the total.
 
 </details>
 
-### pytest-split @ 0.9.0
+### pytest-split @ 0.11.0
 
 <details><summary>per-file detail (1 files)</summary>
 
@@ -260,7 +260,7 @@ pytest-rs; they are not counted in the total.
 | tests/streams/test_memory.py | passed | 109 | 0 | 0 | 0 | 0 | 0 |
 | tests/streams/test_stapled.py | passed | 24 | 0 | 0 | 0 | 0 | 0 |
 | tests/streams/test_text.py | passed | 24 | 0 | 0 | 0 | 0 | 0 |
-| tests/streams/test_tls.py | passed | 64 | 0 | 0 | 0 | 0 | 4 |
+| tests/streams/test_tls.py | passed | 64 | 0 | 0 | 0 | 0 | 5 |
 | tests/test_all_attributes.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_contextmanagers.py | passed | 49 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_debugging.py | passed | 31 | 0 | 0 | 1 | 0 | 0 |
