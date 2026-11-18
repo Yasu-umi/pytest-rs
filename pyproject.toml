@@ -26,7 +26,7 @@ Source = "https://github.com/Yasu-umi/pytest-rs"
 Tracker = "https://github.com/Yasu-umi/pytest-rs/issues"
 
 [build-system]
-requires = ["maturin>=1.7,<2.0"]
+requires = ["maturin>=1.16,<2.0"]
 build-backend = "maturin"
 
 [tool.maturin]
