@@ -309,7 +309,15 @@ impl Engine {
             let entry = entry?;
             let name: String = entry.get_item(0)?.extract()?;
             let bound = entry.get_item(1)?;
-            python::register_fixture_def(py, &name, &bound, "", false, &mut self.session.registry)?;
+            python::register_fixture_def(
+                py,
+                &name,
+                &bound,
+                "",
+                false,
+                None,
+                &mut self.session.registry,
+            )?;
         }
         Ok(())
     }
