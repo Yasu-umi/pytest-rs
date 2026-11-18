@@ -76,6 +76,7 @@ pub(crate) fn teardown_one(
     );
     python::log_start_phase(py, "teardown", log_level_cfg.as_deref());
     let teardown_started = TimeMark::now();
+    clear_phase_exception(&item.nodeid, Phase::Teardown);
     // A unittest tearDown/addCleanup failure (test.py's call-phase run
     // already raised the primary entry; any further captured errors have no
     // other phase to land in) — surface before fixture finalizer errors.
@@ -128,7 +129,18 @@ pub(crate) fn teardown_one(
         ));
     }
 
-    if errors.is_empty() {
+    // A lone pytest.skip()/pytest.xfail() raised by a finalizer makes a
+    // skipped/xfailed teardown report, like upstream's makereport, not an
+    // error.
+    let skip_or_xfail = (errors.len() == 1)
+        .then(|| peek_phase_exception(py, &item.nodeid, Phase::Teardown))
+        .flatten()
+        .filter(|err| python::is_skipped(py, err) || python::is_xfailed(py, err));
+    if let Some(err) = skip_or_xfail {
+        let mut report = report_from_err(py, config, item, Phase::Teardown, teardown_started, &err);
+        report.sections = python::log_failure_sections(py);
+        reports.push(report);
+    } else if errors.is_empty() {
         reports.push(TestReport {
             nodeid: item.nodeid.clone(),
             phase: Phase::Teardown,

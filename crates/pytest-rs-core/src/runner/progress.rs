@@ -419,7 +419,7 @@ pub fn summary_line_with_extras(
         match (report.phase, report.outcome) {
             (Phase::Call, Outcome::Passed) => passed += 1,
             (Phase::Call, Outcome::Failed) => failed += 1,
-            (Phase::Call, Outcome::Skipped) | (Phase::Setup, Outcome::Skipped) => skipped += 1,
+            (_, Outcome::Skipped) => skipped += 1,
             (Phase::Setup, Outcome::Failed) | (Phase::Teardown, Outcome::Failed) => errors += 1,
             (_, Outcome::XFailed) => xfailed += 1,
             (_, Outcome::XPassed) => xpassed += 1,

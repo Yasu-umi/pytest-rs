@@ -106,6 +106,26 @@ pub(crate) fn record_phase_exception(py: Python<'_>, nodeid: &str, phase: Phase,
     });
 }
 
+/// The exception recorded for `nodeid`'s `phase`, left in place for that
+/// phase's makereport.
+pub(crate) fn peek_phase_exception(py: Python<'_>, nodeid: &str, phase: Phase) -> Option<PyErr> {
+    PHASE_EXCEPTIONS.with(|cell| {
+        cell.borrow()
+            .iter()
+            .find(|(id, p, _)| id == nodeid && *p == phase)
+            .map(|(_, _, value)| PyErr::from_value(value.bind(py).clone()))
+    })
+}
+
+/// Forget the exception recorded for `nodeid`'s `phase` (a rerun attempt
+/// starting that phase afresh).
+pub(crate) fn clear_phase_exception(nodeid: &str, phase: Phase) {
+    PHASE_EXCEPTIONS.with(|cell| {
+        cell.borrow_mut()
+            .retain(|(id, p, _)| !(id == nodeid && *p == phase));
+    });
+}
+
 fn phase_name(phase: Phase) -> &'static str {
     match phase {
         Phase::Setup => "setup",
