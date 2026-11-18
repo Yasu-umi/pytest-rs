@@ -17,9 +17,9 @@ jobs:
     name: rust check (fmt + clippy + test)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
 
@@ -48,9 +48,9 @@ jobs:
       matrix:
         python-version: ["3.13", "3.14", "3.15"]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -79,9 +79,9 @@ jobs:
       matrix:
         python-version: ["3.13", "3.14", "3.15"]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -128,16 +128,16 @@ jobs:
           - group: pydantic
             suites: "pydantic"
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # Conformance runs on the newest supported Python only: it is the
       # slowest job, and expected/*.toml + scoreboard/linux are recorded on
       # it. 3.13 / 3.14 are covered by regression-tests.
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.15"
 
-      - uses: astral-sh/setup-uv@v8.2.0
+      - uses: astral-sh/setup-uv@v10.3.3
 
       - uses: actions/download-artifact@v8
         with:
@@ -148,7 +148,7 @@ jobs:
         run: chmod +x target/debug/pytest-rs-bin
 
       - name: cache conformance checkouts + deps
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: .tmp/conformance
           # Also keyed on runner.py: it writes console_scripts/interpreter
@@ -183,16 +183,16 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # Conformance runs on the newest supported Python only: it is the
       # slowest job, and expected/*.toml + scoreboard/linux are recorded on
       # it. 3.13 / 3.14 are covered by regression-tests.
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.15"
 
-      - uses: astral-sh/setup-uv@v8.2.0
+      - uses: astral-sh/setup-uv@v10.3.3
 
       - uses: actions/download-artifact@v8
         with:
@@ -222,7 +222,7 @@ jobs:
           "
 
       - name: cache plugin smoke deps
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: .tmp/conformance
           key: plugin-smoke-${{ runner.os }}-py3.15-${{ hashFiles('conformance/plugin_smoke.py') }}
@@ -258,9 +258,9 @@ jobs:
     name: python lint (ruff + mypy)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: astral-sh/setup-uv@v8.2.0
+      - uses: astral-sh/setup-uv@v10.3.3
 
       - name: uv sync
         run: uv sync --no-install-project
