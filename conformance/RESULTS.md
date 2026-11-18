@@ -34,7 +34,7 @@ pytest-rs; they are not counted in the total.
 | pytest-split | 0.9.0 | 59 | 0 | 0 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
 | pytest-benchmark | v5.1.0 | 122 | 0 | 0 | 1 | 0 | 0 | 123 | 100.0% | 6 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 42 | 0 | 0 | 1 | 0 | 0 | 43 | 100.0% | 1 | 1 | 0 |
-| anyio | 4.13.0 | 3137 | 0 | 0 | 21 | 0 | 4 | 3162 | 99.9% | 26 | 26 | 0 |
+| anyio | 4.13.0 | 3136 | 1 | 0 | 21 | 0 | 4 | 3162 | 99.8% | 25 | 26 | 0 |
 | pytest-mypy | v1.1.0 | 76 | 0 | 0 | 2 | 0 | 0 | 78 | 100.0% | 1 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-subtests | v0.15.0 | 32 | 0 | 0 | 0 | 0 | 2 | 34 | 94.1% | 1 | 1 | 0 |
@@ -63,7 +63,7 @@ pytest-rs; they are not counted in the total.
 | werkzeug | 3.1.9 | 955 | 0 | 0 | 1 | 25 | 0 | 981 | 97.5% | 24 | 25 | 0 |
 | fastapi | 0.117.1 | 2357 | 5 | 0 | 131 | 0 | 0 | 2493 | 99.8% | 309 | 315 | 0 |
 | packaging | 26.3 | 62423 | 0 | 0 | 0 | 0 | 0 | 62423 | 100.0% | 17 | 31 | 0 |
-| pandas | v3.0.6 | 163211 | 2505 | 1209 | 28212 | 0 | 8 | 195145 | 98.1% | 804 | 961 | 3 |
+| pandas | v3.0.6 | 152122 | 1521 | 1209 | 28200 | 0 | 8 | 183060 | 98.5% | 804 | 961 | 3 |
 | networkx | 3.6.1 | 6815 | 0 | 0 | 79 | 0 | 0 | 6894 | 100.0% | 259 | 266 | 0 |
 | pydantic | v2.14.3 | 10972 | 0 | 0 | 981 | 0 | 14 | 11967 | 99.9% | 128 | 133 | 0 |
 | scikit-learn-1 | 1.9.1 | 8443 | 0 | 0 | 6630 | 0 | 0 | 15073 | 100.0% | 79 | 87 | 0 |
@@ -279,7 +279,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_tempfile.py | passed | 60 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_to_interpreter.py | passed | 12 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_to_process.py | passed | 36 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_to_thread.py | passed | 64 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_to_thread.py | failed | 63 | 1 | 0 | 0 | 0 | 0 |
 | tests/test_typedattr.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 
 </details>
@@ -1326,7 +1326,7 @@ pytest-rs; they are not counted in the total.
 | pandas/tests/arithmetic/test_array_ops.py | passed | 26 | 0 | 0 | 0 | 0 | 0 |
 | pandas/tests/arithmetic/test_bool.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
 | pandas/tests/arithmetic/test_categorical.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
-| pandas/tests/arithmetic/test_datetime64.py | failed | 11089 | 984 | 0 | 12 | 0 | 0 |
+| pandas/tests/arithmetic/test_datetime64.py | timeout | 0 | 0 | 0 | 0 | 0 | 0 |
 | pandas/tests/arithmetic/test_interval.py | passed | 783 | 0 | 0 | 0 | 0 | 0 |
 | pandas/tests/arithmetic/test_numeric.py | passed | 3066 | 0 | 0 | 76 | 0 | 0 |
 | pandas/tests/arithmetic/test_object.py | passed | 98 | 0 | 0 | 1 | 0 | 0 |

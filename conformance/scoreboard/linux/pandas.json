@@ -162,11 +162,11 @@
     },
     {
       "file": "pandas/tests/arithmetic/test_datetime64.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 11089,
-      "failed": 984,
-      "skipped": 12,
+      "status": "timeout",
+      "exit_code": null,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
       "errors": 0,
       "deselected": 0,
       "known_failed": 0
