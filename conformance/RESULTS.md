@@ -35,7 +35,7 @@ pytest-rs; they are not counted in the total.
 | pytest-benchmark | v5.1.0 | 122 | 0 | 0 | 1 | 0 | 0 | 123 | 100.0% | 6 | 7 | 6 |
 | pytest-timeout | 2.4.0 | 42 | 0 | 0 | 1 | 0 | 0 | 43 | 100.0% | 1 | 1 | 0 |
 | anyio | 4.13.0 | 3137 | 0 | 0 | 21 | 0 | 5 | 3163 | 99.8% | 26 | 26 | 0 |
-| pytest-mypy | v1.0.1 | 75 | 0 | 0 | 2 | 0 | 1 | 78 | 98.7% | 1 | 1 | 0 |
+| pytest-mypy | v1.0.1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | - | 0 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-subtests | v0.14.2 | 32 | 0 | 0 | 0 | 0 | 0 | 32 | 100.0% | 1 | 1 | 0 |
 | pytest-metadata | v2.0.4 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
@@ -290,7 +290,7 @@ pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| tests/test_pytest_mypy.py | passed | 75 | 0 | 0 | 2 | 0 | 1 |
+| tests/test_pytest_mypy.py | timeout | 0 | 0 | 0 | 0 | 0 | 0 |
 
 </details>
 
