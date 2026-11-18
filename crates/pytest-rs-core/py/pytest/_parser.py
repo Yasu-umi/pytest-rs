@@ -48,6 +48,17 @@ flag_dests["--help"] = "help"
 flag_dests["-h"] = "help"
 flag_actions["--help"] = "store_true"
 flag_actions["-h"] = "store_true"
+# -V/--version likewise (pytest-django reads options.version there too; the
+# engine passes it on only for -VV, the one form that loads conftests).
+option_specs["version"] = {
+    "default": 0,
+    "type": None,
+    "action": "count",
+    "nargs": None,
+    "choices": None,
+}
+flag_dests["--version"] = "version"
+flag_actions["--version"] = "count"
 
 
 class Option:
@@ -1482,10 +1493,10 @@ CORE_OPTION_DEFAULTS: dict[str, Any] = {
     # helper reads config.option.assertmode to pick runpytest vs subprocess.
     "assertmode": "rewrite",
     # core flags plugins read off a parse_known_args namespace (pytest-django).
-    # "help" has its own option_specs entry (registered above) instead of a
-    # CORE_OPTION_DEFAULTS one, since it needs apply_cli_args to actually set
-    # it from argv, not just supply a static default.
-    "version": 0,
+    # "help" and "version" have their own option_specs entries (registered
+    # above) instead of CORE_OPTION_DEFAULTS ones, since they need
+    # apply_cli_args to actually set them from argv, not just supply a
+    # static default.
     # --fixtures / --funcargs dest; the engine sets it true when either is given.
     "showfixtures": False,
 }
@@ -1545,6 +1556,9 @@ def apply_cli_args(namespace: Any, tokens: list[str]) -> tuple[list[str], list[s
         action = flag_actions.get(name) or spec["action"]
         if action in ("store_true", "store_false"):
             setattr(namespace, dest, action == "store_true")
+            continue
+        if action == "count":
+            setattr(namespace, dest, (getattr(namespace, dest, 0) or 0) + 1)
             continue
         convert = spec["type"]
         nargs = spec.get("nargs")

@@ -801,10 +801,16 @@ impl Config {
 
         // Handle --version/-V before clap so we control the output format.
         // Count occurrences: single = short version, 2+ = verbose with path.
-        let version_count = argv
+        // A `-VV` cluster counts each V, like argparse's count action.
+        let version_count: usize = argv
             .iter()
-            .filter(|a| *a == "--version" || *a == "-V")
-            .count();
+            .map(|a| match a.strip_prefix('-') {
+                Some("-version") => 1,
+                Some(vs) if !vs.is_empty() && vs.chars().all(|c| c == 'V') => vs.len(),
+                _ => 0,
+            })
+            .sum();
+        let mut version_text = None;
         if version_count >= 1 {
             const PYTEST_API_VERSION: &str = "9.0.3";
             let msg = if version_count >= 2 {
@@ -819,7 +825,10 @@ impl Config {
             } else {
                 format!("pytest {}\n", PYTEST_API_VERSION)
             };
-            return Err(format!("{}{}", crate::EXIT_ZERO_SENTINEL, msg));
+            if version_count == 1 {
+                return Err(format!("{}{}", crate::EXIT_ZERO_SENTINEL, msg));
+            }
+            version_text = Some(msg);
         }
 
         // Expand @file arguments: each arg of the form "@path" is replaced by
@@ -996,6 +1005,7 @@ impl Config {
             invocation_args,
             reporter_delegated: std::sync::atomic::AtomicBool::new(false),
             help_text,
+            version_text,
             plugin_option_help: String::new(),
         })
     }

@@ -3,6 +3,12 @@ use super::types::ProgressKind;
 use std::collections::HashMap;
 
 impl Config {
+    /// `-h/--help` or `-VV`: startup runs (plugins and initial conftests
+    /// load) but no session follows.
+    pub fn ends_before_session(&self) -> bool {
+        self.help_text.is_some() || self.version_text.is_some()
+    }
+
     /// The signed global verbosity level (pytest's `option.verbose`): -v
     /// raises it, -q lowers it, --verbosity=N sets it directly.
     pub fn global_verbosity(&self) -> i32 {

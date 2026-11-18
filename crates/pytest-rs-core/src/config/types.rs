@@ -67,6 +67,11 @@ pub struct Config {
     /// a reduced "minimal help" form, when that happens) — so printing is
     /// deferred to after `load_and_validate_config` succeeds or fails.
     pub help_text: Option<String>,
+    /// `-VV` (`--version` given twice)'s output. A single `--version` is
+    /// answered before any startup, but upstream (pytest #13574) runs the
+    /// full startup for two — plugins and initial conftests load — and only
+    /// then prints this instead of starting a session.
+    pub version_text: Option<String>,
     /// Conftest/plugin-registered CLI options' `--help` text (each under its
     /// own `parser.getgroup()` heading, or "custom options:" for a bare
     /// `parser.addoption()`), appended by `fire_py_addoption` once those

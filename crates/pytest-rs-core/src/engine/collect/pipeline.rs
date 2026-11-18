@@ -165,6 +165,18 @@ impl Engine {
                 &self.session.initial_paths,
             );
             let conftest_sections = python::capture_collect_end(py);
+            // -h/--help and -VV end without a session: upstream's global
+            // capture hands an initial conftest's import-time output back to
+            // the terminal, ahead of the help/version text.
+            if conftest_result.is_ok() && self.config.ends_before_session() {
+                for (title, text) in &conftest_sections {
+                    if title == "Captured stderr" {
+                        eprint!("{text}");
+                    } else {
+                        print!("{text}");
+                    }
+                }
+            }
             if let Err(err) = conftest_result {
                 for (title, text) in &conftest_sections {
                     if title == "Captured stderr" {
@@ -178,6 +190,10 @@ impl Engine {
                 // downgraded to a PytestConfigWarning (Config.parse's
                 // ConftestImportFailure handling) and printed alongside the
                 // help output (helpconfig.showhelp's warning lines) instead.
+                // -VV: upstream records the failure but never prints it.
+                if self.config.version_text.is_some() {
+                    continue;
+                }
                 if self.config.help_text.is_some() {
                     let msg = format!("could not load initial conftests: {}", conftest.display());
                     let _ = python::warn_explicit_at(

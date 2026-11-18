@@ -1,21 +1,23 @@
 # Upstream pytest-django tests that must keep passing under pytest-rs.
 #
-# tests (~146/216): pytest-django sets Django up in pytest_load_initial_conftests
-# (Parser.parse_known_args + pytest.Config now exist) and its fixtures run once
-# session-scoped autouse fixtures are ordered before function ones (so
-# django_test_environment installs mail.outbox before _dj_autoclear_mailbox).
-# pytest_collectstart/pytest_itemcollected fire (Django class tags -> marks) and
-# fixture-override cycle detection keys on the def identity (the `pytester`
-# override resolves to the builtin). Most non-DB tests and many sqlite DB pass.
+# Every collected file passes at 4.14.0. tests/test_django_configurations.py
+# collects no tests here: it needs django-configurations, which the suite's
+# deps do not install.
 
 [files]
 "tests/test_asserts.py" = "passed"
+"tests/test_database.py" = "passed"
+"tests/test_db_access_in_repr.py" = "passed"
+"tests/test_db_setup.py" = "passed"
+"tests/test_django_settings_module.py" = "passed"
+"tests/test_environment.py" = "passed"
+"tests/test_fixtures.py" = "passed"
+"tests/test_initialization.py" = "passed"
+"tests/test_isolate_apps.py" = "passed"
+"tests/test_manage_py_scan.py" = "passed"
+"tests/test_runner.py" = "passed"
+"tests/test_unittest.py" = "passed"
+"tests/test_urls.py" = "passed"
 "tests/test_without_django_loaded.py" = "passed"
 
 [excluded]
-# (partial — tracked by the scoreboard)
-
-# Known remaining gaps:
-#   transactional/reset_sequences DB semantics, Django unittest TestCase
-#   wrapping (_pytest.unittest.TestCaseFunction patch), a recursive-fixture
-#   chain, --ds/--reuse-db CLI value parsing, and output-format fnmatch lines.
