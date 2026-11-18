@@ -1,6 +1,6 @@
 {
   "suite": "more-itertools",
-  "tag": "v10.7.0",
+  "tag": "v11.2.1",
   "category": "real-world",
   "excluded_files": 0,
   "deselected": 0,
@@ -10,7 +10,7 @@
       "file": "tests/test_more.py",
       "status": "passed",
       "exit_code": 0,
-      "passed": 535,
+      "passed": 620,
       "failed": 0,
       "skipped": 0,
       "errors": 0,
@@ -21,9 +21,9 @@
       "file": "tests/test_recipes.py",
       "status": "passed",
       "exit_code": 0,
-      "passed": 135,
+      "passed": 145,
       "failed": 0,
-      "skipped": 1,
+      "skipped": 0,
       "errors": 0,
       "deselected": 0,
       "known_failed": 0
