@@ -127,7 +127,7 @@ enabled = true
 
 [pytest-mock]
 repo = "https://github.com/pytest-dev/pytest-mock"
-tag = "v3.15.1"
+tag = "v3.17.0"
 testpaths = ["tests"]
 local = "conformance/suites/pytest-mock"
 # These assert the low-verbosity "Use -v to get more diff" hint, which pytest
@@ -137,8 +137,8 @@ local = "conformance/suites/pytest-mock"
 # dev run (CI env vars unset), so this self-corrects per environment instead
 # of always hiding them.
 known_failures = [
-    "tests/test_pytest_mock.py::test_detailed_introspection",
-    "tests/test_pytest_mock.py::test_detailed_introspection_async",
+    "tests/test_pytest_mock.py::TestIntrospection::test_detailed",
+    "tests/test_pytest_mock.py::TestIntrospection::test_detailed_async",
 ]
 enabled = true
 
