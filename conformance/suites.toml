@@ -286,13 +286,20 @@ enabled = true
 
 [pytest-subtests]
 repo = "https://github.com/pytest-dev/pytest-subtests"
-tag = "v0.14.2"
+tag = "v0.15.0"
 testpaths = ["tests"]
-deps = ["pytest-subtests==0.14.2"]
+deps = ["pytest-subtests==0.15.0"]
 use_src = false
 category = "third-party"
 enabled = true
 env = { "PYTEST_RS_INLINE_INPROCESS" = "1" }
+# Expects verbose subtest lines shaped "<nodeid> * (i=0) SUBPASS*"; pytest
+# 9.0.3's builtin subtests print "<nodeid> SUBPASSED[custom] (i=0)", so these
+# fail under real pytest 9.0.3 too.
+known_failures = [
+    "tests/test_subtests.py::TestFixture::test_no_subtests_reports[normal]",
+    "tests/test_subtests.py::TestFixture::test_no_subtests_reports[xdist]",
+]
 
 [pytest-metadata]
 repo = "https://github.com/pytest-dev/pytest-metadata"
