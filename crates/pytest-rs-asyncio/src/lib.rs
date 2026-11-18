@@ -566,6 +566,12 @@ impl Plugin for AsyncioPlugin {
             ),
         ] {
             if let Some(value) = ctx.config.get_ini(ini_key) {
+                // 1.5.0: "fixture-scope" makes an async fixture without
+                // loop_scope use its own scope, which is what leaving the
+                // fixture default unset does here. Not valid for tests.
+                if ini_key == "asyncio_default_fixture_loop_scope" && value == "fixture-scope" {
+                    continue;
+                }
                 match Scope::parse(value) {
                     Some(scope) => *slot = Some(scope),
                     None => {
