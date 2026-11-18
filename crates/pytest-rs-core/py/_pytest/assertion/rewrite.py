@@ -14,6 +14,8 @@ import importlib.util
 import marshal
 import os
 import types
+from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from _pytest._stub import __getattr__  # noqa: F401  (other internals stay stubbed)
@@ -67,7 +69,7 @@ class AssertionRewritingHook:
 # pytest-rs's own (content-hash pycs), not upstream's.
 
 
-def try_makedirs(cache_dir: str) -> bool:
+def try_makedirs(cache_dir: Path | str) -> bool:
     """Create the __pycache__ directory; False when that is not possible."""
     try:
         os.makedirs(cache_dir, exist_ok=True)
@@ -76,12 +78,26 @@ def try_makedirs(cache_dir: str) -> bool:
     return True
 
 
-def _read_pyc(source: bytes, cache_path: str) -> types.CodeType | None:
+def _read_pyc(
+    source: Path | str,
+    pyc: Path | str,
+    trace: Callable[[str], None] = lambda x: None,
+    *,
+    source_bytes: bytes | None = None,
+) -> types.CodeType | None:
     """Return the cached code object iff the pyc's embedded source hash
-    matches `source`; otherwise None. The pytest-rs tag + CPython magic
-    guard means a stale interpreter or non-rewritten pyc is never reused."""
+    matches the source; otherwise None. Upstream's signature; pytest-rs's
+    loader passes the source it already read as `source_bytes` so it is not
+    read twice. The pytest-rs tag + CPython magic guard means a stale
+    interpreter or non-rewritten pyc is never reused."""
+    if source_bytes is None:
+        try:
+            with open(source, "rb") as fp:
+                source_bytes = fp.read()
+        except OSError:
+            return None
     try:
-        with open(cache_path, "rb") as fp:
+        with open(pyc, "rb") as fp:
             data = fp.read()
     except OSError:
         return None
@@ -89,7 +105,7 @@ def _read_pyc(source: bytes, cache_path: str) -> types.CodeType | None:
         return None
     if int.from_bytes(data[4:8], "little") != 0b11:  # hash-based, checked
         return None
-    if data[8:16] != importlib.util.source_hash(source):
+    if data[8:16] != importlib.util.source_hash(source_bytes):
         return None
     try:
         # A memoryview slice rather than `data[16:]`, which would copy the
@@ -102,19 +118,33 @@ def _read_pyc(source: bytes, cache_path: str) -> types.CodeType | None:
     return code if isinstance(code, types.CodeType) else None
 
 
-def _write_pyc(code: types.CodeType, source: bytes, cache_path: str) -> None:
+def _write_pyc(
+    state: object,
+    co: types.CodeType,
+    source_stat: os.stat_result | None,
+    pyc: Path | str,
+    *,
+    source_bytes: bytes | None = None,
+) -> bool:
+    """Write a content-hash pyc for `co`; True on success. Upstream's
+    signature: pytest-rs keys pycs on the source's hash rather than
+    `source_stat`, so without `source_bytes` there is nothing to key on and
+    it skips caching."""
+    if source_bytes is None:
+        return False
     header = bytearray(importlib.util.MAGIC_NUMBER)
     header += (0b11).to_bytes(4, "little")  # hash-based + check_source flags
-    header += importlib.util.source_hash(source)  # 8 bytes
-    if not try_makedirs(os.path.dirname(cache_path)):
-        return
+    header += importlib.util.source_hash(source_bytes)  # 8 bytes
+    if not try_makedirs(os.path.dirname(pyc)):
+        return False
     try:
         # Write to a process-unique temp then atomically rename, so parallel
         # workers sharing a __pycache__ never observe a half-written pyc.
-        tmp = f"{cache_path}.{os.getpid()}"
+        tmp = f"{pyc}.{os.getpid()}"
         with open(tmp, "wb") as fp:
             fp.write(header)
-            fp.write(marshal.dumps(code))
-        os.replace(tmp, cache_path)
+            fp.write(marshal.dumps(co))
+        os.replace(tmp, pyc)
     except OSError:
-        pass  # read-only dir etc.: skip caching, like upstream
+        return False  # read-only dir etc.: skip caching, like upstream
+    return True

@@ -879,12 +879,12 @@ class _RewriteLoader(importlib.machinery.SourceFileLoader):
         path = self.get_filename(fullname)
         source = self.get_data(path)
         cache_path = self._cache_path(path)
-        code = _upstream_named._read_pyc(source, cache_path)
+        code = _upstream_named._read_pyc(path, cache_path, source_bytes=source)
         if code is not None:
             return code
         code = self.source_to_code(source, path)
         if not sys.dont_write_bytecode:
-            _upstream_named._write_pyc(code, source, cache_path)
+            _upstream_named._write_pyc(None, code, None, cache_path, source_bytes=source)
         return code
 
     @staticmethod
