@@ -314,6 +314,7 @@ pub(crate) fn start_runtest_py_wrappers(
     py: Python<'_>,
     session: &Session,
     item: &TestItem,
+    nextitem: Option<&TestItem>,
     name: &str,
     call_plain: bool,
 ) -> PyResult<Vec<Py<PyAny>>> {
@@ -336,17 +337,29 @@ pub(crate) fn start_runtest_py_wrappers(
         return Ok(Vec::new());
     }
     let node = super::item_node(py, item)?;
+    let mut kwargs = vec![("item", node)];
+    // Upstream's pytest_runtest_protocol hookspec is (item, nextitem); an
+    // impl declaring nextitem (logfire's pytest plugin) needs it passed.
+    if name == "pytest_runtest_protocol" {
+        let next_node = match nextitem {
+            // make_node, not item_node: see fire_runtest_py_hooks' teardown
+            // case for why the running item's cached node must survive.
+            Some(next) => python::make_node(py, next)?,
+            None => py.None(),
+        };
+        kwargs.push(("nextitem", next_node));
+    }
     let next_fn = py.import("builtins")?.getattr("next")?;
     let isgenfunc = py.import("inspect")?.getattr("isgeneratorfunction")?;
     let mut wrappers = Vec::new();
     for func in funcs {
         if !isgenfunc.call1((func.bind(py),))?.extract::<bool>()? {
             if call_plain {
-                python::call_py_hook(py, &func, &[("item", node.clone_ref(py))])?;
+                python::call_py_hook(py, &func, &kwargs)?;
             }
             continue;
         }
-        let result = python::call_py_hook_raw(py, &func, &[("item", node.clone_ref(py))])?;
+        let result = python::call_py_hook_raw(py, &func, &kwargs)?;
         let bound = result.bind(py);
         match next_fn.call1((bound,)) {
             Ok(_) => wrappers.push(result.clone_ref(py)),

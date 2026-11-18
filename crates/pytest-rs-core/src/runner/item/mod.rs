@@ -67,20 +67,26 @@ pub(crate) fn run_one(
     // pytest_runtest_protocol hookwrappers (e.g. pytest-timeout's timer)
     // surround the whole setup/call/teardown protocol: their pre-yield part
     // runs now, the rest after the item finishes.
-    let wrappers =
-        match start_runtest_py_wrappers(py, session, item, "pytest_runtest_protocol", false) {
-            Ok(wrappers) => wrappers,
-            Err(err) => {
-                return vec![report_from_err(
-                    py,
-                    config,
-                    item,
-                    Phase::Setup,
-                    TimeMark::now(),
-                    &err,
-                )];
-            }
-        };
+    let wrappers = match start_runtest_py_wrappers(
+        py,
+        session,
+        item,
+        nextitem,
+        "pytest_runtest_protocol",
+        false,
+    ) {
+        Ok(wrappers) => wrappers,
+        Err(err) => {
+            return vec![report_from_err(
+                py,
+                config,
+                item,
+                Phase::Setup,
+                TimeMark::now(),
+                &err,
+            )];
+        }
+    };
     // A plain pytest_runtest_protocol impl (pytest-rerunfailures) may replace
     // the protocol; if one handles the item, use the reports it logged. A
     // replacing impl owns its own nodeid-print/logstart (matching upstream:

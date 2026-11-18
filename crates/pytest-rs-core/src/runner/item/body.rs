@@ -422,7 +422,7 @@ pub(crate) fn run_item_body(
     // pytest_runtest_call hookwrappers surround just the call phase; their
     // post-yield part runs after the test body, pass or fail.
     let (call_wrappers, wrapper_start_err) =
-        match start_runtest_py_wrappers(py, session, item, "pytest_runtest_call", true) {
+        match start_runtest_py_wrappers(py, session, item, None, "pytest_runtest_call", true) {
             Ok(wrappers) => (wrappers, None),
             Err(err) => (Vec::new(), Some(err)),
         };
