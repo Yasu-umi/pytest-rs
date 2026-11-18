@@ -773,8 +773,8 @@ category = "real-world"
 enabled = true
 
 [pandas]
-tag = "v3.0.6"
-package = "pandas==3.0.6"
+tag = "v3.1.1"
+package = "pandas==3.1.1"
 testpaths = ["pandas/tests"]
 deps = ["hypothesis>=6.116.0"]
 category = "real-world"
