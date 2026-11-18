@@ -302,8 +302,25 @@ impl AsyncioPlugin {
         Err(Self::invalid_factories_error())
     }
 
+    /// An invalid mark.asyncio: upstream (1.5.0+) fails with
+    /// `pytest.fail(f"{nodeid}: {msg}", pytrace=False)`, so the report shows
+    /// the message naming the test instead of a traceback.
+    fn marker_error(py: Python<'_>, item: &TestItem, msg: &str) -> pytest_rs_core::pyo3::PyErr {
+        let message = format!("{}: {msg}", item.nodeid);
+        // pytest.fail(..., pytrace=False) sets the attribute on the instance.
+        let failed = py
+            .import("_pytest.outcomes")
+            .and_then(|outcomes| outcomes.getattr("Failed"))
+            .and_then(|failed| failed.call1((message.as_str(),)))
+            .and_then(|exc| exc.setattr("pytrace", false).map(|()| exc));
+        match failed {
+            Ok(exc) => pytest_rs_core::pyo3::PyErr::from_value(exc),
+            Err(err) => err,
+        }
+    }
+
     /// The loop_factories kwarg of mark.asyncio: requested factory names.
-    /// Err (a ValueError) when the value is not a non-empty sequence of
+    /// Err (a pytrace-less Failed) when the value is not a non-empty sequence of
     /// non-empty factory names.
     fn marker_loop_factories(
         &self,
@@ -320,8 +337,10 @@ impl AsyncioPlugin {
             return Ok(None);
         };
         let invalid = || {
-            pytest_rs_core::pyo3::exceptions::PyValueError::new_err(
-                "mark.asyncio 'loop_factories' must be a non-empty sequence of factory names",
+            Self::marker_error(
+                py,
+                item,
+                "mark.asyncio 'loop_factories' must be a non-empty sequence of strings.",
             )
         };
         if value.is_instance_of::<pytest_rs_core::pyo3::types::PyString>() {
@@ -919,19 +938,45 @@ impl Plugin for AsyncioPlugin {
                 })
                 .unwrap_or(false);
             if positional || unknown_kwarg {
-                return Err(pytest_rs_core::pyo3::exceptions::PyValueError::new_err(
-                    "mark.asyncio accepts only keyword arguments",
+                return Err(Self::marker_error(
+                    ctx.py,
+                    item,
+                    "mark.asyncio accepts only keyword arguments 'loop_scope' and \
+                     'loop_factories'.",
                 ));
             }
-            // scope= is the deprecated alias of loop_scope; both together
-            // are rejected.
-            if let Ok(kwargs) = mark.getattr("kwargs")
-                && kwargs.get_item("scope").is_ok()
-                && kwargs.get_item("loop_scope").is_ok()
-            {
-                return Err(pytest_rs_core::pyo3::exceptions::PyValueError::new_err(
-                    "The 'scope' and 'loop_scope' arguments are mutually exclusive",
-                ));
+            if let Ok(kwargs) = mark.getattr("kwargs") {
+                // scope= is the deprecated alias of loop_scope; both together
+                // are rejected.
+                if kwargs.get_item("scope").is_ok() && kwargs.get_item("loop_scope").is_ok() {
+                    return Err(Self::marker_error(
+                        ctx.py,
+                        item,
+                        "An asyncio pytest marker defines both \"scope\" and \"loop_scope\", \
+                         but it should only use \"loop_scope\".",
+                    ));
+                }
+                let scope = kwargs
+                    .get_item("loop_scope")
+                    .or_else(|_| kwargs.get_item("scope"))
+                    .ok()
+                    .filter(|scope| !scope.is_none());
+                if let Some(scope) = scope {
+                    let valid = scope
+                        .extract::<String>()
+                        .is_ok_and(|name| Scope::parse(&name).is_some());
+                    if !valid {
+                        return Err(Self::marker_error(
+                            ctx.py,
+                            item,
+                            &format!(
+                                "mark.asyncio got an unexpected loop scope value {}. \
+                                 Valid scopes are: function, class, module, package, session.",
+                                scope.repr()?
+                            ),
+                        ));
+                    }
+                }
             }
         }
 
@@ -947,7 +992,9 @@ impl Plugin for AsyncioPlugin {
             let has_hooks = !self.hook_funcs(ctx, &item.nodeid).is_empty();
             if !has_hooks {
                 if requested.is_some() {
-                    return Err(PyRuntimeError::new_err(
+                    return Err(Self::marker_error(
+                        ctx.py,
+                        item,
                         "mark.asyncio 'loop_factories' requires at least one \
                          pytest_asyncio_loop_factories hook implementation.",
                     ));
