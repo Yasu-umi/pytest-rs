@@ -28,13 +28,13 @@ pytest-rs; they are not counted in the total.
 | pytest | 9.0.3 | 2782 | 0 | 0 | 55 | 0 | 12 | 2849 | 99.6% | 54 | 54 | 61 |
 | pytest-asyncio | v1.4.0 | 268 | 0 | 0 | 0 | 0 | 0 | 268 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 7 | 0 | 0 | 0 | 0 | 0 | 7 | 100.0% | 2 | 2 | 0 |
-| pytest-mock | v3.15.1 | 87 | 0 | 0 | 1 | 0 | 2 | 90 | 97.8% | 1 | 1 | 0 |
+| pytest-mock | v3.17.0 | 158 | 0 | 0 | 1 | 0 | 2 | 161 | 98.8% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 205 | 0 | 0 | 3 | 0 | 1 | 209 | 99.5% | 1 | 1 | 0 |
 | pytest-xdist | v3.8.0 | 96 | 0 | 0 | 2 | 0 | 0 | 98 | 100.0% | 1 | 1 | 6 |
 | pytest-split | 0.11.0 | 59 | 0 | 0 | 0 | 0 | 0 | 59 | 100.0% | 1 | 1 | 3 |
-| pytest-benchmark | v5.1.0 | 122 | 0 | 0 | 1 | 0 | 0 | 123 | 100.0% | 6 | 7 | 6 |
+| pytest-benchmark | v5.3.1 | 158 | 0 | 0 | 10 | 0 | 1 | 169 | 99.4% | 9 | 10 | 5 |
 | pytest-timeout | 2.4.0 | 42 | 0 | 0 | 1 | 0 | 0 | 43 | 100.0% | 1 | 1 | 0 |
-| anyio | 4.13.0 | 3137 | 0 | 0 | 21 | 0 | 5 | 3163 | 99.8% | 26 | 26 | 0 |
+| anyio | 4.16.0 | 4737 | 0 | 0 | 20 | 0 | 0 | 4757 | 100.0% | 29 | 29 | 0 |
 | pytest-mypy | v1.1.0 | 76 | 0 | 0 | 2 | 0 | 0 | 78 | 100.0% | 1 | 1 | 0 |
 | pytest-ruff | v0.5 | 10 | 0 | 0 | 0 | 0 | 0 | 10 | 100.0% | 1 | 1 | 0 |
 | pytest-subtests | v0.15.0 | 32 | 0 | 0 | 0 | 0 | 2 | 34 | 94.1% | 1 | 1 | 0 |
@@ -51,7 +51,7 @@ pytest-rs; they are not counted in the total.
 | click | 8.5.1 | 2373 | 61 | 0 | 24 | 0 | 0 | 2458 | 97.5% | 42 | 43 | 0 |
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
 | marshmallow | 4.4.0 | 1192 | 0 | 0 | 0 | 0 | 0 | 1192 | 100.0% | 12 | 12 | 3 |
-| rich | v15.0.0 | 955 | 0 | 0 | 20 | 0 | 6 | 981 | 99.4% | 61 | 63 | 0 |
+| rich | v15.0.0 | 954 | 0 | 0 | 20 | 0 | 7 | 981 | 99.3% | 61 | 63 | 0 |
 | sqlglot | v30.33.0 | 1613 | 0 | 0 | 0 | 0 | 0 | 1613 | 100.0% | 58 | 60 | 0 |
 | pytest-bdd | 9.0.1 | 145 | 0 | 0 | 1 | 0 | 0 | 146 | 100.0% | 35 | 35 | 0 |
 | httpx | 0.28.1 | 1410 | 0 | 0 | 1 | 0 | 7 | 1418 | 99.5% | 31 | 31 | 0 |
@@ -183,13 +183,13 @@ pytest-rs; they are not counted in the total.
 
 </details>
 
-### pytest-mock @ v3.15.1
+### pytest-mock @ v3.17.0
 
 <details><summary>per-file detail (1 files)</summary>
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| tests/test_pytest_mock.py | passed | 87 | 0 | 0 | 1 | 0 | 2 |
+| tests/test_pytest_mock.py | passed | 158 | 0 | 0 | 1 | 0 | 2 |
 
 </details>
 
@@ -223,18 +223,21 @@ pytest-rs; they are not counted in the total.
 
 </details>
 
-### pytest-benchmark @ v5.1.0
+### pytest-benchmark @ v5.3.1
 
-<details><summary>per-file detail (7 files)</summary>
+<details><summary>per-file detail (10 files)</summary>
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| tests/test_benchmark.py | passed | 53 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_benchmark.py | passed | 56 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_calibration.py | passed | 34 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_fixture.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_normal.py | passed | 10 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_pedantic.py | passed | 19 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_pedantic.py | passed | 23 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_precision.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_sample.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_skip.py | no-tests | 0 | 0 | 0 | 1 | 0 | 0 |
+| tests/test_utils.py | passed | 24 | 0 | 0 | 9 | 0 | 1 |
 | tests/test_with_testcase.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
 
 </details>
@@ -249,38 +252,41 @@ pytest-rs; they are not counted in the total.
 
 </details>
 
-### anyio @ 4.13.0
+### anyio @ 4.16.0
 
-<details><summary>per-file detail (26 files)</summary>
+<details><summary>per-file detail (29 files)</summary>
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| tests/streams/test_buffered.py | passed | 28 | 0 | 0 | 0 | 0 | 0 |
-| tests/streams/test_file.py | passed | 40 | 0 | 0 | 0 | 0 | 0 |
-| tests/streams/test_memory.py | passed | 109 | 0 | 0 | 0 | 0 | 0 |
-| tests/streams/test_stapled.py | passed | 24 | 0 | 0 | 0 | 0 | 0 |
-| tests/streams/test_text.py | passed | 24 | 0 | 0 | 0 | 0 | 0 |
-| tests/streams/test_tls.py | passed | 64 | 0 | 0 | 0 | 0 | 5 |
+| tests/streams/test_buffered.py | passed | 60 | 0 | 0 | 0 | 0 | 0 |
+| tests/streams/test_file.py | passed | 56 | 0 | 0 | 0 | 0 | 0 |
+| tests/streams/test_memory.py | passed | 133 | 0 | 0 | 0 | 0 | 0 |
+| tests/streams/test_stapled.py | passed | 35 | 0 | 0 | 0 | 0 | 0 |
+| tests/streams/test_text.py | passed | 48 | 0 | 0 | 0 | 0 | 0 |
+| tests/streams/test_tls.py | passed | 84 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_all_attributes.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_concurrency_utils.py | passed | 40 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_contextmanagers.py | passed | 49 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_debugging.py | passed | 31 | 0 | 0 | 1 | 0 | 0 |
-| tests/test_deprecations.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_eventloop.py | passed | 17 | 0 | 0 | 1 | 0 | 0 |
-| tests/test_fileio.py | passed | 259 | 0 | 0 | 7 | 0 | 0 |
-| tests/test_from_thread.py | passed | 195 | 0 | 0 | 4 | 0 | 0 |
-| tests/test_functools.py | passed | 132 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_eventloop.py | passed | 36 | 0 | 0 | 1 | 0 | 0 |
+| tests/test_fileio.py | passed | 446 | 0 | 0 | 7 | 0 | 0 |
+| tests/test_from_thread.py | passed | 300 | 0 | 0 | 4 | 0 | 0 |
+| tests/test_functools.py | passed | 136 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_futures.py | passed | 68 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_itertools.py | passed | 404 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_lazyimport.py | passed | 6 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_lowlevel.py | passed | 44 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_pytest_plugin.py | passed | 35 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_pytest_plugin.py | passed | 42 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_signals.py | passed | 12 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_sockets.py | passed | 1189 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_subprocesses.py | passed | 76 | 0 | 0 | 4 | 0 | 0 |
-| tests/test_synchronization.py | passed | 235 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_taskgroups.py | passed | 399 | 0 | 0 | 4 | 0 | 0 |
-| tests/test_tempfile.py | passed | 60 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_sockets.py | passed | 1543 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_subprocesses.py | passed | 93 | 0 | 0 | 3 | 0 | 0 |
+| tests/test_synchronization.py | passed | 280 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_taskgroups.py | passed | 563 | 0 | 0 | 4 | 0 | 0 |
+| tests/test_tempfile.py | passed | 96 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_to_interpreter.py | passed | 12 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_to_process.py | passed | 36 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_to_thread.py | passed | 64 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_typedattr.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_to_process.py | passed | 44 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_to_thread.py | passed | 73 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_typedattr.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
 
 </details>
 
@@ -562,7 +568,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_color_triplet.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_columns.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_columns_align.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_console.py | passed | 100 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_console.py | passed | 99 | 0 | 0 | 0 | 0 | 1 |
 | tests/test_constrain.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_containers.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_control.py | passed | 7 | 0 | 0 | 0 | 0 | 0 |

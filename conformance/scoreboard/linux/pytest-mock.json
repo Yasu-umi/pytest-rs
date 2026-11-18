@@ -1,6 +1,6 @@
 {
   "suite": "pytest-mock",
-  "tag": "v3.15.1",
+  "tag": "v3.17.0",
   "category": "ecosystem",
   "excluded_files": 0,
   "deselected": 0,
@@ -10,7 +10,7 @@
       "file": "tests/test_pytest_mock.py",
       "status": "passed",
       "exit_code": 1,
-      "passed": 87,
+      "passed": 158,
       "failed": 0,
       "skipped": 1,
       "errors": 0,
