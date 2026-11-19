@@ -71,7 +71,9 @@ no longer the reference version.
   `pytest.importorskip` at module level for a missing module ended the run with
   "ImportError while loading conftest" (exit 4) once collection reached its
   directory. That directory is now skipped and the rest collected, as in
-  pytest, also under `-n`.
+  pytest, also under `-n`. An initial conftest (on an argument's own path)
+  that skips ends the run as an uncaught exception (traceback on stderr,
+  exit status 1), as it does in pytest.
 - **Class fixtures** written as `@pytest.fixture` over `@classmethod` are bound
   to the class (they failed collection), and over `@staticmethod` async and
   generator fixtures are recognised.
