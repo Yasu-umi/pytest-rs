@@ -4,7 +4,7 @@
   "category": "ecosystem",
   "excluded_files": 62,
   "deselected": 0,
-  "known_failed": 32,
+  "known_failed": 29,
   "files": [
     {
       "file": "testing/python/approx.py",
@@ -536,14 +536,14 @@
     },
     {
       "file": "testing/test_tmpdir.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 42,
-      "failed": 21,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 66,
+      "failed": 0,
       "skipped": 1,
       "errors": 0,
       "deselected": 0,
-      "known_failed": 3
+      "known_failed": 0
     },
     {
       "file": "testing/test_unittest.py",

@@ -25,7 +25,7 @@ pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.2.0 | 3245 | 23 | 0 | 61 | 0 | 32 | 3361 | 98.4% | 52 | 55 | 62 |
+| pytest | 9.2.0 | 3269 | 2 | 0 | 61 | 0 | 29 | 3361 | 99.1% | 53 | 55 | 62 |
 | pytest-asyncio | v1.5.0 | 268 | 0 | 0 | 3 | 0 | 0 | 271 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 7 | 0 | 0 | 0 | 0 | 0 | 7 | 100.0% | 2 | 2 | 0 |
 | pytest-mock | v3.17.0 | 158 | 0 | 0 | 1 | 0 | 2 | 161 | 98.8% | 1 | 1 | 0 |
@@ -124,7 +124,7 @@ pytest-rs; they are not counted in the total.
 | testing/test_subtests.py | passed | 36 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_terminal.py | passed | 238 | 0 | 0 | 4 | 0 | 0 |
 | testing/test_threadexception.py | passed | 8 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_tmpdir.py | failed | 42 | 21 | 0 | 1 | 0 | 3 |
+| testing/test_tmpdir.py | passed | 66 | 0 | 0 | 1 | 0 | 0 |
 | testing/test_unittest.py | passed | 70 | 0 | 0 | 9 | 0 | 1 |
 | testing/test_unraisableexception.py | passed | 14 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_warning_types.py | passed | 16 | 0 | 0 | 0 | 0 | 0 |

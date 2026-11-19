@@ -8083,7 +8083,7 @@
     {
       "file": "pandas/tests/scalar/test_na_scalar.py",
       "status": "passed",
-      "exit_code": 0,
+      "exit_code": 1,
       "passed": 285,
       "failed": 0,
       "skipped": 6,
