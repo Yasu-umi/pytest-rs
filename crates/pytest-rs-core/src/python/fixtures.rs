@@ -284,7 +284,9 @@ pub(crate) fn register_fixtures_from_skip(
     registry: &mut FixtureRegistry,
     skip_names: &[&str],
 ) -> PyResult<()> {
-    for (key, value) in module.dict().iter() {
+    // A snapshot: a wrapped-fixture warning adds __warningregistry__.
+    for pair in module.dict().items().iter() {
+        let (key, value): (Bound<'_, PyAny>, Bound<'_, PyAny>) = pair.extract()?;
         let Ok(attr_name) = key.extract::<String>() else {
             continue;
         };
@@ -295,12 +297,41 @@ pub(crate) fn register_fixtures_from_skip(
         // object with a throwing __getattr__, #214) is not a fixture; treat a
         // failing probe as a miss rather than erroring collection (pytest's
         // safe_getattr).
+        if skip_wrapped_fixture(py, &attr_name, &value)? {
+            continue;
+        }
         if !value.is_callable() || !value.hasattr("_pytestfixturefunction").unwrap_or(false) {
             continue;
         }
         register_fixture_def(py, &attr_name, &value, baseid, false, None, registry)?;
     }
     Ok(())
+}
+
+/// pytest 9.2 (#13507): a raw module/class `__dict__` entry that hides a
+/// fixture behind wrappers (a custom decorator or @classmethod above
+/// @pytest.fixture) warns and is not discovered; @staticmethod above
+/// @pytest.fixture warns but is still discovered. Only objects with a
+/// `__wrapped__` chain other than a bare fixture are handed to Python.
+pub(crate) fn skip_wrapped_fixture(
+    py: Python<'_>,
+    name: &str,
+    raw: &Bound<'_, PyAny>,
+) -> PyResult<bool> {
+    if !raw.hasattr("__wrapped__").unwrap_or(false) {
+        return Ok(false);
+    }
+    let fixtures = py.import("pytest._fixtures")?;
+    if raw
+        .get_type()
+        .is(&fixtures.getattr("FixtureFunctionDefinition")?)
+    {
+        return Ok(false);
+    }
+    fixtures
+        .getattr("check_for_wrapped_fixture")?
+        .call1((name, raw))?
+        .extract()
 }
 
 pub(crate) fn validate_dynamic_fixture_scopes(
@@ -411,7 +442,8 @@ pub(crate) fn register_fixture_def(
             .and_then(|code| {
                 let file: String = code.getattr("co_filename")?.extract()?;
                 let lineno: u32 = code.getattr("co_firstlineno")?.extract()?;
-                Ok(format!("{file}:{}", lineno + 1))
+                // pytest 9.2's getlocation(): co_firstlineno as-is.
+                Ok(format!("{file}:{lineno}"))
             })
             .unwrap_or_else(|_: PyErr| name.clone());
         let msg =

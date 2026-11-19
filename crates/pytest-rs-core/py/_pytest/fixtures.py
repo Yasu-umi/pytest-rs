@@ -359,9 +359,9 @@ def fail_subrequest_no_param(nodeid, fixturefunc, argname, rootpath):
 
     real = getattr(fixturefunc, "__wrapped__", fixturefunc)
     code = real.__code__
-    # getlocation() reports co_firstlineno + 1 (the def line for a singly
-    # decorated fixture).
-    fixture_loc = _loc(code.co_filename, code.co_firstlineno + 1)
+    # pytest 9.2's getlocation() reports co_firstlineno as-is (the first
+    # decorator line).
+    fixture_loc = _loc(code.co_filename, code.co_firstlineno)
     frame = sys._getframe(1)
     here_loc = _loc(frame.f_code.co_filename, frame.f_lineno)
 
