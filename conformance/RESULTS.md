@@ -25,7 +25,7 @@ pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.2.0 | 3165 | 105 | 0 | 61 | 0 | 30 | 3361 | 96.0% | 38 | 55 | 62 |
+| pytest | 9.2.0 | 3212 | 58 | 0 | 61 | 0 | 30 | 3361 | 97.4% | 39 | 55 | 62 |
 | pytest-asyncio | v1.5.0 | 268 | 0 | 0 | 3 | 0 | 0 | 271 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 7 | 0 | 0 | 0 | 0 | 0 | 7 | 100.0% | 2 | 2 | 0 |
 | pytest-mock | v3.17.0 | 158 | 0 | 0 | 1 | 0 | 2 | 161 | 98.8% | 1 | 1 | 0 |
@@ -89,7 +89,7 @@ pytest-rs; they are not counted in the total.
 | testing/logging/test_fixture.py | passed | 31 | 0 | 0 | 0 | 0 | 0 |
 | testing/logging/test_formatter.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
 | testing/logging/test_reporting.py | passed | 57 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_assertion.py | failed | 161 | 47 | 0 | 0 | 0 | 0 |
+| testing/test_assertion.py | passed | 208 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_cacheprovider.py | passed | 68 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_capture.py | passed | 131 | 0 | 0 | 2 | 0 | 0 |
 | testing/test_collect_imported_tests.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |

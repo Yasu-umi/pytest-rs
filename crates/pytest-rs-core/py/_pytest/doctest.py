@@ -246,14 +246,16 @@ def _get_flag_lookup() -> dict[str, int]:
 def get_optionflags(config: Any) -> int:
     flags = 0
     flag_lookup = _get_flag_lookup()
-    raw = config.getini("doctest_optionflags") if hasattr(config, "getini") else []
-    # getini returns a string (space/newline-separated) or a list depending on the caller.
-    if isinstance(raw, str):
-        ini_flags = raw.split() if raw else []
-    else:
-        ini_flags = list(raw) if raw else []
-    if not ini_flags:
+    raw = config.getini("doctest_optionflags") if hasattr(config, "getini") else None
+    # getini returns a string (space/newline-separated) or a list depending on
+    # the caller. Unset is upstream's default ["ELLIPSIS"]; an explicitly empty
+    # value means no flags.
+    if raw is None:
         ini_flags = ["ELLIPSIS"]
+    elif isinstance(raw, str):
+        ini_flags = raw.split()
+    else:
+        ini_flags = list(raw)
     for name in ini_flags:
         flag = flag_lookup.get(name)
         if flag is not None:
@@ -417,7 +419,13 @@ def _init_runner_class(
 
         def run(self, test, compileflags=None, out=None, clear_globs=True):  # type: ignore[override]
             self._failures = []
-            super().run(test, compileflags=compileflags, out=out, clear_globs=clear_globs)
+            optionflags_before = self.optionflags
+            try:
+                super().run(test, compileflags=compileflags, out=out, clear_globs=clear_globs)
+            finally:
+                # Raising out of a report_* hook skips doctest's own restore
+                # of the flags a `# doctest:` directive changed (#9924).
+                self.optionflags = optionflags_before
             if self._failures:
                 if len(self._failures) == 1 and isinstance(self._failures[0], DoctestFailure):
                     raise self._failures[0]

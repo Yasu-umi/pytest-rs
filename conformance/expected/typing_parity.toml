@@ -46,7 +46,6 @@ shim_only = [
     "testing/test_mark_expression.py: [arg-type] Argument 2 to \"evaluate\" has incompatible type \"def <lambda>(Any, /, **kwargs: Any) -> bool\"; expected \"ExpressionMatcher\"",
     "testing/test_mark_expression.py: [arg-type] Argument 2 to \"evaluate\" has incompatible type \"def matcher(str, /, **kwargs: str | int | bool | None) -> bool\"; expected \"ExpressionMatcher\"",
     "testing/test_mark_expression.py: [attr-defined] \"Expression\" has no attribute \"idents\"",
-    "testing/test_nodeid.py: [attr-defined] \"TestReport\" has no attribute \"id\"",
     "testing/test_pluginmanager.py: [attr-defined] \"Callable[[str], None]\" has no attribute \"root\"",
     "testing/test_pluginmanager.py: [attr-defined] \"HookCaller\" has no attribute \"name\"; maybe \"_name\"?",
     "testing/test_pytester.py: [attr-defined] \"Pytester\" has no attribute \"_monkeypatch\"",

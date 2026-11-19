@@ -619,6 +619,17 @@ pub(crate) fn expand_parametrize(
                 } else if force_scalar {
                     (vec![value_set], None, false, Vec::new())
                 } else {
+                    // A non-sequence value with tuple-style argnames (pytest
+                    // 9.2's ParameterSet._for_parametrize check).
+                    if value_set.len().is_err() {
+                        let message = format!(
+                            "{nodeid}: in \"parametrize\" expected a sequence of values, for a \
+                             single value use a one-element tuple like ('value',), got {}:\n  {}",
+                            value_set.get_type().name()?,
+                            value_set.str()?
+                        );
+                        return Err(collect_error(py, &message));
+                    }
                     let values: Vec<Bound<'_, PyAny>> =
                         value_set.try_iter()?.collect::<PyResult<_>>()?;
                     (values, None, false, Vec::new())

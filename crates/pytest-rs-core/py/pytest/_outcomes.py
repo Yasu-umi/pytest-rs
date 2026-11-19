@@ -1,7 +1,6 @@
 """Outcome exceptions and helpers (skip/fail/xfail/importorskip)."""
 
 import importlib
-import warnings
 from typing import ClassVar, NoReturn
 
 
@@ -114,25 +113,13 @@ def importorskip(modname, minversion=None, reason=None, *, exc_type=None):
     if not all(part.isidentifier() for part in modname.split(".")):
         raise SyntaxError(f"Not a valid module name: {modname!r}")
 
+    # pytest 9.1: only ModuleNotFoundError is caught by default; an
+    # ImportError raised by a module that was found propagates.
+    if exc_type is None:
+        exc_type = ModuleNotFoundError
     try:
         mod = importlib.import_module(modname)
-    except ImportError as exc:
-        if exc_type is not None and not isinstance(exc, exc_type):
-            raise
-        # Distinguish ModuleNotFoundError (module not installed, no warning)
-        # from ImportError (module found but failed during import → deprecation
-        # warning; real pytest will drop this behaviour in a future version).
-        if exc_type is None and not isinstance(exc, ModuleNotFoundError):
-            from pytest._warning_types import PytestDeprecationWarning
-
-            warnings.warn(
-                f"Module {modname!r} was found, but when imported by pytest it raised:\n"
-                f"      {exc!r}\n"
-                "In the future only ModuleNotFoundError will be caught. "
-                "Pass `exc_type=ImportError` to suppress this warning.",
-                PytestDeprecationWarning,
-                stacklevel=2,
-            )
+    except exc_type as exc:
         skipped = Skipped(msg=reason or f"could not import {modname!r}: {exc}")
         skipped.allow_module_level = True
         raise skipped from None
