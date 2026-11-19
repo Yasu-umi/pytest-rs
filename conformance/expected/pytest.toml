@@ -15,6 +15,7 @@
 "testing/python/integration.py" = "passed"
 "testing/python/metafunc.py" = "passed"
 "testing/python/raises.py" = "passed"
+"testing/python/raises_group.py" = "passed"
 "testing/python/show_fixtures_per_test.py" = "passed"
 "testing/test_assertion.py" = "passed"
 "testing/test_cacheprovider.py" = "passed"
@@ -55,6 +56,7 @@
 "testing/test_unittest.py" = "passed"
 "testing/test_unraisableexception.py" = "passed"
 "testing/test_warning_types.py" = "passed"
+"testing/test_warnings.py" = "passed"
 
 [excluded]
 "testing/_py/test_local.py" = "vendored legacy py.path implementation"
