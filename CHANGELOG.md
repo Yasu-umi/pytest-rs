@@ -67,6 +67,11 @@ no longer the reference version.
   test that swaps `atexit.register` (pytest-xdist's own test suite does) ran the
   session's temp-dir cleanup at that test's end, so the basetemp lost its lock
   and another process's pruning removed it mid-session.
+- **A conftest that skips itself stopped the whole run** — a conftest calling
+  `pytest.importorskip` at module level for a missing module ended the run with
+  "ImportError while loading conftest" (exit 4) once collection reached its
+  directory. That directory is now skipped and the rest collected, as in
+  pytest, also under `-n`.
 - **Class fixtures** written as `@pytest.fixture` over `@classmethod` are bound
   to the class (they failed collection), and over `@staticmethod` async and
   generator fixtures are recognised.
