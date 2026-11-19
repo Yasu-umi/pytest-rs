@@ -188,6 +188,24 @@ class Config:
     def issue_config_time_warning(self, warning: Warning, stacklevel: int = 2) -> None:
         self._from_proxy("issue_config_time_warning")
 
+    @staticmethod
+    def _warn_about_skipped_plugins(issue: Any = None) -> None:
+        """Upstream's Config._warn_about_skipped_plugins: one config-time
+        PytestConfigWarning per startup plugin that skipped itself (called
+        by the engine once -p/entry-point/PYTEST_PLUGINS plugins loaded;
+        the warning's location is this function, like upstream's).
+        ``issue(warning, stacklevel)`` defaults to the session's
+        config-time warning path (pytester's parseconfig passes its own)."""
+        from pytest._pluginmanager import pluginmanager
+        from pytest._warning_types import PytestConfigWarning
+        from pytest._wcapture import _fire_config_time_warning
+
+        issue = issue or _fire_config_time_warning
+        skipped = list(pluginmanager.skipped_plugins)
+        pluginmanager.skipped_plugins.clear()
+        for module_name, msg in skipped:
+            issue(PytestConfigWarning(f"skipped plugin {module_name!r}: {msg}"), stacklevel=1)
+
     def notify_exception(self, excinfo: Any, option: Any = None) -> None:
         self._from_proxy("notify_exception")
 
