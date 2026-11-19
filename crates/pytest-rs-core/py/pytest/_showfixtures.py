@@ -33,8 +33,8 @@ def _getlocation(func, curdir: str) -> str:
     try:
         relfn = fn.relative_to(curdir)
     except ValueError:
-        return f"{fn}:{lineno + 1}"
-    return f"{relfn}:{lineno + 1}"
+        return f"{fn}:{lineno}"
+    return f"{relfn}:{lineno}"
 
 
 def _bestrelpath(directory: Path, dest: Path) -> str:
