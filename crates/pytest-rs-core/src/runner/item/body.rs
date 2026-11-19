@@ -388,6 +388,11 @@ pub(crate) fn run_item_body(
                 names.join(", ")
             );
         }
+        // pytest 9.2's show_test_item(add_space=...): a space before the
+        // outcome char when the test itself runs.
+        if !config.get_flag("setup-only") && !config.get_flag("setup-plan") {
+            print!(" ");
+        }
         let _ = std::io::stdout().flush();
         python::capture_resume(py);
         if config.get_flag("setup-only") || config.get_flag("setup-plan") {
