@@ -501,25 +501,15 @@ enabled = true
 
 [pytest-env]
 repo = "https://github.com/pytest-dev/pytest-env"
-tag = "1.6.0"
+tag = "1.8.6"
 testpaths = ["tests"]
 # Installed for the pytest11 entry point; use_src=false so the dist (with its
 # build-generated pytest_env/version.py) is imported, not the version-less
 # git checkout's src/.
-deps = ["pytest-env==1.6.0"]
+deps = ["pytest-env==1.8.6"]
 use_src = false
 category = "third-party"
 enabled = true
-# test_env_via_pyproject_toml_bad asserts pytest core's own TOML parse-error
-# message text verbatim (Python tomllib's prose format), which pytest-rs's
-# native TOML parsing (crates/pytest-rs-core/src/config/ini.rs, the Rust
-# `toml` crate's own Display) cannot reproduce byte-for-byte — a cosmetic
-# error-message wording gap, not a functional parsing difference.
-known_failures = [
-    "tests/test_env.py::test_env_via_pyproject_toml_bad[pytest.toml]",
-    "tests/test_env.py::test_env_via_pyproject_toml_bad[.pytest.toml]",
-    "tests/test_env.py::test_env_via_pyproject_toml_bad[pyproject.toml]",
-]
 
 [pytest-rerunfailures]
 repo = "https://github.com/pytest-dev/pytest-rerunfailures"

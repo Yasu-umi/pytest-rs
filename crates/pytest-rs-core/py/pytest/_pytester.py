@@ -740,9 +740,16 @@ class Pytester:
         # sys.path); fall back to the PYTHONPATH captured at fixture setup.
         # Upstream popen() also prepends os.getcwd() (= pytester.path after
         # chdir) so test-local packages are importable in nested runs.
-        existing = env.get("PYTHONPATH") or _RUNNER_PYTHONPATH
-        entries = [os.getcwd(), *self._syspaths, *([existing] if existing else [])]
-        env["PYTHONPATH"] = os.pathsep.join(filter(None, entries))
+        # A test's own PYTHONPATH comes first, but the runner's is still
+        # appended: upstream's child interpreter reaches site-packages no
+        # matter what PYTHONPATH says (pytest-env sets a marker-only one).
+        entries = [
+            os.getcwd(),
+            *self._syspaths,
+            env.get("PYTHONPATH"),
+            _RUNNER_PYTHONPATH,
+        ]
+        env["PYTHONPATH"] = os.pathsep.join(dict.fromkeys(filter(None, entries)))
         # Upstream pytester parity: nested runs get a numbered --basetemp
         # under this pytester dir, so their tmp dirs are cleaned up with it
         # (a later user-passed --basetemp still wins).
@@ -886,12 +893,17 @@ class Pytester:
         env = os.environ.copy()
         for _var, _value in _RUNNER_LIBPATH.items():
             env.setdefault(_var, _value)
-        existing = env.get("PYTHONPATH") or _RUNNER_PYTHONPATH
         # Upstream popen() prepends os.getcwd() (= pytester.path after chdir)
-        # so that test-local packages (e.g. tpkg/) are importable in subprocesses.
-        cwd = os.getcwd()
-        entries = [cwd, *self._syspaths, *([existing] if existing else [])]
-        env["PYTHONPATH"] = os.pathsep.join(filter(None, entries))
+        # so that test-local packages (e.g. tpkg/) are importable in
+        # subprocesses; the runner's PYTHONPATH follows a test's own (see
+        # _runpytest).
+        entries = [
+            os.getcwd(),
+            *self._syspaths,
+            env.get("PYTHONPATH"),
+            _RUNNER_PYTHONPATH,
+        ]
+        env["PYTHONPATH"] = os.pathsep.join(dict.fromkeys(filter(None, entries)))
         # Ensure console_scripts (e.g. pytest-bdd) installed in the venv's
         # bin/ directory are discoverable by subprocess calls.
         bindir = os.path.dirname(sys.executable)

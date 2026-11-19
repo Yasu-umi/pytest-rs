@@ -145,6 +145,29 @@ pub fn usage_error(py: Python<'_>, message: &str) -> PyErr {
     result.unwrap_or_else(|_| pyo3::exceptions::PyRuntimeError::new_err(message.to_string()))
 }
 
+/// Upstream's `print_usage_error`: each UsageError arg on stderr as
+/// "ERROR: <arg>" followed by a blank line (`tw.line(f"ERROR: {msg}\n")`).
+pub fn print_usage_error(py: Python<'_>, err: &PyErr) {
+    let value = err.value(py);
+    let args: Vec<String> = value
+        .getattr("args")
+        .and_then(|args| {
+            args.try_iter()?
+                .map(|arg| arg?.str().map(|s| s.to_string()))
+                .collect()
+        })
+        .unwrap_or_default();
+    if args.is_empty() {
+        eprint_usage_error(&value.to_string());
+    }
+    args.iter().for_each(|arg| eprint_usage_error(arg));
+}
+
+/// One "ERROR: <message>" usage-error block (see [`print_usage_error`]).
+pub fn eprint_usage_error(message: &str) {
+    eprintln!("ERROR: {message}\n");
+}
+
 /// Is this error a pytest.UsageError?
 pub fn is_usage_error(py: Python<'_>, err: &PyErr) -> bool {
     py.import("pytest")

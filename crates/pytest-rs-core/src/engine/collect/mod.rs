@@ -140,13 +140,7 @@ impl Engine {
             // as a fatal error; we replicate that by printing to stderr and exiting.
             // UsageError is handled specially (exit code 4).
             if python::is_usage_error(py, &err) {
-                let msg = python::format_exception(py, &err);
-                let usage_msg = msg
-                    .lines()
-                    .last()
-                    .and_then(|l| l.strip_prefix("pytest.UsageError: "))
-                    .unwrap_or(msg.trim());
-                eprintln!("ERROR: {usage_msg}");
+                python::print_usage_error(py, &err);
                 return Err("\x00USAGE_ERROR\x00".to_string());
             }
             eprintln!("{}", python::format_exception(py, &err));
@@ -237,7 +231,7 @@ impl Engine {
         // a CLI arg references a non-existent file).
         if !deferred_not_found_args.is_empty() {
             for arg in &deferred_not_found_args {
-                eprintln!("ERROR: file or directory not found: {arg}");
+                python::eprint_usage_error(&format!("file or directory not found: {arg}"));
             }
             return Err("\x00USAGE_ERROR\x00".to_string());
         }

@@ -262,8 +262,17 @@ impl Engine {
     }
 
     pub(crate) fn print_header(&mut self, py: Python<'_>) {
+        if self.print_header_start(py) {
+            self.print_header_terminal_lines();
+        }
+    }
+
+    /// The banner, the platform line and the header lines of the plugins
+    /// registered before the terminal reporter (native ones, cachedir).
+    /// False when nothing more is shown (-q, --no-header).
+    pub(crate) fn print_header_start(&mut self, py: Python<'_>) -> bool {
         if self.config.quiet || self.config.no_terminal() {
-            return;
+            return false;
         }
         println!(
             "{}",
@@ -272,7 +281,7 @@ impl Engine {
         // --no-header keeps only the "test session starts" banner; the
         // platform/rootdir/testpaths/plugins block below is suppressed.
         if self.config.get_flag("no-header") {
-            return;
+            return false;
         }
         // Upstream's "platform darwin -- Python 3.13.2, pytest-9.2.0,
         // pluggy-1.6.0", pluggy being the installed one. Built by the shim's
@@ -313,6 +322,14 @@ impl Engine {
         {
             println!("cachedir: {cache_dir}");
         }
+        true
+    }
+
+    /// The terminal reporter's own pytest_report_header lines (rootdir,
+    /// configfile, testpaths, plugins). Upstream registers the reporter in
+    /// pytest_configure, after conftests and plugins, so pluggy calls it
+    /// first and the reversed display puts these after their lines.
+    pub(crate) fn print_header_terminal_lines(&self) {
         println!("rootdir: {}", self.config.rootdir.display());
         if let Some(name) = &self.config.config_file_name {
             // pytest appends a warning when other config files in the rootdir

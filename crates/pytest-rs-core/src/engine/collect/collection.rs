@@ -53,14 +53,7 @@ impl Engine {
         if let Err(err) = configure_result {
             if python::is_usage_error(py, &err) {
                 // UsageError in configure → eprintln ERROR: msg, then exit 4.
-                let msg = python::format_exception(py, &err);
-                // Extract just the exception message (drop "pytest.UsageError: " prefix).
-                let usage_msg = msg
-                    .lines()
-                    .last()
-                    .and_then(|l| l.strip_prefix("pytest.UsageError: "))
-                    .unwrap_or(msg.trim());
-                eprintln!("ERROR: {usage_msg}");
+                python::print_usage_error(py, &err);
                 return Err("\x00USAGE_ERROR\x00".to_string());
             }
             // pytest.exit() in pytest_configure: print "Exit: msg" to stderr
@@ -190,9 +183,11 @@ impl Engine {
             let native_lines = self.native_plugin_header_lines(py).unwrap_or_default();
             python::reporter_sessionstart(py, &self.config, &native_lines);
         } else {
-            self.print_header(py);
-            if let Err(err) = self.print_py_report_header(py) {
-                errors.push((rootdir.to_path_buf(), python::format_exception(py, &err)));
+            if self.print_header_start(py) {
+                if let Err(err) = self.print_py_report_header(py) {
+                    errors.push((rootdir.to_path_buf(), python::format_exception(py, &err)));
+                }
+                self.print_header_terminal_lines();
             }
         }
         // --markers: list registered markers (configure hooks above already

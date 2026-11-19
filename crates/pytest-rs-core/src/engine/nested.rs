@@ -105,7 +105,9 @@ impl Engine {
             && !self.config.is_worker()
         {
             if std::path::Path::new(&path).is_dir() {
-                eprintln!("ERROR: --junitxml must be a filename, given: {path}");
+                python::eprint_usage_error(&format!(
+                    "--junitxml must be a filename, given: {path}"
+                ));
                 return exit_code::USAGE_ERROR;
             }
             if let Err(err) = python::junit_configure(py, &self.config, &path) {
