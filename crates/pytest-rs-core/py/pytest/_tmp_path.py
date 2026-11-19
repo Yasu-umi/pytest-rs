@@ -2,7 +2,6 @@
 port: pytest-of-{user} numbered basetemps with lock-driven retention)."""
 
 import atexit
-import contextlib
 import fnmatch
 import getpass
 import hashlib
@@ -128,9 +127,6 @@ class TempPathFactory:
         self._retention_count = retention_count
         self._retention_policy = retention_policy
         self._basetemp = basetemp
-        # Cleanups (numbered-dir pruning, lock removal) run at session
-        # finish; atexit only as a last resort (pytest 9.2).
-        self._exit_stack = contextlib.ExitStack()
         # Lower-cased prefix -> next number to try, so numbered dirs don't
         # need basetemp listed on every call.
         self._next_number = {}
@@ -277,12 +273,12 @@ class TempPathFactory:
                 keep=keep,
                 lock_timeout=LOCK_TIMEOUT,
                 mode=0o700,
-                register=self._exit_stack.callback,
+                # Upstream (9.2) registers these on an ExitStack closed at
+                # session finish. Under concurrent pytest-rs processes that
+                # made another live session's basetemp disappear (cause not
+                # found), so they stay on atexit, as before.
+                register=atexit.register,
             )
-            # Close the stack at exit as a last resort; closing it normally
-            # (session finish) unregisters that.
-            atexit.register(self._exit_stack.close)
-            self._exit_stack.callback(atexit.unregister, self._exit_stack.close)
         assert basetemp is not None, basetemp
         self._basetemp = basetemp
         self._trace("new basetemp", basetemp)
@@ -310,12 +306,6 @@ def tmp_path_factory():
         and not _any_failed
     ):
         rm_rf(factory._basetemp)
-    # Upstream closes the factory's exit stack here (pytest 9.2: prune stale
-    # numbered basetemps and drop the lock at session finish). Not done yet:
-    # under many concurrent pytest-rs processes it deleted another live
-    # session's basetemp, for a reason not found yet. The stack is only
-    # closed by its atexit registration, which the embedded interpreter
-    # never runs, as before.
 
 
 @fixture
