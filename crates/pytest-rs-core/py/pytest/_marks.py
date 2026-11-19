@@ -168,7 +168,21 @@ def get_unpacked_marks(obj, *, consider_mro=True):
                 mark_list.append(item)
     else:
         mark_attribute = getattr(obj, "pytestmark", [])
-        if isinstance(mark_attribute, list):
+        if mark_attribute is None:
+            # A module __getattr__ returning None for everything (#8265).
+            from _pytest.warning_types import PytestCollectionWarning
+
+            warnings.warn(
+                "Module defines a `__getattr__` which returns None for "
+                "'pytestmark' instead of raising AttributeError. "
+                "Make sure `__getattr__` raises AttributeError for "
+                "attributes it does not provide. "
+                "See https://github.com/pytest-dev/pytest/issues/8265",
+                PytestCollectionWarning,
+                stacklevel=2,
+            )
+            mark_list = []
+        elif isinstance(mark_attribute, list):
             mark_list = mark_attribute
         else:
             mark_list = [mark_attribute]
