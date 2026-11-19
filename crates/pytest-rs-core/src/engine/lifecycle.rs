@@ -74,7 +74,7 @@ impl Engine {
             && let Err(err) =
                 python::install_warning_capture(py, &ini_filters, &self.config.w_options)
         {
-            eprintln!("ERROR: {}", err.value(py));
+            python::print_usage_error(py, &err);
             return exit_code::USAGE_ERROR;
         }
         if let Some(mode) = self
@@ -113,7 +113,7 @@ impl Engine {
         python::set_fulltrace(py, self.config.get_flag("full-trace"));
         python::set_truncate_args(py, self.config.global_verbosity() <= 2);
         if let Some(message) = python::invalid_theme_message(py) {
-            eprintln!("ERROR: {message}");
+            python::eprint_usage_error(&message);
             return exit_code::USAGE_ERROR;
         }
 
@@ -196,7 +196,9 @@ impl Engine {
             && !self.config.is_worker()
         {
             if std::path::Path::new(&path).is_dir() {
-                eprintln!("ERROR: --junitxml must be a filename, given: {path}");
+                python::eprint_usage_error(&format!(
+                    "--junitxml must be a filename, given: {path}"
+                ));
                 return exit_code::USAGE_ERROR;
             }
             if let Err(err) = python::junit_configure(py, &self.config, &path) {

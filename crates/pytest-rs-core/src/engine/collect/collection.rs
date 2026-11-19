@@ -53,14 +53,7 @@ impl Engine {
         if let Err(err) = configure_result {
             if python::is_usage_error(py, &err) {
                 // UsageError in configure → eprintln ERROR: msg, then exit 4.
-                let msg = python::format_exception(py, &err);
-                // Extract just the exception message (drop "pytest.UsageError: " prefix).
-                let usage_msg = msg
-                    .lines()
-                    .last()
-                    .and_then(|l| l.strip_prefix("pytest.UsageError: "))
-                    .unwrap_or(msg.trim());
-                eprintln!("ERROR: {usage_msg}");
+                python::print_usage_error(py, &err);
                 return Err("\x00USAGE_ERROR\x00".to_string());
             }
             // pytest.exit() in pytest_configure: print "Exit: msg" to stderr

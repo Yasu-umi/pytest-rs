@@ -33,7 +33,7 @@ impl Engine {
             .and_then(|()| self.fire_sessionstart(py))
         {
             if python::is_usage_error(py, &err) {
-                eprintln!("ERROR: {}", err.value(py));
+                python::print_usage_error(py, &err);
                 return exit_code::USAGE_ERROR;
             }
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
@@ -160,7 +160,7 @@ impl Engine {
                     });
                     return code;
                 }
-                eprintln!("ERROR: {message}");
+                python::eprint_usage_error(&message);
                 return exit_code::USAGE_ERROR;
             }
         };
@@ -266,7 +266,7 @@ impl Engine {
                 if !summary.is_empty() {
                     println!("{summary}");
                 }
-                eprintln!("ERROR: {}", err.value(py));
+                python::print_usage_error(py, &err);
                 return exit_code::USAGE_ERROR;
             }
             // Upstream pytest_internalerror: the traceback goes to the

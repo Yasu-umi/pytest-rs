@@ -68,7 +68,7 @@ fn main() {
             std::process::exit(0);
         }
         Err(message) => {
-            eprintln!("ERROR: {message}");
+            eprintln!("ERROR: {message}\n");
             std::process::exit(pytest_rs_core::report::exit_code::USAGE_ERROR);
         }
     };
@@ -76,7 +76,7 @@ fn main() {
     #[cfg(feature = "xdist")]
     if config.get_flag("looponfail") {
         if config.get_flag("pdb") {
-            eprintln!("ERROR: --pdb is incompatible with --looponfail.");
+            eprintln!("ERROR: --pdb is incompatible with --looponfail.\n");
             std::process::exit(pytest_rs_core::report::exit_code::USAGE_ERROR);
         }
         std::process::exit(pytest_rs_core::looponfail::run(&config, &argv));

@@ -129,7 +129,7 @@ pub(crate) fn run_one(
                         .str()
                         .map(|s| s.to_string())
                         .unwrap_or_default();
-                    eprintln!("ERROR: {msg}");
+                    python::eprint_usage_error(&msg);
                     python::set_session_shouldstop(py, &msg);
                     return vec![];
                 }

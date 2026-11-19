@@ -264,7 +264,7 @@ impl Engine {
             }
             if let Err(err) = self.apply_plugin_cli_args(py, true) {
                 if python::is_usage_error(py, &err) {
-                    eprintln!("ERROR: {}", err.value(py));
+                    python::print_usage_error(py, &err);
                     return exit_code::USAGE_ERROR;
                 }
                 eprintln!("{}", python::format_exception(py, &err));
@@ -272,13 +272,7 @@ impl Engine {
             }
             if let Err(err) = self.fire_py_load_initial_conftests(py) {
                 if python::is_usage_error(py, &err) {
-                    let msg = python::format_exception(py, &err);
-                    let usage_msg = msg
-                        .lines()
-                        .last()
-                        .and_then(|l| l.strip_prefix("pytest.UsageError: "))
-                        .unwrap_or(msg.trim());
-                    eprintln!("ERROR: {usage_msg}");
+                    python::print_usage_error(py, &err);
                     return exit_code::USAGE_ERROR;
                 }
                 eprintln!("{}", python::format_exception(py, &err));
