@@ -2,6 +2,7 @@
 port: pytest-of-{user} numbered basetemps with lock-driven retention)."""
 
 import atexit
+import contextlib
 import fnmatch
 import getpass
 import hashlib
@@ -31,6 +32,16 @@ _retention_policy = "all"
 # the item stash) and whether anything failed (upstream checks exitstatus).
 _call_results: dict = {}
 _any_failed = False
+
+
+# The interpreter's own atexit functions, captured at import: a test that
+# swaps atexit.register out (pytest-xdist's conftest diverts it and runs the
+# registered functions when the test ends) must not get the session's
+# basetemp cleanup, or the basetemp loses its lock mid-session and a
+# concurrent pytest process prunes it. Upstream looks atexit.register up at
+# call time; it is the same function otherwise.
+_atexit_register = atexit.register
+_atexit_unregister = atexit.unregister
 
 
 def configure(basetemp, retention_count=None, retention_policy=None):
@@ -130,6 +141,9 @@ class TempPathFactory:
         # Lower-cased prefix -> next number to try, so numbered dirs don't
         # need basetemp listed on every call.
         self._next_number = {}
+        # Numbered-dir pruning and lock removal run when the session
+        # finishes (pytest 9.2); atexit closes it only as a last resort.
+        self._exit_stack = contextlib.ExitStack()
 
     @classmethod
     def from_config(cls, config, *, _ispytest=False):
@@ -273,12 +287,10 @@ class TempPathFactory:
                 keep=keep,
                 lock_timeout=LOCK_TIMEOUT,
                 mode=0o700,
-                # Upstream (9.2) registers these on an ExitStack closed at
-                # session finish. Under concurrent pytest-rs processes that
-                # made another live session's basetemp disappear (cause not
-                # found), so they stay on atexit, as before.
-                register=atexit.register,
+                register=self._exit_stack.callback,
             )
+            _atexit_register(self._exit_stack.close)
+            self._exit_stack.callback(_atexit_unregister, self._exit_stack.close)
         assert basetemp is not None, basetemp
         self._basetemp = basetemp
         self._trace("new basetemp", basetemp)
@@ -306,6 +318,17 @@ def tmp_path_factory():
         and not _any_failed
     ):
         rm_rf(factory._basetemp)
+    # Upstream pytest_sessionfinish closes the factory's exit stack. Here it
+    # runs in the session fixture's teardown, inside the last test's warning
+    # capture, so rm_rf's warnings about leftovers it cannot delete (e.g. a
+    # test's deliberately unreadable dir) are kept from failing that test.
+    import warnings
+
+    from _pytest.warning_types import PytestWarning
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", PytestWarning)
+        factory._exit_stack.close()
 
 
 @fixture
