@@ -989,32 +989,26 @@ pub(crate) fn resolve_fixture_def(
             Some(fixture_value) => Ok((fixture_value.value, fixture_value.finalizer)),
             None => (|| {
                 if def.is_coroutine || def.is_async_gen {
-                    // pytest 8.4 parity: an unhandled async fixture resolves to
-                    // its raw coroutine/async-generator and warns (this becomes
-                    // an error in pytest 9.1).
+                    // pytest 9.1+: an async fixture no plugin or hook handled
+                    // is an error (it used to resolve to the raw coroutine
+                    // and warn).
                     let test_name = item.nodeid.rsplit("::").next().unwrap_or(&item.nodeid);
                     let autouse_suffix = if def.autouse {
-                        " with autouse=True,"
+                        " with autouse=True"
                     } else {
-                        ","
+                        ""
                     };
-                    python::warn_explicit_at(
+                    Err(fail_no_trace(
                         py,
-                        "PytestRemovedIn9Warning",
                         &format!(
-                            "'{test_name}' requested an async fixture '{}'{autouse_suffix} \
-                             with no plugin or \
-                             hook that handled it. This is usually an error, as pytest does not \
-                             natively support it. This will turn into an error in pytest 9.\n\
+                            "'{test_name}' requested an async fixture '{}'{autouse_suffix}, \
+                             with no plugin or hook that handled it. This is an error, as \
+                             pytest does not natively support it.\n\
                              See: https://docs.pytest.org/en/stable/deprecations.html\
                              #sync-test-depending-on-async-fixture",
                             def.name
                         ),
-                        "_pytest/fixtures.py",
-                        1188,
-                    )?;
-                    let value = python::call_fixture(py, &def.func, fixture_instance, &kwargs)?;
-                    Ok((value.unbind(), None))
+                    ))
                 } else if def.is_generator {
                     let generator = python::call_fixture(py, &def.func, fixture_instance, &kwargs)?;
                     let value = match python::next_value(py, &generator) {
