@@ -243,13 +243,28 @@ pub fn keyword_match_names(py: Python<'_>, item: &TestItem) -> Vec<String> {
         && let Ok(iter) = keys.try_iter()
     {
         for key in iter.flatten() {
-            if let Ok(name) = key.extract::<String>() {
+            // Upstream ignores private names and the bookkeeping attributes
+            // decorators leave behind (#4569).
+            if let Ok(name) = key.extract::<String>()
+                && !name.starts_with('_')
+                && !matches!(name.as_str(), "pytestmark" | "cache_parameters")
+            {
                 names.push(name);
             }
         }
     }
     for mark in &item.marks {
         names.push(mark.name.clone());
+    }
+    // extra_keyword_matches on the item node itself (a hook added them).
+    if let Some(node) = &item.py_node
+        && let Ok(extras) = node.bind(py).getattr("extra_keyword_matches")
+        && let Ok(iter) = extras.try_iter()
+    {
+        names.extend(
+            iter.flatten()
+                .filter_map(|name| name.extract::<String>().ok()),
+        );
     }
     // extra_keyword_matches set by pytest_pycollect_makeitem hooks on the class.
     if let Some(cls) = &item.cls
