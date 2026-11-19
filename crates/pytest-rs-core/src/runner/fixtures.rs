@@ -27,6 +27,9 @@ pub(crate) struct ResolveCtx {
     /// the override too. Scoped to the item's ResolveCtx frame — dropped
     /// with it, no cross-item leakage.
     injected: std::collections::HashMap<String, Py<PyAny>>,
+    /// The item's teardown has begun: `request.getfixturevalue()` of a
+    /// fixture not requested before is deprecated / an error (#12882).
+    tearing_down: bool,
 }
 
 thread_local! {
@@ -125,6 +128,7 @@ pub(crate) fn push_resolve_ctx(
             item,
             class_instance: None,
             injected: std::collections::HashMap::new(),
+            tearing_down: false,
         });
     });
     DYNAMIC_NAMES.with(|stack| stack.borrow_mut().push(Vec::new()));
@@ -137,6 +141,61 @@ pub(crate) fn push_resolve_ctx(
 /// re-runs the phases of one item, which upstream keeps as the same object.
 pub(crate) fn reset_item_node() {
     ITEM_NODE.with(|cell| *cell.borrow_mut() = None);
+}
+
+/// The running item's teardown has begun (see `ResolveCtx::tearing_down`).
+pub(crate) fn mark_resolve_ctx_teardown() {
+    RESOLVE_CTX.with(|stack| {
+        if let Some(ctx) = stack.borrow_mut().last_mut() {
+            ctx.tearing_down = true;
+        }
+    });
+}
+
+/// pytest 9.2 (#12882): during teardown, `request.getfixturevalue()` of a
+/// fixture the item had not requested warns; a function-scoped one (whose
+/// node is already torn down) raises FixtureLookupError.
+fn check_teardown_getfixturevalue(
+    py: Python<'_>,
+    session: &Session,
+    item: &TestItem,
+    name: &str,
+) -> PyResult<()> {
+    let tearing_down =
+        RESOLVE_CTX.with(|stack| stack.borrow().last().is_some_and(|ctx| ctx.tearing_down));
+    if !tearing_down
+        || current_fixturenames(py).is_some_and(|names| names.iter().any(|n| n == name))
+    {
+        return Ok(());
+    }
+    let message = format!(
+        "Calling request.getfixturevalue(\"{name}\") during teardown is deprecated.\n\
+         Please request the fixture before teardown begins, either by declaring it in the \
+         fixture signature or by calling request.getfixturevalue() before the fixture yields.\n\
+         See https://docs.pytest.org/en/stable/deprecations.html#dynamic-fixture-request-during-teardown"
+    );
+    let category = py
+        .import("_pytest.warning_types")?
+        .getattr("PytestRemovedIn10Warning")?;
+    py.import("warnings")?
+        .call_method1("warn", (category.call1((message,))?,))?;
+    let function_scoped = session
+        .registry
+        .lookup(name, &item.nodeid)
+        .is_some_and(|def| def.scope == crate::fixture::Scope::Function);
+    if function_scoped {
+        let err_type = py
+            .import("_pytest.fixtures")?
+            .getattr("FixtureLookupError")?;
+        return Err(PyErr::from_value(err_type.call1((format!(
+            "The fixture value for \"{name}\" is not available during teardown because it \
+             was not previously requested.\n\
+             Only fixtures that were already active can be retrieved during teardown.\n\
+             Request the fixture before teardown begins by declaring it in the fixture \
+             signature or by calling request.getfixturevalue() before the fixture yields."
+        ),))?));
+    }
+    Ok(())
 }
 
 /// Record the test's class instance once setup created it, so dynamically
@@ -216,6 +275,7 @@ pub(crate) fn getfixturevalue(py: Python<'_>, name: &str) -> PyResult<Py<PyAny>>
             err_type.call1((format!("fixture '{name}' not found"),))?,
         ));
     }
+    check_teardown_getfixturevalue(py, session, item, name)?;
     let mut stack = Vec::new();
     // Override-reuse via getfixturevalue: if `name` matches a fixture currently
     // executing on this thread, an override is asking for its own name — resolve

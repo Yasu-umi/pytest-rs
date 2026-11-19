@@ -26,6 +26,7 @@ pub(crate) fn teardown_one(
     xfail: bool,
     reports: &mut Vec<TestReport>,
 ) {
+    super::fixtures::mark_resolve_ctx_teardown();
     // tmp_path retention: the fixture teardown (a function finalizer below)
     // reads this item's call outcome; None means no call phase ran.
     let call_passed = reports
