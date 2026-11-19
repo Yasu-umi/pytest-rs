@@ -267,6 +267,17 @@ impl Engine {
                         print!("{text}");
                     }
                 }
+                // An initial conftest raising Skipped (module-level
+                // importorskip): upstream's _importconftest wraps only
+                // `Exception` in ConftestImportFailure, so the BaseException
+                // escapes pytest altogether — the interpreter prints it as an
+                // uncaught exception and exits 1 (with --help/-VV too).
+                if python::is_skipped(py, &err) {
+                    return Err(format!(
+                        "\x00UNCAUGHT_EXCEPTION\x00{}",
+                        python::format_exception(py, &err)
+                    ));
+                }
                 // -h/--help: upstream still shows the (full) help text rather
                 // than aborting on a broken initial conftest — the failure is
                 // downgraded to a PytestConfigWarning (Config.parse's
