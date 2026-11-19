@@ -845,20 +845,17 @@ deselect = [
 
 [fastapi]
 repo = "https://github.com/fastapi/fastapi"
-tag = "0.163.2"
+tag = "0.165.0"
 testpaths = ["tests"]
 deps = [
-    "fastapi[standard]==0.163.2",
+    "fastapi[standard]==0.165.0",
     "httpx==0.28.1",
-    # 4.15+ deprecates the anyio.abc.BlockingPortal alias that the starlette
-    # fastapi 0.163 resolves to (0.48) still imports; under the suite's
-    # filterwarnings=error every test module then fails to import.
-    "anyio==4.14.2",
+    "anyio==4.16.0",
     "trio==0.35.0",
-    "pydantic==2.14.3",
+    "pydantic==2.14.4",
     "sqlmodel==0.0.50",
     "dirty-equals==0.11",
-    "inline-snapshot==0.36.2",
+    "inline-snapshot==0.37.0",
     "orjson==3.13.0",
     "ujson==6.1.0",
     "a2wsgi==1.10.10",
@@ -870,7 +867,7 @@ deps = [
     "pydantic-settings==2.16.3",
     "flask==3.1.3",
     "coverage==7.17.3",
-    # fastapi's `tests` / `docs-tests` dependency groups (0.163). pytest-timeout
+    # fastapi's `tests` / `docs-tests` dependency groups (0.165). pytest-timeout
     # provides the `timeout` ini key its --strict-config run requires.
     "httpx2==2.16.2",
     "opentelemetry-instrumentation-fastapi==0.66b2",
@@ -880,7 +877,7 @@ deps = [
     "sentry-sdk==2.75.0",
     "pwdlib[argon2]==0.4.2",
     "strawberry-graphql==0.341.2",
-    "typer==0.29.1",
+    "typer==0.29.2",
     "pyyaml==6.0.3",
     "python-slugify==9.2.0",
     "pytest-timeout==2.4.0",
@@ -949,20 +946,20 @@ enabled = true
 
 [pydantic]
 repo = "https://github.com/pydantic/pydantic"
-tag = "v2.14.3"
+tag = "v2.14.4"
 testpaths = ["tests"]
 deps = [
-    "pydantic[email]==2.14.3",
+    "pydantic[email]==2.14.4",
     "dirty-equals==0.11",
     "jsonschema==4.26.0",
     "pytz==2026.6",
     "pytest-run-parallel==0.10.0",
-    "pytest-benchmark==5.1.0",
+    "pytest-benchmark==5.3.1",
     "cloudpickle==3.1.2",
     "faker==40.54.0",
     "eval-type-backport==0.4.0",
     "pytest-examples==0.0.18",
-    # tests/test_docs.py imports it (pydantic v2.14.3 dev deps).
+    # tests/test_docs.py imports it (pydantic v2.14.4 dev deps).
     "time-machine==3.6.0",
 ]
 # pytest-run-parallel registers the 'thread_unsafe' marker that pydantic's
