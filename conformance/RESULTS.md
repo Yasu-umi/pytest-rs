@@ -25,8 +25,8 @@ pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2782 | 0 | 0 | 55 | 0 | 12 | 2849 | 99.6% | 54 | 54 | 61 |
-| pytest-asyncio | v1.5.0 | 271 | 0 | 0 | 0 | 0 | 0 | 271 | 100.0% | 30 | 30 | 0 |
+| pytest | 9.2.0 | 2880 | 363 | 0 | 62 | 0 | 55 | 3360 | 87.6% | 25 | 55 | 62 |
+| pytest-asyncio | v1.5.0 | 268 | 0 | 0 | 3 | 0 | 0 | 271 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 7 | 0 | 0 | 0 | 0 | 0 | 7 | 100.0% | 2 | 2 | 0 |
 | pytest-mock | v3.17.0 | 158 | 0 | 0 | 1 | 0 | 2 | 161 | 98.8% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 205 | 0 | 0 | 3 | 0 | 1 | 209 | 99.5% | 1 | 1 | 0 |
@@ -51,10 +51,10 @@ pytest-rs; they are not counted in the total.
 | click | 8.5.1 | 2373 | 61 | 0 | 24 | 0 | 0 | 2458 | 97.5% | 42 | 43 | 0 |
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
 | marshmallow | 4.4.0 | 1192 | 0 | 0 | 0 | 0 | 0 | 1192 | 100.0% | 12 | 12 | 3 |
-| rich | v15.0.0 | 955 | 0 | 0 | 20 | 0 | 6 | 981 | 99.4% | 61 | 63 | 0 |
+| rich | v15.0.0 | 954 | 0 | 0 | 20 | 0 | 7 | 981 | 99.3% | 61 | 63 | 0 |
 | sqlglot | v30.33.0 | 1613 | 0 | 0 | 0 | 0 | 0 | 1613 | 100.0% | 58 | 60 | 0 |
-| pytest-bdd | 9.0.1 | 145 | 0 | 0 | 1 | 0 | 0 | 146 | 100.0% | 35 | 35 | 0 |
-| httpx | 0.28.1 | 1410 | 0 | 0 | 1 | 0 | 7 | 1418 | 99.5% | 31 | 31 | 0 |
+| pytest-bdd | 9.0.1 | 45 | 100 | 0 | 1 | 0 | 0 | 146 | 31.5% | 7 | 35 | 0 |
+| httpx | 0.28.1 | 1408 | 2 | 0 | 1 | 0 | 7 | 1418 | 99.4% | 30 | 31 | 0 |
 | httpx2 | v2.16.2 | 1807 | 0 | 0 | 0 | 0 | 2 | 1809 | 99.9% | 36 | 36 | 0 |
 | starlette | 1.10.0 | 1357 | 0 | 1 | 2 | 0 | 0 | 1360 | 99.9% | 30 | 31 | 0 |
 | attrs | 26.1.0 | 1379 | 0 | 0 | 6 | 0 | 0 | 1385 | 100.0% | 23 | 25 | 0 |
@@ -70,66 +70,67 @@ pytest-rs; they are not counted in the total.
 | scikit-learn-2 | 1.9.1 | 5091 | 0 | 0 | 1892 | 0 | 0 | 6983 | 100.0% | 52 | 58 | 0 |
 | scikit-learn-3 | 1.9.1 | 9275 | 0 | 0 | 2540 | 0 | 3 | 11818 | 100.0% | 107 | 114 | 0 |
 
-### pytest @ 9.0.3
+### pytest @ 9.2.0
 
-<details><summary>per-file detail (54 files)</summary>
+<details><summary>per-file detail (55 files)</summary>
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| testing/python/approx.py | passed | 75 | 0 | 0 | 18 | 0 | 0 |
-| testing/python/collect.py | passed | 82 | 0 | 0 | 0 | 0 | 0 |
-| testing/python/fixtures.py | passed | 206 | 0 | 0 | 2 | 0 | 2 |
+| testing/python/approx.py | failed | 94 | 63 | 0 | 22 | 0 | 0 |
+| testing/python/collect.py | failed | 83 | 1 | 0 | 0 | 0 | 0 |
+| testing/python/fixtures.py | failed | 201 | 29 | 0 | 2 | 0 | 11 |
 | testing/python/integration.py | passed | 16 | 0 | 0 | 4 | 0 | 0 |
-| testing/python/metafunc.py | passed | 112 | 0 | 0 | 0 | 0 | 0 |
-| testing/python/raises.py | passed | 31 | 0 | 0 | 0 | 0 | 0 |
-| testing/python/raises_group.py | passed | 29 | 0 | 0 | 0 | 0 | 0 |
-| testing/python/show_fixtures_per_test.py | passed | 8 | 0 | 0 | 0 | 0 | 0 |
-| testing/examples/test_issue519.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
+| testing/python/metafunc.py | failed | 84 | 48 | 0 | 0 | 0 | 1 |
+| testing/python/raises.py | failed | 29 | 5 | 0 | 0 | 0 | 2 |
+| testing/python/raises_group.py | failed | 28 | 2 | 0 | 0 | 0 | 0 |
+| testing/python/show_fixtures_per_test.py | failed | 3 | 7 | 0 | 0 | 0 | 0 |
+| testing/examples/test_issue519.py | failed | 0 | 1 | 0 | 0 | 0 | 0 |
 | testing/freeze/tests/test_trivial.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
-| testing/logging/test_fixture.py | passed | 27 | 0 | 0 | 0 | 0 | 0 |
+| testing/logging/test_fixture.py | passed | 31 | 0 | 0 | 0 | 0 | 0 |
 | testing/logging/test_formatter.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
-| testing/logging/test_reporting.py | passed | 52 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_assertion.py | passed | 160 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_cacheprovider.py | passed | 57 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_capture.py | passed | 130 | 0 | 0 | 2 | 0 | 0 |
+| testing/logging/test_reporting.py | passed | 57 | 0 | 0 | 0 | 0 | 0 |
+| testing/test_assertion.py | failed | 161 | 47 | 0 | 0 | 0 | 0 |
+| testing/test_cacheprovider.py | passed | 68 | 0 | 0 | 0 | 0 | 0 |
+| testing/test_capture.py | passed | 131 | 0 | 0 | 2 | 0 | 0 |
 | testing/test_collect_imported_tests.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_collection.py | passed | 113 | 0 | 0 | 2 | 0 | 1 |
-| testing/test_compat.py | passed | 10 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_config.py | passed | 214 | 0 | 0 | 1 | 0 | 0 |
-| testing/test_conftest.py | passed | 53 | 0 | 0 | 1 | 0 | 0 |
-| testing/test_doctest.py | passed | 139 | 0 | 0 | 1 | 0 | 0 |
+| testing/test_collection.py | passed | 114 | 0 | 0 | 2 | 0 | 1 |
+| testing/test_compat.py | passed | 10 | 0 | 0 | 0 | 0 | 1 |
+| testing/test_config.py | failed | 224 | 50 | 0 | 1 | 0 | 12 |
+| testing/test_conftest.py | passed | 58 | 0 | 0 | 1 | 0 | 0 |
+| testing/test_doctest.py | failed | 154 | 5 | 0 | 1 | 0 | 0 |
 | testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_faulthandler.py | passed | 9 | 0 | 0 | 3 | 0 | 0 |
-| testing/test_helpconfig.py | passed | 12 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_junitxml.py | passed | 136 | 0 | 0 | 0 | 0 | 1 |
+| testing/test_faulthandler.py | failed | 10 | 2 | 0 | 3 | 0 | 0 |
+| testing/test_helpconfig.py | failed | 13 | 2 | 0 | 0 | 0 | 0 |
+| testing/test_junitxml.py | failed | 129 | 16 | 0 | 0 | 0 | 6 |
 | testing/test_link_resolve.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_main.py | passed | 24 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_mark.py | passed | 105 | 0 | 0 | 0 | 0 | 1 |
-| testing/test_monkeypatch.py | passed | 33 | 0 | 0 | 2 | 0 | 0 |
-| testing/test_nodes.py | passed | 8 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_pastebin.py | passed | 8 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_pytester.py | passed | 51 | 0 | 0 | 1 | 0 | 0 |
+| testing/test_mark.py | failed | 118 | 6 | 0 | 0 | 0 | 5 |
+| testing/test_monkeypatch.py | passed | 44 | 0 | 0 | 2 | 0 | 0 |
+| testing/test_nodeid.py | failed | 29 | 1 | 0 | 0 | 0 | 0 |
+| testing/test_nodes.py | passed | 8 | 0 | 0 | 0 | 0 | 6 |
+| testing/test_pastebin.py | failed | 8 | 1 | 0 | 0 | 0 | 0 |
+| testing/test_pytester.py | failed | 50 | 1 | 0 | 1 | 0 | 0 |
 | testing/test_python_path.py | passed | 6 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_recwarn.py | passed | 63 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_runner.py | passed | 66 | 0 | 0 | 0 | 0 | 0 |
+| testing/test_recwarn.py | failed | 61 | 6 | 0 | 0 | 0 | 0 |
+| testing/test_runner.py | failed | 64 | 3 | 0 | 0 | 0 | 0 |
 | testing/test_runner_xunit.py | passed | 13 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_scope.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_session.py | passed | 26 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_setuponly.py | passed | 26 | 0 | 0 | 0 | 0 | 0 |
+| testing/test_session.py | failed | 25 | 1 | 0 | 0 | 0 | 0 |
+| testing/test_setuponly.py | failed | 25 | 1 | 0 | 0 | 0 | 0 |
 | testing/test_setupplan.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_skipping.py | passed | 92 | 0 | 0 | 0 | 0 | 0 |
+| testing/test_skipping.py | failed | 92 | 3 | 0 | 0 | 0 | 0 |
 | testing/test_stash.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_stepwise.py | passed | 18 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_subtests.py | passed | 34 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_terminal.py | passed | 223 | 0 | 0 | 4 | 0 | 0 |
+| testing/test_subtests.py | failed | 34 | 2 | 0 | 0 | 0 | 0 |
+| testing/test_terminal.py | failed | 237 | 1 | 0 | 4 | 0 | 0 |
 | testing/test_threadexception.py | passed | 8 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_tmpdir.py | passed | 39 | 0 | 0 | 1 | 0 | 0 |
-| testing/test_unittest.py | passed | 69 | 0 | 0 | 9 | 0 | 1 |
-| testing/test_unraisableexception.py | passed | 11 | 0 | 0 | 0 | 0 | 0 |
+| testing/test_tmpdir.py | failed | 42 | 21 | 0 | 1 | 0 | 3 |
+| testing/test_unittest.py | failed | 67 | 3 | 0 | 9 | 0 | 1 |
+| testing/test_unraisableexception.py | passed | 14 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_warning_types.py | passed | 15 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_warnings.py | passed | 42 | 0 | 0 | 2 | 0 | 0 |
-| testing/acceptance_test.py | passed | 85 | 0 | 0 | 2 | 0 | 6 |
-| testing/deprecated_test.py | passed | 15 | 0 | 0 | 0 | 0 | 0 |
+| testing/test_warnings.py | failed | 56 | 3 | 0 | 5 | 0 | 0 |
+| testing/acceptance_test.py | failed | 82 | 15 | 0 | 2 | 0 | 6 |
+| testing/deprecated_test.py | failed | 12 | 17 | 0 | 0 | 0 | 0 |
 
 </details>
 
@@ -152,7 +153,7 @@ pytest-rs; they are not counted in the total.
 | tests/markers/test_package_scope.py | passed | 8 | 0 | 0 | 0 | 0 | 0 |
 | tests/markers/test_session_scope.py | passed | 11 | 0 | 0 | 0 | 0 | 0 |
 | tests/modes/test_auto_mode.py | passed | 6 | 0 | 0 | 0 | 0 | 0 |
-| tests/modes/test_strict_mode.py | passed | 7 | 0 | 0 | 0 | 0 | 0 |
+| tests/modes/test_strict_mode.py | passed | 4 | 0 | 0 | 3 | 0 | 0 |
 | tests/test_asyncio_debug.py | passed | 12 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_asyncio_fixture.py | passed | 6 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_asyncio_mark.py | passed | 9 | 0 | 0 | 0 | 0 | 0 |
@@ -568,7 +569,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_color_triplet.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_columns.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_columns_align.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_console.py | passed | 100 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_console.py | passed | 99 | 0 | 0 | 0 | 0 | 1 |
 | tests/test_constrain.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_containers.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_control.py | passed | 7 | 0 | 0 | 0 | 0 | 0 |
@@ -698,41 +699,41 @@ pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| tests/args/cfparse/test_args.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
-| tests/args/parse/test_args.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
-| tests/args/regex/test_args.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
-| tests/args/test_common.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
-| tests/datatable/test_datatable.py | passed | 5 | 0 | 0 | 0 | 0 | 0 |
-| tests/feature/test_alias.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
-| tests/feature/test_background.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
-| tests/feature/test_cucumber_json.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
-| tests/feature/test_description.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
+| tests/args/cfparse/test_args.py | failed | 0 | 2 | 0 | 0 | 0 | 0 |
+| tests/args/parse/test_args.py | failed | 0 | 2 | 0 | 0 | 0 | 0 |
+| tests/args/regex/test_args.py | failed | 0 | 3 | 0 | 0 | 0 | 0 |
+| tests/args/test_common.py | failed | 0 | 2 | 0 | 0 | 0 | 0 |
+| tests/datatable/test_datatable.py | failed | 0 | 5 | 0 | 0 | 0 | 0 |
+| tests/feature/test_alias.py | failed | 0 | 1 | 0 | 0 | 0 | 0 |
+| tests/feature/test_background.py | failed | 0 | 2 | 0 | 0 | 0 | 0 |
+| tests/feature/test_cucumber_json.py | failed | 0 | 3 | 0 | 0 | 0 | 0 |
+| tests/feature/test_description.py | failed | 0 | 1 | 0 | 0 | 0 | 0 |
 | tests/feature/test_feature_base_dir.py | passed | 7 | 0 | 0 | 0 | 0 | 0 |
-| tests/feature/test_gherkin_terminal_reporter.py | passed | 16 | 0 | 0 | 0 | 0 | 0 |
+| tests/feature/test_gherkin_terminal_reporter.py | failed | 3 | 13 | 0 | 0 | 0 | 0 |
 | tests/feature/test_no_scenario.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
-| tests/feature/test_outline.py | passed | 7 | 0 | 0 | 0 | 0 | 0 |
-| tests/feature/test_outline_empty_values.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
-| tests/feature/test_report.py | passed | 1 | 0 | 0 | 1 | 0 | 0 |
-| tests/feature/test_rule_example_format.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
-| tests/feature/test_same_function_name.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
-| tests/feature/test_scenario.py | passed | 18 | 0 | 0 | 0 | 0 | 0 |
-| tests/feature/test_scenarios.py | passed | 8 | 0 | 0 | 0 | 0 | 0 |
-| tests/feature/test_steps.py | passed | 13 | 0 | 0 | 0 | 0 | 0 |
-| tests/feature/test_tags.py | passed | 5 | 0 | 0 | 0 | 0 | 0 |
+| tests/feature/test_outline.py | failed | 0 | 7 | 0 | 0 | 0 | 0 |
+| tests/feature/test_outline_empty_values.py | failed | 0 | 1 | 0 | 0 | 0 | 0 |
+| tests/feature/test_report.py | failed | 0 | 1 | 0 | 1 | 0 | 0 |
+| tests/feature/test_rule_example_format.py | failed | 0 | 1 | 0 | 0 | 0 | 0 |
+| tests/feature/test_same_function_name.py | failed | 0 | 1 | 0 | 0 | 0 | 0 |
+| tests/feature/test_scenario.py | failed | 8 | 10 | 0 | 0 | 0 | 0 |
+| tests/feature/test_scenarios.py | failed | 4 | 4 | 0 | 0 | 0 | 0 |
+| tests/feature/test_steps.py | failed | 1 | 12 | 0 | 0 | 0 | 0 |
+| tests/feature/test_tags.py | failed | 0 | 5 | 0 | 0 | 0 | 0 |
 | tests/feature/test_wrong.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
-| tests/generation/test_generate_missing.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
-| tests/library/test_parent.py | passed | 5 | 0 | 0 | 0 | 0 | 0 |
+| tests/generation/test_generate_missing.py | failed | 1 | 2 | 0 | 0 | 0 | 0 |
+| tests/library/test_parent.py | failed | 0 | 5 | 0 | 0 | 0 | 0 |
 | tests/parser/test_errors.py | passed | 7 | 0 | 0 | 0 | 0 | 0 |
 | tests/parser/test_parser.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/scripts/test_generate.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
-| tests/scripts/test_main.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
+| tests/scripts/test_main.py | failed | 1 | 1 | 0 | 0 | 0 | 0 |
 | tests/scripts/test_migrate.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
-| tests/steps/test_common.py | passed | 8 | 0 | 0 | 0 | 0 | 0 |
-| tests/steps/test_docstring.py | passed | 5 | 0 | 0 | 0 | 0 | 0 |
-| tests/steps/test_given.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
-| tests/steps/test_keyword.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
-| tests/steps/test_unicode.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_hooks.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
+| tests/steps/test_common.py | failed | 3 | 5 | 0 | 0 | 0 | 0 |
+| tests/steps/test_docstring.py | failed | 0 | 5 | 0 | 0 | 0 | 0 |
+| tests/steps/test_given.py | failed | 0 | 2 | 0 | 0 | 0 | 0 |
+| tests/steps/test_keyword.py | failed | 0 | 1 | 0 | 0 | 0 | 0 |
+| tests/steps/test_unicode.py | failed | 0 | 2 | 0 | 0 | 0 | 0 |
+| tests/test_hooks.py | failed | 3 | 1 | 0 | 0 | 0 | 0 |
 
 </details>
 
@@ -771,7 +772,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_multipart.py | passed | 38 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_status_codes.py | passed | 6 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_timeouts.py | passed | 9 | 0 | 0 | 0 | 0 | 1 |
-| tests/test_utils.py | passed | 40 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_utils.py | failed | 38 | 2 | 0 | 0 | 0 | 0 |
 | tests/test_wsgi.py | passed | 12 | 0 | 0 | 0 | 0 | 0 |
 
 </details>

@@ -296,7 +296,10 @@ class Suite:
         if not pyproject.exists():
             return
         config = tomllib.loads(pyproject.read_text())
-        write_to = config.get("tool", {}).get("setuptools_scm", {}).get("write_to")
+        scm = config.get("tool", {}).get("setuptools_scm", {})
+        # `version_file` is setuptools_scm's newer name for `write_to`
+        # (pytest >= 9.1 uses it).
+        write_to = scm.get("version_file") or scm.get("write_to")
         if not write_to:
             return
         target = self.checkout / write_to
