@@ -214,6 +214,42 @@ impl Engine {
                     &[("collector", session_collector.clone().unbind())],
                 )?;
             }
+            // Then each Module collector, in collection order (upstream
+            // fires pytest_collectstart for every collector it collects).
+            let mut seen_modules: Vec<String> = Vec::new();
+            for item in items.iter() {
+                let module_nodeid = item
+                    .nodeid
+                    .split("::")
+                    .next()
+                    .unwrap_or(&item.nodeid)
+                    .to_string();
+                if item.is_doctest || seen_modules.contains(&module_nodeid) {
+                    continue;
+                }
+                seen_modules.push(module_nodeid.clone());
+                let name = module_nodeid
+                    .rsplit('/')
+                    .next()
+                    .unwrap_or(&module_nodeid)
+                    .to_string();
+                let path = item.path.to_string_lossy().to_string();
+                let module_collector = proxy_cls.call1((
+                    name,
+                    module_nodeid.as_str(),
+                    path.as_str(),
+                    session_collector.getattr("session")?,
+                    &session_collector,
+                    "Module",
+                ))?;
+                for func in &collectstart_funcs {
+                    python::call_py_hook(
+                        py,
+                        func,
+                        &[("collector", module_collector.clone().unbind())],
+                    )?;
+                }
+            }
             let class_cls = node_mod.getattr("Class")?;
             let mut seen_cls: Vec<Py<pyo3::PyAny>> = Vec::new();
             for node in node_list.iter() {
