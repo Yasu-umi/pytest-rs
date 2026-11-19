@@ -4,7 +4,7 @@
   "category": "real-world",
   "excluded_files": 0,
   "deselected": 0,
-  "known_failed": 6,
+  "known_failed": 7,
   "files": [
     {
       "file": "tests/test_align.py",
@@ -130,13 +130,13 @@
     {
       "file": "tests/test_console.py",
       "status": "passed",
-      "exit_code": 0,
-      "passed": 100,
+      "exit_code": 1,
+      "passed": 99,
       "failed": 0,
       "skipped": 0,
       "errors": 0,
       "deselected": 0,
-      "known_failed": 0
+      "known_failed": 1
     },
     {
       "file": "tests/test_constrain.py",
