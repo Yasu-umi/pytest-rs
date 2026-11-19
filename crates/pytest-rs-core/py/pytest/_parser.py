@@ -7,6 +7,7 @@ wired up yet — unknown flags still error at the Rust argument parser."""
 from __future__ import annotations
 
 import argparse
+import re
 import shlex
 import textwrap
 from pathlib import Path
@@ -154,6 +155,13 @@ class Parser:
         aliases: Any = (),
     ) -> None:
         aliases = list(aliases)
+        type = _normalize_ini_type(name, type)
+        if default is _UNSET and isinstance(type, (tuple, _IniLiteral)):
+            kind = "union" if isinstance(type, tuple) else "Literal"
+            raise ValueError(
+                f"ini option {name!r} has a {kind} type, which has no "
+                "implicit default; pass an explicit `default` to `addini`"
+            )
         for alias in aliases:
             if alias in ini_specs:
                 raise ValueError(f"alias {alias!r} conflicts with existing configuration option")
@@ -915,48 +923,89 @@ _LINELIST_INIS = {
 #: The ini options pytest's core and builtin plugins register (name -> type).
 #: Consulted only in strict mode (parseconfig-built configs) so getini can
 #: tell a genuinely-unknown key from a core one the Rust engine owns.
-_CORE_INI_TYPES: dict[str, str | None] = {
+class _IniLiteral:
+    """The choices of an ini option registered with a ``Literal`` type
+    (upstream's argparsing._IniLiteral)."""
+
+    __slots__ = ("choices",)
+
+    def __init__(self, choices: tuple[str, ...]) -> None:
+        self.choices = choices
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, _IniLiteral) and other.choices == self.choices
+
+    def __hash__(self) -> int:
+        return hash(self.choices)
+
+    def __repr__(self) -> str:
+        return f"_IniLiteral(choices={self.choices!r})"
+
+
+_CORE_INI_TYPES: dict[str, Any] = {
     "addopts": "args",
-    "cache_dir": None,
+    "assertion_text_diff_style": _IniLiteral(("ndiff", "block")),
+    "cache_dir": "string",
     "collect_imported_tests": "bool",
     "consider_namespace_packages": "bool",
-    "console_output_style": None,
+    "console_output_style": _IniLiteral(
+        ("classic", "progress", "count", "times", "progress-even-when-capture-no")
+    ),
     "disable_test_id_escaping_and_forfeit_all_rights_to_community_support": "bool",
-    "doctest_encoding": None,
+    "doctest_encoding": "string",
     "doctest_optionflags": "args",
-    "empty_parameter_set_mark": None,
+    "empty_parameter_set_mark": _IniLiteral(("skip", "xfail", "fail_at_collect")),
     "enable_assertion_pass_hook": "bool",
     "faulthandler_exit_on_timeout": "bool",
-    "faulthandler_timeout": None,
+    "faulthandler_timeout": (
+        "float",
+        "string",
+    ),
     "filterwarnings": "linelist",
-    "junit_duration_report": None,
-    "junit_family": None,
+    "junit_duration_report": _IniLiteral(("total", "call")),
+    "junit_family": _IniLiteral(("legacy", "xunit1", "xunit2")),
     "junit_log_passing_tests": "bool",
-    "junit_logging": None,
-    "junit_suite_name": None,
-    "log_auto_indent": None,
+    "junit_logging": _IniLiteral(("no", "log", "system-out", "system-err", "out-err", "all")),
+    "junit_suite_name": "string",
+    "log_auto_indent": (
+        "int",
+        "bool",
+        "string",
+    ),
     "log_cli": "bool",
-    "log_cli_date_format": None,
-    "log_cli_format": None,
-    "log_cli_level": None,
-    "log_date_format": None,
-    "log_file": None,
-    "log_file_date_format": None,
-    "log_file_format": None,
-    "log_file_level": None,
-    "log_file_mode": None,
-    "log_format": None,
-    "log_level": None,
+    "log_cli_date_format": "string",
+    "log_cli_format": "string",
+    "log_cli_level": (
+        "int",
+        "string",
+    ),
+    "log_date_format": "string",
+    "log_file": "string",
+    "log_file_date_format": "string",
+    "log_file_format": "string",
+    "log_file_level": (
+        "int",
+        "string",
+    ),
+    "log_file_mode": _IniLiteral(("w", "a")),
+    "log_format": "string",
+    "log_level": (
+        "int",
+        "string",
+    ),
     "markers": "linelist",
-    "max_warnings": None,
-    "parametrize_long_str_id_strategy": None,
+    "max_warnings": (
+        "int",
+        "string",
+    ),
     "minversion": None,
     "norecursedirs": "args",
+    "parametrize_long_str_id_strategy": _IniLiteral(("short", "sha256", "legacy", "disallow")),
+    "pytester_example_dir": None,
     "python_classes": "args",
     "python_files": "args",
     "python_functions": "args",
     "pythonpath": "paths",
-    "pytester_example_dir": None,
     "required_plugins": "args",
     "strict": "bool",
     "strict_config": "bool",
@@ -964,15 +1013,89 @@ _CORE_INI_TYPES: dict[str, str | None] = {
     "strict_parametrization_ids": "bool",
     "strict_xfail": "bool",
     "testpaths": "args",
-    "tmp_path_retention_count": "string",
-    "tmp_path_retention_policy": "string",
+    "tmp_path_retention_count": (
+        "int",
+        "string",
+    ),
+    "tmp_path_retention_policy": _IniLiteral(("all", "failed", "none")),
+    "truncation_limit_chars": (
+        "int",
+        "string",
+    ),
+    "truncation_limit_lines": (
+        "int",
+        "string",
+    ),
+    "usefixtures": "args",
+    "verbosity_assertions": (
+        "int",
+        _IniLiteral(("auto",)),
+    ),
+    "verbosity_subtests": (
+        "int",
+        _IniLiteral(("auto",)),
+    ),
+    "verbosity_test_cases": (
+        "int",
+        _IniLiteral(("auto",)),
+    ),
+    "xfail_strict": "bool",
+}
+
+#: Upstream defaults of the core inis (where not the per-type empty value).
+_CORE_INI_DEFAULTS: dict[str, Any] = {
+    "assertion_text_diff_style": "ndiff",
+    "cache_dir": ".pytest_cache",
+    "collect_imported_tests": True,
+    "console_output_style": "progress",
+    "doctest_encoding": "utf-8",
+    "doctest_optionflags": ["ELLIPSIS"],
+    "empty_parameter_set_mark": "skip",
+    "faulthandler_timeout": 0.0,
+    "junit_duration_report": "total",
+    "junit_family": "xunit2",
+    "junit_log_passing_tests": True,
+    "junit_logging": "no",
+    "junit_suite_name": "pytest",
+    "log_auto_indent": None,
+    "log_cli_date_format": None,
+    "log_cli_format": None,
+    "log_cli_level": None,
+    "log_date_format": "%H:%M:%S",
+    "log_file": None,
+    "log_file_date_format": None,
+    "log_file_format": None,
+    "log_file_level": None,
+    "log_file_mode": "w",
+    "log_format": "%(levelname)-8s %(name)s:%(filename)s:%(lineno)d %(message)s",
+    "log_level": None,
+    "max_warnings": None,
+    "norecursedirs": [
+        "*.egg",
+        ".*",
+        "_darcs",
+        "build",
+        "CVS",
+        "dist",
+        "node_modules",
+        "venv",
+        "{arch}",
+    ],
+    "parametrize_long_str_id_strategy": "short",
+    "python_classes": ["Test"],
+    "python_files": ["test_*.py", "*_test.py"],
+    "python_functions": ["test"],
+    "strict_config": None,
+    "strict_markers": None,
+    "strict_parametrization_ids": None,
+    "strict_xfail": None,
+    "tmp_path_retention_count": 3,
+    "tmp_path_retention_policy": "all",
     "truncation_limit_chars": None,
     "truncation_limit_lines": None,
-    "usefixtures": "args",
-    "verbosity_assertions": "string",
-    "verbosity_subtests": "string",
-    "verbosity_test_cases": "string",
-    "xfail_strict": "bool",
+    "verbosity_assertions": "auto",
+    "verbosity_subtests": "auto",
+    "verbosity_test_cases": "auto",
 }
 
 
@@ -1009,6 +1132,11 @@ _CORE_INI_HELP: list[tuple[str, str, str]] = [
         "linelist",
         "Each line specifies a pattern for warnings.filterwarnings. Processed "
         "after -W/--pythonwarnings.",
+    ),
+    (
+        "max_warnings",
+        "int | string",
+        "Exit with error if all tests pass but the number of warnings exceeds this threshold",
     ),
     ("norecursedirs", "args", "Directory patterns to avoid for recursion"),
     (
@@ -1053,6 +1181,15 @@ _CORE_INI_HELP: list[tuple[str, str, str]] = [
         "strict_parametrization_ids",
         "bool",
         "Emit an error if non-unique parameter set IDs are detected",
+    ),
+    (
+        "parametrize_long_str_id_strategy",
+        "string",
+        "strategy for long str/bytes parameter values in auto-generated ids\n"
+        "- short (default): values over 100 chars fall back to argname+index\n"
+        "- sha256: replace value with its sha256 hex digest\n"
+        "- legacy: keep the full value (for temporary backward compatibility)\n"
+        "- disallow: raise an error requesting explicit ids",
     ),
     (
         "console_output_style",
@@ -1101,6 +1238,11 @@ _CORE_INI_HELP: list[tuple[str, str, str]] = [
         "truncation_limit_chars",
         "string",
         "Set threshold of CHARS after which truncation will take effect",
+    ),
+    (
+        "assertion_text_diff_style",
+        "string",
+        "Choose how pytest renders diffs for string equality assertions",
     ),
     (
         "verbosity_assertions",
@@ -1161,16 +1303,6 @@ _CORE_INI_HELP: list[tuple[str, str, str]] = [
     ),
     ("addopts", "args", "Extra command line options"),
     ("minversion", "string", "Minimally required pytest version"),
-    (
-        "parametrize_long_str_id_strategy",
-        "string",
-        "strategy for long str/bytes parameter values in auto-generated ids",
-    ),
-    (
-        "max_warnings",
-        "string",
-        "Exit with error if all tests pass but the number of warnings exceeds this threshold",
-    ),
     ("pythonpath", "paths", "Add paths to sys.path"),
     ("required_plugins", "args", "Plugins that must be present for pytest to run"),
 ]
@@ -1232,9 +1364,13 @@ def render_ini_help(columns: int) -> str:
 
     indent_len = 24
     indent = " " * indent_len
-    entries = list(_CORE_INI_HELP)
+    # Core labels follow the (pytest 9.2) typed registrations.
+    entries = [
+        (name, _ini_type_repr(_CORE_INI_TYPES[name]) if name in _CORE_INI_TYPES else label, text)
+        for name, label, text in _CORE_INI_HELP
+    ]
     entries.extend(
-        (name, spec["type"] or "string", spec["help"]) for name, spec in ini_specs.items()
+        (name, _ini_type_repr(spec["type"]), spec["help"]) for name, spec in ini_specs.items()
     )
     for name, type_, help_ in entries:
         if help_ is None:
@@ -1242,23 +1378,17 @@ def render_ini_help(columns: int) -> str:
         spec = f"{name} ({type_}):"
         write(f"  {spec}")
         spec_len = len(spec)
+        wrapped = _split_help_text(help_, columns - indent_len)
         if spec_len > (indent_len - 3):
             line()
-            for wrapped_line in textwrap.wrap(
-                help_,
-                columns,
-                initial_indent=indent,
-                subsequent_indent=indent,
-                break_on_hyphens=False,
-            ):
-                line(wrapped_line)
+            for wrapped_line in wrapped:
+                line(indent + wrapped_line if wrapped_line else "")
         else:
             write(" " * (indent_len - spec_len - 2))
-            wrapped = textwrap.wrap(help_, columns - indent_len, break_on_hyphens=False)
             if wrapped:
                 line(wrapped[0])
                 for wrapped_line in wrapped[1:]:
-                    line(indent + wrapped_line)
+                    line(indent + wrapped_line if wrapped_line else "")
 
     line()
     line("Environment variables:")
@@ -1272,15 +1402,104 @@ def render_ini_help(columns: int) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _empty_for_type(type_: str | None) -> Any:
+_BULLET = re.compile(r"^([-*+]|\(?\d+[.)])\s+")
+
+
+def _split_help_text(text: str, width: int) -> list[str]:
+    """Wrap help text to ``width`` keeping its line structure (pytest 9.2's
+    argparsing._split_help_text, #6817): explicit line breaks and
+    indentation are kept, list items' continuation lines hang under the item."""
+    first, newline, rest = text.partition("\n")
+    lines: list[str] = []
+    for raw in (first.strip() + newline + textwrap.dedent(rest)).splitlines():
+        stripped = raw.lstrip()
+        if not stripped:
+            lines.append("")
+            continue
+        indent = raw[: len(raw) - len(stripped)]
+        bullet = _BULLET.match(stripped)
+        subsequent_indent = indent + " " * len(bullet.group()) if bullet else indent
+        lines.extend(
+            textwrap.wrap(
+                stripped,
+                width,
+                initial_indent=indent,
+                subsequent_indent=subsequent_indent,
+                break_on_hyphens=False,
+            )
+        )
+    while lines and not lines[0]:
+        del lines[0]
+    while lines and not lines[-1]:
+        del lines[-1]
+    return lines
+
+
+def _empty_for_type(type_: Any) -> Any:
     """The default getini value for a registered ini with no value and no
-    explicit default (pytest's per-type empty)."""
+    explicit default (pytest's get_ini_default_for_type)."""
     if type_ == "bool":
         return False
     if type_ in ("args", "linelist", "paths", "pathlist"):
         return []
-    # string / int / float / None
+    if type_ == "int":
+        return 0
+    if type_ == "float":
+        return 0.0
+    # string / None
     return ""
+
+
+_INI_TYPE_TAGS = ("string", "paths", "pathlist", "args", "linelist", "bool", "int", "float")
+_INI_PLAIN_TYPES: dict[Any, str] = {str: "string", bool: "bool", int: "int", float: "float"}
+
+
+def _ini_type_to_member(name: str, type_: Any) -> Any:
+    """One member of an ``addini(type=...)`` argument, normalized: a string
+    tag, or an ``_IniLiteral`` for a ``Literal`` of strings (pytest 9.2)."""
+    import typing
+
+    if typing.get_origin(type_) is typing.Literal:
+        choices = typing.get_args(type_)
+        if not all(isinstance(choice, str) for choice in choices):
+            raise ValueError(
+                f"invalid type for ini option {name!r}: Literal choices "
+                f"must be strings, got {choices!r}"
+            )
+        return _IniLiteral(choices)
+    if isinstance(type_, str) and type_ in _INI_TYPE_TAGS:
+        return type_
+    try:
+        return _INI_PLAIN_TYPES[type_]
+    except (KeyError, TypeError):
+        raise ValueError(
+            f"invalid type for ini option {name!r}: {type_!r} (expected one of "
+            f"{', '.join(repr(tag) for tag in _INI_TYPE_TAGS)}, one of "
+            "the types str, bool, int, float, a union of these types such as "
+            "`int | str`, or a `Literal` of strings)"
+        ) from None
+
+
+def _normalize_ini_type(name: str, type_: Any) -> Any:
+    """``addini``'s ``type``: None means "string"; a union becomes a tuple of
+    members."""
+    import types as _types
+    import typing
+
+    if type_ is None:
+        return "string"
+    if typing.get_origin(type_) in (typing.Union, _types.UnionType):
+        return tuple(_ini_type_to_member(name, member) for member in typing.get_args(type_))
+    return _ini_type_to_member(name, type_)
+
+
+def _ini_type_repr(type_: Any) -> str:
+    """An ini option type for --help output and error messages."""
+    if isinstance(type_, _IniLiteral):
+        return " | ".join(repr(choice) for choice in type_.choices)
+    if isinstance(type_, tuple):
+        return " | ".join(_ini_type_repr(member) for member in type_)
+    return type_ or "string"
 
 
 def _split_str(value: str, shlex_split: bool) -> list:
@@ -1440,10 +1659,16 @@ def getini(
     canonical = ini_aliases.get(name, name)
     spec = ini_specs.get(canonical)
     if spec is None:
-        if strict:
-            if canonical not in _CORE_INI_TYPES:
-                raise ValueError(f"unknown configuration value: {name!r}")
-            spec = {"type": _CORE_INI_TYPES[canonical], "default": _UNSET, "aliases": ()}
+        if canonical in _CORE_INI_TYPES:
+            # Core inis are typed like upstream's own addini registrations
+            # (pytest 9.2: e.g. int | 'auto'), with upstream's defaults.
+            spec = {
+                "type": _CORE_INI_TYPES[canonical],
+                "default": _CORE_INI_DEFAULTS.get(canonical, _UNSET),
+                "aliases": (),
+            }
+        elif strict:
+            raise ValueError(f"unknown configuration value: {name!r}")
         else:
             # Unregistered: lenient fallback.
             raw = inicfg.get(name)
@@ -1463,7 +1688,7 @@ def getini(
                     override_val = overrides[alias]
                     break
         if override_val is not None:
-            return _coerce_ini(type_, override_val, rootpath, canonical)
+            return _convert_ini(type_, override_val, rootpath, canonical)
     # Value precedence: canonical name first, then any alias.
     value = inicfg.get(canonical)
     matched_key = canonical if value is not None else None
@@ -1477,7 +1702,115 @@ def getini(
         default = spec["default"]
         return _empty_for_type(type_) if default is _UNSET else default
     toml_type = toml_types.get(matched_key) if toml_types and matched_key else None
-    return _coerce_ini(type_, value, rootpath, canonical, toml_type)
+    return _convert_ini(type_, value, rootpath, canonical, toml_type)
+
+
+def _native_scalar(raw: str, tag: str) -> Any:
+    if tag == "int":
+        return int(raw)
+    if tag == "float":
+        return float(raw)
+    if tag == "bool":
+        return raw == "true"
+    return raw
+
+
+def _native_value(raw: Any, toml_type: str | None) -> Any:
+    """The value as upstream's config dict holds it: a native TOML value
+    (``toml_type`` tag from ini.rs), a list for an INI-mode array
+    ("ini-list"), else the raw string."""
+    if toml_type is None or not isinstance(raw, str):
+        return raw
+    if toml_type == "ini-list":
+        return raw.split("\x00") if raw else []
+    if toml_type.startswith("array"):
+        item_tags = toml_type[len("array:") :].split("\x00") if toml_type != "array:" else []
+        items = raw.split("\x00") if item_tags else []
+        return [_native_scalar(item, tag) for item, tag in zip(items, item_tags, strict=False)]
+    return _native_scalar(raw, toml_type)
+
+
+def _convert_ini_member(
+    member: Any, raw: Any, rootpath: str | None, name: str, toml_type: str | None
+) -> Any:
+    """Convert a config value to one ini type member (upstream's
+    Config._getini_value / _getini_ini / _getini_toml)."""
+    import warnings
+
+    value = _native_value(raw, toml_type)
+    if isinstance(member, _IniLiteral):
+        if not isinstance(value, str):
+            raise TypeError(
+                f"config option {name!r} expects a string, got {type(value).__name__}: {value!r}"
+            )
+        if value not in member.choices:
+            raise ValueError(
+                f"config option {name!r} expects one of {_ini_type_repr(member)}, got {value!r}"
+            )
+        return value
+    member = member or "string"
+    native_toml = toml_type is not None and toml_type != "ini-list"
+    if member in ("paths", "pathlist", "args", "linelist"):
+        return _coerce_ini(member, raw, rootpath, name, toml_type if native_toml else None)
+    if toml_type is not None and native_toml:
+        _validate_toml_type(member, toml_type, raw, name)
+        return value
+    if member == "bool":
+        return _strtobool(str(value).strip())
+    if member == "string":
+        if not isinstance(value, str):
+            from _pytest.warning_types import PytestRemovedIn10Warning
+
+            warnings.warn(
+                PytestRemovedIn10Warning(
+                    "Passing a value that is not a string to a 'string'-typed ini "
+                    "option is deprecated.\n"
+                    "In a future version this will raise a TypeError, matching the "
+                    "behavior of the corresponding TOML config path.\n"
+                    "If your plugin intentionally accepts non-string values, declare "
+                    'an explicit type (e.g. type="args") instead of relying on the '
+                    "implicit string default."
+                ),
+                stacklevel=4,
+            )
+        return value
+    if member == "int":
+        if not isinstance(value, str):
+            raise TypeError(
+                f"Expected an int string for option {name} of type integer, but got: {value!r}"
+            )
+        return int(value)
+    if member == "float":
+        if not isinstance(value, str):
+            raise TypeError(
+                f"Expected a float string for option {name} of type float, but got: {value!r}"
+            )
+        return float(value)
+    return value
+
+
+def _convert_ini(
+    type_: Any, raw: Any, rootpath: str | None, name: str, toml_type: str | None = None
+) -> Any:
+    """getini's typed value. An invalid value is a user error, raised as
+    UsageError (upstream's Config._getini); a union tries each member."""
+    try:
+        if not isinstance(type_, tuple):
+            return _convert_ini_member(type_, raw, rootpath, name, toml_type)
+        for member in type_:
+            try:
+                return _convert_ini_member(member, raw, rootpath, name, toml_type)
+            except (TypeError, ValueError):
+                pass
+        value = _native_value(raw, toml_type)
+        raise TypeError(
+            f"config option {name!r} expects one of {_ini_type_repr(type_)}, "
+            f"got {type(value).__name__}: {value!r}"
+        )
+    except (TypeError, ValueError) as e:
+        import pytest
+
+        raise pytest.UsageError(str(e)) from e
 
 
 #: Inis the bundled native plugins read (registered in Rust via the plugin's

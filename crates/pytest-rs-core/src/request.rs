@@ -382,10 +382,11 @@ impl PyConfig {
         let ini_name = format!("verbosity_{vt}");
         // The verbosity ini must be registered (a plugin's addini); otherwise
         // fall back to the global level (upstream's `_parser._inidict` check).
-        let registered = py
-            .import("pytest._parser")?
-            .getattr("ini_specs")?
-            .contains(ini_name.as_str())?;
+        let parser = py.import("pytest._parser")?;
+        let registered = parser.getattr("ini_specs")?.contains(ini_name.as_str())?
+            || parser
+                .getattr("_CORE_INI_TYPES")?
+                .contains(ini_name.as_str())?;
         if !registered {
             return Ok(global_level);
         }

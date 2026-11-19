@@ -279,12 +279,18 @@ fn parse_pyproject(content: &str, path: Option<&str>) -> Result<Option<ParsedIni
     // [tool.pytest.ini_options]: upstream's INI mode — scalars stringify and
     // types never get validated, unlike the native [tool.pytest] TOML mode
     // above. render_toml_entries's stringified `values` map is exactly the
-    // INI-mode form; discard its toml_types (INI mode carries none).
+    // INI-mode form; its toml_types are replaced by an "ini-list" tag on
+    // arrays only (upstream's INI mode reads them as list[str], so getini
+    // can tell a one-item list from a plain string).
     match tool_pytest.get("ini_options").and_then(|v| v.as_table()) {
-        Some(t) => Ok(Some((
-            render_toml_entries(t.iter().collect()).0,
-            HashMap::new(),
-        ))),
+        Some(t) => {
+            let ini_lists: HashMap<String, String> = t
+                .iter()
+                .filter(|(_, v)| v.is_array())
+                .map(|(k, _)| (k.clone(), "ini-list".to_string()))
+                .collect();
+            Ok(Some((render_toml_entries(t.iter().collect()).0, ini_lists)))
+        }
         None => Ok(None),
     }
 }
