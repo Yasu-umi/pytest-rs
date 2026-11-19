@@ -995,10 +995,27 @@ class Pytester:
                 pluginmanager.unregister(plugin)
         _validate_required_plugins(config)
         pm = config.pluginmanager
-        pm.consider_preparse(new_args)
-        if not config.getoption("disable_plugin_autoload", default=False):
-            pm.consider_setuptools_entrypoints()
-        pm.consider_env()
+        # Warnings issued while plugins import are recorded and handed to
+        # pytest_warning_recorded (pytest 9.2's _capture_plugin_import_warnings).
+        with warnings.catch_warnings(record=True) as plugin_import_warnings:
+            warnings.simplefilter("always")
+            pm.consider_preparse(new_args)
+            if not config.getoption("disable_plugin_autoload", default=False):
+                pm.consider_setuptools_entrypoints()
+            pm.consider_env()
+        for warning_message in plugin_import_warnings:
+            for plugin in extra_plugins:
+                hook = getattr(plugin, "pytest_warning_recorded", None)
+                if hook is None:
+                    continue
+                params = inspect.signature(hook).parameters
+                kwargs = {
+                    "warning_message": warning_message,
+                    "nodeid": "",
+                    "when": "config",
+                    "location": None,
+                }
+                hook(**{k: v for k, v in kwargs.items() if k in params})
         if self._request is not None:
             self._request.addfinalizer(config._ensure_unconfigure)
         return config

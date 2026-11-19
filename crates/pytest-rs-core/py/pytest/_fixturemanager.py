@@ -79,6 +79,16 @@ class ShimFixtureDef:
         self.owner = None
 
     @property
+    def has_location(self):
+        """Deprecated (pytest 9.2): FixtureDef.has_location."""
+        import warnings
+
+        from _pytest.deprecated import FIXTUREDEF_HAS_LOCATION_DEPRECATED
+
+        warnings.warn(FIXTUREDEF_HAS_LOCATION_DEPRECATED.format(), stacklevel=2)
+        return True
+
+    @property
     def cached_result(self):
         return self._cached_result
 
@@ -103,8 +113,9 @@ class ShimFixtureManager:
         if not defs:
             return None
         nodeid = node if isinstance(node, str) else getattr(node, "nodeid", "")
-        visible = tuple(d for d in defs if _visible(d.baseid, nodeid))
-        return visible or None
+        # Like upstream (9.2): None when the name is unknown, a (possibly
+        # empty) list of the visible definitions otherwise.
+        return [d for d in defs if _visible(d.baseid, nodeid)]
 
     def _getautousenames(self, node):
         nodeid = getattr(node, "nodeid", "")
@@ -143,6 +154,49 @@ class SessionFixtureManager(ShimFixtureManager):
     def __init__(self, pending):
         super().__init__({}, ())
         self._pending = pending
+        # Legacy (nodeid=) autouse registrations, upstream's
+        # FixtureManager._nodeid_autousenames.
+        self._nodeid_autousenames = {}
+
+    def parsefactories(self, node_or_obj=_NOTSET, nodeid=_NOTSET, *, holder=None, node=None):
+        """Register the @pytest.fixture definitions found on an object
+        (upstream's FixtureManager.parsefactories); a nodeid argument is
+        deprecated (PARSEFACTORIES_NODEID_DEPRECATED)."""
+        import warnings
+
+        from pytest._fixtures import FixtureFunctionDefinition
+
+        if holder is not None:
+            holderobj, baseid = holder, getattr(node, "nodeid", "") or ""
+        elif node_or_obj is _NOTSET:
+            raise TypeError("parsefactories() requires holder or node_or_obj")
+        elif nodeid is not _NOTSET:
+            from _pytest.deprecated import PARSEFACTORIES_NODEID_DEPRECATED
+
+            warnings.warn(PARSEFACTORIES_NODEID_DEPRECATED.format(), stacklevel=2)
+            holderobj, baseid = node_or_obj, nodeid or ""
+        else:
+            holderobj = getattr(node_or_obj, "obj", node_or_obj)
+            baseid = getattr(node_or_obj, "nodeid", "") or ""
+        for name in dir(holderobj):
+            try:
+                obj = getattr(holderobj, name)
+            except Exception:
+                continue
+            if type(obj) is not FixtureFunctionDefinition:
+                continue
+            marker = obj._fixture_function_marker
+            self._pending.append(
+                (
+                    marker.name or name,
+                    obj._get_wrapped_function(),
+                    baseid,
+                    marker.scope,
+                    marker.params,
+                    marker.ids,
+                    marker.autouse,
+                )
+            )
 
     def _register_fixture(
         self,
@@ -172,6 +226,8 @@ class SessionFixtureManager(ShimFixtureManager):
             baseid = getattr(node, "nodeid", "") or ""
         elif nodeid is not _NOTSET and nodeid is not None:
             baseid = nodeid
+            if autouse:
+                self._nodeid_autousenames.setdefault(nodeid, []).append(name)
         else:
             baseid = ""
         self._pending.append((name, func, baseid, scope, params, ids, autouse))
