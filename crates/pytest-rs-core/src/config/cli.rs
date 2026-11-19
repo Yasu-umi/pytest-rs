@@ -150,6 +150,7 @@ impl Config {
     /// specs. Depends only on the parser's registered option specs.
     fn build_clap_command(parser: &OptionParser, blocked: &HashSet<String>) -> clap::Command {
         let mut cmd = clap::Command::new("pytest-rs")
+            .override_usage(Self::usage_line())
             // A plain flag, not clap's own auto --help: showing help needs
             // conftest/plugin option registration first (a malformed plugin
             // option must still show a reduced "minimal help", matching
@@ -747,7 +748,27 @@ impl Config {
     /// Upstream's `PytestArgumentParser.error()` always prefixes UsageError
     /// messages with this same synopsis (`self.format_usage() + msg`); reused
     /// wherever a Rust-raised UsageError needs the same treatment.
-    pub(crate) const USAGE_SYNOPSIS: &str = "usage: pytest-rs-bin [OPTIONS] [FILE_OR_DIR]...\n";
+    pub(crate) fn usage_synopsis() -> String {
+        format!("usage: {}\n", Self::usage_line())
+    }
+
+    /// The program name in usage and error messages (pytest 9.2, #1764):
+    /// "pytest", "python -m pytest" or "pytest.main()", as the Python entry
+    /// points (pytest.main / console_main, pytester) pass it in
+    /// PYTEST_RS_PROG.
+    pub(crate) fn prog_name() -> String {
+        std::env::var("PYTEST_RS_PROG")
+            .ok()
+            .filter(|p| !p.is_empty())
+            .unwrap_or_else(|| "pytest".to_string())
+    }
+
+    fn usage_line() -> String {
+        format!(
+            "{} [options] [file_or_dir] [file_or_dir] [...]",
+            Self::prog_name()
+        )
+    }
 
     /// Rewrite clap's auto-generated `--help` text into upstream's
     /// argparse-based `showhelp()`/`print_help()` shape: only the section
@@ -903,7 +924,7 @@ impl Config {
                             }
                         }
                         Err(err) => {
-                            return Err(format!("pytest: error: {}: {}", arg, err));
+                            return Err(format!("{}: error: {}: {}", Self::prog_name(), arg, err));
                         }
                     }
                 } else {
@@ -934,7 +955,10 @@ impl Config {
                     && let Some(clap::error::ContextValue::String(arg)) =
                         err.get(clap::error::ContextKind::InvalidArg)
                 {
-                    return Err(format!("pytest: error: unrecognized arguments: {arg}"));
+                    return Err(format!(
+                        "{}: error: unrecognized arguments: {arg}",
+                        Self::prog_name()
+                    ));
                 }
                 let msg = err.to_string();
                 // Rewrite clap's verbose error for --override-ini missing value
@@ -942,10 +966,10 @@ impl Config {
                 if msg.contains("override-ini")
                     && (msg.contains("required") || msg.contains("value"))
                 {
-                    return Err(
-                        "pytest: error: argument -o/--override-ini: expected one argument"
-                            .to_string(),
-                    );
+                    return Err(format!(
+                        "{}: error: argument -o/--override-ini: expected one argument",
+                        Self::prog_name()
+                    ));
                 }
                 return Err(msg);
             }

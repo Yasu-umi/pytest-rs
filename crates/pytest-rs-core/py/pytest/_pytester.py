@@ -229,6 +229,9 @@ def run_inprocess(args, plugins=(), helper_plugin=None, forwarded_filter_marks=(
     sys_path_snapshot = _pytester_shim.SysPathsSnapshot()
     cwd_before = os.getcwd()
     env_before = dict(os.environ)
+    # A programmatic run names itself "pytest.main()" in usage/error
+    # messages (pytest 9.2's _get_prog_name, #1764).
+    os.environ["PYTEST_RS_PROG"] = "pytest.main()"
 
     # Every non-package conftest.py imports under the bare module name
     # "conftest" (module_name_for). If the OUTER (already-running) session
@@ -691,7 +694,9 @@ class Pytester:
             return getattr(reprec, "_result", reprec)
         return self._runpytest(args, timeout=timeout, forward_filters=True)
 
-    def _runpytest(self, args, *, timeout=None, forward_filters=False, hook_relay=None):
+    def _runpytest(
+        self, args, *, timeout=None, forward_filters=False, hook_relay=None, prog="pytest.main()"
+    ):
         forwarded_filters = []
         if forward_filters and self._request is not None:
             # Only the outer item's filterwarnings marks — forwarding the
@@ -711,6 +716,10 @@ class Pytester:
         if exe is None:
             fail("PYTEST_RS_EXE is not set; pytester cannot run the runner")
         env = os.environ.copy()
+        # The name upstream's run would show in usage/error messages:
+        # runpytest_subprocess spawns `python -m pytest`, the other modes
+        # call pytest.main() (pytest 9.2, #1764).
+        env["PYTEST_RS_PROG"] = prog
         # The engine binary needs its loader path to find libpython; restore it
         # if the test cleared the environment (setdefault keeps a test's own).
         for _var, _value in _RUNNER_LIBPATH.items():
@@ -812,7 +821,9 @@ class Pytester:
             # Pytester.runpytest_subprocess, which always spawns through
             # self.run(), so the monkeypatch takes effect.
             return self._runpytest_subprocess_via_run(args, timeout=timeout)
-        return self._runpytest(args, timeout=timeout, forward_filters=False)
+        return self._runpytest(
+            args, timeout=timeout, forward_filters=False, prog="python -m pytest"
+        )
 
     def _runpytest_subprocess_via_run(self, args, *, timeout=None):
         # Spawn the pytest-rs binary directly (not upstream's `python -mpytest`)
@@ -827,7 +838,17 @@ class Pytester:
         for plugin in self.plugins:
             args = ("-p", plugin, *args)
         args = (exe, *args)
-        return self.run(*args, timeout=timeout)
+        # Upstream spawns `python -m pytest`, which names itself so in
+        # usage/error messages.
+        prog_before = os.environ.get("PYTEST_RS_PROG")
+        os.environ["PYTEST_RS_PROG"] = "python -m pytest"
+        try:
+            return self.run(*args, timeout=timeout)
+        finally:
+            if prog_before is None:
+                os.environ.pop("PYTEST_RS_PROG", None)
+            else:
+                os.environ["PYTEST_RS_PROG"] = prog_before
 
     def runpytest_inprocess(self, *args, timeout=None, plugins=()):
         """Run pytest in-process (shares sys state with the outer test)."""

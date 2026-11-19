@@ -1405,6 +1405,13 @@ def render_ini_help(columns: int) -> str:
 _BULLET = re.compile(r"^([-*+]|\(?\d+[.)])\s+")
 
 
+def _prog() -> str:
+    """The program name in usage/error messages (see Config::prog_name)."""
+    import os
+
+    return os.environ.get("PYTEST_RS_PROG") or "pytest"
+
+
 def _split_help_text(text: str, width: int) -> list[str]:
     """Wrap help text to ``width`` keeping its line structure (pytest 9.2's
     argparsing._split_help_text, #6817): explicit line breaks and
@@ -1928,14 +1935,14 @@ def apply_cli_args(namespace: Any, tokens: list[str]) -> tuple[list[str], list[s
 
                 plural = "s" if nargs != 1 else ""
                 raise UsageError(
-                    f"pytest: error: argument {name}: expected {nargs} argument{plural}"
+                    f"{_prog()}: error: argument {name}: expected {nargs} argument{plural}"
                 )
             try:
                 converted = [convert(v) if callable(convert) else v for v in collected]
             except (ValueError, argparse.ArgumentTypeError) as exc:
                 from pytest import UsageError
 
-                raise UsageError(f"pytest: error: argument {name}: {exc}") from None
+                raise UsageError(f"{_prog()}: error: argument {name}: {exc}") from None
         else:
             if not eq:
                 if index < len(tokens) and not tokens[index].startswith("--"):
@@ -1944,13 +1951,13 @@ def apply_cli_args(namespace: Any, tokens: list[str]) -> tuple[list[str], list[s
                 else:
                     from pytest import UsageError
 
-                    raise UsageError(f"pytest: error: argument {name}: expected one argument")
+                    raise UsageError(f"{_prog()}: error: argument {name}: expected one argument")
             try:
                 converted = convert(value) if callable(convert) else value
             except (ValueError, argparse.ArgumentTypeError) as exc:
                 from pytest import UsageError
 
-                raise UsageError(f"pytest: error: argument {name}: {exc}") from None
+                raise UsageError(f"{_prog()}: error: argument {name}: {exc}") from None
         # Validate choices (argparse-compatible behaviour).
         choices = spec.get("choices")
         if choices is not None:
@@ -1961,7 +1968,7 @@ def apply_cli_args(namespace: Any, tokens: list[str]) -> tuple[list[str], list[s
 
                     choices_str = ", ".join(repr(c) for c in choices)
                     raise UsageError(
-                        f"pytest: error: argument {name}: invalid choice: {val!r} (choose from {choices_str})"
+                        f"{_prog()}: error: argument {name}: invalid choice: {val!r} (choose from {choices_str})"
                     )
         # action="append" accumulates into a list (default []).
         if spec["action"] == "append":
