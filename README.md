@@ -134,15 +134,15 @@ Benchmarks on open-source projects (macOS arm64, median of 3 warm runs), reprodu
 <!-- perf-results:start -->
 | suite (tests) | mode | pytest | pytest-rs | speedup |
 |---|---|---:|---:|---|
-| marshmallow (1119) | `(plain)` | 0.44 s | 0.32 s | **1.4x** |
-| marshmallow (1119) | `--cov` | 0.86 s | 0.42 s | **2.0x** |
-| marshmallow (1119) | `-n 3 --cov` | 0.97 s | 0.45 s | **2.2x** |
-| click (1336) | `(plain)` | 1.25 s | 1.18 s | **1.1x** |
-| click (1336) | `--cov` | 2.08 s | 1.32 s | **1.6x** |
-| click (1336) | `-n 3 --cov` | 1.65 s | 1.19 s | **1.4x** |
-| networkx (6890) | `(plain)` | 30.77 s | 28.96 s | **1.1x** |
-| networkx (6890) | `--cov` | 128.01 s | 42.38 s | **3.0x** |
-| networkx (6890) | `-n 3 --cov` | 48.79 s | 22.12 s | **2.2x** |
+| marshmallow (1119) | `(plain)` | 0.43 s | 0.32 s | **1.3x** |
+| marshmallow (1119) | `--cov` | 0.77 s | 0.34 s | **2.3x** |
+| marshmallow (1119) | `-n 3 --cov` | 0.87 s | 0.29 s | **3.0x** |
+| click (2459) | `(plain)` | 3.24 s | 2.37 s | **1.4x** |
+| click (2459) | `--cov` | 4.57 s | 2.44 s | **1.9x** |
+| click (2459) | `-n 3 --cov` | 3.32 s | 1.26 s | **2.6x** |
+| networkx (6890) | `(plain)` | 30.09 s | 27.86 s | **1.1x** |
+| networkx (6890) | `--cov` | 94.20 s | 33.34 s | **2.8x** |
+| networkx (6890) | `-n 3 --cov` | 36.84 s | 15.48 s | **2.4x** |
 <!-- perf-results:end -->
 
 Small-to-medium suites see a **1.3–1.4x** speedup even without coverage, thanks to lower startup overhead. On large suites where test bodies dominate, the plain-mode gap narrows; the bigger wins come from `--cov` and `-n` parallelism. Try it on your own suite:

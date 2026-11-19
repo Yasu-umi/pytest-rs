@@ -98,7 +98,7 @@ native engine can't speed up what runs inside a test.
 | suite | tag | `--cov` source path | parallel mode | test deps |
 |---|---|---|---|---|
 | marshmallow | 4.1.1 | `src/marshmallow` | `-n 3` (xdist) | `simplejson==4.1.1` |
-| click | 8.3.1 | `src/click` | `-n 3` (xdist) | — |
+| click | 8.5.1 | `src/click` | `-n 3` (xdist) | — |
 | networkx | networkx-3.6.1 | `networkx` | `-n 3` (xdist) | `numpy==2.4.6 scipy==1.18.0 pandas==3.0.3` |
 
 marshmallow/click are mid-sized suites of fast unit tests, where the framework
@@ -117,8 +117,11 @@ Gotchas baked into the script (why pinned / why these targets):
 - **Pin the versions, don't track latest.** The *latest* marshmallow/click
   releases don't run clean out of the box — marshmallow's suite imports
   `simplejson` (a test-only dep), and click's latest has collection errors —
-  so a naive run measures a near-empty/error run, not real work. The pinned
-  tags match the conformance submodules and pass under pytest-rs at 100%.
+  so a naive run measures a near-empty/error run, not real work. Re-check the
+  pins when the reference pytest moves: click 8.3.1's suite stops at collection
+  under pytest 9.2 (a 9.2 deprecation turned into an error by its
+  `filterwarnings = error`), so the click row moved to 8.5.1. The pinned tags
+  run clean, with the same outcome, under both runners.
 - **Give `--cov` the in-tree source path, not the package name.** The suites are
   installed editable, so their source stays at `src/<pkg>`, and both runners
   measure those files. Passing the path keeps the comparison robust across

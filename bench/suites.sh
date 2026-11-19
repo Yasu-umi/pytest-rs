@@ -25,8 +25,9 @@
 # Two things that make the numbers valid (learned the hard way):
 #   * Pin the versions. The *latest* marshmallow/click don't run clean
 #     (marshmallow's suite imports `simplejson`; click's latest has collection
-#     errors), so a naive run measures an error/near-empty run. These tags match
-#     the conformance submodules and pass under pytest-rs at 100%.
+#     errors), so a naive run measures an error/near-empty run. These tags run
+#     clean, with the same outcome, under both runners (re-check them when the
+#     reference pytest moves: click 8.3.1 stops at collection under pytest 9.2).
 #   * Give `--cov` a SOURCE PATH, not a package name. pytest-rs resolves the
 #     `--cov` argument as a path; `--cov=click` (a src-layout package living at
 #     src/click) would measure nothing, while real pytest resolves it by import.
@@ -47,7 +48,7 @@ PERF_ROWS=""   # accumulated README-format rows (for WRITE_README)
 # suite spec: repo | tag | cov-source-path (repo-relative) | parallel-flag | extra deps | testpath (repo-relative, default "tests")
 spec() { case "$1" in
   marshmallow) echo "https://github.com/marshmallow-code/marshmallow|4.1.1|src/marshmallow|-n 3|simplejson==4.1.1|" ;;
-  click)       echo "https://github.com/pallets/click|8.3.1|src/click|-n 3||" ;;
+  click)       echo "https://github.com/pallets/click|8.5.1|src/click|-n 3||" ;;
   networkx)    echo "https://github.com/networkx/networkx|networkx-3.6.1|networkx|-n 3|numpy==2.4.6 scipy==1.18.0 pandas==3.0.3|networkx" ;;
   *) echo "unknown suite: $1" >&2; return 1 ;;
 esac; }
@@ -83,7 +84,8 @@ for name in "${SUITES[@]}"; do
   uv pip install -q --python "$dir/.venv-rs/bin/python" "$RS_SPEC" -e "$dir" $extra >/dev/null 2>&1
   PY="$dir/.venv-py/bin/python"; RS="$dir/.venv-rs/bin/pytest-rs"
   CFLAGS="-q -p no:cacheprovider -p no:randomly"
-  cnt=$( { "$PY" -m pytest "$dir/$tp" --co -q -p no:cacheprovider 2>/dev/null || true; } | grep -oE '[0-9]+ tests collected' | head -1 | grep -oE '^[0-9]+' )
+  # "N/M tests collected (K deselected)" when the suite deselects: count the N that run.
+  cnt=$( { "$PY" -m pytest "$dir/$tp" --co -q -p no:cacheprovider 2>/dev/null || true; } | grep -oE '[0-9]+(/[0-9]+)? tests? collected' | head -1 | grep -oE '^[0-9]+' )
   [ -n "$cnt" ] || cnt='?'
 
   # median real/rs for one mode (interleaved), printed as a table row.
