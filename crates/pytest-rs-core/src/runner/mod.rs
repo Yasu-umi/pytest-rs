@@ -293,6 +293,15 @@ impl Engine {
                 }
             }
             prev_pkg_instance = Some(pkg_instance);
+            if idx > 0 {
+                // A session-scoped param advanced: fixtures depending on it
+                // (a non-parametrized session fixture over indirectly
+                // parametrized ones) are rebuilt for the new value.
+                report_param_teardown!(
+                    items[idx - 1].ended_param_bindings(py, item, &[Scope::Session]),
+                    item
+                );
+            }
 
             let package = item
                 .module_name
