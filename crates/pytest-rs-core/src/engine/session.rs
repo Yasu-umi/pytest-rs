@@ -573,7 +573,9 @@ impl Engine {
             // warnings (first), passes/xpasses, then the conftest & plugin
             // pytest_terminal_summary hooks (which may emit more warnings),
             // then the short summary and the final warnings pass.
-            self.print_collect_errors();
+            // The blank line before the section is sessionfinish's, printed
+            // above whenever any report exists.
+            self.print_collect_errors(self.session.reports.is_empty());
             self.print_failures();
             self.print_xfailures();
             warnings_shown = self.print_warnings_summary(py, 0, false);
