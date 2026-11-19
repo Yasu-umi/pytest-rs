@@ -147,6 +147,15 @@ class ExceptionInfo[E: BaseException]:
         tuple) — upstream ExceptionInfo.errisinstance."""
         return self.value is not None and isinstance(self.value, exc)
 
+    def _getreprcrash(self):
+        """The crash location ("path:lineno: exconly") of the innermost
+        traceback entry, or None without one (upstream's _getreprcrash)."""
+        entries = traceback.extract_tb(self.tb) if self.tb is not None else []
+        if not entries:
+            return None
+        entry = entries[-1]
+        return _ReprFileLocation(entry.filename, entry.lineno, self.exconly(tryshort=True))
+
     def exconly(self, tryshort=False):
         """The exception's `type: message` line(s), like pytest's exconly.
         With tryshort, the rewritten-assert "AssertionError: " noise is
@@ -213,6 +222,18 @@ class ExceptionInfo[E: BaseException]:
             msg += "\n Did you mean to `re.escape()` the regex?"
         assert _re.search(regexp, value), msg
         return True
+
+
+class _ReprFileLocation:
+    """upstream's ReprFileLocation: str() is "path:lineno: message"."""
+
+    def __init__(self, path, lineno, message):
+        self.path = path
+        self.lineno = lineno
+        self.message = message
+
+    def __str__(self):
+        return f"{self.path}:{self.lineno}: {self.message}"
 
 
 class _ReprCrash:
