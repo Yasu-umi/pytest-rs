@@ -7,6 +7,7 @@ from pytest._junitxml import merge_family as merge_family
 from pytest._junitxml import record_property as record_property
 from pytest._junitxml import record_testsuite_property as record_testsuite_property
 from pytest._junitxml import record_xml_attribute as record_xml_attribute
+from pytest._junitxml import shorten_message as shorten_message
 
 from _pytest._stub import __getattr__  # noqa: E402, F401
 from _pytest.stash import StashKey
