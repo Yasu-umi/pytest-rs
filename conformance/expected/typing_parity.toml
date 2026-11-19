@@ -28,7 +28,6 @@ shim_only = [
     "testing/code/test_source.py: [attr-defined] \"Source\" has no attribute \"getstatementrange\"",
     "testing/code/test_source.py: [index] Value of type \"Source\" is not indexable",
     "testing/io/test_terminalwriter.py: [attr-defined] \"TerminalWriter\" has no attribute \"_write_source\"",
-    "testing/python/approx.py: [attr-defined] Module has no attribute \"PytestApproxDecimalToleranceWarning\"",
     "testing/python/collect.py: [attr-defined] \"Class\" has no attribute \"collect\"",
     "testing/python/collect.py: [attr-defined] \"File\" has no attribute \"obj\"",
     "testing/python/fixtures.py: [attr-defined] \"Function\" has no attribute \"funcargs\"",

@@ -5,6 +5,8 @@ the Rust engine introspects the imported module afterwards. Nothing here
 resolves fixtures or runs tests.
 """
 
+# ruff: noqa: E402 (version constants are defined before the submodule imports)
+
 import enum as _enum
 import os
 import pathlib
@@ -16,6 +18,12 @@ from collections.abc import Callable as _Callable
 from collections.abc import MutableMapping as _MutableMapping
 from typing import Any as _Any
 from typing import NoReturn as _NoReturn
+
+# Defined before the submodule imports below: `_pytest/__init__.py` reads
+# them, and modules such as `_pytest.approx` import `_pytest` while this
+# package is still initializing.
+__version__ = "9.2.0"  # pytest API version this shim tracks
+version_tuple = (9, 2, 0)
 
 from pytest import _debugging
 from pytest._approx import approx as approx
@@ -95,6 +103,9 @@ from pytest._tmp_path import tmp_path as tmp_path
 from pytest._tmp_path import tmp_path_factory as tmp_path_factory
 from pytest._tmp_path import tmpdir as tmpdir
 from pytest._tmp_path import tmpdir_factory as tmpdir_factory
+from pytest._warning_types import (
+    PytestApproxDecimalToleranceWarning as PytestApproxDecimalToleranceWarning,
+)
 from pytest._warning_types import PytestAssertRewriteWarning as PytestAssertRewriteWarning
 from pytest._warning_types import PytestCacheWarning as PytestCacheWarning
 from pytest._warning_types import PytestCollectionWarning as PytestCollectionWarning
@@ -120,8 +131,6 @@ from pytest._warns import warns as warns
 from pytest._xdist_fixtures import testrun_uid as testrun_uid
 from pytest._xdist_fixtures import worker_id as worker_id
 
-__version__ = "9.2.0"  # pytest API version this shim tracks
-version_tuple = (9, 2, 0)
 __pytest_rs__ = True
 
 

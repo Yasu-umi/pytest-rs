@@ -22,6 +22,13 @@ class PytestConfigWarning(PytestWarning):
     __module__ = "pytest"
 
 
+class PytestApproxDecimalToleranceWarning(PytestWarning):
+    """Warning emitted when :func:`pytest.approx` is given a float tolerance
+    for a :class:`~decimal.Decimal` comparison."""
+
+    __module__ = "pytest"
+
+
 class PytestUnknownMarkWarning(PytestWarning):
     __module__ = "pytest"
 

@@ -3,6 +3,7 @@ import warnings
 from types import FunctionType
 
 from pytest._warning_types import (  # noqa: F401
+    PytestApproxDecimalToleranceWarning,
     PytestAssertRewriteWarning,
     PytestCacheWarning,
     PytestCollectionWarning,
