@@ -254,6 +254,18 @@ def runtestprotocol(item, log=True, nextitem=None):
                     item.ihook.pytest_runtest_logreport(report=report)
             return reports
 
+    hasrequest = hasattr(item, "_request")
+    try:
+        return _shim_runtestprotocol(item)
+    finally:
+        # Once the protocol ends (or an exception, e.g. KeyboardInterrupt,
+        # escapes it) the item's fixtures and request go away (#13626).
+        if hasrequest:
+            item._request = False
+            item.funcargs = None
+
+
+def _shim_runtestprotocol(item):
     keywords = dict(getattr(item, "keywords", None) or {})
     reports = []
     skipped = evaluate_skip_marks(item)

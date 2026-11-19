@@ -10,6 +10,29 @@ impl Engine {
         &mut self,
         py: Python<'_>,
     ) -> Result<(), String> {
+        // Warnings raised while the plugins import are recorded and
+        // re-issued afterwards with the session's filters (pytest 9.2).
+        let recorder = py
+            .import("pytest._pluginmanager")
+            .and_then(|m| m.getattr("PluginImportWarnings")?.call0())
+            .and_then(|r| {
+                r.call_method0("__enter__")?;
+                Ok(r)
+            })
+            .ok();
+        let result = self.load_startup_plugins(py);
+        if let Some(recorder) = recorder {
+            let _ = recorder.call_method1("__exit__", (py.None(), py.None(), py.None()));
+            // Without the warnings plugin nothing records them (upstream
+            // hands them to pytest_warning_recorded).
+            if !self.config.plugin_disabled("warnings") {
+                let _ = recorder.call_method0("reissue");
+            }
+        }
+        result
+    }
+
+    fn load_startup_plugins(&mut self, py: Python<'_>) -> Result<(), String> {
         // Tracks module names loaded within this one bootstrap call — scoped
         // per Engine (a nested run gets its own), unlike the process-wide
         // pluginmanager registry — so a hook-less plugin's entry-point

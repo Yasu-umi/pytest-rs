@@ -203,11 +203,14 @@ impl Config {
             .store(true, std::sync::atomic::Ordering::Relaxed);
     }
 
-    /// `-p no:NAME` for a bundled plugin.
+    /// `-p no:NAME` for a bundled plugin; a later `-p NAME` enables it
+    /// again (upstream processes -p args in order).
     pub fn plugin_disabled(&self, name: &str) -> bool {
         self.plugin_opts
             .iter()
-            .any(|spec| spec.strip_prefix("no:") == Some(name))
+            .rev()
+            .find(|spec| spec.as_str() == name || spec.strip_prefix("no:") == Some(name))
+            .is_some_and(|spec| spec.starts_with("no:"))
     }
 
     /// This process is a `-n` worker, driven over stdin/stdout.

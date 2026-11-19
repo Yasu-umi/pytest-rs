@@ -1281,3 +1281,30 @@ def load_entry_point(ep):
         raise
     except Exception as e:
         raise PluginImportFailure(getattr(ep, "name", None) or "pytest11") from e
+
+
+class PluginImportWarnings:
+    """Record the warnings raised while startup plugins import, then
+    re-issue them as config-time warnings (pytest 9.2's
+    _capture_plugin_import_warnings): an ambient ``error`` filter must not
+    turn them into a plugin import failure."""
+
+    def __enter__(self):
+        import warnings
+
+        self._cm = warnings.catch_warnings(record=True)
+        self._log = self._cm.__enter__()
+        warnings.simplefilter("always")
+        return self
+
+    def __exit__(self, *exc_info):
+        self._cm.__exit__(*exc_info)
+        return False
+
+    def reissue(self):
+        from pytest._wcapture import issue_config_time_warning_explicit
+
+        for record in self._log:
+            issue_config_time_warning_explicit(
+                record.category, str(record.message), record.filename, record.lineno
+            )

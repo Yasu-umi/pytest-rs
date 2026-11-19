@@ -149,7 +149,13 @@ class RunResult:
                 for count, noun in _OUTCOME_RE.findall(clean):
                     found[plural.get(noun, noun)] = int(count)
                 return found
-        raise ValueError("Pytest terminal summary report not found")
+        raise ValueError(
+            "Pytest terminal summary report not found. "
+            "Plugins that modify pytest's terminal output can break outcome "
+            "parsing. Disable the plugin for the test run, for example with "
+            "`-p no:<plugin>`, or disable plugin autoloading with "
+            "`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`."
+        )
 
     def parseoutcomes(self):
         return self.parse_summary_nouns(self.outlines)
@@ -821,8 +827,15 @@ class Pytester:
             # Pytester.runpytest_subprocess, which always spawns through
             # self.run(), so the monkeypatch takes effect.
             return self._runpytest_subprocess_via_run(args, timeout=timeout)
+        # Like upstream, the pytester.plugins names are passed with -p.
+        plugin_args = []
+        for plugin in self.plugins:
+            plugin_args += ["-p", plugin]
         return self._runpytest(
-            args, timeout=timeout, forward_filters=False, prog="python -m pytest"
+            (*plugin_args, *args),
+            timeout=timeout,
+            forward_filters=False,
+            prog="python -m pytest",
         )
 
     def _runpytest_subprocess_via_run(self, args, *, timeout=None):
@@ -2178,9 +2191,12 @@ class Pytester:
                     raise import_error
                 plugins = getattr(mod, "pytest_plugins", None)
                 if plugins is not None:
+                    from pytest._pluginmanager import import_named_plugin
+
                     names = [plugins] if isinstance(plugins, str) else list(plugins)
                     for name in names:
-                        importlib.import_module(name)
+                        # A missing plugin is a UsageError (pytest 9.2, #993).
+                        import_named_plugin(name)
                 return mod
 
             def collect(self):

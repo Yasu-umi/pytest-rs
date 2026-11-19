@@ -106,6 +106,10 @@ known_failures = [
     # session fixture instance; the test itself calls sharing "also an
     # acceptable behavior" (#14533), which is what pytest-rs does.
     "testing/test_doctest.py::TestDoctestAutoUseFixtures::test_doctest_and_python_fixtures_not_shared",
+    # Spies on _pytest._code.ExceptionInfo.getrepr inside runtestprotocol's
+    # report building (the style it asks for); pytest-rs renders reports in
+    # Rust, so the spy never sees a call.
+    "testing/test_skipping.py::TestXFail::test_xfail_not_run_does_not_format_traceback",
     # pytest 9.2 tests that call pytest internals directly (helpers or
     # classes pytest-rs implements in Rust or does not mirror); the
     # user-visible behavior they back is covered by other tests.
@@ -565,6 +569,9 @@ env = { PYTEST_RS_DISABLE_PLUGINS = "benchmark" }
 # every later nested run's own entry-point injection for the rest of the
 # process (test_entrypoint_injection).
 extra_args = ["-p", "no:randomly"]
+# Expects ImportError from a module's missing pytest_plugins; pytest 9.2
+# raises UsageError there (#993), which is what pytest-rs follows.
+known_failures = ["tests/test_pytest_randomly.py::test_failing_import"]
 category = "third-party"
 enabled = true
 

@@ -315,17 +315,35 @@ pub(crate) fn collect_testcase(
 
     // @pytest.fixture methods on the TestCase (upstream supports them,
     // typically autouse=True stashing values on self); they bind to the
-    // same instance the test runs on via the runner's make_case().
-    for pair in cls.getattr("__dict__")?.call_method0("items")?.try_iter()? {
+    // same instance the test runs on via the runner's make_case(). A
+    // skipped class's own fixtures never run (pytest 9.2, #13885).
+    let class_skipped_early: bool = cls
+        .getattr("__unittest_skip__")
+        .and_then(|v| v.extract())
+        .unwrap_or(false);
+    let own_fixture_pairs = if class_skipped_early {
+        pyo3::types::PyList::empty(py).into_any()
+    } else {
+        cls.getattr("__dict__")?.call_method0("items")?
+    };
+    for pair in own_fixture_pairs.try_iter()? {
         let (name, value): (String, Bound<'_, PyAny>) = pair?.extract()?;
         if value.is_callable() && value.hasattr("_pytestfixturefunction")? {
+            // @pytest.fixture over @classmethod/@staticmethod binds to the
+            // class, not the test instance (like a plain test class).
+            let inner = value
+                .getattr("_fixture_function")
+                .unwrap_or_else(|_| value.clone());
+            let builtins = py.import("builtins")?;
+            let descriptor = inner.is_instance(&builtins.getattr("classmethod")?)?
+                || inner.is_instance(&builtins.getattr("staticmethod")?)?;
             register_fixture_def(
                 py,
                 &name,
                 &value,
                 &format!("{class_nodeid}::"),
-                true,
-                None,
+                !descriptor,
+                descriptor.then_some(cls),
                 registry,
             )?;
         }
