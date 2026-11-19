@@ -334,6 +334,40 @@ pub(crate) fn skip_wrapped_fixture(
         .extract()
 }
 
+/// Fixtures registered during collection through `pytest.register_fixture` /
+/// `session._fixturemanager._register_fixture` (pytest 9.1): added to the
+/// registry once collection settles, visible to the given node's subtree.
+/// (A registered fixture's `params` do not parametrize already collected
+/// items.)
+pub(crate) fn register_pending_fixtures(
+    py: Python<'_>,
+    registry: &mut FixtureRegistry,
+) -> PyResult<()> {
+    let pending = py
+        .import("pytest._node")?
+        .call_method0("take_pending_fixtures")?;
+    if pending.len()? == 0 {
+        return Ok(());
+    }
+    let fixture = py.import("pytest._fixtures")?.getattr("fixture")?;
+    for entry in pending.try_iter()? {
+        let entry = entry?;
+        let name: String = entry.get_item(0)?.extract()?;
+        let func = entry.get_item(1)?;
+        let baseid: String = entry.get_item(2)?.extract()?;
+        let kwargs = pyo3::types::PyDict::new(py);
+        kwargs.set_item("scope", entry.get_item(3)?)?;
+        kwargs.set_item("params", entry.get_item(4)?)?;
+        kwargs.set_item("ids", entry.get_item(5)?)?;
+        kwargs.set_item("autouse", entry.get_item(6)?)?;
+        kwargs.set_item("name", name.as_str())?;
+        let fixture_def = fixture.call((func,), Some(&kwargs))?;
+        register_fixture_def(py, &name, &fixture_def, &baseid, false, None, registry)?;
+        registry.sort_by_visibility(&name);
+    }
+    Ok(())
+}
+
 pub(crate) fn validate_dynamic_fixture_scopes(
     py: Python<'_>,
     config: &crate::config::Config,

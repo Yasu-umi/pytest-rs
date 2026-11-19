@@ -15,6 +15,7 @@ import pytest
 # class if the engine has already installed it -- exactly as the getattr did,
 # and pytest always defines the name, so the old `object` fallback was dead.
 from pytest import FixtureRequest as FixtureRequest  # noqa: E402
+from pytest._fixturemanager import register_fixture as register_fixture  # noqa: E402
 from pytest._fixtures import (  # noqa: E402
     FixtureFunctionDefinition as _RealFixtureFunctionDefinition,
 )

@@ -94,6 +94,17 @@ impl FixtureRegistry {
             .push(Arc::new(def));
     }
 
+    /// Re-sort `name`'s definitions by visibility (pytest 9.2, #14513): a
+    /// definition for a more specific node overrides one for an ancestor
+    /// regardless of registration order. Visibility chains are baseid prefix
+    /// chains, so a stable sort by baseid length orders each chain and keeps
+    /// registration order among equally specific definitions.
+    pub fn sort_by_visibility(&mut self, name: &str) {
+        if let Some(defs) = self.by_name.get_mut(name) {
+            defs.sort_by_key(|def| def.baseid.len());
+        }
+    }
+
     /// Every registered definition (all names, all overrides), for building
     /// the pytest-bdd FixtureManager._arg2fixturedefs view.
     pub fn all_defs(&self) -> impl Iterator<Item = &Arc<FixtureDef>> {

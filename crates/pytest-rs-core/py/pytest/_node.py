@@ -1017,6 +1017,31 @@ def reset_collection_items():
     prior in-process run's items don't leak into the isinstance checks below."""
     _session_state["items"] = []
     _session_state["skipped_modules"] = []
+    _session_state.pop("fixturemanager", None)
+    _session_state["pending_fixtures"] = []
+
+
+def session_fixturemanager():
+    """The collection-time ``session._fixturemanager`` (shared by every
+    session proxy), recording ``_register_fixture`` calls."""
+    from pytest._fixturemanager import SessionFixtureManager
+
+    fm = _session_state.get("fixturemanager")
+    if fm is None:
+        fm = SessionFixtureManager(_session_state.setdefault("pending_fixtures", []))
+        _session_state["fixturemanager"] = fm
+    return fm
+
+
+def take_pending_fixtures():
+    """Fixture registrations made during collection, for the engine:
+    [(name, func, baseid, scope, params, ids, autouse), ...]."""
+    pending = _session_state.get("pending_fixtures") or []
+    _session_state["pending_fixtures"] = []
+    fm = _session_state.get("fixturemanager")
+    if fm is not None:
+        fm._pending = _session_state["pending_fixtures"]
+    return pending
 
 
 def publish_collection_item(item):
@@ -1214,12 +1239,23 @@ class _ModuleCollector:
 class _NodeSession:
     """Minimal stand-in for pytest's Session as seen from item.session."""
 
+    nodeid = ""
+
     def __init__(self, config):
         self.config = config
         # pytest-rerunfailures clears _setupstate.stack between reruns; each
         # pytest-rs attempt is a fresh run_one_body, so the stack is always
         # empty (an object exposing a mutable .stack is enough).
         self._setupstate = _SetupState()
+
+    @property
+    def session(self):
+        # Like a real Session node, the session is its own .session.
+        return self
+
+    @property
+    def _fixturemanager(self):
+        return session_fixturemanager()
 
     @property
     def shouldfail(self):

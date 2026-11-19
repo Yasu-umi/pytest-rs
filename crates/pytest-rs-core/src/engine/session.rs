@@ -294,6 +294,10 @@ impl Engine {
         if let Err(err) = self.fire_py_collection_finish(py) {
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
         }
+        // pytest.register_fixture calls made by collection hooks.
+        if let Err(err) = python::register_pending_fixtures(py, &mut self.session.registry) {
+            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+        }
         // Count module-level skips (pytest.skip/importorskip at module level)
         // that were recorded during collection; these show as "/ N skipped"
         // in the "collected N items" line, matching pytest's format.
