@@ -264,6 +264,20 @@ def parse_override_ini(override_ini):
     return overrides
 
 
+_CONFIG_NAMES = frozenset(
+    {
+        "pytest.toml",
+        ".pytest.toml",
+        "pytest.ini",
+        ".pytest.ini",
+        "pyproject.toml",
+        "tox.ini",
+        "setup.cfg",
+    }
+)
+_CONFIG_SUFFIXES = frozenset({".ini", ".cfg", ".toml"})
+
+
 def determine_setup(*, inifile, override_ini, args, rootdir_cmd_arg, invocation_dir):
     """Determine the rootdir, inifile and ini configuration values from the
     command line arguments.
@@ -276,10 +290,35 @@ def determine_setup(*, inifile, override_ini, args, rootdir_cmd_arg, invocation_
 
     if inifile:
         inipath_ = absolutepath(inifile)
+        if not inipath_.exists():
+            raise UsageError(
+                f"Config file '{inipath_}' not found. Check your '-c/--config-file' option."
+            )
+        if inipath_.is_dir():
+            raise UsageError(
+                f"Config file '{inipath_}' is a directory. Check your '-c/--config-file' option."
+            )
         inipath = inipath_
-        inicfg = load_config_dict_from_file(inipath_) or {}
+        has_loader = inipath_.name in _CONFIG_NAMES or inipath_.suffix in _CONFIG_SUFFIXES
+        if has_loader:
+            inicfg = load_config_dict_from_file(inipath_) or {}
+        elif inipath_.is_file():
+            supported = ", ".join(sorted(_CONFIG_SUFFIXES))
+            raise UsageError(
+                f"Config file '{inipath_}' has an unsupported format. "
+                f"Supported extensions are: {supported}."
+            )
+        else:
+            # Not a regular file (--config-file=/dev/null): no configuration.
+            inicfg = {}
         if rootdir_cmd_arg is None:
-            rootdir = inipath_.parent
+            if inipath_.is_file():
+                rootdir = inipath_.parent
+            else:
+                # The rootdir is not derived from such a path (#11502).
+                rootdir = get_common_ancestor(invocation_dir, dirs)
+                if is_fs_root(rootdir):
+                    rootdir = invocation_dir
     else:
         ancestor = get_common_ancestor(invocation_dir, dirs)
         rootdir, inipath, inicfg, ignored_config_files = locate_config(invocation_dir, [ancestor])

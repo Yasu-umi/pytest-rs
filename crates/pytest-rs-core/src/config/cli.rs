@@ -511,14 +511,68 @@ impl Config {
                 // ".." segments without following symlinks); canonicalize is
                 // the closest std equivalent and the file must already exist
                 // to be loaded as an ini anyway.
+                // pytest 9.2 (#14716): a missing path, a directory or an
+                // unsupported format is a UsageError.
+                if !cf_path.exists() {
+                    return Err(format!(
+                        "Config file '{}' not found. Check your '-c/--config-file' option.",
+                        cf_path.display()
+                    ));
+                }
+                if cf_path.is_dir() {
+                    return Err(format!(
+                        "Config file '{}' is a directory. Check your '-c/--config-file' option.",
+                        cf_path.display()
+                    ));
+                }
                 let cf_path = std::fs::canonicalize(&cf_path).unwrap_or(cf_path);
-                let (ini_file, toml_types) = load_config_from_path(&cf_path)?;
-                let rootdir = cf_path
-                    .parent()
-                    .map(|p| p.to_path_buf())
-                    .unwrap_or_else(|| cwd.clone());
-                let file_name = cf_path.file_name().map(|n| n.to_string_lossy().to_string());
-                (rootdir, file_name, ini_file, Vec::new(), toml_types)
+                let has_loader = matches!(
+                    cf_path.file_name().and_then(|n| n.to_str()),
+                    Some(
+                        "pytest.toml"
+                            | ".pytest.toml"
+                            | "pytest.ini"
+                            | ".pytest.ini"
+                            | "pyproject.toml"
+                            | "tox.ini"
+                            | "setup.cfg"
+                    )
+                ) || matches!(
+                    cf_path.extension().and_then(|e| e.to_str()),
+                    Some("ini" | "cfg" | "toml")
+                );
+                if !has_loader && cf_path.is_file() {
+                    return Err(format!(
+                        "Config file '{}' has an unsupported format. \
+                         Supported extensions are: .cfg, .ini, .toml.",
+                        cf_path.display()
+                    ));
+                }
+                if cf_path.is_file() {
+                    let (ini_file, toml_types) = load_config_from_path(&cf_path)?;
+                    let rootdir = cf_path
+                        .parent()
+                        .map(|p| p.to_path_buf())
+                        .unwrap_or_else(|| cwd.clone());
+                    let file_name = cf_path.file_name().map(|n| n.to_string_lossy().to_string());
+                    (rootdir, file_name, ini_file, Vec::new(), toml_types)
+                } else {
+                    // Not a regular file (--config-file=/dev/null): no
+                    // configuration, and the rootdir is not derived from it
+                    // (#11502).
+                    let ancestor = common_ancestor(&dirs_from_args(cwd.as_ref(), argv));
+                    let mut rootdir = common_ancestor(&[cwd.clone(), ancestor]);
+                    if rootdir.parent().is_none() {
+                        rootdir = cwd.clone();
+                    }
+                    (
+                        rootdir,
+                        Some(cf_path.to_string_lossy().to_string()),
+                        HashMap::new(),
+                        Vec::new(),
+                        HashMap::new(),
+                    )
+                }
             } else {
                 let ancestor = common_ancestor(&dirs_from_args(cwd.as_ref(), argv));
                 let (rootdir, file_name, ini, ignored, toml_types) = find_ini(&ancestor)?;

@@ -167,9 +167,31 @@ pub(crate) fn load_config_from_path(path: &Path) -> Result<ParsedIni, String> {
             if matches!(name, "pytest.toml" | ".pytest.toml") {
                 Ok(parse_toml_pytest(&content, Some(&path_str))?
                     .unwrap_or_else(|| (HashMap::new(), HashMap::new())))
-            } else {
+            } else if name == "pyproject.toml" {
                 Ok(parse_pyproject(&content, Some(&path_str))?
                     .unwrap_or_else(|| (HashMap::new(), HashMap::new())))
+            } else {
+                // Any other TOML file (passed via -c) also reads the [pytest]
+                // table pytest's own files use (pytest 9.2, #14705); using it
+                // together with [tool.pytest] is an error.
+                match parse_pyproject(&content, Some(&path_str))? {
+                    None => Ok(parse_toml_pytest(&content, Some(&path_str))?
+                        .unwrap_or_else(|| (HashMap::new(), HashMap::new()))),
+                    Some(parsed) => {
+                        let has_pytest_table = content
+                            .parse::<toml::Table>()
+                            .is_ok_and(|doc| doc.contains_key("pytest"));
+                        if has_pytest_table {
+                            return Err(format!(
+                                "{path_str}: Cannot use both [pytest] and [tool.pytest]/\
+                                 [tool.pytest.ini_options] in the same file. Please use \
+                                 [pytest], which is what pytest's own configuration files \
+                                 use; the [tool.pytest] tables are meant for pyproject.toml."
+                            ));
+                        }
+                        Ok(parsed)
+                    }
+                }
             }
         }
         Some("cfg") => Ok((
@@ -309,6 +331,29 @@ fn parse_toml_pytest(content: &str, path: Option<&str>) -> Result<Option<ParsedI
         }
     };
     let Some(pytest) = document.get("pytest").and_then(|v| v.as_table()) else {
+        // Options written outside of any table: the usual way of getting the
+        // table wrong (pytest 9.2's _config_from_pytest_table).
+        let mut top_level: Vec<&str> = document
+            .iter()
+            .filter(|(_, v)| !v.is_table())
+            .map(|(k, _)| k.as_str())
+            .collect();
+        // toml::Table sorts its keys; list them in file order like upstream.
+        let line_of = |key: &str| {
+            content.lines().position(|line| {
+                line.trim_start()
+                    .strip_prefix(key)
+                    .is_some_and(|rest| rest.trim_start().starts_with('='))
+            })
+        };
+        top_level.sort_by_key(|key| line_of(key));
+        if let (false, Some(p)) = (top_level.is_empty(), path) {
+            return Err(format!(
+                "{p}: pytest configuration must be under a [pytest] table \
+                 (found top-level options: {})",
+                top_level.join(", ")
+            ));
+        }
         return Ok(None);
     };
     Ok(Some(render_toml_entries(pytest.iter().collect())))
