@@ -129,9 +129,8 @@ impl FixtureRegistry {
     }
 
     /// The transitive fixture closure for an item, in pytest's
-    /// getfixtureclosure order: autouse + requested names seed the list,
-    /// each fixture's own dependencies append at the end as discovered,
-    /// then a stable sort puts higher-scoped fixtures first. Parametrized
+    /// getfixtureclosure order: a DFS pre-order from autouse + requested
+    /// names, then a stable sort puts higher-scoped fixtures first. Parametrized
     /// fixtures expand as ID/axis order from this.
     pub fn closure_for(
         &self,
@@ -194,15 +193,10 @@ impl FixtureRegistry {
         initialnames: &[String],
         ignore_args: &HashSet<String>,
     ) -> Vec<String> {
+        // pytest 9.2: a plain DFS pre-order from the initial names (each
+        // fixture's dependencies follow it), no longer seeded with all of
+        // them first.
         let mut closure: Vec<String> = Vec::new();
-        {
-            let mut seen: HashSet<String> = HashSet::new();
-            for n in initialnames {
-                if seen.insert(n.clone()) {
-                    closure.push(n.clone());
-                }
-            }
-        }
         let mut arg2defs: HashMap<String, Vec<Arc<FixtureDef>>> = HashMap::new();
         let mut current_indices: HashMap<String, i32> = HashMap::new();
         for name in initialnames {
