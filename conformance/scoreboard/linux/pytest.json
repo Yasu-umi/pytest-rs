@@ -8,10 +8,10 @@
   "files": [
     {
       "file": "testing/python/approx.py",
-      "status": "failed",
-      "exit_code": 1,
-      "passed": 94,
-      "failed": 63,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 157,
+      "failed": 0,
       "skipped": 22,
       "errors": 0,
       "deselected": 0,
@@ -571,7 +571,7 @@
       "file": "testing/test_warning_types.py",
       "status": "passed",
       "exit_code": 0,
-      "passed": 15,
+      "passed": 16,
       "failed": 0,
       "skipped": 0,
       "errors": 0,

@@ -25,7 +25,7 @@ pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.2.0 | 2925 | 323 | 0 | 62 | 0 | 50 | 3360 | 88.9% | 29 | 55 | 62 |
+| pytest | 9.2.0 | 2989 | 260 | 0 | 62 | 0 | 50 | 3361 | 90.8% | 30 | 55 | 62 |
 | pytest-asyncio | v1.5.0 | 268 | 0 | 0 | 3 | 0 | 0 | 271 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 7 | 0 | 0 | 0 | 0 | 0 | 7 | 100.0% | 2 | 2 | 0 |
 | pytest-mock | v3.17.0 | 158 | 0 | 0 | 1 | 0 | 2 | 161 | 98.8% | 1 | 1 | 0 |
@@ -76,7 +76,7 @@ pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| testing/python/approx.py | failed | 94 | 63 | 0 | 22 | 0 | 0 |
+| testing/python/approx.py | passed | 157 | 0 | 0 | 22 | 0 | 0 |
 | testing/python/collect.py | failed | 83 | 1 | 0 | 0 | 0 | 0 |
 | testing/python/fixtures.py | failed | 208 | 22 | 0 | 2 | 0 | 11 |
 | testing/python/integration.py | passed | 16 | 0 | 0 | 4 | 0 | 0 |
@@ -127,7 +127,7 @@ pytest-rs; they are not counted in the total.
 | testing/test_tmpdir.py | failed | 42 | 21 | 0 | 1 | 0 | 3 |
 | testing/test_unittest.py | failed | 67 | 3 | 0 | 9 | 0 | 1 |
 | testing/test_unraisableexception.py | passed | 14 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_warning_types.py | passed | 15 | 0 | 0 | 0 | 0 | 0 |
+| testing/test_warning_types.py | passed | 16 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_warnings.py | failed | 56 | 3 | 0 | 5 | 0 | 0 |
 | testing/acceptance_test.py | failed | 82 | 15 | 0 | 2 | 0 | 6 |
 | testing/deprecated_test.py | failed | 12 | 17 | 0 | 0 | 0 | 0 |
