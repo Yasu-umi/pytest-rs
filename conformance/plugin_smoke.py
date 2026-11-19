@@ -52,7 +52,7 @@ DEPS = [
     # process show the same line (NORMALIZERS below reconciles the two
     # differing version numbers) instead of the byte-diff comparing against
     # an incomplete reference environment that lacks it.
-    "pytest-benchmark==5.1.0",
+    "pytest-benchmark==5.3.1",
 ]
 TIMEOUT_S = 120
 
