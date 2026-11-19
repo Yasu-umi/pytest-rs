@@ -299,7 +299,7 @@ class TerminalReporter:
         """Upstream's "platform ... -- Python X, pytest-Y, pluggy-Z" line."""
         pluggy = TerminalReporter._pluggy_version()
         verinfo = platform.python_version()
-        return f"platform {sys.platform} -- Python {verinfo}, pytest-9.0.3, pluggy-{pluggy}"
+        return f"platform {sys.platform} -- Python {verinfo}, pytest-9.2.0, pluggy-{pluggy}"
 
     def __init__(self, config, file=None):
         self.config = config

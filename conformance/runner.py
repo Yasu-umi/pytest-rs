@@ -39,7 +39,7 @@ PY_TAG = f"py{sys.version_info.major}.{sys.version_info.minor}"
 # `importlib.metadata.version("pytest")` (pytest-bdd's fixture-registry
 # compat, for one) would then take code paths for internals pytest-rs does
 # not emulate. Kept in sync with crates/pytest-rs-core/py/pytest/__init__.py.
-TARGET_PYTEST = "9.0.3"
+TARGET_PYTEST = "9.2.0"
 # Results are platform-scoped: counts differ between linux and darwin
 # (platform-specific skips, system deps), so each platform owns its
 # scoreboard; linux is canonical (regenerated and committed from CI).

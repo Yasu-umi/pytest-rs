@@ -243,7 +243,7 @@ uv run --no-project python conformance/runner.py           # re-clones from upst
 
 | Project | License | Tag |
 |---|---|---|
-| [pytest](https://github.com/pytest-dev/pytest) | MIT | 9.0.3 |
+| [pytest](https://github.com/pytest-dev/pytest) | MIT | 9.2.0 |
 | [pytest-asyncio](https://github.com/pytest-dev/pytest-asyncio) | Apache-2.0 | v1.5.0 |
 | [pytest-mock](https://github.com/pytest-dev/pytest-mock) | MIT | v3.17.0 |
 | [pytest-cov](https://github.com/pytest-dev/pytest-cov) | MIT | v7.1.0 |
