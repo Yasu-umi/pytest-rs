@@ -821,8 +821,15 @@ class Pytester:
             # Pytester.runpytest_subprocess, which always spawns through
             # self.run(), so the monkeypatch takes effect.
             return self._runpytest_subprocess_via_run(args, timeout=timeout)
+        # Like upstream, the pytester.plugins names are passed with -p.
+        plugin_args = []
+        for plugin in self.plugins:
+            plugin_args += ["-p", plugin]
         return self._runpytest(
-            args, timeout=timeout, forward_filters=False, prog="python -m pytest"
+            (*plugin_args, *args),
+            timeout=timeout,
+            forward_filters=False,
+            prog="python -m pytest",
         )
 
     def _runpytest_subprocess_via_run(self, args, *, timeout=None):
