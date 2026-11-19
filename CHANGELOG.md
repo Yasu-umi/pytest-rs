@@ -3,6 +3,96 @@
 Notable changes per release. The release workflow uses the matching section
 as the GitHub release notes (auto-generated notes are the fallback).
 
+## v0.0.14 (2026-11-20)
+
+pytest-rs now targets **pytest 9.2.0**: `pytest.__version__`, `-V`, the session
+header and `minversion` report 9.2.0, and the behavior follows 9.2 (pytest's
+own 9.2.0 test suite runs at 99% conformance under pytest-rs). pytest 9.0.3 is
+no longer the reference version.
+
+### Added
+
+- **pytest 9.2 features**: `--max-warnings` / `max_warnings` and
+  `ExitCode.MAX_WARNINGS_ERROR`; the `assertion_text_diff_style` and
+  `parametrize_long_str_id_strategy` inis; typed `addini(type=...)` (plain
+  types, unions, `Literal`) with native TOML value types; `pytest.register_fixture`;
+  `--strict-markers` checking `-m` expressions; `Node.get_closest_marker(name,
+  default)`; `pytest.PytestApproxDecimalToleranceWarning`; `report.id`; the
+  `_pytest.nodeid` / `_pytest.approx` modules and 9.2's assertion comparison
+  modules.
+- **Startup plugin errors as in pytest 9.2** (#993/#12624): a plugin that cannot
+  be found is a usage error (exit 4), one that raises while importing a
+  `PluginImportFailure` (exit 3); `PYTEST_PLUGINS` also names entry points.
+  Warnings raised while plugins import are reported as config-time warnings,
+  and a plugin that skips itself gives `PytestConfigWarning: skipped plugin`.
+- **Hook dispatch**: `pytest_collection` wrapper impls, `pytest_collectstart`
+  for Module collectors, `pytest_runtest_makereport` per phase (with
+  `call.excinfo`), `pytest_runtest_call` wrappers around the test body (old-style
+  `hookwrapper=True` impls get pluggy's `Result`), `nextitem` for
+  `pytest_runtest_protocol`, and `session.exitstatus` set in
+  `pytest_sessionfinish` as the exit code.
+
+### Changed
+
+- **Native plugins follow their latest releases**: pytest-mock 3.17.0 (rebased
+  on upstream: `SpyType`, spy and `resetall()` fixes), pytest-asyncio 1.5.0
+  (upstream's `mark.asyncio` validation messages,
+  `asyncio_default_fixture_loop_scope = fixture-scope`), pytest-benchmark 5.3.1
+  (`pedantic(teardown=)`, `--benchmark-precision` / `--benchmark-confidence`,
+  the upstream constructor) and anyio 4.16.0 (`--anyio-mode`).
+- **Output matches pytest 9.2**: node duration units, `--no-summary` still runs
+  plugin `pytest_terminal_summary` hooks, `--fixtures` line numbers,
+  `--setup-show` layout, `pytest.warns` / `pytest.raises` / `RaisesGroup`
+  failure messages, junitxml message shortening, assertion explanations
+  (upstream 9.2's util/truncate), the program name in usage errors
+  (`pytest` / `python -m pytest` / `pytest.main()`), a blank line after each
+  `ERROR:` usage error, conftest/plugin header lines before `rootdir:`, and
+  tomllib's wording for config-file TOML errors.
+- **Stricter configuration, like pytest 9.2**: invalid values of the builtin
+  `Literal` inis (`console_output_style`, `tmp_path_retention_policy`,
+  `junit_family`, ...) and `-c` paths that are missing, directories or of an
+  unsupported format stop at startup with a usage error; an installed plugin
+  that fails to load ends the run instead of warning.
+- Deprecated as in pytest 9.2, so they now warn: `@pytest.yield_fixture`,
+  `pytest.console_main()`, `--pastebin`, `config.inicfg`,
+  `_pytest.python.CallSpec2`.
+- The session header shows the installed pluggy's version.
+- `tmp_path`: per-prefix numbered dirs, retention pruning and lock removal at
+  session finish, and a best-effort removal of passed tests' dirs under
+  `tmp_path_retention_policy = "failed"` (pytest 9.2).
+
+### Fixed
+
+- **Concurrent pytest processes could delete each other's live basetemp** — a
+  test that swaps `atexit.register` (pytest-xdist's own test suite does) ran the
+  session's temp-dir cleanup at that test's end, so the basetemp lost its lock
+  and another process's pruning removed it mid-session.
+- **A conftest that skips itself stopped the whole run** — a conftest calling
+  `pytest.importorskip` at module level for a missing module ended the run with
+  "ImportError while loading conftest" (exit 4) once collection reached its
+  directory. That directory is now skipped and the rest collected, as in
+  pytest, also under `-n`. An initial conftest (on an argument's own path)
+  that skips ends the run as an uncaught exception (traceback on stderr,
+  exit status 1), as it does in pytest.
+- **Class fixtures** written as `@pytest.fixture` over `@classmethod` are bound
+  to the class (they failed collection), and over `@staticmethod` async and
+  generator fixtures are recognised.
+- monkeypatch's undo restores an instance's own attribute and survives a failed
+  change; the cache keeps keys inside its directory and warns on failed writes;
+  `caplog` captures non-propagating loggers; doctest option flags no longer leak
+  between docstrings; a skipped unittest TestCase's fixtures no longer run.
+- `config.getoption(name, default=None)` returns `None` for an unknown option.
+- xdist workers publish `session.items` (pytest-django's database setup needs
+  it), and a worker crash that spends the restart budget always says
+  `replacing crashed worker`.
+- Test files with non-UTF-8 names are collected; `-VV` and `--help` load the
+  initial conftests like pytest.
+
+### Removed
+
+- **pytest 9.0.3 as the reference version** (and the code kept only for its
+  compatibility, such as the 9.0-era `approx` implementation).
+
 ## v0.0.13 (2026-11-18)
 
 ### Added
