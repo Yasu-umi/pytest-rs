@@ -127,6 +127,14 @@ impl Engine {
                     println!("!!! KeyboardInterrupt !!!");
                     return exit_code::INTERRUPTED;
                 }
+                // Sentinel "\x00UNCAUGHT_EXCEPTION\x00": an exception upstream
+                // never catches (a Skipped from an initial conftest) — the
+                // interpreter's uncaught-exception traceback on stderr and
+                // exit status 1, without pytest_unconfigure.
+                if let Some(traceback) = message.strip_prefix("\x00UNCAUGHT_EXCEPTION\x00") {
+                    eprint!("{traceback}");
+                    return 1;
+                }
                 // Sentinel "\x00CONFTEST_IMPORT_ERROR\x00": a broken initial
                 // conftest — print upstream's dedicated repr verbatim (no
                 // "ERROR during collection:" wrapper) and exit 4.

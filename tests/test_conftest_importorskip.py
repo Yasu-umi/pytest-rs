@@ -5,6 +5,11 @@ When collection reaches a directory whose conftest calls
 (one skipped collect report, located at the conftest's importorskip line)
 and collects the rest. pytest-rs used to stop the whole run with
 "ImportError while loading conftest" and exit 4.
+
+An initial conftest (on an argument's own path) is different: pytest 9.2
+wraps only ``Exception`` in ConftestImportFailure, so the Skipped escapes and
+the interpreter reports it as an uncaught exception (traceback on stderr,
+nothing on stdout, exit status 1).
 """
 
 from __future__ import annotations
@@ -27,7 +32,7 @@ class TestConftestImportorskip(unittest.TestCase):
             raise unittest.SkipTest("debug binary not built")
 
     def run_in_tree(
-        self, *args: str, env: dict[str, str] | None = None
+        self, *args: str, target: str = "pkg", env: dict[str, str] | None = None
     ) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -39,7 +44,7 @@ class TestConftestImportorskip(unittest.TestCase):
             )
             (sub / "test_a.py").write_text("def test_a():\n    pass\n")
             return subprocess.run(
-                [str(BINARY), "pkg", "-rs", "-p", "no:cacheprovider", *args],
+                [str(BINARY), target, "-rs", "-p", "no:cacheprovider", *args],
                 cwd=tmp_path,
                 capture_output=True,
                 text=True,
@@ -63,6 +68,24 @@ class TestConftestImportorskip(unittest.TestCase):
 
     def test_directory_is_skipped_with_spawned_workers(self) -> None:
         self.assert_dir_skipped(self.run_in_tree("-n", "2", env={"PYTEST_RS_DIST_SPAWN": "1"}))
+
+    def test_initial_conftest_skip_is_uncaught(self) -> None:
+        for target in ("pkg/sub", "pkg/sub/test_a.py"):
+            with self.subTest(target=target):
+                result = self.run_in_tree(target=target)
+                output = f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+                self.assertEqual(result.returncode, 1, output)
+                self.assertEqual(result.stdout, "", output)
+                self.assertTrue(
+                    result.stderr.startswith("Traceback (most recent call last):\n"), output
+                )
+                self.assertIn('pytest.importorskip("no_such_module_xyz")', result.stderr)
+                self.assertTrue(
+                    result.stderr.endswith(
+                        "Skipped: could not import 'no_such_module_xyz': No module named 'no_such_module_xyz'\n"
+                    ),
+                    output,
+                )
 
 
 if __name__ == "__main__":
