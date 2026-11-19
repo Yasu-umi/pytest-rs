@@ -148,6 +148,13 @@ class BaseReport:
     nodeid: str
     outcome: Literal["passed", "failed", "skipped"]
 
+    @property
+    def id(self):
+        """The structured form of :attr:`nodeid` (pytest 9.2's NodeId)."""
+        from _pytest.nodeid import coerce_node_id
+
+        return coerce_node_id(getattr(self, "nodeid", ""))
+
     def __init__(self, **kwargs):
         _set_report_attrs(self, kwargs)
 
