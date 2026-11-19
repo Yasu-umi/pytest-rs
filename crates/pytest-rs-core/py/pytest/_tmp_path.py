@@ -13,7 +13,6 @@ import shutil
 import stat
 import tempfile
 import time
-import warnings
 
 from pytest._fixtures import fixture
 
@@ -132,10 +131,6 @@ class TempPathFactory:
         # Cleanups (numbered-dir pruning, lock removal) run at session
         # finish; atexit only as a last resort (pytest 9.2).
         self._exit_stack = contextlib.ExitStack()
-        # The process the cleanups belong to: a forked child (an xdist
-        # worker of an in-process nested run) inherits this factory and must
-        # not run them.
-        self._owner_pid = os.getpid()
         # Lower-cased prefix -> next number to try, so numbered dirs don't
         # need basetemp listed on every call.
         self._next_number = {}
@@ -315,14 +310,12 @@ def tmp_path_factory():
         and not _any_failed
     ):
         rm_rf(factory._basetemp)
-    # The numbered-dir and lock cleanups registered on the exit stack, in
-    # the process that registered them only. They are best-effort: a
-    # concurrent session deleting the same stale dirs makes rm_rf warn,
-    # which must not land on the last test.
-    if factory._owner_pid == os.getpid():
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            factory._exit_stack.close()
+    # Upstream closes the factory's exit stack here (pytest 9.2: prune stale
+    # numbered basetemps and drop the lock at session finish). Not done yet:
+    # under many concurrent pytest-rs processes it deleted another live
+    # session's basetemp, for a reason not found yet. The stack is only
+    # closed by its atexit registration, which the embedded interpreter
+    # never runs, as before.
 
 
 @fixture
