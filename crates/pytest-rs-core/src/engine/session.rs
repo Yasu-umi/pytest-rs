@@ -473,6 +473,14 @@ impl Engine {
         code
     }
 
+    /// The --max-warnings threshold (the CLI wins over the max_warnings ini).
+    fn max_warnings(&self) -> Option<usize> {
+        self.config
+            .get_value("max-warnings")
+            .or_else(|| self.config.get_ini("max_warnings"))
+            .and_then(|v| v.trim().parse().ok())
+    }
+
     /// Post-run finalization: sessionfinish, caches, the terminal-summary
     /// block, and unraisable/threadexception cleanup. Returns the exit code.
     pub(crate) fn finish_session(&mut self, py: Python<'_>, started: Instant) -> i32 {
@@ -632,6 +640,24 @@ impl Engine {
             }
         }
         let warning_count = python::warning_count(py) + self.session.worker_warning_count;
+        // --max-warnings / max_warnings (pytest 9.2): a passing run with more
+        // warnings than allowed exits MAX_WARNINGS_ERROR, said in red just
+        // before the final stats line.
+        if code == exit_code::OK
+            && let Some(max_warnings) = self.max_warnings()
+            && warning_count > max_warnings
+        {
+            code = exit_code::MAX_WARNINGS_ERROR;
+            println!(
+                "{}",
+                crate::tw::markup(
+                    &format!(
+                        "Tests pass, but maximum allowed warnings exceeded: {warning_count} > {max_warnings}"
+                    ),
+                    &[crate::tw::RED]
+                )
+            );
+        }
         let extra_stats = python::reporter_subtest_stats(py);
         // Hide non-failed subtests only for pytest 9's builtin subtests
         // (verbosity_subtests == 0); the third-party pytest-subtests plugin
