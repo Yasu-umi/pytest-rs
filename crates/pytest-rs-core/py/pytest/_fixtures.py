@@ -38,9 +38,14 @@ class FixtureFunctionMarker:
                 f"function {getattr(function, '__name__', function)!r}"
             )
         if hasattr(function, "pytestmark"):
-            from _pytest.deprecated import MARKED_FIXTURE
+            # An error since pytest 9 (#3364).
+            from _pytest.outcomes import fail
 
-            warnings.warn(MARKED_FIXTURE, stacklevel=2)
+            fail(
+                "Marks cannot be applied to fixtures.\n"
+                "See docs: https://docs.pytest.org/en/stable/deprecations.html"
+                "#applying-a-mark-to-a-fixture-function"
+            )
         return FixtureFunctionDefinition(
             function=function,
             fixture_function_marker=self,

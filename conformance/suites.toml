@@ -102,6 +102,10 @@ known_failures = [
     # failure. Not a pytest-rs bug; self-corrects if upstream ever drops the
     # marker.
     "testing/test_mark.py::TestKeywordSelection::test_keyword_extra_dash",
+    # Pins down that doctest and python items of one module don't share a
+    # session fixture instance; the test itself calls sharing "also an
+    # acceptable behavior" (#14533), which is what pytest-rs does.
+    "testing/test_doctest.py::TestDoctestAutoUseFixtures::test_doctest_and_python_fixtures_not_shared",
     # pytest 9.2 tests that call pytest internals directly (helpers or
     # classes pytest-rs implements in Rust or does not mirror); the
     # user-visible behavior they back is covered by other tests.
