@@ -143,7 +143,7 @@ Key structural rules:
   pretty's failure table work. Native runs pay nothing: the default reporter is inert and
   the engine renders in Rust. `-n` runs feed the controller-side reporter in arrival order
   (xdist behavior); forked workers drop the inherited replacement (stdout is the IPC pipe).
-  pytest-pretty's output is byte-identical to real pytest 9.0.3 on the mixed-outcome demo;
+  pytest-pretty's output is byte-identical to real pytest 9.2.0 on the mixed-outcome demo;
   sugar needs a tty (or `--force-sugar`), upstream behavior. Not delegated: --collect-only
   trees and --cache-show stay native.
 - **`pytest_collection_preexpand`** (pytest-rs-specific hook): runs after collection but
@@ -173,10 +173,11 @@ Key structural rules:
   pytest internals. anyio is deliberately *not* skipped: its plugin module's fixtures
   (anyio_backend & friends) register through autoload, while the hooks pytest-rs cannot
   emulate from Python live in the native anyio crate. `PYTEST_DISABLE_PLUGIN_AUTOLOAD` and `-p no:NAME` (entry-point or
-  module name) opt out. Divergence: a plugin that fails to import warns
-  (PytestConfigWarning) and is skipped instead of aborting the run — plugins built against
-  pluggy/`_pytest` internals would otherwise make every run on that venv unusable. Loaded
-  in the controller before conftests and mirrored in spawned workers (forked workers
+  module name) opt out. A plugin that fails to load ends the run, as in pytest 9.2: one
+  that cannot be found is a `UsageError`, one raising while it imports a
+  `PluginImportFailure`; warnings raised while plugins import are re-issued as config-time
+  warnings, and a plugin that skips itself gives `PytestConfigWarning: skipped plugin`.
+  Loaded in the controller before conftests and mirrored in spawned workers (forked workers
   inherit). Autoloaded modules also register into the shim pluginmanager, so plugins
   shipping their own hookspecs (pytest-timeout's `pytest_timeout_set_timer`) dispatch and
   are overridable from conftests.

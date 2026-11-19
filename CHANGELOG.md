@@ -7,8 +7,8 @@ as the GitHub release notes (auto-generated notes are the fallback).
 
 pytest-rs now targets **pytest 9.2.0**: `pytest.__version__`, `-V`, the session
 header and `minversion` report 9.2.0, and the behavior follows 9.2 (pytest's
-own 9.2.0 test suite: 98% of tests, 55 files fully passing or pinned). pytest
-9.0.3 is no longer the reference version.
+own 9.2.0 test suite runs at 99% conformance under pytest-rs). pytest 9.0.3 is
+no longer the reference version.
 
 ### Added
 

@@ -114,10 +114,10 @@ Installed `pytest11` entry points load through the `pytest` API shim — plugins
 |---|---|
 | own upstream test suite runs under pytest-rs and gates CI (per-suite pass-rate in the **Third-party plugins** [conformance table](#conformance-testing) below) | `pytest-timeout`, `pytest-randomly`, `pytest-env`, `pytest-socket`, `pytest-snapshot`, `pytest-ruff`, `pytest-rerunfailures`, `pytest-order`, `pytest-repeat`, `pytest-instafail`, `pytest-icdiff`, `pytest-metadata`, `pytest-subtests`, `pytest-mypy`, `pytest-bdd`, `pytest-django`, `pytest-aiohttp`; `anyio`'s own plugin module also loads this way |
 | functional smoke demo gates CI (`conformance/plugin_smoke.py`) | `Faker`, `time-machine`, `requests-mock`, `inline-snapshot` (snapshot assertions + `--inline-snapshot` flag), `pytest-run-parallel` (`--parallel-threads` really runs each test on N threads) |
-| reporter replacement — terminal output byte-diffed against real pytest 9.0.3 | `pytest-pretty`, `pytest-sugar` (progress bar, instant failures; activates on a tty or `--force-sugar`) |
+| reporter replacement — terminal output byte-diffed against real pytest 9.2.0 | `pytest-pretty`, `pytest-sugar` (progress bar, instant failures; activates on a tty or `--force-sugar`) |
 | not reimplemented yet | `pytest-html` (needs the report data model exposed); `syrupy` (serializer/extension framework) |
 
-A plugin that fails to import (e.g. it reaches into pytest/pluggy internals the shim doesn't provide) warns and is skipped without breaking the run. `-p no:NAME` and `PYTEST_DISABLE_PLUGIN_AUTOLOAD` opt out, like pytest.
+A plugin that fails to load stops the run, as in pytest 9.2: one that cannot be found is a usage error (exit 4), one that raises while importing (e.g. it reaches into pytest/pluggy internals the shim doesn't provide) an `Error while loading plugin` failure (exit 3). `-p no:NAME` and `PYTEST_DISABLE_PLUGIN_AUTOLOAD` opt out, like pytest.
 
 Installing one of these into a pytest-rs environment needs care, since the plugin's own `pytest` dependency would reinstall the real distribution — see [Adding a third-party plugin without pulling `pytest` back in](#adding-a-third-party-plugin-without-pulling-pytest-back-in).
 
@@ -248,7 +248,7 @@ uv run --no-project python conformance/runner.py           # re-clones from upst
 | [pytest-mock](https://github.com/pytest-dev/pytest-mock) | MIT | v3.17.0 |
 | [pytest-cov](https://github.com/pytest-dev/pytest-cov) | MIT | v7.1.0 |
 | [pytest-xdist](https://github.com/pytest-dev/pytest-xdist) | MIT | v3.8.0 |
-| [pytest-split](https://github.com/jerry-git/pytest-split) | MIT | 0.9.0 |
+| [pytest-split](https://github.com/jerry-git/pytest-split) | MIT | 0.11.0 |
 | [pytest-benchmark](https://github.com/ionelmc/pytest-benchmark) | BSD-2-Clause | v5.3.1 |
 
 pytest-rs reimplements the public APIs of these projects, plus [anyio](https://github.com/agronholm/anyio)'s pytest plugin (MIT). Parts of the bundled Python shims are ports of upstream code; see [THIRD-PARTY-NOTICES.md](https://github.com/Yasu-umi/pytest-rs/blob/main/THIRD-PARTY-NOTICES.md). Credit for the API design and the test suites belongs to their respective authors.
