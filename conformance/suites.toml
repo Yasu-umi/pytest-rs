@@ -569,6 +569,9 @@ env = { PYTEST_RS_DISABLE_PLUGINS = "benchmark" }
 # every later nested run's own entry-point injection for the rest of the
 # process (test_entrypoint_injection).
 extra_args = ["-p", "no:randomly"]
+# Expects ImportError from a module's missing pytest_plugins; pytest 9.2
+# raises UsageError there (#993), which is what pytest-rs follows.
+known_failures = ["tests/test_pytest_randomly.py::test_failing_import"]
 category = "third-party"
 enabled = true
 
