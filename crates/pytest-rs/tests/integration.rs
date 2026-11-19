@@ -1190,7 +1190,7 @@ def test_raises_did_not_raise_repr():
     try:
         pytest.raises(ValueError, int, "0")
     except pytest.fail.Exception as e:
-        assert "DID NOT RAISE <class 'ValueError'>" in e.msg
+        assert "DID NOT RAISE ValueError" in e.msg
     else:
         assert False, "Expected exception"
 
