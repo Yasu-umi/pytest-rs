@@ -281,7 +281,9 @@ class _ResultCollector:
         if exc_info is None:
             self._record(desc, "passed")
         else:
-            self._record(desc, "failed", exc=exc_info[1])
+            exc = exc_info[1]
+            _drop_unittest_frames(exc)
+            self._record(desc, "failed", exc=exc)
             from pytest._debugging import maybe_interact
 
             maybe_interact(test_case, exc_info[1])
@@ -301,6 +303,26 @@ class _ResultCollector:
         except ValueError:
             pass
         return f"{filename}:{code.co_firstlineno}"
+
+
+def _drop_unittest_frames(exc):
+    """Drop unittest's own frames (modules marking themselves with a
+    ``__unittest`` global) from ``exc``'s traceback, like upstream's
+    TestCaseFunction._traceback_filter."""
+    import types
+
+    frames = []
+    tb = exc.__traceback__
+    while tb is not None:
+        if not tb.tb_frame.f_globals.get("__unittest"):
+            frames.append((tb.tb_frame, tb.tb_lasti, tb.tb_lineno))
+        tb = tb.tb_next
+    if not frames:
+        return
+    new_tb = None
+    for frame, lasti, lineno in reversed(frames):
+        new_tb = types.TracebackType(new_tb, frame, lasti, lineno)
+    exc.__traceback__ = new_tb
 
 
 def _process_teardown_exceptions(cls):

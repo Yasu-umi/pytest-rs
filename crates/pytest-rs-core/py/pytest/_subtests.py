@@ -65,7 +65,9 @@ class SubtestContext:
 
     def __init__(self, *, msg: str | None = None, kwargs: dict | None = None):
         self.msg = msg
-        self.kwargs = dict(kwargs or {})
+        # saferepr'd up front so the report is JSON serializable
+        # (pytest-dev/pytest-xdist#1273, pytest 9.2).
+        self.kwargs = {k: _saferepr(v) for k, v in (kwargs or {}).items()}
 
     def __eq__(self, other: Any) -> bool:
         return (
@@ -147,7 +149,14 @@ class SubtestReport:
         return f"{domain} {self._sub_test_description()}"
 
     def _sub_test_description(self) -> str:
-        return _description(self.context.msg, self.context.kwargs)
+        parts = []
+        if self.context.msg is not None:
+            parts.append(f"[{self.context.msg}]")
+        if self.context.kwargs:
+            # The values are already saferepr'd (SubtestContext).
+            params_desc = ", ".join(f"{k}={v}" for k, v in self.context.kwargs.items())
+            parts.append(f"({params_desc})")
+        return " ".join(parts) or "(<subtest>)"
 
     def _to_json(self) -> dict[str, Any]:
         data = dict(getattr(self, "__dict__", {}))

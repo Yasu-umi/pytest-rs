@@ -168,7 +168,21 @@ def get_unpacked_marks(obj, *, consider_mro=True):
                 mark_list.append(item)
     else:
         mark_attribute = getattr(obj, "pytestmark", [])
-        if isinstance(mark_attribute, list):
+        if mark_attribute is None:
+            # A module __getattr__ returning None for everything (#8265).
+            from _pytest.warning_types import PytestCollectionWarning
+
+            warnings.warn(
+                "Module defines a `__getattr__` which returns None for "
+                "'pytestmark' instead of raising AttributeError. "
+                "Make sure `__getattr__` raises AttributeError for "
+                "attributes it does not provide. "
+                "See https://github.com/pytest-dev/pytest/issues/8265",
+                PytestCollectionWarning,
+                stacklevel=2,
+            )
+            mark_list = []
+        elif isinstance(mark_attribute, list):
             mark_list = mark_attribute
         else:
             mark_list = [mark_attribute]
@@ -185,10 +199,14 @@ def store_mark(obj, mark, *, stacklevel=3):
     """Store a Mark on an object (upstream store_mark): reassigns pytestmark
     from the object's OWN marks so inherited lists are never mutated."""
     if hasattr(obj, "_pytestfixturefunction"):
-        # Marks applied to a fixture are inert (#3364).
-        from _pytest.deprecated import MARKED_FIXTURE
+        # Marks cannot be applied to a fixture: an error since pytest 9 (#3364).
+        from _pytest.outcomes import fail
 
-        warnings.warn(MARKED_FIXTURE, stacklevel=stacklevel)
+        fail(
+            "Marks cannot be applied to fixtures.\n"
+            "See docs: https://docs.pytest.org/en/stable/deprecations.html"
+            "#applying-a-mark-to-a-fixture-function"
+        )
     obj.pytestmark = [*get_unpacked_marks(obj, consider_mro=False), mark]
 
 
