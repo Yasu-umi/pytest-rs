@@ -119,10 +119,19 @@ class WarningsChecker(WarningsRecorder):
                     f" Emitted warnings: {found_str()}."
                 )
             elif not any(self.matches(w) for w in self):
+                # pytest 9.1 wording; hints at re.escape() when a message
+                # equals the (unescaped) regex.
+                escape_hint = ""
+                if isinstance(self.match_expr, str) and any(
+                    self.match_expr == str(w.message)
+                    for w in self
+                    if issubclass(w.category, self.expected_warning)
+                ):
+                    escape_hint = "\n Did you mean to `re.escape()` the regex?"
                 fail(
-                    f"DID NOT WARN. No warnings of type {self.expected_warning} matching the regex were emitted.\n"
-                    f" Regex: {self.match_expr}\n"
-                    f" Emitted warnings: {found_str()}."
+                    f"Regex pattern did not match any of the {len(self)} warnings emitted.\n"
+                    f" Regex: {self.match_expr!r}\n"
+                    f" Emitted warnings: {found_str()}.{escape_hint}"
                 )
         finally:
             # Whether or not any warnings matched, re-emit all unmatched
@@ -134,7 +143,6 @@ class WarningsChecker(WarningsRecorder):
                         category=w.category,
                         filename=w.filename,
                         lineno=w.lineno,
-                        module=w.__module__,
                         source=w.source,
                     )
 
@@ -169,9 +177,10 @@ def warns[T, **P](
 ) -> T: ...
 
 
-def warns(expected_warning=Warning, *args, match=None, **kwargs):
+def warns(expected_warning=Warning, *args, **kwargs):
     __tracebackhide__ = True
     if not args:
+        match = kwargs.pop("match", None)
         if kwargs:
             argnames = ", ".join(sorted(kwargs))
             raise TypeError(
@@ -196,13 +205,13 @@ def deprecated_call[T, **P](func: "Callable[P, T]", *args: "P.args", **kwargs: "
 
 def deprecated_call(func=None, *args, **kwargs):
     __tracebackhide__ = True
-    if func is not None:
-        args = (func, *args)
-    return warns(
-        (DeprecationWarning, PendingDeprecationWarning, FutureWarning),
-        *args,
-        **kwargs,
-    )
+    dep_warnings = (DeprecationWarning, PendingDeprecationWarning, FutureWarning)
+    if func is None:
+        return warns(dep_warnings, *args, **kwargs)
+    # The function form passes every keyword through to ``func``, `match`
+    # included (pytest 9.2).
+    with warns(dep_warnings):
+        return func(*args, **kwargs)
 
 
 @fixture
