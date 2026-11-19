@@ -9,6 +9,7 @@
 "testing/test_collection.py" = "passed"
 "testing/test_compat.py" = "passed"
 "testing/test_conftest.py" = "passed"
+"testing/test_error_diffs.py" = "passed"
 "testing/test_link_resolve.py" = "passed"
 "testing/test_main.py" = "passed"
 "testing/test_nodes.py" = "passed"
