@@ -3,6 +3,7 @@
 
 [files]
 "testing/acceptance_test.py" = "passed"
+"testing/deprecated_test.py" = "passed"
 "testing/examples/test_issue519.py" = "passed"
 "testing/freeze/tests/test_trivial.py" = "passed"
 "testing/logging/test_fixture.py" = "passed"
@@ -26,8 +27,10 @@
 "testing/test_error_diffs.py" = "passed"
 "testing/test_faulthandler.py" = "passed"
 "testing/test_helpconfig.py" = "passed"
+"testing/test_junitxml.py" = "passed"
 "testing/test_link_resolve.py" = "passed"
 "testing/test_main.py" = "passed"
+"testing/test_mark.py" = "passed"
 "testing/test_monkeypatch.py" = "passed"
 "testing/test_nodeid.py" = "passed"
 "testing/test_nodes.py" = "passed"
@@ -42,6 +45,7 @@
 "testing/test_stash.py" = "passed"
 "testing/test_stepwise.py" = "passed"
 "testing/test_subtests.py" = "passed"
+"testing/test_terminal.py" = "passed"
 "testing/test_threadexception.py" = "passed"
 "testing/test_unraisableexception.py" = "passed"
 "testing/test_warning_types.py" = "passed"
