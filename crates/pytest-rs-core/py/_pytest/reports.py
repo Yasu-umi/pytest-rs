@@ -154,6 +154,13 @@ class BaseReport:
     def _join_sections(self, prefix):
         return "".join(content for (header, content) in self.sections if header.startswith(prefix))
 
+    def get_sections(self, prefix):
+        """Yield ``(prefix, content)`` for each section whose name starts
+        with ``prefix`` (upstream BaseReport.get_sections)."""
+        for name, content in self.sections:
+            if name.startswith(prefix):
+                yield prefix, content
+
     @property
     def capstdout(self):
         return self._join_sections("Captured stdout")
