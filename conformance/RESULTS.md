@@ -51,12 +51,12 @@ pytest-rs; they are not counted in the total.
 | click | 8.5.1 | 2373 | 61 | 0 | 24 | 0 | 0 | 2458 | 97.5% | 42 | 43 | 0 |
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
 | marshmallow | 4.4.0 | 1192 | 0 | 0 | 0 | 0 | 0 | 1192 | 100.0% | 12 | 12 | 3 |
-| rich | v15.0.0 | 954 | 0 | 0 | 20 | 0 | 7 | 981 | 99.3% | 61 | 63 | 0 |
+| rich | v15.0.0 | 955 | 0 | 0 | 20 | 0 | 6 | 981 | 99.4% | 61 | 63 | 0 |
 | sqlglot | v30.33.0 | 1613 | 0 | 0 | 0 | 0 | 0 | 1613 | 100.0% | 58 | 60 | 0 |
 | pytest-bdd | 9.0.1 | 45 | 100 | 0 | 1 | 0 | 0 | 146 | 31.5% | 7 | 35 | 0 |
 | httpx | 0.28.1 | 1408 | 2 | 0 | 1 | 0 | 7 | 1418 | 99.4% | 30 | 31 | 0 |
 | httpx2 | v2.16.2 | 1807 | 0 | 0 | 0 | 0 | 2 | 1809 | 99.9% | 36 | 36 | 0 |
-| starlette | 1.10.0 | 1357 | 0 | 1 | 2 | 0 | 0 | 1360 | 99.9% | 30 | 31 | 0 |
+| starlette | 1.10.0 | 1412 | 0 | 0 | 2 | 0 | 0 | 1414 | 100.0% | 31 | 31 | 0 |
 | attrs | 26.1.0 | 1379 | 0 | 0 | 6 | 0 | 0 | 1385 | 100.0% | 23 | 25 | 0 |
 | more-itertools | v11.2.1 | 765 | 0 | 0 | 0 | 0 | 0 | 765 | 100.0% | 2 | 2 | 0 |
 | pytest-django | v4.14.0 | 237 | 0 | 0 | 1 | 0 | 0 | 238 | 100.0% | 14 | 15 | 0 |
@@ -569,7 +569,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_color_triplet.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_columns.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_columns_align.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_console.py | passed | 99 | 0 | 0 | 0 | 0 | 1 |
+| tests/test_console.py | passed | 100 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_constrain.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_containers.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_control.py | passed | 7 | 0 | 0 | 0 | 0 | 0 |
@@ -835,7 +835,7 @@ pytest-rs; they are not counted in the total.
 | tests/middleware/test_gzip.py | passed | 74 | 0 | 0 | 0 | 0 | 0 |
 | tests/middleware/test_https_redirect.py | passed | 6 | 0 | 0 | 0 | 0 | 0 |
 | tests/middleware/test_middleware.py | passed | 8 | 0 | 0 | 0 | 0 | 0 |
-| tests/middleware/test_opentelemetry.py | error | 0 | 0 | 1 | 0 | 0 | 0 |
+| tests/middleware/test_opentelemetry.py | passed | 55 | 0 | 0 | 0 | 0 | 0 |
 | tests/middleware/test_session.py | passed | 29 | 0 | 0 | 0 | 0 | 0 |
 | tests/middleware/test_trusted_host.py | passed | 53 | 0 | 0 | 0 | 0 | 0 |
 | tests/middleware/test_wsgi.py | passed | 13 | 0 | 0 | 0 | 0 | 0 |
