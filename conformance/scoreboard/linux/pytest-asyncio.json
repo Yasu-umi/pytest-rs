@@ -153,9 +153,9 @@
       "file": "tests/modes/test_strict_mode.py",
       "status": "passed",
       "exit_code": 0,
-      "passed": 7,
+      "passed": 4,
       "failed": 0,
-      "skipped": 0,
+      "skipped": 3,
       "errors": 0,
       "deselected": 0,
       "known_failed": 0
