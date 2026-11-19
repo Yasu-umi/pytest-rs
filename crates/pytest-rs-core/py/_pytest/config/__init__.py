@@ -220,6 +220,19 @@ def main(args=None, plugins=None):
     raise NotImplementedError("_pytest.config.main is not supported by pytest-rs")
 
 
+class PluginImportFailure(Exception):
+    """A plugin was found, but raised while being imported (pytest 9.2, #993):
+    a defect in the plugin, reported as an internal error — unlike a plugin
+    that cannot be found at all, which is a UsageError."""
+
+
+def _is_missing_module(e, importspec):
+    """Whether ``e`` means that ``importspec`` itself could not be found."""
+    if e.name is None:
+        return False
+    return e.name == importspec or importspec.startswith(f"{e.name}.")
+
+
 def get_plugin_manager() -> "PytestPluginManager":
     """Return the global plugin manager (backward-compat API, upstream #787)."""
     from pytest._pluginmanager import pluginmanager

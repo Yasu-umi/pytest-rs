@@ -114,6 +114,13 @@ impl Engine {
                     }
                     return exit_code::INTERNAL_ERROR;
                 }
+                // Sentinel "\x00PLUGIN_IMPORT_FAILURE\x00": a plugin found but
+                // raising while it loads (pytest 9.2 #993) — upstream's
+                // print_plugin_import_error on stderr, INTERNAL_ERROR.
+                if let Some(inner) = message.strip_prefix("\x00PLUGIN_IMPORT_FAILURE\x00") {
+                    eprintln!("{inner}");
+                    return exit_code::INTERNAL_ERROR;
+                }
                 // Sentinel "\x00KEYBOARD_INTERRUPT\x00": KeyboardInterrupt during
                 // collection — print the special "!!! KeyboardInterrupt !!!" banner.
                 if message == "\x00KEYBOARD_INTERRUPT\x00" {

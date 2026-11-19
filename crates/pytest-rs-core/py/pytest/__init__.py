@@ -210,11 +210,11 @@ def _resolve_string_plugin(name):
     existing = sys.modules.get(name)
     if existing is not None:
         return existing
-    try:
-        return importlib.import_module(name)
-    except ImportError as exc:
-        message = exc.args[0] if exc.args else str(exc)
-        raise ImportError(f'Error importing plugin "{name}": {message}') from exc
+    # A plugin that cannot be found is a UsageError, one raising while it
+    # imports a PluginImportFailure (pytest 9.2 #993).
+    from pytest._pluginmanager import import_named_plugin
+
+    return import_named_plugin(name)
 
 
 def main(args=None, plugins=None):
@@ -249,11 +249,24 @@ def main(args=None, plugins=None):
     # gets the in-process path, which is what lets object plugins and a
     # failed plugin import's ImportError reach the caller directly.
     if "_native_inline_run" in globals():
+        from _pytest.config import PluginImportFailure
+
         from pytest._pytester import run_inprocess
 
-        resolved_plugins = [
-            _resolve_string_plugin(p) if isinstance(p, str) else p for p in (plugins or [])
-        ]
+        try:
+            resolved_plugins = [
+                _resolve_string_plugin(p) if isinstance(p, str) else p for p in (plugins or [])
+            ]
+        except UsageError as e:
+            # Reported through the return value, not raised (#993).
+            print(f"ERROR: {e}\n", file=sys.stderr)
+            return ExitCode.USAGE_ERROR
+        except PluginImportFailure as e:
+            from pytest._tb import format_plugin_import_error
+
+            print(format_plugin_import_error(e), file=sys.stderr)
+            return ExitCode.INTERNAL_ERROR
+        resolved_plugins = [p for p in resolved_plugins if p is not None]
         reprec = run_inprocess(cli, plugins=resolved_plugins)
         return reprec.ret
 

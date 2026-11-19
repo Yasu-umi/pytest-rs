@@ -1098,14 +1098,10 @@ class PluginManager:
             if loaded:
                 _ = getattr(sys.modules.get(modname), "__loader__", None)
                 return
-        try:
-            __import__(modname)
-        except ImportError as e:
-            raise ImportError(f'Error importing plugin "{modname}": {e.args[0]}').with_traceback(
-                e.__traceback__
-            ) from e
-        else:
-            mod = sys.modules[modname]
+        # A plugin that cannot be found is a UsageError, one raising while
+        # it imports a PluginImportFailure (pytest 9.2 #993).
+        mod = import_named_plugin(modname)
+        if mod is not None:
             _ = getattr(mod, "__loader__", None)
             self.register(mod, modname)
 
@@ -1121,7 +1117,7 @@ class PluginManager:
                 from pytest._rewrite import _FINDER
 
                 _FINDER.mark_rewrite(name.split(".")[0])
-                plugin = ep.load()
+                plugin = load_entry_point(ep)
                 self.register(plugin, ep.name)
                 return True
         return False
@@ -1150,12 +1146,8 @@ class PluginManager:
         for name in env.split(","):
             name = name.strip()
             if name:
-                already_loaded = self.getplugin(name) is not None
+                # pytest 9.2 (#12624): PYTEST_PLUGINS names entry points too.
                 self.import_plugin(name, consider_entry_points=True)
-                if not already_loaded:
-                    mod = sys.modules.get(name)
-                    if mod is not None:
-                        _ = getattr(mod, "__spec__", None)
 
     def consider_setuptools_entrypoints(self) -> None:
         """Load installed pytest11 entry-point plugins (like upstream)."""
@@ -1179,8 +1171,104 @@ class PluginManager:
                 from pytest._rewrite import _FINDER
 
                 _FINDER.mark_rewrite(modname.split(".")[0])
-                plugin = ep.load()
+                plugin = load_entry_point(ep)
                 self.register(plugin, ep.name)
 
 
 pluginmanager = PluginManager()
+
+
+#: Top-level modules of the plugins pytest-rs implements natively: a
+#: ``-p NAME`` for one of them is satisfied even when the real package is
+#: not installed.
+_NATIVE_PLUGIN_TOPS = frozenset(
+    {
+        "xdist",
+        "pytest_cov",
+        "pytest_mock",
+        "pytest_asyncio",
+        "pytest_benchmark",
+        "pytest_split",
+        "anyio",
+        "hypothesis",
+        "_hypothesis_pytestplugin",
+    }
+)
+
+
+def import_named_plugin(name, search_dir=None):
+    """Import the plugin module ``name`` for ``-p NAME``, ``PYTEST_PLUGINS``
+    or a conftest's ``pytest_plugins`` (upstream's
+    PytestPluginManager.import_plugin, pytest 9.2 #993). Returns the module,
+    or None when there is nothing to register (a builtin or natively
+    implemented plugin, or one that skipped itself). A plugin that cannot be
+    found raises UsageError; one that raises while importing raises
+    PluginImportFailure."""
+    import importlib
+
+    from _pytest.config import PluginImportFailure, _is_missing_module
+    from _pytest.outcomes import Skipped
+
+    import pytest
+
+    if name in PluginManager._BUILTIN_PLUGINS:
+        try:
+            return importlib.import_module("_pytest." + name)
+        except ImportError:
+            return None
+
+    def attempt():
+        try:
+            return importlib.import_module(name)
+        except Skipped:
+            return None
+        except ModuleNotFoundError as e:
+            if not _is_missing_module(e, name):
+                raise PluginImportFailure(name) from e
+            raise
+        except pytest.UsageError:
+            raise
+        except PluginImportFailure:
+            raise
+        except Exception as e:
+            raise PluginImportFailure(name) from e
+
+    try:
+        return attempt()
+    except ModuleNotFoundError as missing:
+        # pytest-rs fallbacks: a `_pytest.NAME` shim, and the invocation dir
+        # (sys.path[0] under `python -m pytest`).
+        try:
+            return importlib.import_module("_pytest." + name)
+        except ImportError:
+            pass
+        if search_dir is not None:
+            sys.path.insert(0, str(search_dir))
+            try:
+                return attempt()
+            except ModuleNotFoundError:
+                pass
+            finally:
+                try:
+                    sys.path.remove(str(search_dir))
+                except ValueError:
+                    pass
+        if name.split(".")[0] in _NATIVE_PLUGIN_TOPS:
+            return None
+        raise pytest.UsageError(f'Error importing plugin "{name}": {missing}') from missing
+
+
+def load_entry_point(ep):
+    """``ep.load()`` for a pytest11 entry point: an installed plugin that
+    cannot be loaded is a defect in that plugin (PluginImportFailure), a
+    UsageError passes through."""
+    from _pytest.config import PluginImportFailure
+
+    import pytest
+
+    try:
+        return ep.load()
+    except pytest.UsageError:
+        raise
+    except Exception as e:
+        raise PluginImportFailure(getattr(ep, "name", None) or "pytest11") from e

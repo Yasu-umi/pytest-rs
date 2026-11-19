@@ -212,6 +212,15 @@ impl Engine {
                 // this happens before the header ever prints). Signal both
                 // with the sentinel so the caller in mod.rs returns the right
                 // exit code.
+                // A plugin named by the conftest's pytest_plugins failing to
+                // load is reported like any startup plugin (pytest 9.2 #993):
+                // upstream imports those after the conftest itself.
+                let plugin_error = python::plugin_load_error(py, &err);
+                if plugin_error.starts_with("\x00PLUGIN_IMPORT_FAILURE\x00")
+                    || plugin_error.starts_with("Error importing plugin \"")
+                {
+                    return Err(plugin_error);
+                }
                 let err_msg =
                     python::format_conftest_import_error(py, &err, &conftest.to_string_lossy());
                 return Err(format!("\x00CONFTEST_IMPORT_ERROR\x00{err_msg}"));
