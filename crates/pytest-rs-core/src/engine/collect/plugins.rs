@@ -29,6 +29,24 @@ impl Engine {
                 let _ = recorder.call_method0("reissue");
             }
         }
+        // Upstream's _warn_about_skipped_plugins, right after the startup
+        // plugins load (and before the initial conftests); without the
+        // warnings plugin issue_config_time_warning does nothing.
+        if result.is_ok() {
+            let _ = py.import("_pytest.config").and_then(|m| {
+                if self.config.plugin_disabled("warnings") {
+                    py.import("pytest._pluginmanager")?
+                        .getattr("pluginmanager")?
+                        .getattr("skipped_plugins")?
+                        .call_method0("clear")
+                        .map(drop)
+                } else {
+                    m.getattr("Config")?
+                        .call_method0("_warn_about_skipped_plugins")
+                        .map(drop)
+                }
+            });
+        }
         result
     }
 

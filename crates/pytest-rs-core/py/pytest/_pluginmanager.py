@@ -513,6 +513,10 @@ class PluginManager:
     def __init__(self) -> None:
         self._plugins: list[Any] = []
         self._names: dict[str, Any] = {}
+        # (module name, skip message) of the startup plugins that called
+        # pytest.skip(allow_module_level=True) while importing; reported by
+        # _pytest.config.Config._warn_about_skipped_plugins.
+        self.skipped_plugins: list[tuple[str, str]] = []
         # Core firstresult hookspecs the relay must honor even though no
         # plugin registers them via pytest_addhooks.
         self._specs: dict[str, dict[str, Any]] = {
@@ -1229,7 +1233,8 @@ def import_named_plugin(name, search_dir=None):
     def attempt():
         try:
             return importlib.import_module(name)
-        except Skipped:
+        except Skipped as e:
+            pluginmanager.skipped_plugins.append((name, e.msg or ""))
             return None
         except ModuleNotFoundError as e:
             if not _is_missing_module(e, name):

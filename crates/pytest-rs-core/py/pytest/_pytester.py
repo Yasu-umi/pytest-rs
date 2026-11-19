@@ -1026,6 +1026,19 @@ class Pytester:
             if not config.getoption("disable_plugin_autoload", default=False):
                 pm.consider_setuptools_entrypoints()
             pm.consider_env()
+        locations = dict.fromkeys(map(id, plugin_import_warnings))
+
+        def issue_skipped(warning, stacklevel):
+            # The caller's frame, like _wcapture._fire_config_time_warning.
+            frame = sys._getframe(stacklevel)
+            location = (frame.f_code.co_filename, frame.f_lineno, frame.f_code.co_name)
+            message = warnings.WarningMessage(warning, type(warning), location[0], location[1])
+            plugin_import_warnings.append(message)
+            locations[id(message)] = location
+
+        from _pytest.config import Config as _Config
+
+        _Config._warn_about_skipped_plugins(issue_skipped)
         for warning_message in plugin_import_warnings:
             for plugin in extra_plugins:
                 hook = getattr(plugin, "pytest_warning_recorded", None)
@@ -1036,7 +1049,7 @@ class Pytester:
                     "warning_message": warning_message,
                     "nodeid": "",
                     "when": "config",
-                    "location": None,
+                    "location": locations.get(id(warning_message)),
                 }
                 hook(**{k: v for k, v in kwargs.items() if k in params})
         if self._request is not None:
