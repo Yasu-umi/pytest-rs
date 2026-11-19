@@ -1,6 +1,6 @@
 {
   "suite": "fastapi",
-  "tag": "0.163.2",
+  "tag": "0.165.0",
   "category": "real-world",
   "excluded_files": 0,
   "deselected": 0,
@@ -733,6 +733,17 @@
       "known_failed": 0
     },
     {
+      "file": "tests/test_form_limits.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "deselected": 0,
+      "known_failed": 0
+    },
+    {
       "file": "tests/test_forms_from_non_typing_sequences.py",
       "status": "passed",
       "exit_code": 0,
@@ -1441,6 +1452,17 @@
       "status": "passed",
       "exit_code": 0,
       "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "deselected": 0,
+      "known_failed": 0
+    },
+    {
+      "file": "tests/test_request_body_limits.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 172,
       "failed": 0,
       "skipped": 0,
       "errors": 0,
@@ -4961,6 +4983,28 @@
       "status": "passed",
       "exit_code": 0,
       "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "deselected": 0,
+      "known_failed": 0
+    },
+    {
+      "file": "tests/test_tutorial/test_request_body_limits/test_tutorial001.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "deselected": 0,
+      "known_failed": 0
+    },
+    {
+      "file": "tests/test_tutorial/test_request_body_limits/test_tutorial002.py",
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 2,
       "failed": 0,
       "skipped": 0,
       "errors": 0,

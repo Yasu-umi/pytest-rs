@@ -1,27 +1,27 @@
 {
   "suite": "pytest-env",
-  "tag": "1.6.0",
+  "tag": "1.8.6",
   "category": "third-party",
   "excluded_files": 0,
   "deselected": 0,
-  "known_failed": 3,
+  "known_failed": 0,
   "files": [
     {
       "file": "tests/test_env.py",
       "status": "passed",
-      "exit_code": 1,
-      "passed": 61,
+      "exit_code": 0,
+      "passed": 144,
       "failed": 0,
       "skipped": 0,
       "errors": 0,
       "deselected": 0,
-      "known_failed": 3
+      "known_failed": 0
     },
     {
       "file": "tests/test_verbose.py",
       "status": "passed",
       "exit_code": 0,
-      "passed": 10,
+      "passed": 14,
       "failed": 0,
       "skipped": 0,
       "errors": 0,

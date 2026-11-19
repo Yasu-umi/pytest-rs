@@ -162,6 +162,11 @@ pub struct Session {
     /// --doctest-ignore-import-errors, etc.), for collector-tree hook synthesis.
     /// Each entry is (nodeid, reason, location) where location is "file:line".
     pub skipped_modules: Vec<(String, String, String)>,
+    /// Directories whose conftest.py skipped itself while loading
+    /// (`pytest.importorskip` at module level) outside the initial conftests:
+    /// upstream skips the directory's collection. Each entry is
+    /// (dir, nodeid, reason, location).
+    pub skipped_conftest_dirs: Vec<(std::path::PathBuf, String, String, String)>,
     /// Files skipped by a conftest/plugin `pytest_collect_file` hook that raised
     /// `pytest.skip()`. Their parent Dir collectreport should be "skipped".
     /// Each entry is (nodeid, reason).
@@ -243,6 +248,7 @@ impl Session {
             collect_errors: Vec::new(),
             not_found_nodeids: Vec::new(),
             skipped_modules: Vec::new(),
+            skipped_conftest_dirs: Vec::new(),
             collect_file_skips: Vec::new(),
             stopped_after: None,
             shouldfail: None,
