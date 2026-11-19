@@ -149,7 +149,13 @@ class RunResult:
                 for count, noun in _OUTCOME_RE.findall(clean):
                     found[plural.get(noun, noun)] = int(count)
                 return found
-        raise ValueError("Pytest terminal summary report not found")
+        raise ValueError(
+            "Pytest terminal summary report not found. "
+            "Plugins that modify pytest's terminal output can break outcome "
+            "parsing. Disable the plugin for the test run, for example with "
+            "`-p no:<plugin>`, or disable plugin autoloading with "
+            "`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`."
+        )
 
     def parseoutcomes(self):
         return self.parse_summary_nouns(self.outlines)
@@ -2185,9 +2191,12 @@ class Pytester:
                     raise import_error
                 plugins = getattr(mod, "pytest_plugins", None)
                 if plugins is not None:
+                    from pytest._pluginmanager import import_named_plugin
+
                     names = [plugins] if isinstance(plugins, str) else list(plugins)
                     for name in names:
-                        importlib.import_module(name)
+                        # A missing plugin is a UsageError (pytest 9.2, #993).
+                        import_named_plugin(name)
                 return mod
 
             def collect(self):
