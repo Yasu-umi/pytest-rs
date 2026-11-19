@@ -1387,7 +1387,8 @@ impl Engine {
             // "<prog>: error: <message>" line followed by the sorted
             // extra_info (inifile, rootdir) pytest attaches to the parser.
             let mut msg = format!(
-                "pytest: error: unrecognized arguments: {}",
+                "{}: error: unrecognized arguments: {}",
+                crate::config::Config::prog_name(),
                 unknown.join(" ")
             );
             if let Some(name) = &self.config.config_file_name {

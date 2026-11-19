@@ -246,7 +246,7 @@ impl Engine {
             if python::is_usage_error(py, &err) {
                 return Err(format!(
                     "{}{}",
-                    crate::config::Config::USAGE_SYNOPSIS,
+                    crate::config::Config::usage_synopsis(),
                     err.value(py)
                 ));
             }

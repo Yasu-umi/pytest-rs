@@ -180,13 +180,33 @@ class ExitCode(_enum.IntEnum):
 
 
 def console_main() -> int:
+    """The CLI entry point of pytest (deprecated since pytest 9.1; use
+    :func:`main`)."""
+    import warnings as _warnings
+
+    import _pytest.config as _config
+
+    from pytest._warning_types import PytestRemovedIn10Warning as _Removed
+
+    _warnings.warn(
+        _Removed(
+            "pytest.console_main() is deprecated and will be removed in pytest 10.\n"
+            "It was never intended for programmatic use; use pytest.main() instead.\n"
+            "See https://docs.pytest.org/en/stable/deprecations.html#console-main"
+        ),
+        stacklevel=2,
+    )
+    return _config._console_main()
+
+
+def _console_main() -> int:
     """Entry point for ``python -m pytest``.
 
     Delegates to :func:`main`, which spawns the pytest-rs binary when called
     from a standalone Python process (the common case for ``python -m pytest``).
     """
     try:
-        return main()
+        return main(_prog=_get_prog_name(sys.argv))
     except KeyboardInterrupt:
         return 2  # INTERRUPTED
     except SystemExit as exc:
@@ -217,7 +237,15 @@ def _resolve_string_plugin(name):
         raise ImportError(f'Error importing plugin "{name}": {message}') from exc
 
 
-def main(args=None, plugins=None):
+def _get_prog_name(argv):
+    """The program name for usage/error messages (pytest 9.2's
+    _get_prog_name): "python -m pytest" when run as ``python -m pytest``."""
+    if argv and os.path.basename(argv[0]) == "__main__.py":
+        return "python -m pytest"
+    return "pytest"
+
+
+def main(args=None, plugins=None, *, _prog="pytest.main()"):
     """Run pytest, returning an integer exit code.
 
     args: list of CLI arg strings, or a single path-like object, or None
@@ -277,6 +305,7 @@ def main(args=None, plugins=None):
         # object plugins are not passable to a subprocess; skip them
 
     env = os.environ.copy()
+    env["PYTEST_RS_PROG"] = _prog
     for var, val in _RUNNER_LIBPATH.items():
         env.setdefault(var, val)
 

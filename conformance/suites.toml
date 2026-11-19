@@ -117,23 +117,15 @@ known_failures = [
     "testing/test_tmpdir.py::TestRmRf::test_chmod_rwx_returns_false_on_nonexistent_path",
     "testing/test_tmpdir.py::TestRmRf::test_chmod_rwx_returns_false_when_already_sufficient",
     "testing/test_tmpdir.py::TestRmRf::test_chmod_rwx_returns_false_when_chmod_fails",
-    # _pytest.config._get_prog_name helper called directly.
-    "testing/test_config.py::TestProgName::test_get_prog_name_direct_pytest",
-    "testing/test_config.py::TestProgName::test_get_prog_name_empty_argv",
-    "testing/test_config.py::TestProgName::test_get_prog_name_python_m_pytest",
     # _pytest.python._infer_parametrize_scope helper called directly.
     "testing/python/metafunc.py::TestMetafunc::test_infer_parametrize_scope",
     # _pytest.cacheprovider._make_cachedir helper called directly.
     "testing/test_cacheprovider.py::test_make_cachedir_cleans_up_on_base_exception",
-    # _pytest.config._plugin_rewrite_name helper called directly.
-    "testing/test_config.py::TestConfigAPI::test_plugin_rewrite_name_skips_namespace_packages",
     # _pytest.mark._validate_marker_names helper; marker validation is in Rust.
     "testing/test_mark.py::TestValidateMarkerNames::test_no_validation_without_strict",
     "testing/test_mark.py::TestValidateMarkerNames::test_registered_marker_passes",
     "testing/test_mark.py::TestValidateMarkerNames::test_unknown_marker_with_strict",
     "testing/test_mark.py::TestValidateMarkerNames::test_unknown_marker_with_strict_markers",
-    # _pytest.config.console_main (the installed console script entry point) called in-process.
-    "testing/test_config.py::TestProgName::test_console_main_deprecated",
     # _pytest.compat.deprecated helper called directly.
     "testing/test_compat.py::test_deprecated",
     # _pytest.raises.is_fully_escaped helper called directly.
