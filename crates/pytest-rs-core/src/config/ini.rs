@@ -266,6 +266,24 @@ pub(crate) fn semver_ge(current: &str, required: &str) -> bool {
     parse(current) >= parse(required)
 }
 
+/// Upstream's config-file TOML error: "<path>: <tomllib's message>". The
+/// interpreter is already up when config files are read, so tomllib gives
+/// the exact wording; the toml crate's own message is the fallback.
+fn toml_parse_error(path: &str, content: &str, err: &toml::de::Error) -> String {
+    use pyo3::prelude::PyAnyMethods;
+    let message = pyo3::Python::try_attach(|py| {
+        let result = py
+            .import("tomllib")
+            .and_then(|tomllib| tomllib.call_method1("loads", (content,)));
+        match result {
+            Ok(_) => None,
+            Err(decode_error) => decode_error.value(py).str().ok().map(|s| s.to_string()),
+        }
+    })
+    .flatten();
+    format!("{path}: {}", message.unwrap_or_else(|| err.to_string()))
+}
+
 /// pytest config from pyproject.toml: [tool.pytest] (pytest 9 toml mode,
 /// keys other than ini_options) or [tool.pytest.ini_options] (ini mode).
 /// Returns Err when both styles are present simultaneously (upstream
@@ -275,7 +293,7 @@ fn parse_pyproject(content: &str, path: Option<&str>) -> Result<Option<ParsedIni
         Ok(t) => t,
         Err(e) => {
             return match path {
-                Some(p) => Err(format!("{p}: Invalid statement ({e})")),
+                Some(p) => Err(toml_parse_error(p, content, &e)),
                 None => Ok(None),
             };
         }
@@ -325,7 +343,7 @@ fn parse_toml_pytest(content: &str, path: Option<&str>) -> Result<Option<ParsedI
         Ok(t) => t,
         Err(e) => {
             return match path {
-                Some(p) => Err(format!("{p}: Invalid statement ({e})")),
+                Some(p) => Err(toml_parse_error(p, content, &e)),
                 None => Ok(None),
             };
         }
