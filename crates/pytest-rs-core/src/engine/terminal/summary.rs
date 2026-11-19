@@ -180,8 +180,15 @@ impl Engine {
                 } else {
                     word.to_string()
                 };
+                // pytest 9.2: an xfail outside the call phase names it
+                // ("XFAIL at setup of <nodeid>").
+                let phase_note = match (c, report.phase) {
+                    ('x', Phase::Setup) => " at setup of",
+                    ('x', Phase::Teardown) => " at teardown of",
+                    _ => "",
+                };
                 let mut line = format!(
-                    "{word} {}",
+                    "{word}{phase_note} {}",
                     crate::collect::cwd_relative_nodeid(
                         &self.config.rootdir,
                         &self.config.invocation_dir,
