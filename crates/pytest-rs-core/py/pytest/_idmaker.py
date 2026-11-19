@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import dataclasses
 import enum
+import hashlib
 import re
 import textwrap
 from collections import Counter, defaultdict
@@ -77,6 +78,10 @@ def complain_multiple_hidden_parameter_sets(func_name):
     raise Failed(msg)
 
 
+# parametrize_long_str_id_strategy values (pytest 9.2, #6881).
+_LONG_STR_STRATEGIES = frozenset({"short", "sha256", "legacy", "disallow"})
+
+
 @dataclasses.dataclass(frozen=True)
 class IdMaker:
     """Make IDs for a parametrization."""
@@ -87,7 +92,6 @@ class IdMaker:
     ids: object
     config: object
     nodeid: object
-    func_name: object
 
     def make_unique_parameterset_ids(self):
         """Make a unique identifier for each ParameterSet, usable in a node ID.
@@ -175,10 +179,53 @@ class IdMaker:
         idval = self._idval_from_hook(val, argname)
         if idval is not None:
             return idval
-        idval = self._idval_from_value(val)
-        if idval is not None:
-            return idval
+        if isinstance(val, str | bytes):
+            idval = self._apply_long_str_strategy(val, argname, idx)
+            if idval is not None:
+                return idval
+        else:
+            idval = self._idval_from_value(val)
+            if idval is not None:
+                return idval
         return self._idval_from_argname(argname, idx)
+
+    def _get_long_str_strategy(self):
+        if not self.config:
+            return "short"
+        # Unset reads back empty here: the ini's default is "short".
+        value = self.config.getini("parametrize_long_str_id_strategy") or "short"
+        if value not in _LONG_STR_STRATEGIES:
+            from pytest import UsageError
+
+            raise UsageError(
+                f"Unknown parametrize_long_str_id_strategy: {value!r}. "
+                f"Valid values: {', '.join(sorted(_LONG_STR_STRATEGIES))}"
+            )
+        return value
+
+    def _apply_long_str_strategy(self, val, argname, idx):
+        """An auto-generated ID for a str/bytes value: up to 100 characters
+        the value itself; longer, per parametrize_long_str_id_strategy
+        (pytest 9.2): ``short`` -> None (argname+index), ``sha256`` -> the
+        digest, ``legacy`` -> the value, ``disallow`` -> an error."""
+        if len(val) <= 100:
+            return _ascii_escaped_by_config(val, self.config)
+        strategy = self._get_long_str_strategy()
+        if strategy == "legacy":
+            return _ascii_escaped_by_config(val, self.config)
+        if strategy == "short":
+            return None
+        if strategy == "sha256":
+            encoded = val.encode("utf-8") if isinstance(val, str) else val
+            return hashlib.sha256(encoded).hexdigest()
+        prefix = self._make_error_prefix()
+        fail(
+            f"{prefix}parametrize value for '{argname}' at index {idx} "
+            f"is too long for an auto-generated ID ({len(val)} characters). "
+            f"Use pytest.param(..., id=...) or parametrize(..., ids=...) "
+            f"to set an explicit ID, or change parametrize_long_str_id_strategy.",
+            pytrace=False,
+        )
 
     def _idval_from_function(self, val, argname, idx):
         if self.idfn is None:
@@ -221,9 +268,16 @@ class IdMaker:
         )
 
     def _make_error_prefix(self):
-        if self.func_name is not None:
-            return f"In {self.func_name}: "
-        elif self.nodeid is not None:
+        if self.nodeid is not None:
             return f"In {self.nodeid}: "
         else:
             return ""
+
+
+def long_str_id(val, argname, idx, config, nodeid=None):
+    """The engine's auto-generated ID for a str/bytes value longer than 100
+    characters (IdMaker._apply_long_str_strategy); None means argname+index."""
+    maker = IdMaker(
+        argnames=[argname], parametersets=[], idfn=None, ids=None, config=config, nodeid=nodeid
+    )
+    return maker._apply_long_str_strategy(val, argname, idx)

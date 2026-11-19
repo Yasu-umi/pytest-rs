@@ -949,6 +949,7 @@ _CORE_INI_TYPES: dict[str, str | None] = {
     "log_level": None,
     "markers": "linelist",
     "max_warnings": None,
+    "parametrize_long_str_id_strategy": None,
     "minversion": None,
     "norecursedirs": "args",
     "python_classes": "args",
@@ -1160,6 +1161,11 @@ _CORE_INI_HELP: list[tuple[str, str, str]] = [
     ),
     ("addopts", "args", "Extra command line options"),
     ("minversion", "string", "Minimally required pytest version"),
+    (
+        "parametrize_long_str_id_strategy",
+        "string",
+        "strategy for long str/bytes parameter values in auto-generated ids",
+    ),
     (
         "max_warnings",
         "string",

@@ -347,7 +347,6 @@ class Metafunc:
                 ids=None if ids is None or callable(ids) else list(ids),
                 config=self.config,
                 nodeid=nodeid,
-                func_name=self.function.__name__,
             ).make_unique_parameterset_ids()
         except Exception:
             return self._resolve_ids_simple(argnames, ids, parametersets)
