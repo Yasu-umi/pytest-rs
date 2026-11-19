@@ -199,11 +199,15 @@ impl Engine {
             return;
         }
         println!("{}", center_banner("PASSES"));
+        // Only tests with captured sections get a heading (upstream's
+        // summary_passes_combined); teardown sections follow either way.
         for report in passed {
-            println!("{}", center_named(&Self::failure_title(&report.nodeid)));
-            for (title, text) in &report.sections {
-                println!("{:-^80}", format!(" {title} "));
-                println!("{}", text.trim_end_matches('\n'));
+            if !report.sections.is_empty() {
+                println!("{}", center_named(&Self::failure_title(&report.nodeid)));
+                for (title, text) in &report.sections {
+                    println!("{:-^80}", format!(" {title} "));
+                    println!("{}", text.trim_end_matches('\n'));
+                }
             }
             self.print_teardown_sections(&report.nodeid);
         }
