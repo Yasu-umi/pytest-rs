@@ -278,7 +278,6 @@ def run_inprocess(args, plugins=(), helper_plugin=None, forwarded_filter_marks=(
         "_retention_count": _tmp_path._retention_count,
         "_retention_policy": _tmp_path._retention_policy,
         "_call_results": dict(_tmp_path._call_results),
-        "_any_failed": _tmp_path._any_failed,
     }
 
     old_pm_plugins = list(pluginmanager._plugins)
@@ -505,7 +504,6 @@ def run_inprocess(args, plugins=(), helper_plugin=None, forwarded_filter_marks=(
         _tmp_path._retention_policy = old_tmp_state["_retention_policy"]
         _tmp_path._call_results.clear()
         _tmp_path._call_results.update(old_tmp_state["_call_results"])
-        _tmp_path._any_failed = old_tmp_state["_any_failed"]
         # Restore warning capture: the inner run_session called
         # _wcapture.uninstall() which broke the outer capture.
         _wcapture.captured[:] = old_wcapture_captured

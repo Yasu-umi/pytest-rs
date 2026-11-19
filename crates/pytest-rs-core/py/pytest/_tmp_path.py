@@ -29,9 +29,8 @@ _retention_count = 3
 _retention_policy = "all"
 
 # Call-phase outcomes per nodeid (engine-fed; upstream stores rep.passed in
-# the item stash) and whether anything failed (upstream checks exitstatus).
+# the item stash).
 _call_results: dict = {}
-_any_failed = False
 
 
 # The interpreter's own atexit functions, captured at import: a test that
@@ -45,7 +44,7 @@ _atexit_unregister = atexit.unregister
 
 
 def configure(basetemp, retention_count=None, retention_policy=None):
-    global _given_basetemp, _retention_count, _retention_policy, _any_failed
+    global _given_basetemp, _retention_count, _retention_policy
     _given_basetemp = basetemp
     if retention_count is not None:
         _retention_count = int(retention_count)
@@ -55,18 +54,14 @@ def configure(basetemp, retention_count=None, retention_policy=None):
     # nested run would inherit the outer run's pass/fail outcomes and prune the
     # wrong tmp dirs (tmp_path_retention_policy="failed").
     _call_results.clear()
-    _any_failed = False
 
 
 def record_call(nodeid, passed):
     """The engine reports each item's call outcome (None: no call ran)
     before function-scope finalizers — the tmp_path retention teardown
     reads it (upstream's tmppath_result_key stash)."""
-    global _any_failed
     if passed is not None:
         _call_results[nodeid] = passed
-        if not passed:
-            _any_failed = True
 
 
 def rm_rf(path):
@@ -298,7 +293,7 @@ class TempPathFactory:
 
 
 @fixture(scope="session")
-def tmp_path_factory():
+def tmp_path_factory(request):
     """Return a :class:`pytest.TempPathFactory` instance for the test session."""
     factory = TempPathFactory(
         given_basetemp=_given_basetemp,
@@ -307,28 +302,38 @@ def tmp_path_factory():
         trace=lambda *args: None,
         _ispytest=True,
     )
+    # Like upstream's config._tmp_path_factory: session_finish() below (the
+    # tmpdir plugin's pytest_sessionfinish) finds it there.
+    request.config._tmp_path_factory = factory
     yield factory
-    # Upstream pytest_sessionfinish: a fully-passed run under the "failed"
-    # policy removes the whole basetemp. ("all" keeps it; the numbered-dir
-    # retention prunes old ones at the next session's creation.)
+
+
+def session_finish(config, exitstatus):
+    """Upstream tmpdir plugin's pytest_sessionfinish, called by the engine
+    when the session finishes (outside any test's warning capture; warnings
+    are recorded with when="config"): a fully-passed run under the "failed"
+    policy removes the whole basetemp (best effort, errors ignored), dead
+    symlinks are removed, then the factory's exit stack (lock removal,
+    numbered-dir pruning) is closed."""
+    factory = getattr(config, "_tmp_path_factory", None)
+    if factory is None:
+        return
+    config._tmp_path_factory = None
+    basetemp = factory._basetemp
+    if basetemp is None:
+        return
     if (
-        factory._basetemp is not None
-        and factory._given_basetemp is None
+        exitstatus == 0
         and factory._retention_policy == "failed"
-        and not _any_failed
+        and factory._given_basetemp is None
     ):
-        rm_rf(factory._basetemp)
-    # Upstream pytest_sessionfinish closes the factory's exit stack. Here it
-    # runs in the session fixture's teardown, inside the last test's warning
-    # capture, so rm_rf's warnings about leftovers it cannot delete (e.g. a
-    # test's deliberately unreadable dir) are kept from failing that test.
-    import warnings
+        if basetemp.is_dir():
+            shutil.rmtree(basetemp, ignore_errors=True)
+    if basetemp.is_dir():
+        from _pytest.pathlib import cleanup_dead_symlinks
 
-    from _pytest.warning_types import PytestWarning
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", PytestWarning)
-        factory._exit_stack.close()
+        cleanup_dead_symlinks(basetemp)
+    factory._exit_stack.close()
 
 
 @fixture
@@ -347,7 +352,8 @@ def tmp_path(tmp_path_factory, request):
     if tmp_path_factory._retention_policy == "failed" and _call_results.pop(
         request.node.nodeid, True
     ):
-        rm_rf(path)
+        # Best effort, like upstream: a dir the test left unremovable stays.
+        shutil.rmtree(path, ignore_errors=True)
 
 
 class _NeverRaised(Exception):
