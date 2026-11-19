@@ -1416,14 +1416,18 @@ impl WorkerOwner {
         }
 
         match action {
-            CrashAction::Replace if replace => {
+            // Upstream's DSession.worker_errordown replaces a crashed worker
+            // whenever the restart budget lasts, and says so. A slot that can
+            // no longer use a replacement (see `replace`) still spent that
+            // budget, so it narrates the same; it only skips spawning a
+            // process that would have nothing to run.
+            CrashAction::Replace => {
                 let _ = self.sender.send(Event::Output(format!(
                     "replacing crashed worker gw{}",
                     self.index
                 )));
-                self.spawn().ok()
+                if replace { self.spawn().ok() } else { None }
             }
-            CrashAction::Replace => None,
             CrashAction::Abort => {
                 // Budget exhausted: stop dispatching new work (xdist shutdown).
                 let message = match self.max_restart {
