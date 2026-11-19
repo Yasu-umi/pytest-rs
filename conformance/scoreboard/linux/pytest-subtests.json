@@ -8,10 +8,10 @@
   "files": [
     {
       "file": "tests/test_subtests.py",
-      "status": "passed",
+      "status": "failed",
       "exit_code": 1,
-      "passed": 32,
-      "failed": 0,
+      "passed": 31,
+      "failed": 1,
       "skipped": 0,
       "errors": 0,
       "deselected": 0,
