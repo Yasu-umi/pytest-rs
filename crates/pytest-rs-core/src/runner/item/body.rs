@@ -466,10 +466,41 @@ pub(crate) fn run_item_body(
             fire_pyfunc_call_hooks(py, session, config, item, &mut callable, &kwargs)
         })()
     };
-    // The original error wins over a wrapper-teardown one.
-    let call_result = match finish_runtest_py_wrappers(py, &call_wrappers) {
+    // No hook ran the test: call it natively here, still inside the
+    // pytest_runtest_call hookwrappers, so their post-yield part sees the
+    // call's outcome (upstream: the wrappers surround item.runtest()).
+    let mut native: Option<PyResult<Py<PyAny>>> = match &call_result {
+        Ok(false) if !item.is_coroutine => {
+            Some(python::call_with_kwargs(py, &callable, &kwargs).map(|retval| retval.unbind()))
+        }
+        _ => None,
+    };
+    // The wrappers see the call's exception (if any) and may re-raise,
+    // replace or swallow it.
+    let call_error = match (&native, &call_result) {
+        (Some(Err(err)), _) | (None, Err(err)) => Some(err.clone_ref(py)),
+        _ => None,
+    };
+    let had_error = call_error.is_some();
+    let call_result = match finish_runtest_py_wrappers(py, &call_wrappers, call_error) {
+        Ok(()) if had_error => {
+            // A wrapper swallowed the exception: the call passed.
+            match native.as_mut() {
+                Some(outcome) => {
+                    *outcome = Ok(py.None());
+                    call_result
+                }
+                None => Ok(true),
+            }
+        }
         Ok(()) => call_result,
-        Err(err) => call_result.and(Err(err)),
+        Err(err) => match native.as_mut() {
+            Some(outcome) => {
+                *outcome = Err(err);
+                call_result
+            }
+            None => Err(err),
+        },
     };
 
     // pytest.exit / Ctrl-C abort the session without a test outcome.
@@ -526,7 +557,13 @@ pub(crate) fn run_item_body(
                     head_line: None,
                 }
             } else {
-                match python::call_with_kwargs(py, &callable, &kwargs) {
+                let outcome = native
+                    .take()
+                    .unwrap_or_else(|| {
+                        python::call_with_kwargs(py, &callable, &kwargs).map(Bound::unbind)
+                    })
+                    .map(|retval| retval.into_bound(py));
+                match outcome {
                     Ok(retval) => {
                         let is_coro = !retval.is_none()
                             && py
