@@ -166,16 +166,39 @@ def set_enabled(flag):
     _rewrite_enabled = bool(flag)
 
 
-def set_truncation_limits(lines, chars):
-    global _truncation_lines, _truncation_chars
+_diff_style = "ndiff"
+
+
+def set_truncation_limits(lines, chars, diff_style=None):
+    global _truncation_lines, _truncation_chars, _diff_style
     _truncation_lines = lines
     _truncation_chars = chars
+    _diff_style = diff_style or "ndiff"
 
 
 class _RewriteConfig:
-    """Just enough of pytest's Config for util.assertrepr_compare and
+    """Just enough of pytest's Config for the builtin pytest_assertrepr_compare
+    (util.assertrepr_compare + truncate.materialize_with_truncation) and
     pytest_assertrepr_compare plugins (e.g. pytest-icdiff reads
     config.get_terminal_writer().hasmarkup)."""
+
+    VERBOSITY_ASSERTIONS = "assertions"
+
+    class _PluginManager:
+        @staticmethod
+        def has_plugin(name):
+            return name == "terminalreporter"
+
+    pluginmanager = _PluginManager()
+
+    def getini(self, name):
+        if name == "truncation_limit_lines":
+            return _truncation_lines
+        if name == "truncation_limit_chars":
+            return _truncation_chars
+        if name == "assertion_text_diff_style":
+            return _diff_style
+        return None
 
     def get_verbosity(self, verbosity_type=None):
         if verbosity_type == "assertions" and _assertion_verbosity is not None:
@@ -238,8 +261,7 @@ def _format_assert(op, left, right):
         fallback = f"{left!r} {op} {right!r}"
     try:
         from _pytest import outcomes
-        from _pytest.assertion import truncate, util
-        from _pytest.compat import running_on_ci
+        from _pytest.assertion import truncate
     except Exception:
         return fallback
     try:
@@ -268,22 +290,18 @@ def _format_assert(op, left, right):
                     break
         except Exception:
             expl = None
-        if not expl:
-            expl = util.assertrepr_compare(cfg, op, left, right)
+        if expl:
+            # Like upstream's callbinrepr, a plugin's explanation is
+            # truncated as well.
+            expl = truncate.materialize_with_truncation(expl, cfg)
+        else:
+            # The builtin impl (pytest 9.2): a lazy explanation, truncated
+            # while it is pulled.
+            from _pytest.assertion import pytest_assertrepr_compare
+
+            expl = pytest_assertrepr_compare(cfg, op, left, right)
         if not expl:
             return fallback
-        max_lines = int(
-            _truncation_lines if _truncation_lines is not None else truncate.DEFAULT_MAX_LINES
-        )
-        max_chars = int(
-            _truncation_chars if _truncation_chars is not None else truncate.DEFAULT_MAX_CHARS
-        )
-        assert_verbose = _assertion_verbosity if _assertion_verbosity is not None else _verbosity
-        should_truncate = (
-            assert_verbose < 2 and not running_on_ci() and (max_lines > 0 or max_chars > 0)
-        )
-        if should_truncate:
-            expl = truncate._truncate_explanation(expl, max_lines=max_lines, max_chars=max_chars)
         expl = [line.replace("\n", "\\n") for line in expl]
         return expl[0] + "".join("\n  " + line for line in expl[1:])
     except outcomes.Exit:
