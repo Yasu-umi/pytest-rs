@@ -106,6 +106,10 @@ known_failures = [
     # session fixture instance; the test itself calls sharing "also an
     # acceptable behavior" (#14533), which is what pytest-rs does.
     "testing/test_doctest.py::TestDoctestAutoUseFixtures::test_doctest_and_python_fixtures_not_shared",
+    # Spies on _pytest._code.ExceptionInfo.getrepr inside runtestprotocol's
+    # report building (the style it asks for); pytest-rs renders reports in
+    # Rust, so the spy never sees a call.
+    "testing/test_skipping.py::TestXFail::test_xfail_not_run_does_not_format_traceback",
     # pytest 9.2 tests that call pytest internals directly (helpers or
     # classes pytest-rs implements in Rust or does not mirror); the
     # user-visible behavior they back is covered by other tests.
