@@ -430,6 +430,17 @@ impl Engine {
                     });
                 }
                 item.marks = marks;
+                // A hook may add -k keywords to the item itself
+                // (node.extra_keyword_matches): keep that node, which
+                // keyword_match_names reads them from.
+                if item.py_node.is_none()
+                    && node
+                        .getattr("extra_keyword_matches")
+                        .and_then(|extra| extra.len())
+                        .is_ok_and(|n| n > 0)
+                {
+                    item.py_node = Some(node.clone().unbind());
+                }
                 // A hook may mutate node.fixturenames in place (e.g.
                 // pytest-order's --error-on-failed-ordering pushing a
                 // nonexistent name to force a setup error, matching
