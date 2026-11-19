@@ -63,7 +63,7 @@ pytest-rs; they are not counted in the total.
 | werkzeug | 3.1.9 | 955 | 0 | 0 | 1 | 25 | 0 | 981 | 97.5% | 24 | 25 | 0 |
 | fastapi | 0.165.0 | 5221 | 0 | 0 | 6 | 0 | 0 | 5227 | 100.0% | 539 | 550 | 0 |
 | packaging | 26.3 | 62423 | 0 | 0 | 0 | 0 | 0 | 62423 | 100.0% | 17 | 31 | 0 |
-| pandas | v3.1.1 | 188852 | 945 | 304 | 24877 | 0 | 6 | 214984 | 99.4% | 858 | 978 | 3 |
+| pandas | v3.1.1 | 188852 | 945 | 304 | 24877 | 0 | 6 | 214984 | 99.4% | 886 | 978 | 3 |
 | networkx | 3.7 | 9128 | 0 | 0 | 61 | 0 | 0 | 9189 | 100.0% | 261 | 268 | 0 |
 | pydantic | v2.14.4 | 10984 | 0 | 0 | 982 | 0 | 14 | 11980 | 99.9% | 128 | 133 | 0 |
 | scikit-learn-1 | 1.9.1 | 8443 | 0 | 0 | 6630 | 0 | 0 | 15073 | 100.0% | 79 | 87 | 0 |
@@ -1591,17 +1591,17 @@ pytest-rs; they are not counted in the total.
 | pandas/tests/arithmetic/test_period.py | passed | 718 | 0 | 0 | 0 | 0 | 0 |
 | pandas/tests/arithmetic/test_string.py | passed | 204 | 0 | 0 | 249 | 0 | 0 |
 | pandas/tests/arithmetic/test_timedelta64.py | passed | 1861 | 0 | 0 | 64 | 0 | 0 |
-| pandas/tests/arrays/arrow/test_concat.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
-| pandas/tests/arrays/arrow/test_conversion.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
-| pandas/tests/arrays/arrow/test_datetimelike.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
-| pandas/tests/arrays/arrow/test_dtype.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
-| pandas/tests/arrays/arrow/test_function.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
-| pandas/tests/arrays/arrow/test_groupby.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
-| pandas/tests/arrays/arrow/test_indexing.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
-| pandas/tests/arrays/arrow/test_ops.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
-| pandas/tests/arrays/arrow/test_pickle.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
-| pandas/tests/arrays/arrow/test_reductions.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
-| pandas/tests/arrays/arrow/test_string.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
+| pandas/tests/arrays/arrow/test_concat.py | passed | 0 | 0 | 0 | 0 | 0 | 0 |
+| pandas/tests/arrays/arrow/test_conversion.py | passed | 0 | 0 | 0 | 0 | 0 | 0 |
+| pandas/tests/arrays/arrow/test_datetimelike.py | passed | 0 | 0 | 0 | 0 | 0 | 0 |
+| pandas/tests/arrays/arrow/test_dtype.py | passed | 0 | 0 | 0 | 0 | 0 | 0 |
+| pandas/tests/arrays/arrow/test_function.py | passed | 0 | 0 | 0 | 0 | 0 | 0 |
+| pandas/tests/arrays/arrow/test_groupby.py | passed | 0 | 0 | 0 | 0 | 0 | 0 |
+| pandas/tests/arrays/arrow/test_indexing.py | passed | 0 | 0 | 0 | 0 | 0 | 0 |
+| pandas/tests/arrays/arrow/test_ops.py | passed | 0 | 0 | 0 | 0 | 0 | 0 |
+| pandas/tests/arrays/arrow/test_pickle.py | passed | 0 | 0 | 0 | 0 | 0 | 0 |
+| pandas/tests/arrays/arrow/test_reductions.py | passed | 0 | 0 | 0 | 0 | 0 | 0 |
+| pandas/tests/arrays/arrow/test_string.py | passed | 0 | 0 | 0 | 0 | 0 | 0 |
 | pandas/tests/arrays/boolean/test_arithmetic.py | passed | 21 | 0 | 0 | 0 | 0 | 0 |
 | pandas/tests/arrays/boolean/test_astype.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
 | pandas/tests/arrays/boolean/test_comparison.py | passed | 30 | 0 | 0 | 0 | 0 | 0 |
@@ -2199,23 +2199,23 @@ pytest-rs; they are not counted in the total.
 | pandas/tests/io/parser/usecols/test_parse_dates.py | passed | 6 | 0 | 0 | 2 | 0 | 0 |
 | pandas/tests/io/parser/usecols/test_strings.py | passed | 15 | 0 | 0 | 5 | 0 | 0 |
 | pandas/tests/io/parser/usecols/test_usecols_basic.py | passed | 135 | 0 | 0 | 45 | 0 | 0 |
-| pandas/tests/io/pytables/test_append.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
-| pandas/tests/io/pytables/test_categorical.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
-| pandas/tests/io/pytables/test_compat.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
-| pandas/tests/io/pytables/test_complex.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
-| pandas/tests/io/pytables/test_errors.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
-| pandas/tests/io/pytables/test_file_handling.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
-| pandas/tests/io/pytables/test_keys.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
-| pandas/tests/io/pytables/test_put.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
-| pandas/tests/io/pytables/test_pytables_missing.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
-| pandas/tests/io/pytables/test_read.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
-| pandas/tests/io/pytables/test_retain_attributes.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
-| pandas/tests/io/pytables/test_round_trip.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
-| pandas/tests/io/pytables/test_select.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
-| pandas/tests/io/pytables/test_store.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
-| pandas/tests/io/pytables/test_subclass.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
-| pandas/tests/io/pytables/test_time_series.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
-| pandas/tests/io/pytables/test_timezones.py | error | 0 | 0 | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_append.py | passed | 0 | 0 | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_categorical.py | passed | 0 | 0 | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_compat.py | passed | 0 | 0 | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_complex.py | passed | 0 | 0 | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_errors.py | passed | 0 | 0 | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_file_handling.py | passed | 0 | 0 | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_keys.py | passed | 0 | 0 | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_put.py | passed | 0 | 0 | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_pytables_missing.py | passed | 0 | 0 | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_read.py | passed | 0 | 0 | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_retain_attributes.py | passed | 0 | 0 | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_round_trip.py | passed | 0 | 0 | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_select.py | passed | 0 | 0 | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_store.py | passed | 0 | 0 | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_subclass.py | passed | 0 | 0 | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_time_series.py | passed | 0 | 0 | 0 | 0 | 0 | 0 |
+| pandas/tests/io/pytables/test_timezones.py | passed | 0 | 0 | 0 | 0 | 0 | 0 |
 | pandas/tests/io/sas/test_byteswap.py | passed | 216 | 0 | 0 | 0 | 0 | 0 |
 | pandas/tests/io/sas/test_sas.py | failed | 2 | 1 | 0 | 0 | 0 | 0 |
 | pandas/tests/io/sas/test_sas7bdat.py | failed | 17 | 189 | 73 | 0 | 0 | 0 |
