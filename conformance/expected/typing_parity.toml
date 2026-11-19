@@ -63,7 +63,6 @@ shim_only = [
     "testing/test_runner.py: [attr-defined] \"BaseReport\" has no attribute \"newthing\"",
     "testing/test_runner.py: [attr-defined] \"Function\" has no attribute \"funcargs\"",
     "testing/test_tmpdir.py: [attr-defined] \"Pytester\" has no attribute \"_test_tmproot\"",
-    "testing/test_warnings.py: [attr-defined] \"type[ExitCode]\" has no attribute \"MAX_WARNINGS_ERROR\"",
     "testing/typing_checks.py: [assert-type] Expression is of type \"tuple[str, int | None, str] | None\", not \"tuple[str, int | None, str]\"",
     "testing/typing_checks.py: [attr-defined] Module \"pytest\" has no attribute \"ScopeName\"",
 ]
