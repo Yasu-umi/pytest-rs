@@ -280,10 +280,16 @@ class RaisesContext[E: BaseException]:
     def __exit__(self, exc_type, exc_value, tb) -> bool:
         __tracebackhide__ = True
         if exc_type is None:
-            desc = (
-                self.expected_exception if self.expected_exception is not None else "an exception"
-            )
-            fail(f"DID NOT RAISE {desc!r}")
+            # Exception class names, not reprs (pytest 9.2).
+            expected = self.expected_exception
+            if expected is None:
+                fail("DID NOT RAISE any exception")
+            if isinstance(expected, tuple) and len(expected) != 1:
+                names = ", ".join(x.__name__ for x in expected)
+                fail(f"DID NOT RAISE any of ({names})")
+            if isinstance(expected, tuple):
+                expected = expected[0]
+            fail(f"DID NOT RAISE {expected.__name__}")
         if self.expected_exception is not None and not issubclass(
             exc_type, self.expected_exception
         ):
@@ -298,7 +304,14 @@ class RaisesContext[E: BaseException]:
                     f"Invalid regex pattern provided to 'match': {e}",
                     pytrace=False,
                 )
-            self.excinfo.match(self.match_expr)
+            # Same failure text as RaisesExc (a compiled regex shows its
+            # pattern, a literal match a text diff), without chaining the
+            # raised exception as the AssertionError's context (pytest 9.2).
+            from pytest._raises_group import RaisesExc
+
+            checker = RaisesExc(exc_type, match=self.match_expr)
+            if not checker._check_match(exc_value):
+                raise AssertionError(checker._fail_reason) from None
         if self.check is not None:
             if not self.check(exc_value):
                 fail(f"{self.check!r} did not return True for the raised exception")
