@@ -97,6 +97,81 @@ impl Engine {
         Ok((paths, files, not_found_args))
     }
 
+    /// A conftest that raised a module-level skip (`pytest.importorskip`)
+    /// outside the initial conftests skips its directory, like upstream's
+    /// Dir collector: recorded in `session.skipped_conftest_dirs`, and true
+    /// when the error was handled that way.
+    pub(crate) fn record_conftest_skip(
+        &mut self,
+        py: Python<'_>,
+        conftest: &Path,
+        err: &PyErr,
+        paths: &[String],
+    ) -> bool {
+        let Some(dir) = conftest.parent() else {
+            return false;
+        };
+        let Some(Ok(reason)) = python::module_level_skip(py, err) else {
+            return false;
+        };
+        if self.is_initial_conftest_dir(dir, paths) {
+            return false;
+        }
+        let rootdir = &self.config.rootdir;
+        let nodeid = dir
+            .strip_prefix(rootdir)
+            .map(|rel| rel.to_string_lossy().replace('\\', "/"))
+            .unwrap_or_else(|_| dir.to_string_lossy().into_owned());
+        let location =
+            python::raise_location(py, err).unwrap_or_else(|| format!("{nodeid}/conftest.py:1"));
+        if !self
+            .session
+            .skipped_conftest_dirs
+            .iter()
+            .any(|(d, ..)| d == dir)
+        {
+            self.session
+                .skipped_conftest_dirs
+                .push((dir.to_path_buf(), nodeid, reason, location));
+        }
+        true
+    }
+
+    /// Whether `dir`'s conftest.py is one of upstream's initial conftests
+    /// (`_try_load_conftest`): on an argument's directory chain (the
+    /// invocation dir without arguments) or a `test*` directory right under
+    /// an argument's directory.
+    fn is_initial_conftest_dir(&self, dir: &Path, paths: &[String]) -> bool {
+        let canonical = |p: &Path| p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
+        let anchors: Vec<PathBuf> = if paths.is_empty() {
+            vec![self.config.invocation_dir.clone()]
+        } else {
+            paths
+                .iter()
+                .map(|p| {
+                    let resolved = self
+                        .config
+                        .invocation_dir
+                        .join(p.split("::").next().unwrap_or_default());
+                    if resolved.is_dir() {
+                        resolved
+                    } else {
+                        resolved.parent().map(Path::to_path_buf).unwrap_or(resolved)
+                    }
+                })
+                .collect()
+        };
+        let dir = canonical(dir);
+        anchors.iter().map(|a| canonical(a)).any(|anchor| {
+            anchor.starts_with(&dir)
+                || (dir.parent() == Some(anchor.as_path())
+                    && dir
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .is_some_and(|n| n.starts_with("test")))
+        })
+    }
+
     /// Phase 2: load `-p NAME` / `PYTEST_PLUGINS` cmdline plugins, then
     /// installed pytest11 entry-point plugins — both before conftests.
     pub(crate) fn load_and_validate_config(
@@ -178,6 +253,13 @@ impl Engine {
                 }
             }
             if let Err(err) = conftest_result {
+                // A conftest that skips itself (module-level importorskip)
+                // while collection reaches its directory skips that
+                // directory, like upstream's Dir collector. Only an initial
+                // conftest (on an argument's own path) stays fatal.
+                if self.record_conftest_skip(py, conftest, &err, paths) {
+                    continue;
+                }
                 for (title, text) in &conftest_sections {
                     if title == "Captured stderr" {
                         eprint!("{text}");

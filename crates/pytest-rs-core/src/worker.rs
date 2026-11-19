@@ -830,7 +830,7 @@ impl Engine {
             if collection.loaded_conftests.contains(&conftest) {
                 continue;
             }
-            python::collect_conftest(
+            if let Err(err) = python::collect_conftest(
                 py,
                 &rootdir,
                 &conftest,
@@ -838,7 +838,10 @@ impl Engine {
                 &mut self.session.py_hooks,
                 import_mode,
                 &self.session.initial_paths,
-            )?;
+            ) && !self.record_conftest_skip(py, &conftest, &err, paths)
+            {
+                return Err(err);
+            }
             collection.loaded_conftests.insert(conftest);
         }
         Ok(())
@@ -896,7 +899,30 @@ impl Engine {
         // never call Engine::collect at all) — so without this, -n mode pays
         // the full per-worker cold-cache cost on every worker.
         self.prefetch_rewrite_cache(py, &files);
-        for file in files {
+        // Directories whose conftest skipped itself: reported as skips (the
+        // controller dedupes them across workers) and not collected.
+        for (_, nodeid, reason, location) in self.session.skipped_conftest_dirs.clone() {
+            if !self
+                .session
+                .skipped_modules
+                .iter()
+                .any(|(n, ..)| n == &nodeid)
+            {
+                self.session
+                    .skipped_modules
+                    .push((nodeid, reason, location));
+            }
+        }
+        let skipped_dirs: Vec<PathBuf> = self
+            .session
+            .skipped_conftest_dirs
+            .iter()
+            .map(|(dir, ..)| dir.clone())
+            .collect();
+        for file in files
+            .into_iter()
+            .filter(|file| !skipped_dirs.iter().any(|dir| file.starts_with(dir)))
+        {
             let rel = crate::collect::file_nodeid(&self.config.rootdir, &file, &[]);
             if let Err(msg) = self.ensure_collected(py, collection, &rel) {
                 errors.push((rel, msg));
@@ -1074,8 +1100,9 @@ impl Engine {
         }
         chain.reverse();
         let import_mode = crate::collect::ImportMode::from_config(&self.config);
+        let paths = self.config.paths.clone();
         for conftest in chain {
-            python::collect_conftest(
+            if let Err(err) = python::collect_conftest(
                 py,
                 &self.config.rootdir,
                 &conftest,
@@ -1083,8 +1110,10 @@ impl Engine {
                 &mut self.session.py_hooks,
                 import_mode,
                 &self.session.initial_paths,
-            )
-            .map_err(|err| python::format_exception(py, &err))?;
+            ) && !self.record_conftest_skip(py, &conftest, &err, &paths)
+            {
+                return Err(python::format_exception(py, &err));
+            }
             collection.loaded_conftests.insert(conftest);
         }
         self.fire_new_conftest_configure(py, &mut collection.configured_hooks)
