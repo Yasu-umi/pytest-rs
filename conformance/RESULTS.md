@@ -25,7 +25,7 @@ pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.2.0 | 3230 | 39 | 0 | 61 | 0 | 31 | 3361 | 97.9% | 43 | 55 | 62 |
+| pytest | 9.2.0 | 3236 | 33 | 0 | 61 | 0 | 31 | 3361 | 98.1% | 47 | 55 | 62 |
 | pytest-asyncio | v1.5.0 | 268 | 0 | 0 | 3 | 0 | 0 | 271 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 7 | 0 | 0 | 0 | 0 | 0 | 7 | 100.0% | 2 | 2 | 0 |
 | pytest-mock | v3.17.0 | 158 | 0 | 0 | 1 | 0 | 2 | 161 | 98.8% | 1 | 1 | 0 |
@@ -101,10 +101,10 @@ pytest-rs; they are not counted in the total.
 | testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_faulthandler.py | passed | 12 | 0 | 0 | 3 | 0 | 0 |
 | testing/test_helpconfig.py | passed | 15 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_junitxml.py | failed | 147 | 3 | 0 | 0 | 0 | 1 |
+| testing/test_junitxml.py | passed | 150 | 0 | 0 | 0 | 0 | 1 |
 | testing/test_link_resolve.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_main.py | passed | 24 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_mark.py | failed | 123 | 1 | 0 | 0 | 0 | 5 |
+| testing/test_mark.py | passed | 124 | 0 | 0 | 0 | 0 | 5 |
 | testing/test_monkeypatch.py | passed | 44 | 0 | 0 | 2 | 0 | 0 |
 | testing/test_nodeid.py | passed | 30 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_nodes.py | passed | 8 | 0 | 0 | 0 | 0 | 6 |
@@ -122,7 +122,7 @@ pytest-rs; they are not counted in the total.
 | testing/test_stash.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_stepwise.py | passed | 18 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_subtests.py | passed | 36 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_terminal.py | failed | 237 | 1 | 0 | 4 | 0 | 0 |
+| testing/test_terminal.py | passed | 238 | 0 | 0 | 4 | 0 | 0 |
 | testing/test_threadexception.py | passed | 8 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_tmpdir.py | failed | 42 | 21 | 0 | 1 | 0 | 3 |
 | testing/test_unittest.py | failed | 67 | 3 | 0 | 9 | 0 | 1 |
@@ -130,7 +130,7 @@ pytest-rs; they are not counted in the total.
 | testing/test_warning_types.py | passed | 16 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_warnings.py | failed | 56 | 4 | 0 | 4 | 0 | 0 |
 | testing/acceptance_test.py | passed | 103 | 0 | 0 | 2 | 0 | 0 |
-| testing/deprecated_test.py | failed | 28 | 1 | 0 | 0 | 0 | 0 |
+| testing/deprecated_test.py | passed | 29 | 0 | 0 | 0 | 0 | 0 |
 
 </details>
 
