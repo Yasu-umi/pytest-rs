@@ -2,7 +2,6 @@
 machinery is upstream's, byte-for-byte where practical: upstream's own
 test suite drives these functions directly)."""
 
-import atexit
 import contextlib
 import importlib.util
 import itertools
@@ -56,6 +55,27 @@ def get_lock_path(path):
     return path.joinpath(".lock")
 
 
+def _chmod_rwx(p):
+    """Grant the owner enough permissions for deletion: S_IRWXU on a
+    directory (exec for traversal), only read+write on a file. True if the
+    mode changed, False if it was already enough or couldn't change."""
+    try:
+        old_mode = os.stat(p).st_mode
+    except OSError:
+        # Removed concurrently, or inaccessible.
+        return False
+    perm_mode = stat.S_IMODE(old_mode)
+    bits = stat.S_IRWXU if stat.S_ISDIR(old_mode) else stat.S_IRUSR | stat.S_IWUSR
+    new_mode = perm_mode | bits
+    if perm_mode == new_mode:
+        return False
+    try:
+        os.chmod(p, new_mode)
+    except OSError:
+        return False
+    return True
+
+
 def on_rm_rf_error(func, path, excinfo, *, start_path):
     """Handle known read-only errors during rmtree.
 
@@ -76,30 +96,46 @@ def on_rm_rf_error(func, path, excinfo, *, start_path):
         warnings.warn(PytestWarning(f"(rm_rf) error removing {path}\n{type(exc)}: {exc}"))
         return False
 
+    p = Path(path)
+
+    if func in (os.open, os.scandir):
+        # Directory traversal failed (e.g. no S_IXUSR): fix the permissions
+        # of the path and its parent (never above start_path), then remove
+        # it here, as rmtree skips the entry once this handler returns
+        # (pytest 9.2, #7940).
+        parent_changed = False
+        parent = p.parent
+        if parent not in (p, start_path):
+            parent_changed = _chmod_rwx(str(parent))
+        path_changed = _chmod_rwx(str(p))
+        if not (parent_changed or path_changed):
+            return False
+        if p.is_dir():
+            rm_rf(p)
+        else:
+            try:
+                os.unlink(str(p))
+            except OSError:
+                return False
+        return True
+
     if func not in (os.rmdir, os.remove, os.unlink):
-        if func not in (os.open,):
-            warnings.warn(
-                PytestWarning(
-                    f"(rm_rf) unknown function {func} when removing {path}:\n{type(exc)}: {exc}"
-                )
+        warnings.warn(
+            PytestWarning(
+                f"(rm_rf) unknown function {func} when removing {path}:\n{type(exc)}: {exc}"
             )
+        )
         return False
 
-    # Chmod + retry.
-    def chmod_rw(p):
-        mode = os.stat(p).st_mode
-        os.chmod(p, mode | stat.S_IRUSR | stat.S_IWUSR)
-
-    # For files, we need to recursively go upwards in the directories to
-    # ensure they all are also writable.
-    p = Path(path)
+    # Chmod + retry. For files, go upwards through the directories to make
+    # them all accessible and writable.
     if p.is_file():
         for parent in p.parents:
-            chmod_rw(str(parent))
+            _chmod_rwx(str(parent))
             # Stop when we reach the original path passed to rm_rf.
             if parent == start_path:
                 break
-    chmod_rw(str(path))
+    _chmod_rwx(str(path))
 
     func(path)
     return True
@@ -214,8 +250,8 @@ def create_cleanup_lock(p):
         return lock_path
 
 
-def register_cleanup_lock_removal(lock_path, register=atexit.register):
-    """Register a cleanup function for removing a lock, by default on atexit."""
+def register_cleanup_lock_removal(lock_path, register):
+    """Register a cleanup function for removing a lock."""
     pid = os.getpid()
 
     def cleanup_on_exit(lock_path=lock_path, original_pid=pid):
@@ -321,8 +357,11 @@ def cleanup_numbered_dir(root, prefix, keep, consider_lock_dead_if_created_befor
     cleanup_dead_symlinks(root)
 
 
-def make_numbered_dir_with_cleanup(root, prefix, keep, lock_timeout, mode):
-    """Create a numbered dir with a cleanup lock and remove old ones."""
+def make_numbered_dir_with_cleanup(*, root, prefix, mode, keep, lock_timeout, register):
+    """Create a numbered dir with a cleanup lock, and schedule the lock's
+    removal and the pruning of stale numbered dirs through
+    ``register(cleanup_func, *params)`` (pytest 9.2: run at session finish,
+    not at interpreter exit)."""
     e = None
     for _i in range(10):
         try:
@@ -330,13 +369,12 @@ def make_numbered_dir_with_cleanup(root, prefix, keep, lock_timeout, mode):
             # Only lock the current dir when keep is not 0
             if keep != 0:
                 lock_path = create_cleanup_lock(p)
-                register_cleanup_lock_removal(lock_path)
+                register_cleanup_lock_removal(lock_path, register)
         except Exception as exc:
             e = exc
         else:
             consider_lock_dead_if_created_before = p.stat().st_mtime - lock_timeout
-            # Register a cleanup for program exit
-            atexit.register(
+            register(
                 cleanup_numbered_dir,
                 root,
                 prefix,
