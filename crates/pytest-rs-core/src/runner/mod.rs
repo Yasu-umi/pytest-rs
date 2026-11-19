@@ -21,27 +21,70 @@ use crate::session::Session;
 ///
 /// Switching to `Instant` eliminates those Python round-trips entirely.
 ///
-/// ## Why `mock_timing` conformance tests are unaffected
+/// ## `mock_timing`
 ///
-/// pytest's `TestDurations` tests (in `testing/acceptance_test.py`) patch
-/// `_pytest.timing.perf_counter` via `mock_timing` and then run inner pytest
-/// sessions via `pytester.runpytest_inprocess()`.  That call invokes vanilla
-/// `pytest.main()` in the same process — the *inner* session is real pytest,
-/// not pytest-rs.  Vanilla pytest still reads `_pytest.timing.perf_counter`
-/// (which is mocked), so the `--durations` output remains correct and those
-/// tests continue to pass.  pytest-rs's `TimeMark` only affects the *outer*
-/// session's `TestReport.duration` values, which no conformance test asserts
-/// exact values for.
+/// pytest's own tests (`TestDurations`, pytest 9.2) patch
+/// `_pytest.timing.perf_counter` with a `MockTiming` clock that only
+/// advances through `timing.sleep`, then run a nested pytest-rs session in
+/// process. A session that starts with the clock patched (checked once, in
+/// `run_items`) measures through `_pytest.timing.perf_counter` instead, so
+/// its durations follow the mock like upstream's.
 #[derive(Clone, Copy)]
-pub(crate) struct TimeMark(std::time::Instant);
+pub(crate) enum TimeMark {
+    Real(std::time::Instant),
+    Mock(f64),
+}
+
+thread_local! {
+    /// The running session measures with a patched `_pytest.timing` clock.
+    static MOCK_CLOCK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
 
 impl TimeMark {
     pub(crate) fn now() -> Self {
-        Self(std::time::Instant::now())
+        if MOCK_CLOCK.with(std::cell::Cell::get)
+            && let Some(t) = Self::mock_now()
+        {
+            return Self::Mock(t);
+        }
+        Self::Real(std::time::Instant::now())
     }
 
     pub(crate) fn elapsed(self) -> Duration {
-        self.0.elapsed()
+        match self {
+            Self::Real(start) => start.elapsed(),
+            Self::Mock(start) => Self::mock_now()
+                .map(|now| Duration::from_secs_f64((now - start).max(0.0)))
+                .unwrap_or_default(),
+        }
+    }
+
+    fn mock_now() -> Option<f64> {
+        Python::attach(|py| {
+            py.import("_pytest.timing")
+                .and_then(|m| m.getattr("perf_counter")?.call0()?.extract())
+                .ok()
+        })
+    }
+
+    /// Use the patched clock for this session if `_pytest.timing` is
+    /// mocked; the guard restores the enclosing session's choice.
+    fn use_mock_clock_if_patched(py: Python<'_>) -> MockClockGuard {
+        let patched = (|| -> PyResult<bool> {
+            let ours = py.import("_pytest.timing")?.getattr("perf_counter")?;
+            let real = py.import("time")?.getattr("perf_counter")?;
+            Ok(!ours.is(&real))
+        })()
+        .unwrap_or(false);
+        MockClockGuard(MOCK_CLOCK.with(|c| c.replace(patched)))
+    }
+}
+
+struct MockClockGuard(bool);
+
+impl Drop for MockClockGuard {
+    fn drop(&mut self) {
+        MOCK_CLOCK.with(|c| c.set(self.0));
     }
 }
 
@@ -71,6 +114,7 @@ impl Engine {
             ..
         } = self;
 
+        let _mock_clock = TimeMark::use_mock_clock_if_patched(py);
         let items = std::mem::take(&mut session.items);
         let total = items.len().max(1);
         // Per-test progress display level (pytest's VERBOSITY_TEST_CASES):
