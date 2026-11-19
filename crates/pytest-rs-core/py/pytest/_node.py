@@ -223,7 +223,15 @@ class _NodeBase:
 
     @property
     def nodeid(self):
-        return self._nodeid
+        try:
+            return self._nodeid
+        except AttributeError:
+            # A dataclass subclass (pytest's own metafunc DefinitionMock) sets
+            # only the structured `_id` and never runs Node.__init__.
+            node_id = self.__dict__.get("_id")
+            if node_id is None:
+                raise
+            return str(node_id)
 
     @nodeid.setter
     def nodeid(self, value):

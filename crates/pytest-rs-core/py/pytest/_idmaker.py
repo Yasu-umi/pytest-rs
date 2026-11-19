@@ -64,14 +64,14 @@ def idval_from_value_required(val, idx, error_prefix="", config=None):
     fail(msg, pytrace=False)
 
 
-def complain_multiple_hidden_parameter_sets(func_name):
+def complain_multiple_hidden_parameter_sets(nodeid):
     """Raise the pytrace=True Failed for duplicate HIDDEN_PARAM ids (upstream's
     Metafunc._complain_multiple_hidden_parameter_sets). Called directly by the
     Rust collector so the raise happens in a frame with no __tracebackhide__ —
     unlike pytest._outcomes.fail (which sets it locally), leaving at least one
     visible frame for format_test_failure's traceback rendering."""
     msg = (
-        f"In {func_name}: multiple instances of HIDDEN_PARAM "
+        f"In {nodeid}: multiple instances of HIDDEN_PARAM "
         "cannot be used in the same parametrize call, "
         "because the tests names need to be unique."
     )
