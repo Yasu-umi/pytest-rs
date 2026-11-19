@@ -274,17 +274,19 @@ impl Engine {
         if self.config.get_flag("no-header") {
             return;
         }
-        // Upstream's "platform darwin -- Python 3.13.2, pytest-9.0.3, pluggy-1.6.0"
-        let platform = match std::env::consts::OS {
-            "macos" => "darwin",
-            "windows" => "win32",
-            other => other,
-        };
-        let version = pyo3::Python::version_str()
-            .split_whitespace()
-            .next()
-            .unwrap_or("");
-        println!("platform {platform} -- Python {version}, pytest-9.0.3, pluggy-1.6.0");
+        // Upstream's "platform darwin -- Python 3.13.2, pytest-9.0.3,
+        // pluggy-1.6.0", pluggy being the installed one. Built by the shim's
+        // TerminalReporter._platform_line so a replacement reporter prints
+        // the identical line.
+        let line = py
+            .import("_pytest.terminal")
+            .and_then(|m| m.getattr("TerminalReporter"))
+            .and_then(|cls| cls.call_method0("_platform_line"))
+            .and_then(|line| line.extract::<String>());
+        match line {
+            Ok(line) => println!("{line}"),
+            Err(err) => eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err)),
+        }
         // Native plugins' pytest_report_header lines (e.g. pytest-benchmark's
         // "benchmark: ...") print here, right after the platform line —
         // matching where real pytest-benchmark's own hookimpl lands once

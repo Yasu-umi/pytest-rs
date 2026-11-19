@@ -270,6 +270,37 @@ class TerminalReporter:
     Native runs never instantiate hook behavior from this class — the
     engine renders in Rust; only a registered replacement gets driven."""
 
+    # Shown when no pluggy distribution is installed: pytest-rs itself does
+    # not depend on pluggy, but the header keeps upstream's shape.
+    _PLUGGY_FALLBACK_VERSION = "1.6.0"
+
+    @staticmethod
+    def _pluggy_version():
+        """The installed pluggy's version for the session header, as upstream
+        prints pluggy.__version__. Read from the first ``pluggy-<version>
+        .dist-info`` (or ``.egg-info``) directory on sys.path, the entry
+        importlib.metadata would resolve, without importlib.metadata's cost
+        (several ms per lookup) or importing pluggy."""
+        for entry in sys.path:
+            try:
+                names = os.listdir(entry or ".")
+            except OSError:
+                continue
+            for name in names:
+                if not name.startswith(("pluggy-", "Pluggy-")):
+                    continue
+                for suffix in (".dist-info", ".egg-info"):
+                    if name.endswith(suffix):
+                        return name[len("pluggy-") : -len(suffix)]
+        return TerminalReporter._PLUGGY_FALLBACK_VERSION
+
+    @staticmethod
+    def _platform_line():
+        """Upstream's "platform ... -- Python X, pytest-Y, pluggy-Z" line."""
+        pluggy = TerminalReporter._pluggy_version()
+        verinfo = platform.python_version()
+        return f"platform {sys.platform} -- Python {verinfo}, pytest-9.0.3, pluggy-{pluggy}"
+
     def __init__(self, config, file=None):
         self.config = config
         self.stats = {}
@@ -653,12 +684,11 @@ class TerminalReporter:
             return
         self.write_sep("=", "test session starts", bold=True)
         if not self.no_header:
-            verinfo = platform.python_version()
-
-            # Match the native engine header exactly: a replacement
-            # reporter's header must equal the native one — pytest-bdd's
-            # gherkin reporter test compares them line by line.
-            msg = f"platform {sys.platform} -- Python {verinfo}, pytest-9.0.3, pluggy-1.6.0"
+            # Match the native engine header exactly (the engine prints this
+            # same line): a replacement reporter's header must equal the
+            # native one — pytest-bdd's gherkin reporter test compares them
+            # line by line.
+            msg = self._platform_line()
             if self.verbosity > 0:
                 msg += " -- " + str(sys.executable)
             self.write_line(msg)
