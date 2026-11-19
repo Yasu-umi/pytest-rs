@@ -220,6 +220,24 @@ def main(args=None, plugins=None):
     raise NotImplementedError("_pytest.config.main is not supported by pytest-rs")
 
 
+def _get_prog_name(argv):
+    import pytest
+
+    return pytest._get_prog_name(argv)
+
+
+def _console_main() -> int:
+    import pytest
+
+    return pytest._console_main()
+
+
+def console_main() -> int:
+    import pytest
+
+    return pytest.console_main()
+
+
 def get_plugin_manager() -> "PytestPluginManager":
     """Return the global plugin manager (backward-compat API, upstream #787)."""
     from pytest._pluginmanager import pluginmanager
@@ -314,6 +332,74 @@ def _get_plugin_specs_as_list(specs):
         "Plugins may be specified as a sequence or a ','-separated string of "
         f"plugin names. Got: {specs!r}"
     )
+
+
+def _plugin_rewrite_name(module):
+    """The name to mark so that ``module`` is rewritten: its outermost
+    package that is not a namespace package (upstream 9.2, #11783). Resolved
+    through PathFinder, which imports nothing."""
+    import importlib.machinery
+
+    parts = module.split(".")
+    search_path = None
+    for i, part in enumerate(parts):
+        spec = importlib.machinery.PathFinder.find_spec(part, search_path)
+        if spec is None:
+            return None
+        if spec.origin is not None or spec.submodule_search_locations is None:
+            return ".".join(parts[: i + 1])
+        search_path = list(spec.submodule_search_locations)
+    return None
+
+
+def _is_editable_install(dist):
+    """Whether the distribution was installed in editable mode (PEP 660)."""
+    import json
+
+    read_text = getattr(dist, "read_text", None)
+    if read_text is None:
+        return False
+    direct_url = read_text("direct_url.json")
+    if not direct_url:
+        return False
+    try:
+        dir_info = json.loads(direct_url).get("dir_info", {})
+    except ValueError:
+        return False
+    return bool(dir_info.get("editable"))
+
+
+def plugin_rewrite_names(dists):
+    """The module names to mark for assertion rewrite for every distribution
+    registering a pytest11 entry point (upstream's
+    Config._mark_plugins_for_rewrite): its top-level modules, or for an
+    editable install (which records no Python files) the package owning
+    each entry point."""
+    names = []
+    for dist in dists:
+        entry_points = [ep for ep in dist.entry_points if ep.group == "pytest11"]
+        if not entry_points:
+            continue
+        found = set(_iter_rewritable_modules(str(f) for f in (dist.files or [])))
+        if not found and _is_editable_install(dist):
+            found = {
+                name
+                for ep in entry_points
+                if (name := _plugin_rewrite_name(ep.value.partition(":")[0].strip()))
+            }
+        names.extend(sorted(found - set(names)))
+    return names
+
+
+def mark_plugins_for_rewrite(config, hook, disable_autoload):
+    """Config._mark_plugins_for_rewrite."""
+    import importlib.metadata
+
+    config.pluginmanager.rewrite_hook = hook
+    if disable_autoload:
+        return
+    for name in plugin_rewrite_names(importlib.metadata.distributions()):
+        hook.mark_rewrite(name)
 
 
 def _iter_rewritable_modules(package_files):

@@ -311,6 +311,22 @@ impl PyConfig {
             .unbind())
     }
 
+    /// `config._mark_plugins_for_rewrite(hook, disable_autoload)`: mark the
+    /// pytest11 plugin distributions' modules for assertion rewrite
+    /// (including editable installs, pytest 9.2 #11783). The engine does the
+    /// same at startup (bootstrap's entry point loading).
+    #[pyo3(signature = (hook, disable_autoload))]
+    fn _mark_plugins_for_rewrite(
+        slf: &Bound<'_, Self>,
+        hook: &Bound<'_, PyAny>,
+        disable_autoload: bool,
+    ) -> PyResult<()> {
+        slf.py()
+            .import("_pytest.config")?
+            .call_method1("mark_plugins_for_rewrite", (slf, hook, disable_autoload))?;
+        Ok(())
+    }
+
     /// `config._get_unknown_ini_keys()`: ini-file keys that aren't a
     /// registered or core option (pytest's unknown-config-option set).
     fn _get_unknown_ini_keys(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -714,6 +730,18 @@ impl PyConfig {
     /// (matches pytest's recent behaviour where inicfg is a detached view).
     #[getter]
     fn inicfg(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        // Deprecated since pytest 9.1 (CONFIG_INICFG).
+        let category = py
+            .import("_pytest.warning_types")?
+            .getattr("PytestRemovedIn10Warning")?;
+        let warning = category.call1((
+            "config.inicfg is deprecated, use config.getini() to access configuration \
+             values instead.\nSee https://docs.pytest.org/en/stable/deprecations.html#config-inicfg",
+        ))?;
+        let kwargs = pyo3::types::PyDict::new(py);
+        kwargs.set_item("stacklevel", 2)?;
+        py.import("warnings")?
+            .call_method("warn", (warning,), Some(&kwargs))?;
         let dict = pyo3::types::PyDict::new(py);
         for (key, value) in self.ini.lock().expect("config lock poisoned").iter() {
             dict.set_item(key, value)?;

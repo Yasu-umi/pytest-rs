@@ -533,8 +533,8 @@ bundled = {name.lower() for name in bundled}\n\
 dist_name = lambda dist: (getattr(dist, 'metadata', None) or {}).get('Name') or ''\n\
 dists = [dist for dist in importlib.metadata.distributions() if any(ep.group == 'pytest11' for ep in dist.entry_points) if dist_name(dist).lower() not in bundled]\n\
 result = [(ep.name, getattr(ep, 'module', None) or '', dist_name(dist), getattr(dist, 'version', None) or '', ep) for dist in dists for ep in dist.entry_points if ep.group == 'pytest11']\n\
-from _pytest.config import _iter_rewritable_modules\n\
-rewrite_names = list({name for dist in dists for name in _iter_rewritable_modules(str(f) for f in (dist.files or []))})\n",
+from _pytest.config import plugin_rewrite_names\n\
+rewrite_names = plugin_rewrite_names(dists)\n",
         Some(&globals),
         None,
     )?;
