@@ -183,9 +183,11 @@ impl Engine {
             let native_lines = self.native_plugin_header_lines(py).unwrap_or_default();
             python::reporter_sessionstart(py, &self.config, &native_lines);
         } else {
-            self.print_header(py);
-            if let Err(err) = self.print_py_report_header(py) {
-                errors.push((rootdir.to_path_buf(), python::format_exception(py, &err)));
+            if self.print_header_start(py) {
+                if let Err(err) = self.print_py_report_header(py) {
+                    errors.push((rootdir.to_path_buf(), python::format_exception(py, &err)));
+                }
+                self.print_header_terminal_lines();
             }
         }
         // --markers: list registered markers (configure hooks above already
