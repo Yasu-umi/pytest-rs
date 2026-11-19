@@ -105,16 +105,6 @@ known_failures = [
     # pytest 9.2 tests that call pytest internals directly (helpers or
     # classes pytest-rs implements in Rust or does not mirror); the
     # user-visible behavior they back is covered by other tests.
-    # _pytest.fixtures.ParamValueKey (fixture-cache key class) is engine-internal in pytest-rs.
-    "testing/python/fixtures.py::TestParamValueKey::test_equal_hashable_values",
-    "testing/python/fixtures.py::TestParamValueKey::test_equal_values_of_different_type",
-    "testing/python/fixtures.py::TestParamValueKey::test_exotic_eq",
-    "testing/python/fixtures.py::TestParamValueKey::test_identical_value",
-    "testing/python/fixtures.py::TestParamValueKey::test_other_types",
-    "testing/python/fixtures.py::TestParamValueKey::test_repr",
-    "testing/python/fixtures.py::TestParamValueKey::test_unequal_hashable_values",
-    "testing/python/fixtures.py::TestParamValueKey::test_unhashable_values_compare_by_index",
-    "testing/python/fixtures.py::TestParamValueKey::test_value_key_never_equals_index_key",
     # constructs _pytest.config.argparsing.Parser directly; pytest-rs parses the CLI in Rust.
     "testing/test_config.py::TestConfigAPI::test_addini_invalid_type[Union]",
     "testing/test_config.py::TestConfigAPI::test_addini_invalid_type[dict]",

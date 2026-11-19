@@ -376,6 +376,66 @@ def fail_subrequest_no_param(nodeid, fixturefunc, argname, rootpath):
     )
 
 
+class ParamValueKey:
+    """A hashable equivalence key for a parameter value, used in `reorder_items`
+    (upstream pytest 9.2 verbatim; the engine's reorder interns these).
+
+    Approximates the equality which `FixtureDef.execute` uses at runtime to
+    decide whether a cached fixture value can be reused (see
+    `FixtureDef.cache_key`), while always being safe to use as a dict key:
+
+    - A hashable value uses its own hash, and compares with ``==``, guarded
+      against exotic ``__eq__`` implementations which raise or return
+      non-booleans (e.g. numpy arrays -- #6497), and restricted to values of
+      the same type so that e.g. ``1``, ``1.0`` and ``True`` are not grouped.
+    - An unhashable value falls back to comparing by the value's index within
+      its ``parametrize()`` call, which is how *all* values were compared
+      before #8914 was fixed. This may group items whose values are actually
+      different, or fail to group items whose values are equal, but it is
+      never worse than the historical index-based behavior.
+
+    Since the runtime cache check in `FixtureDef.execute` remains authoritative,
+    an imprecise key can only cause a suboptimal test order (extra
+    setups/teardowns), never an incorrect fixture value.
+    """
+
+    __slots__ = ("_by_value", "_hash", "_key")
+
+    def __init__(self, value: object, fallback_index: int) -> None:
+        try:
+            self._hash = hash(value)
+            self._key = value
+            self._by_value = True
+        except TypeError:
+            self._hash = hash(fallback_index)
+            self._key = fallback_index
+            self._by_value = False
+
+    def __hash__(self) -> int:
+        return self._hash
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ParamValueKey):
+            return NotImplemented
+        if self._by_value != other._by_value:
+            return False
+        if not self._by_value:
+            # Both unhashable: compare by parametrize() index.
+            return self._key == other._key
+        if self._key is other._key:
+            return True
+        if type(self._key) is not type(other._key):
+            return False
+        try:
+            return bool(self._key == other._key)
+        except (TypeError, ValueError, RuntimeError):
+            return False
+
+    def __repr__(self) -> str:
+        kind = "value" if self._by_value else "index"
+        return f"ParamValueKey({kind}={self._key!r})"
+
+
 class FixtureFunctionDefinition:
     """pytest 8.4+ wraps @pytest.fixture functions in this. pytest-rs marks
     fixtures with recorded metadata instead, so nothing is ever an instance —

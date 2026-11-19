@@ -120,6 +120,21 @@ impl TestItem {
     /// (`fixture_params`). Used as the parametrization-binding key so teardown
     /// keys on the value, not the per-function param index (which differs
     /// across functions parametrizing the same fixture, e.g. issue634).
+    /// The parametrized value bound to `argname` (indirect/fixture param or
+    /// direct callspec value).
+    pub fn param_value(&self, argname: &str) -> Option<&Py<PyAny>> {
+        self.fixture_params
+            .iter()
+            .find(|(n, _, _)| n == argname)
+            .map(|(_, _, v)| v)
+            .or_else(|| {
+                self.callspec
+                    .iter()
+                    .find(|(n, _)| n == argname)
+                    .map(|(_, v)| v)
+            })
+    }
+
     pub fn param_value_repr(&self, py: Python<'_>, argname: &str) -> Option<String> {
         if let Some((_, _, value)) = self.fixture_params.iter().find(|(n, _, _)| n == argname) {
             return value.bind(py).repr().ok().map(|r| r.to_string());
