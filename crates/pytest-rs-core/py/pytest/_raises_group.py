@@ -236,11 +236,22 @@ class AbstractRaises(ABC, Generic[BaseExcT_co]):
             f" the `{_exception_type_name(type(e))}()`" if isinstance(e, BaseExceptionGroup) else ""
         )
         if isinstance(self.rawmatch, str):
-            # TODO: it instructs to use `-v` to print leading text, but that doesn't work
-            # I also don't know if this is the proper entry point, or tool to use at all
-            from _pytest.assertion.util import _diff_text, dummy_highlighter
+            from _pytest.assertion.compare_text import _diff_text
+            from _pytest.assertion.highlight import dummy_highlighter
+            from _pytest.assertion.util import _config
 
-            diff = _diff_text(self.rawmatch, stringified_exception, dummy_highlighter)
+            # -v shows the identical leading/trailing text too (pytest 9.2).
+            # Without upstream's assertion plugin config, the engine's
+            # rewrite settings carry the verbosity.
+            if _config is not None:
+                verbose = _config.get_verbosity("assertions")
+            else:
+                from pytest._rewrite import _RewriteConfig
+
+                verbose = _RewriteConfig().get_verbosity("assertions")
+            diff = list(
+                _diff_text(self.rawmatch, stringified_exception, dummy_highlighter, verbose)
+            )
             self._fail_reason = ("\n" if diff[0][0] == "-" else "") + "\n".join(diff)
             return False
 
@@ -426,10 +437,11 @@ class RaisesExc(AbstractRaises[BaseExcT_co_default]):
         if exc_type is None:
             if not self.expected_exceptions:
                 fail("DID NOT RAISE any exception")
-            if len(self.expected_exceptions) > 1:
-                fail(f"DID NOT RAISE any of {self.expected_exceptions!r}")
-
-            fail(f"DID NOT RAISE {self.expected_exceptions[0]!r}")
+            # Exception class names, not reprs (pytest 9.2).
+            if len(self.expected_exceptions) == 1:
+                fail(f"DID NOT RAISE {self.expected_exceptions[0].__name__}")
+            names = ", ".join(x.__name__ for x in self.expected_exceptions)
+            fail(f"DID NOT RAISE any of ({names})")
 
         assert self.excinfo is not None, (
             "Internal error - should have been constructed in __enter__"
@@ -438,7 +450,7 @@ class RaisesExc(AbstractRaises[BaseExcT_co_default]):
         if not self.matches(exc_val):
             if self._just_propagate:
                 return False
-            raise AssertionError(self._fail_reason)
+            raise AssertionError(self._fail_reason) from None
 
         # Cast to narrow the exception type now that it's verified....
         # even though the TypeGuard in self.matches should be narrowing
