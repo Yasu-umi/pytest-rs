@@ -45,6 +45,11 @@ pub struct Engine {
     /// The `items` list the suspended wrappers above hold; refilled with the
     /// final items before they resume.
     pending_modifyitems_list: Option<Py<pyo3::types::PyList>>,
+    /// `pytest_collection` wrapper impls suspended at their yield: started
+    /// once the session header is out (after pytest_sessionstart) and
+    /// resumed once collection settles (after pytest_collection_finish),
+    /// like upstream's wrappers around the default perform_collect impl.
+    pending_collection_wrappers: Vec<(Py<PyAny>, bool)>,
     /// The testrun_uid for this dist run, generated at the
     /// `collect_pre_configure` checkpoint (before any fork) and consumed by
     /// `run_dist`. `None` when not distributing.

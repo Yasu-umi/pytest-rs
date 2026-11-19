@@ -184,6 +184,11 @@ impl Engine {
             }
             return Ok(true);
         }
+        // pytest_collection runs after pytest_sessionstart: its wrappers
+        // advance to their yield before any file is collected.
+        if let Err(err) = self.start_py_collection_wrappers(py) {
+            errors.push((rootdir.to_path_buf(), python::format_exception(py, &err)));
+        }
         Ok(false)
     }
 

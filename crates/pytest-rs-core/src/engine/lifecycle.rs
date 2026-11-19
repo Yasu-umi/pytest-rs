@@ -18,6 +18,7 @@ impl Engine {
             cache: None,
             pending_modifyitems_wrapper_hooks: Vec::new(),
             pending_modifyitems_list: None,
+            pending_collection_wrappers: Vec::new(),
             #[cfg(feature = "xdist")]
             dist_testrun_uid: None,
             #[cfg(feature = "xdist")]

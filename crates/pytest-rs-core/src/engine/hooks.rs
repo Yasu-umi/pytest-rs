@@ -485,6 +485,73 @@ impl Engine {
     }
 
     /// True for a `wrapper=True`/`hookwrapper=True` hookimpl.
+    /// Start the `pytest_collection` wrapper impls (conftest and plugin) up
+    /// to their yield; `finish_py_collection_wrappers` resumes them. Plain
+    /// impls are not called: upstream's is firstresult and a plain impl
+    /// returning a value replaces collection, which pytest-rs does not
+    /// emulate (same as a plain pytest_runtest_protocol impl).
+    pub(crate) fn start_py_collection_wrappers(&mut self, py: Python<'_>) -> PyResult<()> {
+        let mut funcs = python::instance_hook_funcs(py, "pytest_collection");
+        funcs.extend(
+            self.session
+                .py_hooks
+                .iter()
+                .filter(|hook| hook.name == "pytest_collection" && hook.plugin_module.is_none())
+                .map(|hook| hook.func.clone_ref(py)),
+        );
+        // pluggy: the last registered (conftests) is outermost; tryfirst
+        // wrappers outermost, trylast innermost.
+        funcs.reverse();
+        let mut wrappers: Vec<Py<pyo3::PyAny>> = funcs
+            .into_iter()
+            .filter(|func| Self::modifyitems_hookimpl_is_wrapper(py, func))
+            .collect();
+        if wrappers.is_empty() {
+            return Ok(());
+        }
+        wrappers.sort_by_key(|func| {
+            if Self::hookimpl_flag(py, func, "tryfirst") {
+                0
+            } else if Self::hookimpl_flag(py, func, "trylast") {
+                2
+            } else {
+                1
+            }
+        });
+        let session = python::make_session_proxy(py, &self.config)?;
+        let next_fn = py.import("builtins")?.getattr("next")?;
+        let isgenerator = py.import("inspect")?.getattr("isgenerator")?;
+        for func in &wrappers {
+            let wrapper_gen =
+                python::call_py_hook_raw(py, func, &[("session", session.clone_ref(py))])?;
+            if !isgenerator
+                .call1((wrapper_gen.bind(py),))?
+                .extract::<bool>()?
+            {
+                continue;
+            }
+            match next_fn.call1((wrapper_gen.bind(py),)) {
+                Ok(_) => {
+                    let old_style = Self::hookimpl_flag(py, func, "hookwrapper");
+                    self.pending_collection_wrappers
+                        .push((wrapper_gen, old_style));
+                }
+                Err(err) if err.is_instance_of::<pyo3::exceptions::PyStopIteration>(py) => {}
+                Err(err) => return Err(err),
+            }
+        }
+        Ok(())
+    }
+
+    /// Resume the suspended `pytest_collection` wrappers (innermost first).
+    pub(crate) fn finish_py_collection_wrappers(&mut self, py: Python<'_>) -> PyResult<()> {
+        let wrappers = std::mem::take(&mut self.pending_collection_wrappers);
+        if wrappers.is_empty() {
+            return Ok(());
+        }
+        crate::runner::finish_runtest_py_wrappers(py, &wrappers, None)
+    }
+
     fn modifyitems_hookimpl_is_wrapper(py: Python<'_>, func: &Py<pyo3::PyAny>) -> bool {
         Self::hookimpl_flag(py, func, "wrapper") || Self::hookimpl_flag(py, func, "hookwrapper")
     }
@@ -1616,6 +1683,11 @@ impl Engine {
     /// pytest_sessionfinish conftest/plugin hooks (session is not modeled;
     /// hooks asking for it receive None).
     pub(crate) fn fire_py_sessionfinish(&mut self, py: Python<'_>, code: i32) -> PyResult<()> {
+        // Collection ended early (errors, nothing collected): pytest_collection
+        // wrappers still suspended resume before the session finishes.
+        if let Err(err) = self.finish_py_collection_wrappers(py) {
+            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+        }
         let mut hook_funcs = python::instance_hook_funcs(py, "pytest_sessionfinish");
         // Conftest-defined impls only here — third-party plugin modules
         // (e.g. pytest-ruff) are already covered by instance_hook_funcs
