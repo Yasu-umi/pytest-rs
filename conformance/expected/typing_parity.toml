@@ -32,7 +32,6 @@ shim_only = [
     "testing/python/collect.py: [attr-defined] \"Class\" has no attribute \"collect\"",
     "testing/python/collect.py: [attr-defined] \"File\" has no attribute \"obj\"",
     "testing/python/fixtures.py: [attr-defined] \"Function\" has no attribute \"funcargs\"",
-    "testing/python/metafunc.py: [call-arg] Missing positional argument \"func_name\" in call to \"IdMaker\"",
     "testing/python/metafunc.py: [type-arg] \"FixtureDef\" expects no type arguments, but 1 given",
     "testing/python/raises_group.py: [return-value] Incompatible return value type (got \"RaisesContext[Failed]\", expected \"RaisesExc[Failed]\")",
     "testing/test_argcomplete.py: [import-not-found] Cannot find implementation or library stub for module named \"_pytest._argcomplete\"",
