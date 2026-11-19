@@ -299,6 +299,30 @@ pub(crate) fn register_pytest_plugins(
     )
 }
 
+/// Render a startup plugin-loading error like upstream's main(): a
+/// PluginImportFailure becomes the "\x00PLUGIN_IMPORT_FAILURE\x00" sentinel
+/// carrying print_plugin_import_error's text (INTERNAL_ERROR), a UsageError
+/// its bare message (USAGE_ERROR, "ERROR: <msg>"), anything else the
+/// formatted exception.
+pub fn plugin_load_error(py: Python<'_>, err: &PyErr) -> String {
+    let failure = py
+        .import("_pytest.config")
+        .and_then(|m| m.getattr("PluginImportFailure"))
+        .is_ok_and(|cls| err.is_instance(py, &cls));
+    if failure {
+        let text = py
+            .import("pytest._tb")
+            .and_then(|m| m.call_method1("format_plugin_import_error", (err.value(py),)))
+            .and_then(|t| t.extract::<String>())
+            .unwrap_or_else(|_| format_exception(py, err));
+        return format!("\x00PLUGIN_IMPORT_FAILURE\x00{text}");
+    }
+    if is_usage_error(py, err) {
+        return err.value(py).to_string();
+    }
+    format_exception(py, err)
+}
+
 /// True for pytest-rs's own internal shim modules (resolved via the
 /// `_pytest.{name}` fallback import, e.g. `-p pytester`/`pytest_plugins =
 /// ["pytester"]` resolving to `_pytest.pytester`). These lean on
@@ -341,7 +365,6 @@ pub fn load_named_plugins(
     blocked: &[String],
     consider_entry_points: bool,
 ) -> PyResult<()> {
-    let importlib = py.import("importlib")?;
     for name in names {
         if consider_entry_points && blocked.contains(name) {
             continue;
@@ -378,11 +401,12 @@ result = next(((getattr(ep, 'module', None) or '', ep) for dist in importlib.met
                 if already {
                     continue;
                 }
-                let loaded = ep
-                    .bind(py)
-                    .call_method0("load")
-                    .and_then(|obj| obj.cast_into::<pyo3::types::PyModule>().map_err(Into::into));
-                if let Ok(module) = loaded {
+                // A failing load is a defect in the installed plugin
+                // (PluginImportFailure, pytest 9.2 #993).
+                let loaded = py
+                    .import("pytest._pluginmanager")?
+                    .call_method1("load_entry_point", (ep.bind(py),))?;
+                if let Ok(module) = loaded.cast_into::<pyo3::types::PyModule>() {
                     register_fixtures_from(py, &module, "", registry)?;
                     let before = hooks.len();
                     scan_py_hooks(&module, "", hooks)?;
@@ -407,32 +431,23 @@ result = next(((getattr(ep, 'module', None) or '', ep) for dist in importlib.met
         // Check sys.modules first: importlib.import_module may fail for
         // non-module objects registered by tests (their __spec__ lacks
         // the _initializing attribute importlib probes).
-        let import_fn = importlib.getattr("import_module")?;
         let modules = py.import("sys")?.getattr("modules")?;
         let plugin = match modules.get_item(name.as_str()) {
             Ok(obj) if !obj.is_none() => obj,
-            _ => match import_fn.call1((name.as_str(),)) {
-                Ok(obj) => obj,
-                Err(_) => {
-                    let scoped = format!("_pytest.{name}");
-                    match import_fn.call1((scoped.as_str(),)) {
-                        Ok(obj) => obj,
-                        Err(_) => {
-                            // Under `python -m pytest` the invocation dir is
-                            // sys.path[0], so -p resolves local plugin modules;
-                            // emulate that for the import only.
-                            let Some(dir) = search_dir else { continue };
-                            let dir = dir.to_string_lossy();
-                            let sys_path = py.import("sys")?.getattr("path")?;
-                            sys_path.call_method1("insert", (0, dir.as_ref()))?;
-                            let result = import_fn.call1((name.as_str(),));
-                            let _ = sys_path.call_method1("remove", (dir.as_ref(),));
-                            let Ok(plugin) = result else { continue };
-                            plugin
-                        }
-                    }
+            _ => {
+                // Upstream's import_plugin (pytest 9.2 #993): a plugin that
+                // cannot be found is a UsageError, one raising while it
+                // imports a PluginImportFailure; builtin and natively
+                // implemented plugin names resolve to nothing to register.
+                let search = search_dir.map(|d| d.to_string_lossy().into_owned());
+                let plugin = py
+                    .import("pytest._pluginmanager")?
+                    .call_method1("import_named_plugin", (name.as_str(), search))?;
+                if plugin.is_none() {
+                    continue;
                 }
-            },
+                plugin
+            }
         };
         // Re-registering an already-seen plugin would duplicate its hooks.
         let already = hooks
@@ -578,10 +593,13 @@ rewrite_names = plugin_rewrite_names(dists)\n",
         if already {
             continue;
         }
-        let loaded = ep
-            .bind(py)
-            .call_method0("load")
-            .and_then(|obj| obj.cast_into::<pyo3::types::PyModule>().map_err(Into::into));
+        // An installed plugin that cannot be loaded is a defect in that
+        // plugin: PluginImportFailure (pytest 9.2 #993) ends the run.
+        let loaded = py
+            .import("pytest._pluginmanager")?
+            .call_method1("load_entry_point", (ep.bind(py),))?
+            .cast_into::<pyo3::types::PyModule>()
+            .map_err(PyErr::from);
         let plugin = match loaded {
             Ok(plugin) => plugin,
             Err(err) => {

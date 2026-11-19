@@ -436,4 +436,17 @@ def _iter_rewritable_modules(package_files):
             yield from _iter_rewritable_modules(new_package_files)
 
 
+class PluginImportFailure(Exception):
+    """A plugin was found, but raised while being imported (pytest 9.2, #993):
+    a defect in the plugin, reported as an internal error — unlike a plugin
+    that cannot be found at all, which is a UsageError."""
+
+
+def _is_missing_module(e, importspec):
+    """Whether ``e`` means that ``importspec`` itself could not be found."""
+    if e.name is None:
+        return False
+    return e.name == importspec or importspec.startswith(f"{e.name}.")
+
+
 from _pytest._stub import __getattr__  # noqa: E402, F401

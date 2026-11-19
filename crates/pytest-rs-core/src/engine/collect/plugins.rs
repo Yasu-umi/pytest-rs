@@ -44,7 +44,7 @@ impl Engine {
                 true,
             )
         {
-            return Err(python::format_exception(py, &err));
+            return Err(python::plugin_load_error(py, &err));
         }
 
         // Installed third-party plugins (pytest11 entry points) autoload
@@ -62,7 +62,7 @@ impl Engine {
                 &mut loaded_modules,
             )
         {
-            return Err(python::format_exception(py, &err));
+            return Err(python::plugin_load_error(py, &err));
         }
 
         // PYTEST_PLUGINS (comma-separated module names) loads the same
@@ -85,10 +85,12 @@ impl Engine {
                     &mut self.session.py_hooks,
                     &mut loaded_modules,
                     &blocked,
-                    false,
+                    // pytest 9.2 (#12624): PYTEST_PLUGINS names entry points
+                    // too, like -p NAME.
+                    true,
                 )
             {
-                return Err(python::format_exception(py, &err));
+                return Err(python::plugin_load_error(py, &err));
             }
         }
         Ok(())

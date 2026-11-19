@@ -527,6 +527,29 @@ def format_exception(exc, style="long"):
     return body
 
 
+def format_plugin_import_error(exc):
+    """upstream's print_plugin_import_error for a PluginImportFailure: the
+    'Error while loading plugin "<name>".' header, then a short-style
+    traceback of its cause."""
+    cause = exc.__cause__ if exc.__cause__ is not None else exc
+    lines = [_markup(f'Error while loading plugin "{exc}".', 1, 31)]
+    frames = [
+        (frame, lineno)
+        for frame, lineno in _visible_frames(cause)
+        if not ("<" in frame.f_code.co_filename and ">" in frame.f_code.co_filename)
+        and "importlib" not in frame.f_code.co_filename.split("/")
+        and "/pytest/_pluginmanager.py" not in frame.f_code.co_filename
+    ]
+    if not frames:
+        lines.extend(_markup(f"E   {entry}", 1, 31) for entry in _exception_lines(cause))
+        return "\n".join(lines)
+    for index, (frame, lineno) in enumerate(frames):
+        lines.extend(_format_short_frame(frame, lineno))
+        if index == len(frames) - 1:
+            lines.extend(_markup(f"E   {entry}", 1, 31) for entry in _exception_lines(cause))
+    return "\n".join(lines)
+
+
 def format_conftest_import_error(exc, conftest_path):
     """upstream's print_conftest_import_error: an "ImportError while loading
     conftest '<path>'." header, then a short-style traceback of `exc` with
