@@ -6,6 +6,7 @@ import inspect
 import os
 import sys
 import warnings
+from collections.abc import Mapping
 from typing import overload
 
 from pytest._fixtures import fixture
@@ -99,27 +100,51 @@ class MonkeyPatch:
             if raising:
                 raise AttributeError(name)
             return
-        self._setattr.append((target, name, self._old_value(target, name)))
+        oldval = self._old_value(target, name)
         delattr(target, name)
+        # Recorded only once the delete succeeded: undo() must not restore
+        # an attribute that was never removed.
+        self._setattr.append((target, name, oldval))
 
     def _old_value(self, target, name):
         """The restore value: for classes, read the raw __dict__ entry so
-        descriptors (staticmethod/classmethod) are not unwrapped."""
+        descriptors (staticmethod/classmethod) are not unwrapped. For an
+        instance whose attribute isn't a data descriptor, the assignment
+        lands in the instance __dict__, so undo() restores that entry (or
+        its absence) rather than shadowing an inherited value (#10644)."""
         if inspect.isclass(target):
             return target.__dict__.get(name, self._notset)
+        if not MonkeyPatch._is_data_descriptor(type(target), name):
+            target_dict = getattr(target, "__dict__", None)
+            if isinstance(target_dict, Mapping):
+                return target_dict.get(name, self._notset)
         return getattr(target, name, self._notset)
 
+    @staticmethod
+    def _is_data_descriptor(cls, name):
+        """True if looking ``name`` up on ``cls`` finds a data descriptor,
+        which takes precedence over the instance __dict__."""
+        for klass in cls.__mro__:
+            if name in klass.__dict__:
+                descr_type = type(klass.__dict__[name])
+                return hasattr(descr_type, "__set__") or hasattr(descr_type, "__delete__")
+        return False
+
     def setitem(self, mapping, name, value):
-        self._setitem.append((mapping, name, mapping.get(name, self._notset)))
+        oldval = mapping.get(name, self._notset)
         mapping[name] = value
+        # Recorded only once the assignment succeeded (e.g. not on a
+        # read-only mapping), so undo() doesn't fail on it too.
+        self._setitem.append((mapping, name, oldval))
 
     def delitem(self, mapping, name, raising=True):
         if name not in mapping:
             if raising:
                 raise KeyError(name)
             return
-        self._setitem.append((mapping, name, mapping[name]))
+        oldval = mapping[name]
         del mapping[name]
+        self._setitem.append((mapping, name, oldval))
 
     @staticmethod
     def _warn_if_env_name_is_not_str(name):
