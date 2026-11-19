@@ -1646,6 +1646,7 @@ def getini(
     strict: bool = False,
     overrides: dict[str, str] | None = None,
     toml_types: dict[str, str] | None = None,
+    inipath: str | None = None,
 ) -> Any:
     """config.getini(name): the typed, alias-resolved ini value. Registered
     options (parser.addini) supply type conversion and defaults.
@@ -1695,7 +1696,7 @@ def getini(
                     override_val = overrides[alias]
                     break
         if override_val is not None:
-            return _convert_ini(type_, override_val, rootpath, canonical)
+            return _convert_ini(type_, override_val, rootpath, canonical, inipath=inipath)
     # Value precedence: canonical name first, then any alias.
     value = inicfg.get(canonical)
     matched_key = canonical if value is not None else None
@@ -1709,7 +1710,7 @@ def getini(
         default = spec["default"]
         return _empty_for_type(type_) if default is _UNSET else default
     toml_type = toml_types.get(matched_key) if toml_types and matched_key else None
-    return _convert_ini(type_, value, rootpath, canonical, toml_type)
+    return _convert_ini(type_, value, rootpath, canonical, toml_type, inipath=inipath)
 
 
 def _native_scalar(raw: str, tag: str) -> Any:
@@ -1797,7 +1798,12 @@ def _convert_ini_member(
 
 
 def _convert_ini(
-    type_: Any, raw: Any, rootpath: str | None, name: str, toml_type: str | None = None
+    type_: Any,
+    raw: Any,
+    rootpath: str | None,
+    name: str,
+    toml_type: str | None = None,
+    inipath: str | None = None,
 ) -> Any:
     """getini's typed value. An invalid value is a user error, raised as
     UsageError (upstream's Config._getini); a union tries each member."""
@@ -1817,7 +1823,11 @@ def _convert_ini(
     except (TypeError, ValueError) as e:
         import pytest
 
-        raise pytest.UsageError(str(e)) from e
+        message = str(e)
+        # Upstream names the config file in its own messages.
+        if inipath and message.startswith("config option "):
+            message = f"{inipath}: {message}"
+        raise pytest.UsageError(message) from e
 
 
 #: Inis the bundled native plugins read (registered in Rust via the plugin's

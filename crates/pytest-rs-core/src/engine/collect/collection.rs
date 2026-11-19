@@ -23,7 +23,13 @@ impl Engine {
         // ini/-W filters on reinstall too, or install()'s own defaults would
         // re-take priority over a user's filterwarnings override.
         let _ = python::suspend_warning_capture(py);
-        let configure_result = self.fire_py_configure(py, rootdir, errors);
+        let configure_result = self.fire_py_configure(py, rootdir, errors).and_then(|()| {
+            // The assertion plugin's pytest_configure validates this
+            // Literal ini up front (pytest 9.2).
+            python::make_py_config(py, &self.config)?
+                .call_method1(py, "getini", ("assertion_text_diff_style",))
+                .map(|_| ())
+        });
         let ini_filters: Vec<String> = self
             .config
             .get_ini_lines("filterwarnings")
