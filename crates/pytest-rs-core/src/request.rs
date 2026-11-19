@@ -301,6 +301,7 @@ impl PyConfig {
         let kwargs = pyo3::types::PyDict::new(py);
         kwargs.set_item("overrides", &overrides)?;
         kwargs.set_item("toml_types", &toml_types)?;
+        kwargs.set_item("inipath", self.inipath.as_deref())?;
         Ok(py
             .import("pytest._parser")?
             .call_method(
