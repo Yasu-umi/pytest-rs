@@ -1,6 +1,7 @@
 """tmp_path / tmp_path_factory builtin fixtures (upstream _pytest/tmpdir.py
 port: pytest-of-{user} numbered basetemps with lock-driven retention)."""
 
+import atexit
 import fnmatch
 import getpass
 import hashlib
@@ -126,6 +127,9 @@ class TempPathFactory:
         self._retention_count = retention_count
         self._retention_policy = retention_policy
         self._basetemp = basetemp
+        # Lower-cased prefix -> next number to try, so numbered dirs don't
+        # need basetemp listed on every call.
+        self._next_number = {}
 
     @classmethod
     def from_config(cls, config, *, _ispytest=False):
@@ -158,16 +162,51 @@ class TempPathFactory:
 
     def mktemp(self, basename, numbered=True):
         """Create a new temporary directory managed by the factory."""
-        from _pytest.pathlib import make_numbered_dir
-
         basename = self._ensure_relative_to_basetemp(str(basename))
         if not numbered:
             p = self.getbasetemp().joinpath(basename)
             p.mkdir(mode=0o700)
         else:
-            p = make_numbered_dir(root=self.getbasetemp(), prefix=basename, mode=0o700)
+            p = self._make_counted_dir(basename)
             self._trace("mktemp", p)
         return p
+
+    def _make_counted_dir(self, prefix):
+        """Create ``<prefix><n>`` in basetemp from a per-prefix counter
+        (pytest 9.2): counting starts at 0 without listing basetemp, names
+        mkdir fails on are skipped, the 10th failure lists basetemp once to
+        jump past the run, and the 20th raises OSError."""
+        # Looked up on _pytest.tmpdir, like upstream's module globals, so
+        # tests monkeypatching _pytest.tmpdir.find_suffixes see it used.
+        import _pytest.tmpdir as _tmpdir
+
+        root = self.getbasetemp()
+        key = prefix.lower()
+        number = self._next_number.get(key, 0)
+        collisions = 0
+        while True:
+            path = root.joinpath(f"{prefix}{number}")
+            try:
+                path.mkdir(mode=0o700)
+            except OSError as e:
+                collisions += 1
+                if collisions == 10:
+                    listed = max(
+                        map(_tmpdir.parse_num, _tmpdir.find_suffixes(root, prefix)), default=-1
+                    )
+                    number = max(number, listed) + 1
+                elif collisions == 20:
+                    raise OSError(
+                        f"could not create numbered dir with prefix {prefix} in {root}"
+                        f" after {collisions} tries"
+                    ) from e
+                else:
+                    number += 1
+            else:
+                break
+        self._next_number[key] = number + 1
+        _tmpdir._force_symlink(root, prefix + "current", path)
+        return path
 
     def getbasetemp(self):
         """Return the base temporary directory, creating it if needed."""
@@ -234,6 +273,11 @@ class TempPathFactory:
                 keep=keep,
                 lock_timeout=LOCK_TIMEOUT,
                 mode=0o700,
+                # Upstream (9.2) registers these on an ExitStack closed at
+                # session finish. Under concurrent pytest-rs processes that
+                # made another live session's basetemp disappear (cause not
+                # found), so they stay on atexit, as before.
+                register=atexit.register,
             )
         assert basetemp is not None, basetemp
         self._basetemp = basetemp
