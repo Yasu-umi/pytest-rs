@@ -977,6 +977,28 @@ pub(crate) fn resolve_fixture_def(
     } else {
         None
     };
+    // pytest 9.2: a class-or-wider-scoped fixture bound to the test instance
+    // (an instance method, not a classmethod) is deprecated — attributes it
+    // sets on `self` are not seen by the other tests' instances.
+    if fixture_instance.is_some() && def.scope >= Scope::Class && !config.get_flag("setup-plan") {
+        let scope = def.scope.as_str();
+        let mut scope_name = scope.to_string();
+        scope_name[..1].make_ascii_uppercase();
+        let warning = py
+            .import("_pytest.deprecated")?
+            .getattr("CLASS_FIXTURE_INSTANCE_METHOD")?
+            .call_method(
+                "format",
+                (),
+                Some(&{
+                    let kw = pyo3::types::PyDict::new(py);
+                    kw.set_item("scope", scope_name)?;
+                    kw.set_item("fixturename", def.name.as_str())?;
+                    kw
+                }),
+            )?;
+        py.import("warnings")?.call_method1("warn", (warning,))?;
+    }
     // Track this def as executing so a fixture body calling
     // request.getfixturevalue(<own name>) resolves to the overridden super.
     EXECUTING.with(|s| s.borrow_mut().push(def.clone()));

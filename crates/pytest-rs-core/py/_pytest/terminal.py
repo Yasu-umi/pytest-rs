@@ -474,6 +474,11 @@ class TerminalReporter:
 
     def write_line(self, line, **markup):
         if not isinstance(line, str):
+            import warnings
+
+            from _pytest.deprecated import TERMINAL_WRITE_LINE_BYTES
+
+            warnings.warn(TERMINAL_WRITE_LINE_BYTES.format(), stacklevel=2)
             line = str(line, errors="replace")
         self.ensure_newline()
         self._tw.line(line, **markup)
