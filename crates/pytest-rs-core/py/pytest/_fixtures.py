@@ -147,7 +147,7 @@ def yield_fixture(
     """Deprecated alias for :func:`fixture`."""
     from _pytest.deprecated import YIELD_FIXTURE
 
-    warnings.warn(YIELD_FIXTURE, stacklevel=2)
+    warnings.warn(YIELD_FIXTURE.format(), stacklevel=2)
     return fixture(
         fixture_function, scope=scope, params=params, autouse=autouse, ids=ids, name=name
     )
