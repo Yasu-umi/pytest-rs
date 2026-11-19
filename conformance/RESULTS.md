@@ -46,8 +46,8 @@ pytest-rs; they are not counted in the total.
 | pytest-repeat | v0.9.4 | 16 | 0 | 0 | 0 | 0 | 0 | 16 | 100.0% | 1 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
 | pytest-env | 1.6.0 | 72 | 0 | 0 | 0 | 0 | 3 | 75 | 96.0% | 3 | 3 | 0 |
-| pytest-rerunfailures | 9.1.1 | 47 | 0 | 0 | 1 | 0 | 0 | 48 | 100.0% | 1 | 1 | 0 |
-| pytest-randomly | 4.1.0 | 37 | 0 | 0 | 0 | 0 | 0 | 37 | 100.0% | 1 | 1 | 0 |
+| pytest-rerunfailures | 16.7 | 225 | 13 | 0 | 10 | 0 | 0 | 248 | 94.8% | 0 | 1 | 0 |
+| pytest-randomly | 5.1.0 | 47 | 0 | 0 | 0 | 0 | 0 | 47 | 100.0% | 1 | 1 | 0 |
 | click | 8.5.1 | 2373 | 61 | 0 | 24 | 0 | 0 | 2458 | 97.5% | 42 | 43 | 0 |
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
 | marshmallow | 4.4.0 | 1192 | 0 | 0 | 0 | 0 | 0 | 1192 | 100.0% | 12 | 12 | 3 |
@@ -59,7 +59,7 @@ pytest-rs; they are not counted in the total.
 | starlette | 1.10.0 | 1357 | 0 | 1 | 2 | 0 | 0 | 1360 | 99.9% | 30 | 31 | 0 |
 | attrs | 26.1.0 | 1379 | 0 | 0 | 6 | 0 | 0 | 1385 | 100.0% | 23 | 25 | 0 |
 | more-itertools | v11.2.1 | 765 | 0 | 0 | 0 | 0 | 0 | 765 | 100.0% | 2 | 2 | 0 |
-| pytest-django | v4.9.0 | 215 | 0 | 0 | 1 | 0 | 0 | 216 | 100.0% | 12 | 13 | 0 |
+| pytest-django | v4.14.0 | 237 | 0 | 0 | 1 | 0 | 0 | 238 | 100.0% | 14 | 15 | 0 |
 | werkzeug | 3.1.9 | 955 | 0 | 0 | 1 | 25 | 0 | 981 | 97.5% | 24 | 25 | 0 |
 | fastapi | 0.163.2 | 5031 | 0 | 0 | 6 | 0 | 0 | 5037 | 100.0% | 535 | 546 | 0 |
 | packaging | 26.3 | 62423 | 0 | 0 | 0 | 0 | 0 | 62423 | 100.0% | 17 | 31 | 0 |
@@ -427,23 +427,23 @@ pytest-rs; they are not counted in the total.
 
 </details>
 
-### pytest-rerunfailures @ 9.1.1
+### pytest-rerunfailures @ 16.7
 
 <details><summary>per-file detail (1 files)</summary>
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| test_pytest_rerunfailures.py | passed | 47 | 0 | 0 | 1 | 0 | 0 |
+| tests/test_pytest_rerunfailures.py | failed | 225 | 13 | 0 | 10 | 0 | 0 |
 
 </details>
 
-### pytest-randomly @ 4.1.0
+### pytest-randomly @ 5.1.0
 
 <details><summary>per-file detail (1 files)</summary>
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| tests/test_pytest_randomly.py | passed | 37 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_pytest_randomly.py | passed | 47 | 0 | 0 | 0 | 0 | 0 |
 
 </details>
 
@@ -906,22 +906,24 @@ pytest-rs; they are not counted in the total.
 
 </details>
 
-### pytest-django @ v4.9.0
+### pytest-django @ v4.14.0
 
-<details><summary>per-file detail (13 files)</summary>
+<details><summary>per-file detail (15 files)</summary>
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
 | tests/test_asserts.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_database.py | passed | 61 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_database.py | passed | 64 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_db_access_in_repr.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_db_setup.py | passed | 14 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_django_configurations.py | no-tests | 0 | 0 | 0 | 1 | 0 | 0 |
 | tests/test_django_settings_module.py | passed | 19 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_environment.py | passed | 22 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_fixtures.py | passed | 52 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_initialization.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_environment.py | passed | 24 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_fixtures.py | passed | 54 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_initialization.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_isolate_apps.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_manage_py_scan.py | passed | 9 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_runner.py | passed | 8 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_unittest.py | passed | 23 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_urls.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_without_django_loaded.py | passed | 7 | 0 | 0 | 0 | 0 | 0 |

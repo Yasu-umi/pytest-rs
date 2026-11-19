@@ -1,18 +1,18 @@
 {
   "suite": "pytest-rerunfailures",
-  "tag": "9.1.1",
+  "tag": "16.7",
   "category": "third-party",
   "excluded_files": 0,
   "deselected": 0,
   "known_failed": 0,
   "files": [
     {
-      "file": "test_pytest_rerunfailures.py",
-      "status": "passed",
-      "exit_code": 0,
-      "passed": 47,
-      "failed": 0,
-      "skipped": 1,
+      "file": "tests/test_pytest_rerunfailures.py",
+      "status": "failed",
+      "exit_code": 1,
+      "passed": 225,
+      "failed": 13,
+      "skipped": 10,
       "errors": 0,
       "deselected": 0,
       "known_failed": 0

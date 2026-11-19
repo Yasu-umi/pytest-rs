@@ -197,10 +197,10 @@ _linux (CI-verified)_
 | pytest-repeat | v0.9.4 | 16 | 0 | 0 | 0 | 0 | 0 | 16 | 100.0% | 1 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
 | pytest-env | 1.6.0 | 72 | 0 | 0 | 0 | 0 | 3 | 75 | 96.0% | 3 | 3 | 0 |
-| pytest-rerunfailures | 9.1.1 | 47 | 0 | 0 | 1 | 0 | 0 | 48 | 100.0% | 1 | 1 | 0 |
-| pytest-randomly | 4.1.0 | 37 | 0 | 0 | 0 | 0 | 0 | 37 | 100.0% | 1 | 1 | 0 |
+| pytest-rerunfailures | 16.7 | 225 | 13 | 0 | 10 | 0 | 0 | 248 | 94.8% | 0 | 1 | 0 |
+| pytest-randomly | 5.1.0 | 47 | 0 | 0 | 0 | 0 | 0 | 47 | 100.0% | 1 | 1 | 0 |
 | pytest-bdd | 9.0.1 | 145 | 0 | 0 | 1 | 0 | 0 | 146 | 100.0% | 35 | 35 | 0 |
-| pytest-django | v4.9.0 | 215 | 0 | 0 | 1 | 0 | 0 | 216 | 100.0% | 12 | 13 | 0 |
+| pytest-django | v4.14.0 | 237 | 0 | 0 | 1 | 0 | 0 | 238 | 100.0% | 14 | 15 | 0 |
 
 **Real-world projects** (their suites run unchanged, as drop-in evidence):
 

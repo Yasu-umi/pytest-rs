@@ -1,6 +1,6 @@
 {
   "suite": "pytest-randomly",
-  "tag": "4.1.0",
+  "tag": "5.1.0",
   "category": "third-party",
   "excluded_files": 0,
   "deselected": 0,
@@ -10,7 +10,7 @@
       "file": "tests/test_pytest_randomly.py",
       "status": "passed",
       "exit_code": 0,
-      "passed": 37,
+      "passed": 47,
       "failed": 0,
       "skipped": 0,
       "errors": 0,
