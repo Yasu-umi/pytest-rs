@@ -994,11 +994,19 @@ pub fn set_assertion_rewrite(py: Python<'_>, mode: Option<&str>) {
 /// Pass the truncation_limit_lines / truncation_limit_chars ini values to
 /// the assert-rewrite explainer (None keeps pytest's defaults: 8 lines,
 /// 640 chars).
-pub fn set_assertion_truncation(py: Python<'_>, lines: Option<&str>, chars: Option<&str>) {
+pub fn set_assertion_truncation(
+    py: Python<'_>,
+    lines: Option<&str>,
+    chars: Option<&str>,
+    diff_style: Option<&str>,
+) {
     let parse = |value: Option<&str>| value.and_then(|s| s.trim().parse::<i64>().ok());
-    let _ = py
-        .import("pytest._rewrite")
-        .and_then(|m| m.call_method1("set_truncation_limits", (parse(lines), parse(chars))));
+    let _ = py.import("pytest._rewrite").and_then(|m| {
+        m.call_method1(
+            "set_truncation_limits",
+            (parse(lines), parse(chars), diff_style),
+        )
+    });
 }
 
 /// Pass the python_files ini patterns to the assertion rewriter so that

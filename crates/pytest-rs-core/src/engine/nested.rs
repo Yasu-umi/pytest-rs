@@ -125,6 +125,7 @@ impl Engine {
             py,
             self.config.get_ini("truncation_limit_lines"),
             self.config.get_ini("truncation_limit_chars"),
+            self.config.get_ini("assertion_text_diff_style"),
         );
         if let Err(err) = python::configure_mark_generator(
             py,
