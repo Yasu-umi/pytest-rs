@@ -26,6 +26,7 @@ pub(crate) fn teardown_one(
     xfail: bool,
     reports: &mut Vec<TestReport>,
 ) {
+    super::fixtures::mark_resolve_ctx_teardown();
     // tmp_path retention: the fixture teardown (a function finalizer below)
     // reads this item's call outcome; None means no call phase ran.
     let call_passed = reports
@@ -62,6 +63,34 @@ pub(crate) fn teardown_one(
                 );
                 let _ = std::io::stdout().flush();
             }
+        }
+        python::capture_resume(py);
+    }
+    // -v --setup-show: the outcome word continues the "nodeid " line before
+    // the TEARDOWN narration; a later one restates the nodeid.
+    if setup_show_active(config)
+        && !session.live_logging
+        && config.verbose >= 1
+        && !config.no_terminal()
+        && !config.is_worker()
+    {
+        python::capture_suspend(py);
+        let mut shown = 0;
+        while session.streamed_chars < reports.len() {
+            let report = &reports[session.streamed_chars];
+            session.streamed_chars += 1;
+            if !(report.phase == Phase::Call || report.outcome != Outcome::Passed) {
+                continue;
+            }
+            let (word, _) = super::verbose_outcome(report);
+            let word = crate::tw::markup(&word, outcome_codes(report));
+            if shown == 0 {
+                print!("{word}");
+            } else {
+                print!("\n{} {word}", item.nodeid);
+            }
+            shown += 1;
+            let _ = std::io::stdout().flush();
         }
         python::capture_resume(py);
     }

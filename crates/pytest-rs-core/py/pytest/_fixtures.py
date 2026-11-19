@@ -151,3 +151,55 @@ def yield_fixture(
     return fixture(
         fixture_function, scope=scope, params=params, autouse=autouse, ids=ids, name=name
     )
+
+
+def _find_wrapped_fixture_def(obj: object) -> FixtureFunctionDefinition | None:
+    """A FixtureFunctionDefinition in ``obj``'s ``__wrapped__`` chain (upstream's
+    FixtureManager._find_wrapped_fixture_def)."""
+    try:
+        if getattr(obj, "_mock_name", None) is not None:
+            return None
+    except Exception:
+        return None
+    try:
+        unwrapped = inspect.unwrap(
+            obj,  # type: ignore[arg-type]
+            stop=lambda o: type(o) is FixtureFunctionDefinition,
+        )
+    except Exception:
+        return None
+    if type(unwrapped) is FixtureFunctionDefinition:
+        return unwrapped
+    return None
+
+
+def check_for_wrapped_fixture(name: str, obj: object) -> bool:
+    """Warn if the raw class/module ``__dict__`` entry ``obj`` is a fixture
+    hidden behind wrappers (pytest 9.2, #13507). Returns True when discovery
+    must skip it: a classmethod or custom decorator above @pytest.fixture.
+    @staticmethod above @pytest.fixture warns but is still discovered."""
+    import types
+
+    from _pytest.warning_types import PytestWarning, warn_explicit_for
+
+    fixture_def = _find_wrapped_fixture_def(obj)
+    if fixture_def is None or fixture_def is obj:
+        return False
+    fixture_func: Any = fixture_def._get_wrapped_function()
+    if type(fixture_func) is classmethod or type(fixture_func) is staticmethod:
+        fixture_func = fixture_func.__func__
+    if type(obj) is classmethod:
+        msg = (
+            f"cannot discover fixture {name!r} because it is wrapped by "
+            f"@classmethod; place @pytest.fixture above @classmethod"
+        )
+    elif type(obj) is staticmethod:
+        msg = (
+            f"fixture {name!r} is wrapped by @staticmethod above "
+            f"@pytest.fixture; place @pytest.fixture above @staticmethod"
+        )
+    else:
+        msg = f"cannot discover fixture {name!r} due to being wrapped in decorators"
+    if isinstance(fixture_func, types.FunctionType):
+        warn_explicit_for(fixture_func, PytestWarning(msg))
+    return type(obj) is not staticmethod

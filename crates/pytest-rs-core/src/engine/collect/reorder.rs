@@ -378,6 +378,51 @@ pub(crate) fn next_lower_scope(scope: crate::fixture::Scope) -> crate::fixture::
     }
 }
 
+/// pytest 9.2 (#8914): items are grouped by the *value* of a high-scoped
+/// param, not its index within one parametrize() call. Each scope-sort key's
+/// value is interned as a `ParamValueKey` (value equality for hashable
+/// values, the parametrize index otherwise); the returned ids, parallel to
+/// each item's `scope_sort_keys`, replace the raw indices in `ParamArgKey`.
+fn param_value_key_ids(items: &[crate::collect::TestItem]) -> Vec<Vec<usize>> {
+    use pyo3::prelude::*;
+    Python::attach(|py| {
+        let interner = pyo3::types::PyDict::new(py);
+        let key_cls = py
+            .import("_pytest.fixtures")
+            .and_then(|m| m.getattr("ParamValueKey"))
+            .ok();
+        let mut intern = |key: Bound<'_, PyAny>| -> Option<usize> {
+            if let Ok(Some(existing)) = interner.get_item(&key) {
+                return existing.extract().ok();
+            }
+            let id = interner.len();
+            interner.set_item(&key, id).ok()?;
+            Some(id)
+        };
+        items
+            .iter()
+            .map(|item| {
+                item.scope_sort_keys
+                    .iter()
+                    .map(|(arg, _, index)| {
+                        let by_value = match (&key_cls, item.param_value(arg)) {
+                            (Some(cls), Some(value)) => cls.call1((value.bind(py), *index)).ok(),
+                            _ => None,
+                        };
+                        // Without a value (or on error), group by (argname, index).
+                        let key = by_value.or_else(|| {
+                            pyo3::types::PyTuple::new(py, [arg.clone(), index.to_string()])
+                                .ok()
+                                .map(|t| t.into_any())
+                        });
+                        key.and_then(&mut intern).unwrap_or(*index)
+                    })
+                    .collect()
+            })
+            .collect()
+    })
+}
+
 /// Order-preserving dedup (pytest's `dict.fromkeys`).
 pub(crate) fn dedup_keys(keys: Vec<ParamArgKey>) -> Vec<ParamArgKey> {
     let mut seen = std::collections::HashSet::new();
@@ -405,6 +450,7 @@ pub(crate) fn reorder_items_by_param_scope(items: &mut Vec<crate::collect::TestI
     // lower-scope grouping consistent with higher-scope decisions.
     let mut argkeys_by_item: HashMap<Scope, HashMap<usize, Vec<ParamArgKey>>> = HashMap::new();
     let mut items_by_argkey: HashMap<Scope, HashMap<ParamArgKey, Vec<usize>>> = HashMap::new();
+    let value_ids = param_value_key_ids(items);
     for &scope in &HIGH_SCOPES {
         let mut abi: HashMap<usize, Vec<ParamArgKey>> = HashMap::new();
         let mut iba: HashMap<ParamArgKey, Vec<usize>> = HashMap::new();
@@ -412,8 +458,11 @@ pub(crate) fn reorder_items_by_param_scope(items: &mut Vec<crate::collect::TestI
             let keys = dedup_keys(
                 item.scope_sort_keys
                     .iter()
-                    .filter(|(_, s, _)| *s == scope)
-                    .map(|(arg, _, i)| (arg.clone(), *i, scope_boundary(&item.nodeid, scope)))
+                    .zip(&value_ids[idx])
+                    .filter(|((_, s, _), _)| *s == scope)
+                    .map(|((arg, _, _), id)| {
+                        (arg.clone(), *id, scope_boundary(&item.nodeid, scope))
+                    })
                     .collect(),
             );
             if !keys.is_empty() {

@@ -1503,18 +1503,18 @@ class Pytester:
                 )
                 fdefs.update(cdefs)
                 autouse += [a for a in cau if a not in autouse]
+            # pytest 9.2's traverse_fixture_closure: DFS pre-order, each
+            # fixture's dependencies right after it.
             names, seen = [], set()
-            for n in [*autouse, *requested]:
-                if n not in seen:
-                    seen.add(n)
-                    names.append(n)
-            i = 0
-            while i < len(names):
-                for dep in fdefs.get(names[i], ("function", []))[1]:
-                    if dep != "request" and dep not in seen:
-                        seen.add(dep)
-                        names.append(dep)
-                i += 1
+            stack = list(reversed([*autouse, *requested]))
+            while stack:
+                n = stack.pop()
+                if n in seen:
+                    continue
+                seen.add(n)
+                names.append(n)
+                deps = fdefs.get(n, ("function", []))[1]
+                stack.extend(d for d in reversed(deps) if d != "request" and d not in seen)
             names.sort(key=lambda n: _scope_order.get(fdefs.get(n, ("function", []))[0], 4))
             return names
 

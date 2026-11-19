@@ -360,7 +360,7 @@ impl Engine {
     /// The ERRORS section: "ERROR collecting <file>" banners per collection
     /// error, plus "ERROR at setup/teardown of <test>" banners for
     /// fixture/teardown failures (pytest groups all of these together).
-    pub(crate) fn print_collect_errors(&self) {
+    pub(crate) fn print_collect_errors(&self, leading_blank: bool) {
         // --tb=no suppresses the traceback sections entirely (pytest's
         // summary_errors guards on tbstyle != "no").
         if self.config.get_value("tb") == Some("no") {
@@ -385,8 +385,11 @@ impl Engine {
             return;
         }
         // Blank line separating the section from the preceding "collected N
-        // items / M errors" line (or the test-progress output).
-        println!();
+        // items / M errors" line. After test progress output, sessionfinish
+        // already printed it (upstream's tw.line("")).
+        if leading_blank {
+            println!();
+        }
         println!("{}", center_banner("ERRORS"));
         for (nodeid, err) in &self.session.collect_errors {
             println!(

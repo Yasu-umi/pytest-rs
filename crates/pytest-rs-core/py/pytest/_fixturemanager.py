@@ -130,3 +130,67 @@ def build_manager(entries):
         if autouse:
             autousenames.setdefault(baseid, []).append(name)
     return ShimFixtureManager(arg2fixturedefs, tuple(autousenames.items()))
+
+
+_NOTSET = object()
+
+
+class SessionFixtureManager(ShimFixtureManager):
+    """``session._fixturemanager`` during collection. ``_register_fixture``
+    (and ``pytest.register_fixture``, pytest 9.1) records the registration;
+    the engine adds it to its fixture registry once collection settles."""
+
+    def __init__(self, pending):
+        super().__init__({}, ())
+        self._pending = pending
+
+    def _register_fixture(
+        self,
+        *,
+        name,
+        func,
+        nodeid=_NOTSET,
+        scope="function",
+        params=None,
+        ids=None,
+        autouse=False,
+        node=_NOTSET,
+    ):
+        if nodeid is not _NOTSET or node is _NOTSET:
+            import warnings
+
+            from _pytest.warning_types import PytestRemovedIn10Warning
+
+            warnings.warn(
+                PytestRemovedIn10Warning(
+                    "Passing nodeid to _register_fixture is deprecated. "
+                    "Pass node instead for fixture scoping."
+                ),
+                stacklevel=2,
+            )
+        if node is not _NOTSET:
+            baseid = getattr(node, "nodeid", "") or ""
+        elif nodeid is not _NOTSET and nodeid is not None:
+            baseid = nodeid
+        else:
+            baseid = ""
+        self._pending.append((name, func, baseid, scope, params, ids, autouse))
+        return super()._register_fixture(
+            name=name, func=func, nodeid=baseid, scope=scope, params=params
+        )
+
+
+def register_fixture(
+    *, name, func, node, scope="function", params=None, ids=None, autouse=False
+) -> None:
+    """Register a fixture imperatively (pytest 9.1's ``pytest.register_fixture``):
+    visible to ``node`` and its descendants."""
+    node.session._fixturemanager._register_fixture(
+        name=name,
+        func=func,
+        node=node,
+        scope=scope,
+        params=params,
+        ids=ids,
+        autouse=autouse,
+    )

@@ -284,7 +284,9 @@ pub(crate) fn register_fixtures_from_skip(
     registry: &mut FixtureRegistry,
     skip_names: &[&str],
 ) -> PyResult<()> {
-    for (key, value) in module.dict().iter() {
+    // A snapshot: a wrapped-fixture warning adds __warningregistry__.
+    for pair in module.dict().items().iter() {
+        let (key, value): (Bound<'_, PyAny>, Bound<'_, PyAny>) = pair.extract()?;
         let Ok(attr_name) = key.extract::<String>() else {
             continue;
         };
@@ -295,10 +297,73 @@ pub(crate) fn register_fixtures_from_skip(
         // object with a throwing __getattr__, #214) is not a fixture; treat a
         // failing probe as a miss rather than erroring collection (pytest's
         // safe_getattr).
+        if skip_wrapped_fixture(py, &attr_name, &value)? {
+            continue;
+        }
         if !value.is_callable() || !value.hasattr("_pytestfixturefunction").unwrap_or(false) {
             continue;
         }
         register_fixture_def(py, &attr_name, &value, baseid, false, None, registry)?;
+    }
+    Ok(())
+}
+
+/// pytest 9.2 (#13507): a raw module/class `__dict__` entry that hides a
+/// fixture behind wrappers (a custom decorator or @classmethod above
+/// @pytest.fixture) warns and is not discovered; @staticmethod above
+/// @pytest.fixture warns but is still discovered. Only objects with a
+/// `__wrapped__` chain other than a bare fixture are handed to Python.
+pub(crate) fn skip_wrapped_fixture(
+    py: Python<'_>,
+    name: &str,
+    raw: &Bound<'_, PyAny>,
+) -> PyResult<bool> {
+    if !raw.hasattr("__wrapped__").unwrap_or(false) {
+        return Ok(false);
+    }
+    let fixtures = py.import("pytest._fixtures")?;
+    if raw
+        .get_type()
+        .is(&fixtures.getattr("FixtureFunctionDefinition")?)
+    {
+        return Ok(false);
+    }
+    fixtures
+        .getattr("check_for_wrapped_fixture")?
+        .call1((name, raw))?
+        .extract()
+}
+
+/// Fixtures registered during collection through `pytest.register_fixture` /
+/// `session._fixturemanager._register_fixture` (pytest 9.1): added to the
+/// registry once collection settles, visible to the given node's subtree.
+/// (A registered fixture's `params` do not parametrize already collected
+/// items.)
+pub(crate) fn register_pending_fixtures(
+    py: Python<'_>,
+    registry: &mut FixtureRegistry,
+) -> PyResult<()> {
+    let pending = py
+        .import("pytest._node")?
+        .call_method0("take_pending_fixtures")?;
+    if pending.len()? == 0 {
+        return Ok(());
+    }
+    let fixture = py.import("pytest._fixtures")?.getattr("fixture")?;
+    for entry in pending.try_iter()? {
+        let entry = entry?;
+        let name: String = entry.get_item(0)?.extract()?;
+        let func = entry.get_item(1)?;
+        let baseid: String = entry.get_item(2)?.extract()?;
+        let kwargs = pyo3::types::PyDict::new(py);
+        kwargs.set_item("scope", entry.get_item(3)?)?;
+        kwargs.set_item("params", entry.get_item(4)?)?;
+        kwargs.set_item("ids", entry.get_item(5)?)?;
+        kwargs.set_item("autouse", entry.get_item(6)?)?;
+        kwargs.set_item("name", name.as_str())?;
+        let fixture_def = fixture.call((func,), Some(&kwargs))?;
+        register_fixture_def(py, &name, &fixture_def, &baseid, false, None, registry)?;
+        registry.sort_by_visibility(&name);
     }
     Ok(())
 }
@@ -411,7 +476,8 @@ pub(crate) fn register_fixture_def(
             .and_then(|code| {
                 let file: String = code.getattr("co_filename")?.extract()?;
                 let lineno: u32 = code.getattr("co_firstlineno")?.extract()?;
-                Ok(format!("{file}:{}", lineno + 1))
+                // pytest 9.2's getlocation(): co_firstlineno as-is.
+                Ok(format!("{file}:{lineno}"))
             })
             .unwrap_or_else(|_: PyErr| name.clone());
         let msg =

@@ -76,8 +76,11 @@ pub(crate) fn introspect_namespace(
     let isclass = inspect.getattr("isclass")?;
     let isfunction = inspect.getattr("isfunction")?;
     let dict = module.dict();
-    // Module dicts preserve definition order in CPython; keep it.
-    for (key, value) in dict.iter() {
+    // Module dicts preserve definition order in CPython; keep it. Iterate a
+    // snapshot: collection can add to the module dict (warn_explicit_for's
+    // __warningregistry__).
+    for pair in dict.items().iter() {
+        let (key, value): (Bound<'_, PyAny>, Bound<'_, PyAny>) = pair.extract()?;
         let Ok(name) = key.extract::<String>() else {
             continue;
         };
@@ -523,6 +526,9 @@ pub(crate) fn collect_class(
                 continue;
             }
             seen.insert(name.clone());
+            if crate::python::skip_wrapped_fixture(py, &name, &raw)? {
+                continue;
+            }
 
             let is_static = raw.is_instance(&staticmethod_type)?;
             let is_classmethod = raw.is_instance(&classmethod_type)?;
