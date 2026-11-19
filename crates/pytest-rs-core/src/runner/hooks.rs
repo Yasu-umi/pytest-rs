@@ -461,7 +461,7 @@ pub(crate) fn start_runtest_py_wrappers(
     nextitem: Option<&TestItem>,
     name: &str,
     call_plain: bool,
-) -> PyResult<Vec<Py<PyAny>>> {
+) -> PyResult<Vec<(Py<PyAny>, bool)>> {
     let funcs: Vec<Py<PyAny>> = session
         .py_hooks
         .iter()
@@ -506,7 +506,11 @@ pub(crate) fn start_runtest_py_wrappers(
         let result = python::call_py_hook_raw(py, &func, &kwargs)?;
         let bound = result.bind(py);
         match next_fn.call1((bound,)) {
-            Ok(_) => wrappers.push(result.clone_ref(py)),
+            // Kept with the pluggy wrapper style for finish_runtest_py_wrappers.
+            Ok(_) => wrappers.push((
+                result.clone_ref(py),
+                hookimpl_flag(py, &func, "hookwrapper"),
+            )),
             Err(err) if err.is_instance_of::<pyo3::exceptions::PyStopIteration>(py) => {}
             Err(err) => return Err(err),
         }
@@ -514,18 +518,64 @@ pub(crate) fn start_runtest_py_wrappers(
     Ok(wrappers)
 }
 
-/// Finish started hookwrappers in reverse order (pluggy unwinds LIFO).
-pub(crate) fn finish_runtest_py_wrappers(py: Python<'_>, wrappers: &[Py<PyAny>]) -> PyResult<()> {
-    for wrapper in wrappers.iter().rev() {
-        match wrapper.bind(py).call_method1("send", (py.None(),)) {
+/// A boolean flag of a hookimpl's `pytest_impl` options dict.
+fn hookimpl_flag(py: Python<'_>, func: &Py<PyAny>, flag: &str) -> bool {
+    func.bind(py)
+        .getattr("pytest_impl")
+        .ok()
+        .and_then(|d| d.get_item(flag).ok())
+        .and_then(|v| v.extract::<bool>().ok())
+        .unwrap_or(false)
+}
+
+/// Finish started hookwrappers in reverse order (pluggy unwinds LIFO),
+/// handing each the hook's outcome: `error` is the exception the wrapped
+/// call raised, if any. A new-style wrapper (`wrapper=True`) gets it thrown
+/// in at its `yield`; an old-style one (`hookwrapper=True`) gets a pluggy
+/// `Result` it can inspect, re-raise (`get_result()`) or override. Returns
+/// the exception that remains once every wrapper has run, or Ok when none
+/// does (a wrapper swallowed it, or there was none).
+pub(crate) fn finish_runtest_py_wrappers(
+    py: Python<'_>,
+    wrappers: &[(Py<PyAny>, bool)],
+    error: Option<PyErr>,
+) -> PyResult<()> {
+    let mut error = error;
+    let result_cls = py.import("pytest._pluginmanager")?.getattr("_Result")?;
+    for (wrapper, old_style) in wrappers.iter().rev() {
+        let wrapper = wrapper.bind(py);
+        let step = if *old_style {
+            let outcome = result_cls.call1((py.None(),))?;
+            if let Some(err) = &error {
+                outcome.call_method1("force_exception", (err.value(py),))?;
+            }
+            let step = wrapper.call_method1("send", (&outcome,));
+            // The outcome as the wrapper left it (force_result /
+            // force_exception) carries on to the next wrapper.
+            error = outcome
+                .getattr("exception")
+                .ok()
+                .filter(|exc| !exc.is_none())
+                .map(PyErr::from_value);
+            step
+        } else {
+            match error.take() {
+                Some(err) => wrapper.call_method1("throw", (err.value(py),)),
+                None => wrapper.call_method1("send", (py.None(),)),
+            }
+        };
+        match step {
             Ok(_) => {
                 return Err(pyo3::exceptions::PyRuntimeError::new_err(
                     "hook wrapper yielded more than once",
                 ));
             }
             Err(err) if err.is_instance_of::<pyo3::exceptions::PyStopIteration>(py) => {}
-            Err(err) => return Err(err),
+            Err(err) => error = Some(err),
         }
     }
-    Ok(())
+    match error {
+        Some(err) => Err(err),
+        None => Ok(()),
+    }
 }

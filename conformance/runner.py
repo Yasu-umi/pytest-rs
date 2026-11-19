@@ -39,7 +39,7 @@ PY_TAG = f"py{sys.version_info.major}.{sys.version_info.minor}"
 # `importlib.metadata.version("pytest")` (pytest-bdd's fixture-registry
 # compat, for one) would then take code paths for internals pytest-rs does
 # not emulate. Kept in sync with crates/pytest-rs-core/py/pytest/__init__.py.
-TARGET_PYTEST = "9.0.3"
+TARGET_PYTEST = "9.2.0"
 # Results are platform-scoped: counts differ between linux and darwin
 # (platform-specific skips, system deps), so each platform owns its
 # scoreboard; linux is canonical (regenerated and committed from CI).
@@ -296,7 +296,10 @@ class Suite:
         if not pyproject.exists():
             return
         config = tomllib.loads(pyproject.read_text())
-        write_to = config.get("tool", {}).get("setuptools_scm", {}).get("write_to")
+        scm = config.get("tool", {}).get("setuptools_scm", {})
+        # `version_file` is setuptools_scm's newer name for `write_to`
+        # (pytest >= 9.1 uses it).
+        write_to = scm.get("version_file") or scm.get("write_to")
         if not write_to:
             return
         target = self.checkout / write_to

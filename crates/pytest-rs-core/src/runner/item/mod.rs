@@ -116,7 +116,7 @@ pub(crate) fn run_one(
             reports
         }
         Err(err) => {
-            let _ = finish_runtest_py_wrappers(py, &wrappers);
+            let _ = finish_runtest_py_wrappers(py, &wrappers, None);
             if err.is_instance_of::<pyo3::exceptions::PyException>(py) {
                 let is_usage = (|| -> PyResult<bool> {
                     let cls = py.import("pytest")?.getattr("UsageError")?;
@@ -165,7 +165,7 @@ pub(crate) fn run_one(
             return vec![];
         }
     };
-    if let Err(err) = finish_runtest_py_wrappers(py, &wrappers) {
+    if let Err(err) = finish_runtest_py_wrappers(py, &wrappers, None) {
         eprintln!(
             "pytest_runtest_protocol wrapper teardown failed for {}: {}",
             item.nodeid,

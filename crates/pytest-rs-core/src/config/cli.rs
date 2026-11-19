@@ -47,7 +47,7 @@ impl Config {
         "pyargs",                  // interpret args as python module paths
         "disable-plugin-autoload", // disable loading plugins from entry points
     ];
-    const CORE_VALUES: [(&str, Option<char>); 44] = [
+    const CORE_VALUES: [(&str, Option<char>); 45] = [
         ("confcutdir", None),
         ("deselect", None),
         ("log-level", None),
@@ -72,6 +72,7 @@ impl Config {
         ("assert", None),
         ("tb", None),
         ("maxfail", None),
+        ("max-warnings", None), // exit 6 when all pass but warnings exceed it
         ("durations", None),
         ("durations-min", None),
         ("color", None),
@@ -812,7 +813,7 @@ impl Config {
             .sum();
         let mut version_text = None;
         if version_count >= 1 {
-            const PYTEST_API_VERSION: &str = "9.0.3";
+            const PYTEST_API_VERSION: &str = "9.2.0";
             let msg = if version_count >= 2 {
                 // Match upstream's two-line verbose format so tests that
                 // fnmatch_lines("*This is pytest version*") pass.
@@ -939,7 +940,7 @@ impl Config {
         }
 
         // minversion check: if the config requires a newer pytest than ours.
-        // Compare against the pytest API version we track (9.0.3), not the
+        // Compare against the pytest API version we track (9.2.0), not the
         // pytest-rs package version (0.0.5), since minversion targets pytest.
         {
             let required = ini_overrides
@@ -948,7 +949,7 @@ impl Config {
             if let Some(required) = required {
                 // pytest API compatibility version (kept in sync with the
                 // embedded pytest.__version__ shim).
-                const PYTEST_COMPAT_VERSION: &str = "9.0.3";
+                const PYTEST_COMPAT_VERSION: &str = "9.2.0";
                 if !semver_ge(PYTEST_COMPAT_VERSION, required.trim()) {
                     let path = config_file_name
                         .as_ref()

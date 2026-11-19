@@ -120,6 +120,16 @@ def clear_added_marks():
 class _NodeBase:
     """Shared Node implementation. Use Collector or Item, not this directly."""
 
+    @property
+    def extra_keyword_matches(self):
+        """Extra names ``-k`` matches this node by (upstream Node attribute);
+        created on first use."""
+        return self.__dict__.setdefault("_extra_keyword_matches", set())
+
+    @extra_keyword_matches.setter
+    def extra_keyword_matches(self, value):
+        self.__dict__["_extra_keyword_matches"] = value
+
     def __init__(
         self,
         name=None,
@@ -251,7 +261,8 @@ class _NodeBase:
         for marker in self.own_markers:
             if marker.name == name:
                 return marker
-        return default
+        # A MarkDecorator default (``pytest.mark.foo(1)``) yields its Mark.
+        return getattr(default, "mark", default)
 
     def iter_markers(self, name=None):
         for marker in self.own_markers:
@@ -917,7 +928,8 @@ class DoctestNode:
         for marker in self.own_markers:
             if marker.name == name:
                 return marker
-        return default
+        # A MarkDecorator default (``pytest.mark.foo(1)``) yields its Mark.
+        return getattr(default, "mark", default)
 
     def iter_markers(self, name=None):
         for marker in self.own_markers:
@@ -1380,7 +1392,8 @@ class Node(Item):
         for marker in self.own_markers:
             if marker.name == name:
                 return marker
-        return default
+        # A MarkDecorator default (``pytest.mark.foo(1)``) yields its Mark.
+        return getattr(default, "mark", default)
 
     def iter_markers(self, name=None):
         for marker in self.own_markers:

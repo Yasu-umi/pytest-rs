@@ -35,7 +35,7 @@ CACHE = ROOT / ".tmp" / "conformance"
 DEPS = [
     # The reporter byte-diff compares against this exact pytest (the shim
     # reports the same version string).
-    "pytest==9.0.3",
+    "pytest==9.2.0",
     "pytest-sugar==1.1.1",
     "pytest-pretty==1.3.0",
     "Faker==40.54.0",
@@ -52,7 +52,7 @@ DEPS = [
     # process show the same line (NORMALIZERS below reconciles the two
     # differing version numbers) instead of the byte-diff comparing against
     # an incomplete reference environment that lacks it.
-    "pytest-benchmark==5.1.0",
+    "pytest-benchmark==5.3.1",
 ]
 TIMEOUT_S = 120
 
@@ -61,7 +61,7 @@ NORMALIZERS = [
     (re.compile(r"\d+\.\d+s"), "Xs"),
     (re.compile(r"Python \d+\.\d+\.\d+"), "Python X"),
     # Normalize pytest/pytest-rs versions + optional pluggy suffix on the
-    # platform line.  Real pytest produces "pytest-9.0.3, pluggy-1.6.0";
+    # platform line.  Real pytest produces "pytest-9.2.0, pluggy-1.7.0";
     # pytest-rs produces "pytest-rs-0.0.4" (no pluggy tag).  Both map to
     # "pytest-X" so the platform lines compare equal.
     (re.compile(r"pytest(?:-rs)?-[\d.]+(?:, pluggy-[\d.]+)?"), "pytest-X"),

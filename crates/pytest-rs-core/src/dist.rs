@@ -690,19 +690,25 @@ impl Engine {
                         // silent
                     } else if self.config.verbose > 0 {
                         if report.phase == Phase::Call || report.outcome != Outcome::Passed {
-                            // Subtest reports use "{desc} SUBFAIL/SUBPASS" (description
-                            // first, then the short word) to match real xdist output.
-                            let word = if let Some(desc) = &report.subtest_desc {
-                                let short = match report.outcome {
-                                    Outcome::Failed => "SUBFAIL",
-                                    Outcome::Skipped => "SUBSKIP",
-                                    Outcome::XFailed => "SUBXFAIL",
-                                    _ => "SUBPASS",
-                                };
-                                format!("{desc} {short}")
-                            } else {
-                                crate::runner::outcome_word(&report)
-                            };
+                            // A subtest's word comes from the pytest_report_teststatus
+                            // hooks, like xdist's terminal: pytest-subtests' plugin
+                            // says "{desc} SUBPASS", pytest 9's built-in subtests
+                            // "SUBPASSED{desc}" (the fallback).
+                            let word = report
+                                .subtest_desc
+                                .as_ref()
+                                .and_then(|_| {
+                                    crate::runner::report_teststatus(
+                                        py,
+                                        &self.config,
+                                        &self.session,
+                                        &report,
+                                        None,
+                                    )
+                                })
+                                .map(|status| status.word)
+                                .filter(|word| !word.is_empty())
+                                .unwrap_or_else(|| crate::runner::outcome_word(&report));
                             // xdist verbose format: the relayed logstart
                             // line, then "[gw0] [ 50%] PASSED test_a.py::test"
                             // (loadgroup nodeids display as "nodeid@group").

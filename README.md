@@ -171,8 +171,8 @@ _linux (CI-verified)_
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.0.3 | 2782 | 0 | 0 | 55 | 0 | 12 | 2849 | 99.6% | 54 | 54 | 61 |
-| pytest-asyncio | v1.5.0 | 271 | 0 | 0 | 0 | 0 | 0 | 271 | 100.0% | 30 | 30 | 0 |
+| pytest | 9.2.0 | 2850 | 393 | 0 | 62 | 0 | 55 | 3360 | 86.7% | 25 | 55 | 62 |
+| pytest-asyncio | v1.5.0 | 268 | 0 | 0 | 3 | 0 | 0 | 271 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.17.0 | 158 | 0 | 0 | 1 | 0 | 2 | 161 | 98.8% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 205 | 0 | 0 | 3 | 0 | 1 | 209 | 99.5% | 1 | 1 | 0 |
 | pytest-xdist | v3.8.0 | 96 | 0 | 0 | 2 | 0 | 0 | 98 | 100.0% | 1 | 1 | 6 |
@@ -199,7 +199,7 @@ _linux (CI-verified)_
 | pytest-env | 1.6.0 | 72 | 0 | 0 | 0 | 0 | 3 | 75 | 96.0% | 3 | 3 | 0 |
 | pytest-rerunfailures | 16.7 | 91 | 147 | 0 | 10 | 0 | 0 | 248 | 40.7% | 0 | 1 | 0 |
 | pytest-randomly | 5.1.0 | 47 | 0 | 0 | 0 | 0 | 0 | 47 | 100.0% | 1 | 1 | 0 |
-| pytest-bdd | 9.0.1 | 145 | 0 | 0 | 1 | 0 | 0 | 146 | 100.0% | 35 | 35 | 0 |
+| pytest-bdd | 9.0.1 | 45 | 100 | 0 | 1 | 0 | 0 | 146 | 31.5% | 7 | 35 | 0 |
 | pytest-django | v4.14.0 | 237 | 0 | 0 | 1 | 0 | 0 | 238 | 100.0% | 14 | 15 | 0 |
 
 **Real-world projects** (their suites run unchanged, as drop-in evidence):
@@ -211,7 +211,7 @@ _linux (CI-verified)_
 | marshmallow | 4.4.0 | 1192 | 0 | 0 | 0 | 0 | 0 | 1192 | 100.0% | 12 | 12 | 3 |
 | rich | v15.0.0 | 955 | 0 | 0 | 20 | 0 | 6 | 981 | 99.4% | 61 | 63 | 0 |
 | sqlglot | v30.33.0 | 1613 | 0 | 0 | 0 | 0 | 0 | 1613 | 100.0% | 58 | 60 | 0 |
-| httpx | 0.28.1 | 1410 | 0 | 0 | 1 | 0 | 7 | 1418 | 99.5% | 31 | 31 | 0 |
+| httpx | 0.28.1 | 1408 | 2 | 0 | 1 | 0 | 7 | 1418 | 99.4% | 30 | 31 | 0 |
 | httpx2 | v2.16.2 | 1807 | 0 | 0 | 0 | 0 | 2 | 1809 | 99.9% | 36 | 36 | 0 |
 | starlette | 1.10.0 | 1357 | 0 | 1 | 2 | 0 | 0 | 1360 | 99.9% | 30 | 31 | 0 |
 | attrs | 26.1.0 | 1379 | 0 | 0 | 6 | 0 | 0 | 1385 | 100.0% | 23 | 25 | 0 |
@@ -243,7 +243,7 @@ uv run --no-project python conformance/runner.py           # re-clones from upst
 
 | Project | License | Tag |
 |---|---|---|
-| [pytest](https://github.com/pytest-dev/pytest) | MIT | 9.0.3 |
+| [pytest](https://github.com/pytest-dev/pytest) | MIT | 9.2.0 |
 | [pytest-asyncio](https://github.com/pytest-dev/pytest-asyncio) | Apache-2.0 | v1.5.0 |
 | [pytest-mock](https://github.com/pytest-dev/pytest-mock) | MIT | v3.17.0 |
 | [pytest-cov](https://github.com/pytest-dev/pytest-cov) | MIT | v7.1.0 |

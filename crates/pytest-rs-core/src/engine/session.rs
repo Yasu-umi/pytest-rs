@@ -473,6 +473,14 @@ impl Engine {
         code
     }
 
+    /// The --max-warnings threshold (the CLI wins over the max_warnings ini).
+    fn max_warnings(&self) -> Option<usize> {
+        self.config
+            .get_value("max-warnings")
+            .or_else(|| self.config.get_ini("max_warnings"))
+            .and_then(|v| v.trim().parse().ok())
+    }
+
     /// Post-run finalization: sessionfinish, caches, the terminal-summary
     /// block, and unraisable/threadexception cleanup. Returns the exit code.
     pub(crate) fn finish_session(&mut self, py: Python<'_>, started: Instant) -> i32 {
@@ -552,9 +560,10 @@ impl Engine {
         {
             println!("{}", center_with(banner, '!'));
         }
-        // --no-summary suppresses pytest's whole terminal-summary block
-        // (FAILURES/ERRORS/PASSES/warnings/short summary + the conftest
-        // pytest_terminal_summary hooks); the final stats line still shows.
+        // --no-summary suppresses pytest's own terminal-summary sections
+        // (FAILURES/ERRORS/PASSES/warnings/short summary); conftest and
+        // plugin pytest_terminal_summary hooks still run (pytest 9.2,
+        // #14724), and the final stats line still shows.
         let no_summary = self.config.get_flag("no-summary");
         // Warnings shown in the first summary; the "(final)" pass after the
         // short summary reports any emitted during pytest_terminal_summary.
@@ -571,11 +580,11 @@ impl Engine {
             self.print_passes();
             self.print_xpasses();
             self.print_durations();
-            if let Err(err) = self.print_plugin_summaries(py, code) {
-                eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
-            }
-            self.print_pastebin_failed(py);
         }
+        if let Err(err) = self.print_plugin_summaries(py, code) {
+            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+        }
+        self.print_pastebin_failed(py);
         self.write_junit_xml(py);
         if let Some(banner) = &self.session.dist_banner {
             println!("{}", center_banner(banner));
@@ -632,6 +641,24 @@ impl Engine {
             }
         }
         let warning_count = python::warning_count(py) + self.session.worker_warning_count;
+        // --max-warnings / max_warnings (pytest 9.2): a passing run with more
+        // warnings than allowed exits MAX_WARNINGS_ERROR, said in red just
+        // before the final stats line.
+        if code == exit_code::OK
+            && let Some(max_warnings) = self.max_warnings()
+            && warning_count > max_warnings
+        {
+            code = exit_code::MAX_WARNINGS_ERROR;
+            println!(
+                "{}",
+                crate::tw::markup(
+                    &format!(
+                        "Tests pass, but maximum allowed warnings exceeded: {warning_count} > {max_warnings}"
+                    ),
+                    &[crate::tw::RED]
+                )
+            );
+        }
         let extra_stats = python::reporter_subtest_stats(py);
         // Hide non-failed subtests only for pytest 9's builtin subtests
         // (verbosity_subtests == 0); the third-party pytest-subtests plugin
