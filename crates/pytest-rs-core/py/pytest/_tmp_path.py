@@ -1,6 +1,8 @@
 """tmp_path / tmp_path_factory builtin fixtures (upstream _pytest/tmpdir.py
 port: pytest-of-{user} numbered basetemps with lock-driven retention)."""
 
+import atexit
+import contextlib
 import fnmatch
 import getpass
 import hashlib
@@ -27,13 +29,22 @@ _retention_count = 3
 _retention_policy = "all"
 
 # Call-phase outcomes per nodeid (engine-fed; upstream stores rep.passed in
-# the item stash) and whether anything failed (upstream checks exitstatus).
+# the item stash).
 _call_results: dict = {}
-_any_failed = False
+
+
+# The interpreter's own atexit functions, captured at import: a test that
+# swaps atexit.register out (pytest-xdist's conftest diverts it and runs the
+# registered functions when the test ends) must not get the session's
+# basetemp cleanup, or the basetemp loses its lock mid-session and a
+# concurrent pytest process prunes it. Upstream looks atexit.register up at
+# call time; it is the same function otherwise.
+_atexit_register = atexit.register
+_atexit_unregister = atexit.unregister
 
 
 def configure(basetemp, retention_count=None, retention_policy=None):
-    global _given_basetemp, _retention_count, _retention_policy, _any_failed
+    global _given_basetemp, _retention_count, _retention_policy
     _given_basetemp = basetemp
     if retention_count is not None:
         _retention_count = int(retention_count)
@@ -43,18 +54,14 @@ def configure(basetemp, retention_count=None, retention_policy=None):
     # nested run would inherit the outer run's pass/fail outcomes and prune the
     # wrong tmp dirs (tmp_path_retention_policy="failed").
     _call_results.clear()
-    _any_failed = False
 
 
 def record_call(nodeid, passed):
     """The engine reports each item's call outcome (None: no call ran)
     before function-scope finalizers — the tmp_path retention teardown
     reads it (upstream's tmppath_result_key stash)."""
-    global _any_failed
     if passed is not None:
         _call_results[nodeid] = passed
-        if not passed:
-            _any_failed = True
 
 
 def rm_rf(path):
@@ -126,6 +133,12 @@ class TempPathFactory:
         self._retention_count = retention_count
         self._retention_policy = retention_policy
         self._basetemp = basetemp
+        # Lower-cased prefix -> next number to try, so numbered dirs don't
+        # need basetemp listed on every call.
+        self._next_number = {}
+        # Numbered-dir pruning and lock removal run when the session
+        # finishes (pytest 9.2); atexit closes it only as a last resort.
+        self._exit_stack = contextlib.ExitStack()
 
     @classmethod
     def from_config(cls, config, *, _ispytest=False):
@@ -158,16 +171,51 @@ class TempPathFactory:
 
     def mktemp(self, basename, numbered=True):
         """Create a new temporary directory managed by the factory."""
-        from _pytest.pathlib import make_numbered_dir
-
         basename = self._ensure_relative_to_basetemp(str(basename))
         if not numbered:
             p = self.getbasetemp().joinpath(basename)
             p.mkdir(mode=0o700)
         else:
-            p = make_numbered_dir(root=self.getbasetemp(), prefix=basename, mode=0o700)
+            p = self._make_counted_dir(basename)
             self._trace("mktemp", p)
         return p
+
+    def _make_counted_dir(self, prefix):
+        """Create ``<prefix><n>`` in basetemp from a per-prefix counter
+        (pytest 9.2): counting starts at 0 without listing basetemp, names
+        mkdir fails on are skipped, the 10th failure lists basetemp once to
+        jump past the run, and the 20th raises OSError."""
+        # Looked up on _pytest.tmpdir, like upstream's module globals, so
+        # tests monkeypatching _pytest.tmpdir.find_suffixes see it used.
+        import _pytest.tmpdir as _tmpdir
+
+        root = self.getbasetemp()
+        key = prefix.lower()
+        number = self._next_number.get(key, 0)
+        collisions = 0
+        while True:
+            path = root.joinpath(f"{prefix}{number}")
+            try:
+                path.mkdir(mode=0o700)
+            except OSError as e:
+                collisions += 1
+                if collisions == 10:
+                    listed = max(
+                        map(_tmpdir.parse_num, _tmpdir.find_suffixes(root, prefix)), default=-1
+                    )
+                    number = max(number, listed) + 1
+                elif collisions == 20:
+                    raise OSError(
+                        f"could not create numbered dir with prefix {prefix} in {root}"
+                        f" after {collisions} tries"
+                    ) from e
+                else:
+                    number += 1
+            else:
+                break
+        self._next_number[key] = number + 1
+        _tmpdir._force_symlink(root, prefix + "current", path)
+        return path
 
     def getbasetemp(self):
         """Return the base temporary directory, creating it if needed."""
@@ -234,7 +282,10 @@ class TempPathFactory:
                 keep=keep,
                 lock_timeout=LOCK_TIMEOUT,
                 mode=0o700,
+                register=self._exit_stack.callback,
             )
+            _atexit_register(self._exit_stack.close)
+            self._exit_stack.callback(_atexit_unregister, self._exit_stack.close)
         assert basetemp is not None, basetemp
         self._basetemp = basetemp
         self._trace("new basetemp", basetemp)
@@ -242,7 +293,7 @@ class TempPathFactory:
 
 
 @fixture(scope="session")
-def tmp_path_factory():
+def tmp_path_factory(request):
     """Return a :class:`pytest.TempPathFactory` instance for the test session."""
     factory = TempPathFactory(
         given_basetemp=_given_basetemp,
@@ -251,17 +302,38 @@ def tmp_path_factory():
         trace=lambda *args: None,
         _ispytest=True,
     )
+    # Like upstream's config._tmp_path_factory: session_finish() below (the
+    # tmpdir plugin's pytest_sessionfinish) finds it there.
+    request.config._tmp_path_factory = factory
     yield factory
-    # Upstream pytest_sessionfinish: a fully-passed run under the "failed"
-    # policy removes the whole basetemp. ("all" keeps it; the numbered-dir
-    # retention prunes old ones at the next session's creation.)
+
+
+def session_finish(config, exitstatus):
+    """Upstream tmpdir plugin's pytest_sessionfinish, called by the engine
+    when the session finishes (outside any test's warning capture; warnings
+    are recorded with when="config"): a fully-passed run under the "failed"
+    policy removes the whole basetemp (best effort, errors ignored), dead
+    symlinks are removed, then the factory's exit stack (lock removal,
+    numbered-dir pruning) is closed."""
+    factory = getattr(config, "_tmp_path_factory", None)
+    if factory is None:
+        return
+    config._tmp_path_factory = None
+    basetemp = factory._basetemp
+    if basetemp is None:
+        return
     if (
-        factory._basetemp is not None
-        and factory._given_basetemp is None
+        exitstatus == 0
         and factory._retention_policy == "failed"
-        and not _any_failed
+        and factory._given_basetemp is None
     ):
-        rm_rf(factory._basetemp)
+        if basetemp.is_dir():
+            shutil.rmtree(basetemp, ignore_errors=True)
+    if basetemp.is_dir():
+        from _pytest.pathlib import cleanup_dead_symlinks
+
+        cleanup_dead_symlinks(basetemp)
+    factory._exit_stack.close()
 
 
 @fixture
@@ -280,7 +352,8 @@ def tmp_path(tmp_path_factory, request):
     if tmp_path_factory._retention_policy == "failed" and _call_results.pop(
         request.node.nodeid, True
     ):
-        rm_rf(path)
+        # Best effort, like upstream: a dir the test left unremovable stays.
+        shutil.rmtree(path, ignore_errors=True)
 
 
 class _NeverRaised(Exception):

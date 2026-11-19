@@ -51,6 +51,7 @@
 "testing/test_subtests.py" = "passed"
 "testing/test_terminal.py" = "passed"
 "testing/test_threadexception.py" = "passed"
+"testing/test_tmpdir.py" = "passed"
 "testing/test_unittest.py" = "passed"
 "testing/test_unraisableexception.py" = "passed"
 "testing/test_warning_types.py" = "passed"

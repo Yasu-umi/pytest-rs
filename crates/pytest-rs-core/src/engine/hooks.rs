@@ -1517,7 +1517,12 @@ impl Engine {
         // startup (terminal, mark, logging; junitxml only with --junitxml).
         {
             let config_proxy = python::make_py_config(py, &self.config)?;
-            let mut names = vec!["console_output_style", "empty_parameter_set_mark"];
+            let mut names = vec![
+                "console_output_style",
+                "empty_parameter_set_mark",
+                "tmp_path_retention_count",
+                "tmp_path_retention_policy",
+            ];
             if self.config.get_value("log-file-mode").is_none() {
                 names.push("log_file_mode");
             }
@@ -1755,7 +1760,7 @@ impl Engine {
                 .map(|hook| hook.func.clone_ref(py)),
         );
         if hook_funcs.is_empty() {
-            return Ok(());
+            return self.tmp_path_session_finish(py, code);
         }
         let config_proxy = python::make_py_config(py, &self.config)?;
         let session_proxy = python::make_session_proxy(py, &self.config)?;
@@ -1783,6 +1788,21 @@ impl Engine {
         {
             self.session.exit_code_override = Some(updated);
         }
+        self.tmp_path_session_finish(py, code)
+    }
+
+    /// The tmpdir plugin's own pytest_sessionfinish (registered before
+    /// conftests, so it runs after their impls): the "failed" retention
+    /// policy's basetemp removal and the numbered-dir cleanups. Runs outside
+    /// any test, so its warnings are recorded with when="config", like
+    /// upstream's warnings-plugin wrapper around pytest_sessionfinish.
+    fn tmp_path_session_finish(&self, py: Python<'_>, code: i32) -> PyResult<()> {
+        let config_proxy = python::make_py_config(py, &self.config)?;
+        let wcapture = py.import("pytest._wcapture")?;
+        wcapture.call_method1("set_current_test", (py.None(),))?;
+        wcapture.call_method1("set_current_when", ("config",))?;
+        py.import("pytest._tmp_path")?
+            .call_method1("session_finish", (config_proxy, code))?;
         Ok(())
     }
 }
