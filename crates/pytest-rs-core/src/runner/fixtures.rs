@@ -522,19 +522,16 @@ fn fail_no_trace(py: Python<'_>, msg: &str) -> PyErr {
 }
 
 /// Fire the conftest `pytest_fixture_setup` hooks for a just-created fixture
-/// and schedule its `pytest_fixture_post_finalizer` hooks as a finalizer (so
-/// they run at the fixture's scope teardown). Conftest impls are ordered
-/// most-specific first (pluggy LIFO). Each receives `fixturedef`/`request`.
-#[allow(clippy::too_many_arguments)]
+/// and return its `pytest_fixture_post_finalizer` hooks as one callable, for
+/// the caller to schedule at the fixture's scope teardown. Conftest impls are
+/// ordered most-specific first (pluggy LIFO). Each receives `fixturedef`/`request`.
 fn fire_fixture_lifecycle_hooks(
     py: Python<'_>,
-    session: &mut Session,
+    session: &Session,
     item: &TestItem,
     def: &crate::fixture::FixtureDef,
     scope: Scope,
-    instance: &str,
-    bindings: &[crate::session::Binding],
-) -> PyResult<()> {
+) -> PyResult<Option<Py<PyAny>>> {
     let collect = |name: &str| -> Vec<Py<PyAny>> {
         let mut hooks: Vec<(usize, Py<PyAny>)> = session
             .py_hooks
@@ -548,7 +545,7 @@ fn fire_fixture_lifecycle_hooks(
     let setup_funcs = collect("pytest_fixture_setup");
     let final_funcs = collect("pytest_fixture_post_finalizer");
     if setup_funcs.is_empty() && final_funcs.is_empty() {
-        return Ok(());
+        return Ok(None);
     }
     let leaf = item_node(py, item)?;
     let node = resolve_scope_ancestor(py, &leaf, scope)?;
@@ -585,14 +582,9 @@ fn fire_fixture_lifecycle_hooks(
             &fixturedef,
             request.bind(py),
         ))?;
-        session.finalizers.push(PendingFinalizer {
-            scope,
-            instance: instance.to_string(),
-            finalizer: Finalizer::Callable(partial.unbind()),
-            bindings: bindings.to_vec(),
-        });
+        return Ok(Some(partial.unbind()));
     }
-    Ok(())
+    Ok(None)
 }
 
 /// Build the ScopeMismatch error for a fixture (the top of `stack`) requesting
@@ -1083,6 +1075,8 @@ pub(crate) fn resolve_fixture_def(
 
     // --setup-show narration: SETUP now, TEARDOWN via a print finalizer
     // pushed before the real one (LIFO: it prints after the teardown ran).
+    let finalizers_base = session.finalizers.len();
+    let mut printer_index: Option<usize> = None;
     if setup_show_active(config) {
         let (scope_char, indent) = scope_display(def.scope);
         // Parametrized fixtures display their current param: name['spam'].
@@ -1122,6 +1116,7 @@ pub(crate) fn resolve_fixture_def(
         }
         let _ = std::io::stdout().flush();
         python::capture_resume(py);
+        printer_index = Some(session.finalizers.len());
         if let Ok(printer) = py
             .import("pytest._setupshow")
             .and_then(|m| m.getattr("teardown_printer"))
@@ -1159,7 +1154,31 @@ pub(crate) fn resolve_fixture_def(
         });
     }
     // Conftest pytest_fixture_setup / pytest_fixture_post_finalizer hooks.
-    fire_fixture_lifecycle_hooks(py, session, item, &def, cache_scope, &instance, &bindings)?;
+    // Like upstream's FixtureDef.finish, the post_finalizer hooks run after
+    // the fixture's own finalizers (generator teardown, addfinalizer) and
+    // before the --setup-show TEARDOWN line, which a raising hook skips.
+    if let Some(post) = fire_fixture_lifecycle_hooks(py, session, item, &def, cache_scope)? {
+        match printer_index.filter(|&i| i < session.finalizers.len()) {
+            Some(i) => {
+                if let Finalizer::Callable(printer) = &session.finalizers[i].finalizer {
+                    let chained = py
+                        .import("pytest._setupshow")?
+                        .getattr("chain")?
+                        .call1((post.bind(py), printer.bind(py)))?;
+                    session.finalizers[i].finalizer = Finalizer::Callable(chained.unbind());
+                }
+            }
+            None => session.finalizers.insert(
+                finalizers_base,
+                PendingFinalizer {
+                    scope: cache_scope,
+                    instance: instance.clone(),
+                    finalizer: Finalizer::Callable(post),
+                    bindings: bindings.clone(),
+                },
+            ),
+        }
+    }
     session.fixture_cache.insert(
         cache_key,
         crate::session::CachedFixture {

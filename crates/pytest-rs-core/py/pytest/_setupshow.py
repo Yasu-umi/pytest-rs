@@ -23,3 +23,15 @@ def teardown_printer(indent, scope_char, name):
             os.write(1, f"\n{indent}TEARDOWN {scope_char} {name}".encode())
 
     return printer
+
+
+def chain(post_finalizer, printer):
+    """Run the pytest_fixture_post_finalizer hooks, then the TEARDOWN line —
+    upstream prints it from setuponly's own post_finalizer impl, which a
+    raising conftest impl (called first) skips."""
+
+    def run():
+        post_finalizer()
+        printer()
+
+    return run

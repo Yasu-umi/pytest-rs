@@ -361,12 +361,27 @@ impl Engine {
             // With -v and no capture, print "nodeid " before the test runs so
             // the test's own stdout appears after the ID line, then the outcome
             // word prints on its own line — matching upstream pytest's format.
-            let pre_printed_id = tc >= 1
+            // -v --setup-show likewise prints "nodeid " up front (upstream's
+            // logstart location line); the SETUP/TEARDOWN narration and the
+            // outcome word continue that line, with no progress field.
+            let verbose_setup_show = tc >= 1
+                && setup_show_active(config)
                 && !config.no_terminal()
-                && config.capture_disabled()
                 && !session.live_logging
                 && !config.is_worker();
-            if pre_printed_id {
+            let pre_printed_id = verbose_setup_show
+                || (tc >= 1
+                    && !config.no_terminal()
+                    && config.capture_disabled()
+                    && !session.live_logging
+                    && !config.is_worker());
+            if verbose_setup_show {
+                if idx > 0 {
+                    println!();
+                }
+                print!("{} ", item.nodeid);
+                let _ = std::io::stdout().flush();
+            } else if pre_printed_id {
                 python::reporter_ensure_newline(py);
                 print!("{} ", item.nodeid);
                 let _ = std::io::stdout().flush();
@@ -470,6 +485,18 @@ impl Engine {
                 } else if is_quiet_sub {
                     // Quiet subtest: not displayed (and not counted in the
                     // summary — see summary_line_with_extras).
+                } else if tc >= 1 && i < session.streamed_chars {
+                    // -v --setup-show already streamed this report's word
+                    // (before the TEARDOWN narration).
+                } else if tc >= 1 && verbose_setup_show {
+                    // A later word (a teardown ERROR) restates the nodeid on
+                    // a new line (upstream's write_ensure_prefix).
+                    if report.phase == Phase::Call || report.outcome != Outcome::Passed {
+                        println!();
+                        print_verbose_report_line(
+                            py, config, session, item, &report, done, total, tc, pkind, false, true,
+                        );
+                    }
                 } else if tc >= 1 {
                     python::reporter_ensure_newline(py);
                     print_verbose_report_line(
@@ -483,6 +510,7 @@ impl Engine {
                         tc,
                         pkind,
                         pre_printed_id,
+                        false,
                     );
                 } else if session.live_logging && !config.quiet {
                     // log_cli: outcome words print via live_flush (between
@@ -616,6 +644,17 @@ impl Engine {
             report_scope_teardown!(Scope::Session, "", last);
         }
         flush_pending_teardown!();
+        if setup_show_active(config)
+            && !config.no_terminal()
+            && !session.live_logging
+            && !config.is_worker()
+            && !items.is_empty()
+        {
+            // The last narration line (TEARDOWN) is left open; close it so
+            // the summary's leading blank line follows (upstream's
+            // pytest_sessionfinish tw.line("")).
+            println!();
+        }
         if tc <= 0
             && !config.no_terminal()
             && !session.live_logging
@@ -658,6 +697,9 @@ fn print_verbose_report_line(
     tc: i32,
     pkind: crate::config::ProgressKind,
     pre_printed_id: bool,
+    // -v --setup-show: no progress field and no trailing newline (the
+    // narration continues the line).
+    setup_show: bool,
 ) {
     if !(report.phase == Phase::Call || report.outcome != Outcome::Passed) {
         return;
@@ -756,6 +798,11 @@ fn print_verbose_report_line(
     let last_line = plain.rsplit('\n').next().unwrap_or(&plain);
     // "times" in verbose mode reports each test's own
     // duration (pytest's per-item showlongtestinfo).
+    if setup_show {
+        print!("{rendered}");
+        let _ = std::io::stdout().flush();
+        return;
+    }
     let msg = progress_message(pkind, done, total, report.duration);
     println!(
         "{rendered}{}",
