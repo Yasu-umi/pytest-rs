@@ -185,10 +185,14 @@ def store_mark(obj, mark, *, stacklevel=3):
     """Store a Mark on an object (upstream store_mark): reassigns pytestmark
     from the object's OWN marks so inherited lists are never mutated."""
     if hasattr(obj, "_pytestfixturefunction"):
-        # Marks applied to a fixture are inert (#3364).
-        from _pytest.deprecated import MARKED_FIXTURE
+        # Marks cannot be applied to a fixture: an error since pytest 9 (#3364).
+        from _pytest.outcomes import fail
 
-        warnings.warn(MARKED_FIXTURE, stacklevel=stacklevel)
+        fail(
+            "Marks cannot be applied to fixtures.\n"
+            "See docs: https://docs.pytest.org/en/stable/deprecations.html"
+            "#applying-a-mark-to-a-fixture-function"
+        )
     obj.pytestmark = [*get_unpacked_marks(obj, consider_mro=False), mark]
 
 
