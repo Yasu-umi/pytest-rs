@@ -112,6 +112,31 @@ pub(crate) fn id_for_value(value: &Bound<'_, PyAny>, argname: &str, index: usize
     if let Ok(b) = value.cast::<pyo3::types::PyBool>() {
         return if b.is_true() { "True" } else { "False" }.to_string();
     }
+    // A str/bytes value over 100 characters goes through
+    // parametrize_long_str_id_strategy (pytest 9.2, default: argname+index).
+    let too_long = value.len().is_ok_and(|n| {
+        n > 100
+            && (value.extract::<String>().is_ok() || value.cast::<pyo3::types::PyBytes>().is_ok())
+    });
+    if too_long {
+        let py = value.py();
+        let config = crate::python::proxies::existing_py_config(py);
+        let id = py
+            .import("pytest._idmaker")
+            .and_then(|m| {
+                m.getattr("long_str_id")?.call1((
+                    value,
+                    argname,
+                    index,
+                    config
+                        .as_ref()
+                        .map_or_else(|| py.None(), |c| c.clone_ref(py)),
+                ))
+            })
+            .ok()
+            .and_then(|id| id.extract::<Option<String>>().ok().flatten());
+        return id.unwrap_or_else(|| format!("{argname}{index}"));
+    }
     if let Ok(s) = value.extract::<String>() {
         return ascii_escaped_str(value, s);
     }

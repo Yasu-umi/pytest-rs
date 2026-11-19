@@ -162,7 +162,6 @@ pub(crate) fn push_test_items(
     validate_parametrize_argnames(
         py,
         &marks,
-        name,
         &closure_names,
         &validation_extra_fixtures,
         func,
@@ -254,7 +253,6 @@ struct Dim {
 fn validate_parametrize_argnames(
     py: Python<'_>,
     marks: &[MarkData],
-    func_name: &str,
     fixture_names: &[String],
     extra_fixture_names: &[String],
     func: &Bound<'_, PyAny>,
@@ -372,12 +370,12 @@ fn validate_parametrize_argnames(
             }
             let msg = if default_arg_names.contains(argname) {
                 format!(
-                    "In {func_name}: function already takes an argument '{argname}' with a default value"
+                    "In {test_nodeid}: function already takes an argument '{argname}' with a default value"
                 )
             } else {
                 let is_indirect = indirect_all || indirect_names.iter().any(|n| n == argname);
                 let kind = if is_indirect { "fixture" } else { "argument" };
-                format!("In {func_name}: function uses no {kind} '{argname}'")
+                format!("In {test_nodeid}: function uses no {kind} '{argname}'")
             };
             let failed_result: PyResult<PyErr> = (|| {
                 let cls = py.import("_pytest.outcomes")?.getattr("Failed")?;
@@ -421,15 +419,21 @@ pub(crate) fn expand_parametrize(
             .ok()
             .and_then(|hook| hook.getattr("pytest_make_parametrize_id").ok())
     });
-    let func_name: Option<String> = func
-        .and_then(|f| f.getattr("__name__").ok())
-        .and_then(|n| n.extract::<String>().ok());
-    let error_prefix = format!("In {}: ", func_name.as_deref().unwrap_or(nodeid));
+    // pytest 9.2 names the test by its nodeid in parametrize errors.
+    let error_prefix = format!("In {nodeid}: ");
     let mut dims: Vec<Dim> = Vec::new();
 
     for mark in marks.iter().filter(|m| m.name == "parametrize") {
         let args = mark.obj.bind(py).getattr("args")?;
         let kwargs = mark.obj.bind(py).getattr("kwargs")?;
+        // `indirect` and later are keyword-only (pytest 9.2): upstream's
+        // Metafunc.parametrize(*mark.args, **mark.kwargs) raises this.
+        if args.len()? > 2 {
+            return Err(pyo3::exceptions::PyTypeError::new_err(format!(
+                "Metafunc.parametrize() takes 3 positional arguments but {} were given",
+                args.len()? + 1
+            )));
+        }
         // Both spellings are valid: positional or argnames=/argvalues= keywords.
         let argnames_obj = if args.len()? > 0 {
             args.get_item(0)?
@@ -454,11 +458,14 @@ pub(crate) fn expand_parametrize(
                 while names.last().map(|s: &String| s.is_empty()).unwrap_or(false) {
                     names.pop();
                 }
-                let single = names.len() == 1;
+                // ...but a single name with a trailing comma ("arg,") is
+                // tuple-style like ("arg",) (pytest 9.2, #719).
+                let single = names.len() == 1 && !joined.trim_end().ends_with(',');
                 (names, single)
             }
             Err(_) => (argnames_obj.extract()?, false),
         };
+        warn_non_collection_argvalues(py, &argvalues, nodeid)?;
         let ids_obj = mark.obj.bind(py).getattr("kwargs")?.get_item("ids").ok();
         let n_argvalues = argvalues.len().unwrap_or(usize::MAX);
         // When multiple functions share the same parametrize mark's ids generator
@@ -917,9 +924,8 @@ fn dedup_param_ids(
             return Err(collect_error(py, &message));
         }
         if counts.get(&None).copied().unwrap_or(0) > 1 {
-            let func_name = nodeid.rsplit("::").next().unwrap_or(nodeid);
             let msg = format!(
-                "In {func_name}: multiple instances of HIDDEN_PARAM cannot be used in \
+                "In {nodeid}: multiple instances of HIDDEN_PARAM cannot be used in \
                  the same parametrize call, because the tests names need to be unique."
             );
             // Upstream's fail() (via _complain_multiple_hidden_parameter_sets in
@@ -936,7 +942,7 @@ fn dedup_param_ids(
             let failed_result: PyResult<()> = (|| {
                 py.import("pytest._idmaker")?
                     .getattr("complain_multiple_hidden_parameter_sets")?
-                    .call1((func_name,))?;
+                    .call1((nodeid,))?;
                 Ok(())
             })();
             return Err(match failed_result {
@@ -1013,4 +1019,30 @@ fn notset_param_set(
             obj: mark_obj.unbind(),
         }],
     })
+}
+
+/// pytest 9.2 deprecates a non-Collection iterable (an iterator/generator)
+/// as parametrize argvalues (PARAMETRIZE_NON_COLLECTION_ITERABLE).
+fn warn_non_collection_argvalues(
+    py: Python<'_>,
+    argvalues: &Bound<'_, PyAny>,
+    nodeid: &str,
+) -> PyResult<()> {
+    let collection = py.import("collections.abc")?.getattr("Collection")?;
+    if argvalues.is_instance(&collection)? {
+        return Ok(());
+    }
+    let type_name = argvalues.get_type().name()?;
+    let message = format!(
+        "Passing a non-Collection iterable to parametrize is deprecated.\n\
+         Test: {nodeid}, argvalues type: {type_name}\n\
+         Please convert to a list or tuple.\n\
+         See https://docs.pytest.org/en/stable/deprecations.html#parametrize-iterators"
+    );
+    let category = py
+        .import("_pytest.warning_types")?
+        .getattr("PytestRemovedIn10Warning")?;
+    py.import("warnings")?
+        .call_method1("warn", (category.call1((message,))?,))?;
+    Ok(())
 }

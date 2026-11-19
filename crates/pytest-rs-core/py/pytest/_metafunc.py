@@ -13,7 +13,8 @@ from __future__ import annotations
 import dataclasses
 import inspect
 import itertools
-from collections.abc import Callable, Iterable, Mapping, Sequence
+import warnings
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
 from _pytest._io.saferepr import saferepr
@@ -120,8 +121,16 @@ def _parse_argnames(argnames: str | Sequence[str]) -> list[str]:
     return list(argnames)
 
 
+def _force_tuple(argnames: str | Sequence[str]) -> bool:
+    """A single argname string takes bare values, unless it ends in a comma
+    ("arg," behaves like ("arg",), #719)."""
+    if not isinstance(argnames, str):
+        return False
+    return len(_parse_argnames(argnames)) == 1 and not argnames.rstrip().endswith(",")
+
+
 def _resolve_parametersets(
-    argnames: list[str], argvalues: Iterable[Any], func: Any
+    argnames: list[str], argvalues: Iterable[Any], func: Any, force_tuple: bool = True
 ) -> list[ParamSpec]:
     nargs = len(argnames)
     sets: list[ParamSpec] = []
@@ -133,7 +142,7 @@ def _resolve_parametersets(
                 sets.append(val)
             else:
                 sets.append(val)
-        elif nargs == 1:
+        elif nargs == 1 and (force_tuple or not isinstance(val, (tuple, list))):
             sets.append(ParamSpec((val,), [], None))
         elif isinstance(val, (tuple, list)):
             sets.append(ParamSpec(tuple(val), [], None))
@@ -227,10 +236,10 @@ class Metafunc:
         self,
         argnames: str | Sequence[str],
         argvalues: Iterable[Any],
+        *,
         indirect: bool | Sequence[str] = False,
         ids: Iterable[object | None] | Callable[[Any], object | None] | None = None,
         scope: _ScopeName | None = None,
-        *,
         _param_mark: Any = None,
     ) -> None:
         if ids is not None and not callable(ids):
@@ -240,6 +249,18 @@ class Metafunc:
                 raise TypeError("ids must be a callable or an iterable") from err
         argnames_parsed = _parse_argnames(argnames)
         nodeid = getattr(self.definition, "nodeid", "")
+        if not isinstance(argvalues, Collection):
+            from _pytest.warning_types import PytestRemovedIn10Warning
+
+            warnings.warn(
+                PytestRemovedIn10Warning(
+                    "Passing a non-Collection iterable to parametrize is deprecated.\n"
+                    f"Test: {nodeid}, argvalues type: {type(argvalues).__name__}\n"
+                    "Please convert to a list or tuple.\n"
+                    "See https://docs.pytest.org/en/stable/deprecations.html#parametrize-iterators"
+                ),
+                stacklevel=2,
+            )
         argvalues_list = list(argvalues)
         # Metafunc.parametrize's own `ids` contract is intentionally broader
         # than pytest.mark.parametrize's typed public surface (matches
@@ -269,7 +290,9 @@ class Metafunc:
 
         self._validate_if_using_arg_names(argnames_parsed, indirect)
 
-        parametersets = _resolve_parametersets(argnames_parsed, argvalues_list, self.function)
+        parametersets = _resolve_parametersets(
+            argnames_parsed, argvalues_list, self.function, _force_tuple(argnames)
+        )
 
         if not parametersets:
             skip_mark = _mark.skip(
@@ -293,8 +316,8 @@ class Metafunc:
         if ids is not None and not callable(ids) and isinstance(ids, (list, tuple)):
             if len(ids) != len(parametersets):
                 fail(
-                    f"In {self.function.__name__}: {len(ids)} ids given for "
-                    f"{len(parametersets)} expected",
+                    f"In {nodeid}: {len(parametersets)} parameter sets specified, "
+                    f"with different number of ids: {len(ids)}",
                     pytrace=False,
                 )
 
@@ -347,7 +370,6 @@ class Metafunc:
                 ids=None if ids is None or callable(ids) else list(ids),
                 config=self.config,
                 nodeid=nodeid,
-                func_name=self.function.__name__,
             ).make_unique_parameterset_ids()
         except Exception:
             return self._resolve_ids_simple(argnames, ids, parametersets)
@@ -379,6 +401,9 @@ class Metafunc:
                 result.append("-".join(saferepr(v, maxsize=50) for v in ps.values))
         return result
 
+    def _definition_nodeid(self) -> str:
+        return getattr(self.definition, "nodeid", "")
+
     def _validate_if_using_arg_names(
         self, argnames: list[str], indirect: bool | Sequence[str]
     ) -> None:
@@ -387,7 +412,7 @@ class Metafunc:
 
         if not isinstance(indirect, (bool, list, tuple)):
             fail(
-                f"In {self.function.__name__}: expected Sequence or boolean for "
+                f"In {self._definition_nodeid()}: expected Sequence or boolean for "
                 f"indirect, got {type(indirect).__name__}",
                 pytrace=False,
             )
@@ -395,7 +420,7 @@ class Metafunc:
             for arg in indirect:
                 if arg not in argnames:
                     fail(
-                        f"In {self.function.__name__}: indirect fixture '{arg}' doesn't exist",
+                        f"In {self._definition_nodeid()}: indirect fixture '{arg}' doesn't exist",
                         pytrace=False,
                     )
 
@@ -414,7 +439,7 @@ class Metafunc:
             else:
                 kind = "fixture" if indirect else "argument"
             fail(
-                f"In {self.function.__name__}: function uses no {kind} '{arg}'",
+                f"In {self._definition_nodeid()}: function uses no {kind} '{arg}'",
                 pytrace=False,
             )
 
