@@ -85,12 +85,12 @@
     },
     {
       "file": "tests/middleware/test_opentelemetry.py",
-      "status": "error",
-      "exit_code": 2,
-      "passed": 0,
+      "status": "passed",
+      "exit_code": 0,
+      "passed": 55,
       "failed": 0,
       "skipped": 0,
-      "errors": 1,
+      "errors": 0,
       "deselected": 0,
       "known_failed": 0
     },
