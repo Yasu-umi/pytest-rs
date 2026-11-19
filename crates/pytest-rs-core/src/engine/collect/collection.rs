@@ -24,6 +24,19 @@ impl Engine {
         // re-take priority over a user's filterwarnings override.
         let _ = python::suspend_warning_capture(py);
         let configure_result = self.fire_py_configure(py, rootdir, errors);
+        // pytest 9.2's pastebin plugin: --pastebin is deprecated (moved to
+        // the external pytest-pastebin package).
+        if self.config.get_value("pastebin").is_some() {
+            let _ = python::warn_explicit_at(
+                py,
+                "PytestRemovedIn10Warning",
+                "The --pastebin option is deprecated. The functionality is now available \
+                 in an external plugin package, pytest-pastebin.\n\
+                 See https://docs.pytest.org/en/stable/deprecations.html#the-pastebin-option",
+                "_pytest/pastebin.py",
+                38,
+            );
+        }
         let ini_filters: Vec<String> = self
             .config
             .get_ini_lines("filterwarnings")
