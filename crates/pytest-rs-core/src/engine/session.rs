@@ -548,9 +548,17 @@ impl Engine {
             code = forced;
         }
 
-        if !self.config.no_terminal() && !self.session.reports.is_empty() {
+        // -n runs keep the blank line under -q: their quiet output has no
+        // progress line yet for _tw.line("") to end.
+        let distributed = self.session.dist_workers_resolved.flatten().is_some();
+        if !self.config.no_terminal()
+            && !self.session.reports.is_empty()
+            && (!self.config.quiet || distributed)
+        {
             // Real pytest's sessionfinish prints _tw.line("") before the summary
             // sections, creating a blank line between test output and the summary.
+            // Under -q that call only ends the still-open progress line, which
+            // pytest-rs has already ended: no blank line.
             println!();
         }
         if self.config.no_terminal() {
