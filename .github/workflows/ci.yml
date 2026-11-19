@@ -108,6 +108,8 @@ jobs:
         include:
           - group: pytest
             suites: "pytest"
+          - group: pytest-92
+            suites: "pytest-92"
           - group: plugins
             suites: "pytest-asyncio,pytest-mock,pytest-cov,pytest-xdist,pytest-split,pytest-benchmark,pytest-timeout,pytest-mypy,pytest-ruff,pytest-subtests,pytest-bdd,pytest-metadata,pytest-snapshot,pytest-icdiff,pytest-socket,pytest-order,pytest-repeat,pytest-instafail,pytest-env,pytest-rerunfailures,pytest-randomly,pytest-django,pytest-aiohttp"
           - group: libs-1
