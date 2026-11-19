@@ -25,7 +25,7 @@ pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.2.0 | 3212 | 58 | 0 | 61 | 0 | 30 | 3361 | 97.4% | 39 | 55 | 62 |
+| pytest | 9.2.0 | 3230 | 39 | 0 | 61 | 0 | 31 | 3361 | 97.9% | 43 | 55 | 62 |
 | pytest-asyncio | v1.5.0 | 268 | 0 | 0 | 3 | 0 | 0 | 271 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 7 | 0 | 0 | 0 | 0 | 0 | 7 | 100.0% | 2 | 2 | 0 |
 | pytest-mock | v3.17.0 | 158 | 0 | 0 | 1 | 0 | 2 | 161 | 98.8% | 1 | 1 | 0 |
@@ -46,7 +46,7 @@ pytest-rs; they are not counted in the total.
 | pytest-repeat | v0.9.4 | 16 | 0 | 0 | 0 | 0 | 0 | 16 | 100.0% | 1 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
 | pytest-env | 1.6.0 | 72 | 0 | 0 | 0 | 0 | 3 | 75 | 96.0% | 3 | 3 | 0 |
-| pytest-rerunfailures | 16.7 | 91 | 147 | 0 | 10 | 0 | 0 | 248 | 40.7% | 0 | 1 | 0 |
+| pytest-rerunfailures | 16.7 | 225 | 13 | 0 | 10 | 0 | 0 | 248 | 94.8% | 0 | 1 | 0 |
 | pytest-randomly | 5.1.0 | 47 | 0 | 0 | 0 | 0 | 0 | 47 | 100.0% | 1 | 1 | 0 |
 | click | 8.5.1 | 2373 | 61 | 0 | 24 | 0 | 0 | 2458 | 97.5% | 42 | 43 | 0 |
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
@@ -97,31 +97,31 @@ pytest-rs; they are not counted in the total.
 | testing/test_compat.py | passed | 10 | 0 | 0 | 0 | 0 | 1 |
 | testing/test_config.py | passed | 279 | 0 | 0 | 1 | 0 | 7 |
 | testing/test_conftest.py | passed | 58 | 0 | 0 | 1 | 0 | 0 |
-| testing/test_doctest.py | failed | 154 | 5 | 0 | 1 | 0 | 0 |
+| testing/test_doctest.py | passed | 158 | 0 | 0 | 1 | 0 | 1 |
 | testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_faulthandler.py | passed | 12 | 0 | 0 | 3 | 0 | 0 |
 | testing/test_helpconfig.py | passed | 15 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_junitxml.py | failed | 147 | 3 | 0 | 0 | 0 | 1 |
 | testing/test_link_resolve.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_main.py | passed | 24 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_mark.py | failed | 118 | 6 | 0 | 0 | 0 | 5 |
+| testing/test_mark.py | failed | 123 | 1 | 0 | 0 | 0 | 5 |
 | testing/test_monkeypatch.py | passed | 44 | 0 | 0 | 2 | 0 | 0 |
-| testing/test_nodeid.py | failed | 29 | 1 | 0 | 0 | 0 | 0 |
+| testing/test_nodeid.py | passed | 30 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_nodes.py | passed | 8 | 0 | 0 | 0 | 0 | 6 |
-| testing/test_pastebin.py | failed | 8 | 1 | 0 | 0 | 0 | 0 |
+| testing/test_pastebin.py | passed | 9 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_pytester.py | failed | 50 | 1 | 0 | 1 | 0 | 0 |
 | testing/test_python_path.py | passed | 6 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_recwarn.py | passed | 67 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_runner.py | failed | 64 | 3 | 0 | 0 | 0 | 0 |
+| testing/test_runner.py | failed | 66 | 1 | 0 | 0 | 0 | 0 |
 | testing/test_runner_xunit.py | passed | 13 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_scope.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_session.py | passed | 26 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_setuponly.py | passed | 26 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_setupplan.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_skipping.py | failed | 92 | 3 | 0 | 0 | 0 | 0 |
+| testing/test_skipping.py | failed | 94 | 1 | 0 | 0 | 0 | 0 |
 | testing/test_stash.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_stepwise.py | passed | 18 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_subtests.py | failed | 33 | 3 | 0 | 0 | 0 | 0 |
+| testing/test_subtests.py | passed | 36 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_terminal.py | failed | 237 | 1 | 0 | 4 | 0 | 0 |
 | testing/test_threadexception.py | passed | 8 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_tmpdir.py | failed | 42 | 21 | 0 | 1 | 0 | 3 |
@@ -434,7 +434,7 @@ pytest-rs; they are not counted in the total.
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| tests/test_pytest_rerunfailures.py | failed | 91 | 147 | 0 | 10 | 0 | 0 |
+| tests/test_pytest_rerunfailures.py | failed | 225 | 13 | 0 | 10 | 0 | 0 |
 
 </details>
 

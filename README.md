@@ -171,7 +171,7 @@ _linux (CI-verified)_
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.2.0 | 3212 | 58 | 0 | 61 | 0 | 30 | 3361 | 97.4% | 39 | 55 | 62 |
+| pytest | 9.2.0 | 3230 | 39 | 0 | 61 | 0 | 31 | 3361 | 97.9% | 43 | 55 | 62 |
 | pytest-asyncio | v1.5.0 | 268 | 0 | 0 | 3 | 0 | 0 | 271 | 100.0% | 30 | 30 | 0 |
 | pytest-mock | v3.17.0 | 158 | 0 | 0 | 1 | 0 | 2 | 161 | 98.8% | 1 | 1 | 0 |
 | pytest-cov | v7.1.0 | 205 | 0 | 0 | 3 | 0 | 1 | 209 | 99.5% | 1 | 1 | 0 |
@@ -197,7 +197,7 @@ _linux (CI-verified)_
 | pytest-repeat | v0.9.4 | 16 | 0 | 0 | 0 | 0 | 0 | 16 | 100.0% | 1 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
 | pytest-env | 1.6.0 | 72 | 0 | 0 | 0 | 0 | 3 | 75 | 96.0% | 3 | 3 | 0 |
-| pytest-rerunfailures | 16.7 | 91 | 147 | 0 | 10 | 0 | 0 | 248 | 40.7% | 0 | 1 | 0 |
+| pytest-rerunfailures | 16.7 | 225 | 13 | 0 | 10 | 0 | 0 | 248 | 94.8% | 0 | 1 | 0 |
 | pytest-randomly | 5.1.0 | 47 | 0 | 0 | 0 | 0 | 0 | 47 | 100.0% | 1 | 1 | 0 |
 | pytest-bdd | 9.0.1 | 45 | 100 | 0 | 1 | 0 | 0 | 146 | 31.5% | 7 | 35 | 0 |
 | pytest-django | v4.14.0 | 237 | 0 | 0 | 1 | 0 | 0 | 238 | 100.0% | 14 | 15 | 0 |
