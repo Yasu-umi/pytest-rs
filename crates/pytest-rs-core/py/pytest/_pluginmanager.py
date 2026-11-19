@@ -1126,8 +1126,17 @@ class PluginManager:
         """-p NAME plugins: import and register (skip no: entries)."""
         i = 0
         while i < len(args):
-            if args[i] == "-p" and i + 1 < len(args):
-                spec = args[i + 1]
+            arg = args[i]
+            if arg.startswith("-p") and arg != "-p" and not arg.startswith("--"):
+                # "-pNAME" / "-p NAME" given as one argument (upstream strips it).
+                spec = arg[2:].strip()
+                i += 1
+                if spec.startswith("no:"):
+                    self.set_blocked(spec[3:])
+                    continue
+                self.import_plugin(spec, consider_entry_points=True)
+            elif arg == "-p" and i + 1 < len(args):
+                spec = args[i + 1].strip()
                 i += 2
                 if spec.startswith("no:"):
                     self.set_blocked(spec[3:])

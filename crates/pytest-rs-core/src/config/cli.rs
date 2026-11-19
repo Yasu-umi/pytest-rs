@@ -448,7 +448,7 @@ impl Config {
             };
             let parsed: Vec<&String> = parsed.collect();
             if name == "plugin" {
-                plugin_opts = parsed.iter().map(|v| v.to_string()).collect();
+                plugin_opts = parsed.iter().map(|v| v.trim().to_string()).collect();
             }
             if matches!(
                 name,
