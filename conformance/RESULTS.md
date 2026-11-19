@@ -25,7 +25,7 @@ pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.2.0 | 3269 | 2 | 0 | 61 | 0 | 29 | 3361 | 99.1% | 53 | 55 | 62 |
+| pytest | 9.2.0 | 3271 | 0 | 0 | 61 | 0 | 29 | 3361 | 99.1% | 55 | 55 | 62 |
 | pytest-asyncio | v1.5.0 | 268 | 0 | 0 | 3 | 0 | 0 | 271 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 7 | 0 | 0 | 0 | 0 | 0 | 7 | 100.0% | 2 | 2 | 0 |
 | pytest-mock | v3.17.0 | 158 | 0 | 0 | 1 | 0 | 2 | 161 | 98.8% | 1 | 1 | 0 |
@@ -45,13 +45,13 @@ pytest-rs; they are not counted in the total.
 | pytest-order | v1.5.0 | 142 | 0 | 0 | 0 | 0 | 0 | 142 | 100.0% | 17 | 17 | 0 |
 | pytest-repeat | v0.9.4 | 16 | 0 | 0 | 0 | 0 | 0 | 16 | 100.0% | 1 | 1 | 0 |
 | pytest-instafail | v0.5.0 | 63 | 0 | 0 | 0 | 0 | 0 | 63 | 100.0% | 1 | 1 | 0 |
-| pytest-env | 1.6.0 | 72 | 0 | 0 | 0 | 0 | 3 | 75 | 96.0% | 3 | 3 | 0 |
+| pytest-env | 1.8.6 | 159 | 0 | 0 | 0 | 0 | 0 | 159 | 100.0% | 3 | 3 | 0 |
 | pytest-rerunfailures | 16.7 | 225 | 13 | 0 | 10 | 0 | 0 | 248 | 94.8% | 0 | 1 | 0 |
 | pytest-randomly | 5.1.0 | 46 | 0 | 0 | 0 | 0 | 1 | 47 | 97.9% | 1 | 1 | 0 |
 | click | 8.5.1 | 2373 | 61 | 0 | 24 | 0 | 0 | 2458 | 97.5% | 42 | 43 | 0 |
 | jinja | 3.1.6 | 909 | 0 | 0 | 0 | 0 | 0 | 909 | 100.0% | 22 | 22 | 0 |
 | marshmallow | 4.4.0 | 1192 | 0 | 0 | 0 | 0 | 0 | 1192 | 100.0% | 12 | 12 | 3 |
-| rich | v15.0.0 | 955 | 0 | 0 | 20 | 0 | 6 | 981 | 99.4% | 61 | 63 | 0 |
+| rich | v15.0.0 | 954 | 0 | 0 | 20 | 0 | 7 | 981 | 99.3% | 61 | 63 | 0 |
 | sqlglot | v30.33.0 | 1613 | 0 | 0 | 0 | 0 | 0 | 1613 | 100.0% | 58 | 60 | 0 |
 | pytest-bdd | 9.0.1 | 45 | 100 | 0 | 1 | 0 | 0 | 146 | 31.5% | 7 | 35 | 0 |
 | httpx | 0.28.1 | 1408 | 2 | 0 | 1 | 0 | 7 | 1418 | 99.4% | 30 | 31 | 0 |
@@ -61,11 +61,11 @@ pytest-rs; they are not counted in the total.
 | more-itertools | v11.2.1 | 765 | 0 | 0 | 0 | 0 | 0 | 765 | 100.0% | 2 | 2 | 0 |
 | pytest-django | v4.14.0 | 237 | 0 | 0 | 1 | 0 | 0 | 238 | 100.0% | 14 | 15 | 0 |
 | werkzeug | 3.1.9 | 955 | 0 | 0 | 1 | 25 | 0 | 981 | 97.5% | 24 | 25 | 0 |
-| fastapi | 0.163.2 | 5031 | 0 | 0 | 6 | 0 | 0 | 5037 | 100.0% | 535 | 546 | 0 |
+| fastapi | 0.165.0 | 5221 | 0 | 0 | 6 | 0 | 0 | 5227 | 100.0% | 539 | 550 | 0 |
 | packaging | 26.3 | 62423 | 0 | 0 | 0 | 0 | 0 | 62423 | 100.0% | 17 | 31 | 0 |
 | pandas | v3.1.1 | 188852 | 945 | 304 | 24877 | 0 | 6 | 214984 | 99.4% | 858 | 978 | 3 |
 | networkx | 3.7 | 9128 | 0 | 0 | 61 | 0 | 0 | 9189 | 100.0% | 261 | 268 | 0 |
-| pydantic | v2.14.3 | 10972 | 0 | 0 | 981 | 0 | 14 | 11967 | 99.9% | 128 | 133 | 0 |
+| pydantic | v2.14.4 | 10984 | 0 | 0 | 982 | 0 | 14 | 11980 | 99.9% | 128 | 133 | 0 |
 | scikit-learn-1 | 1.9.1 | 8443 | 0 | 0 | 6630 | 0 | 0 | 15073 | 100.0% | 79 | 87 | 0 |
 | scikit-learn-2 | 1.9.1 | 5091 | 0 | 0 | 1892 | 0 | 0 | 6983 | 100.0% | 52 | 58 | 0 |
 | scikit-learn-3 | 1.9.1 | 9275 | 0 | 0 | 2540 | 0 | 3 | 11818 | 100.0% | 107 | 114 | 0 |
@@ -82,7 +82,7 @@ pytest-rs; they are not counted in the total.
 | testing/python/integration.py | passed | 16 | 0 | 0 | 4 | 0 | 0 |
 | testing/python/metafunc.py | passed | 132 | 0 | 0 | 0 | 0 | 1 |
 | testing/python/raises.py | passed | 34 | 0 | 0 | 0 | 0 | 2 |
-| testing/python/raises_group.py | failed | 29 | 1 | 0 | 0 | 0 | 0 |
+| testing/python/raises_group.py | passed | 30 | 0 | 0 | 0 | 0 | 0 |
 | testing/python/show_fixtures_per_test.py | passed | 10 | 0 | 0 | 0 | 0 | 0 |
 | testing/examples/test_issue519.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | testing/freeze/tests/test_trivial.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
@@ -128,7 +128,7 @@ pytest-rs; they are not counted in the total.
 | testing/test_unittest.py | passed | 70 | 0 | 0 | 9 | 0 | 1 |
 | testing/test_unraisableexception.py | passed | 14 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_warning_types.py | passed | 16 | 0 | 0 | 0 | 0 | 0 |
-| testing/test_warnings.py | failed | 59 | 1 | 0 | 4 | 0 | 0 |
+| testing/test_warnings.py | passed | 60 | 0 | 0 | 4 | 0 | 0 |
 | testing/acceptance_test.py | passed | 103 | 0 | 0 | 2 | 0 | 0 |
 | testing/deprecated_test.py | passed | 29 | 0 | 0 | 0 | 0 | 0 |
 
@@ -416,14 +416,14 @@ pytest-rs; they are not counted in the total.
 
 </details>
 
-### pytest-env @ 1.6.0
+### pytest-env @ 1.8.6
 
 <details><summary>per-file detail (3 files)</summary>
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
-| tests/test_env.py | passed | 61 | 0 | 0 | 0 | 0 | 3 |
-| tests/test_verbose.py | passed | 10 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_env.py | passed | 144 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_verbose.py | passed | 14 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_version.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 
 </details>
@@ -569,7 +569,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_color_triplet.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_columns.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_columns_align.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_console.py | passed | 100 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_console.py | passed | 99 | 0 | 0 | 0 | 0 | 1 |
 | tests/test_constrain.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_containers.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_control.py | passed | 7 | 0 | 0 | 0 | 0 | 0 |
@@ -965,9 +965,9 @@ pytest-rs; they are not counted in the total.
 
 </details>
 
-### fastapi @ 0.163.2
+### fastapi @ 0.165.0
 
-<details><summary>per-file detail (546 files)</summary>
+<details><summary>per-file detail (550 files)</summary>
 
 | file | status | passed | failed | errors | skipped | deselected | known_failed |
 |---|---|---:|---:|---:|---:|---:|---:|
@@ -1037,6 +1037,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_file_and_form_order_issue_9116.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_filter_pydantic_sub_model_pv2.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_form_default.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_form_limits.py | passed | 12 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_forms_from_non_typing_sequences.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_forms_multiple_models.py | passed | 23 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_forms_multiple_unions.py | passed | 34 | 0 | 0 | 0 | 0 | 0 |
@@ -1102,6 +1103,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_repeated_cookie_headers.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_repeated_dependency_schema.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_repeated_parameter_alias.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_request_body_limits.py | passed | 172 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_request_body_parameters_media_type.py | passed | 10 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_request_param_model_by_alias.py | passed | 7 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_request_params/test_body/test_list.py | passed | 40 | 0 | 0 | 0 | 0 | 0 |
@@ -1422,6 +1424,8 @@ pytest-rs; they are not counted in the total.
 | tests/test_tutorial/test_query_params_str_validations/test_tutorial013.py | passed | 6 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_tutorial/test_query_params_str_validations/test_tutorial014.py | passed | 6 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_tutorial/test_query_params_str_validations/test_tutorial015.py | passed | 5 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_tutorial/test_request_body_limits/test_tutorial001.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_tutorial/test_request_body_limits/test_tutorial002.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_tutorial/test_request_files/test_tutorial001.py | passed | 12 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_tutorial/test_request_files/test_tutorial001_02.py | passed | 10 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_tutorial/test_request_files/test_tutorial001_03.py | passed | 6 | 0 | 0 | 0 | 0 | 0 |
@@ -2824,7 +2828,7 @@ pytest-rs; they are not counted in the total.
 
 </details>
 
-### pydantic @ v2.14.3
+### pydantic @ v2.14.4
 
 <details><summary>per-file detail (133 files)</summary>
 
@@ -2881,13 +2885,13 @@ pytest-rs; they are not counted in the total.
 | tests/test_generics.py | passed | 124 | 0 | 0 | 2 | 0 | 0 |
 | tests/test_internal.py | passed | 40 | 0 | 0 | 1 | 0 | 0 |
 | tests/test_json.py | passed | 60 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_json_schema.py | passed | 672 | 0 | 0 | 1 | 0 | 0 |
+| tests/test_json_schema.py | passed | 678 | 0 | 0 | 2 | 0 | 0 |
 | tests/test_lazy_imports.py | passed | 5 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_main.py | passed | 278 | 0 | 0 | 25 | 0 | 0 |
 | tests/test_meta.py | no-tests | 0 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_migration.py | passed | 229 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_missing_sentinel.py | passed | 13 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_model_signature.py | passed | 21 | 0 | 0 | 1 | 0 | 0 |
+| tests/test_model_signature.py | passed | 22 | 0 | 0 | 1 | 0 | 0 |
 | tests/test_model_validator.py | passed | 9 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_networks.py | passed | 319 | 0 | 0 | 1 | 0 | 0 |
 | tests/test_networks_ipaddress.py | passed | 157 | 0 | 0 | 0 | 0 | 0 |
@@ -2907,14 +2911,14 @@ pytest-rs; they are not counted in the total.
 | tests/test_titles.py | passed | 116 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_tools.py | passed | 9 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_type_adapter.py | passed | 221 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_type_alias_type.py | passed | 19 | 0 | 0 | 0 | 0 | 0 |
+| tests/test_type_alias_type.py | passed | 20 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_type_hints.py | passed | 6 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_types.py | passed | 287 | 0 | 0 | 3 | 0 | 0 |
 | tests/test_types_payment_card_number.py | passed | 46 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_types_self.py | passed | 18 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_types_typeddict.py | passed | 89 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_typing.py | passed | 16 | 0 | 0 | 0 | 0 | 0 |
-| tests/test_utils.py | passed | 159 | 0 | 0 | 1 | 0 | 0 |
+| tests/test_utils.py | passed | 162 | 0 | 0 | 1 | 0 | 0 |
 | tests/test_v1.py | passed | 2 | 0 | 0 | 1 | 0 | 0 |
 | tests/test_validate_call.py | passed | 66 | 0 | 0 | 0 | 0 | 0 |
 | tests/test_validation_context.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
@@ -2924,7 +2928,7 @@ pytest-rs; they are not counted in the total.
 | tests/test_warnings.py | passed | 5 | 0 | 0 | 0 | 0 | 0 |
 | tests/types/test_bool.py | passed | 59 | 0 | 0 | 0 | 0 | 0 |
 | tests/types/test_bytes.py | passed | 22 | 0 | 0 | 0 | 0 | 0 |
-| tests/types/test_complex.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
+| tests/types/test_complex.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
 | tests/types/test_counter.py | passed | 15 | 0 | 0 | 0 | 0 | 0 |
 | tests/types/test_date.py | passed | 16 | 0 | 0 | 0 | 0 | 0 |
 | tests/types/test_datetime.py | passed | 14 | 0 | 0 | 0 | 0 | 0 |
