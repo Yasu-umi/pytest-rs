@@ -205,25 +205,29 @@ pub(crate) fn edge_wrap_message(
 /// pytest's format_node_duration, sans the leading space: a compact, human
 /// readable duration (us/ms/s/m/h) for the "times" progress style.
 fn node_duration(d: Duration) -> String {
+    // The unit is picked from the rounded value (pytest 9.2), so 999.96us
+    // shows as "1.000ms", not "1000.0us".
+    const STEPS: [(f64, &str, usize, f64); 7] = [
+        (1_000_000.0, "us", 3, 10.0),
+        (1_000_000.0, "us", 2, 100.0),
+        (1_000_000.0, "us", 1, 1000.0),
+        (1000.0, "ms", 3, 10.0),
+        (1000.0, "ms", 2, 100.0),
+        (1000.0, "ms", 1, 1000.0),
+        (1.0, "s", 3, 60.0),
+    ];
     let s = d.as_secs_f64();
-    if s < 0.00001 {
-        format!("{:.3}us", s * 1_000_000.0)
-    } else if s < 0.0001 {
-        format!("{:.2}us", s * 1_000_000.0)
-    } else if s < 0.001 {
-        format!("{:.1}us", s * 1_000_000.0)
-    } else if s < 0.01 {
-        format!("{:.3}ms", s * 1000.0)
-    } else if s < 0.1 {
-        format!("{:.2}ms", s * 1000.0)
-    } else if s < 1.0 {
-        format!("{:.1}ms", s * 1000.0)
-    } else if s < 60.0 {
-        format!("{s:.3}s")
-    } else if s < 3600.0 {
-        format!("{:.0}m {:.0}s", s / 60.0, s % 60.0)
+    for (scale, unit, precision, limit) in STEPS {
+        let text = format!("{:.*}", precision, s * scale);
+        if text.parse::<f64>().is_ok_and(|v| v < limit) {
+            return format!("{text}{unit}");
+        }
+    }
+    let whole = s.round() as u64;
+    if whole < 3600 {
+        format!("{}m {}s", whole / 60, whole % 60)
     } else {
-        format!("{:.0}h {:.0}m", s / 3600.0, (s % 3600.0) / 60.0)
+        format!("{}h {}m", whole / 3600, (whole % 3600) / 60)
     }
 }
 

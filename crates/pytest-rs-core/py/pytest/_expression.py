@@ -352,6 +352,24 @@ def compile_for_engine(expr: str, flag: str) -> Expression:
         ) from None
 
 
+def validate_marker_names(compiled: Expression, registered) -> None:
+    """--strict-markers: every marker name a ``-m`` expression mentions must
+    be registered (pytest 9.2's _validate_marker_names)."""
+    idents = {
+        name[len(IDENT_PREFIX) :]
+        for name in compiled._code.co_names
+        if name.startswith(IDENT_PREFIX)
+    }
+    unknown = idents - set(registered)
+    if unknown:
+        from pytest import UsageError
+
+        raise UsageError(
+            f"Unknown marker(s) in '-m' expression: {', '.join(sorted(unknown))}. "
+            "Use 'pytest --markers' to see available markers."
+        )
+
+
 def evaluate_marks(compiled: Expression, marks) -> bool:
     return compiled.evaluate(MarkMatcher.from_markers(marks))
 

@@ -8,7 +8,7 @@
 
 [pytest]
 repo = "https://github.com/pytest-dev/pytest"
-tag = "9.0.3"
+tag = "9.2.0"
 testpaths = ["testing"]
 exclude = ["example_scripts"]
 # Mirror pytest's own python_files ini so testing/python/*.py (collect.py,
@@ -102,6 +102,66 @@ known_failures = [
     # failure. Not a pytest-rs bug; self-corrects if upstream ever drops the
     # marker.
     "testing/test_mark.py::TestKeywordSelection::test_keyword_extra_dash",
+    # pytest 9.2 tests that call pytest internals directly (helpers or
+    # classes pytest-rs implements in Rust or does not mirror); the
+    # user-visible behavior they back is covered by other tests.
+    # _pytest.fixtures.ParamValueKey (fixture-cache key class) is engine-internal in pytest-rs.
+    "testing/python/fixtures.py::TestParamValueKey::test_equal_hashable_values",
+    "testing/python/fixtures.py::TestParamValueKey::test_equal_values_of_different_type",
+    "testing/python/fixtures.py::TestParamValueKey::test_exotic_eq",
+    "testing/python/fixtures.py::TestParamValueKey::test_identical_value",
+    "testing/python/fixtures.py::TestParamValueKey::test_other_types",
+    "testing/python/fixtures.py::TestParamValueKey::test_repr",
+    "testing/python/fixtures.py::TestParamValueKey::test_unequal_hashable_values",
+    "testing/python/fixtures.py::TestParamValueKey::test_unhashable_values_compare_by_index",
+    "testing/python/fixtures.py::TestParamValueKey::test_value_key_never_equals_index_key",
+    # constructs _pytest.config.argparsing.Parser directly; pytest-rs parses the CLI in Rust.
+    "testing/test_config.py::TestConfigAPI::test_addini_invalid_type[Union]",
+    "testing/test_config.py::TestConfigAPI::test_addini_invalid_type[dict]",
+    "testing/test_config.py::TestConfigAPI::test_addini_invalid_type[integer]",
+    "testing/test_config.py::TestConfigAPI::test_addini_literal_type_non_str_choice",
+    "testing/test_config.py::TestConfigAPI::test_addini_literal_type_requires_default",
+    "testing/test_config.py::TestConfigAPI::test_addini_union_type_requires_default",
+    "testing/test_config.py::TestConfigAPI::test_addini_union_with_literal_non_str_choice",
+    # _pytest.pathlib._chmod_rwx helper called directly.
+    "testing/test_tmpdir.py::TestRmRf::test_chmod_rwx_returns_false_on_nonexistent_path",
+    "testing/test_tmpdir.py::TestRmRf::test_chmod_rwx_returns_false_when_already_sufficient",
+    "testing/test_tmpdir.py::TestRmRf::test_chmod_rwx_returns_false_when_chmod_fails",
+    # _pytest.config._get_prog_name helper called directly.
+    "testing/test_config.py::TestProgName::test_get_prog_name_direct_pytest",
+    "testing/test_config.py::TestProgName::test_get_prog_name_empty_argv",
+    "testing/test_config.py::TestProgName::test_get_prog_name_python_m_pytest",
+    # _pytest.python._infer_parametrize_scope helper called directly.
+    "testing/python/metafunc.py::TestMetafunc::test_infer_parametrize_scope",
+    # _pytest.cacheprovider._make_cachedir helper called directly.
+    "testing/test_cacheprovider.py::test_make_cachedir_cleans_up_on_base_exception",
+    # _pytest.config._plugin_rewrite_name helper called directly.
+    "testing/test_config.py::TestConfigAPI::test_plugin_rewrite_name_skips_namespace_packages",
+    # _pytest.mark._validate_marker_names helper; marker validation is in Rust.
+    "testing/test_mark.py::TestValidateMarkerNames::test_no_validation_without_strict",
+    "testing/test_mark.py::TestValidateMarkerNames::test_registered_marker_passes",
+    "testing/test_mark.py::TestValidateMarkerNames::test_unknown_marker_with_strict",
+    "testing/test_mark.py::TestValidateMarkerNames::test_unknown_marker_with_strict_markers",
+    # _pytest.config.console_main (the installed console script entry point) called in-process.
+    "testing/test_config.py::TestProgName::test_console_main_deprecated",
+    # _pytest.compat.deprecated helper called directly.
+    "testing/test_compat.py::test_deprecated",
+    # _pytest.raises.is_fully_escaped helper called directly.
+    "testing/python/raises.py::TestRaises::test_consecutive_backslashes_in_escape_check",
+    "testing/python/raises.py::TestRaises::test_pipe_is_treated_as_regex_metacharacter",
+    # _pytest.nodes.norm_sep helper; pytest-rs builds node ids in Rust.
+    "testing/test_nodes.py::TestNormSep::test_backslashes_converted",
+    "testing/test_nodes.py::TestNormSep::test_empty_string",
+    "testing/test_nodes.py::TestNormSep::test_forward_slashes_unchanged",
+    "testing/test_nodes.py::TestNormSep::test_mixed_separators",
+    "testing/test_nodes.py::TestNormSep::test_pathlike_input",
+    "testing/test_nodes.py::TestNormSep::test_windows_absolute_path",
+    # _pytest.junitxml.shorten_message helper called directly.
+    "testing/test_junitxml.py::test_shorten_message_before_escaping",
+    "testing/test_junitxml.py::test_shorten_message_cuts_long_first_line_with_more_lines",
+    "testing/test_junitxml.py::test_shorten_message_cuts_on_line_boundary",
+    "testing/test_junitxml.py::test_shorten_message_cuts_single_long_line",
+    "testing/test_junitxml.py::test_shorten_message_keeps_short_messages[]",
 ]
 
 [pytest-asyncio]

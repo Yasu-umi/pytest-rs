@@ -17,7 +17,7 @@ class SessionCacheWriter:
         saved_lastfailed = config.cache.get("cache/lastfailed", {})
         if saved_lastfailed != self.lastfailed:
             config.cache.set("cache/lastfailed", self.lastfailed)
-        config.cache.set("cache/nodeids", sorted(self.cached_nodeids))
+        config.cache.set("cache/nodeids", sorted(str(n) for n in self.cached_nodeids))
 
 
 def write_session_cache(config, lastfailed, cached_nodeids):

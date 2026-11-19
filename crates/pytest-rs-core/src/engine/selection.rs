@@ -29,13 +29,9 @@ impl Engine {
         }
     }
 
-    /// --strict-markers / --strict (CLI or ini): every mark must be
-    /// registered in the `markers` ini option or be a builtin/bundled one.
-    pub(crate) fn check_strict_markers(&self, py: Python<'_>) -> Result<(), String> {
-        if !self.strict_markers() {
-            return Ok(());
-        }
-
+    /// The marker names registered through the `markers` ini (including
+    /// plugins' addinivalue_line at configure time) plus the builtin ones.
+    fn registered_markers(&self, py: Python<'_>) -> std::collections::HashSet<String> {
         // Read through the config proxy: plugins register their markers at
         // configure time via addinivalue_line("markers", ...), which lands
         // there, not in the Rust-side ini snapshot.
@@ -57,15 +53,24 @@ impl Engine {
             .into_iter()
             .map(str::to_string)
             .collect();
-        let registered: std::collections::HashSet<String> = proxy_lines
+        proxy_lines
             .iter()
             .chain(ini_lines.iter())
             .filter_map(|line| {
                 let name = line.trim().split([':', '(']).next()?.trim();
                 (!name.is_empty()).then(|| name.to_string())
             })
-            .collect();
+            .chain(BUILTIN_MARKS.iter().map(|name| name.to_string()))
+            .collect()
+    }
 
+    /// --strict-markers / --strict (CLI or ini): every mark must be
+    /// registered in the `markers` ini option or be a builtin/bundled one.
+    pub(crate) fn check_strict_markers(&self, py: Python<'_>) -> Result<(), String> {
+        if !self.strict_markers() {
+            return Ok(());
+        }
+        let registered = self.registered_markers(py);
         for item in &self.session.items {
             for mark in &item.marks {
                 if !BUILTIN_MARKS.contains(&mark.name.as_str()) && !registered.contains(&mark.name)
@@ -133,6 +138,12 @@ impl Engine {
             if !expr.is_empty() {
                 let shim = py.import("pytest._expression")?;
                 let compiled = shim.call_method1("compile_for_engine", (expr.as_str(), "-m"))?;
+                // --strict-markers: the expression may only name registered
+                // markers (pytest 9.2).
+                if self.strict_markers() {
+                    let registered: Vec<String> = self.registered_markers(py).into_iter().collect();
+                    shim.call_method1("validate_marker_names", (&compiled, registered))?;
+                }
                 let mut error: Option<PyErr> = None;
                 let (kept, removed): (Vec<_>, Vec<_>) =
                     self.session.items.drain(..).partition(|item| {

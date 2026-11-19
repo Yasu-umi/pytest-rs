@@ -341,7 +341,7 @@ def _compare_eq_iterable(
     left_formatting = PrettyPrinter().pformat(left).splitlines()
     right_formatting = PrettyPrinter().pformat(right).splitlines()
 
-    explanation = ["", "Full diff:"]
+    explanation = ["", "Full diff: (-: missing in left side, +: extra in left side)"]
     # "right" is the expected base against which we compare "left",
     # see https://github.com/pytest-dev/pytest/issues/3333
     explanation.extend(

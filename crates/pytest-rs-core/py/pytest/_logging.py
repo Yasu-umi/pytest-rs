@@ -35,18 +35,37 @@ caplog_handler_key = _StashKey()
 class catching_logs:
     """Context manager that prepares the whole logging machinery properly."""
 
-    __slots__ = ("handler", "level", "orig_level")
+    __slots__ = ("attached_loggers", "handler", "level", "orig_level")
 
     def __init__(self, handler, level=None):
         self.handler = handler
         self.level = level
+        self.attached_loggers = []
+
+    @staticmethod
+    def capturing_loggers():
+        """The root logger plus every non-propagating logger, whose records
+        never reach root (pytest 9.2). Misses loggers that *become*
+        non-propagating later, like upstream."""
+        root_logger = logging.getLogger()
+        return [root_logger] + [
+            logger
+            for logger in root_logger.manager.loggerDict.values()
+            if isinstance(logger, logging.Logger)
+            and not logger.propagate
+            and logger is not root_logger
+        ]
 
     def __enter__(self):
         root_logger = logging.getLogger()
         if self.level is not None:
             self.handler.setLevel(self.level)
-        root_logger.addHandler(self.handler)
+        for logger in catching_logs.capturing_loggers():
+            logger.addHandler(self.handler)
+            self.attached_loggers.append(logger)
         if self.level is not None:
+            # Non-propagating loggers inherit the level (unless set), so
+            # only the root logger's changes.
             self.orig_level = root_logger.level
             root_logger.setLevel(min(self.orig_level, self.level))
         return self.handler
@@ -55,7 +74,9 @@ class catching_logs:
         root_logger = logging.getLogger()
         if self.level is not None:
             root_logger.setLevel(self.orig_level)
-        root_logger.removeHandler(self.handler)
+        for logger in self.attached_loggers:
+            logger.removeHandler(self.handler)
+        self.attached_loggers.clear()
 
 
 class LogCaptureHandler(logging.StreamHandler):
@@ -281,6 +302,7 @@ class LoggingState:
         self.sections = []  # finished (when, text) pairs for the current item
         self.when = None
         self._root_level_restore = None
+        self._attached_loggers = []
         self._subtest_parent_log = []
         # Session-wide handlers, wired by configure().
         self.log_cli_enabled = False
@@ -450,6 +472,14 @@ class LoggingState:
         root.addHandler(self.report_handler)
         if self.relay_handler is not None:
             root.addHandler(self.relay_handler)
+        # Non-propagating loggers never reach root: attach the capturing
+        # handlers to them directly (pytest 9.2).
+        self._attached_loggers = [
+            logger for logger in catching_logs.capturing_loggers() if logger is not root
+        ]
+        for logger in self._attached_loggers:
+            logger.addHandler(self.caplog_handler)
+            logger.addHandler(self.report_handler)
 
     def end_phase(self):
         if self.when is None:
@@ -459,6 +489,10 @@ class LoggingState:
         root.removeHandler(self.report_handler)
         if self.relay_handler is not None:
             root.removeHandler(self.relay_handler)
+        for logger in self._attached_loggers:
+            logger.removeHandler(self.caplog_handler)
+            logger.removeHandler(self.report_handler)
+        self._attached_loggers = []
         if self._root_level_restore is not None:
             root.setLevel(self._root_level_restore)
             self._root_level_restore = None
@@ -658,6 +692,11 @@ class LogCaptureFixture:
 
     @contextlib.contextmanager
     def filtering(self, filter_):
+        # A filter already on the handler (an outer filtering() block) stays
+        # until that block ends (pytest 9.2).
+        if filter_ in self.handler.filters:
+            yield
+            return
         self.handler.addFilter(filter_)
         try:
             yield
@@ -739,15 +778,16 @@ class PercentStyleMultiline(logging.PercentStyle):
 
     @staticmethod
     def _get_auto_indent(auto_indent_option):
+        # Negative values clamp to 0 (pytest 9.2).
         if auto_indent_option is None:
             return 0
         elif isinstance(auto_indent_option, bool):
             return -1 if auto_indent_option else 0
         elif isinstance(auto_indent_option, int):
-            return int(auto_indent_option)
+            return max(int(auto_indent_option), 0)
         elif isinstance(auto_indent_option, str):
             try:
-                return int(auto_indent_option)
+                return max(int(auto_indent_option), 0)
             except ValueError:
                 pass
             val = auto_indent_option.lower()

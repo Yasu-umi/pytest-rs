@@ -32,6 +32,13 @@ Signature: 8a477f597d28d172789f06886806bc55
 #\thttps://bford.info/cachedir/spec.html
 """
 
+# The files a fresh cache dir is created with (pytest 9.2's CACHEDIR_FILES).
+CACHEDIR_FILES = {
+    "README.md": README_CONTENT.encode(),
+    ".gitignore": b"# Created by pytest automatically.\n*\n",
+    "CACHEDIR.TAG": CACHEDIR_TAG_CONTENT,
+}
+
 
 class Cache:
     # Sub-directory under cache-dir for directories created by `mkdir()`.
@@ -70,23 +77,33 @@ class Cache:
             if d.is_dir():
                 shutil.rmtree(d, ignore_errors=True)
 
-    def warn(self, fmt, **args):
+    def warn(self, fmt, *, _ispytest=False, **args):
         warnings.warn(PytestCacheWarning(fmt.format(**args) if args else fmt), stacklevel=3)
 
     def _mkdir(self, path):
         self._ensure_cache_dir_and_supporting_files()
         path.mkdir(exist_ok=True, parents=True)
 
+    @staticmethod
+    def _join_within(base, name):
+        """Join ``name`` onto ``base``, keeping the result inside ``base``:
+        an absolute ``name`` or ``..`` segments escaping it raise ValueError
+        (pytest 9.2), while a ``..`` that cancels out within ``base`` is
+        fine."""
+        path = Path(os.path.normpath(base.joinpath(name)))
+        if not path.is_relative_to(base):
+            raise ValueError(f"{name!r} is not allowed to escape the cache directory")
+        return path
+
     def mkdir(self, name):
-        path = Path(name)
-        if len(path.parts) > 1:
+        if len(Path(name).parts) > 1:
             raise ValueError("name is not allowed to contain path separators")
-        res = self._cachedir.joinpath(self._CACHE_PREFIX_DIRS, path)
+        res = self._join_within(self._cachedir / self._CACHE_PREFIX_DIRS, name)
         self._mkdir(res)
         return res
 
     def _getvaluepath(self, key):
-        return self._cachedir.joinpath(self._CACHE_PREFIX_VALUES, Path(key))
+        return self._join_within(self._cachedir / self._CACHE_PREFIX_VALUES, key)
 
     def get(self, key, default):
         path = self._getvaluepath(key)
@@ -105,41 +122,38 @@ class Cache:
             return
         data = json.dumps(value, ensure_ascii=False, indent=2)
         try:
-            f = path.open("w", encoding="UTF-8")
+            # A failed write or close warns too, not only a failed open.
+            path.write_text(data, encoding="UTF-8")
         except OSError as exc:
             self.warn(f"cache could not write path {path}: {exc}")
-        else:
-            with f:
-                f.write(data)
 
     def _ensure_cache_dir_and_supporting_files(self):
-        if self._cachedir.is_dir():
-            return
-        self._cachedir.parent.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(
-            prefix="pytest-cache-files-", dir=self._cachedir.parent
-        ) as newpath:
-            path = Path(newpath)
+        if not self._cachedir.is_dir():
+            Cache._make_cachedir(self._cachedir)
+
+    @staticmethod
+    def _make_cachedir(target):
+        """Create the cache dir with its supporting files atomically: fill a
+        temporary sibling, then rename it into place. Losing a concurrent
+        race just discards the temporary dir; the temporary dir never
+        outlives the call, whatever is raised (pytest 9.2)."""
+        target.parent.mkdir(parents=True, exist_ok=True)
+        path = Path(tempfile.mkdtemp(prefix="pytest-cache-files-", dir=target.parent))
+        try:
             # Reset permissions to the default, see pytest#12308.
             umask = os.umask(0o022)
             os.umask(umask)
             path.chmod(0o777 - umask)
-            with open(path.joinpath("README.md"), "x", encoding="UTF-8") as f:
-                f.write(README_CONTENT)
-            with open(path.joinpath(".gitignore"), "x", encoding="UTF-8") as f:
-                f.write("# Created by pytest automatically.\n*\n")
-            with open(path.joinpath("CACHEDIR.TAG"), "xb") as f:
-                f.write(CACHEDIR_TAG_CONTENT)
-            try:
-                path.rename(self._cachedir)
-            except OSError as e:
-                # Lost a concurrent-creation race: the cache dir now exists
-                # with the same supporting files, so nothing left to do.
-                if e.errno not in (errno.ENOTEMPTY, errno.EEXIST):
-                    raise
-            else:
-                # Recreate so TemporaryDirectory's cleanup finds its dir.
-                path.mkdir()
+            for name, content in CACHEDIR_FILES.items():
+                path.joinpath(name).write_bytes(content)
+            path.rename(target)
+        except OSError as e:
+            # Lost a concurrent-creation race: the cache dir now exists with
+            # the same supporting files, so nothing left to do.
+            if e.errno not in (errno.ENOTEMPTY, errno.EEXIST):
+                raise
+        finally:
+            shutil.rmtree(path, ignore_errors=True)
 
 
 def _sep(title):
@@ -162,7 +176,15 @@ def cacheshow(cachedir, glob):
     basedir = cache._cachedir
     vdir = basedir / Cache._CACHE_PREFIX_VALUES
     print(_sep(f"cache values for {glob!r}"))
-    for valpath in sorted(x for x in vdir.rglob(glob) if x.is_file()):
+
+    def globfiles(base):
+        # A glob may contain `..` segments, which rglob() follows: keep only
+        # files that stay under `base` (pytest 9.2).
+        for x in base.rglob(glob):
+            if x.is_file() and Path(os.path.normpath(x)).is_relative_to(base):
+                yield x
+
+    for valpath in sorted(globfiles(vdir)):
         key = str(valpath.relative_to(vdir))
         val = cache.get(key, dummy)
         if val is dummy:
@@ -174,12 +196,10 @@ def cacheshow(cachedir, glob):
 
     ddir = basedir / Cache._CACHE_PREFIX_DIRS
     if ddir.is_dir():
-        contents = sorted(ddir.rglob(glob))
         print(_sep(f"cache directories for {glob!r}"))
-        for p in contents:
-            if p.is_file():
-                key = str(p.relative_to(basedir))
-                print(f"{key} is a file of length {p.stat().st_size}")
+        for p in sorted(globfiles(ddir)):
+            key = str(p.relative_to(basedir))
+            print(f"{key} is a file of length {p.stat().st_size}")
     return 0
 
 

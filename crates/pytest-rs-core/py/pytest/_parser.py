@@ -585,6 +585,12 @@ _CORE_OPTIONS: list[tuple[str, tuple[str, ...], dict[str, Any], str]] = [
         "Set which warnings to report, see -W option of Python itself",
     ),
     (
+        "pytest-warnings",
+        ("--max-warnings",),
+        {"metavar": "num", "type": int},
+        "Exit with error if all tests pass but the number of warnings exceeds this threshold",
+    ),
+    (
         "collection",
         ("--collect-only", "--co"),
         {"action": "store_true"},
@@ -942,6 +948,7 @@ _CORE_INI_TYPES: dict[str, str | None] = {
     "log_format": None,
     "log_level": None,
     "markers": "linelist",
+    "max_warnings": None,
     "minversion": None,
     "norecursedirs": "args",
     "python_classes": "args",
@@ -1153,6 +1160,11 @@ _CORE_INI_HELP: list[tuple[str, str, str]] = [
     ),
     ("addopts", "args", "Extra command line options"),
     ("minversion", "string", "Minimally required pytest version"),
+    (
+        "max_warnings",
+        "string",
+        "Exit with error if all tests pass but the number of warnings exceeds this threshold",
+    ),
     ("pythonpath", "paths", "Add paths to sys.path"),
     ("required_plugins", "args", "Plugins that must be present for pytest to run"),
 ]

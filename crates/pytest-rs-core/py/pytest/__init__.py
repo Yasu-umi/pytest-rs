@@ -120,8 +120,8 @@ from pytest._warns import warns as warns
 from pytest._xdist_fixtures import testrun_uid as testrun_uid
 from pytest._xdist_fixtures import worker_id as worker_id
 
-__version__ = "9.0.3"  # pytest API version this shim tracks
-version_tuple = (9, 0, 3)
+__version__ = "9.2.0"  # pytest API version this shim tracks
+version_tuple = (9, 2, 0)
 __pytest_rs__ = True
 
 
@@ -166,6 +166,7 @@ class ExitCode(_enum.IntEnum):
     INTERNAL_ERROR = 3
     USAGE_ERROR = 4
     NO_TESTS_COLLECTED = 5
+    MAX_WARNINGS_ERROR = 6
 
 
 def console_main() -> int:

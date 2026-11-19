@@ -76,8 +76,8 @@ for name in "${SUITES[@]}"; do
   # the genuine real pytest.
   uv venv "$dir/.venv-py" --python "$PYVER" >/dev/null 2>&1
   uv venv "$dir/.venv-rs" --python "$PYVER" >/dev/null 2>&1
-  # pytest 9.0.3 = the version pytest-rs reproduces; xdist for real's `-n` baseline.
-  uv pip install -q --python "$dir/.venv-py/bin/python" "pytest==9.0.3" pytest-cov pytest-xdist -e "$dir" $extra >/dev/null 2>&1
+  # pytest 9.2.0 = the version pytest-rs reproduces; xdist for real's `-n` baseline.
+  uv pip install -q --python "$dir/.venv-py/bin/python" "pytest==9.2.0" pytest-cov pytest-xdist -e "$dir" $extra >/dev/null 2>&1
   # Install pytest-rs the same way a user does, into its own venv, so it self-locates.
   # Editable install keeps the suite's source in-tree (so the cov path resolves).
   uv pip install -q --python "$dir/.venv-rs/bin/python" "$RS_SPEC" -e "$dir" $extra >/dev/null 2>&1

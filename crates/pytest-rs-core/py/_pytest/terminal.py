@@ -56,24 +56,24 @@ def format_node_duration(seconds):
     """Format the given seconds in a human readable manner to show in the
     test progress."""
     # The formatting is designed to be compact and readable, with at most
-    # 7 characters for durations below 100 hours.
-    if seconds < 0.00001:
-        return f" {seconds * 1000000:.3f}us"
-    if seconds < 0.0001:
-        return f" {seconds * 1000000:.2f}us"
-    if seconds < 0.001:
-        return f" {seconds * 1000000:.1f}us"
-    if seconds < 0.01:
-        return f" {seconds * 1000:.3f}ms"
-    if seconds < 0.1:
-        return f" {seconds * 1000:.2f}ms"
-    if seconds < 1:
-        return f" {seconds * 1000:.1f}ms"
-    if seconds < 60:
-        return f" {seconds:.3f}s"
-    if seconds < 3600:
-        return f" {seconds // 60:.0f}m {seconds % 60:.0f}s"
-    return f" {seconds // 3600:.0f}h {(seconds % 3600) // 60:.0f}m"
+    # 7 characters for durations below 100 hours. The unit is picked from
+    # the rounded value, so 999.96us shows as "1.000ms", not "1000.0us".
+    for scale, unit, precision, limit in (
+        (1000000, "us", 3, 10),
+        (1000000, "us", 2, 100),
+        (1000000, "us", 1, 1000),
+        (1000, "ms", 3, 10),
+        (1000, "ms", 2, 100),
+        (1000, "ms", 1, 1000),
+        (1, "s", 3, 60),
+    ):
+        text = f"{seconds * scale:.{precision}f}"
+        if float(text) < limit:
+            return f" {text}{unit}"
+    whole_seconds = round(seconds)
+    if whole_seconds < 3600:
+        return f" {whole_seconds // 60}m {whole_seconds % 60}s"
+    return f" {whole_seconds // 3600}h {(whole_seconds % 3600) // 60}m"
 
 
 KNOWN_TYPES = (
@@ -299,7 +299,7 @@ class TerminalReporter:
         """Upstream's "platform ... -- Python X, pytest-Y, pluggy-Z" line."""
         pluggy = TerminalReporter._pluggy_version()
         verinfo = platform.python_version()
-        return f"platform {sys.platform} -- Python {verinfo}, pytest-9.0.3, pluggy-{pluggy}"
+        return f"platform {sys.platform} -- Python {verinfo}, pytest-9.2.0, pluggy-{pluggy}"
 
     def __init__(self, config, file=None):
         self.config = config
@@ -311,6 +311,10 @@ class TerminalReporter:
         self._showfspath = None
         self._progress_nodeids_reported = set()
         self._tests_ran = False
+        # "times" progress style: node ids already summed into a shown
+        # duration, and the report being logged.
+        self._timing_nodeids_reported = set()
+        self._current_logreport = None
         self._already_displayed_warnings = None
         try:
             self.startpath = Path(os.getcwd())
@@ -401,6 +405,13 @@ class TerminalReporter:
 
     @property
     def showlongtestinfo(self):
+        # Upstream reads config.get_verbosity() (which tests may patch).
+        get_verbosity = getattr(self.config, "get_verbosity", None)
+        if callable(get_verbosity):
+            try:
+                return get_verbosity() > 0
+            except Exception:  # noqa: BLE001
+                pass
         return self.verbosity > 0
 
     @property
@@ -551,6 +562,7 @@ class TerminalReporter:
 
     def pytest_runtest_logreport(self, report):
         self._tests_ran = True
+        self._current_logreport = report
         rep = report
         category, letter, word = self._gettestkindstatus(rep)
         if not isinstance(word, tuple):
@@ -610,9 +622,56 @@ class TerminalReporter:
                 format_string = f" [{counter_format}/{{}}]"
                 return format_string.format(progress, collected)
             return f" [ {collected} / {collected} ]"
+        if self._show_progress_info == "times":
+            return self._get_times_progress_message(collected)
         if collected:
             return f" [{self.reported_progress * 100 // collected:3d}%]"
         return " [100%]"
+
+    def _get_times_progress_message(self, collected):
+        """The "times" progress field (upstream 9.2): the summed duration of
+        the reports not shown yet, once per item with -v, or once per
+        module otherwise; a subtest's own duration with -v."""
+        if not collected:
+            return ""
+        from _pytest.reports import TestReport
+        from _pytest.subtests import SubtestReport
+
+        def report_id(report):
+            return getattr(report, "id", None) or report.nodeid
+
+        if isinstance(self._current_logreport, SubtestReport):
+            if self.showlongtestinfo:
+                return format_node_duration(self._current_logreport.duration)
+            return ""
+        all_reports = [
+            report
+            for key in ("passed", "xpassed", "failed", "xfailed", "skipped", "error", "")
+            for report in self._get_reports_to_display(key)
+        ]
+        report = self._current_logreport
+        if report is not None:
+            current_location = report.location[0]
+        else:
+            current_location = all_reports[-1].location[0] if all_reports else ""
+        not_reported = [
+            r
+            for r in all_reports
+            if not isinstance(r, SubtestReport)
+            and report_id(r) not in self._timing_nodeids_reported
+        ]
+        items = getattr(self._session, "items", None) or []
+        tests_in_module = sum(i.location[0] == current_location for i in items)
+        tests_completed = sum(
+            r.when == "setup" for r in not_reported if r.location[0] == current_location
+        )
+        last_in_module = tests_completed == tests_in_module
+        if self.showlongtestinfo or last_in_module:
+            self._timing_nodeids_reported.update(report_id(r) for r in not_reported)
+            return format_node_duration(
+                sum(r.duration for r in not_reported if isinstance(r, TestReport))
+            )
+        return ""
 
     def _write_progress_information_if_past_edge(self):
         w = self._width_of_current_line
