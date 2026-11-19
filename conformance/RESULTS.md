@@ -25,7 +25,7 @@ pytest-rs; they are not counted in the total.
 
 | suite | tag | passed | failed | errors | skipped | deselected | known_failed | total | conformant % | files all-pass | files run | files excluded |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| pytest | 9.2.0 | 2989 | 260 | 0 | 62 | 0 | 50 | 3361 | 90.8% | 30 | 55 | 62 |
+| pytest | 9.2.0 | 3069 | 189 | 0 | 62 | 0 | 41 | 3361 | 93.2% | 32 | 55 | 62 |
 | pytest-asyncio | v1.5.0 | 268 | 0 | 0 | 3 | 0 | 0 | 271 | 100.0% | 30 | 30 | 0 |
 | pytest-aiohttp | v1.1.1 | 7 | 0 | 0 | 0 | 0 | 0 | 7 | 100.0% | 2 | 2 | 0 |
 | pytest-mock | v3.17.0 | 158 | 0 | 0 | 1 | 0 | 2 | 161 | 98.8% | 1 | 1 | 0 |
@@ -78,13 +78,13 @@ pytest-rs; they are not counted in the total.
 |---|---|---:|---:|---:|---:|---:|---:|
 | testing/python/approx.py | passed | 157 | 0 | 0 | 22 | 0 | 0 |
 | testing/python/collect.py | failed | 83 | 1 | 0 | 0 | 0 | 0 |
-| testing/python/fixtures.py | failed | 208 | 22 | 0 | 2 | 0 | 11 |
+| testing/python/fixtures.py | failed | 238 | 1 | 0 | 2 | 0 | 2 |
 | testing/python/integration.py | passed | 16 | 0 | 0 | 4 | 0 | 0 |
-| testing/python/metafunc.py | failed | 84 | 48 | 0 | 0 | 0 | 1 |
+| testing/python/metafunc.py | passed | 132 | 0 | 0 | 0 | 0 | 1 |
 | testing/python/raises.py | passed | 34 | 0 | 0 | 0 | 0 | 2 |
 | testing/python/raises_group.py | failed | 29 | 1 | 0 | 0 | 0 | 0 |
 | testing/python/show_fixtures_per_test.py | passed | 10 | 0 | 0 | 0 | 0 | 0 |
-| testing/examples/test_issue519.py | failed | 0 | 1 | 0 | 0 | 0 | 0 |
+| testing/examples/test_issue519.py | passed | 1 | 0 | 0 | 0 | 0 | 0 |
 | testing/freeze/tests/test_trivial.py | passed | 2 | 0 | 0 | 0 | 0 | 0 |
 | testing/logging/test_fixture.py | passed | 31 | 0 | 0 | 0 | 0 | 0 |
 | testing/logging/test_formatter.py | passed | 4 | 0 | 0 | 0 | 0 | 0 |
@@ -95,7 +95,7 @@ pytest-rs; they are not counted in the total.
 | testing/test_collect_imported_tests.py | passed | 3 | 0 | 0 | 0 | 0 | 0 |
 | testing/test_collection.py | passed | 114 | 0 | 0 | 2 | 0 | 1 |
 | testing/test_compat.py | passed | 10 | 0 | 0 | 0 | 0 | 1 |
-| testing/test_config.py | failed | 224 | 50 | 0 | 1 | 0 | 12 |
+| testing/test_config.py | failed | 225 | 49 | 0 | 1 | 0 | 12 |
 | testing/test_conftest.py | passed | 58 | 0 | 0 | 1 | 0 | 0 |
 | testing/test_doctest.py | failed | 154 | 5 | 0 | 1 | 0 | 0 |
 | testing/test_error_diffs.py | passed | 12 | 0 | 0 | 0 | 0 | 0 |
