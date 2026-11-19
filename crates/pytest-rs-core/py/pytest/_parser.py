@@ -314,8 +314,8 @@ def render_new_option_help(new_flags: list[str]) -> str:
 #: `terminal.py`, `cacheprovider.py`, `main.py`'s collection group,
 #: `config/__init__.py`'s debugconfig group, `logging.py`), in upstream's
 #: exact group/registration order, restricted to options pytest-rs actually
-#: implements (a clap arg exists for it) — e.g. `--disable-warnings` and
-#: `--code-highlight` have no pytest-rs equivalent yet and are omitted rather
+#: implements (a clap arg exists for it) — e.g. `--code-highlight` has no
+#: pytest-rs equivalent yet and is omitted rather
 #: than fabricated; xdist's own options (`-n`, `--dist`, ...) are omitted too
 #: since bundled xdist has no `pytest_help_group` section of its own yet
 #: (only pytest-rs-benchmark does) — matching a real pytest-xdist-less
@@ -525,6 +525,12 @@ _CORE_OPTIONS: list[tuple[str, tuple[str, ...], dict[str, Any], str]] = [
         "output, (a)ll except passed (p/P), or (A)ll. (w)arnings are "
         "enabled by default (see --disable-warnings), 'N' can be used to "
         "reset the list. (default: 'fE').",
+    ),
+    (
+        "Reporting",
+        ("--disable-warnings", "--disable-pytest-warnings"),
+        {"action": "store_true"},
+        "Disable warnings summary",
     ),
     (
         "Reporting",

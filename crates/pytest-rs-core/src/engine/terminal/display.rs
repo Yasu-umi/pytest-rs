@@ -230,7 +230,9 @@ impl Engine {
     ) -> usize {
         let in_process = python::warning_count(py);
         let total = in_process + self.session.worker_warning_count;
-        if self.config.quiet || self.config.plugin_disabled("warnings") {
+        // Shown at any verbosity unless --disable-warnings drops (w) from the
+        // report chars (upstream's summary_warnings / hasopt("w")).
+        if !self.report_chars().contains('w') || self.config.plugin_disabled("warnings") {
             return in_process;
         }
         let lines = python::warning_summary_lines(py, start);

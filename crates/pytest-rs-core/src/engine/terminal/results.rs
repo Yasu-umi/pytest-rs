@@ -173,12 +173,18 @@ impl Engine {
                 _ => {}
             }
         }
+        // (w)arnings are on unless --disable-warnings (upstream's getreportopt).
+        if self.config.get_flag("disable-warnings") {
+            chars.retain(|c| c != 'w');
+        } else if !chars.contains('w') {
+            chars.insert(0, 'w');
+        }
         chars
     }
 
     /// -rP/-rA: the PASSES section, passed tests' captured output.
     pub(crate) fn print_passes(&self) {
-        if !self.report_chars().contains('P') {
+        if !self.report_chars().contains('P') || self.config.get_value("tb") == Some("no") {
             return;
         }
         let passed: Vec<_> = self
