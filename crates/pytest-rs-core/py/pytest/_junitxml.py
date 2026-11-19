@@ -18,6 +18,37 @@ import xml.etree.ElementTree as ET
 from pytest._fixtures import fixture
 from pytest._warning_types import PytestExperimentalApiWarning, PytestWarning
 
+# Budget for the ``message`` attribute of <failure> and <error> elements;
+# the full report is always written as the element text (pytest 9.2).
+MESSAGE_ATTR_BUDGET = 500
+
+
+def shorten_message(msg, budget=MESSAGE_ATTR_BUDGET):
+    """Shorten ``msg`` for a ``message`` attribute: whole lines are kept
+    while they fit in ``budget`` characters, a first line longer than that
+    is cut, and a final line points to the element text when anything was
+    dropped (upstream _pytest.junitxml.shorten_message)."""
+    lines = msg.splitlines() or [""]
+    kept = []
+    size = 0
+    for line in lines:
+        if kept and size + len(line) + 1 > budget:
+            break
+        kept.append(line)
+        size += len(line) + 1
+    shortened = "\n".join(kept)
+    first_line_cut = len(shortened) > budget
+    if first_line_cut:
+        shortened = shortened[:budget] + "..."
+    remaining = len(lines) - len(kept)
+    if remaining:
+        note = f"+{remaining} more line{'s' if remaining > 1 else ''}"
+    elif first_line_cut:
+        note = "truncated"
+    else:
+        return msg
+    return f"{shortened}\n[{note}; full report in element text]"
+
 
 def bin_xml_escape(arg):
     r"""Visually escape invalid XML characters.
@@ -194,7 +225,7 @@ class _NodeReporter:
                 message = reprcrash.message
             else:
                 message = str(report.longrepr)
-            message = bin_xml_escape(message)
+            message = bin_xml_escape(shorten_message(message))
             self._add_simple("failure", message, str(report.longrepr))
 
     def append_collect_error(self, report):
@@ -216,7 +247,7 @@ class _NodeReporter:
             msg = f'failed on teardown with "{reason}"'
         else:
             msg = f'failed on setup with "{reason}"'
-        self._add_simple("error", bin_xml_escape(msg), str(report.longrepr))
+        self._add_simple("error", bin_xml_escape(shorten_message(msg)), str(report.longrepr))
 
     def append_skipped(self, report):
         if hasattr(report, "wasxfail"):
@@ -339,7 +370,13 @@ class LogXML:
                     # A failure in call plus an error in teardown needs two
                     # testcases to follow the junit schema.
                     self.finalize(close_report)
-                    self.cnt_double_fail_tests += 1
+                else:
+                    # A passing call with a teardown error creates separate
+                    # terminal reports, but JUnit XML keeps one testcase
+                    # element for that item (pytest 9.2, #3850).
+                    self.cnt_double_fail_tests += int(
+                        (report.nodeid, getattr(report, "node", None)) in self.node_reporters
+                    )
             reporter = self._opentestcase(report)
             if report.when == "call":
                 reporter.append_failure(report)
