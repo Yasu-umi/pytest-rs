@@ -47,7 +47,7 @@ impl Config {
         "pyargs",                  // interpret args as python module paths
         "disable-plugin-autoload", // disable loading plugins from entry points
     ];
-    const CORE_VALUES: [(&str, Option<char>); 44] = [
+    const CORE_VALUES: [(&str, Option<char>); 45] = [
         ("confcutdir", None),
         ("deselect", None),
         ("log-level", None),
@@ -72,6 +72,7 @@ impl Config {
         ("assert", None),
         ("tb", None),
         ("maxfail", None),
+        ("max-warnings", None), // exit 6 when all pass but warnings exceed it
         ("durations", None),
         ("durations-min", None),
         ("color", None),

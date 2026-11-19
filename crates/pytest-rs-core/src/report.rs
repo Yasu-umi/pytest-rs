@@ -93,4 +93,6 @@ pub mod exit_code {
     pub const INTERNAL_ERROR: i32 = 3;
     pub const USAGE_ERROR: i32 = 4;
     pub const NO_TESTS_COLLECTED: i32 = 5;
+    /// All tests passed but more warnings than --max-warnings/max_warnings.
+    pub const MAX_WARNINGS_ERROR: i32 = 6;
 }

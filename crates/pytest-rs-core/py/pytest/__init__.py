@@ -166,6 +166,7 @@ class ExitCode(_enum.IntEnum):
     INTERNAL_ERROR = 3
     USAGE_ERROR = 4
     NO_TESTS_COLLECTED = 5
+    MAX_WARNINGS_ERROR = 6
 
 
 def console_main() -> int:
