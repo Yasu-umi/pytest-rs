@@ -1476,6 +1476,22 @@ impl Engine {
         rootdir: &std::path::Path,
         errors: &mut Vec<(std::path::PathBuf, String)>,
     ) -> PyResult<()> {
+        // pytest 9.2's builtin plugins read these Literal-typed inis in their
+        // own pytest_configure, so an invalid value is a usage error at
+        // startup (terminal, mark, logging; junitxml only with --junitxml).
+        {
+            let config_proxy = python::make_py_config(py, &self.config)?;
+            let mut names = vec!["console_output_style", "empty_parameter_set_mark"];
+            if self.config.get_value("log-file-mode").is_none() {
+                names.push("log_file_mode");
+            }
+            if self.config.get_value("junit-xml").is_some() {
+                names.extend(["junit_logging", "junit_duration_report", "junit_family"]);
+            }
+            for ini in names {
+                config_proxy.call_method1(py, "getini", (ini,))?;
+            }
+        }
         let name = "pytest_configure";
         let mut hooks: Vec<_> = self
             .session
