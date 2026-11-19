@@ -124,7 +124,7 @@ Gotchas baked into the script (why pinned / why these targets):
   measure those files. Passing the path keeps the comparison robust across
   pytest-rs versions; the script sanity-checks that pytest-rs reports a non-zero
   statement count and skips the cov rows otherwise.
-- **Real baseline is pytest 9.0.3** — the version pytest-rs reproduces.
+- **Real baseline is pytest 9.2.0** — the version pytest-rs reproduces.
 - Coverage is the interesting axis: pytest-rs uses `sys.monitoring`, real
   pytest uses `coverage.py`'s trace hooks, so the gap is widest on `--cov`.
 

@@ -274,7 +274,7 @@ impl Engine {
         if self.config.get_flag("no-header") {
             return;
         }
-        // Upstream's "platform darwin -- Python 3.13.2, pytest-9.0.3,
+        // Upstream's "platform darwin -- Python 3.13.2, pytest-9.2.0,
         // pluggy-1.6.0", pluggy being the installed one. Built by the shim's
         // TerminalReporter._platform_line so a replacement reporter prints
         // the identical line.
@@ -346,7 +346,7 @@ impl Engine {
         // real pytest's _pytest.helpconfig shows in pytest_report_header).
         if self.config.get_flag("traceconfig") {
             println!(
-                "using: pytest-9.0.3 (pytest-rs-{}, embedded)",
+                "using: pytest-9.2.0 (pytest-rs-{}, embedded)",
                 env!("CARGO_PKG_VERSION")
             );
             println!("active plugins:");
