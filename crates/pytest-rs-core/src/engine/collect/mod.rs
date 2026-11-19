@@ -196,6 +196,18 @@ impl Engine {
             // own doc comment for why this exact point matters.
             self.fork_workers_at_checkpoint(py);
         }
+        // Files under a directory whose conftest skipped itself are not
+        // collected (upstream skips the whole Dir collector).
+        let files: Vec<PathBuf> = files
+            .into_iter()
+            .filter(|file| {
+                !self
+                    .session
+                    .skipped_conftest_dirs
+                    .iter()
+                    .any(|(dir, ..)| file.starts_with(dir))
+            })
+            .collect();
         Ok(PreConfigure {
             rootdir,
             paths,
@@ -225,6 +237,31 @@ impl Engine {
         if self.fire_configure_and_print_header(py, &rootdir, &mut errors)? {
             // --markers (or another short-circuit) handled output; skip collection.
             return Ok(errors);
+        }
+        // Directories skipped by their conftest: a skipped collect report
+        // each, reported once by the controller (workers inherit the list).
+        if !self.config.is_worker() {
+            for (_, nodeid, reason, location) in self.session.skipped_conftest_dirs.clone() {
+                self.session.skipped_modules.push((
+                    nodeid.clone(),
+                    reason.clone(),
+                    location.clone(),
+                ));
+                self.session.reports.push(crate::report::TestReport {
+                    nodeid,
+                    phase: crate::report::Phase::Setup,
+                    outcome: crate::report::Outcome::Skipped,
+                    duration: std::time::Duration::ZERO,
+                    longrepr: Some(reason),
+                    location: Some(location),
+                    subtest_desc: None,
+                    sections: Vec::new(),
+                    rerun: false,
+                    xfail_longrepr: None,
+                    reprcrash_message: None,
+                    head_line: None,
+                });
+            }
         }
         // Deferred path-existence check: conftest pytest_configure hooks have
         // now fired (issue #143 — ensure configure/unconfigure run even when
