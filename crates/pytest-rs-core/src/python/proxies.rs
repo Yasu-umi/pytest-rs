@@ -261,6 +261,18 @@ fn build_py_config(
     // alias of config.option (pytest-env reads it for its verbose flag).
     let bound = proxy.bind(py);
     let opt = bound.getattr("option")?;
+    // -W/--pythonwarnings (upstream dest "pythonwarnings", action append):
+    // None when not given.
+    if !opt.hasattr("pythonwarnings")? {
+        let warnings = if config.w_options.is_empty() {
+            py.None()
+        } else {
+            pyo3::types::PyList::new(py, &config.w_options)?
+                .into_any()
+                .unbind()
+        };
+        opt.setattr("pythonwarnings", warnings)?;
+    }
     bound.setattr("known_args_namespace", opt)?;
     // config.invocation_params.args: the verbatim args passed to
     // pytest.main()/the CLI (before addopts splicing).
