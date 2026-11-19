@@ -1517,7 +1517,12 @@ impl Engine {
         // startup (terminal, mark, logging; junitxml only with --junitxml).
         {
             let config_proxy = python::make_py_config(py, &self.config)?;
-            let mut names = vec!["console_output_style", "empty_parameter_set_mark"];
+            let mut names = vec![
+                "console_output_style",
+                "empty_parameter_set_mark",
+                "tmp_path_retention_count",
+                "tmp_path_retention_policy",
+            ];
             if self.config.get_value("log-file-mode").is_none() {
                 names.push("log_file_mode");
             }
