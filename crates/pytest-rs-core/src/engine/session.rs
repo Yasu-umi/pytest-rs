@@ -552,9 +552,10 @@ impl Engine {
         {
             println!("{}", center_with(banner, '!'));
         }
-        // --no-summary suppresses pytest's whole terminal-summary block
-        // (FAILURES/ERRORS/PASSES/warnings/short summary + the conftest
-        // pytest_terminal_summary hooks); the final stats line still shows.
+        // --no-summary suppresses pytest's own terminal-summary sections
+        // (FAILURES/ERRORS/PASSES/warnings/short summary); conftest and
+        // plugin pytest_terminal_summary hooks still run (pytest 9.2,
+        // #14724), and the final stats line still shows.
         let no_summary = self.config.get_flag("no-summary");
         // Warnings shown in the first summary; the "(final)" pass after the
         // short summary reports any emitted during pytest_terminal_summary.
@@ -571,11 +572,11 @@ impl Engine {
             self.print_passes();
             self.print_xpasses();
             self.print_durations();
-            if let Err(err) = self.print_plugin_summaries(py, code) {
-                eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
-            }
-            self.print_pastebin_failed(py);
         }
+        if let Err(err) = self.print_plugin_summaries(py, code) {
+            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+        }
+        self.print_pastebin_failed(py);
         self.write_junit_xml(py);
         if let Some(banner) = &self.session.dist_banner {
             println!("{}", center_banner(banner));
