@@ -1448,6 +1448,14 @@ impl Engine {
     /// real session — previously only reachable from the `parseconfig`-style
     /// standalone Config paths.
     pub(crate) fn fire_py_hooks_simple(&mut self, py: Python<'_>, name: &str) -> PyResult<()> {
+        self.fire_py_unconfigure_impls(py, name)?;
+        self.drain_config_cleanups(py)
+    }
+
+    /// The `pytest_unconfigure` impls alone (see `fire_py_hooks_simple`), for
+    /// the session end, which runs upstream's own unraisableexception
+    /// `pytest_unconfigure` between them and the cleanup-stack drain.
+    pub(crate) fn fire_py_unconfigure_impls(&mut self, py: Python<'_>, name: &str) -> PyResult<()> {
         // Respect @pytest.hookimpl(tryfirst/trylast) ordering: tryfirst before
         // normal, normal next, trylast last (mirrors pluggy's call ordering).
         // Conftest-defined impls only from py_hooks — third-party plugin
@@ -1491,6 +1499,13 @@ impl Engine {
                 python::call_py_hook(py, func, &[("config", config_proxy.clone_ref(py))])?;
             }
         }
+        Ok(())
+    }
+
+    /// Upstream's `_cleanup_stack.close()` after `pytest_unconfigure`: the
+    /// pythonpath cleanup and the `config.add_cleanup` callbacks.
+    pub(crate) fn drain_config_cleanups(&mut self, py: Python<'_>) -> PyResult<()> {
+        let config_proxy = python::make_py_config(py, &self.config)?;
         python::pythonpath_cleanup(py, &self.config);
         let _ = config_proxy.bind(py).call_method0("_ensure_unconfigure");
         Ok(())

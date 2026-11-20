@@ -708,20 +708,10 @@ impl Engine {
         if !summary.is_empty() {
             println!("{summary}");
         }
-        // Unraisable leftovers (e.g. refcycles with broken __del__, only
-        // collectable after a forced gc) drain after the terminal reporter
-        // has finished, like upstream's config cleanup; an error filter
-        // propagates them to the top (exit 1, traceback on stderr). Stop
-        // the warnings capture first so they print for real.
+        // Stop the warnings capture so warnings from here on print for real.
         let _ = py
             .import("pytest._wcapture")
             .and_then(|m| m.call_method0("uninstall"));
-        if let Err(err) = python::unraisable_session_cleanup(py) {
-            eprintln!("{}", python::format_exception(py, &err));
-            if code == 0 {
-                code = crate::report::exit_code::TESTS_FAILED;
-            }
-        }
         // pytest_unconfigure: mirrors upstream's config teardown (fired after
         // the terminal summary, just before the session returns). conftest and
         // plugin hooks observe it; in pytester inline runs the HookRecorder's
@@ -733,7 +723,24 @@ impl Engine {
         // one spawned during a test's setup/call/teardown, drained per-phase
         // in runner/item/body.rs) only exists once this drain runs, so
         // checking for it any earlier always finds nothing.
-        let _ = self.fire_py_hooks_simple(py, "pytest_unconfigure");
+        let hooks_result = self.fire_py_unconfigure_impls(py, "pytest_unconfigure");
+        // Unraisable leftovers (e.g. refcycles with broken __del__, only
+        // collectable after a forced gc) drain after the conftest/plugin
+        // pytest_unconfigure impls and before the config cleanup stack, like
+        // upstream's own unraisableexception pytest_unconfigure (a builtin
+        // plugin, so called last): a conftest that gc.freeze()s there spares
+        // the session-end gc a full-heap scan, and filters a cleanup would
+        // reset still apply. An error filter propagates them to the top
+        // (exit 1, traceback on stderr).
+        if let Err(err) = python::unraisable_session_cleanup(py) {
+            eprintln!("{}", python::format_exception(py, &err));
+            if code == 0 {
+                code = crate::report::exit_code::TESTS_FAILED;
+            }
+        }
+        if hooks_result.is_ok() {
+            let _ = self.drain_config_cleanups(py);
+        }
         if let Err(err) = python::threadexception_session_cleanup(py) {
             eprintln!("{}", python::format_exception(py, &err));
             // Unlike a thread exception discovered during a test's own
