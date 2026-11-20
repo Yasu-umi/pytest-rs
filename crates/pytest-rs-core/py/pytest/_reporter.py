@@ -134,6 +134,12 @@ def run_makereport(report: Any, node: Any, when: str, exc: Any = None) -> Any:
     result: hookwrappers may enrich the report (pytest-bdd's .scenario) or
     replace it (pytest-rerunfailures' teardown of suspended finalizers)."""
     global _makereport_result
+    # A -n worker never runs setup() (no terminal reporter of its own), so
+    # register the core impl here: without it the `_pytest.runner` fallback
+    # rebuilds the report from `call`, turning a skip-marked test's setup
+    # (no exception) into a pass. Registered last, it answers first.
+    if pluginmanager.getplugin("_core_makereport") is None:
+        pluginmanager.register(_CoreMakeReport(), "_core_makereport")
     # Nothing but the core impls (and no HookRecorder watching): the result
     # is the engine's report, so skip building the CallInfo/ExceptionInfo.
     if not pluginmanager._call_monitors:
