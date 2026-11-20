@@ -519,7 +519,7 @@ dependencies = [
 
 [[package]]
 name = "pytest-rs"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "libc",
  "pytest-rs-anyio",
@@ -533,21 +533,21 @@ dependencies = [
 
 [[package]]
 name = "pytest-rs-anyio"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "pytest-rs-core",
 ]
 
 [[package]]
 name = "pytest-rs-asyncio"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "pytest-rs-core",
 ]
 
 [[package]]
 name = "pytest-rs-benchmark"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "pyo3",
  "pytest-rs-core",
@@ -557,7 +557,7 @@ dependencies = [
 
 [[package]]
 name = "pytest-rs-core"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "clap",
  "glob",
@@ -573,7 +573,7 @@ dependencies = [
 
 [[package]]
 name = "pytest-rs-cov"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "pyo3",
  "pytest-rs-core",
@@ -589,14 +589,14 @@ dependencies = [
 
 [[package]]
 name = "pytest-rs-mock"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "pytest-rs-core",
 ]
 
 [[package]]
 name = "pytest-rs-split"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "pytest-rs-core",
  "serde_json",

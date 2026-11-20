@@ -3,6 +3,59 @@
 Notable changes per release. The release workflow uses the matching section
 as the GitHub release notes (auto-generated notes are the fallback).
 
+## v0.0.15 (2026-11-20)
+
+### Added
+
+- `--disable-warnings` / `--disable-pytest-warnings` (pytest's own option;
+  previously "unrecognized arguments").
+
+### Changed
+
+- **`-n` hands work out as workers free up**, like pytest-xdist's
+  LoadScheduling / LoadScopeScheduling, instead of pre-assigning every batch
+  round-robin. A worker that draws faster tests no longer sits idle while
+  another works through a fixed share. loadscope/loadfile/loadgroup grouping
+  is unchanged.
+- **Faster per-test and session-end overhead**:
+  - the session-end gc runs after `pytest_unconfigure`, once on CPython (as in
+    pytest 9.2), so a conftest that `gc.freeze()`s there no longer pays for a
+    full-heap scan;
+  - logging capture checks its cached logger list in O(1);
+  - hook implementations are cached until the plugin list changes;
+  - FD capture skips reading an empty capture file;
+  - collection dedupes files with a hash set and finds a conftest's
+    `collect_ignore` module without canonicalizing every module path.
+- Under `-q` there is no blank line before the result line, the warnings
+  summary shows at any verbosity, and the PASSES section only heads tests that
+  captured output (and is skipped under `--tb=no`), as in pytest.
+
+### Fixed
+
+- **`-n` with a conftest `pytest_runtest_makereport` hook reported
+  skip-marked tests as passed** (missing from the summary and the junit
+  report).
+- **`-n`: the controller now fires `pytest_runtest_logreport`** (conftest,
+  plugins, reporter) for every worker report, as pytest-xdist does.
+- **A test ending in setup (skip/skipif mark, `xfail(run=False)`) now reports
+  its teardown phase too.**
+- **Rootdir and config file**:
+  - a plugin option's value pointing outside the project (`--durations-path
+    /elsewhere/d.json`) no longer loses the project's `pytest.ini`;
+  - pytest's `determine_setup` fallbacks are now used: a `setup.py` chain,
+    each arg's own chain, no filesystem-root rootdir;
+  - values of pytest's own options (`--basetemp DIR`, `-k EXPR`) are no
+    longer taken as paths;
+  - conftests above the rootdir up to `--confcutdir` load, with session-wide
+    fixtures.
+- A `-p` / entry-point plugin module's `pytest_runtest_logreport` was called
+  twice per report.
+- Parametrize ids escape explicit `pytest.param(id=...)` ids and name `\t`,
+  `\r`, `\n` in bytes values, as pytest does.
+- `-v` and `-q` count into one verbosity level (`addopts = -q` plus `-v` is
+  the default level).
+- `bench/suites.sh` runs again on a reused work-dir.
+
 ## v0.0.14 (2026-11-20)
 
 pytest-rs now targets **pytest 9.2.0**: `pytest.__version__`, `-V`, the session
