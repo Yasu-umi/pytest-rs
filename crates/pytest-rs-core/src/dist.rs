@@ -762,19 +762,19 @@ impl Engine {
                             queue.stop();
                         }
                     }
-                    // Delegated mode: the replacement reporter renders the
-                    // arrival-order progress (xdist drives it the same way).
-                    if self.session.custom_reporter.is_some() {
-                        match crate::python::make_report_proxy(py, &report, None) {
-                            Ok(proxy) => crate::python::reporter_logreport(py, proxy.bind(py)),
-                            Err(err) => {
-                                eprintln!(
-                                    "INTERNAL ERROR: {}",
-                                    crate::python::format_exception(py, &err)
-                                );
-                            }
-                        }
-                    }
+                    // Like xdist's DSession.worker_testreport, every report
+                    // goes through the controller's pytest_runtest_logreport:
+                    // conftest and plugin impls, the HookRecorder, and the
+                    // reporter (a replacement renders the arrival-order
+                    // progress; the default one keeps its stats).
+                    crate::runner::fire_logreport_hooks(
+                        py,
+                        &self.session,
+                        &report,
+                        None,
+                        None,
+                        false,
+                    );
                     reports.push(report);
                 }
                 Event::Extra { plugin, payload } => extras.push((plugin, payload)),
