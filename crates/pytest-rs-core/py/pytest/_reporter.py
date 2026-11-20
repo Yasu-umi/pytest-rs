@@ -134,6 +134,15 @@ def run_makereport(report: Any, node: Any, when: str, exc: Any = None) -> Any:
     result: hookwrappers may enrich the report (pytest-bdd's .scenario) or
     replace it (pytest-rerunfailures' teardown of suspended finalizers)."""
     global _makereport_result
+    # Nothing but the core impls (and no HookRecorder watching): the result
+    # is the engine's report, so skip building the CallInfo/ExceptionInfo.
+    if not pluginmanager._call_monitors:
+        core = tuple(
+            getattr(pluginmanager.getplugin(name), "pytest_runtest_makereport", None)
+            for name in ("_core_makereport", "_pytest.runner")
+        )
+        if all(impl in core for impl in pluginmanager._reversed_impls("pytest_runtest_makereport")):
+            return report
     from _pytest.runner import CallInfo
 
     from pytest._raises import ExceptionInfo

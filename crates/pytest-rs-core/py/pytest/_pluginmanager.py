@@ -53,6 +53,17 @@ def instance_hook_impls(name: str) -> list:
     are included so their hooks fire normally."""
     reporter = pluginmanager.getplugin("terminalreporter")
     logreport_sink = pluginmanager.getplugin("_logreport_sink")
+    # Cached like PluginManager._reversed_impls (until `_plugins` changes).
+    key = (
+        pluginmanager._plugins_version,
+        len(pluginmanager._plugins),
+        id(pluginmanager._plugins),
+        id(reporter),
+        id(logreport_sink),
+    )
+    cached = pluginmanager._impls_cache.get("instance:" + name)
+    if cached is not None and cached[0] == key:
+        return cached[1]
     impls = []
     for plugin in pluginmanager._plugins:
         if plugin is reporter or plugin is logreport_sink:
@@ -64,6 +75,7 @@ def instance_hook_impls(name: str) -> list:
         func = getattr(plugin, name, None)
         if callable(func):
             impls.append(func)
+    pluginmanager._impls_cache["instance:" + name] = (key, impls)
     return impls
 
 
@@ -194,11 +206,7 @@ class HookCaller:
     def __call__(self, **kwargs: Any) -> Any:
         kwargs = self._fix_path_args(kwargs)
         firstresult = self._pm._specs.get(self._name, {}).get("firstresult", False)
-        impls = []
-        for plugin in reversed(self._pm._plugins):
-            func = getattr(plugin, self._name, None)
-            if callable(func):
-                impls.append(func)
+        impls = list(self._pm._reversed_impls(self._name))
         monitors = self._pm._call_monitors
         if monitors:
             return self._call_monitored(monitors, impls, firstresult, kwargs)
@@ -517,6 +525,12 @@ class PluginManager:
         # pytest.skip(allow_module_level=True) while importing; reported by
         # _pytest.config.Config._warn_about_skipped_plugins.
         self.skipped_plugins: list[tuple[str, str]] = []
+        # Bumped whenever `_plugins` changes; keys `_impls_cache` (hook name
+        # -> its implementations, last registered first), so a hook call
+        # does not getattr every plugin each time. Like pluggy, an attribute
+        # added to a plugin after it registered is not picked up.
+        self._plugins_version = 0
+        self._impls_cache: dict[str, tuple[tuple[int, ...], list[Any]]] = {}
         # Core firstresult hookspecs the relay must honor even though no
         # plugin registers them via pytest_addhooks.
         self._specs: dict[str, dict[str, Any]] = {
@@ -801,6 +815,7 @@ class PluginManager:
                 self._warn_legacy_marking(method, attr, "impl")
             self._warn_legacy_path_args(method, attr)
         self._plugins.append(plugin)
+        self._plugins_version += 1
         if name is not None:
             self._names[name] = plugin
         self._notify_plugin_registered(plugin, name)
@@ -821,9 +836,25 @@ class PluginManager:
             plugin = self._names.get(name)
         if plugin in self._plugins:
             self._plugins.remove(plugin)
+            self._plugins_version += 1
         for key in [k for k, v in self._names.items() if v is plugin]:
             del self._names[key]
         return None
+
+    def _reversed_impls(self, name: str) -> list[Any]:
+        """The callables implementing hook `name`, last registered first
+        (cached until `_plugins` changes)."""
+        key = (self._plugins_version, len(self._plugins), id(self._plugins))
+        cached = self._impls_cache.get(name)
+        if cached is not None and cached[0] == key:
+            return cached[1]
+        impls = []
+        for plugin in reversed(self._plugins):
+            func = getattr(plugin, name, None)
+            if callable(func):
+                impls.append(func)
+        self._impls_cache[name] = (key, impls)
+        return impls
 
     def is_registered(self, plugin: Any) -> bool:
         return plugin in self._plugins
