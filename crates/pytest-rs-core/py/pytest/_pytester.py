@@ -479,6 +479,7 @@ def run_inprocess(args, plugins=(), helper_plugin=None, forwarded_filter_marks=(
         _logging.state = old_logging_state
         reprec.finish_recording()
         pluginmanager._plugins[:] = old_pm_plugins
+        pluginmanager._plugins_version += 1
         pluginmanager._names.clear()
         pluginmanager._names.update(old_pm_names)
         pluginmanager._blocked_plugins.clear()
