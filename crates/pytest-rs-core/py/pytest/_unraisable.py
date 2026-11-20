@@ -16,8 +16,10 @@ from typing import NamedTuple
 
 import pytest
 
-#: Constant determined experimentally by the Trio project.
-_GC_COLLECT_ITERATIONS = 5
+#: Session-end gc passes, as in pytest 9.2 (#14441): PyPy can resurrect
+#: objects in __del__ and needs several (5, per the Trio project); CPython
+#: frees cycles in one.
+_GC_COLLECT_ITERATIONS = 5 if sys.implementation.name == "pypy" else 1
 
 _deque = None
 _prev_hook = None
