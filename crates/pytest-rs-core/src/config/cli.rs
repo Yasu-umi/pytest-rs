@@ -622,21 +622,52 @@ impl Config {
                     )
                 }
             } else {
-                let ancestor = common_ancestor(&dirs_from_args(
-                    cwd.as_ref(),
-                    argv,
-                    Self::core_option_takes_value,
-                ));
-                let (rootdir, file_name, ini, ignored, toml_types) = find_ini(&ancestor)?;
-                if file_name.is_none() {
-                    // No config file found anywhere. pytest's determine_setup
-                    // falls back to the common ancestor of the invocation dir
-                    // and the args' ancestor, so e.g. `pytest a a/b` run from
-                    // the parent roots at the invocation dir, not at `a`.
-                    let rootdir = common_ancestor(&[cwd.clone(), ancestor]);
-                    (rootdir, file_name, ini, ignored, HashMap::new())
+                let dirs = dirs_from_args(cwd.as_ref(), argv, Self::core_option_takes_value);
+                let ancestor = common_ancestor(&dirs);
+                let found = find_ini(&ancestor)?;
+                if found.1.is_some() {
+                    found
                 } else {
-                    (rootdir, file_name, ini, ignored, toml_types)
+                    // No config file above the args' common ancestor: pytest's
+                    // determine_setup then tries, unless --rootdir is given,
+                    // a setup.py in the ancestor's chain, then each arg's own
+                    // chain (a plugin option's value, e.g. `--durations-path
+                    // /elsewhere/d.json`, is an arg too and can pull the
+                    // ancestor out of the project); otherwise the common
+                    // ancestor of the invocation dir and the args' ancestor,
+                    // so `pytest a a/b` from the parent roots at the
+                    // invocation dir — unless that is the filesystem root.
+                    let rootdir_given = argv
+                        .iter()
+                        .any(|arg| arg == "--rootdir" || arg.starts_with("--rootdir="));
+                    let setup_py = (!rootdir_given)
+                        .then(|| {
+                            ancestor
+                                .ancestors()
+                                .find(|dir| dir.join("setup.py").is_file())
+                                .map(Path::to_path_buf)
+                        })
+                        .flatten();
+                    let per_arg =
+                        if rootdir_given || setup_py.is_some() || dirs == [ancestor.clone()] {
+                            None
+                        } else {
+                            dirs.iter()
+                                .map(|dir| find_ini(dir))
+                                .find(|found| found.as_ref().map_or(true, |f| f.1.is_some()))
+                                .transpose()?
+                        };
+                    match (setup_py, per_arg) {
+                        (Some(dir), _) => (dir, None, found.2, found.3, HashMap::new()),
+                        (None, Some(per_arg)) => per_arg,
+                        (None, None) => {
+                            let mut rootdir = common_ancestor(&[cwd.clone(), ancestor.clone()]);
+                            if rootdir.parent().is_none() {
+                                rootdir = ancestor;
+                            }
+                            (rootdir, None, found.2, found.3, HashMap::new())
+                        }
+                    }
                 }
             };
 
