@@ -1103,7 +1103,17 @@ impl Config {
         {
             Some(level) if level >= 0 => (level as u8, 0),
             Some(level) => (0, (-level) as u8),
-            None => (matches.get_count("verbose"), matches.get_count("quiet")),
+            // -v and -q count into the same signed level (`addopts = -q`
+            // plus `-v` on the command line is level 0).
+            None => {
+                let level =
+                    i32::from(matches.get_count("verbose")) - i32::from(matches.get_count("quiet"));
+                if level >= 0 {
+                    (level as u8, 0)
+                } else {
+                    (0, (-level) as u8)
+                }
+            }
         };
 
         Ok(Self {
