@@ -358,6 +358,9 @@ pub fn collect_test_files(
     };
 
     let mut files = Vec::new();
+    // The files already collected, for the overlapping-argument check (a
+    // linear `files.contains` made large trees quadratic).
+    let mut seen: std::collections::HashSet<PathBuf> = std::collections::HashSet::new();
     for ra in survivors {
         if ra.is_dir {
             // An explicitly given directory is collected even if it is a
@@ -365,13 +368,14 @@ pub fn collect_test_files(
             collect_dir(
                 &ra.path,
                 files.as_mut(),
+                &mut seen,
                 collect_in_virtualenv,
                 python_files,
                 norecursedirs,
                 ignores,
                 keep_duplicates,
             )?;
-        } else if keep_duplicates || !files.contains(&ra.path) {
+        } else if keep_duplicates || seen.insert(ra.path.clone()) {
             // --keep-duplicates: a file given twice collects twice (pytest
             // keeps duplicated args).
             files.push(ra.path.clone());
@@ -386,9 +390,11 @@ fn in_venv(path: &Path) -> bool {
     path.join("pyvenv.cfg").is_file() || path.join("conda-meta").join("history").is_file()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn collect_dir(
     dir: &Path,
     files: &mut Vec<PathBuf>,
+    seen: &mut std::collections::HashSet<PathBuf>,
     collect_in_virtualenv: bool,
     python_files: &[String],
     norecursedirs: &[String],
@@ -416,6 +422,7 @@ fn collect_dir(
                 collect_dir(
                     &path,
                     files,
+                    seen,
                     collect_in_virtualenv,
                     python_files,
                     norecursedirs,
@@ -425,7 +432,7 @@ fn collect_dir(
             }
         } else if is_test_file(&path, python_files)
             && path.is_file()
-            && (keep_duplicates || !files.contains(&path))
+            && (keep_duplicates || seen.insert(path.clone()))
         {
             // Overlapping arguments ("pytest a a/b") collect each file
             // once; is_file also drops broken symlinks.
