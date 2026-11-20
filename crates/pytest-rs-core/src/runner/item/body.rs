@@ -142,6 +142,30 @@ pub(crate) fn run_one_body(
     let mut fired = 0usize;
     let (xfailed, runxfail) = match evaluate_item_prelude(py, session, config, item) {
         ItemPrelude::Done(mut reports) => {
+            // A skip/xfail(run=False) mark or a mark error ends the item in
+            // setup; pytest still runs (and reports) its teardown phase.
+            if !reports
+                .iter()
+                .any(|r| r.nodeid == item.nodeid && r.phase == Phase::Teardown)
+                && reports
+                    .iter()
+                    .any(|r| r.nodeid == item.nodeid && r.phase == Phase::Setup)
+            {
+                reports.push(TestReport {
+                    nodeid: item.nodeid.clone(),
+                    phase: Phase::Teardown,
+                    outcome: Outcome::Passed,
+                    duration: std::time::Duration::ZERO,
+                    longrepr: None,
+                    location: None,
+                    subtest_desc: None,
+                    sections: Vec::new(),
+                    rerun: false,
+                    xfail_longrepr: None,
+                    reprcrash_message: None,
+                    head_line: None,
+                });
+            }
             fire_makereport(py, session, item, &mut reports, &mut fired);
             return reports;
         }

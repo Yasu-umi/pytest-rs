@@ -96,6 +96,45 @@ impl Config {
         ("pastebin", None),           // "failed"|"all": post session/failure info to bpaste.net
     ];
 
+    /// Whether `arg` is one of pytest's own options that takes a value as
+    /// the next argument (`--basetemp DIR`, `-k EXPR`, ...). The bundled
+    /// xdist options are plugin options upstream, unknown when the rootdir
+    /// is determined, so they are left out.
+    fn core_option_takes_value(arg: &str) -> bool {
+        const XDIST: [&str; 6] = [
+            "numprocesses",
+            "dist",
+            "maxprocesses",
+            "max-worker-restart",
+            "tx",
+            "rsyncdir",
+        ];
+        if let Some(long) = arg.strip_prefix("--") {
+            return !long.contains('=')
+                && (matches!(
+                    long,
+                    "junitxml"
+                        | "junitprefix"
+                        | "lfnf"
+                        | "rootdir"
+                        | "override-ini"
+                        | "pythonwarnings"
+                ) || Self::CORE_VALUES
+                    .iter()
+                    .any(|(name, _)| *name == long && !XDIST.contains(name)));
+        }
+        let mut chars = arg.chars().skip(1);
+        match (chars.next(), chars.next()) {
+            (Some(short), None) => {
+                matches!(short, 'o' | 'W')
+                    || Self::CORE_VALUES
+                        .iter()
+                        .any(|(name, s)| *s == Some(short) && !XDIST.contains(name))
+            }
+            _ => false,
+        }
+    }
+
     /// Bundled-plugin names blocked via `-p no:X`/`--plugin no:X`/`-pno:X`,
     /// scanned from the raw argv (after addopts splicing, before clap parses
     /// it). A blocked plugin's own CLI options must not be registered at
@@ -565,7 +604,11 @@ impl Config {
                     // Not a regular file (--config-file=/dev/null): no
                     // configuration, and the rootdir is not derived from it
                     // (#11502).
-                    let ancestor = common_ancestor(&dirs_from_args(cwd.as_ref(), argv));
+                    let ancestor = common_ancestor(&dirs_from_args(
+                        cwd.as_ref(),
+                        argv,
+                        Self::core_option_takes_value,
+                    ));
                     let mut rootdir = common_ancestor(&[cwd.clone(), ancestor]);
                     if rootdir.parent().is_none() {
                         rootdir = cwd.clone();
@@ -579,7 +622,11 @@ impl Config {
                     )
                 }
             } else {
-                let ancestor = common_ancestor(&dirs_from_args(cwd.as_ref(), argv));
+                let ancestor = common_ancestor(&dirs_from_args(
+                    cwd.as_ref(),
+                    argv,
+                    Self::core_option_takes_value,
+                ));
                 let (rootdir, file_name, ini, ignored, toml_types) = find_ini(&ancestor)?;
                 if file_name.is_none() {
                     // No config file found anywhere. pytest's determine_setup
@@ -1056,7 +1103,17 @@ impl Config {
         {
             Some(level) if level >= 0 => (level as u8, 0),
             Some(level) => (0, (-level) as u8),
-            None => (matches.get_count("verbose"), matches.get_count("quiet")),
+            // -v and -q count into the same signed level (`addopts = -q`
+            // plus `-v` on the command line is level 0).
+            None => {
+                let level =
+                    i32::from(matches.get_count("verbose")) - i32::from(matches.get_count("quiet"));
+                if level >= 0 {
+                    (level as u8, 0)
+                } else {
+                    (0, (-level) as u8)
+                }
+            }
         };
 
         Ok(Self {

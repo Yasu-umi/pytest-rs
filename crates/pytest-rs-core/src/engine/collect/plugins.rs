@@ -137,6 +137,38 @@ impl Engine {
         Ok(())
     }
 
+    /// Where an upward conftest search stops: the rootdir, or a
+    /// `--confcutdir` above it. Upstream walks every ancestor, keeping those
+    /// inside the confcutdir, whose default is the rootdir.
+    pub(crate) fn conftest_search_top(&self, rootdir: &Path) -> PathBuf {
+        let Some(cut) = self.config.get_value("confcutdir") else {
+            return rootdir.to_path_buf();
+        };
+        let cut = Path::new(cut);
+        let cut = if cut.is_absolute() {
+            cut.to_path_buf()
+        } else {
+            self.config.invocation_dir.join(cut)
+        };
+        let cut = cut.canonicalize().unwrap_or(cut);
+        let root = rootdir
+            .canonicalize()
+            .unwrap_or_else(|_| rootdir.to_path_buf());
+        if root != cut && root.starts_with(&cut) {
+            cut
+        } else {
+            rootdir.to_path_buf()
+        }
+    }
+
+    /// Whether two paths name the same directory (symlinks resolved).
+    pub(crate) fn is_same_dir(a: &Path, b: &Path) -> bool {
+        a == b
+            || a.canonicalize()
+                .ok()
+                .is_some_and(|a| b.canonicalize().ok() == Some(a))
+    }
+
     /// Phase 3: enumerate the collection start dirs and the conftest chain to
     /// load (ascending from each start dir up to rootdir).
     pub(crate) fn discover_conftests(
@@ -246,6 +278,7 @@ impl Engine {
             }
         };
 
+        let top = self.conftest_search_top(rootdir);
         let mut conftests: Vec<PathBuf> = Vec::new();
         for start in &start_dirs {
             let mut dir = Some(start.as_path());
@@ -257,7 +290,7 @@ impl Engine {
                         chain.push(conftest);
                     }
                 }
-                if d == rootdir {
+                if d == rootdir && top.as_path() == rootdir || Self::is_same_dir(d, &top) {
                     break;
                 }
                 dir = d.parent();

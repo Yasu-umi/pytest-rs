@@ -84,10 +84,24 @@ pub struct Config {
 
 /// pytest's rootdir-discovery inputs: explicit filesystem path args, falling
 /// back to cwd when no path args exist (mirrors pytest's get_dirs_from_args).
-pub(crate) fn dirs_from_args(cwd: &Path, argv: &[String]) -> Vec<PathBuf> {
+/// The existing paths among the positional args, for the rootdir.
+/// `takes_value(option)` says whether a space-separated option consumes the
+/// next arg (upstream parses the command line with pytest's own options
+/// before determining the rootdir, so their values are not paths; a plugin
+/// option's value still is, as there).
+pub(crate) fn dirs_from_args(
+    cwd: &Path,
+    argv: &[String],
+    takes_value: impl Fn(&str) -> bool,
+) -> Vec<PathBuf> {
     let mut dirs = vec![];
+    let mut skip_value = false;
     for arg in argv.iter().skip(1) {
+        if std::mem::take(&mut skip_value) {
+            continue;
+        }
         if arg.starts_with('-') {
+            skip_value = takes_value(arg);
             continue;
         }
         let candidate = arg.split("::").next().unwrap_or(arg);

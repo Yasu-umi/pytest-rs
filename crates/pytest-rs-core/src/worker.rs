@@ -1088,12 +1088,14 @@ impl Engine {
     ) -> Result<(), String> {
         let mut chain = Vec::new();
         let mut dir = path.parent();
+        let rootdir = self.config.rootdir.clone();
+        let top = self.conftest_search_top(&rootdir);
         while let Some(d) = dir {
             let conftest = d.join("conftest.py");
             if conftest.exists() && !collection.loaded_conftests.contains(&conftest) {
                 chain.push(conftest);
             }
-            if d == self.config.rootdir {
+            if d == rootdir && top == rootdir || Self::is_same_dir(d, &top) {
                 break;
             }
             dir = d.parent();

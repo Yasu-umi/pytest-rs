@@ -601,8 +601,22 @@ pub(crate) fn expand_parametrize(
                     let id_obj = value_set.getattr("id")?;
                     let (spec_id, hidden) = if id_obj.is(&hidden_param) {
                         (None, true)
+                    } else if id_obj.is_none() {
+                        (None, false)
                     } else {
-                        (id_obj.extract::<Option<String>>()?, false)
+                        // Escaped like upstream's make_unique_parameterset_ids
+                        // (`_ascii_escaped_by_config`): "a\nb", not a newline.
+                        let config = crate::python::proxies::existing_py_config(py);
+                        let escaped = py.import("pytest._idmaker")?.call_method1(
+                            "_ascii_escaped_by_config",
+                            (
+                                &id_obj,
+                                config
+                                    .as_ref()
+                                    .map_or_else(|| py.None(), |c| c.clone_ref(py)),
+                            ),
+                        )?;
+                        (Some(escaped.extract::<String>()?), false)
                     };
                     let extra_marks = value_set
                         .getattr("marks")?
