@@ -675,8 +675,21 @@ pub fn collect_conftest(
             None => py.import(module_name.as_str())?,
         }
     };
-    let dir_nodeid = file_nodeid(rootdir, path.parent().unwrap_or(rootdir), initial_paths);
-    let baseid = if dir_nodeid.is_empty() || dir_nodeid == "." {
+    let conftest_dir = path.parent().unwrap_or(rootdir);
+    // A conftest in a directory above the rootdir (reached through a
+    // --confcutdir above it) has no Directory collector, so upstream attaches
+    // its fixtures to the Session (_flush_pending_conftests_to_session).
+    let above_rootdir = {
+        let dir = conftest_dir
+            .canonicalize()
+            .unwrap_or_else(|_| conftest_dir.to_path_buf());
+        let root = rootdir
+            .canonicalize()
+            .unwrap_or_else(|_| rootdir.to_path_buf());
+        dir != root && root.starts_with(&dir)
+    };
+    let dir_nodeid = file_nodeid(rootdir, conftest_dir, initial_paths);
+    let baseid = if above_rootdir || dir_nodeid.is_empty() || dir_nodeid == "." {
         String::new()
     } else {
         format!("{dir_nodeid}/")
