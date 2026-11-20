@@ -78,10 +78,12 @@ enum Event {
 }
 
 /// The shared work queue. Workers block on `next_blocking` until the merge
-/// loop pushes batches (worker-side collection) or until aborted/stopped.
-/// Batches are pre-assigned round-robin to per-worker queues so that
-/// loadscope/loadfile scheduling is stable: each worker works through its
-/// own pre-assigned modules in order (matching upstream xdist behaviour).
+/// loop pushes the work (worker-side collection) or until aborted/stopped.
+/// Like upstream xdist's schedulers, work is handed out as workers free up
+/// (see `DistWork`), so a worker that runs fast tests does not sit idle
+/// while another still holds a fixed share. Each worker also has a private
+/// FIFO, used for `--dist each` (every worker runs every item) and for a
+/// crashed worker's requeued remainder.
 /// Crash bookkeeping lives under the same lock so concurrent crashes resolve
 /// deterministically: a crashed worker requeues its remainder onto its own
 /// slot so the replacement picks it up; the crash that exhausts the restart
@@ -96,9 +98,38 @@ struct WorkQueue {
     ready: Condvar,
 }
 
+/// How the collected items are handed out (the dist mode's scheduler).
+enum DistWork {
+    /// `--dist load`: upstream's LoadScheduling. Every worker first gets a
+    /// chunk of consecutive items (a quarter of its even share, at least 2),
+    /// then each refill takes `max(2, pending / workers / 2)` items from the
+    /// front, so the chunks shrink as the run nears its end.
+    Items {
+        pending: VecDeque<String>,
+        initial_chunk: usize,
+    },
+    /// loadscope/loadfile/loadgroup: upstream's LoadScopeScheduling. One
+    /// work unit (scope group) per worker round-robin, then a second one to
+    /// each worker holding at most 2 tests (#277); the rest go out one unit
+    /// at a time as workers free up.
+    Groups(VecDeque<Vec<String>>),
+    /// Pre-assigned round-robin to the workers' private FIFOs: `--dist each`
+    /// (every worker runs every item), and `--dist load` with fewer than 2
+    /// items per worker (upstream sends them all out one at a time).
+    PerWorker(VecDeque<Vec<String>>),
+}
+
 struct QueueState {
-    /// Per-worker FIFO queues; index by worker index.
+    /// Per-worker FIFO queues; index by worker index. Checked before the
+    /// shared work: `--dist each` batches and crash requeues.
     queues: Vec<VecDeque<Vec<String>>>,
+    /// The shared work (`DistWork::Items`/`Groups`), or empty.
+    shared_items: VecDeque<String>,
+    shared_groups: VecDeque<Vec<String>>,
+    /// Size of each worker's first chunk under `--dist load` (0 otherwise).
+    initial_chunk: usize,
+    /// Whether each worker has already taken its first chunk.
+    started: Vec<bool>,
     aborted: bool,
     /// True once -x/--maxfail fires: workers must not start new batches.
     soft_stopped: bool,
@@ -124,6 +155,10 @@ impl WorkQueue {
             num_workers,
             state: Mutex::new(QueueState {
                 queues: vec![VecDeque::new(); num_workers],
+                shared_items: VecDeque::new(),
+                shared_groups: VecDeque::new(),
+                initial_chunk: 0,
+                started: vec![false; num_workers],
                 aborted: false,
                 soft_stopped: false,
                 restarts,
@@ -133,18 +168,56 @@ impl WorkQueue {
         }
     }
 
-    /// Called by the merge loop once all workers have reported Collection.
-    /// Distributes batches round-robin across per-worker queues (matching
-    /// upstream xdist's pre-assignment order) and wakes all waiters.
-    fn push_batches(&self, batches: VecDeque<Vec<String>>) {
+    /// Called by the merge loop once all workers have reported Collection:
+    /// installs the work and wakes all waiters.
+    fn push_work(&self, work: DistWork) {
         let mut state = self.state.lock().expect("work queue lock poisoned");
         if !state.aborted && !state.soft_stopped {
-            for (i, batch) in batches.into_iter().enumerate() {
-                state.queues[i % self.num_workers].push_back(batch);
+            match work {
+                DistWork::Items {
+                    pending,
+                    initial_chunk,
+                } => {
+                    state.shared_items = pending;
+                    state.initial_chunk = initial_chunk;
+                }
+                DistWork::Groups(mut groups) => {
+                    for queue in &mut state.queues {
+                        if let Some(group) = groups.pop_front() {
+                            queue.push_back(group);
+                        }
+                    }
+                    for queue in &mut state.queues {
+                        let pending: usize = queue.iter().map(Vec::len).sum();
+                        if pending <= 2
+                            && let Some(group) = groups.pop_front()
+                        {
+                            queue.push_back(group);
+                        }
+                    }
+                    state.shared_groups = groups;
+                }
+                DistWork::PerWorker(batches) => {
+                    for (i, batch) in batches.into_iter().enumerate() {
+                        state.queues[i % self.num_workers].push_back(batch);
+                    }
+                }
             }
         }
         state.batches_ready = true;
         self.ready.notify_all();
+    }
+
+    /// The next `--dist load` chunk for `worker_idx` from the shared items.
+    fn take_items(state: &mut QueueState, worker_idx: usize, num_workers: usize) -> Vec<String> {
+        let count = if state.started[worker_idx] {
+            (state.shared_items.len() / num_workers / 2).max(2)
+        } else {
+            state.started[worker_idx] = true;
+            state.initial_chunk
+        };
+        let count = count.min(state.shared_items.len());
+        state.shared_items.drain(..count).collect()
     }
 
     /// Block until batches are available (or the run is stopped/aborted),
@@ -160,7 +233,13 @@ impl WorkQueue {
         if state.aborted || state.soft_stopped {
             return None;
         }
-        state.queues[worker_idx].pop_front()
+        if let Some(batch) = state.queues[worker_idx].pop_front() {
+            return Some(batch);
+        }
+        if !state.shared_items.is_empty() {
+            return Some(Self::take_items(&mut state, worker_idx, self.num_workers));
+        }
+        state.shared_groups.pop_front()
     }
 
     /// -x/--maxfail: stop dispatching new batches; workers finish what
@@ -170,6 +249,8 @@ impl WorkQueue {
         for q in &mut state.queues {
             q.clear();
         }
+        state.shared_items.clear();
+        state.shared_groups.clear();
         state.soft_stopped = true;
         state.batches_ready = true;
         self.ready.notify_all();
@@ -204,6 +285,8 @@ impl WorkQueue {
             for q in &mut state.queues {
                 q.clear();
             }
+            state.shared_items.clear();
+            state.shared_groups.clear();
             state.batches_ready = true;
             self.ready.notify_all();
             CrashAction::Abort
@@ -667,7 +750,7 @@ impl Engine {
                                 nodeid_groups.insert(nodeid.clone(), g.clone());
                             }
                         }
-                        let batches = self.build_dist_batches_from_nodeids(
+                        let work = self.build_dist_work_from_nodeids(
                             &all_nodeids,
                             &all_xdist_groups,
                             workers,
@@ -682,7 +765,7 @@ impl Engine {
                             }
                             println!("{workers} {noun} [{total_items} {item_noun}]");
                         }
-                        queue.push_batches(batches);
+                        queue.push_work(work);
                     }
                 }
                 Event::Report { report, worker } => {
@@ -827,12 +910,12 @@ impl Engine {
 
     /// Partition nodeids (from worker Collections) into work batches for the
     /// active dist mode. Used in the merge loop once all workers have reported.
-    fn build_dist_batches_from_nodeids(
+    fn build_dist_work_from_nodeids(
         &self,
         nodeids: &[String],
         xdist_groups: &[Option<String>],
         workers: usize,
-    ) -> VecDeque<Vec<String>> {
+    ) -> DistWork {
         let dist_mode = self.config.get_value("dist").unwrap_or("load");
         // Plain `load` (no scope/file/group grouping): upstream's initial
         // distribution is round-robin over CHUNKS of consecutive items, not
@@ -844,13 +927,14 @@ impl Engine {
         // worker matters beyond just ordering — splitting them across
         // workers double-runs class-scoped setup/teardown.
         if dist_mode == "load" && workers > 0 {
-            let chunk_size = if nodeids.len() < 2 * workers {
-                1
-            } else {
-                let items_per_node = nodeids.len() / workers;
-                (items_per_node / 4).max(2)
+            if nodeids.len() < 2 * workers {
+                return DistWork::PerWorker(nodeids.iter().map(|n| vec![n.clone()]).collect());
+            }
+            let items_per_node = nodeids.len() / workers;
+            return DistWork::Items {
+                pending: nodeids.iter().cloned().collect(),
+                initial_chunk: (items_per_node / 4).max(2),
             };
-            return nodeids.chunks(chunk_size).map(<[String]>::to_vec).collect();
         }
         let per_module = matches!(dist_mode, "loadscope" | "loadfile" | "loadgroup");
         // Insertion-ordered group-by keyed by scope, not by adjacency in
@@ -897,8 +981,9 @@ impl Engine {
             for _ in 1..workers {
                 batches.extend(base.iter().cloned());
             }
+            return DistWork::PerWorker(batches);
         }
-        batches
+        DistWork::Groups(batches)
     }
 
     /// Called once from the tail of `collect_pre_configure`, before any
