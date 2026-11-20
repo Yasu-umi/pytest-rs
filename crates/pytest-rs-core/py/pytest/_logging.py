@@ -9,6 +9,7 @@ engine drives phases via start_phase()/finish_item().
 
 import contextlib
 import datetime
+import functools
 import io
 import logging
 import os
@@ -41,9 +42,11 @@ class catching_logs:
     #: dict gains an entry or a PlaceHolder in it becomes a Logger; every
     #: phase still reads each one's current `propagate` (like upstream's
     #: per-phase scan) without re-walking and type-checking the whole dict.
-    _logger_cache_size = -1
+    #: A PlaceHolder only becomes a Logger through `Manager.getLogger`, which
+    #: bumps `_logger_generation` when it creates one, so the check is O(1).
+    _logger_generation = 0
+    _logger_cache_key: tuple = ()
     _logger_cache_loggers: list = []
-    _logger_cache_placeholders: list = []
 
     def __init__(self, handler, level=None):
         self.handler = handler
@@ -51,26 +54,39 @@ class catching_logs:
         self.attached_loggers = []
 
     @classmethod
+    def _watch_get_logger(cls):
+        """Wrap `logging.Manager.getLogger` (once per process) to count the
+        Loggers it creates, for `capturing_loggers`' cache key."""
+        original = logging.Manager.getLogger
+        if getattr(original, "_pytest_rs_counts_loggers", False):
+            return
+
+        @functools.wraps(original)
+        def getLogger(self, name):
+            before = self.loggerDict.get(name)
+            logger = original(self, name)
+            if not isinstance(before, logging.Logger):
+                cls._logger_generation += 1
+            return logger
+
+        getLogger._pytest_rs_counts_loggers = True
+        logging.Manager.getLogger = getLogger
+
+    @classmethod
     def capturing_loggers(cls):
         """The root logger plus every non-propagating logger, whose records
         never reach root (pytest 9.2). Misses loggers that *become*
         non-propagating later, like upstream."""
+        cls._watch_get_logger()
         root_logger = logging.getLogger()
         logger_dict = root_logger.manager.loggerDict
-        if len(logger_dict) != cls._logger_cache_size or any(
-            not isinstance(logger_dict.get(name), logging.PlaceHolder)
-            for name in cls._logger_cache_placeholders
-        ):
-            cls._logger_cache_size = len(logger_dict)
+        key = (cls._logger_generation, len(logger_dict), id(logger_dict))
+        if key != cls._logger_cache_key:
+            cls._logger_cache_key = key
             cls._logger_cache_loggers = [
                 logger
                 for logger in logger_dict.values()
                 if isinstance(logger, logging.Logger) and logger is not root_logger
-            ]
-            cls._logger_cache_placeholders = [
-                name
-                for name, logger in logger_dict.items()
-                if isinstance(logger, logging.PlaceHolder)
             ]
         return [root_logger] + [
             logger for logger in cls._logger_cache_loggers if not logger.propagate
