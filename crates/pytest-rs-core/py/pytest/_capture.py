@@ -442,6 +442,10 @@ class FDCapture(FDCaptureBase):
 
     def snap(self):
         self._assert_state("snap", ("started", "suspended"))
+        # Nothing written since the last snap (the usual case): the temp
+        # file is still empty, so skip the seek/read/seek/truncate round.
+        if os.fstat(self.tmpfile.fileno()).st_size == 0:
+            return ""
         self.tmpfile.seek(0)
         res = self.tmpfile.read()
         self.tmpfile.seek(0)
