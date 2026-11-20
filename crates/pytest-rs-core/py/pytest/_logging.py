@@ -37,23 +37,43 @@ class catching_logs:
 
     __slots__ = ("attached_loggers", "handler", "level", "orig_level")
 
+    #: The non-root Logger objects of `loggerDict`, rebuilt only when the
+    #: dict gains an entry or a PlaceHolder in it becomes a Logger; every
+    #: phase still reads each one's current `propagate` (like upstream's
+    #: per-phase scan) without re-walking and type-checking the whole dict.
+    _logger_cache_size = -1
+    _logger_cache_loggers: list = []
+    _logger_cache_placeholders: list = []
+
     def __init__(self, handler, level=None):
         self.handler = handler
         self.level = level
         self.attached_loggers = []
 
-    @staticmethod
-    def capturing_loggers():
+    @classmethod
+    def capturing_loggers(cls):
         """The root logger plus every non-propagating logger, whose records
         never reach root (pytest 9.2). Misses loggers that *become*
         non-propagating later, like upstream."""
         root_logger = logging.getLogger()
+        logger_dict = root_logger.manager.loggerDict
+        if len(logger_dict) != cls._logger_cache_size or any(
+            not isinstance(logger_dict.get(name), logging.PlaceHolder)
+            for name in cls._logger_cache_placeholders
+        ):
+            cls._logger_cache_size = len(logger_dict)
+            cls._logger_cache_loggers = [
+                logger
+                for logger in logger_dict.values()
+                if isinstance(logger, logging.Logger) and logger is not root_logger
+            ]
+            cls._logger_cache_placeholders = [
+                name
+                for name, logger in logger_dict.items()
+                if isinstance(logger, logging.PlaceHolder)
+            ]
         return [root_logger] + [
-            logger
-            for logger in root_logger.manager.loggerDict.values()
-            if isinstance(logger, logging.Logger)
-            and not logger.propagate
-            and logger is not root_logger
+            logger for logger in cls._logger_cache_loggers if not logger.propagate
         ]
 
     def __enter__(self):
