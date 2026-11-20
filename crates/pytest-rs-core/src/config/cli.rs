@@ -11,7 +11,7 @@ impl Config {
     // Core pytest options parsed into flags/values (queried via
     // get_flag/get_value); some are still inert and gain behavior as
     // features land.
-    const CORE_FLAGS: [&str; 34] = [
+    const CORE_FLAGS: [&str; 35] = [
         "fixtures",             // list available fixtures and exit (a la --collect-only)
         "fixtures-per-test",    // list fixtures used by each test and exit
         "loadscope-reorder",    // xdist: reorder loadscope work units by size (default on)
@@ -28,6 +28,7 @@ impl Config {
         "cache-clear",
         "no-header",
         "no-summary",
+        "disable-warnings", // no warnings summary (--disable-pytest-warnings)
         "continue-on-collection-errors",
         "exact-mode", // placeholder; harmless
         "doctest-modules",
@@ -238,6 +239,9 @@ impl Config {
             // --funcargs is upstream's deprecated alias for --fixtures.
             if flag == "fixtures" {
                 arg = arg.alias("funcargs");
+            }
+            if flag == "disable-warnings" {
+                arg = arg.alias("disable-pytest-warnings");
             }
             cmd = cmd.arg(arg);
         }

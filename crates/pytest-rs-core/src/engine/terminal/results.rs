@@ -173,12 +173,18 @@ impl Engine {
                 _ => {}
             }
         }
+        // (w)arnings are on unless --disable-warnings (upstream's getreportopt).
+        if self.config.get_flag("disable-warnings") {
+            chars.retain(|c| c != 'w');
+        } else if !chars.contains('w') {
+            chars.insert(0, 'w');
+        }
         chars
     }
 
     /// -rP/-rA: the PASSES section, passed tests' captured output.
     pub(crate) fn print_passes(&self) {
-        if !self.report_chars().contains('P') {
+        if !self.report_chars().contains('P') || self.config.get_value("tb") == Some("no") {
             return;
         }
         let passed: Vec<_> = self
@@ -193,11 +199,15 @@ impl Engine {
             return;
         }
         println!("{}", center_banner("PASSES"));
+        // Only tests with captured sections get a heading (upstream's
+        // summary_passes_combined); teardown sections follow either way.
         for report in passed {
-            println!("{}", center_named(&Self::failure_title(&report.nodeid)));
-            for (title, text) in &report.sections {
-                println!("{:-^80}", format!(" {title} "));
-                println!("{}", text.trim_end_matches('\n'));
+            if !report.sections.is_empty() {
+                println!("{}", center_named(&Self::failure_title(&report.nodeid)));
+                for (title, text) in &report.sections {
+                    println!("{:-^80}", format!(" {title} "));
+                    println!("{}", text.trim_end_matches('\n'));
+                }
             }
             self.print_teardown_sections(&report.nodeid);
         }

@@ -75,13 +75,16 @@ for name in "${SUITES[@]}"; do
   # are unaffected either way since its binary always shadows site-packages
   # with its embedded shim copy, but the baseline "$PY -m pytest" must be
   # the genuine real pytest.
-  uv venv "$dir/.venv-py" --python "$PYVER" >/dev/null 2>&1
-  uv venv "$dir/.venv-rs" --python "$PYVER" >/dev/null 2>&1
+  # --clear: a reused <work-dir> already has these venvs, and `uv venv` refuses
+  # an existing one (the run used to stop there silently under `set -e`).
+  # Errors stay on stderr so a failed setup is visible.
+  uv venv -q --clear "$dir/.venv-py" --python "$PYVER" >/dev/null
+  uv venv -q --clear "$dir/.venv-rs" --python "$PYVER" >/dev/null
   # pytest 9.2.0 = the version pytest-rs reproduces; xdist for real's `-n` baseline.
-  uv pip install -q --python "$dir/.venv-py/bin/python" "pytest==9.2.0" pytest-cov pytest-xdist -e "$dir" $extra >/dev/null 2>&1
+  uv pip install -q --python "$dir/.venv-py/bin/python" "pytest==9.2.0" pytest-cov pytest-xdist -e "$dir" $extra >/dev/null
   # Install pytest-rs the same way a user does, into its own venv, so it self-locates.
   # Editable install keeps the suite's source in-tree (so the cov path resolves).
-  uv pip install -q --python "$dir/.venv-rs/bin/python" "$RS_SPEC" -e "$dir" $extra >/dev/null 2>&1
+  uv pip install -q --python "$dir/.venv-rs/bin/python" "$RS_SPEC" -e "$dir" $extra >/dev/null
   PY="$dir/.venv-py/bin/python"; RS="$dir/.venv-rs/bin/pytest-rs"
   CFLAGS="-q -p no:cacheprovider -p no:randomly"
   # "N/M tests collected (K deselected)" when the suite deselects: count the N that run.
