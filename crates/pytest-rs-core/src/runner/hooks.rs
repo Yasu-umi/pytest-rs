@@ -19,11 +19,16 @@ pub(crate) fn fire_logreport_hooks(
     item: Option<&TestItem>,
     protocol_delegated: bool,
 ) {
+    // Conftest impls only: a third-party plugin module's impl (entry point
+    // or `-p`, tagged with plugin_module) is dispatched through the shim
+    // pluginmanager by reporter_logreport below — taking it here too called
+    // it twice per report.
     let funcs: Vec<Py<PyAny>> = session
         .py_hooks
         .iter()
         .filter(|hook| {
             hook.name == "pytest_runtest_logreport"
+                && hook.plugin_module.is_none()
                 && report.nodeid.starts_with(hook.baseid.as_str())
         })
         .map(|hook| hook.func.clone_ref(py))
