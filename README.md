@@ -145,6 +145,17 @@ Benchmarks on open-source projects (macOS arm64, median of 3 warm runs), reprodu
 | networkx (6890) | `-n 3 --cov` | 36.84 s | 15.48 s | **2.4x** |
 <!-- perf-results:end -->
 
+On a large application suite (~45,000 tests, database-backed, Python 3.15 in a Linux container on a local filesystem; wall-clock medians of interleaved runs, seconds):
+
+| run | pytest 9.2 | pytest-rs 0.0.14 | pytest-rs 0.0.15 |
+|---|---:|---:|---:|
+| startup (collect one file) | 3.60 | 2.71 | **2.67** |
+| collect all tests | 16.6 | 14.0 | **11.0** |
+| `-n auto`, all tests | 104.9 | 80.8 | **64.3** |
+| serial, all tests | 234.9 | 231.1 | **208.0** |
+| CI-style 8 shards with `--cov`, serial: slowest shard / sum | 53.9 / 414 | 53.0 / 407 | **47.8 / 360** |
+| CI-style 8 shards with `--cov`, `-n 2`: slowest shard / sum | — | 44.7 / 326 | **32.5 / 247** |
+
 Small-to-medium suites see a **1.3–1.4x** speedup even without coverage, thanks to lower startup overhead. On large suites where test bodies dominate, the plain-mode gap narrows; the bigger wins come from `--cov` and `-n` parallelism. Try it on your own suite:
 
 ```sh
