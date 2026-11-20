@@ -141,17 +141,18 @@ pub(crate) fn id_for_value(value: &Bound<'_, PyAny>, argname: &str, index: usize
         return ascii_escaped_str(value, s);
     }
     // bytes: ascii_escaped = decode("ascii", "backslashreplace") with
-    // non-printables escaped.
+    // non-printables escaped (\t, \r and \n by name, like upstream's
+    // translate table).
     if let Ok(bytes) = value.cast::<pyo3::types::PyBytes>() {
         return bytes
             .as_bytes()
             .iter()
-            .map(|&b| {
-                if matches!(b, 0x20..=0x7e) {
-                    (b as char).to_string()
-                } else {
-                    format!("\\x{b:02x}")
-                }
+            .map(|&b| match b {
+                b'\t' => "\\t".to_string(),
+                b'\r' => "\\r".to_string(),
+                b'\n' => "\\n".to_string(),
+                0x20..=0x7e => (b as char).to_string(),
+                _ => format!("\\x{b:02x}"),
             })
             .collect();
     }
