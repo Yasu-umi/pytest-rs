@@ -1084,23 +1084,33 @@ pub fn extract_collect_ignores(
     let Ok(sys_modules) = py.import("sys").and_then(|s| s.getattr("modules")) else {
         return (Vec::new(), Vec::new());
     };
-    // Find the conftest module by matching __file__
+    // Find the conftest module by matching __file__: the exact path first,
+    // then (only among modules whose file is a conftest.py) the resolved
+    // one — canonicalizing every module's file per conftest made this a
+    // realpath per module per conftest.
     let module = {
-        let mut found = None;
+        let mut files: Vec<(Bound<'_, PyAny>, String)> = Vec::new();
         if let Ok(values) = sys_modules.call_method0("values") {
             for m in values.try_iter().into_iter().flatten().flatten() {
                 if let Ok(file_attr) = m.getattr("__file__")
                     && let Ok(file_str) = file_attr.extract::<String>()
                 {
-                    let canon = std::fs::canonicalize(&file_str)
-                        .unwrap_or_else(|_| std::path::PathBuf::from(&file_str));
-                    if canon == conftest_canonical || file_str == conftest_str.as_ref() {
-                        found = Some(m);
-                        break;
-                    }
+                    files.push((m, file_str));
                 }
             }
         }
+        let exact = files
+            .iter()
+            .position(|(_, file)| file == conftest_str.as_ref());
+        let found = exact
+            .or_else(|| {
+                files.iter().position(|(_, file)| {
+                    Path::new(file).file_name() == conftest_path.file_name()
+                        && std::fs::canonicalize(file)
+                            .is_ok_and(|canon| canon == conftest_canonical)
+                })
+            })
+            .map(|index| files.swap_remove(index).0);
         match found {
             Some(m) => m,
             None => return (Vec::new(), Vec::new()),
