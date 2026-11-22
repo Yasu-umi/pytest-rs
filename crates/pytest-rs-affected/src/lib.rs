@@ -10,12 +10,14 @@ mod config;
 mod data;
 mod git;
 mod imports;
+mod names;
 mod selection;
 mod snapshot;
 mod units;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::sync::Mutex;
 
 use pyo3::prelude::*;
@@ -26,10 +28,13 @@ use pytest_rs_core::report::Outcome;
 use pytest_rs_core::session::{PendingFinalizer, ScopedSetup};
 
 use crate::collector::{AffectedCollector, InputKind, Recording};
-use crate::config::{AffectedConfig, BUILTIN_FULL_RUN_ON, BUILTIN_IGNORE, Globs, Incomplete};
+use crate::config::{
+    AffectedConfig, BUILTIN_FULL_RUN_ON, BUILTIN_IGNORE, Globs, ImportTime, Incomplete,
+};
 use crate::data::{Data, Dep, FileEntry, FileRecord, Header, LoadError, SnapEntry, TestEntry};
 use crate::git::{Git, Unchanged};
 use crate::imports::StaticImports;
+use crate::names::{Closure, ModuleKind, ModuleMap, Narrower};
 use crate::selection::{Plan, Reason};
 use crate::snapshot::Snapshot;
 use crate::units::{CHECKSUM_SCHEME, FILE_UNIT, FileUnits, MODULE_UNIT};
@@ -1286,6 +1291,7 @@ impl AffectedPlugin {
             .map(|d| d.as_millis() as u64)
             .unwrap_or(0);
         let mut recorded = 0usize;
+        let mut recorded_tests: Vec<u32> = Vec::new();
         for nodeid in &state.to_run {
             let Some(&(failed, duration)) = outcomes.get(nodeid.as_str()) else {
                 continue;
@@ -1331,6 +1337,7 @@ impl AffectedPlugin {
                     recorded: now,
                 },
             );
+            recorded_tests.push(id);
             recorded += 1;
         }
         // Test files imported this session: what they collected and the
@@ -1340,6 +1347,7 @@ impl AffectedPlugin {
             .keys()
             .chain(state.file_nodeids.keys())
             .collect();
+        let mut recorded_files: Vec<u32> = Vec::new();
         for path in imported {
             // The file's whole content: a test added to it changes no unit
             // an existing test depends on, but must be collected.
@@ -1380,6 +1388,18 @@ impl AffectedPlugin {
                     recorded: now,
                 },
             );
+            recorded_files.push(id);
+        }
+        if state.config.import_time == ImportTime::Names {
+            Self::narrow_recorded(
+                state,
+                ctx.py,
+                &recording,
+                &mut data,
+                end.as_ref(),
+                &recorded_tests,
+                &recorded_files,
+            );
         }
         data.global_incomplete = incomplete_contexts.contains(&GLOBAL_CONTEXT);
         data.snapshot = match state.snapshot.take() {
@@ -1389,6 +1409,280 @@ impl AffectedPlugin {
         let ran: HashSet<String> = state.to_run.iter().cloned().collect();
         Self::drop_stale(state, &mut data, &ran);
         (data, recorded)
+    }
+
+    /// `import_time = "names"`: how this session's modules map to files.
+    fn module_map(state: &State, py: Python<'_>) -> ModuleMap {
+        let mut map = ModuleMap::default();
+        let Ok(items) = py
+            .import("sys")
+            .and_then(|sys| sys.getattr("modules"))
+            .and_then(|m| m.call_method0("copy"))
+            .and_then(|m| m.call_method0("items"))
+            .and_then(|items| items.try_iter())
+        else {
+            return map;
+        };
+        let third_party = |path: &str| {
+            path.split(['/', '\\'])
+                .any(|p| p == "site-packages" || p == "dist-packages")
+        };
+        for item in items.flatten() {
+            let Ok((name, module)) = item.extract::<(String, Bound<'_, PyAny>)>() else {
+                continue;
+            };
+            let file = module
+                .getattr("__file__")
+                .ok()
+                .and_then(|f| f.extract::<String>().ok());
+            let kind = match file {
+                Some(file) => match Self::rel(&state.rootdir, Path::new(&file)) {
+                    Some(rel) if rel.ends_with(".py") && !third_party(&rel) => {
+                        map.names.entry(rel.clone()).or_insert_with(|| name.clone());
+                        ModuleKind::Project(rel)
+                    }
+                    _ => ModuleKind::External {
+                        third_party: third_party(&file),
+                    },
+                },
+                None => {
+                    let in_project = module
+                        .getattr("__path__")
+                        .ok()
+                        .and_then(|p| p.try_iter().ok())
+                        .is_some_and(|entries| {
+                            entries.flatten().any(|entry| {
+                                entry.extract::<String>().is_ok_and(|e| {
+                                    Self::rel(&state.rootdir, Path::new(&e))
+                                        .is_some_and(|rel| !third_party(&rel))
+                                })
+                            })
+                        });
+                    if in_project {
+                        ModuleKind::Namespace
+                    } else {
+                        ModuleKind::External { third_party: false }
+                    }
+                }
+            };
+            map.modules.insert(name, kind);
+        }
+        map
+    }
+
+    /// `import_time = "names"`: replace the dependencies of the tests and
+    /// test files recorded this session on whole module and class units of
+    /// project modules with the name units their code reaches.
+    #[allow(clippy::too_many_arguments)]
+    fn narrow_recorded(
+        state: &State,
+        py: Python<'_>,
+        recording: &Recording,
+        data: &mut Data,
+        end: Option<&(String, HashSet<String>)>,
+        tests: &[u32],
+        files: &[u32],
+    ) {
+        let map = Self::module_map(state, py);
+        let builtins: HashSet<String> = py
+            .import("builtins")
+            .and_then(|b| b.dir())
+            .map(|names| names.iter().filter_map(|n| n.extract().ok()).collect())
+            .unwrap_or_default();
+        let seen: HashMap<&str, &Option<Vec<u8>>> = recording
+            .files
+            .iter()
+            .map(|(abs, content)| (abs.as_str(), content))
+            .collect();
+        let load = |rel: &str| -> Option<String> {
+            let abs = state.rootdir.join(rel);
+            match seen.get(abs.to_str()?) {
+                Some(Some(bytes)) => String::from_utf8(bytes.clone()).ok(),
+                _ => std::fs::read_to_string(&abs).ok(),
+            }
+        };
+        let test_files: HashSet<String> = state
+            .collect_contexts
+            .keys()
+            .chain(state.file_nodeids.keys())
+            .cloned()
+            .chain(state.runs.values().map(|run| run.path.clone()))
+            .chain(
+                data.tests
+                    .values()
+                    .map(|entry| data.strings.resolve(entry.path).to_string()),
+            )
+            .collect();
+        let narrowable = |rel: &str| {
+            !test_files.contains(rel)
+                && rel.rsplit('/').next() != Some("conftest.py")
+                && !state.config.always_changed.matches(rel)
+        };
+        let mut narrower = Narrower::new(map, builtins, &load, &narrowable);
+        let pairs = |groups: &[u32], data: &Data| -> BTreeSet<(String, String)> {
+            groups
+                .iter()
+                .flat_map(|g| data.group(*g).iter())
+                .map(|dep| {
+                    (
+                        data.strings.resolve(dep.file).to_string(),
+                        data.strings.resolve(dep.qualname).to_string(),
+                    )
+                })
+                .collect()
+        };
+        let as_refs = |deps: &BTreeSet<(String, String)>| -> Vec<(String, String)> {
+            deps.iter().cloned().collect()
+        };
+        // The groups every entry has (the global context, mostly): their
+        // closure is computed once and stored as one shared group.
+        let keys: Vec<Vec<u32>> = tests
+            .iter()
+            .map(|id| data.tests[id].groups.clone())
+            .chain(files.iter().map(|id| data.file_records[id].groups.clone()))
+            .collect();
+        let common: Vec<u32> = keys
+            .iter()
+            .map(|groups| groups.iter().copied().collect::<BTreeSet<u32>>())
+            .reduce(|a, b| a.intersection(&b).copied().collect())
+            .unwrap_or_default()
+            .into_iter()
+            .collect();
+        let mut base = Closure::default();
+        let base_deps = as_refs(&pairs(&common, data));
+        let base_refs: Vec<(&str, &str)> = base_deps
+            .iter()
+            .map(|(f, q)| (f.as_str(), q.as_str()))
+            .collect();
+        narrower.extend(&mut base, &base_refs);
+        let add_units = |narrower: &mut Narrower,
+                         units: Vec<(String, String, u64)>,
+                         data: &mut Data|
+         -> Option<u32> {
+            let mut added: Vec<Dep> = Vec::new();
+            for (rel, qualname, checksum) in units {
+                let file = data.strings.intern(&rel);
+                if !data.files.contains_key(&file)
+                    && let Some(info) = narrower.info(&rel)
+                    && let Some(source) = load(&rel)
+                {
+                    let mut units: Vec<(u32, u64)> = info
+                        .units
+                        .iter()
+                        .map(|(q, c)| (data.strings.intern(q), *c))
+                        .collect();
+                    units.sort_unstable();
+                    let commit = Self::commit_for(state, end, data, &rel);
+                    data.files.insert(
+                        file,
+                        FileEntry {
+                            content_hash: FileUnits::content_hash(source.as_bytes()),
+                            units: Some(units),
+                            commit,
+                        },
+                    );
+                }
+                added.push(Dep {
+                    file,
+                    qualname: data.strings.intern(&qualname),
+                    checksum,
+                });
+            }
+            (!added.is_empty()).then(|| data.add_group(added))
+        };
+        let base_units = narrower.units(&base);
+        let base = Rc::new(base);
+        let base_group = add_units(&mut narrower, base_units, data);
+
+        let mut filtered: HashMap<u32, Option<u32>> = HashMap::new();
+        let mut done: HashMap<Vec<u32>, Vec<u32>> = HashMap::new();
+        let common_set: HashSet<u32> = common.iter().copied().collect();
+        // Groups shared by several entries (a test file's import and the
+        // modules it reaches, for its tests): a middle layer, computed once
+        // per combination.
+        let mut uses: HashMap<u32, usize> = HashMap::new();
+        for groups in &keys {
+            for group in groups.iter().collect::<BTreeSet<_>>() {
+                *uses.entry(*group).or_default() += 1;
+            }
+        }
+        let mut middles: HashMap<Vec<u32>, (Rc<Closure>, Option<u32>)> = HashMap::new();
+        let mut narrow = |groups: &[u32], data: &mut Data| -> Vec<u32> {
+            let mut key = groups.to_vec();
+            key.sort_unstable();
+            key.dedup();
+            if let Some(result) = done.get(&key) {
+                return result.clone();
+            }
+            let (shared, own): (Vec<u32>, Vec<u32>) = key
+                .iter()
+                .copied()
+                .filter(|g| !common_set.contains(g))
+                .partition(|g| uses.get(g).copied().unwrap_or(0) > 1);
+            let (middle, middle_group) = match middles.get(&shared) {
+                Some(done) => done.clone(),
+                None => {
+                    let deps = as_refs(&pairs(&shared, data));
+                    let refs: Vec<(&str, &str)> =
+                        deps.iter().map(|(f, q)| (f.as_str(), q.as_str())).collect();
+                    let mut closure = Closure::on(base.clone());
+                    narrower.extend(&mut closure, &refs);
+                    let units = narrower.units(&closure);
+                    let entry = (Rc::new(closure), add_units(&mut narrower, units, data));
+                    middles.insert(shared.clone(), entry.clone());
+                    entry
+                }
+            };
+            let deps = as_refs(&pairs(&own, data));
+            let refs: Vec<(&str, &str)> =
+                deps.iter().map(|(f, q)| (f.as_str(), q.as_str())).collect();
+            let mut closure = Closure::on(middle);
+            narrower.extend(&mut closure, &refs);
+            let delta = narrower.units(&closure);
+            let mut result: Vec<u32> = Vec::new();
+            result.extend(middle_group);
+            for &group in &key {
+                let kept = *filtered.entry(group).or_insert_with(|| {
+                    let all = data.group(group).to_vec();
+                    let kept: Vec<Dep> = all
+                        .iter()
+                        .copied()
+                        .filter(|dep| {
+                            !narrower.drops(
+                                data.strings.resolve(dep.file),
+                                data.strings.resolve(dep.qualname),
+                            )
+                        })
+                        .collect();
+                    if kept.len() == all.len() {
+                        Some(group)
+                    } else if kept.is_empty() {
+                        None
+                    } else {
+                        Some(data.add_group(kept))
+                    }
+                });
+                result.extend(kept);
+            }
+            result.extend(base_group);
+            result.extend(add_units(&mut narrower, delta, data));
+            done.insert(key, result.clone());
+            result
+        };
+        for id in tests {
+            let groups = data.tests[id].groups.clone();
+            let narrowed = narrow(&groups, data);
+            if let Some(entry) = data.tests.get_mut(id) {
+                entry.groups = narrowed;
+            }
+        }
+        for id in files {
+            let groups = data.file_records[id].groups.clone();
+            let narrowed = narrow(&groups, data);
+            if let Some(entry) = data.file_records.get_mut(id) {
+                entry.groups = narrowed;
+            }
+        }
     }
 
     /// Before writing: drop the entries tests a file_triggers entry forced

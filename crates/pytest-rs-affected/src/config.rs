@@ -124,6 +124,16 @@ pub enum Incomplete {
     Trust,
 }
 
+/// `import_time`: what a test depends on in the import-time code (module
+/// and class bodies) of the modules it reaches.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImportTime {
+    /// All of it.
+    Module,
+    /// The statements binding the names its code reaches (`crate::names`).
+    Names,
+}
+
 #[derive(Debug, Clone)]
 pub struct AffectedConfig {
     pub full_run_on: Globs,
@@ -138,6 +148,7 @@ pub struct AffectedConfig {
     /// not depend on it).
     pub file_triggers: Vec<(Globs, Trigger)>,
     pub incomplete: Incomplete,
+    pub import_time: ImportTime,
 }
 
 impl Default for AffectedConfig {
@@ -150,6 +161,7 @@ impl Default for AffectedConfig {
             ignore: Globs::builtin(&[]),
             file_triggers: Vec::new(),
             incomplete: Incomplete::Run,
+            import_time: ImportTime::Module,
         }
     }
 }
@@ -192,6 +204,7 @@ impl AffectedConfig {
             "ignore",
             "file_triggers",
             "incomplete",
+            "import_time",
         ];
         if let Some(unknown) = table.keys().find(|k| !known.contains(&k.as_str())) {
             return Err(format!(
@@ -232,6 +245,15 @@ impl AffectedConfig {
             _ => {
                 return Err(
                     "[tool.pytest-rs.affected] incomplete must be \"run\" or \"trust\"".into(),
+                );
+            }
+        };
+        let import_time = match table.get("import_time").map(|v| v.as_str()) {
+            None | Some(Some("module")) => ImportTime::Module,
+            Some(Some("names")) => ImportTime::Names,
+            _ => {
+                return Err(
+                    "[tool.pytest-rs.affected] import_time must be \"module\" or \"names\"".into(),
                 );
             }
         };
@@ -279,6 +301,7 @@ impl AffectedConfig {
             ignore: list("ignore")?,
             file_triggers,
             incomplete,
+            import_time,
         })
     }
 }
@@ -329,6 +352,7 @@ always_run = ["tests/smoke/**"]
 ignore = ["docs/**"]
 
 incomplete = "trust"
+import_time = "names"
 
 [tool.pytest-rs.affected.file_triggers]
 "migrations/**" = ["tests/db/**"]
@@ -338,6 +362,7 @@ incomplete = "trust"
         )
         .expect("parses");
         assert_eq!(config.incomplete, Incomplete::Trust);
+        assert_eq!(config.import_time, ImportTime::Names);
         assert!(matches!(
             config.triggers_for("migrations/0001.py")[..],
             [Trigger::Tests(globs)] if globs.matches("tests/db/test_x.py")
@@ -362,6 +387,7 @@ incomplete = "trust"
     fn missing_table_is_default() {
         let config = AffectedConfig::parse("[tool.other]\nx = 1\n").expect("parses");
         assert_eq!(config.unknown_files, UnknownFiles::Ignore);
+        assert_eq!(config.import_time, ImportTime::Module);
         assert!(!config.ignore.matches("anything"));
     }
 
@@ -373,6 +399,9 @@ incomplete = "trust"
             AffectedConfig::parse("[tool.pytest-rs.affected]\nunknown_files = \"some\"\n").is_err()
         );
         assert!(AffectedConfig::parse("[tool.pytest-rs.affected]\nincomplete = \"x\"\n").is_err());
+        assert!(
+            AffectedConfig::parse("[tool.pytest-rs.affected]\nimport_time = \"lines\"\n").is_err()
+        );
         assert!(
             AffectedConfig::parse("[tool.pytest-rs.affected.file_triggers]\n\"a/**\" = 1\n")
                 .is_err()

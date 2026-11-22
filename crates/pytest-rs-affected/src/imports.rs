@@ -72,7 +72,7 @@ impl StaticImports {
         (1..=parts.len()).map(|n| parts[..n].join(".")).collect()
     }
 
-    fn resolve_from(
+    pub(crate) fn resolve_from(
         node: &ast::StmtImportFrom,
         module: Option<&str>,
         is_package: bool,
