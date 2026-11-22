@@ -248,7 +248,17 @@ impl Engine {
             }
             return exit_code::INTERNAL_ERROR;
         }
-        if let Err(err) = self.fire_collection_modifyitems(py) {
+        // A -n controller collects nothing (upstream xdist's DSession takes
+        // over pytest_collection), so pytest_collection_modifyitems fires in
+        // each worker, with its items, and never in the controller.
+        #[cfg(feature = "xdist")]
+        let dist_controller =
+            !self.config.collect_only && self.session.dist_workers_resolved.flatten().is_some();
+        #[cfg(not(feature = "xdist"))]
+        let dist_controller = false;
+        if dist_controller {
+            // Nothing to modify: the controller has no items.
+        } else if let Err(err) = self.fire_collection_modifyitems(py) {
             if python::is_usage_error(py, &err) {
                 // Upstream's wrap_session still fires pytest_sessionfinish
                 // when a pytest_collection_modifyitems hookimpl raises
@@ -308,11 +318,6 @@ impl Engine {
         // final item set (sugar's progress total comes from here). A -n
         // controller collects nothing (upstream xdist's DSession returns True
         // from pytest_collection), so the hook fires on each worker instead.
-        #[cfg(feature = "xdist")]
-        let dist_controller =
-            !self.config.collect_only && self.session.dist_workers_resolved.flatten().is_some();
-        #[cfg(not(feature = "xdist"))]
-        let dist_controller = false;
         if dist_controller {
             if let Err(err) = python::set_session_items(py, &self.session.items) {
                 eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
