@@ -84,7 +84,7 @@ At build time, when installing from source — bundled plugins are Cargo feature
 config-settings-package = { pytest-rs = { build-args = "--no-default-features --features asyncio,mock" } }
 ```
 
-`--split-by-file` (pytest-rs only, off by default) makes `--splits`/`--group` assign whole test files before importing them, so each group — and each `-n` worker in it — imports and collects only its own files. It changes which tests land in which group; see [docs/split-by-file.md](docs/split-by-file.md).
+`--splitting-granularity=file` (pytest-rs only; the default is `test`) makes `--splits`/`--group` assign whole test files before importing them, so each group — and each `-n` worker in it — imports and collects only its own files. It changes which tests land in which group, and defaults `--splitting-algorithm` to `least_duration`; see [docs/splitting-granularity.md](docs/splitting-granularity.md).
 
 #### Type annotations
 

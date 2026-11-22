@@ -31,7 +31,7 @@ pub struct SplitPlugin {
     durations_path: PathBuf,
     cached_durations: HashMap<String, f64>,
     split_by_file: bool,
-    /// `--split-by-file`: each scanned test file's group (0-based) and this
+    /// `--splitting-granularity=file`: each scanned test file's group (0-based) and this
     /// group's estimated duration, set before import by
     /// `pytest_collection_select_files`.
     file_groups: Option<(HashMap<String, usize>, f64)>,
@@ -74,7 +74,7 @@ impl SplitPlugin {
         }
     }
 
-    /// `--split-by-file`: items of the files this group imported stay,
+    /// `--splitting-granularity=file`: items of the files this group imported stay,
     /// items of another group's files go, and items of files outside the
     /// scan (doctest modules, custom collectors; every group collects the
     /// same set of them) are split per item. Returns the kept indices and
@@ -172,10 +172,13 @@ impl Plugin for SplitPlugin {
             "Path to the file in which durations are (to be) stored, \
              default is .test_durations in the current working directory",
         ));
-        parser.add_option(OptDef::flag(
-            "--split-by-file",
-            "Split whole test files instead of tests, before importing them, so \
-             each group imports and collects only its own files (pytest-rs only)",
+        parser.add_option(OptDef::value(
+            "--splitting-granularity",
+            Some("test"),
+            "Unit of splitting (pytest-rs only). Choices: ['test', 'file']. \
+             'file' assigns whole test files before importing them, so each group \
+             imports and collects only its own files; its default \
+             --splitting-algorithm is least_duration",
         ));
         parser.add_option(OptDef::flag(
             "--clean-durations",
@@ -188,11 +191,36 @@ impl Plugin for SplitPlugin {
         let py = ctx.py;
 
         // Choice validation first (argparse rejects at parse time upstream).
-        self.algorithm = match ctx
+        self.split_by_file = match ctx
             .config
-            .get_value("splitting-algorithm")
-            .unwrap_or("duration_based_chunks")
+            .get_value("splitting-granularity")
+            .unwrap_or("test")
         {
+            "test" => false,
+            "file" => true,
+            other => {
+                return Err(pytest_rs_core::python::usage_error(
+                    py,
+                    &format!(
+                        "argument --splitting-granularity: invalid choice: '{other}' \
+                         (choose from 'test', 'file')"
+                    ),
+                ));
+            }
+        };
+        // Whole files balance poorly as contiguous chunks, so file
+        // granularity defaults to least_duration; an explicit
+        // --splitting-algorithm (CLI or addopts) still wins.
+        let algorithm_given =
+            ctx.config.effective_args.iter().any(|arg| {
+                arg == "--splitting-algorithm" || arg.starts_with("--splitting-algorithm=")
+            });
+        let algorithm = match ctx.config.get_value("splitting-algorithm") {
+            Some(given) if algorithm_given => given,
+            _ if self.split_by_file => "least_duration",
+            _ => "duration_based_chunks",
+        };
+        self.algorithm = match algorithm {
             "duration_based_chunks" => Algorithm::DurationBasedChunks,
             "least_duration" => Algorithm::LeastDuration,
             other => {
@@ -247,7 +275,6 @@ impl Plugin for SplitPlugin {
 
         self.store_durations = ctx.config.get_flag("store-durations");
         self.clean_durations = ctx.config.get_flag("clean-durations");
-        self.split_by_file = ctx.config.get_flag("split-by-file");
         self.durations_path = match ctx.config.get_value("durations-path") {
             Some(path) => PathBuf::from(path),
             None => ctx.config.rootdir.join(".test_durations"),

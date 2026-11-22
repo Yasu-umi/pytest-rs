@@ -1,11 +1,12 @@
-"""Regression test: pytest-split's group assignment, with and without --split-by-file.
+"""Regression test: pytest-split's group assignment per --splitting-granularity.
 
-The default --splits/--group assignment is per test and happens after
-collection; the expected groups below were recorded with the build before
---split-by-file existed and must not change. With --split-by-file, whole
-files are assigned before import: each group (and each -n worker of it)
-imports only its own files, and the groups still partition the suite.
-See docs/split-by-file.md.
+The default (test) granularity assigns tests after collection; the expected
+groups below were recorded with the build before --splitting-granularity
+existed and must not change. With --splitting-granularity=file, whole files
+are assigned before import: each group (and each -n worker of it) imports
+only its own files, the groups still partition the suite, and the algorithm
+defaults to least_duration unless --splitting-algorithm is given.
+See docs/splitting-granularity.md.
 """
 
 from __future__ import annotations
@@ -45,7 +46,7 @@ DURATIONS = {
     ]
 }
 
-# Recorded before --split-by-file existed (per-test assignment).
+# Recorded before --splitting-granularity existed (per-test assignment).
 DEFAULT = {
     ("duration_based_chunks", 1): "sub/test_s.py::test_a[0] sub/test_s.py::test_a[1] "
     "sub/test_s.py::test_b test_m1.py::test_a[0] test_m1.py::test_b test_m2.py::test_a[0] "
@@ -66,7 +67,7 @@ DEFAULT = {
     "test_m5.py::test_a[2]",
 }
 
-# --split-by-file. File durations: m1 0.6, m2 2.1, m3 4.6, m4 8.1, m5 12.6,
+# --splitting-granularity=file. File durations: m1 0.6, m2 2.1, m3 4.6, m4 8.1, m5 12.6,
 # sub/test_s.py the average of those, 5.6. least_duration places the longest
 # file first into the shortest group; duration_based_chunks cuts the files in
 # collection order, which with few long files can leave a group empty.
@@ -80,16 +81,18 @@ BY_FILE = {
 }
 
 
-class TestSplitByFile(unittest.TestCase):
+class TestSplittingGranularity(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         if not BINARY.exists():
             raise unittest.SkipTest("debug binary not built")
 
-    def _run(self, *args: str) -> tuple[list[str], list[str]]:
+    def _run(self, *args: str, ini: str = "") -> tuple[list[str], list[str]]:
         """(passed node ids, imported test module names) of one run."""
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
+            if ini:
+                (tmp_path / "pytest.ini").write_text(ini)
             for name, n in FILES.items():
                 (tmp_path / name).parent.mkdir(exist_ok=True)
                 (tmp_path / name).write_text(MODULE.format(n=n))
@@ -126,34 +129,77 @@ class TestSplitByFile(unittest.TestCase):
         )
 
     def test_default_assignment_unchanged(self) -> None:
-        for (algorithm, group), expected in DEFAULT.items():
-            with self.subTest(algorithm=algorithm, group=group):
-                passed, imported = self._run(
-                    "--splits", "3", "--group", str(group), "--splitting-algorithm", algorithm
+        for granularity in ((), ("--splitting-granularity=test",)):
+            for (algorithm, group), expected in DEFAULT.items():
+                # Without --splitting-algorithm, test granularity keeps
+                # duration_based_chunks.
+                algorithm_args = (
+                    ()
+                    if algorithm == "duration_based_chunks" and not granularity
+                    else ("--splitting-algorithm", algorithm)
                 )
-                self.assertEqual(passed, sorted(expected.split()))
-                # The default still imports every file.
-                self.assertEqual(len(imported), len(FILES))
+                with self.subTest(granularity=granularity, algorithm=algorithm, group=group):
+                    passed, imported = self._run(
+                        "--splits", "3", "--group", str(group), *algorithm_args, *granularity
+                    )
+                    self.assertEqual(passed, sorted(expected.split()))
+                    # Test granularity still imports every file.
+                    self.assertEqual(len(imported), len(FILES))
 
-    def test_split_by_file(self) -> None:
+    def _check_file_group(
+        self, files: set[str], *args: str, ini: str = "", workers: int = 1
+    ) -> None:
+        passed, imported = self._run(*args, "--splitting-granularity", "file", ini=ini)
+        self.assertEqual(passed, self._all_tests(files))
+        # Only the group's own files are imported, once per process.
+        self.assertEqual(set(imported), {Path(name).stem for name in files})
+        self.assertEqual(len(imported), len(files) * workers)
+
+    def test_file_granularity(self) -> None:
         for dist in ((), ("-n", "2")):
             for (algorithm, group), files in BY_FILE.items():
                 with self.subTest(dist=dist, algorithm=algorithm, group=group):
-                    passed, imported = self._run(
+                    self._check_file_group(
+                        files,
                         "--splits",
                         "3",
                         "--group",
                         str(group),
-                        "--splitting-algorithm",
-                        algorithm,
-                        "--split-by-file",
+                        f"--splitting-algorithm={algorithm}",
                         *dist,
+                        workers=2 if dist else 1,
                     )
-                    self.assertEqual(passed, self._all_tests(files))
-                    modules = {Path(name).stem for name in files}
-                    # Only the group's own files are imported, once per process.
-                    self.assertEqual(set(imported), modules)
-                    self.assertEqual(len(imported), len(files) * (2 if dist else 1))
+
+    def test_file_granularity_defaults_to_least_duration(self) -> None:
+        for group in (1, 2, 3):
+            with self.subTest(group=group):
+                self._check_file_group(
+                    BY_FILE[("least_duration", group)], "--splits", "3", "--group", str(group)
+                )
+            with self.subTest(group=group, addopts="duration_based_chunks"):
+                # An explicit algorithm in addopts still wins.
+                self._check_file_group(
+                    BY_FILE[("duration_based_chunks", group)],
+                    "--splits",
+                    "3",
+                    "--group",
+                    str(group),
+                    ini="[pytest]\naddopts = --splitting-algorithm duration_based_chunks\n",
+                )
+
+    def test_invalid_granularity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            result = subprocess.run(
+                [str(BINARY), "--splits", "2", "--group", "1", "--splitting-granularity", "dir"],
+                cwd=tmp,
+                capture_output=True,
+                text=True,
+            )
+        self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
+        self.assertIn(
+            "argument --splitting-granularity: invalid choice: 'dir' (choose from 'test', 'file')",
+            result.stderr,
+        )
 
 
 if __name__ == "__main__":

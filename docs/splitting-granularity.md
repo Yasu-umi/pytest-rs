@@ -1,7 +1,8 @@
-# Splitting shards before import (`--split-by-file`)
+# Splitting shards before import (`--splitting-granularity=file`)
 
-Status: implemented as an opt-in flag. The default `--splits`/`--group`
-behavior is unchanged.
+Status: implemented as an opt-in option, `--splitting-granularity={test,file}`
+(pytest-rs only; default `test`). The default `--splits`/`--group` behavior is
+unchanged.
 
 ## Problem
 
@@ -28,9 +29,9 @@ tests of the same file regularly end up in different groups. No pre-import
 computation can reproduce that assignment, so the default stays item-level and
 post-collection, exactly as today (and as upstream pytest-split).
 
-## `--split-by-file`
+## `--splitting-granularity=file`
 
-With `--split-by-file`, the unit of splitting is the test **file**:
+With `--splitting-granularity=file`, the unit of splitting is the test **file**:
 
 1. After `pytest_configure` and the collect-ignore filters, and before any
    test module is imported, the plugin receives the ordered list of test files
@@ -40,9 +41,12 @@ With `--split-by-file`, the unit of splitting is the test **file**:
 3. A file with no recorded duration counts as the average duration of the
    files in this run that have one (1.0 if none do) — the item-level rule,
    applied per file.
-4. The selected algorithm runs on those file units unchanged:
+4. The algorithm runs on those file units unchanged:
    `duration_based_chunks` keeps the files in collection order,
-   `least_duration` sorts them by duration (ties by node id).
+   `least_duration` sorts them by duration (ties by node id). Without an
+   explicit `--splitting-algorithm` (on the command line or in `addopts`),
+   file granularity uses `least_duration` — unlike test granularity, whose
+   default stays `duration_based_chunks` (see below).
 5. Only the files of the selected group are imported and collected, by the
    serial session and by every `-n` worker alike.
 
@@ -65,9 +69,10 @@ in exactly one group.
 - Without any recorded durations, groups get roughly equal numbers of
   *files*, not of tests.
 - The "estimated duration" line reports the file-level estimate.
-- `duration_based_chunks` cuts the file list into contiguous runs; with a few
-  long files a run can overshoot and leave the last group empty.
-  `least_duration` balances whole files better and is the better pairing.
+- The default algorithm is `least_duration`, not `duration_based_chunks`:
+  the latter cuts the file list into contiguous runs, and with a few long
+  files a run can overshoot and leave the last group empty. It is still used
+  when given explicitly.
 
 ### What is still paid for every file
 
