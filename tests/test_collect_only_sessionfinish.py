@@ -3,12 +3,13 @@
 Upstream's wrap_session fires pytest_sessionfinish after a collect-only
 session as well, serial and under -n (xdist collects locally then), with the
 session's exit status, before the terminal's ERRORS section and closing line.
-pytest-rs returned without firing it. Expected values are pytest 9.2.0 +
-pytest-xdist 3.8.0's.
+pytest-rs returned without firing it, for the bundled plugins too. Expected
+values are pytest 9.2.0 + pytest-xdist 3.8.0 + pytest-split 0.11.0's.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import tempfile
@@ -78,6 +79,21 @@ class TestCollectOnlySessionfinish(unittest.TestCase):
         result = self.run_rs("test_err.py")
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assert_before(result.stdout, "SESSIONFINISH 2", "ImportError while importing")
+
+    def durations_after(self, *args: str) -> dict[str, float]:
+        durations = self.base / ".test_durations"
+        durations.write_text(json.dumps({"test_x.py::test_a": 1.5, "gone.py::test_z": 2.0}))
+        result = self.run_rs("--store-durations", *args, "test_x.py")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        loaded: dict[str, float] = json.loads(durations.read_text())
+        return loaded
+
+    def test_store_durations_keeps_existing_durations(self) -> None:
+        # pytest-split's sessionfinish runs, with no reports to add.
+        self.assertEqual(self.durations_after(), {"test_x.py::test_a": 1.5, "gone.py::test_z": 2.0})
+
+    def test_clean_durations_empties_them_like_pytest_split(self) -> None:
+        self.assertEqual(self.durations_after("--clean-durations"), {})
 
 
 if __name__ == "__main__":
