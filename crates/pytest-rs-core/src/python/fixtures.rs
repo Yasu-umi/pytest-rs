@@ -35,6 +35,56 @@ pub fn register_builtin_fixtures(
 pub(crate) struct XunitState {
     pub(crate) modules: std::collections::HashMap<String, Option<Py<PyAny>>>,
     pub(crate) classes: std::collections::HashMap<String, Option<Py<PyAny>>>,
+    /// (class scope, key) of the setups that have a setup or teardown
+    /// function: later tests of that scope report them to the
+    /// scoped-setup observers as cached.
+    pub(crate) observed: std::collections::HashSet<(bool, String)>,
+}
+
+/// Report a cached xunit setup to the scoped-setup observers.
+fn xunit_observe_cached(
+    py: Python<'_>,
+    plugins: &[Box<dyn crate::hooks::Plugin>],
+    session: &crate::session::Session,
+    item: &TestItem,
+    class_scope: bool,
+    owner: &crate::session::ScopedSetup,
+) {
+    let observed = session.stash_get::<XunitState>().is_some_and(|state| {
+        state
+            .observed
+            .contains(&(class_scope, owner.baseid.clone()))
+    });
+    if observed {
+        for plugin in plugins {
+            plugin.pytest_scoped_setup_finish(py, owner, item, true);
+        }
+    }
+}
+
+/// Run one xunit module/class setup function inside the scoped-setup
+/// observer bracket.
+fn xunit_run_setup(
+    py: Python<'_>,
+    plugins: &[Box<dyn crate::hooks::Plugin>],
+    item: &TestItem,
+    owner: &crate::session::ScopedSetup,
+    run: impl FnOnce() -> PyResult<()>,
+) -> PyResult<()> {
+    for plugin in plugins {
+        plugin.pytest_scoped_setup_start(py, owner, item);
+    }
+    let result = run();
+    for plugin in plugins {
+        plugin.pytest_scoped_setup_finish(py, owner, item, false);
+    }
+    result
+}
+
+fn xunit_mark_observed(session: &mut crate::session::Session, class_scope: bool, key: &str) {
+    if let Some(state) = session.stash_get_mut::<XunitState>() {
+        state.observed.insert((class_scope, key.to_string()));
+    }
 }
 
 /// The cached setup status for a key: None = never ran, Some(None) = ok,
@@ -83,6 +133,7 @@ pub(crate) fn xunit_record(
 /// runner moves to the next class).
 pub fn ensure_xunit_setup(
     py: Python<'_>,
+    plugins: &[Box<dyn crate::hooks::Plugin>],
     session: &mut crate::session::Session,
     item: &TestItem,
     instance: Option<&Py<PyAny>>,
@@ -121,16 +172,24 @@ pub fn ensure_xunit_setup(
     // so a failing import is not retried for every item in the same module.
     if let Some(parent_pkg) = item.module_name.rsplit_once('.').map(|(p, _)| p) {
         let pkg_key = parent_pkg.to_string();
+        let pkg_owner = crate::session::ScopedSetup {
+            scope: Scope::Package,
+            baseid: pkg_key.clone(),
+            name: "setup_module".to_string(),
+        };
         match xunit_status(py, session, false, &pkg_key) {
             Some(Some(exc)) => {
                 return Err(PyErr::from_value(exc.bind(py).clone()));
             }
-            Some(None) => {} // already handled (including import-not-found)
+            // already handled (including import-not-found)
+            Some(None) => xunit_observe_cached(py, plugins, session, item, false, &pkg_owner),
             None => match py.import(parent_pkg) {
                 Ok(pkg_module) => {
                     let setup_fn = lookup(pkg_module.as_any(), &["setUpModule", "setup_module"]);
-                    let setup_result: PyResult<()> = match setup_fn {
-                        Some(setup) => call_optional.call1((setup, &pkg_module)).map(|_| ()),
+                    let setup_result: PyResult<()> = match &setup_fn {
+                        Some(setup) => xunit_run_setup(py, plugins, item, &pkg_owner, || {
+                            call_optional.call1((setup, &pkg_module)).map(|_| ())
+                        }),
                         None => Ok(()),
                     };
                     if let Err(err) = setup_result {
@@ -141,6 +200,9 @@ pub fn ensure_xunit_setup(
                     xunit_record(py, session, false, pkg_key.clone(), None);
                     let teardown_fn =
                         lookup(pkg_module.as_any(), &["tearDownModule", "teardown_module"]);
+                    if setup_fn.is_some() || teardown_fn.is_some() {
+                        xunit_mark_observed(session, false, &pkg_key);
+                    }
                     if let Some(teardown) = teardown_fn {
                         let finalizer = bind.call1((teardown, &pkg_module))?;
                         session.finalizers.push(crate::session::PendingFinalizer {
@@ -148,6 +210,7 @@ pub fn ensure_xunit_setup(
                             instance: pkg_key,
                             finalizer: crate::session::Finalizer::Callable(finalizer.unbind()),
                             bindings: Vec::new(),
+                            owner: Some(pkg_owner.clone()),
                         });
                     }
                 }
@@ -161,18 +224,25 @@ pub fn ensure_xunit_setup(
         }
     }
 
+    let module_owner = crate::session::ScopedSetup {
+        scope: Scope::Module,
+        baseid: module_instance.clone(),
+        name: "setup_module".to_string(),
+    };
     match xunit_status(py, session, false, &module_instance) {
         Some(Some(exc)) => {
             // setup_module already failed: every test re-raises that error.
             return Err(PyErr::from_value(exc.bind(py).clone()));
         }
-        Some(None) => {}
+        Some(None) => xunit_observe_cached(py, plugins, session, item, false, &module_owner),
         None => {
             // unittest's module-level aliases take priority (upstream's
             // ("setUpModule", "setup_module") first-non-fixture lookup).
             let setup_fn = lookup(module.as_any(), &["setUpModule", "setup_module"]);
-            let setup_result: PyResult<()> = match setup_fn {
-                Some(setup) => call_optional.call1((setup, &module)).map(|_| ()),
+            let setup_result: PyResult<()> = match &setup_fn {
+                Some(setup) => xunit_run_setup(py, plugins, item, &module_owner, || {
+                    call_optional.call1((setup, &module)).map(|_| ())
+                }),
                 None => Ok(()),
             };
             if let Err(err) = setup_result {
@@ -182,6 +252,9 @@ pub fn ensure_xunit_setup(
             }
             xunit_record(py, session, false, module_instance.clone(), None);
             let teardown_fn = lookup(module.as_any(), &["tearDownModule", "teardown_module"]);
+            if setup_fn.is_some() || teardown_fn.is_some() {
+                xunit_mark_observed(session, false, &module_instance);
+            }
             if let Some(teardown) = teardown_fn {
                 let finalizer = bind.call1((teardown, &module))?;
                 session.finalizers.push(crate::session::PendingFinalizer {
@@ -189,6 +262,7 @@ pub fn ensure_xunit_setup(
                     instance: module_instance.clone(),
                     finalizer: crate::session::Finalizer::Callable(finalizer.unbind()),
                     bindings: Vec::new(),
+                    owner: Some(module_owner.clone()),
                 });
             }
         }
@@ -198,28 +272,41 @@ pub fn ensure_xunit_setup(
         (Some(cls), Some(instance)) => {
             let cls = cls.bind(py);
             let class_key = item.class_instance();
+            let class_owner = crate::session::ScopedSetup {
+                scope: Scope::Class,
+                baseid: class_key.clone(),
+                name: "setup_class".to_string(),
+            };
             match xunit_status(py, session, true, &class_key) {
                 Some(Some(exc)) => {
                     return Err(PyErr::from_value(exc.bind(py).clone()));
                 }
-                Some(None) => {}
+                Some(None) => xunit_observe_cached(py, plugins, session, item, true, &class_owner),
                 None => {
-                    let setup_result: PyResult<()> = match lookup(cls, &["setup_class"]) {
-                        Some(setup) => call_optional.call1((setup, cls)).map(|_| ()),
+                    let setup_fn = lookup(cls, &["setup_class"]);
+                    let setup_result: PyResult<()> = match &setup_fn {
+                        Some(setup) => xunit_run_setup(py, plugins, item, &class_owner, || {
+                            call_optional.call1((setup, cls)).map(|_| ())
+                        }),
                         None => Ok(()),
                     };
                     if let Err(err) = setup_result {
                         xunit_record(py, session, true, class_key, Some(&err));
                         return Err(err);
                     }
-                    xunit_record(py, session, true, class_key, None);
-                    if let Some(teardown) = lookup(cls, &["teardown_class"]) {
+                    xunit_record(py, session, true, class_key.clone(), None);
+                    let teardown_fn = lookup(cls, &["teardown_class"]);
+                    if setup_fn.is_some() || teardown_fn.is_some() {
+                        xunit_mark_observed(session, true, &class_key);
+                    }
+                    if let Some(teardown) = teardown_fn {
                         let finalizer = bind.call1((teardown, cls))?;
                         session.finalizers.push(crate::session::PendingFinalizer {
                             scope: Scope::Class,
                             instance: item.class_instance(),
                             finalizer: crate::session::Finalizer::Callable(finalizer.unbind()),
                             bindings: Vec::new(),
+                            owner: Some(class_owner.clone()),
                         });
                     }
                 }
@@ -237,6 +324,7 @@ pub fn ensure_xunit_setup(
                     instance: item.nodeid.clone(),
                     finalizer: crate::session::Finalizer::Callable(finalizer.unbind()),
                     bindings: Vec::new(),
+                    owner: None,
                 });
             }
         }
@@ -251,6 +339,7 @@ pub fn ensure_xunit_setup(
                     instance: item.nodeid.clone(),
                     finalizer: crate::session::Finalizer::Callable(finalizer.unbind()),
                     bindings: Vec::new(),
+                    owner: None,
                 });
             }
         }

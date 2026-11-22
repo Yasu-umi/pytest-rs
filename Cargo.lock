@@ -522,6 +522,7 @@ name = "pytest-rs"
 version = "0.0.15"
 dependencies = [
  "libc",
+ "pytest-rs-affected",
  "pytest-rs-anyio",
  "pytest-rs-asyncio",
  "pytest-rs-benchmark",
@@ -529,6 +530,20 @@ dependencies = [
  "pytest-rs-cov",
  "pytest-rs-mock",
  "pytest-rs-split",
+]
+
+[[package]]
+name = "pytest-rs-affected"
+version = "0.0.15"
+dependencies = [
+ "glob",
+ "pyo3",
+ "pytest-rs-core",
+ "ruff_python_ast",
+ "ruff_python_parser",
+ "ruff_text_size",
+ "siphasher",
+ "toml",
 ]
 
 [[package]]

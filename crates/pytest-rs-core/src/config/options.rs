@@ -8,6 +8,9 @@ pub struct OptDef {
     /// The value may be omitted (`--cov` vs `--cov=src`); a bare occurrence
     /// records an empty string.
     pub optional_value: bool,
+    /// The value only binds as `--name=value`: a following separate token
+    /// stays a positional argument (`--affected tests/`).
+    pub require_equals: bool,
 }
 
 impl OptDef {
@@ -18,6 +21,7 @@ impl OptDef {
             default: None,
             help: help.to_string(),
             optional_value: false,
+            require_equals: false,
         }
     }
 
@@ -28,6 +32,7 @@ impl OptDef {
             default: default.map(str::to_string),
             help: help.to_string(),
             optional_value: false,
+            require_equals: false,
         }
     }
 
@@ -38,7 +43,14 @@ impl OptDef {
             default: None,
             help: help.to_string(),
             optional_value: true,
+            require_equals: false,
         }
+    }
+
+    /// See [`OptDef::require_equals`].
+    pub fn with_require_equals(mut self) -> Self {
+        self.require_equals = true;
+        self
     }
 }
 

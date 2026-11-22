@@ -85,7 +85,7 @@ pub(crate) fn build_test_setup(
     }
 
     // xunit-style setup_module/setup_class/setup_method/setup_function.
-    python::ensure_xunit_setup(py, session, item, instance.as_ref())?;
+    python::ensure_xunit_setup(py, plugins, session, item, instance.as_ref())?;
 
     // @pytest.mark.usefixtures (and the usefixtures ini option): named
     // fixtures are set up before the test's own, values not passed in.

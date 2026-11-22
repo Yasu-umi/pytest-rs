@@ -256,6 +256,7 @@ impl Engine {
                     let report_nodeid = last_nodeid.clone().unwrap_or_else(|| $item.nodeid.clone());
                     handle_teardown_report!(teardown_ended_params_reported(
                         py,
+                        plugins,
                         session,
                         config,
                         &ended,

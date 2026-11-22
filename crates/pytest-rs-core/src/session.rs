@@ -63,6 +63,23 @@ pub struct PendingFinalizer {
     /// teardown. Empty for finalizers that don't depend on any higher-scope
     /// parametrization.
     pub bindings: Vec<Binding>,
+    /// The higher-scope setup this finalizer tears down, for the
+    /// `pytest_finalizer_start/finish` observers. None for function-scope
+    /// finalizers.
+    pub owner: Option<ScopedSetup>,
+}
+
+/// A setup that outlives one test — a fixture with a scope above function,
+/// or an xunit-style module/class setup — as reported to the observer hooks
+/// (`pytest_scoped_setup_start/finish`, `pytest_finalizer_start/finish`).
+/// Fixtures are keyed by their visibility prefix and name; xunit setups use
+/// the module/class instance key and the function name (`setup_module`,
+/// `setup_class`).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ScopedSetup {
+    pub scope: Scope,
+    pub baseid: String,
+    pub name: String,
 }
 
 /// A pytest_* hook function defined in a conftest.py.
@@ -117,6 +134,10 @@ pub struct Session {
     pub py_hooks: Vec<PyHook>,
     /// A plugin may force the session exit code (e.g. --cov-fail-under).
     pub exit_code_override: Option<i32>,
+    /// A plugin deselected every item on purpose (affected-test selection
+    /// with nothing affected): a run left with no items exits OK instead of
+    /// NO_TESTS_COLLECTED.
+    pub no_tests_ok: bool,
     /// "!!! ... !!!" banner for pytest.exit / Ctrl-C aborts.
     pub abort_banner: Option<String>,
     /// A KeyboardInterrupt during a test's setup/call: (short crash line,
@@ -232,6 +253,7 @@ impl Session {
             py_stash: HashMap::new(),
             py_hooks: Vec::new(),
             exit_code_override: None,
+            no_tests_ok: false,
             abort_banner: None,
             keyboard_interrupt_repr: None,
             worker_warnings: Vec::new(),

@@ -452,7 +452,11 @@ impl Engine {
     pub(crate) fn handle_no_tests(&mut self, py: Python<'_>, started: Instant) -> i32 {
         // Upstream: zero collected items is NO_TESTS_COLLECTED even when
         // module-level skips produced skip reports.
-        let mut code = exit_code::NO_TESTS_COLLECTED;
+        let mut code = if self.session.no_tests_ok {
+            exit_code::OK
+        } else {
+            exit_code::NO_TESTS_COLLECTED
+        };
         let mut session_exited = false;
         if let Err(err) = flush_hook_output(py, || self.fire_py_sessionfinish(py, code)) {
             if let Some(returncode) = python::exit_returncode(py, &err) {
