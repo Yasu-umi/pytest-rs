@@ -4,6 +4,10 @@
 //! (project file or not) and pinned so its id is never reused; the callback
 //! returns DISABLE, and every context switch calls `restart_events()` so
 //! each function fires once more under the new context.
+//!
+//! The alternative the design left open (§3: keep `PY_START` armed and
+//! dedupe in Rust) was measured on public suites and lost: it costs one
+//! callback per call, which call-heavy suites pay heavily for.
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
@@ -42,9 +46,6 @@ pub struct AffectedCollector {
     excluded: Vec<String>,
     disable: Py<PyAny>,
     monitoring: Py<PyAny>,
-    /// MEASUREMENT ONLY: keep project code's PY_START armed and dedupe per
-    /// context instead of DISABLE + restart_events.
-    stay_armed: bool,
     state: Mutex<State>,
 }
 
@@ -60,7 +61,6 @@ impl AffectedCollector {
             excluded,
             disable,
             monitoring,
-            stay_armed: std::env::var_os("PYTEST_RS_AFFECTED_STAY_ARMED").is_some(),
             state: Mutex::new(State {
                 contexts: vec![HashSet::new()],
                 ..State::default()
@@ -90,9 +90,7 @@ impl AffectedCollector {
             }
             state.current = context;
         }
-        if !self.stay_armed {
-            self.monitoring.bind(py).call_method0("restart_events")?;
-        }
+        self.monitoring.bind(py).call_method0("restart_events")?;
         Ok(())
     }
 
@@ -133,9 +131,6 @@ impl AffectedCollector {
                 if let Some(index) = entry {
                     let current = state.current;
                     state.contexts[current].insert(index);
-                    if self.stay_armed {
-                        return Ok(py.None());
-                    }
                 }
                 return Ok(self.disable.clone_ref(py));
             }
@@ -167,9 +162,6 @@ impl AffectedCollector {
         });
         state.classified.insert(key, index);
         state.pins.push(code.unbind());
-        if self.stay_armed && index.is_some() {
-            return Ok(py.None());
-        }
         Ok(self.disable.clone_ref(py))
     }
 }
