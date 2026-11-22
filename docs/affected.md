@@ -12,7 +12,7 @@ pytest-rs --affected=select   # select from the record, write nothing
 
 The record lives in `.pytest-rs-affected` in the rootdir. `--affected-data=PATH` puts it elsewhere. Without a usable record (none yet, a different Python, a change in the installed packages or pytest-rs version), everything runs, and the header line says why.
 
-`--affected` cannot be combined with `-n` yet.
+`--affected` works with `-n`: every worker selects on its own and records the tests it ran, and the controller writes one data file. With pytest-split (`--splits`/`--group`), the tests are selected first and the groups divide the selected tests.
 
 ## What runs
 

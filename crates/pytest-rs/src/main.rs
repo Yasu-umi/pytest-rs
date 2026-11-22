@@ -14,12 +14,17 @@ fn build_plugins() -> Vec<Box<dyn Plugin>> {
     plugins.push(Box::new(pytest_rs_mock::MockPlugin::new()));
     #[cfg(feature = "cov")]
     plugins.push(Box::new(pytest_rs_cov::CovPlugin::new()));
-    #[cfg(feature = "split")]
-    plugins.push(Box::new(pytest_rs_split::SplitPlugin::new()));
     #[cfg(feature = "benchmark")]
     plugins.push(Box::new(pytest_rs_benchmark::BenchmarkPlugin::new()));
+    // Native plugins fire in this order. Affected-test selection runs
+    // before pytest-split's hooks, so the split divides the selected set;
+    // and after the other plugins' pytest_configure, so their setup (e.g.
+    // benchmark's machine info, which starts a subprocess) is not recorded
+    // as part of every test's dependencies.
     #[cfg(feature = "affected")]
     plugins.push(Box::new(pytest_rs_affected::AffectedPlugin::new()));
+    #[cfg(feature = "split")]
+    plugins.push(Box::new(pytest_rs_split::SplitPlugin::new()));
     plugins
 }
 

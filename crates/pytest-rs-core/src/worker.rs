@@ -761,8 +761,14 @@ impl Engine {
                     false,
                 );
                 if i >= pre_count {
-                    send(&WorkerMsg::Report { report });
+                    send(&WorkerMsg::Report {
+                        report: report.clone(),
+                    });
                 }
+                // Kept in the worker's own session too, like a serial run:
+                // its sessionfinish (e.g. --affected's recording) reads the
+                // outcomes of the tests this worker ran.
+                self.session.reports.push(report);
             }
             let item = &collection.items[index];
             let _ = crate::runner::fire_runtest_py_hooks(
@@ -1158,7 +1164,10 @@ impl Engine {
         let import_mode = crate::collect::ImportMode::from_config(&self.config);
 
         let mut new_items = Vec::new();
-        if let Err(err) = python::collect_module(
+        for plugin in &self.plugins {
+            plugin.pytest_collect_module_start(py, &path);
+        }
+        let collected = python::collect_module(
             py,
             &self.config.rootdir,
             &path,
@@ -1170,7 +1179,11 @@ impl Engine {
             &self.plugins,
             &self.session.initial_paths,
             self.config.collect_imported_tests(),
-        ) {
+        );
+        for plugin in &self.plugins {
+            plugin.pytest_collect_module_finish(py, &path);
+        }
+        if let Err(err) = collected {
             // Same split as the controller's own collect_module call
             // (engine/collect/collection.rs): a module-level
             // pytest.skip(allow_module_level=True) / unittest.SkipTest —
