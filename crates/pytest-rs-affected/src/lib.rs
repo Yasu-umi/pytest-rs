@@ -1,13 +1,16 @@
 //! Affected-test selection (`--affected`, docs/AFFECTED_TESTS.md): run only
 //! the tests affected by code that changed since a recorded run.
 //!
-//! This is stage 1 of the design (§10 "PR 1"): local, single process,
-//! selection after import. Without `--affected*` the plugin is inert: no
+//! Stages 1 and 2 of the design (§10 "PR 1", "PR 2"): local, single
+//! process; test files are selected before import, items after it; non-Python
+//! inputs and subprocesses are recorded by an audit hook. Without `--affected*` the plugin is inert: no
 //! sys.monitoring tool, no data file, no behavior change.
 
 mod collector;
 mod config;
 mod data;
+mod imports;
+mod selection;
 mod snapshot;
 mod units;
 
@@ -24,7 +27,9 @@ use pytest_rs_core::session::{PendingFinalizer, ScopedSetup};
 
 use crate::collector::{AffectedCollector, Recording};
 use crate::config::{AffectedConfig, BUILTIN_FULL_RUN_ON, BUILTIN_IGNORE, Globs};
-use crate::data::{Data, Dep, FileEntry, Header, SnapEntry, TestEntry};
+use crate::data::{Data, Dep, FileEntry, FileRecord, Header, LoadError, SnapEntry, TestEntry};
+use crate::imports::StaticImports;
+use crate::selection::{Plan, Reason};
 use crate::snapshot::Snapshot;
 use crate::units::{CHECKSUM_SCHEME, FILE_UNIT, FileUnits, MODULE_UNIT};
 
@@ -92,6 +97,13 @@ struct State {
     to_run: HashSet<String>,
     setup_contexts: HashMap<ScopedSetup, usize>,
     collect_contexts: HashMap<String, usize>,
+    /// The selection plan, built once per session (pre-import or at
+    /// modifyitems, whichever comes first).
+    plan: Option<Plan>,
+    /// Test files imported this session: their module names and every node
+    /// id they collected (before any deselection).
+    file_modules: HashMap<String, String>,
+    file_nodeids: HashMap<String, Vec<String>>,
 }
 
 pub struct AffectedPlugin {
@@ -232,7 +244,7 @@ impl AffectedPlugin {
         }
     }
 
-    fn start_collector(state: &mut State, py: Python<'_>) -> PyResult<()> {
+    fn start_collector(state: &mut State, py: Python<'_>, cache_dir: &str) -> PyResult<()> {
         let monitoring = py.import("sys")?.getattr("monitoring")?;
         let tool_id = Self::TOOL_IDS
             .into_iter()
@@ -253,8 +265,21 @@ impl AffectedPlugin {
                 Self::excluded_dirs(py)?,
                 monitoring.getattr("DISABLE")?.unbind(),
                 monitoring.clone().unbind(),
+                // pytest-rs's own files: the data file and the cache
+                // directory, rewritten by every run.
+                [state.data_path.clone(), state.rootdir.join(cache_dir)]
+                    .iter()
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .collect(),
+                Some(Self::with_sep(
+                    &pytest_rs_core::python::shim_root().to_string_lossy(),
+                )),
             ),
         )?;
+        // Audit hooks cannot be removed: the collector goes inert at the end
+        // of the session instead.
+        py.import("sys")?
+            .call_method1("addaudithook", (collector.bind(py).getattr("audit")?,))?;
         let py_start = monitoring.getattr("events")?.getattr("PY_START")?;
         monitoring.call_method1(
             "register_callback",
@@ -310,7 +335,10 @@ impl AffectedPlugin {
                 .filter_map(|p| glob::Pattern::new(p).ok())
                 .collect(),
             ignore: vec![&builtin_ignore, &state.config.ignore],
-            include_py: vec![&builtin_full, &state.config.full_run_on],
+            include_py: [&builtin_full, &state.config.full_run_on]
+                .into_iter()
+                .chain(state.config.file_triggers.iter().map(|(key, _)| key))
+                .collect(),
             own_files: own,
         };
         let previous = state
@@ -342,134 +370,59 @@ impl AffectedPlugin {
             .collect()
     }
 
-    fn is_explicit(explicit: &[String], nodeid: &str) -> bool {
-        explicit.iter().any(|prefix| {
-            nodeid == prefix
-                || nodeid
-                    .strip_prefix(prefix.as_str())
-                    .is_some_and(|rest| rest.starts_with("::") || rest.starts_with('['))
-        })
-    }
-
-    /// The current unit checksums of every file the stored data knows,
-    /// parsing only files whose content changed.
-    fn current_units(state: &State, data: &Data) -> HashMap<u32, CurrentFile> {
-        data.files
-            .iter()
-            .map(|(&file, entry)| {
-                let rel = data.strings.resolve(file);
-                if state.config.always_changed.matches(rel) {
-                    return (file, CurrentFile::Changed);
-                }
-                let Ok(bytes) = std::fs::read(state.rootdir.join(rel)) else {
-                    return (file, CurrentFile::Changed);
-                };
-                let content_hash = FileUnits::content_hash(&bytes);
-                let units: Option<HashMap<String, u64>> = if content_hash == entry.content_hash {
-                    entry.units.as_ref().map(|units| {
-                        units
-                            .iter()
-                            .map(|(q, c)| (data.strings.resolve(*q).to_string(), *c))
-                            .collect()
-                    })
-                } else {
-                    std::str::from_utf8(&bytes)
-                        .ok()
-                        .and_then(FileUnits::parse)
-                        .map(|f| f.units)
-                };
-                match units {
-                    Some(units) => (
-                        file,
-                        CurrentFile::Units {
-                            content_hash,
-                            units,
-                        },
-                    ),
-                    None => (file, CurrentFile::Changed),
-                }
-            })
-            .collect()
-    }
-
-    fn dep_changed(data: &Data, current: &HashMap<u32, CurrentFile>, dep: &Dep) -> bool {
-        match current.get(&dep.file) {
-            None | Some(CurrentFile::Changed) => true,
-            Some(CurrentFile::Units {
-                content_hash,
-                units,
-            }) => {
-                let qualname = data.strings.resolve(dep.qualname);
-                if qualname == FILE_UNIT {
-                    *content_hash != dep.checksum
-                } else {
-                    units.get(qualname) != Some(&dep.checksum)
-                }
-            }
+    /// Build the selection plan once (needs usable data).
+    fn ensure_plan(state: &mut State, ctx: &HookContext) {
+        if state.plan.is_some() {
+            return;
         }
+        if state.snapshot.is_none() {
+            state.snapshot = Some(Self::snapshot(state));
+        }
+        let Some(data) = state.stored.as_ref() else {
+            return;
+        };
+        let plan = Plan::build(
+            data,
+            &state.rootdir,
+            &state.config,
+            state.snapshot.as_deref().unwrap_or_default(),
+            Self::explicit_nodeids(ctx),
+        );
+        if plan.full_reason.is_some() {
+            // A full-run trigger changed since the stored entries were
+            // recorded: tests this run does not cover must not keep them.
+            state.discard_stored = true;
+        }
+        state.plan = Some(plan);
     }
 
+    /// Item-level selection over the imported files.
     fn select(
         state: &mut State,
         ctx: &mut HookContext,
         items: &mut Vec<TestItem>,
     ) -> Option<String> {
-        let Some(data) = state.stored.as_ref() else {
+        let (Some(data), Some(plan)) = (state.stored.as_ref(), state.plan.as_mut()) else {
             return Some(format!(
                 "running all {} tests ({})",
                 items.len(),
                 state.unusable.as_deref().unwrap_or("no data")
             ));
         };
-        let snapshot = state.snapshot.as_deref().unwrap_or_default();
-        let changes = Snapshot::diff(&data.snapshot, snapshot);
-        if !changes.paths.is_empty() {
-            state.discard_stored = true;
-            let shown: Vec<&str> = changes.paths.iter().take(3).map(String::as_str).collect();
-            let more = changes.paths.len().saturating_sub(shown.len());
-            let more = if more > 0 {
-                format!(" and {more} more")
-            } else {
-                String::new()
-            };
-            return Some(format!(
-                "running all {} tests (changed: {}{more})",
-                items.len(),
-                shown.join(", ")
-            ));
+        if let Some(reason) = &plan.full_reason {
+            return Some(format!("running all {} tests ({reason})", items.len()));
         }
-        let current = Self::current_units(state, data);
-        let mut group_changed: HashMap<u32, bool> = HashMap::new();
-        let explicit = Self::explicit_nodeids(ctx);
-        let (mut new, mut failed, mut changed, mut forced) = (0usize, 0usize, 0usize, 0usize);
+        let mut reasons: HashMap<Reason, usize> = HashMap::new();
         let (keep, drop): (Vec<TestItem>, Vec<TestItem>) =
             std::mem::take(items).into_iter().partition(|item| {
                 let path = Self::item_path(&state.rootdir, item);
-                if Self::is_explicit(&explicit, &item.nodeid)
-                    || state.config.always_run.matches(&path)
-                {
-                    forced += 1;
-                    return true;
+                match plan.reason(data, &state.config, &item.nodeid, &path) {
+                    Some(reason) => {
+                        *reasons.entry(reason).or_default() += 1;
+                        true
+                    }
+                    None => false,
                 }
-                let Some(entry) = data.test(&item.nodeid) else {
-                    new += 1;
-                    return true;
-                };
-                if entry.failed {
-                    failed += 1;
-                    return true;
-                }
-                let affected = entry.groups.iter().any(|group| {
-                    *group_changed.entry(*group).or_insert_with(|| {
-                        data.group(*group)
-                            .iter()
-                            .any(|dep| Self::dep_changed(data, &current, dep))
-                    })
-                });
-                if affected {
-                    changed += 1;
-                }
-                affected
             });
         *items = keep;
         let deselected = drop.len();
@@ -477,16 +430,12 @@ impl AffectedPlugin {
         if items.is_empty() && deselected > 0 {
             ctx.session.no_tests_ok = true;
         }
-        let reasons: Vec<String> = [
-            (changed, "affected"),
-            (new, "new"),
-            (failed, "failed"),
-            (forced, "forced"),
-        ]
-        .iter()
-        .filter(|(n, _)| *n > 0)
-        .map(|(n, what)| format!("{n} {what}"))
-        .collect();
+        let mut reasons: Vec<(Reason, usize)> = reasons.into_iter().collect();
+        reasons.sort();
+        let reasons: Vec<String> = reasons
+            .iter()
+            .map(|(reason, n)| format!("{n} {}", reason.label()))
+            .collect();
         Some(format!(
             "{} selected{}, {deselected} deselected",
             items.len(),
@@ -499,28 +448,14 @@ impl AffectedPlugin {
     }
 
     /// Selection (select/auto modes) or, when only recording, the check
-    /// whether stored entries survive.
+    /// whether stored entries survive (a full-run trigger changed).
     fn apply_mode(
         state: &mut State,
         mode: Mode,
         ctx: &mut HookContext,
         items: &mut Vec<TestItem>,
     ) -> PyResult<()> {
-        if mode == Mode::Record {
-            // A full-run trigger changed since the stored entries were
-            // recorded: tests this run does not cover must not keep them.
-            if let Some(data) = &state.stored
-                && !Snapshot::diff(
-                    &data.snapshot,
-                    state.snapshot.as_deref().unwrap_or_default(),
-                )
-                .paths
-                .is_empty()
-            {
-                state.discard_stored = true;
-            }
-            return Ok(());
-        }
+        Self::ensure_plan(state, ctx);
         if mode.selects()
             && let Some(summary) = Self::select(state, ctx, items)
             && !ctx.config.no_terminal()
@@ -528,6 +463,90 @@ impl AffectedPlugin {
             println!("affected: {summary}");
         }
         Ok(())
+    }
+
+    /// Rule 3 (§4.3): per imported test file, a group with the module unit
+    /// of every project module its own import statements name. These are
+    /// the modules a cache hit hid from the file's import context.
+    fn static_import_groups(
+        state: &State,
+        py: Python<'_>,
+        recording: &Recording,
+        data: &mut Data,
+    ) -> HashMap<String, u32> {
+        let seen: HashMap<&str, &Option<Vec<u8>>> = recording
+            .files
+            .iter()
+            .map(|(abs, content)| (abs.as_str(), content))
+            .collect();
+        let Ok(modules) = py.import("sys").and_then(|sys| sys.getattr("modules")) else {
+            return HashMap::new();
+        };
+        let mut out = HashMap::new();
+        let paths: BTreeSet<&String> = state
+            .collect_contexts
+            .keys()
+            .chain(state.file_modules.keys())
+            .collect();
+        for path in paths {
+            let Ok(source) = std::fs::read_to_string(state.rootdir.join(path)) else {
+                continue;
+            };
+            let module = state.file_modules.get(path).map(String::as_str);
+            let names = StaticImports::of(&source, module, path.ends_with("__init__.py"));
+            let mut deps: Vec<Dep> = Vec::new();
+            for name in names {
+                let file: Option<String> = modules
+                    .get_item(&name)
+                    .ok()
+                    .and_then(|m| m.getattr("__file__").ok())
+                    .and_then(|f| f.extract().ok());
+                let Some(file) = file else { continue };
+                let Some(rel) = Self::rel(&state.rootdir, Path::new(&file)) else {
+                    continue;
+                };
+                if !rel.ends_with(".py") || rel.split('/').any(|p| p == "site-packages") {
+                    continue;
+                }
+                let bytes = match seen.get(file.as_str()) {
+                    Some(Some(bytes)) => bytes.clone(),
+                    _ => match std::fs::read(&file) {
+                        Ok(bytes) => bytes,
+                        Err(_) => continue,
+                    },
+                };
+                let units = std::str::from_utf8(&bytes).ok().and_then(FileUnits::parse);
+                let sid = data.strings.intern(&rel);
+                let content_hash = FileUnits::content_hash(&bytes);
+                let entry_units = units.as_ref().map(|f| {
+                    let mut units: Vec<(u32, u64)> = f
+                        .units
+                        .iter()
+                        .map(|(q, c)| (data.strings.intern(q), *c))
+                        .collect();
+                    units.sort_unstable();
+                    units
+                });
+                data.files.entry(sid).or_insert(FileEntry {
+                    content_hash,
+                    units: entry_units,
+                });
+                let (qualname, checksum) =
+                    match units.as_ref().and_then(|f| f.units.get(MODULE_UNIT)) {
+                        Some(&checksum) => (MODULE_UNIT, checksum),
+                        None => (FILE_UNIT, content_hash),
+                    };
+                deps.push(Dep {
+                    file: sid,
+                    qualname: data.strings.intern(qualname),
+                    checksum,
+                });
+            }
+            if !deps.is_empty() {
+                out.insert(path.clone(), data.add_group(deps));
+            }
+        }
+        out
     }
 
     /// Turn the session's recording into data entries, merged into the
@@ -608,17 +627,40 @@ impl AffectedPlugin {
                 }
             })
             .collect();
+        // Non-Python inputs (§4.5): content or listing hash at first sight.
+        let input_deps: Vec<Option<Dep>> = recording
+            .inputs
+            .iter()
+            .map(|(abs, kind, hash)| {
+                let rel = Self::rel(&state.rootdir, Path::new(abs))?;
+                Some(Dep {
+                    file: data.strings.intern(&rel),
+                    qualname: data.strings.intern(kind.qualname()),
+                    checksum: *hash,
+                })
+            })
+            .collect();
         let groups: Vec<Option<u32>> = recording
             .contexts
             .iter()
-            .map(|codes| {
+            .enumerate()
+            .map(|(context, codes)| {
                 let deps: Vec<Dep> = codes
                     .iter()
                     .flat_map(|code| code_deps[*code as usize].iter().copied())
+                    .chain(
+                        recording
+                            .context_inputs
+                            .get(context)
+                            .into_iter()
+                            .flatten()
+                            .filter_map(|input| input_deps[*input as usize]),
+                    )
                     .collect();
                 (!deps.is_empty()).then(|| data.add_group(deps))
             })
             .collect();
+        let static_groups = Self::static_import_groups(state, ctx.py, &recording, &mut data);
 
         // Tests that ran.
         let mut outcomes: HashMap<&str, (bool, f64)> = HashMap::new();
@@ -643,12 +685,16 @@ impl AffectedPlugin {
                     BTreeSet::new(),
                 ),
             };
-            let contexts = std::iter::once(GLOBAL_CONTEXT)
+            let contexts: Vec<usize> = std::iter::once(GLOBAL_CONTEXT)
                 .chain(state.collect_contexts.get(&run_path).copied())
                 .chain(setups)
-                .chain(own);
+                .chain(own)
+                .collect();
+            let incomplete = contexts.iter().any(|c| recording.incomplete.contains(c));
             let test_groups: Vec<u32> = contexts
-                .filter_map(|c| groups.get(c).copied().flatten())
+                .iter()
+                .filter_map(|c| groups.get(*c).copied().flatten())
+                .chain(static_groups.get(&run_path).copied())
                 .collect();
             let id = data.strings.intern(nodeid);
             let path = data.strings.intern(&run_path);
@@ -659,9 +705,67 @@ impl AffectedPlugin {
                     failed,
                     duration,
                     groups: test_groups,
+                    incomplete,
                 },
             );
             recorded += 1;
+        }
+        // Test files imported this session: what they collected and the
+        // groups every one of their tests depends on.
+        let imported: BTreeSet<&String> = state
+            .collect_contexts
+            .keys()
+            .chain(state.file_nodeids.keys())
+            .collect();
+        for path in imported {
+            // The file's whole content: a test added to it changes no unit
+            // an existing test depends on, but must be collected.
+            // Taken from the collector's first sight (the content that was
+            // imported), not from disk now.
+            let own = data
+                .strings
+                .get(path)
+                .and_then(|file| Some((file, data.files.get(&file)?.content_hash)))
+                .map(|(file, content_hash)| {
+                    let qualname = data.strings.intern(FILE_UNIT);
+                    data.add_group(vec![Dep {
+                        file,
+                        qualname,
+                        checksum: content_hash,
+                    }])
+                });
+            let groups: Vec<u32> = std::iter::once(GLOBAL_CONTEXT)
+                .chain(state.collect_contexts.get(path).copied())
+                .filter_map(|c| groups.get(c).copied().flatten())
+                .chain(static_groups.get(path).copied())
+                .chain(own)
+                .collect();
+            let nodeids: Vec<u32> = state
+                .file_nodeids
+                .get(path)
+                .into_iter()
+                .flatten()
+                .map(|nodeid| data.strings.intern(nodeid))
+                .collect();
+            let id = data.strings.intern(path);
+            data.file_records.insert(id, FileRecord { groups, nodeids });
+        }
+        // Tests a file_triggers entry forced but this run left out (-k):
+        // without their entry they run as new next time.
+        if let Some(plan) = &state.plan {
+            let left_out: Vec<u32> = data
+                .tests
+                .iter()
+                .filter(|(id, entry)| {
+                    let path = data.strings.resolve(entry.path);
+                    plan.triggered.iter().any(|g| g.matches(path))
+                        && !state.to_run.contains(data.strings.resolve(**id))
+                })
+                .map(|(id, _)| *id)
+                .collect();
+            for id in left_out {
+                data.tests.remove(&id);
+            }
         }
         // Entries whose test file is gone.
         let rootdir = state.rootdir.clone();
@@ -674,6 +778,8 @@ impl AffectedPlugin {
         for id in gone {
             data.tests.remove(&id);
         }
+        data.file_records
+            .retain(|path, _| rootdir.join(data.strings.resolve(*path)).exists());
         data.snapshot = match state.snapshot.take() {
             Some(snapshot) => snapshot,
             None => Self::snapshot(state),
@@ -686,17 +792,6 @@ impl AffectedPlugin {
         })?;
         Ok(recorded)
     }
-}
-
-/// A stored file's state now.
-enum CurrentFile {
-    /// Missing, unreadable, unparseable or configured as always changed:
-    /// every unit counts as changed.
-    Changed,
-    Units {
-        content_hash: u64,
-        units: HashMap<String, u64>,
-    },
 }
 
 impl Plugin for AffectedPlugin {
@@ -763,16 +858,22 @@ impl Plugin for AffectedPlugin {
         };
         let header = Self::current_header(py)?;
         match Data::load(&state.data_path) {
-            None if state.data_path.exists() => state.unusable = Some("unreadable data".into()),
-            None => state.unusable = Some("no data".into()),
-            Some(data) => match data.header.mismatch(&header) {
+            Err(LoadError::Missing) => state.unusable = Some("no data".into()),
+            Err(LoadError::OtherFormat) => state.unusable = Some("data format changed".into()),
+            Err(LoadError::Unreadable) => state.unusable = Some("unreadable data".into()),
+            Ok(data) => match data.header.mismatch(&header) {
                 Some(reason) => state.unusable = Some(reason.into()),
                 None => state.stored = Some(data),
             },
         }
         state.header = Some(header);
         if mode.records() {
-            Self::start_collector(&mut state, py)?;
+            let cache_dir = ctx
+                .config
+                .get_ini("cache_dir")
+                .unwrap_or(".pytest_cache")
+                .to_string();
+            Self::start_collector(&mut state, py, &cache_dir)?;
         }
         Ok(())
     }
@@ -820,6 +921,37 @@ impl Plugin for AffectedPlugin {
         Self::sync_context(&state, py);
     }
 
+    fn pytest_collection_select_files(
+        &mut self,
+        ctx: &mut HookContext,
+        files: &mut Vec<PathBuf>,
+    ) -> PyResult<()> {
+        let mut state = self.lock();
+        if !state.mode.is_some_and(Mode::selects) {
+            return Ok(());
+        }
+        Self::ensure_plan(&mut state, ctx);
+        let state = &mut *state;
+        let (Some(data), Some(plan)) = (state.stored.as_ref(), state.plan.as_mut()) else {
+            return Ok(());
+        };
+        let before = files.len();
+        let rootdir = state.rootdir.clone();
+        files.retain(|file| {
+            let path = Self::rel(&rootdir, file).unwrap_or_default();
+            !plan.file_unchanged(data, &state.config, &path)
+        });
+        let skipped = before - files.len();
+        if skipped > 0 {
+            // Nothing left to run because of the selection is a success.
+            ctx.session.no_tests_ok = true;
+            if !ctx.config.no_terminal() {
+                println!("affected: {skipped} of {before} test files unchanged, not imported");
+            }
+        }
+        Ok(())
+    }
+
     fn pytest_collection_modifyitems(
         &self,
         ctx: &mut HookContext,
@@ -829,8 +961,18 @@ impl Plugin for AffectedPlugin {
         let Some(mode) = state.mode.filter(|m| *m != Mode::Off) else {
             return Ok(());
         };
-        let snapshot = Self::snapshot(&state);
-        state.snapshot = Some(snapshot);
+        for item in items.iter().chain(ctx.session.deselected_items.iter()) {
+            let path = Self::item_path(&state.rootdir, item);
+            state
+                .file_modules
+                .entry(path.clone())
+                .or_insert_with(|| item.module_name.clone());
+            state
+                .file_nodeids
+                .entry(path)
+                .or_default()
+                .push(item.nodeid.clone());
+        }
         let result = Self::apply_mode(&mut state, mode, ctx, items);
         state.to_run = items.iter().map(|item| item.nodeid.clone()).collect();
         result
@@ -970,27 +1112,5 @@ mod tests {
             Ok(Mode::Select)
         );
         assert!(AffectedPlugin::parse_mode(Some(vec!["tests/"])).is_err());
-    }
-
-    #[test]
-    fn explicit_prefixes() {
-        let explicit = vec!["tests/test_a.py::test_x".to_string()];
-        assert!(AffectedPlugin::is_explicit(
-            &explicit,
-            "tests/test_a.py::test_x"
-        ));
-        assert!(AffectedPlugin::is_explicit(
-            &explicit,
-            "tests/test_a.py::test_x[1]"
-        ));
-        assert!(!AffectedPlugin::is_explicit(
-            &explicit,
-            "tests/test_a.py::test_xy"
-        ));
-        let class = vec!["tests/test_a.py::TestK".to_string()];
-        assert!(AffectedPlugin::is_explicit(
-            &class,
-            "tests/test_a.py::TestK::test_m"
-        ));
     }
 }
