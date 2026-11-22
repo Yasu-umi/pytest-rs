@@ -23,6 +23,8 @@ use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 use ruff_text_size::TextRange;
 use siphasher::sip::SipHasher13;
 
+use crate::names::ModuleFacts;
+
 /// The qualname of a file's module unit (matches `co_qualname` of a
 /// module's code object).
 pub const MODULE_UNIT: &str = "<module>";
@@ -33,7 +35,7 @@ pub const FILE_UNIT: &str = "<file>";
 
 /// Bumped whenever the unit split or the hash input changes; stored in the
 /// data header, where a mismatch means a full re-record.
-pub const CHECKSUM_SCHEME: u32 = 1;
+pub const CHECKSUM_SCHEME: u32 = 2;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Unit {
@@ -52,14 +54,20 @@ impl FileUnits {
     /// file then counts as changed.
     pub fn parse(source: &str) -> Option<Self> {
         let parsed = ruff_python_parser::parse_module(source).ok()?;
-        let suite = parsed.suite();
+        Some(Self::from_suite(parsed.suite()))
+    }
+
+    /// The units of a parsed module, the name units of its module-level and
+    /// class-level statements (`crate::names`) included.
+    pub fn from_suite(suite: &[Stmt]) -> Self {
         let mut found: Vec<Unit> = Vec::new();
         Self::walk(suite, "", &mut found);
         found.push(Unit {
             qualname: MODULE_UNIT.to_string(),
             checksum: Self::hash_suite(&Self::strip_defs(suite)),
         });
-        Some(Self::merge(found))
+        found.extend(ModuleFacts::analyze(suite, None, false).1);
+        Self::merge(found)
     }
 
     /// Duplicate qualnames (`if X: def f() ... else: def f() ...`) merge
@@ -129,7 +137,7 @@ impl FileUnits {
 
     /// The statement lists nested in a compound statement other than
     /// `def`/`class`.
-    fn child_suites(stmt: &Stmt) -> Vec<&[Stmt]> {
+    pub(crate) fn child_suites(stmt: &Stmt) -> Vec<&[Stmt]> {
         match stmt {
             Stmt::If(node) => std::iter::once(node.body.as_slice())
                 .chain(node.elif_else_clauses.iter().map(|c| c.body.as_slice()))
@@ -149,7 +157,7 @@ impl FileUnits {
     }
 
     /// Rebuild a compound statement with each nested suite mapped by `f`.
-    fn map_child_suites(stmt: &Stmt, f: &dyn Fn(&[Stmt]) -> Vec<Stmt>) -> Stmt {
+    pub(crate) fn map_child_suites(stmt: &Stmt, f: &dyn Fn(&[Stmt]) -> Vec<Stmt>) -> Stmt {
         let mut stmt = stmt.clone();
         match &mut stmt {
             Stmt::If(node) => {
@@ -188,7 +196,7 @@ impl FileUnits {
 
     /// Replace each nested `def`/`class` (also inside compound statements)
     /// with a name-only placeholder.
-    fn placeholder_defs(stmts: &[Stmt]) -> Vec<Stmt> {
+    pub(crate) fn placeholder_defs(stmts: &[Stmt]) -> Vec<Stmt> {
         stmts
             .iter()
             .map(|stmt| match stmt {
@@ -219,7 +227,7 @@ impl FileUnits {
 
     /// Drop each `def`/`class` (also inside compound statements): the
     /// module unit covers only the other top-level code.
-    fn strip_defs(stmts: &[Stmt]) -> Vec<Stmt> {
+    pub(crate) fn strip_defs(stmts: &[Stmt]) -> Vec<Stmt> {
         stmts
             .iter()
             .filter(|stmt| !matches!(stmt, Stmt::FunctionDef(_) | Stmt::ClassDef(_)))
@@ -308,8 +316,15 @@ impl FileUnits {
 mod tests {
     use super::*;
 
+    /// The function, class and module units (the name units of
+    /// `crate::names`, `scope:name`, are tested there).
     fn units(source: &str) -> HashMap<String, u64> {
-        FileUnits::parse(source).expect("parses").units
+        FileUnits::parse(source)
+            .expect("parses")
+            .units
+            .into_iter()
+            .filter(|(qualname, _)| !qualname.contains(':'))
+            .collect()
     }
 
     /// The qualnames whose checksum differs between two versions (added and

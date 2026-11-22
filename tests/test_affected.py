@@ -1052,5 +1052,340 @@ class TestAffected(unittest.TestCase):
         self.assertIn("unreadable data", result.stdout)
 
 
+class TestImportTimeNames(unittest.TestCase):
+    """import_time = "names": a test depends on the module-level and
+    class-level statements binding the names its code reaches."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        if not BINARY.exists():
+            raise unittest.SkipTest("debug binary not built")
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.project = Project(Path(self._tmp.name).resolve())
+        self.project.write(
+            "pyproject.toml",
+            """
+            [tool.pytest.ini_options]
+            testpaths = ["tests"]
+            pythonpath = ["."]
+
+            [tool.pytest-rs.affected]
+            import_time = "names"
+            """,
+        )
+        # The conftest imports the application: with import_time = "module"
+        # every test would depend on all of its import-time code.
+        self.project.write("tests/conftest.py", "import app.consts\nimport app.core\n")
+        self.project.write(
+            "app/consts.py",
+            """
+            LIMIT = 10
+            OTHER = 5
+            DOUBLE = LIMIT * 2
+
+            class Config:
+                size = 1
+                color = "red"
+
+                def grow(self):
+                    return self.size + 1
+            """,
+        )
+        self.project.write(
+            "app/core.py",
+            """
+            from app import consts
+            from app.consts import DOUBLE, LIMIT
+
+            def limit():
+                return LIMIT
+
+            def double():
+                return DOUBLE
+
+            def other():
+                return consts.OTHER
+            """,
+        )
+        (self.project.base / "tests/test_add.py").unlink()
+        (self.project.base / "tests/test_mul.py").unlink()
+        self.project.write(
+            "tests/test_names.py",
+            """
+            from app.consts import Config
+            from app.core import double, limit, other
+
+            def test_limit():
+                assert limit() == 10
+
+            def test_double():
+                assert double() == 20
+
+            def test_other():
+                assert other() == 5
+
+            def test_grow():
+                assert Config().grow() == 2
+
+            def test_color():
+                assert Config().color == "red"
+
+            def test_nothing():
+                pass
+            """,
+        )
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def ran(self) -> set[str]:
+        return {n.removeprefix("tests/test_names.py::") for n in self.project.ran("--affected")}
+
+    def record(self) -> None:
+        self.assertEqual(len(self.ran()), 6)
+        self.assertEqual(self.ran(), set())
+
+    def test_module_constant(self) -> None:
+        """a constant reached through `from m import X` and `m.X`."""
+        self.record()
+        self.project.edit("app/consts.py", "OTHER = 5", "OTHER = 6")
+        self.assertEqual(self.ran(), {"test_other"})
+        self.project.edit("app/consts.py", "OTHER = 6", "OTHER = 5")
+        self.ran()
+        self.project.edit("app/consts.py", "LIMIT = 10", "LIMIT = 11")
+        # DOUBLE = LIMIT * 2: followed through other statements.
+        self.assertEqual(self.ran(), {"test_limit", "test_double"})
+
+    def test_class_attribute(self) -> None:
+        """an attribute of an instance of unknown type: every attribute of that name."""
+        self.record()
+        self.project.edit("app/consts.py", 'color = "red"', 'color = "blue"')
+        self.assertEqual(self.ran(), {"test_color"})
+        self.project.edit("app/consts.py", "size = 1", "size = 2")
+        self.assertEqual(self.ran(), {"test_grow", "test_color"})
+
+    def test_adding_a_constant_changes_nothing(self) -> None:
+        self.record()
+        self.project.edit("app/consts.py", "OTHER = 5", "OTHER = 5\nNEW = 1")
+        self.assertEqual(self.ran(), set())
+
+    def test_moving_a_definition_across_a_use(self) -> None:
+        """a statement records how many earlier statements bound each name it reads."""
+        self.project.edit("app/consts.py", "DOUBLE = LIMIT * 2", "DOUBLE = LIMIT * 2\nLIMIT = 10")
+        self.record()
+        self.project.edit(
+            "app/consts.py",
+            "LIMIT = 10\nOTHER = 5\nDOUBLE = LIMIT * 2\nLIMIT = 10",
+            "LIMIT = 10\nOTHER = 5\nLIMIT = 10\nDOUBLE = LIMIT * 2",
+        )
+        self.assertIn("test_double", self.ran())
+
+    def test_enum_is_a_whole_class(self) -> None:
+        """an Enum member reached only through `Color(value)` still counts."""
+        self.project.write(
+            "app/colors.py",
+            """
+            import enum
+
+            class Color(enum.Enum):
+                RED = "red"
+                BLUE = "blue"
+            """,
+        )
+        self.project.write(
+            "tests/test_colors.py",
+            """
+            from app.colors import Color
+
+            def test_lookup():
+                assert Color("red") is not None
+            """,
+        )
+        self.project.ran("--affected")
+        self.project.edit("app/colors.py", 'RED = "red"', 'RED = "crimson"')
+        self.assertEqual(self.project.ran("--affected"), {"tests/test_colors.py::test_lookup"})
+
+    def test_dataclass_is_a_whole_class(self) -> None:
+        self.project.write(
+            "app/point.py",
+            """
+            import dataclasses
+
+            @dataclasses.dataclass
+            class Point:
+                x: int = 0
+                y: int = 0
+            """,
+        )
+        self.project.write(
+            "tests/test_point.py",
+            """
+            import dataclasses
+            from app.point import Point
+
+            def test_fields():
+                assert dataclasses.astuple(Point()) == (0, 0)
+            """,
+        )
+        self.project.ran("--affected")
+        self.project.edit("app/point.py", "y: int = 0", "y: int = 1")
+        self.assertEqual(self.project.ran("--affected"), {"tests/test_point.py::test_fields"})
+
+    def test_init_subclass_registration(self) -> None:
+        """a subclass whose definition runs its base's __init_subclass__ is a
+        dependency of every test that reaches its module."""
+        self.project.write(
+            "app/registry.py",
+            """
+            HANDLERS = {}
+
+            class Handler:
+                def __init_subclass__(cls, **kwargs):
+                    super().__init_subclass__(**kwargs)
+                    HANDLERS[cls.__name__] = cls
+
+            def describe(name, field):
+                return getattr(HANDLERS[name], field)
+            """,
+        )
+        self.project.write(
+            "app/handlers.py",
+            """
+            from app.registry import Handler
+
+            class Json(Handler):
+                kind = "json"
+            """,
+        )
+        self.project.write(
+            "tests/conftest.py", "import app.consts\nimport app.core\nimport app.handlers\n"
+        )
+        self.project.write(
+            "tests/test_registry.py",
+            """
+            from app.registry import describe
+
+            def test_describe():
+                assert describe("Json", "kind") == "json"
+            """,
+        )
+        self.project.ran("--affected")
+        self.project.edit("app/handlers.py", 'kind = "json"', 'kind = "yaml"')
+        self.assertIn("tests/test_registry.py::test_describe", self.project.ran("--affected"))
+
+    def test_call_at_import_time_is_everyones(self) -> None:
+        """a module-level call into the project can change any state."""
+        self.project.write(
+            "app/plugins.py",
+            """
+            from app import core
+
+            ENABLED = []
+
+            def enable(name):
+                ENABLED.append(name)
+
+            enable("x")
+            """,
+        )
+        self.project.write(
+            "tests/conftest.py", "import app.consts\nimport app.core\nimport app.plugins\n"
+        )
+        self.record()
+        self.project.edit("app/plugins.py", 'enable("x")', 'enable("y")')
+        self.assertEqual(len(self.ran()), 6)
+
+    def test_write_from_another_module(self) -> None:
+        """`m.X = ...` at the top of another module counts for everyone reaching it."""
+        self.project.write("app/override.py", "from app import consts\n\nconsts.OTHER = 5\n")
+        self.project.write(
+            "tests/conftest.py", "import app.consts\nimport app.core\nimport app.override\n"
+        )
+        self.record()
+        self.project.edit("app/override.py", "consts.OTHER = 5", "consts.OTHER = 7")
+        self.assertIn("test_other", self.ran())
+
+    def test_star_import(self) -> None:
+        self.project.write("app/__init__.py", "from app.consts import *\n")
+        self.project.write(
+            "tests/test_star.py",
+            """
+            import app
+
+            def test_other():
+                assert app.OTHER == 5
+            """,
+        )
+        self.project.ran("--affected")
+        self.project.edit("app/consts.py", "LIMIT = 10", "LIMIT = 11")
+        self.assertNotIn("tests/test_star.py::test_other", self.project.ran("--affected"))
+        self.project.edit("app/consts.py", "OTHER = 5", "OTHER = 6")
+        self.assertIn("tests/test_star.py::test_other", self.project.ran("--affected"))
+
+    def test_computed_attribute_of_a_module(self) -> None:
+        """getattr(module, name) with a computed name: the whole module."""
+        self.project.write(
+            "tests/test_dynamic.py",
+            """
+            from app import consts
+
+            def test_lookup():
+                name = "OT" + "HER"
+                assert getattr(consts, name) == 5
+            """,
+        )
+        self.project.ran("--affected")
+        self.project.edit("app/consts.py", "LIMIT = 10", "LIMIT = 11")
+        self.assertIn("tests/test_dynamic.py::test_lookup", self.project.ran("--affected"))
+
+    def test_name_the_module_does_not_bind(self) -> None:
+        """a name set some other way (a module __getattr__, setattr): the whole module."""
+        self.project.write(
+            "app/lazy.py",
+            """
+            VALUE = 1
+
+            def __getattr__(name):
+                return VALUE
+            """,
+        )
+        self.project.write(
+            "tests/test_lazy.py",
+            """
+            from app import lazy
+
+            def test_lazy():
+                assert lazy.anything == 1
+            """,
+        )
+        self.project.ran("--affected")
+        self.project.edit("app/lazy.py", "VALUE = 1", "VALUE = 2")
+        self.assertIn("tests/test_lazy.py::test_lazy", self.project.ran("--affected"))
+
+    def test_always_changed_files_are_not_narrowed(self) -> None:
+        self.project.edit(
+            "pyproject.toml",
+            'import_time = "names"',
+            'import_time = "names"\nalways_changed = ["app/consts.py"]',
+        )
+        self.assertEqual(len(self.ran()), 6)
+        self.assertEqual(len(self.ran()), 6)
+
+    def test_under_n(self) -> None:
+        self.assertEqual(len(self.project.ran("--affected", "-n", "2")), 6)
+        self.project.edit("app/consts.py", "OTHER = 5", "OTHER = 6")
+        self.assertEqual(
+            self.project.ran("--affected", "-n", "2"), {"tests/test_names.py::test_other"}
+        )
+
+    def test_invalid_value_is_a_usage_error(self) -> None:
+        self.project.edit("pyproject.toml", 'import_time = "names"', 'import_time = "lines"')
+        result = self.project.run("--affected")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("import_time", result.stdout + result.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()
