@@ -72,6 +72,7 @@ impl Plan {
         config: &AffectedConfig,
         snapshot: &[SnapEntry],
         explicit: Vec<String>,
+        vouched: &dyn Fn(&str, Option<&str>) -> bool,
     ) -> Self {
         let changes = Snapshot::diff(&data.snapshot, snapshot).paths;
         let builtin_full = Globs::builtin(BUILTIN_FULL_RUN_ON);
@@ -100,7 +101,7 @@ impl Plan {
                 format!("changed: {}", shown.join(", "))
             }
         });
-        let current = Self::current_units(data, rootdir, config);
+        let current = Self::current_units(data, rootdir, config, vouched);
         let inputs = Self::current_inputs(data, rootdir, config);
         Self {
             full_reason,
@@ -112,10 +113,14 @@ impl Plan {
         }
     }
 
+    /// `vouched(path, commit)`: git vouches that the file is unchanged since
+    /// the commit its stored state was recorded clean at; its stored state
+    /// is then current, and the file is not read.
     fn current_units(
         data: &Data,
         rootdir: &Path,
         config: &AffectedConfig,
+        vouched: &dyn Fn(&str, Option<&str>) -> bool,
     ) -> HashMap<u32, CurrentFile> {
         data.files
             .iter()
@@ -123,6 +128,20 @@ impl Plan {
                 let rel = data.strings.resolve(file);
                 if config.always_changed.matches(rel) {
                     return (file, CurrentFile::Changed);
+                }
+                let commit = entry.commit.map(|c| data.strings.resolve(c));
+                if vouched(rel, commit) {
+                    let current = match &entry.units {
+                        Some(units) => CurrentFile::Units {
+                            content_hash: entry.content_hash,
+                            units: units
+                                .iter()
+                                .map(|(q, c)| (data.strings.resolve(*q).to_string(), *c))
+                                .collect(),
+                        },
+                        None => CurrentFile::Changed,
+                    };
+                    return (file, current);
                 }
                 let Ok(bytes) = std::fs::read(rootdir.join(rel)) else {
                     return (file, CurrentFile::Changed);

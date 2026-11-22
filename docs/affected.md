@@ -14,6 +14,8 @@ The record lives in `.pytest-rs-affected` in the rootdir. `--affected-data=PATH`
 
 `--affected` works with `-n`: every worker selects on its own and records the tests it ran, and the controller writes one data file. With pytest-split (`--splits`/`--group`), the tests are selected first and the groups divide the selected tests.
 
+In a git checkout, `--affected` records which commit each file's state came from, when the file was tracked and unmodified. Later it skips reading the files git reports unchanged since that commit. Git only saves reading: untracked and ignored files, files that had uncommitted changes, and everything outside a repository are compared by content.
+
 ## What runs
 
 A test runs when any of these is true:

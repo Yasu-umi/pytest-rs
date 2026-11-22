@@ -22,6 +22,12 @@ pub struct Snapshot<'a> {
     /// Rootdir-relative paths of files pytest-rs writes itself (the data
     /// file).
     pub own_files: Vec<String>,
+    /// The git fast path: whether git vouches that a previous entry's file
+    /// is unchanged since the commit it names (then it is not read), and
+    /// the files that are clean at HEAD, with HEAD (their new entries name
+    /// it).
+    pub vouched: Option<&'a dyn Fn(&SnapEntry) -> bool>,
+    pub clean_at_head: Option<(&'a str, &'a std::collections::HashSet<String>)>,
 }
 
 /// The difference between two snapshots.
@@ -108,20 +114,29 @@ impl Snapshot<'_> {
                 .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
                 .map(|d| d.as_nanos() as i64)
                 .unwrap_or(-1);
-            let hash = match known.get(child_rel.as_str()) {
+            let old = known.get(child_rel.as_str());
+            let (hash, kept_commit) = match old {
+                Some(old) if self.vouched.is_some_and(|vouched| vouched(old)) => {
+                    (old.hash, old.commit.clone())
+                }
                 Some(old) if old.size == size && old.mtime_ns == mtime_ns && mtime_ns >= 0 => {
-                    old.hash
+                    (old.hash, None)
                 }
                 _ => match std::fs::read(&path) {
-                    Ok(bytes) => FileUnits::content_hash(&bytes),
+                    Ok(bytes) => (FileUnits::content_hash(&bytes), None),
                     Err(_) => continue,
                 },
+            };
+            let commit = match self.clean_at_head {
+                Some((head, clean)) if clean.contains(&child_rel) => Some(head.to_string()),
+                _ => kept_commit,
             };
             out.push(SnapEntry {
                 path: child_rel,
                 size,
                 mtime_ns,
                 hash,
+                commit,
             });
         }
     }
@@ -185,6 +200,8 @@ mod tests {
             ignore: vec![&builtin_ignore, &user_ignore],
             include_py: vec![&full_run],
             own_files: vec![".pytest-rs-affected".to_string()],
+            vouched: None,
+            clean_at_head: None,
         };
         let first = snapshot.take(&[]);
         let paths: Vec<&str> = first.iter().map(|e| e.path.as_str()).collect();
