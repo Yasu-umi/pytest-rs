@@ -70,6 +70,25 @@ impl Engine {
         result
     }
 
+    /// Native plugins' `pytest_collection_select_files`: the test files left
+    /// to import and collect in this process.
+    pub(crate) fn fire_collection_select_files(
+        &mut self,
+        py: Python<'_>,
+        files: &[std::path::PathBuf],
+    ) -> PyResult<Vec<std::path::PathBuf>> {
+        let mut selected = files.to_vec();
+        let mut ctx = HookContext {
+            py,
+            session: &mut self.session,
+            config: &self.config,
+        };
+        for plugin in self.plugins.iter_mut() {
+            plugin.pytest_collection_select_files(&mut ctx, &mut selected)?;
+        }
+        Ok(selected)
+    }
+
     fn fire_collection_modifyitems_inner(&mut self, py: Python<'_>) -> PyResult<()> {
         // Temporarily move items out so hooks can mutate the list while the
         // session stays borrowable.

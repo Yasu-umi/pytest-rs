@@ -30,6 +30,11 @@ pub struct SplitPlugin {
     clean_durations: bool,
     durations_path: PathBuf,
     cached_durations: HashMap<String, f64>,
+    split_by_file: bool,
+    /// `--splitting-granularity=file`: each scanned test file's group (0-based) and this
+    /// group's estimated duration, set before import by
+    /// `pytest_collection_select_files`.
+    file_groups: Option<(HashMap<String, usize>, f64)>,
 }
 
 impl SplitPlugin {
@@ -42,7 +47,66 @@ impl SplitPlugin {
             clean_durations: false,
             durations_path: PathBuf::new(),
             cached_durations: HashMap::new(),
+            split_by_file: false,
+            file_groups: None,
         }
+    }
+
+    fn split(&self, splits: usize, nodeids: &[String]) -> Vec<algorithms::TestGroup> {
+        match self.algorithm {
+            Algorithm::DurationBasedChunks => {
+                algorithms::duration_based_chunks(splits, nodeids, &self.cached_durations)
+            }
+            Algorithm::LeastDuration => {
+                algorithms::least_duration(splits, nodeids, &self.cached_durations)
+            }
+        }
+    }
+
+    /// The groups of whole files, in `files` order (file node ids).
+    fn split_files(&self, splits: usize, files: &[String]) -> Vec<algorithms::TestGroup> {
+        let durations = algorithms::files_with_durations(files, &self.cached_durations);
+        match self.algorithm {
+            Algorithm::DurationBasedChunks => {
+                algorithms::duration_based_chunks_of(splits, &durations)
+            }
+            Algorithm::LeastDuration => algorithms::least_duration_of(splits, files, &durations),
+        }
+    }
+
+    /// `--splitting-granularity=file`: items of the files this group imported stay,
+    /// items of another group's files go, and items of files outside the
+    /// scan (doctest modules, custom collectors; every group collects the
+    /// same set of them) are split per item. Returns the kept indices and
+    /// the group's estimated duration.
+    fn select_by_file(
+        &self,
+        splits: usize,
+        group: usize,
+        file_groups: &HashMap<String, usize>,
+        file_duration: f64,
+        nodeids: &[String],
+    ) -> (Vec<usize>, f64) {
+        let mut keep = Vec::new();
+        let mut rest = Vec::new();
+        for (index, nodeid) in nodeids.iter().enumerate() {
+            let file = nodeid.split("::").next().unwrap_or(nodeid);
+            match file_groups.get(file) {
+                Some(&g) if g == group - 1 => keep.push(index),
+                Some(_) => {}
+                None => rest.push(index),
+            }
+        }
+        let mut duration = file_duration;
+        if !rest.is_empty() {
+            let rest_ids: Vec<String> = rest.iter().map(|&i| nodeids[i].clone()).collect();
+            let groups = self.split(splits, &rest_ids);
+            let selected = &groups[group - 1];
+            keep.extend(selected.selected.iter().map(|&i| rest[i]));
+            duration += selected.duration;
+            keep.sort_unstable();
+        }
+        (keep, duration)
     }
 
     fn load_durations(path: &PathBuf) -> HashMap<String, f64> {
@@ -108,6 +172,14 @@ impl Plugin for SplitPlugin {
             "Path to the file in which durations are (to be) stored, \
              default is .test_durations in the current working directory",
         ));
+        parser.add_option(OptDef::value(
+            "--splitting-granularity",
+            Some("test"),
+            "Unit of splitting (pytest-rs only). Choices: ['test', 'file']. \
+             'file' assigns whole test files before importing them, so each group \
+             imports and collects only its own files; its default \
+             --splitting-algorithm is least_duration",
+        ));
         parser.add_option(OptDef::flag(
             "--clean-durations",
             "Removes the test duration info for tests which are not present \
@@ -119,11 +191,36 @@ impl Plugin for SplitPlugin {
         let py = ctx.py;
 
         // Choice validation first (argparse rejects at parse time upstream).
-        self.algorithm = match ctx
+        self.split_by_file = match ctx
             .config
-            .get_value("splitting-algorithm")
-            .unwrap_or("duration_based_chunks")
+            .get_value("splitting-granularity")
+            .unwrap_or("test")
         {
+            "test" => false,
+            "file" => true,
+            other => {
+                return Err(pytest_rs_core::python::usage_error(
+                    py,
+                    &format!(
+                        "argument --splitting-granularity: invalid choice: '{other}' \
+                         (choose from 'test', 'file')"
+                    ),
+                ));
+            }
+        };
+        // Whole files balance poorly as contiguous chunks, so file
+        // granularity defaults to least_duration; an explicit
+        // --splitting-algorithm (CLI or addopts) still wins.
+        let algorithm_given =
+            ctx.config.effective_args.iter().any(|arg| {
+                arg == "--splitting-algorithm" || arg.starts_with("--splitting-algorithm=")
+            });
+        let algorithm = match ctx.config.get_value("splitting-algorithm") {
+            Some(given) if algorithm_given => given,
+            _ if self.split_by_file => "least_duration",
+            _ => "duration_based_chunks",
+        };
+        self.algorithm = match algorithm {
             "duration_based_chunks" => Algorithm::DurationBasedChunks,
             "least_duration" => Algorithm::LeastDuration,
             other => {
@@ -206,18 +303,19 @@ impl Plugin for SplitPlugin {
             return Ok(());
         };
         let nodeids: Vec<String> = items.iter().map(|item| item.nodeid.clone()).collect();
-        let groups = match self.algorithm {
-            Algorithm::DurationBasedChunks => {
-                algorithms::duration_based_chunks(splits, &nodeids, &self.cached_durations)
+        let (selected, duration) = match &self.file_groups {
+            Some((file_groups, file_duration)) => {
+                self.select_by_file(splits, group, file_groups, *file_duration, &nodeids)
             }
-            Algorithm::LeastDuration => {
-                algorithms::least_duration(splits, &nodeids, &self.cached_durations)
+            None => {
+                let mut groups = self.split(splits, &nodeids);
+                let selected = groups.swap_remove(group - 1);
+                (selected.selected, selected.duration)
             }
         };
-        let selected = &groups[group - 1];
 
         let mut keep: Vec<bool> = vec![false; items.len()];
-        for &index in &selected.selected {
+        for &index in &selected {
             keep[index] = true;
         }
         let mut index = 0usize;
@@ -235,9 +333,42 @@ impl Plugin for SplitPlugin {
             println!("\n\n[pytest-split] Splitting tests with algorithm: {algorithm}");
             println!(
                 "[pytest-split] Running group {group}/{splits} (estimated duration: {:.2}s)\n",
-                selected.duration
+                duration
             );
         }
+        Ok(())
+    }
+
+    fn pytest_collection_select_files(
+        &mut self,
+        ctx: &mut HookContext,
+        files: &mut Vec<PathBuf>,
+    ) -> PyResult<()> {
+        let (Some(splits), Some(group), true) = (self.splits, self.group, self.split_by_file)
+        else {
+            return Ok(());
+        };
+        let rootdir = &ctx.config.rootdir;
+        let nodeids: Vec<String> = files
+            .iter()
+            .map(|file| {
+                pytest_rs_core::collect::file_nodeid(rootdir, file, &ctx.session.initial_paths)
+            })
+            .collect();
+        let groups = self.split_files(splits, &nodeids);
+        let mut file_groups = HashMap::with_capacity(nodeids.len());
+        for (g, test_group) in groups.iter().enumerate() {
+            for &index in &test_group.selected {
+                file_groups.insert(nodeids[index].clone(), g);
+            }
+        }
+        let mut index = 0usize;
+        files.retain(|_| {
+            let kept = file_groups.get(&nodeids[index]) == Some(&(group - 1));
+            index += 1;
+            kept
+        });
+        self.file_groups = Some((file_groups, groups[group - 1].duration));
         Ok(())
     }
 

@@ -90,6 +90,19 @@ pub trait Plugin: Send {
         Ok(())
     }
 
+    /// After `pytest_configure`, before any test module is imported: drop
+    /// test files this process should not import or collect at all. `files`
+    /// is the ordered `python_files` scan of the arguments (the serial
+    /// session's and each `-n` worker's); files reached otherwise (doctest
+    /// modules, `pytest_collect_file` collectors) are not passed here.
+    fn pytest_collection_select_files(
+        &mut self,
+        _ctx: &mut HookContext,
+        _files: &mut Vec<std::path::PathBuf>,
+    ) -> PyResult<()> {
+        Ok(())
+    }
+
     /// Extra fixture names to treat as requested by one test function for
     /// parametrize-argname validation, for a plugin that connects its
     /// fixture to matching items only in `pytest_collection_preexpand`/

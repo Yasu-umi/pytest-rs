@@ -84,6 +84,8 @@ At build time, when installing from source — bundled plugins are Cargo feature
 config-settings-package = { pytest-rs = { build-args = "--no-default-features --features asyncio,mock" } }
 ```
 
+`--splitting-granularity=file` (pytest-rs only; the default is `test`) makes `--splits`/`--group` assign whole test files before importing them, so each group — and each `-n` worker in it — imports and collects only its own files. It changes which tests land in which group, and defaults `--splitting-algorithm` to `least_duration`; see [docs/splitting-granularity.md](docs/splitting-granularity.md).
+
 #### Type annotations
 
 A suite that annotates its fixture parameters keeps working: the wheel installs
