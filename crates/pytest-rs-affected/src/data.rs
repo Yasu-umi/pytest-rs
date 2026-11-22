@@ -11,7 +11,7 @@ use std::path::Path;
 
 const MAGIC: &[u8] = b"PYTEST-RS-AFFECTED\0";
 /// Bumped on any change to the layout below.
-pub const FORMAT_VERSION: u32 = 3;
+pub const FORMAT_VERSION: u32 = 4;
 
 /// The fields that decide whether stored data is usable at all: any
 /// mismatch means a full run (and, when recording, a fresh file).
@@ -76,6 +76,9 @@ pub struct TestEntry {
     /// The test (or a context it depends on) started a subprocess, whose
     /// dependencies are not recorded (§4.5).
     pub incomplete: bool,
+    /// When it was recorded (ms since the epoch): merging keeps the newer
+    /// of two entries, whatever order the files are merged in.
+    pub recorded: u64,
 }
 
 /// A test file's state at its latest import: every node id it collected
@@ -86,6 +89,8 @@ pub struct TestEntry {
 pub struct FileRecord {
     pub groups: Vec<u32>,
     pub nodeids: Vec<u32>,
+    /// As `TestEntry::recorded`.
+    pub recorded: u64,
 }
 
 /// A non-`.py` file's state when the snapshot was taken (§6: in PR 1 any
@@ -278,6 +283,13 @@ impl Data {
         }
         for (nodeid, entry) in &other.tests {
             let nodeid = string(self, *nodeid);
+            if self
+                .tests
+                .get(&nodeid)
+                .is_some_and(|ours| ours.recorded > entry.recorded)
+            {
+                continue;
+            }
             let path = string(self, entry.path);
             let groups = entry.groups.iter().map(|g| group(self, *g)).collect();
             self.tests.insert(
@@ -288,15 +300,29 @@ impl Data {
                     duration: entry.duration,
                     groups,
                     incomplete: entry.incomplete,
+                    recorded: entry.recorded,
                 },
             );
         }
         for (path, record) in &other.file_records {
             let path = string(self, *path);
+            if self
+                .file_records
+                .get(&path)
+                .is_some_and(|ours| ours.recorded > record.recorded)
+            {
+                continue;
+            }
             let groups = record.groups.iter().map(|g| group(self, *g)).collect();
             let nodeids = record.nodeids.iter().map(|n| string(self, *n)).collect();
-            self.file_records
-                .insert(path, FileRecord { groups, nodeids });
+            self.file_records.insert(
+                path,
+                FileRecord {
+                    groups,
+                    nodeids,
+                    recorded: record.recorded,
+                },
+            );
         }
         if !other.snapshot.is_empty() {
             self.snapshot = other.snapshot.clone();
@@ -365,6 +391,7 @@ impl Data {
                     duration: entry.duration,
                     groups,
                     incomplete: entry.incomplete,
+                    recorded: entry.recorded,
                 };
                 (id, entry)
             })
@@ -380,7 +407,14 @@ impl Data {
             .map(|(path, record)| {
                 let groups = record.groups.iter().map(|g| c.group(*g)).collect();
                 let nodeids = record.nodeids.iter().map(|n| c.string(*n)).collect();
-                (c.strings.intern(path), FileRecord { groups, nodeids })
+                (
+                    c.strings.intern(path),
+                    FileRecord {
+                        groups,
+                        nodeids,
+                        recorded: record.recorded,
+                    },
+                )
             })
             .collect();
         let used: Vec<u32> = c.used_files.iter().copied().collect();
@@ -453,6 +487,7 @@ impl Data {
             out.u8(u8::from(entry.failed));
             out.f64(entry.duration);
             out.u8(u8::from(entry.incomplete));
+            out.u64(entry.recorded);
             out.u32(entry.groups.len() as u32);
             entry.groups.iter().for_each(|group| out.u32(*group));
         });
@@ -463,6 +498,7 @@ impl Data {
             record.groups.iter().for_each(|group| out.u32(*group));
             out.u32(record.nodeids.len() as u32);
             record.nodeids.iter().for_each(|nodeid| out.u32(*nodeid));
+            out.u64(record.recorded);
         });
         out.u32(self.snapshot.len() as u32);
         self.snapshot.iter().for_each(|entry| {
@@ -544,6 +580,7 @@ impl Data {
             let failed = input.u8()? != 0;
             let duration = input.f64()?;
             let incomplete = input.u8()? != 0;
+            let recorded = input.u64()?;
             let groups = input.group_ids(n_groups)?;
             data.tests.insert(
                 nodeid,
@@ -553,6 +590,7 @@ impl Data {
                     duration,
                     groups,
                     incomplete,
+                    recorded,
                 },
             );
         }
@@ -564,8 +602,15 @@ impl Data {
             for _ in 0..n {
                 nodeids.push(string_id(input.u32()?)?);
             }
-            data.file_records
-                .insert(path, FileRecord { groups, nodeids });
+            let recorded = input.u64()?;
+            data.file_records.insert(
+                path,
+                FileRecord {
+                    groups,
+                    nodeids,
+                    recorded,
+                },
+            );
         }
         for _ in 0..input.u32()? {
             data.snapshot.push(SnapEntry {
@@ -702,6 +747,7 @@ mod tests {
                     duration: 0.5,
                     groups: vec![shared, own],
                     incomplete: nodeid.ends_with("test_b"),
+                    recorded: 200,
                 },
             );
         }
@@ -711,6 +757,7 @@ mod tests {
             FileRecord {
                 groups: vec![shared],
                 nodeids: vec![a],
+                recorded: 200,
             },
         );
         data.global_incomplete = true;
@@ -786,6 +833,7 @@ mod tests {
                     duration: 1.0,
                     groups: vec![old_group],
                     incomplete: false,
+                    recorded: if nodeid.ends_with("test_c") { 100 } else { 150 },
                 },
             );
         }
@@ -808,6 +856,25 @@ mod tests {
         let decoded = Data::decode(&base.encode()).expect("decodes");
         assert_eq!(decoded.tests.len(), 3);
         assert_eq!(decoded.file_records.len(), 1);
+    }
+
+    #[test]
+    fn merge_keeps_the_newer_entry_in_any_order() {
+        let newer = sample();
+        let mut older = sample();
+        for entry in older.tests.values_mut() {
+            entry.recorded = 1;
+            entry.failed = !entry.failed;
+        }
+        let mut a = older.clone();
+        a.merge(&newer);
+        let mut b = newer.clone();
+        b.merge(&older);
+        for data in [&a, &b] {
+            let entry = data.test("tests/test_mod.py::test_b").expect("test_b");
+            assert!(entry.failed, "the newer entry wins");
+            assert_eq!(entry.recorded, 200);
+        }
     }
 
     #[test]
