@@ -391,6 +391,52 @@ class TestAffected(unittest.TestCase):
         self.project.edit("app/config.py", "MODE = 'a'", "MODE = 'b'")
         self.assertEqual(self.project.ran("--affected"), {"tests/test_mode.py::test_mode"})
 
+    def test_subdirectory_conftest_import_is_scoped_to_its_directory(self) -> None:
+        """Code run while importing tests/api/conftest.py only affects tests under tests/api."""
+        self.project.write("app/helpers.py", "def setup_value():\n    return 1\n")
+        self.project.write(
+            "tests/api/conftest.py",
+            "from app import helpers\n\nVALUE = helpers.setup_value()\n",
+        )
+        self.project.write("tests/api/test_api.py", "def test_api():\n    pass\n")
+        self.project.ran("--affected")
+        self.project.edit("app/helpers.py", "return 1", "return 2")
+        self.assertEqual(self.project.ran("--affected"), {"tests/api/test_api.py::test_api"})
+
+    def test_module_first_imported_by_a_subdirectory_conftest(self) -> None:
+        """A test outside the directory that imports the same module from the cache still sees it."""
+        self.project.write("app/shared.py", "SIZE = 1\n")
+        self.project.write("tests/api/conftest.py", "from app import shared\n")
+        self.project.write("tests/api/test_api.py", "def test_api():\n    pass\n")
+        self.project.write(
+            "tests/test_outside.py",
+            "from app.shared import SIZE\n\ndef test_outside():\n    assert SIZE == 1\n",
+        )
+        self.project.ran("--affected")
+        self.project.edit("app/shared.py", "SIZE = 1", "SIZE = 2")
+        self.assertEqual(
+            self.project.ran("--affected"),
+            {"tests/api/test_api.py::test_api", "tests/test_outside.py::test_outside"},
+        )
+
+    def test_imports_of_a_cached_module_are_followed(self) -> None:
+        """A module imported from the cache brings along the modules it imported."""
+        self.project.write("app/inner.py", "LIMIT = 1\n")
+        self.project.write("app/outer.py", "from app import inner\n")
+        self.project.write(
+            "tests/test_a_first.py", "from app import outer\n\ndef test_first():\n    pass\n"
+        )
+        self.project.write(
+            "tests/test_b_second.py",
+            "from app import outer\n\ndef test_second():\n    assert outer.inner.LIMIT == 1\n",
+        )
+        self.project.ran("--affected")
+        self.project.edit("app/inner.py", "LIMIT = 1", "LIMIT = 2")
+        self.assertEqual(
+            self.project.ran("--affected"),
+            {"tests/test_a_first.py::test_first", "tests/test_b_second.py::test_second"},
+        )
+
     def test_lazy_import_belongs_to_the_test(self) -> None:
         """a module first imported inside a test is that test's dependency."""
         self.project.write("app/lazy.py", "FLAG = True\n")
@@ -613,9 +659,9 @@ class TestAffected(unittest.TestCase):
         self.assertEqual(self.project.ran("--affected"), {"tests/test_proc.py::test_spawns"})
 
     def test_subprocess_outside_tests_says_why_everything_runs(self) -> None:
-        """A conftest starting a subprocess at import makes every test incomplete."""
+        """The rootdir's conftest starting a subprocess at import makes every test incomplete."""
         self.project.write(
-            "tests/conftest.py",
+            "conftest.py",
             "import subprocess, sys\n\nsubprocess.run([sys.executable, '-c', 'pass'], check=True)\n",
         )
         self.record()
