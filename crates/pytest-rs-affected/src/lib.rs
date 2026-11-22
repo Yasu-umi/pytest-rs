@@ -188,9 +188,6 @@ struct State {
     to_run: HashSet<String>,
     setup_contexts: HashMap<ScopedSetup, usize>,
     collect_contexts: HashMap<String, usize>,
-    /// Contexts of the conftests below the rootdir, by directory
-    /// (rootdir-relative).
-    conftest_contexts: HashMap<String, usize>,
     /// The sys.meta_path finder that brackets project modules' execution.
     import_finder: Option<Py<PyAny>>,
     /// The selection plan, built once per session (pre-import or at
@@ -812,20 +809,6 @@ impl AffectedPlugin {
         out
     }
 
-    /// The contexts of the conftests (below the rootdir) whose directory
-    /// holds `path`: their import-time code is a dependency of the tests
-    /// under them only.
-    fn conftest_contexts_over<'a>(
-        state: &'a State,
-        path: &'a str,
-    ) -> impl Iterator<Item = usize> + 'a {
-        state
-            .conftest_contexts
-            .iter()
-            .filter(move |(dir, _)| path.starts_with(&format!("{dir}/")))
-            .map(|(_, context)| *context)
-    }
-
     /// Per imported test file, the import-time dependencies of every
     /// project module reachable from it through imports, whichever context
     /// first imported them: modules it imported (first or from the cache)
@@ -1105,7 +1088,6 @@ impl AffectedPlugin {
             };
             let contexts: Vec<usize> = std::iter::once(GLOBAL_CONTEXT)
                 .chain(state.collect_contexts.get(&run_path).copied())
-                .chain(Self::conftest_contexts_over(state, &run_path))
                 .chain(setups)
                 .chain(own_context)
                 .collect();
@@ -1162,7 +1144,6 @@ impl AffectedPlugin {
                 });
             let groups: Vec<u32> = std::iter::once(GLOBAL_CONTEXT)
                 .chain(state.collect_contexts.get(path).copied())
-                .chain(Self::conftest_contexts_over(state, path))
                 .filter_map(|c| groups.get(c).copied().flatten())
                 .chain(static_groups.get(path).copied())
                 .chain(closure_groups.get(path).and_then(|(g, _)| *g))
@@ -1375,36 +1356,6 @@ impl Plugin for AffectedPlugin {
         let path = Self::rel(&state.rootdir, &state.data_path)
             .unwrap_or_else(|| state.data_path.display().to_string());
         Ok(vec![format!("affected: {mode}, {path} ({data})")])
-    }
-
-    fn pytest_conftest_import_start(&self, py: Python<'_>, path: &Path) {
-        let mut state = self.lock();
-        let Some(collector) = state.collector.as_ref().map(|c| c.clone_ref(py)) else {
-            return;
-        };
-        // The rootdir's own conftest (and any above it) stays global.
-        let dir = path.parent().and_then(|d| Self::rel(&state.rootdir, d));
-        let Some(dir) = dir.filter(|d| !d.is_empty()) else {
-            return;
-        };
-        let context = Self::context_for(&collector, py, &mut state.conftest_contexts, &dir);
-        state.stack.push(context);
-        Self::sync_context(&state, py);
-    }
-
-    fn pytest_conftest_import_finish(&self, py: Python<'_>, path: &Path) {
-        let mut state = self.lock();
-        if state.collector.is_none() {
-            return;
-        }
-        let dir = path.parent().and_then(|d| Self::rel(&state.rootdir, d));
-        let Some(context) = dir.and_then(|d| state.conftest_contexts.get(&d).copied()) else {
-            return;
-        };
-        if let Some(pos) = state.stack.iter().rposition(|c| *c == context) {
-            state.stack.truncate(pos);
-        }
-        Self::sync_context(&state, py);
     }
 
     fn pytest_collect_module_start(&self, py: Python<'_>, path: &Path) {

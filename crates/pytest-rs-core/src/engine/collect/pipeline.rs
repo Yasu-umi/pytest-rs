@@ -230,9 +230,6 @@ impl Engine {
             // it still reaches the caller's stdout/stderr instead of leaking
             // into whatever the nested run's own capture happened to be.
             python::capture_collect_begin(py);
-            for plugin in &self.plugins {
-                plugin.pytest_conftest_import_start(py, conftest);
-            }
             let conftest_result = python::collect_conftest(
                 py,
                 rootdir,
@@ -242,9 +239,6 @@ impl Engine {
                 crate::collect::ImportMode::from_config(&self.config),
                 &self.session.initial_paths,
             );
-            for plugin in &self.plugins {
-                plugin.pytest_conftest_import_finish(py, conftest);
-            }
             let conftest_sections = python::capture_collect_end(py);
             // -h/--help and -VV end without a session: upstream's global
             // capture hands an initial conftest's import-time output back to
