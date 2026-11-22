@@ -1,4 +1,4 @@
-//! The data file (docs/AFFECTED_TESTS.md §4.6, §5.1): one versioned binary
+//! The data file (docs/affected.md): one versioned binary
 //! file, loaded fully into memory, strings interned, dependency sets
 //! deduplicated into groups that many tests share, written atomically.
 //!
@@ -62,7 +62,7 @@ pub struct FileEntry {
     pub units: Option<Vec<(u32, u64)>>,
     /// The commit (interned) this state is the clean, tracked content of,
     /// if it was when recorded: while git reports the file unchanged since
-    /// that commit, the state is reused without reading the file (§5.2).
+    /// that commit, the state is reused without reading the file.
     pub commit: Option<u32>,
 }
 
@@ -74,7 +74,7 @@ pub struct TestEntry {
     pub duration: f64,
     pub groups: Vec<u32>,
     /// The test (or a context it depends on) started a subprocess, whose
-    /// dependencies are not recorded (§4.5).
+    /// dependencies are not recorded.
     pub incomplete: bool,
     /// When it was recorded (ms since the epoch): merging keeps the newer
     /// of two entries, whatever order the files are merged in.
@@ -84,7 +84,7 @@ pub struct TestEntry {
 /// A test file's state at its latest import: every node id it collected
 /// and the groups every one of its tests depends on (global, the file's
 /// import, its static imports). When all of them are unchanged the file
-/// need not be imported at all (pre-import selection, §5.3).
+/// need not be imported at all.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileRecord {
     pub groups: Vec<u32>,
@@ -93,8 +93,8 @@ pub struct FileRecord {
     pub recorded: u64,
 }
 
-/// A non-`.py` file's state when the snapshot was taken (§6: in PR 1 any
-/// change to one means a full run).
+/// A non-`.py` file's state when the snapshot was taken (a change is
+/// classified by the rules for changed files that are not Python code).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SnapEntry {
     pub path: String,

@@ -1,4 +1,4 @@
-//! Code units and their checksums (docs/AFFECTED_TESTS.md §4.1).
+//! Code units and their checksums (docs/affected.md).
 //!
 //! A Python file splits into one unit per `def`/`async def` (keyed by its
 //! qualified name), one per `class`, and one module unit. Checksums hash
@@ -289,8 +289,7 @@ impl FileUnits {
     }
 
     /// The units a dependency on `qualname` implies: every enclosing
-    /// function or class unit and the module unit (§4.1 "Implied
-    /// dependencies").
+    /// function or class unit and the module unit.
     pub fn enclosing(qualname: &str) -> Vec<String> {
         if qualname == MODULE_UNIT || qualname == FILE_UNIT {
             return Vec::new();

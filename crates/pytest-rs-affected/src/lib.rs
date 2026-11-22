@@ -1,10 +1,9 @@
-//! Affected-test selection (`--affected`, docs/AFFECTED_TESTS.md): run only
-//! the tests affected by code that changed since a recorded run.
-//!
-//! Stages 1 and 2 of the design (§10 "PR 1", "PR 2"): local, single
-//! process; test files are selected before import, items after it; non-Python
-//! inputs and subprocesses are recorded by an audit hook. Without `--affected*` the plugin is inert: no
-//! sys.monitoring tool, no data file, no behavior change.
+//! Affected-test selection (`--affected`, docs/affected.md): run only the
+//! tests affected by code that changed since a recorded run. Test files are
+//! selected before import, items after it; code is recorded with
+//! sys.monitoring, and non-Python inputs and subprocesses with an audit
+//! hook. Without `--affected*` the plugin is inert: no sys.monitoring tool,
+//! no data file, no behavior change.
 
 mod collector;
 mod config;
@@ -66,7 +65,7 @@ struct TestRun {
 }
 
 /// Contexts are numbered by the collector; 0 is the global one
-/// (`collect:global`, §4.2): plugin and conftest imports, collection hooks
+/// (`collect:global`): plugin and conftest imports, collection hooks
 /// and everything else outside a test, a higher-scope setup or a test
 /// module's import.
 const GLOBAL_CONTEXT: usize = 0;
@@ -111,7 +110,7 @@ struct State {
     partial_path: Option<PathBuf>,
     /// `-n` controller: the workers' recordings, with their discard flag.
     partials: Vec<(Data, bool)>,
-    /// The git fast path (§5.2): the repository at configure time, and
+    /// The git fast path: the repository at configure time, and
     /// which stored states git vouches for (built with the plan).
     git: Option<Git>,
     unchanged: Option<Unchanged>,
@@ -607,7 +606,7 @@ impl AffectedPlugin {
         Ok(())
     }
 
-    /// Rule 3 (§4.3): per imported test file, a group with the module unit
+    /// Rule 3: per imported test file, a group with the module unit
     /// of every project module its own import statements name. These are
     /// the modules a cache hit hid from the file's import context.
     fn static_import_groups(
@@ -783,7 +782,7 @@ impl AffectedPlugin {
                 }
             })
             .collect();
-        // Non-Python inputs (§4.5): content or listing hash at first sight.
+        // Non-Python inputs: content or listing hash at first sight.
         let input_deps: Vec<Option<Dep>> = recording
             .inputs
             .iter()
