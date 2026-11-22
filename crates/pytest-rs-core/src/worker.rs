@@ -1052,6 +1052,9 @@ impl Engine {
                 .map_err(pyo3::exceptions::PyRuntimeError::new_err)?;
             self.fire_collection_modifyitems(py)?;
             self.fire_py_deselected(py)?;
+            // Upstream perform_collect ends with pytest_collection_finish,
+            // and every xdist worker runs its own perform_collect.
+            self.fire_py_collection_finish(py)?;
             Ok(())
         })();
         collection.items = std::mem::take(&mut self.session.items);
