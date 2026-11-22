@@ -577,13 +577,25 @@ impl Engine {
 
         let actual_exit = self.session.exit_code_override.unwrap_or(exit_code::OK);
         // Collect py_hooks before the mutable borrow for native plugins.
-        let py_sessionfinish: Vec<Py<PyAny>> = self
-            .session
-            .py_hooks
+        // Instances registered at configure time (`config.pluginmanager.
+        // register(Plugin())`) are not in session.py_hooks; take them from
+        // the plugin manager like the controller does, skipping any module
+        // function that py_hooks also carries so it fires once.
+        let mut py_sessionfinish = python::instance_hook_funcs(py, "pytest_sessionfinish");
+        let from_instances: HashSet<usize> = py_sessionfinish
             .iter()
-            .filter(|h| h.name == "pytest_sessionfinish")
-            .map(|h| h.func.clone_ref(py))
+            .map(|func| func.as_ptr() as usize)
             .collect();
+        py_sessionfinish.extend(
+            self.session
+                .py_hooks
+                .iter()
+                .filter(|h| {
+                    h.name == "pytest_sessionfinish"
+                        && !from_instances.contains(&(h.func.as_ptr() as usize))
+                })
+                .map(|h| h.func.clone_ref(py)),
+        );
         let mut ctx = HookContext {
             py,
             session: &mut self.session,
