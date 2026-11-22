@@ -295,8 +295,12 @@ Configuration lives in `[tool.pytest-rs.affected]` in `pyproject.toml`, not in `
 
 ```toml
 [tool.pytest-rs.affected]
-# Any change to these → run everything.
-full_run_on = ["pyproject.toml", "uv.lock", "requirements*.txt", "setup.cfg", "tox.ini"]
+# Any change to these → run everything. Added to the built-in list below.
+full_run_on = ["docker/**", ".python-version"]
+
+# A changed non-.py file that is not a recorded dependency and matches no rule:
+# "ignore" (default) or "all" (strict: full run).
+unknown_files = "ignore"
 
 # Treated as changed on every run → tests that depend on them always run
 # (e.g. code that reads the clock, the environment, or external state).
@@ -318,7 +322,16 @@ always_run = ["tests/smoke/**"]
 
 Defaults lean toward running more:
 
-- **A changed non-`.py` file** that matches no rule and is not a recorded dependency causes a **full run**, unless it matches `ignore`. A README edit therefore needs an `ignore` entry to avoid a full run. That is deliberate.
+- **Changed non-`.py` files.** These need care. A blanket full run would make every docs or CI edit a full run. Instead the default relies on what the audit hook can and cannot see:
+  - **Recorded dependency.** If the file (or a directory listing that contains it) is a recorded dependency of some tests, those tests run. This holds for files read through Python's `open`/`io.open_code` and directories listed through `os.listdir`/`os.scandir`, at test time or at collection time. The hook is installed in `pytest_plugins_registered`, before any conftest is imported.
+  - **Never read.** If no recorded run ever read the file through Python, no test's Python code depends on its content. It is ignored (`unknown_files = "ignore"`, the default).
+  - **Built-in full-run list.** This covers files that influence tests without being read through Python's `open`, so the audit hook cannot see them. Any change to them means a full run:
+    - pytest/pytest-rs configuration read by the Rust config loader: `pytest.ini`, `pyproject.toml`, `tox.ini`, `setup.cfg`. (`conftest.py` is `.py` and already covered.)
+    - Environment definitions: `uv.lock`, `poetry.lock`, `Pipfile.lock`, `requirements*.txt`, `constraints*.txt`, `setup.py`. The environment fingerprint (§5.1) also catches installed-package changes, but only once they are installed.
+    - Native code that is loaded with `dlopen` rather than `open`: `*.so`, `*.pyd`, `*.dylib`, and in-tree extension sources `*.pyx`, `*.pxd`, `*.c`, `*.cc`, `*.cpp`, `*.h`, `*.rs`.
+    - `*.pth`.
+  - `full_run_on` extends the built-in list. `unknown_files = "all"` restores the strict behavior: any unrecorded non-`.py` change means a full run.
+  - What `"ignore"` can miss is already in §8: files read only by non-Python code (C libraries, subprocesses). Subprocess-spawning tests are `deps_incomplete` and always run anyway. Files read by an in-process C library (e.g. a native config parser) are the remaining gap, covered by `full_run_on` or `file_triggers`.
 - **A new `.py` file** needs no extra action.
   - Nothing can import it without a change to an already-tracked file, which selects that file's dependents.
   - Code that discovers it through a directory listing is caught by the recorded dir dependency, which selects the tests that did the listing.
@@ -328,7 +341,7 @@ Defaults lean toward running more:
 - **A `deps_incomplete` test** (subprocess, …) always runs. `incomplete = "run" | "trust"` switches this.
 - **New tests** (not in the data) and **previously failed tests** run.
 - **Explicit node ids** on the command line always run.
-- **`-k`, `-m` and `--lf`** compose with selection as additional filters. testmon turns selection off instead. Composing is more predictable for a native option. This is open for discussion (§10).
+- **`-k`, `-m` and `--lf`** compose with selection as additional filters. testmon turns selection off instead. Composing is more predictable for a native option (decided).
 
 ---
 
@@ -399,7 +412,7 @@ It deliberately does **not** reuse `--testmon*`. Both would register the same op
   - rerun failed tests;
   - run new tests and explicit node ids;
   - turn exit status 5 into 0 when everything was deselected.
-- **Config:** `full_run_on`, `always_changed`, `always_run` and `ignore`. Any other non-`.py` change triggers a full run.
+- **Config:** `full_run_on` (plus the built-in list), `always_changed`, `always_run`, `ignore` and `unknown_files`. In PR 1 no audit hook exists yet, so no non-`.py` file is a recorded dependency: PR 1 treats an unrecorded non-`.py` change outside the built-in list as `unknown_files = "all"` regardless of the setting, and the `"ignore"` default takes effect in PR 2 together with the audit hook.
 - **`-n` with `--affected`** is a usage error ("not supported yet"), rather than a run that records wrong data.
 - **Rust unit tests** for unit splitting and checksums:
   - formatting-only edits change nothing;
@@ -433,9 +446,9 @@ It deliberately does **not** reuse `--testmon*`. Both would register the same op
 - Recording inside Python subprocesses, through cov's `.pth` child.
 - A collector shared with `--cov`.
 
-### Open questions for review
+### Decisions (review of this doc)
 
-1. The option name: `--affected`, or something else?
-2. Should `-k`, `-m` and `--lf` compose with selection, or disable it as testmon does?
-3. The default for unmatched non-`.py` changes. A full run is safe but noisy for docs edits.
-4. Should the cargo feature be on by default, or opt-in at build time?
+1. Option name: `--affected`.
+2. `-k`, `-m` and `--lf` compose with selection as extra filters (testmon disables selection instead).
+3. Unrecorded non-`.py` changes are ignored by default; a built-in list (config, lock files, native code) plus `full_run_on` triggers full runs, and `unknown_files = "all"` gives the strict behavior (§6).
+4. The cargo feature is on by default; the feature itself stays inert unless `--affected*` is given.
