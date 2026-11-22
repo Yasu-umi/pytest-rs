@@ -82,21 +82,6 @@ impl Engine {
         let rootdir = self.config.rootdir.clone();
         let (paths, files, deferred_not_found_args) =
             self.resolve_collection_paths(py, &rootdir)?;
-        // In dist mode the controller never imports test modules itself
-        // (workers do, independently — skip_module_import below), so this
-        // prefetch buys the controller nothing; skip it so its detached
-        // background threads can never still be running at the dist-mode
-        // fork checkpoint a few lines below, which requires a
-        // single-threaded parent.
-        #[cfg(feature = "xdist")]
-        let requested_dist = self.config.numprocesses_spec().is_some_and(|s| s != "0")
-            || self.config.get_flag("dist-load")
-            || self.config.get_value("tx").is_some();
-        #[cfg(not(feature = "xdist"))]
-        let requested_dist = false;
-        if !requested_dist {
-            self.prefetch_rewrite_cache(py, &files);
-        }
         self.session.initial_paths =
             crate::collect::resolve_initial_paths(&self.config.invocation_dir, &paths);
         self.load_cmdline_and_entrypoint_plugins(py)?;
@@ -301,6 +286,13 @@ impl Engine {
             let selected = self
                 .fire_collection_select_files(py, &files)
                 .map_err(|err| python::format_exception(py, &err))?;
+            // Warm the page cache for exactly the files about to be imported:
+            // after plugins narrowed them (a file dropped here is never
+            // read). The dist controller imports nothing itself, and must
+            // stay single-threaded for its fork checkpoint.
+            if !skip_module_import {
+                self.prefetch_rewrite_cache(py, &selected);
+            }
             let deferred_not_found =
                 self.collect_files(py, &rootdir, &selected, &mut errors, skip_module_import)?;
             self.collect_extra_and_custom(py, &rootdir, &paths, &files, &mut errors)?;
