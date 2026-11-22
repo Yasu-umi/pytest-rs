@@ -804,6 +804,7 @@ pub(crate) fn run_item_body(
                 instance: item.nodeid.clone(),
                 finalizer: Finalizer::Callable(finalizer),
                 bindings: Vec::new(),
+                owner: None,
             });
         }
     }

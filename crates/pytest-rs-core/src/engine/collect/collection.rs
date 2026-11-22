@@ -433,6 +433,9 @@ impl Engine {
             // Where this file's items start: --doctest-modules inserts the
             // module's doctest items BEFORE its functions (upstream order).
             let file_items_start = self.session.items.len();
+            for plugin in &self.plugins {
+                plugin.pytest_collect_module_start(py, file);
+            }
             let collect_result = python::collect_module(
                 py,
                 rootdir,
@@ -446,6 +449,9 @@ impl Engine {
                 &self.session.initial_paths,
                 self.config.collect_imported_tests(),
             );
+            for plugin in &self.plugins {
+                plugin.pytest_collect_module_finish(py, file);
+            }
             let collect_sections = python::capture_collect_end(py);
             let with_sections = |mut message: String| {
                 for (title, text) in &collect_sections {

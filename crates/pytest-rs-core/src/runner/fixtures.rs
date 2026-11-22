@@ -872,7 +872,19 @@ pub(crate) fn resolve_fixture_def(
         instance.clone(),
         param_cache_key,
     );
+    // Observer hooks see setups that outlive one test (scope above function).
+    let owner: Option<crate::session::ScopedSetup> =
+        (cache_scope > Scope::Function).then(|| crate::session::ScopedSetup {
+            scope: cache_scope,
+            baseid: def.baseid.clone(),
+            name: def.name.clone(),
+        });
     if let Some(cached) = session.fixture_cache.get(&cache_key) {
+        if let Some(owner) = &owner {
+            for plugin in plugins {
+                plugin.pytest_scoped_setup_finish(py, owner, item, true);
+            }
+        }
         // A cached setup failure re-raises (pytest re-raises the cached
         // exception) — the fixture body is not run again for this scope. The
         // traceback is reset to the one captured at the original raise so it
@@ -947,15 +959,28 @@ pub(crate) fn resolve_fixture_def(
     stack.pop();
     let kwargs = deps_result?;
 
+    if let Some(owner) = &owner {
+        for plugin in plugins {
+            plugin.pytest_scoped_setup_start(py, owner, item);
+        }
+    }
     // firstresult: a plugin may claim this fixture (async fixtures, native
     // plugin fixtures).
-    let claimed = {
+    // The scoped-setup observers' finish must fire on every exit from here
+    // on, including the early error returns below.
+    let finish_owner = |cached: bool| {
+        if let Some(owner) = &owner {
+            for plugin in plugins {
+                plugin.pytest_scoped_setup_finish(py, owner, item, cached);
+            }
+        }
+    };
+    let claimed = (|| -> PyResult<Option<crate::hooks::FixtureValue>> {
         let mut ctx = HookContext {
             py,
             session,
             config,
         };
-        let mut claimed = None;
         let fixture_instance = if def.needs_instance {
             class_instance
         } else {
@@ -965,12 +990,12 @@ pub(crate) fn resolve_fixture_def(
             if let Some(value) =
                 plugin.pytest_fixture_setup(&mut ctx, &def, item, fixture_instance, &kwargs)?
             {
-                claimed = Some(value);
-                break;
+                return Ok(Some(value));
             }
         }
-        claimed
-    };
+        Ok(None)
+    })()
+    .inspect_err(|_| finish_owner(false))?;
 
     let fixture_instance = if def.needs_instance {
         class_instance
@@ -981,23 +1006,7 @@ pub(crate) fn resolve_fixture_def(
     // (an instance method, not a classmethod) is deprecated — attributes it
     // sets on `self` are not seen by the other tests' instances.
     if fixture_instance.is_some() && def.scope >= Scope::Class && !config.get_flag("setup-plan") {
-        let scope = def.scope.as_str();
-        let mut scope_name = scope.to_string();
-        scope_name[..1].make_ascii_uppercase();
-        let warning = py
-            .import("_pytest.deprecated")?
-            .getattr("CLASS_FIXTURE_INSTANCE_METHOD")?
-            .call_method(
-                "format",
-                (),
-                Some(&{
-                    let kw = pyo3::types::PyDict::new(py);
-                    kw.set_item("scope", scope_name)?;
-                    kw.set_item("fixturename", def.name.as_str())?;
-                    kw
-                }),
-            )?;
-        py.import("warnings")?.call_method1("warn", (warning,))?;
+        warn_class_fixture_instance_method(py, &def).inspect_err(|_| finish_owner(false))?;
     }
     // Track this def as executing so a fixture body calling
     // request.getfixturevalue(<own name>) resolves to the overridden super.
@@ -1056,6 +1065,7 @@ pub(crate) fn resolve_fixture_def(
     EXECUTING.with(|s| {
         s.borrow_mut().pop();
     });
+    finish_owner(false);
     let (value, finalizer) = match call_result {
         Ok(value_finalizer) => value_finalizer,
         Err(err) => {
@@ -1072,6 +1082,7 @@ pub(crate) fn resolve_fixture_def(
                     instance: instance.clone(),
                     finalizer: Finalizer::Callable(drainer.unbind()),
                     bindings: bindings.clone(),
+                    owner: owner.clone(),
                 });
             }
             let exc = err.value(py).clone().into_any().unbind();
@@ -1143,6 +1154,7 @@ pub(crate) fn resolve_fixture_def(
                 instance: instance.clone(),
                 finalizer: Finalizer::Callable(printer.unbind()),
                 bindings: bindings.clone(),
+                owner: owner.clone(),
             });
         }
     }
@@ -1159,6 +1171,7 @@ pub(crate) fn resolve_fixture_def(
             instance: instance.clone(),
             finalizer: Finalizer::Callable(drainer.unbind()),
             bindings: bindings.clone(),
+            owner: owner.clone(),
         });
     }
     if let Some(finalizer) = finalizer {
@@ -1167,6 +1180,7 @@ pub(crate) fn resolve_fixture_def(
             instance: instance.clone(),
             finalizer,
             bindings: bindings.clone(),
+            owner: owner.clone(),
         });
     }
     // Conftest pytest_fixture_setup / pytest_fixture_post_finalizer hooks.
@@ -1191,6 +1205,7 @@ pub(crate) fn resolve_fixture_def(
                     instance: instance.clone(),
                     finalizer: Finalizer::Callable(post),
                     bindings: bindings.clone(),
+                    owner: owner.clone(),
                 },
             ),
         }
@@ -1205,4 +1220,30 @@ pub(crate) fn resolve_fixture_def(
         },
     );
     Ok(value)
+}
+
+/// pytest 9.2's CLASS_FIXTURE_INSTANCE_METHOD deprecation warning for a
+/// class-or-wider-scoped fixture bound to the test instance.
+fn warn_class_fixture_instance_method(
+    py: Python<'_>,
+    def: &crate::fixture::FixtureDef,
+) -> PyResult<()> {
+    let scope = def.scope.as_str();
+    let mut scope_name = scope.to_string();
+    scope_name[..1].make_ascii_uppercase();
+    let warning = py
+        .import("_pytest.deprecated")?
+        .getattr("CLASS_FIXTURE_INSTANCE_METHOD")?
+        .call_method(
+            "format",
+            (),
+            Some(&{
+                let kw = pyo3::types::PyDict::new(py);
+                kw.set_item("scope", scope_name)?;
+                kw.set_item("fixturename", def.name.as_str())?;
+                kw
+            }),
+        )?;
+    py.import("warnings")?.call_method1("warn", (warning,))?;
+    Ok(())
 }

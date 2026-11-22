@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 use crate::collect::{MarkData, TestItem};
 use crate::config::{Config, OptionParser};
 use crate::fixture::{FixtureDef, FixtureRegistry};
-use crate::session::{Finalizer, Session};
+use crate::session::{Finalizer, PendingFinalizer, ScopedSetup, Session};
 
 /// firstresult hooks return `Ok(Some(_))` to claim the call; `Ok(None)` to
 /// pass to the next plugin / the core default.
@@ -135,6 +135,38 @@ pub trait Plugin: Send {
     ) -> HookResult<String> {
         Ok(None)
     }
+
+    /// Observer: the code of a setup that outlives one test (a fixture with
+    /// a scope above function, or an xunit module/class setup) is about to
+    /// run for `item`. Always followed by `pytest_scoped_setup_finish` with
+    /// `cached = false`, also when the setup raises. Starts can nest (a
+    /// fixture body calling `request.getfixturevalue`).
+    fn pytest_scoped_setup_start(&self, _py: Python<'_>, _setup: &ScopedSetup, _item: &TestItem) {}
+
+    /// Observer: `item` got the value of a setup that outlives one test.
+    /// `cached = false` closes a `pytest_scoped_setup_start` (the setup ran
+    /// just now); `cached = true` means it was already set up and its code
+    /// did not run again.
+    fn pytest_scoped_setup_finish(
+        &self,
+        _py: Python<'_>,
+        _setup: &ScopedSetup,
+        _item: &TestItem,
+        _cached: bool,
+    ) {
+    }
+
+    /// Observer bracket around running one pending finalizer at scope
+    /// teardown (`finalizer.owner` names the setup it belongs to, if any).
+    fn pytest_finalizer_start(&self, _py: Python<'_>, _finalizer: &PendingFinalizer) {}
+
+    fn pytest_finalizer_finish(&self, _py: Python<'_>, _finalizer: &PendingFinalizer) {}
+
+    /// Observer bracket around importing and collecting one Python test
+    /// module during collection.
+    fn pytest_collect_module_start(&self, _py: Python<'_>, _path: &std::path::Path) {}
+
+    fn pytest_collect_module_finish(&self, _py: Python<'_>, _path: &std::path::Path) {}
 
     fn pytest_runtest_setup(&self, _ctx: &mut HookContext, _item: &TestItem) -> PyResult<()> {
         Ok(())

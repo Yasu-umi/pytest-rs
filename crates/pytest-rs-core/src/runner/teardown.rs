@@ -9,7 +9,7 @@ use crate::fixture::Scope;
 use crate::hooks::{HookContext, Plugin};
 use crate::python;
 use crate::report::{Outcome, Phase, TestReport};
-use crate::session::{Finalizer, Session};
+use crate::session::{Finalizer, PendingFinalizer, Session};
 
 use super::*;
 
@@ -294,7 +294,7 @@ pub(crate) fn teardown_scope_reported(
 
 pub(crate) fn teardown_scope(
     py: Python<'_>,
-    _plugins: &[Box<dyn Plugin>],
+    plugins: &[Box<dyn Plugin>],
     session: &mut Session,
     config: &Config,
     scope: Scope,
@@ -313,10 +313,7 @@ pub(crate) fn teardown_scope(
             continue;
         }
         let pf = session.finalizers.remove(idx);
-        let result = match &pf.finalizer {
-            Finalizer::Callable(callable) => callable.bind(py).call0().map(|_| ()),
-            Finalizer::GenNext(generator) => python::finalize_generator(py, generator),
-        };
+        let result = run_finalizer(py, plugins, &pf);
         if let Err(err) = result {
             super::record_phase_exception(py, &_item.nodeid, Phase::Teardown, &err);
             // pytest-style longrepr (source lines + E markers), like any
@@ -347,6 +344,7 @@ pub(crate) fn teardown_scope(
 /// A failure becomes a deferred teardown ERROR attributed to `report_nodeid`.
 pub(crate) fn teardown_ended_params_reported(
     py: Python<'_>,
+    plugins: &[Box<dyn Plugin>],
     session: &mut Session,
     config: &Config,
     ended: &[crate::session::Binding],
@@ -360,7 +358,7 @@ pub(crate) fn teardown_ended_params_reported(
         python::capture_scope_teardown_begin(py);
     }
     let started = TimeMark::now();
-    let errors = teardown_ended_params(py, session, config, ended);
+    let errors = teardown_ended_params(py, plugins, session, config, ended);
     if !has_finalizers {
         // Nothing ran, but the param transition still evicted any cached
         // values that depended on it (above) — no report to emit.
@@ -407,6 +405,7 @@ pub(crate) fn teardown_ended_params_reported(
 /// bindings, evicting the matching cached values. Returns formatted errors.
 fn teardown_ended_params(
     py: Python<'_>,
+    plugins: &[Box<dyn Plugin>],
     session: &mut Session,
     config: &Config,
     ended: &[crate::session::Binding],
@@ -423,10 +422,7 @@ fn teardown_ended_params(
             continue;
         }
         let pf = session.finalizers.remove(idx);
-        let result = match &pf.finalizer {
-            Finalizer::Callable(callable) => callable.bind(py).call0().map(|_| ()),
-            Finalizer::GenNext(generator) => python::finalize_generator(py, generator),
-        };
+        let result = run_finalizer(py, plugins, &pf);
         if let Err(err) = result {
             errors.push(python::format_test_failure(
                 py,
@@ -439,6 +435,26 @@ fn teardown_ended_params(
         .fixture_cache
         .retain(|_, cached| !cached.bindings.iter().any(|b| ended.contains(b)));
     errors
+}
+
+/// Run one pending finalizer inside the `pytest_finalizer_start/finish`
+/// observer bracket.
+fn run_finalizer(
+    py: Python<'_>,
+    plugins: &[Box<dyn Plugin>],
+    pf: &PendingFinalizer,
+) -> PyResult<()> {
+    for plugin in plugins {
+        plugin.pytest_finalizer_start(py, pf);
+    }
+    let result = match &pf.finalizer {
+        Finalizer::Callable(callable) => callable.bind(py).call0().map(|_| ()),
+        Finalizer::GenNext(generator) => python::finalize_generator(py, generator),
+    };
+    for plugin in plugins {
+        plugin.pytest_finalizer_finish(py, pf);
+    }
+    result
 }
 
 pub(crate) fn setup_show_active(config: &Config) -> bool {
