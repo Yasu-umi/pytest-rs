@@ -843,7 +843,10 @@ impl Engine {
             if collection.loaded_conftests.contains(&conftest) {
                 continue;
             }
-            if let Err(err) = python::collect_conftest(
+            for plugin in &self.plugins {
+                plugin.pytest_conftest_import_start(py, &conftest);
+            }
+            let result = python::collect_conftest(
                 py,
                 &rootdir,
                 &conftest,
@@ -851,7 +854,12 @@ impl Engine {
                 &mut self.session.py_hooks,
                 import_mode,
                 &self.session.initial_paths,
-            ) && !self.record_conftest_skip(py, &conftest, &err, paths)
+            );
+            for plugin in &self.plugins {
+                plugin.pytest_conftest_import_finish(py, &conftest);
+            }
+            if let Err(err) = result
+                && !self.record_conftest_skip(py, &conftest, &err, paths)
             {
                 return Err(err);
             }
@@ -1128,7 +1136,10 @@ impl Engine {
         let import_mode = crate::collect::ImportMode::from_config(&self.config);
         let paths = self.config.paths.clone();
         for conftest in chain {
-            if let Err(err) = python::collect_conftest(
+            for plugin in &self.plugins {
+                plugin.pytest_conftest_import_start(py, &conftest);
+            }
+            let result = python::collect_conftest(
                 py,
                 &self.config.rootdir,
                 &conftest,
@@ -1136,7 +1147,12 @@ impl Engine {
                 &mut self.session.py_hooks,
                 import_mode,
                 &self.session.initial_paths,
-            ) && !self.record_conftest_skip(py, &conftest, &err, &paths)
+            );
+            for plugin in &self.plugins {
+                plugin.pytest_conftest_import_finish(py, &conftest);
+            }
+            if let Err(err) = result
+                && !self.record_conftest_skip(py, &conftest, &err, &paths)
             {
                 return Err(python::format_exception(py, &err));
             }

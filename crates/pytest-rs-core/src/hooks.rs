@@ -181,6 +181,13 @@ pub trait Plugin: Send {
 
     fn pytest_collect_module_finish(&self, _py: Python<'_>, _path: &std::path::Path) {}
 
+    /// Observer bracket around importing one conftest.py (its module code
+    /// and the `pytest_plugins` it names). Fires on the controller and on
+    /// `-n` workers alike; `finish` always follows `start`.
+    fn pytest_conftest_import_start(&self, _py: Python<'_>, _path: &std::path::Path) {}
+
+    fn pytest_conftest_import_finish(&self, _py: Python<'_>, _path: &std::path::Path) {}
+
     fn pytest_runtest_setup(&self, _ctx: &mut HookContext, _item: &TestItem) -> PyResult<()> {
         Ok(())
     }
