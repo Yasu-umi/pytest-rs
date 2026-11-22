@@ -295,8 +295,14 @@ impl Engine {
         let skip_module_import = false;
 
         let collect_result = (|| -> Result<(), String> {
+            // Plugins may narrow the files to import (pytest-split's
+            // --split-by-file); the doctest/custom pass below still gets the
+            // full scan, so it does not mistake a dropped file for an extra one.
+            let selected = self
+                .fire_collection_select_files(py, &files)
+                .map_err(|err| python::format_exception(py, &err))?;
             let deferred_not_found =
-                self.collect_files(py, &rootdir, &files, &mut errors, skip_module_import)?;
+                self.collect_files(py, &rootdir, &selected, &mut errors, skip_module_import)?;
             self.collect_extra_and_custom(py, &rootdir, &paths, &files, &mut errors)?;
             // Non-Python explicit file args that no custom collector handled → USAGE_ERROR.
             if !deferred_not_found.is_empty() {

@@ -892,6 +892,15 @@ impl Engine {
         ) else {
             return errors;
         };
+        // Plugins may narrow the files to import (pytest-split's
+        // --split-by-file), same as the serial session's collect.
+        let files = match self.fire_collection_select_files(py, &files) {
+            Ok(selected) => selected,
+            Err(err) => {
+                errors.push((String::new(), python::format_exception(py, &err)));
+                return errors;
+            }
+        };
         // Same rationale as the controller's own prefetch (engine/collect/mod.rs):
         // this worker is about to import every one of these files sequentially
         // through the same content-hash-validated __pycache__ path, entirely
