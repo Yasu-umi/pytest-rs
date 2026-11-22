@@ -25,7 +25,7 @@ use pytest_rs_core::hooks::{HookContext, Plugin};
 use pytest_rs_core::report::Outcome;
 use pytest_rs_core::session::{PendingFinalizer, ScopedSetup};
 
-use crate::collector::{AffectedCollector, Recording};
+use crate::collector::{AffectedCollector, InputKind, Recording};
 use crate::config::{AffectedConfig, BUILTIN_FULL_RUN_ON, BUILTIN_IGNORE, Globs, Incomplete};
 use crate::data::{Data, Dep, FileEntry, FileRecord, Header, LoadError, SnapEntry, TestEntry};
 use crate::git::{Git, Unchanged};
@@ -62,6 +62,101 @@ struct TestRun {
     context: usize,
     /// Contexts of the higher-scope setups the test used.
     setups: BTreeSet<usize>,
+}
+
+/// Folding the records Python subprocesses wrote (the .pth child) into the
+/// session's recording.
+struct ChildRecords;
+
+impl ChildRecords {
+    fn fold(recording: &mut Recording, records: &[serde_json::Value]) {
+        let mut file_index: HashMap<String, u32> = recording
+            .files
+            .iter()
+            .enumerate()
+            .map(|(i, (file, _))| (file.clone(), i as u32))
+            .collect();
+        let mut code_index: HashMap<(u32, String), u32> = recording
+            .codes
+            .iter()
+            .enumerate()
+            .map(|(i, code)| (code.clone(), i as u32))
+            .collect();
+        let mut input_index: HashMap<(String, InputKind), u32> = recording
+            .inputs
+            .iter()
+            .enumerate()
+            .map(|(i, (path, kind, _))| ((path.clone(), *kind), i as u32))
+            .collect();
+        // Per context: records that came back, the children they started in
+        // turn, and whether any of them could not see everything.
+        let mut came_back: HashMap<usize, usize> = HashMap::new();
+        let mut started: HashMap<usize, usize> = HashMap::new();
+        let mut blind: HashSet<usize> = HashSet::new();
+        for record in records {
+            let Some(context) = record["context"].as_u64().map(|c| c as usize) else {
+                continue;
+            };
+            if context >= recording.contexts.len() {
+                continue;
+            }
+            *came_back.entry(context).or_default() += 1;
+            *started.entry(context).or_default() +=
+                record["spawned"].as_u64().unwrap_or(0) as usize;
+            if record["incomplete"].as_bool().unwrap_or(true) {
+                blind.insert(context);
+            }
+            for code in record["codes"].as_array().into_iter().flatten() {
+                let (Some(file), Some(qualname)) = (code[0].as_str(), code[1].as_str()) else {
+                    continue;
+                };
+                let file_id = *file_index.entry(file.to_string()).or_insert_with(|| {
+                    recording
+                        .files
+                        .push((file.to_string(), std::fs::read(file).ok()));
+                    (recording.files.len() - 1) as u32
+                });
+                let id = *code_index
+                    .entry((file_id, qualname.to_string()))
+                    .or_insert_with(|| {
+                        recording.codes.push((file_id, qualname.to_string()));
+                        (recording.codes.len() - 1) as u32
+                    });
+                recording.contexts[context].insert(id);
+            }
+            for input in record["inputs"].as_array().into_iter().flatten() {
+                let (Some(path), Some(kind)) = (input[0].as_str(), input[1].as_str()) else {
+                    continue;
+                };
+                let kind = match kind {
+                    "content" => InputKind::Content,
+                    _ => InputKind::Listing,
+                };
+                let id = *input_index
+                    .entry((path.to_string(), kind))
+                    .or_insert_with(|| {
+                        let hash = kind.hash(Path::new(path));
+                        recording.inputs.push((path.to_string(), kind, hash));
+                        (recording.inputs.len() - 1) as u32
+                    });
+                if let Some(inputs) = recording.context_inputs.get_mut(context) {
+                    inputs.insert(id);
+                }
+            }
+        }
+        // Every Python child (and every Python child of theirs) must have
+        // come back with a complete record; otherwise the context stays
+        // incomplete.
+        for (context, spawned) in &recording.spawns {
+            let expected = spawned + started.get(context).copied().unwrap_or(0);
+            if came_back.get(context).copied().unwrap_or(0) != expected || blind.contains(context) {
+                recording.incomplete.insert(*context);
+            }
+        }
+        for context in blind {
+            recording.incomplete.insert(context);
+        }
+    }
 }
 
 /// How module executions nest, from one session's recording: which import
@@ -190,6 +285,10 @@ struct State {
     collect_contexts: HashMap<String, usize>,
     /// The sys.meta_path finder that brackets project modules' execution.
     import_finder: Option<Py<PyAny>>,
+    /// Python subprocesses' records: this process's output directory, and
+    /// the variables every child recorder reads.
+    children_out: Option<PathBuf>,
+    children_env: Option<Vec<(&'static str, String)>>,
     /// The selection plan, built once per session (pre-import or at
     /// modifyitems, whichever comes first).
     plan: Option<Plan>,
@@ -452,9 +551,125 @@ impl AffectedPlugin {
             (tool_id, &py_start, collector.bind(py).getattr("py_start")?),
         )?;
         monitoring.call_method1("set_events", (tool_id, &py_start))?;
+        state.children_env = Some(Self::children_env(state, py, cache_dir)?);
+        Self::arm_children(state, py, &collector)?;
         state.collector = Some(collector);
         state.tool_id = tool_id;
         Ok(())
+    }
+
+    /// The .pth line that starts the child recorder in Python subprocesses:
+    /// a no-op unless this session exported the activation variables.
+    const PTH_LINE: &str = "import os, runpy; os.environ.get(\"PYTEST_RS_AFFECTED_OUT\") and os.environ.get(\"PYTEST_RS_AFFECTED_CHILD\") and runpy.run_path(os.environ[\"PYTEST_RS_AFFECTED_CHILD\"], run_name=\"pytest_rs_affected_child\")\n";
+
+    /// The environment a child recorder needs, besides its output directory
+    /// and the current context (both set per process).
+    fn children_env(
+        state: &State,
+        py: Python<'_>,
+        cache_dir: &str,
+    ) -> PyResult<Vec<(&'static str, String)>> {
+        let sep = std::path::MAIN_SEPARATOR.to_string();
+        let pathsep = if cfg!(windows) { ";" } else { ":" };
+        Ok(vec![
+            (
+                "PYTEST_RS_AFFECTED_ROOT",
+                Self::with_sep(&state.rootdir.to_string_lossy()),
+            ),
+            (
+                "PYTEST_RS_AFFECTED_EXCLUDED",
+                Self::excluded_dirs(py)?.join(pathsep),
+            ),
+            (
+                "PYTEST_RS_AFFECTED_IGNORED",
+                [state.data_path.clone(), state.rootdir.join(cache_dir)]
+                    .iter()
+                    .map(|p| {
+                        p.to_string_lossy()
+                            .trim_end_matches(sep.as_str())
+                            .to_string()
+                    })
+                    .collect::<Vec<_>>()
+                    .join(pathsep),
+            ),
+        ])
+    }
+
+    /// Make Python subprocesses record their own dependencies: a per-process
+    /// output directory holding the child recorder, the activation
+    /// variables, and the .pth line in the environment's site-packages.
+    /// Also called after a `-n` fork, so every worker reads only its own
+    /// children's records.
+    fn arm_children(
+        state: &mut State,
+        py: Python<'_>,
+        collector: &Py<AffectedCollector>,
+    ) -> PyResult<()> {
+        let out = std::env::temp_dir().join(format!("pytest-rs-affected-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&out);
+        std::fs::create_dir_all(&out)
+            .map_err(|e| pyo3::exceptions::PyOSError::new_err(e.to_string()))?;
+        let child = out.join("child.py");
+        std::fs::write(&child, include_str!("child.py"))
+            .map_err(|e| pyo3::exceptions::PyOSError::new_err(e.to_string()))?;
+        let environ = py.import("os")?.getattr("environ")?;
+        for (key, value) in state.children_env.iter().flatten() {
+            environ.set_item(*key, value)?;
+        }
+        environ.set_item("PYTEST_RS_AFFECTED_CHILD", child.to_string_lossy())?;
+        environ.set_item("PYTEST_RS_AFFECTED_OUT", out.to_string_lossy())?;
+        // Children started with sys.executable run this environment's Python,
+        // which processes its own site-packages .pth files.
+        let mut site_dirs: Vec<PathBuf> = Vec::new();
+        if let Ok(paths) = py.import("sysconfig")?.call_method0("get_paths")
+            && let Ok(Some(purelib)) = paths
+                .get_item("purelib")
+                .map(|p| p.extract::<String>().ok())
+        {
+            site_dirs.push(PathBuf::from(purelib));
+        }
+        if let Ok(venv) = std::env::var("VIRTUAL_ENV")
+            && let Ok(entries) = std::fs::read_dir(Path::new(&venv).join("lib"))
+        {
+            site_dirs.extend(
+                entries
+                    .filter_map(Result::ok)
+                    .map(|e| e.path().join("site-packages"))
+                    .filter(|dir| dir.is_dir()),
+            );
+        }
+        for dir in site_dirs {
+            let _ = std::fs::write(dir.join("pytest-rs-affected.pth"), Self::PTH_LINE);
+        }
+        state.children_out = Some(out);
+        collector.borrow(py).arm_children(py)
+    }
+
+    /// Stop children from recording, and fold the records they wrote into
+    /// the session's recording: their code and inputs count toward the
+    /// context that started them, and a context whose Python children all
+    /// came back complete is no longer incomplete.
+    fn fold_children(state: &mut State, py: Python<'_>, recording: &mut Recording) {
+        if let Ok(environ) = py.import("os").and_then(|os| os.getattr("environ")) {
+            for key in ["PYTEST_RS_AFFECTED_OUT", "PYTEST_RS_AFFECTED_CHILD"] {
+                let _ = environ.call_method1("pop", (key, py.None()));
+            }
+        }
+        let Some(out) = state.children_out.take() else {
+            return;
+        };
+        let records: Vec<serde_json::Value> = std::fs::read_dir(&out)
+            .map(|entries| {
+                entries
+                    .filter_map(Result::ok)
+                    .filter(|e| e.path().extension().is_some_and(|x| x == "json"))
+                    .filter_map(|e| std::fs::read(e.path()).ok())
+                    .filter_map(|bytes| serde_json::from_slice(&bytes).ok())
+                    .collect()
+            })
+            .unwrap_or_default();
+        let _ = std::fs::remove_dir_all(&out);
+        ChildRecords::fold(recording, &records);
     }
 
     /// Make the top of the context stack current.
@@ -1536,6 +1751,21 @@ impl Plugin for AffectedPlugin {
         Ok(())
     }
 
+    /// A forked `-n` worker inherited the controller's children output
+    /// directory: give it its own, so it folds only its own children.
+    fn reinit_post_fork(&mut self, py: Python<'_>) {
+        let mut state = self.lock();
+        if state.children_out.is_none() {
+            return;
+        }
+        let Some(collector) = state.collector.as_ref().map(|c| c.clone_ref(py)) else {
+            return;
+        };
+        if let Err(err) = Self::arm_children(&mut state, py, &collector) {
+            err.print(py);
+        }
+    }
+
     fn pytest_worker_dump(&mut self, _ctx: &mut HookContext) -> PyResult<Option<String>> {
         let state = self.lock();
         Ok(state.partial_path.as_ref().map(|path| {
@@ -1579,7 +1809,9 @@ impl Plugin for AffectedPlugin {
                 .getattr("meta_path")?
                 .call_method1("remove", (finder,));
         }
-        let recording = collector.borrow(py).take();
+        collector.borrow(py).disarm_children();
+        let mut recording = collector.borrow(py).take();
+        Self::fold_children(&mut state, py, &mut recording);
         let recorded = if ctx.config.is_worker() {
             // A -n worker records only its own tests, for the controller to
             // merge (pytest_worker_dump).
