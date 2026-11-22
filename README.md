@@ -77,6 +77,8 @@ Per project or per run, like pytest (works with the prebuilt wheel):
 addopts = "-p no:benchmark -p no:split"
 ```
 
+`--affected` (run only the tests affected by changes since a recorded run; experimental, see [docs/AFFECTED_TESTS.md](docs/AFFECTED_TESTS.md)) is a pytest-rs option of its own, not a reimplementation of pytest-testmon: it never registers the `--testmon*` options, so an installed pytest-testmon still loads as a third-party plugin. It is inert unless an `--affected*` option is given, and is the `affected` feature below.
+
 At build time, when installing from source — bundled plugins are Cargo features, all enabled by default:
 
 ```toml
