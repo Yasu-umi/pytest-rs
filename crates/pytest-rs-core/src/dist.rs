@@ -76,7 +76,6 @@ enum Event {
         xdist_groups: Vec<Option<String>>,
         errors: Vec<(String, String)>,
         skips: Vec<(String, String, String)>,
-        deselected: usize,
     },
 }
 
@@ -660,7 +659,6 @@ impl Engine {
                     xdist_groups,
                     errors,
                     skips,
-                    deselected,
                 } => {
                     // A module that skips at import time (pytest.importorskip,
                     // skip(allow_module_level=True), unittest.SkipTest) is a
@@ -722,11 +720,10 @@ impl Engine {
                         first_collection_worker = worker;
                         all_nodeids = nodeids;
                         all_xdist_groups = xdist_groups;
-                        // Every worker selects independently but identically
-                        // (guaranteed by the mismatch check below) — take the
-                        // count from the first worker only, don't sum across
-                        // workers.
-                        self.session.deselected = deselected;
+                        // The workers' deselected counts stay out of the
+                        // summary: xdist's workers deselect on their own and
+                        // never report it, so the closing line reads
+                        // "no tests ran" / "1 passed", not "N deselected".
                     } else if nodeids != all_nodeids {
                         if line_open {
                             println!();
@@ -1581,7 +1578,6 @@ impl WorkerOwner {
                         xdist_groups: vec![],
                         errors: vec![],
                         skips: vec![],
-                        deselected: 0,
                     });
                     return;
                 }
@@ -1602,7 +1598,6 @@ impl WorkerOwner {
                     xdist_groups: vec![],
                     errors: vec![],
                     skips: vec![],
-                    deselected: 0,
                 });
                 return;
             }
@@ -1610,7 +1605,7 @@ impl WorkerOwner {
 
         // Collection phase: read from the worker's stdout until it sends
         // WorkerMsg::Collection (after precollect_all) or EOF (crash).
-        // Returns Some((nodeids, groups, errors, skips, deselected)) on success,
+        // Returns Some((nodeids, groups, errors, skips)) on success,
         // None on crash.
         let collection_msg = loop {
             let Some(line) = proc.lines.next() else {
@@ -1628,8 +1623,7 @@ impl WorkerOwner {
                     xdist_groups,
                     errors,
                     skips,
-                    deselected,
-                }) => break Some((nodeids, xdist_groups, errors, skips, deselected)),
+                }) => break Some((nodeids, xdist_groups, errors, skips)),
                 Some(WorkerMsg::InternalError { traceback }) => {
                     // Reported, not a crash: no replacement worker. The empty
                     // collection unblocks the merge loop.
@@ -1640,7 +1634,6 @@ impl WorkerOwner {
                         xdist_groups: vec![],
                         errors: vec![],
                         skips: vec![],
-                        deselected: 0,
                     });
                     let _ = proc.handle.wait();
                     return;
@@ -1653,7 +1646,6 @@ impl WorkerOwner {
                         xdist_groups: vec![],
                         errors: vec![],
                         skips: vec![],
-                        deselected: 0,
                     });
                     let _ = proc.handle.wait();
                     return;
@@ -1675,7 +1667,6 @@ impl WorkerOwner {
                     xdist_groups: vec![],
                     errors: vec![],
                     skips: vec![],
-                    deselected: 0,
                 });
                 // No replacement: this slot's (empty) collection already went to
                 // the merge loop, so a replacement's own Collection frame could
@@ -1683,14 +1674,13 @@ impl WorkerOwner {
                 self.handle_crash(&mut proc, vec![], false);
                 return;
             }
-            Some((nodeids, xdist_groups, errors, skips, deselected)) => {
+            Some((nodeids, xdist_groups, errors, skips)) => {
                 let _ = self.sender.send(Event::Collection {
                     worker: self.index,
                     nodeids,
                     xdist_groups,
                     errors,
                     skips,
-                    deselected,
                 });
             }
         }

@@ -309,15 +309,12 @@ impl Engine {
         // backend-parametrization expansion, pytest-split's group slicing,
         // pytest-order's reordering) are silently ignored under -n, since
         // this whole file never calls collect()'s equivalent pipeline.
-        let deselected = match self.apply_worker_selection(py, &mut collection) {
-            Ok(deselected) => deselected,
-            Err(err) => {
-                send(&WorkerMsg::InternalError {
-                    traceback: python::format_exception(py, &err),
-                });
-                return exit_code::INTERNAL_ERROR;
-            }
-        };
+        if let Err(err) = self.apply_worker_selection(py, &mut collection) {
+            send(&WorkerMsg::InternalError {
+                traceback: python::format_exception(py, &err),
+            });
+            return exit_code::INTERNAL_ERROR;
+        }
         // Report the collected item set (and any errors) to the controller
         // so it can build work batches without importing test files itself.
         let (nodeids, xdist_groups): (Vec<_>, Vec<_>) = collection
@@ -332,7 +329,6 @@ impl Engine {
             // Reported per worker (every worker imports every module) and
             // deduped by the controller.
             skips: std::mem::take(&mut self.session.skipped_modules),
-            deselected,
         });
         // Collection done: tests run from here on, so restore gc — the same
         // point the controller restores it at (see Engine::run_session). A
@@ -1053,8 +1049,8 @@ impl Engine {
     /// `-k`/`-m`, then `pytest_deselected` hooks. Reuses the existing Engine
     /// methods verbatim by lending `collection.items` to `self.session.items`
     /// for the duration (those methods all operate through the session's
-    /// item list) rather than reimplementing any of this. Returns the
-    /// deselected count for the controller's summary line.
+    /// item list) rather than reimplementing any of this. Like xdist, the
+    /// deselected count stays in the worker.
     ///
     /// Deliberately NOT handled here: `--strict-markers` validation (a
     /// sibling gap: it also only runs against the controller's always-empty
@@ -1064,8 +1060,7 @@ impl Engine {
         &mut self,
         py: Python<'_>,
         collection: &mut WorkerCollection,
-    ) -> PyResult<usize> {
-        let collected = collection.items.len();
+    ) -> PyResult<()> {
         self.session.items = std::mem::take(&mut collection.items);
         let result = (|| -> PyResult<()> {
             self.apply_deselect()
@@ -1090,7 +1085,7 @@ impl Engine {
         // upstream workers collect everything (pytest-django sets up the
         // databases every item needs from it).
         python::set_session_items(py, &collection.items)?;
-        Ok(collected.saturating_sub(collection.items.len()))
+        Ok(())
     }
 
     /// Import (once) the conftest.py chain from rootdir down to `path`'s
