@@ -57,9 +57,6 @@ pub enum WorkerMsg {
     /// failed to import so the controller can show them in the ERRORS section.
     /// `xdist_groups`: parallel to nodeids, the resolved xdist_group mark for
     /// each item (None = ungrouped).
-    /// `deselected`: how many items -k/-m/--deselect/conftest
-    /// pytest_collection_modifyitems dropped from this worker's raw
-    /// collected set, for the controller's "N deselected" summary line.
     Collection {
         nodeids: Vec<String>,
         xdist_groups: Vec<Option<String>>,
@@ -68,7 +65,6 @@ pub enum WorkerMsg {
         /// module-level `pytest.importorskip`/`skip(allow_module_level=True)`
         /// is a skip, not a collect error, exactly as in a sequential run.
         skips: Vec<(String, String, String)>,
-        deselected: usize,
     },
 }
 
