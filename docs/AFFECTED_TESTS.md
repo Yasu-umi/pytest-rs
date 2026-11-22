@@ -187,6 +187,31 @@ Import-time code (module units and class units) runs once per process. Per-test 
 
 Together these give at least testmon's coverage, since testmon attributes import-time code to nobody.
 
+#### Application code imported by a conftest
+
+A conftest that imports the application (`from app import models`, `import mypkg as pkg`) runs the application's import-time code in `collect:global`. By rule 1 every module and class unit executed there becomes a dependency of every test, so editing a single module constant or class attribute anywhere in the application means a full run.
+
+- **Default: unchanged.** Rule 1 stays as it is. Its only job beyond conftest code itself is to cover reads without calls: a test calls `N.f`, which reads `M.LIMIT`, and the test runs nothing in `M`. Implied dependencies (§4.1) do not cover that case.
+- **Workaround, documented with PR 2.** Move the application import from the conftest's top level into the fixtures that need it. The import then runs under a fixture or test context (§4.4, rule 4), and its import-time code is attributed to the tests that use it. No implementation change is needed.
+
+Measured alternatives, on networkx 3.6.1 (6890 tests; its conftest does `import networkx as nx`). 30 module constants and 30 class attributes were sampled from the 81 and 85 candidates and edited one at a time:
+
+| Rule | Module constant: tests selected | Class attribute: tests selected |
+|---|---|---|
+| Rule 1 as designed (PR 1) | all 6890 in 30 of 30 | all 6890 in 30 of 30 |
+| Import-time code split per module, re-attached through the static-import closure of each test's roots (its file and the files whose code it ran) | all 6890 in 30 of 30 | all 6890 in 30 of 30 |
+| Global names referenced by the functions the test ran (estimate) | median 50, max 6699 | median 32, max 6734 |
+
+- **The static-import closure is rejected.** `networkx/__init__.py` re-exports every subpackage, and every test file imports the package. The closure therefore reaches nearly every module from every test. A package that re-exports everything from `__init__` gets nothing from it.
+- **Name-based narrowing (opt-in, PR 4).** A test depends on a module-level or class-level statement only if a function the test ran references a name that the statement defines. The dependency follows names through other import-time statements to a fixed point, for example `Y = X * 2`, a default argument, a decorator or a base class.
+  - The estimate above matched bare identifiers without resolving scopes. Its high maxima are partly name collisions, such as `value` and `backends`, and partly real shared state, such as `Graph._node`, which most tests use.
+  - The estimate also missed a case. `gml.Pattern.COMMENT_WHITESPACE` is an `Enum` member that is reached only through `Pattern(i)`, so no function names it. The name rule selected 0 tests for it, although every test that tokenizes a GML comment depends on it.
+  - It ships disabled by default, behind an option, with these safety rules:
+    - Names are resolved to module scope: `X` defined in `M`, `M.X` through `import M`, and `X` through `from M import X`. A bare identifier match across modules is not enough.
+    - A class attribute of an `Enum`, a dataclass, a `NamedTuple`, a `TypedDict` or any class whose body is introspected (a class with a metaclass or `__init_subclass__`) makes the whole class unit the dependency, not the single name.
+    - A name the resolver cannot follow falls back to the module unit: star imports, `getattr` or `setattr` with a non-literal name, `globals()` or `vars()`, `__getattr__` on a module, and attribute access on an object whose type is unknown.
+    - Writes to module attributes from elsewhere (`M.X = ...` outside `M`) count as definitions of `M.X`.
+
 ### 4.4 Fixtures with scope above function
 
 A session, package, module or class fixture runs its code once, under whichever test first requests it. On its own, that test would carry all of the fixture's deps.
@@ -371,6 +396,7 @@ Typical use: `record` on main CI, `select` on PR CI (cheapest) or `auto` (keeps 
 
 - **Code that did not run in the recorded run.** A function that was not called is not a dependency. This is inherent to any dynamic approach, and testmon has the same gap. Function granularity mitigates it in practice: a change to the calling function reruns the test.
 - **Reads without calls.** A later test that reads a module constant or class attribute of a *lazily* imported module, without calling anything in that module (§4.3, rule 4).
+- **Over-run from application code imported by a conftest** (§4.3, "Application code imported by a conftest"). This is not a miss: any edit to the application's import-time code means a full run. The documented workaround moves the import into fixtures. Opt-in name-based narrowing is planned for PR 4. Splitting import-time code per module and re-attaching it through the static-import closure was measured and rejected.
 - **Mocks and autospec.** A test that patches `f` never runs `f`. A change to `f`'s signature that would break `create_autospec` does not rerun that test.
 - **State outside the process.** DB contents, environment variables, the clock, the network, files written by other tests, test-order dependence. A subset run can expose a hidden inter-test dependency as a *failure*. That is visible, not a miss.
 - **Code not compiled from a file under the rootdir.** `exec` of strings (`<string>`), generated code, and C or Cython extensions built in-tree. Use `always_changed` or `file_triggers` for these.
@@ -430,6 +456,7 @@ It deliberately does **not** reuse `--testmon*`. Both would register the same op
 - `open` and `listdir` dependencies from the audit hook.
 - `file_triggers`.
 - `deps_incomplete` marking for subprocesses.
+- Docs: the workaround for application code imported by a conftest, which is to move the import into fixtures (§4.3).
 
 ### PR 3: CI
 
@@ -445,6 +472,7 @@ It deliberately does **not** reuse `--testmon*`. Both would register the same op
 - Global deps scoped by conftest.
 - Recording inside Python subprocesses, through cov's `.pth` child.
 - A collector shared with `--cov`.
+- Opt-in, default-off name-based narrowing of import-time dependencies, with the safety rules in §4.3.
 
 ### Decisions (review of this doc)
 
@@ -452,3 +480,4 @@ It deliberately does **not** reuse `--testmon*`. Both would register the same op
 2. `-k`, `-m` and `--lf` compose with selection as extra filters (testmon disables selection instead).
 3. Unrecorded non-`.py` changes are ignored by default; a built-in list (config, lock files, native code) plus `full_run_on` triggers full runs, and `unknown_files = "all"` gives the strict behavior (§6).
 4. The cargo feature is on by default; the feature itself stays inert unless `--affected*` is given.
+5. Application code imported by a conftest keeps rule 1 by default. That is the safe over-run. The fixture workaround is documented in PR 2, name-based narrowing comes later as an opt-in, and the static-import closure is not adopted (§4.3).
