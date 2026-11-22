@@ -312,10 +312,9 @@ impl Engine {
         let deselected = match self.apply_worker_selection(py, &mut collection) {
             Ok(deselected) => deselected,
             Err(err) => {
-                eprintln!(
-                    "INTERNAL ERROR: worker collection modifyitems failed: {}",
-                    python::format_exception(py, &err)
-                );
+                send(&WorkerMsg::InternalError {
+                    traceback: python::format_exception(py, &err),
+                });
                 return exit_code::INTERNAL_ERROR;
             }
         };

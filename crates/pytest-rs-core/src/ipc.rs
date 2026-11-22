@@ -46,6 +46,11 @@ pub enum WorkerMsg {
     Workeroutput { payload: String },
     /// Clean shutdown.
     Bye,
+    /// A hook raised during the worker's own collection (e.g. a conftest's
+    /// pytest_collection_modifyitems): the controller reports it as an
+    /// internal error and ends the session, as xdist does. Sent instead of
+    /// `Collection`; the worker exits right after.
+    InternalError { traceback: String },
     /// Sent after precollect_all: the worker's full collected item set.
     /// The controller uses this to build work batches (worker-side collection).
     /// `errors` carries formatted collection error strings for files that

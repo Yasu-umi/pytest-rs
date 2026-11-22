@@ -64,6 +64,24 @@ class TestDistControllerModifyitems(unittest.TestCase):
     def test_serial_still_fires(self) -> None:
         self.assertEqual(self.calls(), ["controller 2"])
 
+    def test_worker_hook_error_is_an_internal_error(self) -> None:
+        # The error used to surface only because the controller fired the
+        # hook itself; it must now travel from the workers (xdist's
+        # test_internal_errors_propagate_to_controller).
+        (self.base / "conftest.py").write_text(
+            "def pytest_collection_modifyitems():\n    raise RuntimeError('Some runtime error')\n"
+        )
+        result = subprocess.run(
+            [str(BINARY), "-p", "no:cacheprovider", "-n", "2", "test_x.py"],
+            cwd=self.base,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 3, result.stdout + result.stderr)
+        self.assertEqual(
+            result.stdout.count("INTERNALERROR> RuntimeError: Some runtime error"), 1, result.stdout
+        )
+
     def test_collect_only_under_n_collects_locally(self) -> None:
         # xdist collects in the controller under --collect-only.
         self.assertEqual(self.calls("-n", "2", "--collect-only"), ["controller 2"])
