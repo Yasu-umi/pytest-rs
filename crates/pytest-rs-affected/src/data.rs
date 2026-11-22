@@ -167,6 +167,9 @@ impl Data {
     /// Write atomically: a temp file next to the target, then a rename.
     pub fn save(&self, path: &Path) -> std::io::Result<()> {
         let bytes = self.encode();
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
         let tmp = path.with_file_name(format!(
             "{}.tmp-{}",
             path.file_name()
