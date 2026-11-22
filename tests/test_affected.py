@@ -391,6 +391,24 @@ class TestAffected(unittest.TestCase):
         self.project.edit("app/config.py", "MODE = 'a'", "MODE = 'b'")
         self.assertEqual(self.project.ran("--affected"), {"tests/test_mode.py::test_mode"})
 
+    def test_imports_of_a_cached_module_are_followed(self) -> None:
+        """A module imported from the cache brings along the modules it imported."""
+        self.project.write("app/inner.py", "LIMIT = 1\n")
+        self.project.write("app/outer.py", "from app import inner\n")
+        self.project.write(
+            "tests/test_a_first.py", "from app import outer\n\ndef test_first():\n    pass\n"
+        )
+        self.project.write(
+            "tests/test_b_second.py",
+            "from app import outer\n\ndef test_second():\n    assert outer.inner.LIMIT == 1\n",
+        )
+        self.project.ran("--affected")
+        self.project.edit("app/inner.py", "LIMIT = 1", "LIMIT = 2")
+        self.assertEqual(
+            self.project.ran("--affected"),
+            {"tests/test_a_first.py::test_first", "tests/test_b_second.py::test_second"},
+        )
+
     def test_lazy_import_belongs_to_the_test(self) -> None:
         """a module first imported inside a test is that test's dependency."""
         self.project.write("app/lazy.py", "FLAG = True\n")
@@ -613,9 +631,9 @@ class TestAffected(unittest.TestCase):
         self.assertEqual(self.project.ran("--affected"), {"tests/test_proc.py::test_spawns"})
 
     def test_subprocess_outside_tests_says_why_everything_runs(self) -> None:
-        """A conftest starting a subprocess at import makes every test incomplete."""
+        """The rootdir's conftest starting a subprocess at import makes every test incomplete."""
         self.project.write(
-            "tests/conftest.py",
+            "conftest.py",
             "import subprocess, sys\n\nsubprocess.run([sys.executable, '-c', 'pass'], check=True)\n",
         )
         self.record()

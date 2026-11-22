@@ -64,6 +64,96 @@ struct TestRun {
     setups: BTreeSet<usize>,
 }
 
+/// How module executions nest, from one session's recording: which import
+/// contexts ran while each context was current, and which file each import
+/// context belongs to.
+struct ImportGraph {
+    children: HashMap<usize, Vec<usize>>,
+    file_of: HashMap<usize, String>,
+    incomplete: HashSet<usize>,
+    memo: std::cell::RefCell<HashMap<usize, (HashSet<Dep>, bool)>>,
+}
+
+impl ImportGraph {
+    fn new(recording: &Recording) -> Self {
+        let mut children: HashMap<usize, Vec<usize>> = HashMap::new();
+        for (parent, child) in &recording.nested {
+            if parent != child {
+                children.entry(*parent).or_default().push(*child);
+            }
+        }
+        Self {
+            children,
+            file_of: recording
+                .import_contexts
+                .iter()
+                .map(|(file, context)| (*context, file.clone()))
+                .collect(),
+            incomplete: recording.incomplete.clone(),
+            memo: std::cell::RefCell::new(HashMap::new()),
+        }
+    }
+
+    fn children(&self, context: usize) -> Vec<usize> {
+        self.children.get(&context).cloned().unwrap_or_default()
+    }
+
+    /// A context's own dependencies plus those of every module executed
+    /// while it was current (transitively), and whether any of them
+    /// started a subprocess.
+    fn effective(&self, context: usize, own: &[HashSet<Dep>]) -> (HashSet<Dep>, bool) {
+        self.effective_inner(context, own, &mut HashSet::new())
+    }
+
+    fn effective_inner(
+        &self,
+        context: usize,
+        own: &[HashSet<Dep>],
+        visiting: &mut HashSet<usize>,
+    ) -> (HashSet<Dep>, bool) {
+        if let Some(done) = self.memo.borrow().get(&context) {
+            return done.clone();
+        }
+        if !visiting.insert(context) {
+            // A module re-executed inside itself (reload): already counted.
+            return (HashSet::new(), false);
+        }
+        let mut deps: HashSet<Dep> = own.get(context).cloned().unwrap_or_default();
+        let mut incomplete = self.incomplete.contains(&context);
+        for child in self.children(context) {
+            let (child_deps, child_incomplete) = self.effective_inner(child, own, visiting);
+            deps.extend(child_deps);
+            incomplete |= child_incomplete;
+        }
+        visiting.remove(&context);
+        self.memo
+            .borrow_mut()
+            .insert(context, (deps.clone(), incomplete));
+        (deps, incomplete)
+    }
+
+    /// The import contexts reachable from `roots` through module executions
+    /// and through each module's own import statements (`static_edges`).
+    fn closure(
+        &self,
+        roots: Vec<usize>,
+        static_edges: &dyn Fn(&str) -> Vec<usize>,
+    ) -> HashSet<usize> {
+        let mut reached: HashSet<usize> = HashSet::new();
+        let mut stack = roots;
+        while let Some(context) = stack.pop() {
+            if !reached.insert(context) {
+                continue;
+            }
+            stack.extend(self.children(context));
+            if let Some(file) = self.file_of.get(&context) {
+                stack.extend(static_edges(file));
+            }
+        }
+        reached
+    }
+}
+
 /// Contexts are numbered by the collector; 0 is the global one
 /// (`collect:global`): plugin and conftest imports, collection hooks
 /// and everything else outside a test, a higher-scope setup or a test
@@ -98,6 +188,8 @@ struct State {
     to_run: HashSet<String>,
     setup_contexts: HashMap<ScopedSetup, usize>,
     collect_contexts: HashMap<String, usize>,
+    /// The sys.meta_path finder that brackets project modules' execution.
+    import_finder: Option<Py<PyAny>>,
     /// The selection plan, built once per session (pre-import or at
     /// modifyitems, whichever comes first).
     plan: Option<Plan>,
@@ -331,6 +423,25 @@ impl AffectedPlugin {
                 )),
             ),
         )?;
+        // Bracket each project module's execution through the import system,
+        // so its import-time code also has a context of its own.
+        let hook = pyo3::types::PyModule::from_code(
+            py,
+            &std::ffi::CString::new(include_str!("import_hook.py")).expect("no NUL"),
+            c"_pytest_rs_affected_import_hook.py",
+            c"_pytest_rs_affected_import_hook",
+        )?;
+        state.import_finder = Some(
+            hook.call_method1(
+                "install",
+                (
+                    collector.bind(py),
+                    state.rootdir.to_string_lossy().into_owned(),
+                ),
+            )?
+            .unbind(),
+        );
+
         // Audit hooks cannot be removed: the collector goes inert at the end
         // of the session instead.
         py.import("sys")?
@@ -698,6 +809,117 @@ impl AffectedPlugin {
         out
     }
 
+    /// Per imported test file, the import-time dependencies of every
+    /// project module reachable from it through imports, whichever context
+    /// first imported them: modules it imported (first or from the cache)
+    /// and, transitively, the modules those imported. Returns the group and
+    /// whether any of those imports started a subprocess.
+    fn import_closure_groups(
+        state: &State,
+        py: Python<'_>,
+        recording: &Recording,
+        graph: &ImportGraph,
+        effective: &[(HashSet<Dep>, bool)],
+        data: &mut Data,
+    ) -> HashMap<String, (Option<u32>, bool)> {
+        if recording.import_contexts.is_empty() {
+            return HashMap::new();
+        }
+        let seen: HashMap<&str, &Option<Vec<u8>>> = recording
+            .files
+            .iter()
+            .map(|(abs, content)| (abs.as_str(), content))
+            .collect();
+        // Module name and file of everything loaded, for resolving import
+        // statements to the import contexts of project modules.
+        let mut by_name: HashMap<String, String> = HashMap::new();
+        let mut name_of: HashMap<String, String> = HashMap::new();
+        if let Ok(modules) = py
+            .import("sys")
+            .and_then(|sys| sys.getattr("modules"))
+            .and_then(|m| m.call_method0("copy"))
+            .and_then(|m| m.call_method0("items"))
+            .and_then(|items| items.try_iter())
+        {
+            for item in modules.flatten() {
+                let Ok((name, module)) = item.extract::<(String, Bound<'_, PyAny>)>() else {
+                    continue;
+                };
+                let Some(file) = module
+                    .getattr("__file__")
+                    .ok()
+                    .and_then(|f| f.extract::<String>().ok())
+                else {
+                    continue;
+                };
+                name_of.entry(file.clone()).or_insert_with(|| name.clone());
+                by_name.insert(name, file);
+            }
+        }
+        // Parsed once per module, however many test files reach it.
+        let parsed: std::cell::RefCell<HashMap<String, Vec<usize>>> = Default::default();
+        let static_edges = |file: &str| -> Vec<usize> {
+            if let Some(edges) = parsed.borrow().get(file) {
+                return edges.clone();
+            }
+            let source = match seen.get(file) {
+                Some(Some(bytes)) => String::from_utf8_lossy(bytes).into_owned(),
+                _ => std::fs::read_to_string(file).unwrap_or_default(),
+            };
+            let module = name_of.get(file).map(String::as_str);
+            let edges: Vec<usize> =
+                StaticImports::of(&source, module, file.ends_with("__init__.py"))
+                    .iter()
+                    .filter_map(|name| by_name.get(name))
+                    .filter_map(|target| recording.import_contexts.get(target).copied())
+                    .collect();
+            parsed.borrow_mut().insert(file.to_string(), edges.clone());
+            edges
+        };
+        // Test files that reach the same modules share one group.
+        let mut by_closure: HashMap<Vec<usize>, (Option<u32>, bool)> = HashMap::new();
+        let mut out = HashMap::new();
+        let paths: BTreeSet<&String> = state
+            .collect_contexts
+            .keys()
+            .chain(state.file_modules.keys())
+            .collect();
+        for path in paths {
+            let abs = state.rootdir.join(path).to_string_lossy().into_owned();
+            let roots: Vec<usize> = recording
+                .import_contexts
+                .get(&abs)
+                .copied()
+                .into_iter()
+                .chain(
+                    state
+                        .collect_contexts
+                        .get(path)
+                        .map(|c| graph.children(*c))
+                        .unwrap_or_default(),
+                )
+                .chain(static_edges(&abs))
+                .collect();
+            let mut reached: Vec<usize> = graph.closure(roots, &static_edges).into_iter().collect();
+            if reached.is_empty() {
+                continue;
+            }
+            reached.sort_unstable();
+            let entry = by_closure.entry(reached).or_insert_with_key(|reached| {
+                let mut deps: HashSet<Dep> = HashSet::new();
+                let mut incomplete = false;
+                for context in reached {
+                    deps.extend(effective[*context].0.iter().copied());
+                    incomplete |= effective[*context].1;
+                }
+                let group = (!deps.is_empty()).then(|| data.add_group(deps.into_iter().collect()));
+                (group, incomplete)
+            });
+            out.insert(path.clone(), *entry);
+        }
+        out
+    }
+
     /// Turn the session's recording into data entries, merged into the
     /// stored data (or a fresh file), and write it.
     /// Fold the session's recording into `data` (the stored data, or a fresh
@@ -795,12 +1017,12 @@ impl AffectedPlugin {
                 })
             })
             .collect();
-        let groups: Vec<Option<u32>> = recording
+        let own: Vec<HashSet<Dep>> = recording
             .contexts
             .iter()
             .enumerate()
             .map(|(context, codes)| {
-                let deps: Vec<Dep> = codes
+                codes
                     .iter()
                     .flat_map(|code| code_deps[*code as usize].iter().copied())
                     .chain(
@@ -811,10 +1033,29 @@ impl AffectedPlugin {
                             .flatten()
                             .filter_map(|input| input_deps[*input as usize]),
                     )
-                    .collect();
-                (!deps.is_empty()).then(|| data.add_group(deps))
+                    .collect()
             })
             .collect();
+        // A module executed while a context was current is part of that
+        // context too (its import context only adds a finer grain).
+        let graph = ImportGraph::new(&recording);
+        let effective: Vec<(HashSet<Dep>, bool)> = (0..own.len())
+            .map(|context| graph.effective(context, &own))
+            .collect();
+        let groups: Vec<Option<u32>> = effective
+            .iter()
+            .map(|(deps, _)| {
+                (!deps.is_empty()).then(|| data.add_group(deps.iter().copied().collect()))
+            })
+            .collect();
+        let incomplete_contexts: HashSet<usize> = effective
+            .iter()
+            .enumerate()
+            .filter(|(_, (_, incomplete))| *incomplete)
+            .map(|(context, _)| context)
+            .collect();
+        let closure_groups =
+            Self::import_closure_groups(state, ctx.py, &recording, &graph, &effective, &mut data);
         let static_groups =
             Self::static_import_groups(state, ctx.py, &recording, &mut data, end.as_ref());
 
@@ -837,7 +1078,7 @@ impl AffectedPlugin {
             // A test reported without reaching the runtest_setup hook (a
             // skip mark) ran none of its own code: its file's import and
             // the global context are its dependencies.
-            let (run_path, own, setups) = match state.runs.get(nodeid) {
+            let (run_path, own_context, setups) = match state.runs.get(nodeid) {
                 Some(run) => (run.path.clone(), Some(run.context), run.setups.clone()),
                 None => (
                     nodeid.split("::").next().unwrap_or(nodeid).to_string(),
@@ -848,13 +1089,19 @@ impl AffectedPlugin {
             let contexts: Vec<usize> = std::iter::once(GLOBAL_CONTEXT)
                 .chain(state.collect_contexts.get(&run_path).copied())
                 .chain(setups)
-                .chain(own)
+                .chain(own_context)
                 .collect();
-            let incomplete = contexts.iter().any(|c| recording.incomplete.contains(c));
+            let (closure_group, closure_incomplete) = closure_groups
+                .get(&run_path)
+                .copied()
+                .unwrap_or((None, false));
+            let incomplete =
+                closure_incomplete || contexts.iter().any(|c| incomplete_contexts.contains(c));
             let test_groups: Vec<u32> = contexts
                 .iter()
                 .filter_map(|c| groups.get(*c).copied().flatten())
                 .chain(static_groups.get(&run_path).copied())
+                .chain(closure_group)
                 .collect();
             let id = data.strings.intern(nodeid);
             let path = data.strings.intern(&run_path);
@@ -899,6 +1146,7 @@ impl AffectedPlugin {
                 .chain(state.collect_contexts.get(path).copied())
                 .filter_map(|c| groups.get(c).copied().flatten())
                 .chain(static_groups.get(path).copied())
+                .chain(closure_groups.get(path).and_then(|(g, _)| *g))
                 .chain(own)
                 .collect();
             let nodeids: Vec<u32> = state
@@ -918,7 +1166,7 @@ impl AffectedPlugin {
                 },
             );
         }
-        data.global_incomplete = recording.incomplete.contains(&GLOBAL_CONTEXT);
+        data.global_incomplete = incomplete_contexts.contains(&GLOBAL_CONTEXT);
         data.snapshot = match state.snapshot.take() {
             Some(snapshot) => snapshot,
             None => Self::snapshot(state),
@@ -1325,6 +1573,12 @@ impl Plugin for AffectedPlugin {
         let monitoring = py.import("sys")?.getattr("monitoring")?;
         monitoring.call_method1("set_events", (state.tool_id, 0))?;
         monitoring.call_method1("free_tool_id", (state.tool_id,))?;
+        if let Some(finder) = state.import_finder.take() {
+            let _ = py
+                .import("sys")?
+                .getattr("meta_path")?
+                .call_method1("remove", (finder,));
+        }
         let recording = collector.borrow(py).take();
         let recorded = if ctx.config.is_worker() {
             // A -n worker records only its own tests, for the controller to
