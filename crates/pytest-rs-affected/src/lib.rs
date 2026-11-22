@@ -705,12 +705,16 @@ impl Plugin for AffectedPlugin {
     }
 
     fn pytest_addoption(&self, parser: &mut OptionParser) {
-        parser.add_option(OptDef::optional_value(
-            "--affected",
-            "Run only the tests affected by changes since the recorded run \
+        parser.add_option(
+            OptDef::optional_value(
+                "--affected",
+                "Run only the tests affected by changes since the recorded run \
              ('auto', the default: select and record what ran; 'record': run \
-             as usual and record; 'select': select without recording)",
-        ));
+             as usual and record; 'select': select without recording). \
+             The mode only binds as --affected=MODE",
+            )
+            .with_require_equals(),
+        );
         parser.add_option(OptDef::value(
             "--affected-data",
             None,

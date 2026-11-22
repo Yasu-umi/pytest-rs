@@ -401,6 +401,11 @@ impl Config {
                 } else {
                     arg
                 };
+                let arg = if opt.require_equals {
+                    arg.require_equals(true)
+                } else {
+                    arg
+                };
                 match &opt.default {
                     Some(d) => arg.default_value(d.clone()),
                     None => arg,
