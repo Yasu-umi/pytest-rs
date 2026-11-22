@@ -159,7 +159,8 @@ class TestAffected(unittest.TestCase):
         self.record()
         result = self.project.run("--affected")
         self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("4 deselected", result.stdout)
+        self.assertEqual(self.project.nodeids(result.stdout), set())
+        self.assertIn("2 of 2 test files unchanged, not imported", result.stdout)
 
     def test_select_without_data_runs_everything(self) -> None:
         """§7: select with no usable data runs everything and says so."""
@@ -368,6 +369,25 @@ class TestAffected(unittest.TestCase):
         self.project.edit("app/config.py", "MODE = 'a'", "MODE = 'b'")
         self.assertEqual(self.project.ran("--affected"), ALL)
 
+    def test_conftest_import_moved_into_a_fixture(self) -> None:
+        """docs/affected.md: importing the application inside a fixture scopes its import-time code."""
+        self.project.write("app/config.py", "MODE = 'a'\n")
+        self.project.write(
+            "tests/conftest.py",
+            """
+            import pytest
+
+            @pytest.fixture
+            def mode():
+                from app import config
+                return config.MODE
+            """,
+        )
+        self.project.write("tests/test_mode.py", "def test_mode(mode):\n    assert mode\n")
+        self.project.ran("--affected")
+        self.project.edit("app/config.py", "MODE = 'a'", "MODE = 'b'")
+        self.assertEqual(self.project.ran("--affected"), {"tests/test_mode.py::test_mode"})
+
     def test_lazy_import_belongs_to_the_test(self) -> None:
         """§4.3 rule 4: a module first imported inside a test is that test's dependency."""
         self.project.write("app/lazy.py", "FLAG = True\n")
@@ -451,9 +471,23 @@ class TestAffected(unittest.TestCase):
         self.record()
         self.assertEqual(self.project.ran("--affected"), ALL)
 
-    # --- non-Python files (§6, PR 1) --------------------------------------
+    # --- non-Python files (§4.5, §6) -------------------------------------
 
-    def test_non_python_change_runs_everything(self) -> None:
+    def configure(self, toml: str) -> None:
+        self.project.edit(
+            "pyproject.toml",
+            'pythonpath = ["."]',
+            'pythonpath = ["."]\n\n[tool.pytest-rs.affected]\n' + textwrap.dedent(toml),
+        )
+
+    def test_unrecorded_non_python_change_is_ignored(self) -> None:
+        """§6: a file no test read is ignored by default (unknown_files = "ignore")."""
+        self.record()
+        self.project.write("data/values.json", "{}")
+        self.assertEqual(self.project.ran("--affected"), set())
+
+    def test_unknown_files_all_runs_everything(self) -> None:
+        self.configure('unknown_files = "all"')
         self.record()
         self.project.write("data/values.json", "{}")
         result = self.project.run("--affected")
@@ -462,34 +496,241 @@ class TestAffected(unittest.TestCase):
         self.assertEqual(self.project.ran("--affected"), set())
 
     def test_ignored_files_change_nothing(self) -> None:
-        self.project.edit(
-            "pyproject.toml",
-            'pythonpath = ["."]',
-            'pythonpath = ["."]\n\n[tool.pytest-rs.affected]\nignore = ["docs/**"]',
-        )
+        self.configure('unknown_files = "all"\nignore = ["docs/**"]')
         self.record()
         self.project.write("docs/index.md", "# docs")
         self.assertEqual(self.project.ran("--affected"), set())
 
+    def test_builtin_full_run_list(self) -> None:
+        """§6: configuration and environment files always mean a full run."""
+        self.record()
+        self.project.write("requirements.txt", "attrs\n")
+        self.assertEqual(self.project.ran("--affected"), ALL)
+
     def test_full_run_on_covers_python_files_too(self) -> None:
         self.project.write("scripts/gen.py", "X = 1\n")
-        self.project.edit(
-            "pyproject.toml",
-            'pythonpath = ["."]',
-            'pythonpath = ["."]\n\n[tool.pytest-rs.affected]\nfull_run_on = ["scripts/**"]',
-        )
+        self.configure('full_run_on = ["scripts/**"]')
         self.record()
         self.project.edit("scripts/gen.py", "X = 1", "X = 2")
         self.assertEqual(self.project.ran("--affected"), ALL)
 
     def test_full_run_with_k_drops_the_tests_it_did_not_run(self) -> None:
         """A full-run trigger with -k: the tests left out must run next time."""
+        self.configure('unknown_files = "all"')
         self.record()
         self.project.write("data/values.json", "{}")
         self.assertEqual(
             self.project.ran("--affected", "-k", "test_box"), {"tests/test_mul.py::test_box"}
         )
         self.assertEqual(self.project.ran("--affected"), ALL - {"tests/test_mul.py::test_box"})
+
+    def test_file_read_by_a_test_is_its_dependency(self) -> None:
+        """§4.5: a file opened for reading under the rootdir is a dependency."""
+        self.project.write("data/values.json", '{"a": 1}')
+        self.project.write(
+            "tests/test_data.py",
+            """
+            import json
+
+            def test_reads():
+                with open("data/values.json") as f:
+                    assert "a" in json.load(f)
+
+            def test_other():
+                pass
+            """,
+        )
+        self.project.ran("--affected")
+        self.project.write("data/values.json", '{"a": 2}')
+        self.assertEqual(self.project.ran("--affected"), {"tests/test_data.py::test_reads"})
+
+    def test_file_read_at_collection_belongs_to_the_test_file(self) -> None:
+        """§4.5 + rule 2: parametrize data read while importing a test file."""
+        self.project.write("data/cases.json", "[1, 2]")
+        self.project.write(
+            "tests/test_cases.py",
+            """
+            import json
+            import pytest
+
+            with open("data/cases.json") as f:
+                CASES = json.load(f)
+
+            @pytest.mark.parametrize("n", CASES)
+            def test_case(n):
+                assert n > 0
+            """,
+        )
+        self.project.ran("--affected")
+        self.project.write("data/cases.json", "[1, 2, 3]")
+        self.assertEqual(
+            self.project.ran("--affected"),
+            {
+                "tests/test_cases.py::test_case[1]",
+                "tests/test_cases.py::test_case[2]",
+                "tests/test_cases.py::test_case[3]",
+            },
+        )
+
+    def test_directory_listing_is_a_dependency(self) -> None:
+        """§4.5: a directory listed with os.listdir/os.scandir is a dependency."""
+        self.project.write("plugins/a.txt", "a")
+        self.project.write(
+            "tests/test_plugins.py",
+            """
+            import os
+
+            def test_discovers():
+                assert "a.txt" in os.listdir("plugins")
+
+            def test_other():
+                pass
+            """,
+        )
+        self.project.ran("--affected")
+        self.project.write("plugins/b.txt", "b")
+        self.assertEqual(self.project.ran("--affected"), {"tests/test_plugins.py::test_discovers"})
+
+    def test_subprocess_marks_the_test_incomplete(self) -> None:
+        """§4.5: a test that starts a subprocess always runs (incomplete = "run")."""
+        self.project.write(
+            "tests/test_proc.py",
+            """
+            import subprocess
+            import sys
+
+            def test_spawns():
+                subprocess.run([sys.executable, "-c", "pass"], check=True)
+
+            def test_other():
+                pass
+            """,
+        )
+        self.project.ran("--affected")
+        self.assertEqual(self.project.ran("--affected"), {"tests/test_proc.py::test_spawns"})
+
+    def test_subprocess_outside_tests_says_why_everything_runs(self) -> None:
+        """A conftest starting a subprocess at import makes every test incomplete."""
+        self.project.write(
+            "tests/conftest.py",
+            "import subprocess, sys\n\nsubprocess.run([sys.executable, '-c', 'pass'], check=True)\n",
+        )
+        self.record()
+        result = self.project.run("--affected")
+        self.assertEqual(self.project.nodeids(result.stdout), ALL)
+        self.assertIn("a subprocess was started outside any test", result.stdout)
+
+    def test_incomplete_trust(self) -> None:
+        self.configure('incomplete = "trust"')
+        self.project.write(
+            "tests/test_proc.py",
+            """
+            import subprocess
+            import sys
+
+            def test_spawns():
+                subprocess.run([sys.executable, "-c", "pass"], check=True)
+            """,
+        )
+        self.project.ran("--affected")
+        self.assertEqual(self.project.ran("--affected"), set())
+
+    def test_file_triggers_tests(self) -> None:
+        """§6: a change under a file_triggers key runs the listed test globs."""
+        self.project.write("migrations/0001.sql", "create table a;")
+        self.configure(
+            """
+            [tool.pytest-rs.affected.file_triggers]
+            "migrations/**" = ["tests/test_mul.py"]
+            """
+        )
+        self.record()
+        self.project.write("migrations/0002.sql", "create table b;")
+        self.assertEqual(
+            self.project.ran("--affected"),
+            {"tests/test_mul.py::test_mul", "tests/test_mul.py::test_box"},
+        )
+        self.assertEqual(self.project.ran("--affected"), set())
+
+    def test_file_triggers_tests_left_out_by_k_run_next_time(self) -> None:
+        self.configure(
+            """
+            [tool.pytest-rs.affected.file_triggers]
+            "migrations/**" = ["tests/test_mul.py"]
+            """
+        )
+        self.record()
+        self.project.write("migrations/0001.sql", "create table a;")
+        self.assertEqual(
+            self.project.ran("--affected", "-k", "test_box"), {"tests/test_mul.py::test_box"}
+        )
+        self.assertEqual(self.project.ran("--affected"), {"tests/test_mul.py::test_mul"})
+
+    def test_file_triggers_all_and_recorded(self) -> None:
+        self.configure(
+            """
+            unknown_files = "all"
+
+            [tool.pytest-rs.affected.file_triggers]
+            "assets/**" = "all"
+            "notes/**" = "recorded"
+            """
+        )
+        self.record()
+        self.project.write("notes/todo.txt", "x")
+        self.assertEqual(self.project.ran("--affected"), set())
+        self.project.write("assets/logo.svg", "<svg/>")
+        self.assertEqual(self.project.ran("--affected"), ALL)
+
+    # --- pre-import selection (§5.3) and rule 3 -----------------------------
+
+    def test_unchanged_test_files_are_not_imported(self) -> None:
+        marker = self.project.base.parent / f"{self.project.base.name}-imports.log"
+        self.project.write(
+            "tests/test_marker.py",
+            f"""
+            with open({str(marker)!r}, "a") as f:
+                f.write("imported\\n")
+
+            def test_marker():
+                pass
+            """,
+        )
+        self.project.ran("--affected")
+        self.project.ran("--affected")
+        self.project.ran("--affected")
+        self.assertEqual(marker.read_text().splitlines(), ["imported"])
+        marker.unlink()
+
+    def test_test_file_edit_reimports_only_that_file(self) -> None:
+        self.record()
+        self.project.edit("tests/test_add.py", "assert add(2, 2) == 4", "assert add(2, 2) == 2 + 2")
+        result = self.project.run("--affected")
+        self.assertEqual(self.project.nodeids(result.stdout), {"tests/test_add.py::test_add_more"})
+        self.assertIn("1 of 2 test files unchanged, not imported", result.stdout)
+
+    def test_new_test_file_runs(self) -> None:
+        self.record()
+        self.project.write("tests/test_new.py", "def test_new():\n    pass\n")
+        self.assertEqual(self.project.ran("--affected"), {"tests/test_new.py::test_new"})
+
+    def test_static_import_of_an_already_imported_module(self) -> None:
+        """§4.3 rule 3: a module another test file imported first is a cache hit."""
+        self.project.write("app/consts.py", "SIZE = 3\n")
+        self.project.write(
+            "tests/test_a_first.py",
+            "from app import consts\n\ndef test_first():\n    assert consts.SIZE\n",
+        )
+        self.project.write(
+            "tests/test_b_second.py",
+            "from app.consts import SIZE\n\ndef test_second():\n    assert SIZE == 3\n",
+        )
+        self.project.ran("--affected")
+        self.project.edit("app/consts.py", "SIZE = 3", "SIZE = 4")
+        self.assertEqual(
+            self.project.ran("--affected"),
+            {"tests/test_a_first.py::test_first", "tests/test_b_second.py::test_second"},
+        )
 
     # --- modes (§7) --------------------------------------------------------
 

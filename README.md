@@ -77,7 +77,7 @@ Per project or per run, like pytest (works with the prebuilt wheel):
 addopts = "-p no:benchmark -p no:split"
 ```
 
-`--affected` (run only the tests affected by changes since a recorded run; experimental, see [docs/AFFECTED_TESTS.md](docs/AFFECTED_TESTS.md)) is a pytest-rs option of its own, not one of the bundled plugin compatibility layers. It is inert unless an `--affected*` option is given, and is the `affected` feature below.
+`--affected` (run only the tests affected by changes since a recorded run; experimental, see [docs/affected.md](docs/affected.md)) is a pytest-rs option of its own, not one of the bundled plugin compatibility layers. It is inert unless an `--affected*` option is given, and is the `affected` feature below.
 
 At build time, when installing from source — bundled plugins are Cargo features, all enabled by default:
 

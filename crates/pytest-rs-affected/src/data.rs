@@ -11,7 +11,7 @@ use std::path::Path;
 
 const MAGIC: &[u8] = b"PYTEST-RS-AFFECTED\0";
 /// Bumped on any change to the layout below.
-pub const FORMAT_VERSION: u32 = 1;
+pub const FORMAT_VERSION: u32 = 2;
 
 /// The fields that decide whether stored data is usable at all: any
 /// mismatch means a full run (and, when recording, a fresh file).
@@ -69,6 +69,19 @@ pub struct TestEntry {
     pub failed: bool,
     pub duration: f64,
     pub groups: Vec<u32>,
+    /// The test (or a context it depends on) started a subprocess, whose
+    /// dependencies are not recorded (§4.5).
+    pub incomplete: bool,
+}
+
+/// A test file's state at its latest import: every node id it collected
+/// and the groups every one of its tests depends on (global, the file's
+/// import, its static imports). When all of them are unchanged the file
+/// need not be imported at all (pre-import selection, §5.3).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileRecord {
+    pub groups: Vec<u32>,
+    pub nodeids: Vec<u32>,
 }
 
 /// A non-`.py` file's state when the snapshot was taken (§6: in PR 1 any
@@ -115,7 +128,58 @@ pub struct Data {
     groups: Vec<Vec<Dep>>,
     group_index: HashMap<Vec<Dep>, u32>,
     pub tests: HashMap<u32, TestEntry>,
+    pub file_records: HashMap<u32, FileRecord>,
     pub snapshot: Vec<SnapEntry>,
+    /// The latest recording started a subprocess outside every test (a
+    /// conftest or plugin at import or session start): every test it
+    /// recorded is incomplete.
+    pub global_incomplete: bool,
+}
+
+/// Why a data file could not be loaded.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LoadError {
+    Missing,
+    /// Written by a different data format version.
+    OtherFormat,
+    Unreadable,
+}
+
+/// Re-interns strings and renumbers groups while serializing, so only what
+/// is still referenced is written.
+struct Compactor<'a> {
+    data: &'a Data,
+    strings: Interner,
+    group_map: HashMap<u32, u32>,
+    groups: Vec<Vec<Dep>>,
+    used_files: HashSet<u32>,
+}
+
+impl Compactor<'_> {
+    fn string(&mut self, old: u32) -> u32 {
+        self.strings.intern(self.data.strings.resolve(old))
+    }
+
+    fn group(&mut self, old: u32) -> u32 {
+        if let Some(&new) = self.group_map.get(&old) {
+            return new;
+        }
+        let deps: Vec<Dep> = self.data.groups[old as usize]
+            .iter()
+            .map(|dep| {
+                self.used_files.insert(dep.file);
+                Dep {
+                    file: self.string(dep.file),
+                    qualname: self.string(dep.qualname),
+                    checksum: dep.checksum,
+                }
+            })
+            .collect();
+        self.groups.push(deps);
+        let new = (self.groups.len() - 1) as u32;
+        self.group_map.insert(old, new);
+        new
+    }
 }
 
 impl Data {
@@ -127,7 +191,9 @@ impl Data {
             groups: Vec::new(),
             group_index: HashMap::new(),
             tests: HashMap::new(),
+            file_records: HashMap::new(),
             snapshot: Vec::new(),
+            global_incomplete: false,
         }
     }
 
@@ -148,6 +214,10 @@ impl Data {
         &self.groups[id as usize]
     }
 
+    pub fn groups(&self) -> impl Iterator<Item = &[Dep]> {
+        self.groups.iter().map(Vec::as_slice)
+    }
+
     #[cfg(test)]
     pub fn group_count(&self) -> usize {
         self.groups.len()
@@ -159,9 +229,16 @@ impl Data {
 
     /// Load a data file. None when it is missing, unreadable or malformed
     /// (the caller then runs everything).
-    pub fn load(path: &Path) -> Option<Self> {
-        let bytes = std::fs::read(path).ok()?;
-        Self::decode(&bytes)
+    pub fn load(path: &Path) -> Result<Self, LoadError> {
+        let bytes = std::fs::read(path).map_err(|_| LoadError::Missing)?;
+        let format = bytes
+            .get(MAGIC.len()..MAGIC.len() + 4)
+            .filter(|_| bytes.starts_with(MAGIC))
+            .map(|v| u32::from_le_bytes(v.try_into().expect("4 bytes")));
+        match format {
+            Some(version) if version != FORMAT_VERSION => Err(LoadError::OtherFormat),
+            _ => Self::decode(&bytes).ok_or(LoadError::Unreadable),
+        }
     }
 
     /// Write atomically: a temp file next to the target, then a rename.
@@ -193,57 +270,55 @@ impl Data {
             .collect();
         nodeids.sort_by(|a, b| a.0.cmp(b.0));
 
-        let mut strings = Interner::default();
-        let mut group_map: HashMap<u32, u32> = HashMap::new();
-        let mut groups: Vec<Vec<Dep>> = Vec::new();
-        let mut used_files: HashSet<u32> = HashSet::new();
-        let remap = |old: u32, strings: &mut Interner| strings.intern(self.strings.resolve(old));
+        let mut c = Compactor {
+            data: self,
+            strings: Interner::default(),
+            group_map: HashMap::new(),
+            groups: Vec::new(),
+            used_files: HashSet::new(),
+        };
         let tests: Vec<(u32, TestEntry)> = nodeids
             .iter()
             .map(|(nodeid, entry)| {
-                let groups_new: Vec<u32> = entry
-                    .groups
-                    .iter()
-                    .map(|old| {
-                        *group_map.entry(*old).or_insert_with(|| {
-                            let deps: Vec<Dep> = self.groups[*old as usize]
-                                .iter()
-                                .map(|dep| {
-                                    used_files.insert(dep.file);
-                                    Dep {
-                                        file: remap(dep.file, &mut strings),
-                                        qualname: remap(dep.qualname, &mut strings),
-                                        checksum: dep.checksum,
-                                    }
-                                })
-                                .collect();
-                            groups.push(deps);
-                            (groups.len() - 1) as u32
-                        })
-                    })
-                    .collect();
-                let id = strings.intern(nodeid);
+                let groups = entry.groups.iter().map(|g| c.group(*g)).collect();
+                let id = c.strings.intern(nodeid);
                 let entry = TestEntry {
-                    path: remap(entry.path, &mut strings),
+                    path: c.string(entry.path),
                     failed: entry.failed,
                     duration: entry.duration,
-                    groups: groups_new,
+                    groups,
+                    incomplete: entry.incomplete,
                 };
                 (id, entry)
             })
             .collect();
-        let mut files: Vec<(u32, FileEntry)> = used_files
+        let mut record_paths: Vec<(&str, &FileRecord)> = self
+            .file_records
+            .iter()
+            .map(|(id, record)| (self.strings.resolve(*id), record))
+            .collect();
+        record_paths.sort_by(|a, b| a.0.cmp(b.0));
+        let records: Vec<(u32, FileRecord)> = record_paths
+            .iter()
+            .map(|(path, record)| {
+                let groups = record.groups.iter().map(|g| c.group(*g)).collect();
+                let nodeids = record.nodeids.iter().map(|n| c.string(*n)).collect();
+                (c.strings.intern(path), FileRecord { groups, nodeids })
+            })
+            .collect();
+        let used: Vec<u32> = c.used_files.iter().copied().collect();
+        let mut files: Vec<(u32, FileEntry)> = used
             .iter()
             .filter_map(|old| {
                 let entry = self.files.get(old)?;
                 let units = entry.units.as_ref().map(|units| {
                     units
                         .iter()
-                        .map(|(qualname, checksum)| (remap(*qualname, &mut strings), *checksum))
+                        .map(|(qualname, checksum)| (c.string(*qualname), *checksum))
                         .collect()
                 });
                 Some((
-                    remap(*old, &mut strings),
+                    c.string(*old),
                     FileEntry {
                         content_hash: entry.content_hash,
                         units,
@@ -252,6 +327,9 @@ impl Data {
             })
             .collect();
         files.sort_by_key(|(id, _)| *id);
+        let Compactor {
+            strings, groups, ..
+        } = c;
 
         let mut out = Writer::default();
         out.bytes(MAGIC);
@@ -294,8 +372,17 @@ impl Data {
             out.u32(entry.path);
             out.u8(u8::from(entry.failed));
             out.f64(entry.duration);
+            out.u8(u8::from(entry.incomplete));
             out.u32(entry.groups.len() as u32);
             entry.groups.iter().for_each(|group| out.u32(*group));
+        });
+        out.u32(records.len() as u32);
+        records.iter().for_each(|(path, record)| {
+            out.u32(*path);
+            out.u32(record.groups.len() as u32);
+            record.groups.iter().for_each(|group| out.u32(*group));
+            out.u32(record.nodeids.len() as u32);
+            record.nodeids.iter().for_each(|nodeid| out.u32(*nodeid));
         });
         out.u32(self.snapshot.len() as u32);
         self.snapshot.iter().for_each(|entry| {
@@ -304,6 +391,7 @@ impl Data {
             out.u64(entry.mtime_ns as u64);
             out.u64(entry.hash);
         });
+        out.u8(u8::from(self.global_incomplete));
         out.buf
     }
 
@@ -369,15 +457,8 @@ impl Data {
             let path = string_id(input.u32()?)?;
             let failed = input.u8()? != 0;
             let duration = input.f64()?;
-            let n = input.u32()?;
-            let mut groups = Vec::with_capacity(n as usize);
-            for _ in 0..n {
-                let group = input.u32()?;
-                if group >= n_groups {
-                    return None;
-                }
-                groups.push(group);
-            }
+            let incomplete = input.u8()? != 0;
+            let groups = input.group_ids(n_groups)?;
             data.tests.insert(
                 nodeid,
                 TestEntry {
@@ -385,8 +466,20 @@ impl Data {
                     failed,
                     duration,
                     groups,
+                    incomplete,
                 },
             );
+        }
+        for _ in 0..input.u32()? {
+            let path = string_id(input.u32()?)?;
+            let groups = input.group_ids(n_groups)?;
+            let n = input.u32()?;
+            let mut nodeids = Vec::with_capacity(n as usize);
+            for _ in 0..n {
+                nodeids.push(string_id(input.u32()?)?);
+            }
+            data.file_records
+                .insert(path, FileRecord { groups, nodeids });
         }
         for _ in 0..input.u32()? {
             data.snapshot.push(SnapEntry {
@@ -396,6 +489,7 @@ impl Data {
                 hash: input.u64()?,
             });
         }
+        data.global_incomplete = input.u8()? != 0;
         (input.pos == bytes.len()).then_some(data)
     }
 }
@@ -455,6 +549,19 @@ impl<'a> Reader<'a> {
         let n = self.u32()? as usize;
         String::from_utf8(self.take(n)?.to_vec()).ok()
     }
+    /// A length-prefixed list of group ids, each below `n_groups`.
+    fn group_ids(&mut self, n_groups: u32) -> Option<Vec<u32>> {
+        let n = self.u32()?;
+        let mut groups = Vec::with_capacity(n as usize);
+        for _ in 0..n {
+            let group = self.u32()?;
+            if group >= n_groups {
+                return None;
+            }
+            groups.push(group);
+        }
+        Some(groups)
+    }
 }
 
 #[cfg(test)]
@@ -506,9 +613,19 @@ mod tests {
                     failed,
                     duration: 0.5,
                     groups: vec![shared, own],
+                    incomplete: nodeid.ends_with("test_b"),
                 },
             );
         }
+        let a = data.strings.intern("tests/test_mod.py::test_a");
+        data.file_records.insert(
+            test_file,
+            FileRecord {
+                groups: vec![shared],
+                nodeids: vec![a],
+            },
+        );
+        data.global_incomplete = true;
         data.snapshot.push(SnapEntry {
             path: "pyproject.toml".into(),
             size: 10,
@@ -526,6 +643,13 @@ mod tests {
         assert_eq!(decoded.tests.len(), 2);
         let b = decoded.test("tests/test_mod.py::test_b").expect("test_b");
         assert!(b.failed);
+        assert!(b.incomplete);
+        let record = &decoded.file_records[&b.path];
+        assert_eq!(
+            decoded.strings.resolve(record.nodeids[0]),
+            "tests/test_mod.py::test_a"
+        );
+        assert_eq!(decoded.group(record.groups[0]).len(), 1);
         assert_eq!(decoded.strings.resolve(b.path), "tests/test_mod.py");
         let deps: Vec<(String, String, u64)> = b
             .groups
@@ -547,6 +671,7 @@ mod tests {
             ]
         );
         assert_eq!(decoded.snapshot, data.snapshot);
+        assert!(decoded.global_incomplete);
         // Re-encoding is deterministic.
         assert_eq!(decoded.encode(), data.encode());
     }
@@ -616,6 +741,16 @@ mod tests {
         let path = dir.join(".pytest-rs-affected");
         sample().save(&path).expect("save");
         let loaded = Data::load(&path).expect("load");
+        let mut other = sample().encode();
+        other[MAGIC.len()] = 1;
+        std::fs::write(&path, other).expect("write");
+        assert_eq!(Data::load(&path).err(), Some(LoadError::OtherFormat));
+        std::fs::write(&path, b"junk").expect("write");
+        assert_eq!(Data::load(&path).err(), Some(LoadError::Unreadable));
+        assert_eq!(
+            Data::load(&dir.join("absent")).err(),
+            Some(LoadError::Missing)
+        );
         assert_eq!(loaded.tests.len(), 2);
         let leftovers: Vec<_> = std::fs::read_dir(&dir)
             .expect("readdir")

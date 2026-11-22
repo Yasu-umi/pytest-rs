@@ -105,23 +105,39 @@ impl Globs {
     }
 }
 
+/// What a change under a `file_triggers` key runs.
+#[derive(Debug, Clone)]
+pub enum Trigger {
+    /// The tests matching these globs (by test file path).
+    Tests(Globs),
+    /// Trust the recorded dependencies (nothing extra).
+    Recorded,
+    /// Everything.
+    All,
+}
+
+/// `incomplete`: what to do with a test whose dependencies are incomplete
+/// (it, or a context it depends on, started a subprocess).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Incomplete {
+    Run,
+    Trust,
+}
+
 #[derive(Debug, Clone)]
 pub struct AffectedConfig {
     pub full_run_on: Globs,
-    /// Parsed and validated, but not acted on yet: without recorded file
-    /// dependencies (the audit hook, PR 2) every unrecorded non-`.py`
-    /// change runs everything, as with `"all"`.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "takes effect with recorded file dependencies (PR 2)"
-        )
-    )]
+    /// A changed non-`.py` file that is neither a recorded dependency nor
+    /// matched by any rule: ignored, or a full run.
     pub unknown_files: UnknownFiles,
     pub always_changed: Globs,
     pub always_run: Globs,
     pub ignore: Globs,
+    /// Every key matching a changed path applies: `all` wins, test globs
+    /// add up (TOML tables carry no reliable key order, so the result must
+    /// not depend on it).
+    pub file_triggers: Vec<(Globs, Trigger)>,
+    pub incomplete: Incomplete,
 }
 
 impl Default for AffectedConfig {
@@ -132,16 +148,21 @@ impl Default for AffectedConfig {
             always_changed: Globs::builtin(&[]),
             always_run: Globs::builtin(&[]),
             ignore: Globs::builtin(&[]),
+            file_triggers: Vec::new(),
+            incomplete: Incomplete::Run,
         }
     }
 }
 
 impl AffectedConfig {
-    /// Keys accepted for forward compatibility but not acted on yet
-    /// (§10: file_triggers and incomplete arrive in PR 2). Ignoring them
-    /// can only make a run larger in PR 1, where any non-`.py` change is a
-    /// full run and subprocesses are not tracked.
-    const LATER_KEYS: &[&str] = &["file_triggers", "incomplete"];
+    /// Every `file_triggers` entry matching `rel`.
+    pub fn triggers_for(&self, rel: &str) -> Vec<&Trigger> {
+        self.file_triggers
+            .iter()
+            .filter(|(key, _)| key.matches(rel))
+            .map(|(_, trigger)| trigger)
+            .collect()
+    }
 
     pub fn load(rootdir: &Path) -> Result<Self, String> {
         let path = rootdir.join("pyproject.toml");
@@ -169,11 +190,10 @@ impl AffectedConfig {
             "always_changed",
             "always_run",
             "ignore",
+            "file_triggers",
+            "incomplete",
         ];
-        if let Some(unknown) = table
-            .keys()
-            .find(|k| !known.contains(&k.as_str()) && !Self::LATER_KEYS.contains(&k.as_str()))
-        {
+        if let Some(unknown) = table.keys().find(|k| !known.contains(&k.as_str())) {
             return Err(format!(
                 "[tool.pytest-rs.affected]: unknown key {unknown:?}"
             ));
@@ -206,12 +226,59 @@ impl AffectedConfig {
                 );
             }
         };
+        let incomplete = match table.get("incomplete").map(|v| v.as_str()) {
+            None | Some(Some("run")) => Incomplete::Run,
+            Some(Some("trust")) => Incomplete::Trust,
+            _ => {
+                return Err(
+                    "[tool.pytest-rs.affected] incomplete must be \"run\" or \"trust\"".into(),
+                );
+            }
+        };
+        let file_triggers = match table.get("file_triggers") {
+            None => Vec::new(),
+            Some(value) => {
+                let triggers = value
+                    .as_table()
+                    .ok_or("[tool.pytest-rs.affected] file_triggers must be a table")?;
+                triggers
+                    .iter()
+                    .map(|(key, value)| {
+                        let glob = Globs::new(std::slice::from_ref(key))?;
+                        let trigger = match value {
+                            toml::Value::String(s) if s == "recorded" => Trigger::Recorded,
+                            toml::Value::String(s) if s == "all" => Trigger::All,
+                            toml::Value::Array(items) => {
+                                let patterns: Vec<String> = items
+                                    .iter()
+                                    .map(|item| item.as_str().map(str::to_string))
+                                    .collect::<Option<_>>()
+                                    .ok_or(format!(
+                                        "[tool.pytest-rs.affected.file_triggers] {key:?}: \
+                                         a list must hold test globs"
+                                    ))?;
+                                Trigger::Tests(Globs::new(&patterns)?)
+                            }
+                            _ => {
+                                return Err(format!(
+                                    "[tool.pytest-rs.affected.file_triggers] {key:?} must be \
+                                     a list of test globs, \"recorded\" or \"all\""
+                                ));
+                            }
+                        };
+                        Ok((glob, trigger))
+                    })
+                    .collect::<Result<Vec<_>, String>>()?
+            }
+        };
         Ok(Self {
             full_run_on: list("full_run_on")?,
             unknown_files,
             always_changed: list("always_changed")?,
             always_run: list("always_run")?,
             ignore: list("ignore")?,
+            file_triggers,
+            incomplete,
         })
     }
 }
@@ -261,11 +328,29 @@ always_changed = ["src/settings.py"]
 always_run = ["tests/smoke/**"]
 ignore = ["docs/**"]
 
+incomplete = "trust"
+
 [tool.pytest-rs.affected.file_triggers]
+"migrations/**" = ["tests/db/**"]
 "data/**" = "recorded"
+"assets/**" = "all"
 "#,
         )
         .expect("parses");
+        assert_eq!(config.incomplete, Incomplete::Trust);
+        assert!(matches!(
+            config.triggers_for("migrations/0001.py")[..],
+            [Trigger::Tests(globs)] if globs.matches("tests/db/test_x.py")
+        ));
+        assert!(matches!(
+            config.triggers_for("data/a.json")[..],
+            [Trigger::Recorded]
+        ));
+        assert!(matches!(
+            config.triggers_for("assets/a.png")[..],
+            [Trigger::All]
+        ));
+        assert!(config.triggers_for("other.txt").is_empty());
         assert!(config.full_run_on.matches("docker/Dockerfile"));
         assert_eq!(config.unknown_files, UnknownFiles::All);
         assert!(config.always_changed.matches("src/settings.py"));
@@ -286,6 +371,11 @@ ignore = ["docs/**"]
         assert!(AffectedConfig::parse("[tool.pytest-rs.affected]\nignore = \"docs\"\n").is_err());
         assert!(
             AffectedConfig::parse("[tool.pytest-rs.affected]\nunknown_files = \"some\"\n").is_err()
+        );
+        assert!(AffectedConfig::parse("[tool.pytest-rs.affected]\nincomplete = \"x\"\n").is_err());
+        assert!(
+            AffectedConfig::parse("[tool.pytest-rs.affected.file_triggers]\n\"a/**\" = 1\n")
+                .is_err()
         );
     }
 }
