@@ -1,6 +1,6 @@
 # Affected-test selection (testmon-style) — design
 
-Status: **stages 1 and 2 (§10 "PR 1", "PR 2") are implemented** in `crates/pytest-rs-affected`; usage is in [affected.md](affected.md). The later stages are still design.
+Status: **stages 1, 2 and 3a (§10 "PR 1", "PR 2", "PR 3a") are implemented** in `crates/pytest-rs-affected`; usage is in [affected.md](affected.md). The later stages are still design.
 
 This is an opt-in mode that runs only the tests affected by code that changed since a recorded run, in the spirit of [pytest-testmon](https://github.com/tarpas/pytest-testmon). Without the new options nothing changes. The default run, the conformance suites and every existing option behave exactly as they do today.
 
@@ -269,7 +269,6 @@ The data file is `.pytest-rs-affected` in the rootdir. `--affected-data=PATH` ov
 - pytest-rs version
 - Python `sys.version_info`, implementation and platform
 - the **environment fingerprint**: a hash of `(name, version)` for every installed distribution, with configurable excludes
-- the **base commit** (`git rev-parse HEAD`) and whether the tree was dirty
 - the rootdir-relative path scheme
 
 Any mismatch in format, scheme, Python or environment means a full run, and in record mode a full re-record. This is the same policy as testmon's environment table.
@@ -277,9 +276,10 @@ Any mismatch in format, scheme, Python or environment means a full run, and in r
 ### 5.2 Change detection
 
 1. **Find candidate changed files.**
-   - If the header's base commit exists locally, take the union of `git diff --name-only <base>`, untracked files (`git ls-files --others --exclude-standard`) and worktree changes (`git diff --name-only`). This is cheap and bounded by the size of the diff.
-   - Otherwise, stat and hash every file that appears in the data. For thousands of files that takes milliseconds to a few hundred ms in Rust.
-2. **Confirm by content hash** against the hashes recorded per test. Correctness never depends on the base commit; it only speeds up step 1. A data file from any commit is usable, because each test is compared against its own recorded checksums.
+   - Each recorded file state (a Python file's units, a non-`.py` snapshot entry) carries the commit it was recorded at, set only when the file was tracked and clean at that moment. A single base commit in the header is not enough: runs that record only some tests (`auto` with `-k`, merged shards) leave file states from different commits side by side.
+   - A file whose state names a commit that exists locally, that is still tracked, and that `git diff --name-only <commit>` does not list, is unchanged: its stored state is reused without reading it. One `git diff` runs per distinct commit, and there are few.
+   - Every other file is hashed from disk: untracked or ignored files, files recorded dirty, states from a commit that is not available, and every file when git is absent. For thousands of files that takes milliseconds to a few hundred ms in Rust.
+2. **Confirm by content hash** against the hashes recorded per test. Correctness never depends on git; git only lets step 1 skip reading files. A data file from any commit is usable, because each test is compared against its own recorded checksums.
 3. **Recompute unit checksums** with ruff, for changed `.py` files only.
 4. **Classify** every changed path with the rules in §6.
 
@@ -289,7 +289,7 @@ Any mismatch in format, scheme, Python or environment means a full run, and in r
 
 1. Run `pytest-rs --affected=record`, a full run that records.
 2. Save the data file to the CI cache under a key that includes the commit, for example `affected-<os>-<py>-<sha>` with restore prefix `affected-<os>-<py>-`. An artifact also works.
-3. If the run is sharded with pytest-split, each shard records its own subset, and a final job merges them with `pytest-rs --affected-merge a b c -o out` (PR 3).
+3. If the run is sharded with pytest-split, each shard records its own subset, and a final job merges them with `pytest-rs --affected-merge a b c --affected-data out` (PR 3c; `-o` is pytest's ini override, so the output is named with `--affected-data`).
 
 **Pull request.**
 
@@ -310,7 +310,7 @@ Selection is deterministic for a given data file and tree. Every split shard the
 
 - The pre-import filter sits on the `files` list between `apply_collect_ignores` and `collect_files` (`engine/collect/mod.rs`), and in the worker's `precollect_all` (`worker.rs`).
 - Conftests are still imported, because they define fixtures and hooks.
-- Item-level filtering goes before pytest-split's `pytest_collection_modifyitems`. That needs an explicit ordering slot, because native plugins run in registration order, after the conftest hooks.
+- Item-level filtering goes before pytest-split's `pytest_collection_modifyitems`. Native plugins run in registration order, after the conftest hooks, so the affected plugin is registered right before pytest-split, and after the other bundled plugins, whose `pytest_configure` must not count as test dependencies.
 
 ---
 
@@ -417,7 +417,7 @@ It deliberately does **not** reuse `--testmon*`. Both would register the same op
 **Small, generic core additions.** None of these is specific to this feature.
 
 - A pre-import *file filter* hook on the collected `files` list, in the main process and in the worker's `precollect_all`.
-- An ordering slot so that a native plugin's `pytest_collection_modifyitems` can run before pytest-split's.
+- A registration order in which the affected plugin's `pytest_collection_select_files` and `pytest_collection_modifyitems` run before pytest-split's.
 - Hooks that bracket fixture setup and finalization (§4.4).
 - A collection-phase notification for "now importing test module X".
 
@@ -460,10 +460,16 @@ It deliberately does **not** reuse `--testmon*`. Both would register the same op
 
 ### PR 3: CI
 
-- `-n` support: worker dump/load and selection on the worker side.
-- The ordering slot before pytest-split.
-- A git fast path based on the base commit.
-- `--affected-merge`.
+Split into three PRs, merged in order.
+
+**PR 3a: `-n` and pytest-split.**
+- Workers select on their own: they run the pre-import filter and the item-level selection, deterministically from the same data. They record their own tests, write the recording to a file next to the data file, and pass its path through `pytest_worker_dump`. The controller merges the recordings in `pytest_worker_load` and writes the data.
+- The affected plugin's hooks run before pytest-split's (registration order), so the split divides the selected set, by test or by file.
+
+**PR 3b: git fast path.** Per-record commits, as described in §5.2.
+
+**PR 3c: `--affected-merge` and docs.**
+- `pytest-rs --affected-merge a b c --affected-data out` merges shard recordings and runs no tests.
 - A docs page with a GitHub Actions cache example.
 
 ### PR 4: refinements
