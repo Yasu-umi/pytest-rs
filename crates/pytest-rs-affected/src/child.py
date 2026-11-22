@@ -97,6 +97,16 @@ def _start():
         filename = frame.f_code.co_filename
         return filename.startswith("<frozen importlib") or "importlib/_bootstrap" in filename
 
+    def raised_by_subprocess():
+        # subprocess.Popen may start the child through os.posix_spawn
+        # (Linux): the same spawn, already counted by subprocess.Popen.
+        frame = sys._getframe(1)
+        for _ in range(2):
+            if frame is None:
+                return False
+            frame = frame.f_back
+        return frame is not None and os.path.basename(frame.f_code.co_filename) == "subprocess.py"
+
     def is_python(executable, args):
         program = executable or (args[0] if isinstance(args, (list, tuple)) and args else args)
         try:
@@ -140,6 +150,8 @@ def _start():
             if isinstance(popen_args, (str, bytes)) or not is_python(executable, popen_args):
                 state["incomplete"] = True
         elif event == "os.posix_spawn":
+            if raised_by_subprocess():
+                return
             state["spawned"] += 1
             if not is_python(args[0], None):
                 state["incomplete"] = True

@@ -323,6 +323,20 @@ impl AffectedCollector {
         })
     }
 
+    /// Whether the audited call comes from the subprocess module.
+    fn raised_by_subprocess(py: Python<'_>) -> bool {
+        py.import("sys")
+            .and_then(|sys| sys.call_method1("_getframe", (0,)))
+            .and_then(|frame| frame.getattr("f_code"))
+            .and_then(|code| code.getattr("co_filename"))
+            .and_then(|f| f.extract::<String>())
+            .is_ok_and(|f| {
+                Path::new(&f)
+                    .file_name()
+                    .is_some_and(|n| n == "subprocess.py")
+            })
+    }
+
     /// Whether a subprocess runs a Python interpreter directly: an argument
     /// list (not a shell command line) whose program is `sys.executable` or
     /// named `python*`.
@@ -481,6 +495,12 @@ impl AffectedCollector {
                 } else {
                     (args.get_item(0).ok(), None)
                 };
+                // subprocess.Popen may start the child through
+                // os.posix_spawn (Linux): that is the same spawn, already
+                // counted by the subprocess.Popen event.
+                if event == "os.posix_spawn" && Self::raised_by_subprocess(py) {
+                    return;
+                }
                 let countable = self.children_armed.load(Ordering::Relaxed)
                     && Self::starts_python(py, program.as_ref(), argv.as_ref());
                 let mut state = self.lock();
