@@ -89,6 +89,89 @@ def client():
 
 The default deliberately runs too much rather than too little here. Some tests depend on module-level values without calling any function of that module, so dropping this rule would miss them.
 
+## In CI
+
+Record on the main branch, then select on pull requests against the newest recording. Every entry is checked against its own recorded checksums, so a recording from any earlier commit is usable. A pull request only runs more tests when the recording is older.
+
+The data must come from the same Python and the same installed packages. Otherwise everything runs. So put the operating system and the Python version into the cache key.
+
+```yaml
+# .github/workflows/tests.yml
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -e . pytest-rs
+
+      # The newest recording from main (any commit will do).
+      - uses: actions/cache/restore@v4
+        with:
+          path: .pytest-rs-affected
+          key: affected-${{ runner.os }}-py3.13-${{ github.sha }}
+          restore-keys: affected-${{ runner.os }}-py3.13-
+
+      # main: run everything and record. Pull requests: run the affected tests.
+      - run: pytest-rs --affected=record
+        if: github.event_name == 'push'
+      - run: pytest-rs --affected=select
+        if: github.event_name == 'pull_request'
+
+      - uses: actions/cache/save@v4
+        if: github.event_name == 'push'
+        with:
+          path: .pytest-rs-affected
+          key: affected-${{ runner.os }}-py3.13-${{ github.sha }}
+```
+
+`--affected` also works with `-n`: the workers' recordings end up in one data file.
+
+### Sharded runs
+
+When the suite is split over several jobs with `--splits`/`--group`, each shard records its own group into a separate file, and a final job merges them. Merging keeps the newer entry of each test, so shards that started from the same restored data merge correctly in any order. `--affected-merge` takes the files as arguments, writes `--affected-data`, and runs no tests.
+
+```yaml
+jobs:
+  test:
+    strategy:
+      matrix:
+        group: [1, 2, 3, 4]
+    steps:
+      # ... checkout, Python, install as above ...
+      - run: >
+          pytest-rs --affected=record --splits 4 --group ${{ matrix.group }}
+          --affected-data affected-${{ matrix.group }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: affected-${{ matrix.group }}
+          path: affected-${{ matrix.group }}
+
+  merge-affected:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      # ... checkout, Python, install ...
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: affected-*
+          merge-multiple: true
+      - run: pytest-rs --affected-merge affected-1 affected-2 affected-3 affected-4 --affected-data .pytest-rs-affected
+      - uses: actions/cache/save@v4
+        with:
+          path: .pytest-rs-affected
+          key: affected-${{ runner.os }}-py3.13-${{ github.sha }}
+```
+
+With `--affected=select` on pull requests, the tests are selected first and the groups divide the selected tests.
+
 ## Known gaps
 
 `--affected` cannot see:
