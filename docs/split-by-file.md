@@ -65,6 +65,17 @@ in exactly one group.
 - Without any recorded durations, groups get roughly equal numbers of
   *files*, not of tests.
 - The "estimated duration" line reports the file-level estimate.
+- `duration_based_chunks` cuts the file list into contiguous runs; with a few
+  long files a run can overshoot and leave the last group empty.
+  `least_duration` balances whole files better and is the better pairing.
+
+### What is still paid for every file
+
+The test-file scan (directory walk, no import) and, in a serial run, the
+assertion-rewrite cache prefetch, which happens before `pytest_configure`
+and therefore before the plugin knows the group. Under `-n` the workers
+prefetch only their group's files. Conftests reachable from the arguments are
+loaded as before.
 
 `--store-durations` is unaffected: it still records per-test durations, which
 both modes read.

@@ -8,22 +8,43 @@ pub struct TestGroup {
     pub duration: f64,
 }
 
-/// Per-item durations: cached value, or the average over the cached tests
-/// present in this run (1.0 when nothing is cached).
-fn items_with_durations(nodeids: &[String], durations: &HashMap<String, f64>) -> Vec<f64> {
-    let relevant: Vec<f64> = nodeids
-        .iter()
-        .filter_map(|nodeid| durations.get(nodeid).copied())
-        .collect();
+/// Per-unit durations: the known value, or the average over the known
+/// units present in this run (1.0 when none is known).
+fn fill_missing(known: &[Option<f64>]) -> Vec<f64> {
+    let relevant: Vec<f64> = known.iter().flatten().copied().collect();
     let average = if relevant.is_empty() {
         1.0
     } else {
         relevant.iter().sum::<f64>() / relevant.len() as f64
     };
-    nodeids
+    known.iter().map(|d| d.unwrap_or(average)).collect()
+}
+
+/// Per-item durations: cached value, or the average over the cached tests
+/// present in this run (1.0 when nothing is cached).
+fn items_with_durations(nodeids: &[String], durations: &HashMap<String, f64>) -> Vec<f64> {
+    let known: Vec<Option<f64>> = nodeids
         .iter()
-        .map(|nodeid| durations.get(nodeid).copied().unwrap_or(average))
-        .collect()
+        .map(|nodeid| durations.get(nodeid).copied())
+        .collect();
+    fill_missing(&known)
+}
+
+/// Per-file durations: the sum of the cached durations of the file's tests
+/// (keys equal to the file node id or under `<file>::`); files with none
+/// count as the average of the files present that have some (1.0 when
+/// none does).
+pub fn files_with_durations(files: &[String], durations: &HashMap<String, f64>) -> Vec<f64> {
+    let mut sums: HashMap<&str, f64> = HashMap::new();
+    for (nodeid, duration) in durations {
+        let file = nodeid.split("::").next().unwrap_or(nodeid);
+        *sums.entry(file).or_default() += duration;
+    }
+    let known: Vec<Option<f64>> = files
+        .iter()
+        .map(|file| sums.get(file.as_str()).copied())
+        .collect();
+    fill_missing(&known)
 }
 
 /// Contiguous chunks balanced by duration (order-preserving).
@@ -32,7 +53,11 @@ pub fn duration_based_chunks(
     nodeids: &[String],
     durations: &HashMap<String, f64>,
 ) -> Vec<TestGroup> {
-    let item_durations = items_with_durations(nodeids, durations);
+    duration_based_chunks_of(splits, &items_with_durations(nodeids, durations))
+}
+
+/// `duration_based_chunks` over units whose durations are already resolved.
+pub fn duration_based_chunks_of(splits: usize, item_durations: &[f64]) -> Vec<TestGroup> {
     let time_per_group = item_durations.iter().sum::<f64>() / splits as f64;
 
     let mut groups: Vec<TestGroup> = (0..splits)
@@ -58,8 +83,16 @@ pub fn least_duration(
     nodeids: &[String],
     durations: &HashMap<String, f64>,
 ) -> Vec<TestGroup> {
-    let item_durations = items_with_durations(nodeids, durations);
+    least_duration_of(splits, nodeids, &items_with_durations(nodeids, durations))
+}
 
+/// `least_duration` over units whose durations are already resolved;
+/// `nodeids` only break ties.
+pub fn least_duration_of(
+    splits: usize,
+    nodeids: &[String],
+    item_durations: &[f64],
+) -> Vec<TestGroup> {
     // Sort by nodeid for cross-node determinism, then by duration
     // descending (both stable, matching upstream).
     let mut order: Vec<usize> = (0..nodeids.len()).collect();
