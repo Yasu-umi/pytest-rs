@@ -24,6 +24,10 @@ class Project:
     """A throwaway project directory and helpers to run pytest-rs in it."""
 
     OUTCOME = re.compile(r"^(\S+::\S+) (PASSED|FAILED|ERROR|SKIPPED|XFAIL|XPASS)", re.M)
+    # -n -v: "[gw0] [ 50%] PASSED tests/test_x.py::test_a".
+    DIST_OUTCOME = re.compile(
+        r"^\[gw\d+\] \[[^\]]*\] (?:PASSED|FAILED|ERROR|SKIPPED|XFAIL|XPASS) (\S+::\S+)", re.M
+    )
 
     def __init__(self, base: Path) -> None:
         self.base = base
@@ -91,24 +95,28 @@ class Project:
         assert old in text, f"{old!r} not in {rel}"
         path.write_text(text.replace(old, new, 1))
 
-    def run(self, *args: str) -> subprocess.CompletedProcess[str]:
+    def run(
+        self, *args: str, env: dict[str, str] | None = None
+    ) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [str(BINARY), "-p", "no:cacheprovider", "-v", *args],
             cwd=self.base,
             capture_output=True,
             text=True,
-            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1", **(env or {})},
         )
 
-    def ran(self, *args: str) -> set[str]:
+    def ran(self, *args: str, env: dict[str, str] | None = None) -> set[str]:
         """Node ids that ran (any outcome)."""
-        result = self.run(*args)
+        result = self.run(*args, env=env)
         assert result.returncode in (0, 1), result.stdout + result.stderr
         return self.nodeids(result.stdout)
 
     @classmethod
     def nodeids(cls, stdout: str) -> set[str]:
-        return {nodeid for nodeid, _ in cls.OUTCOME.findall(stdout)}
+        return {nodeid for nodeid, _ in cls.OUTCOME.findall(stdout)} | set(
+            cls.DIST_OUTCOME.findall(stdout)
+        )
 
 
 ALL = {
@@ -145,12 +153,6 @@ class TestAffected(unittest.TestCase):
     def test_invalid_mode_is_a_usage_error(self) -> None:
         result = self.project.run("--affected=sometimes")
         self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
-
-    def test_n_is_a_usage_error(self) -> None:
-        """§10 PR 1: -n with --affected is not supported yet."""
-        result = self.project.run("--affected", "-n", "2")
-        self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
-        self.assertIn("not supported", result.stdout + result.stderr)
 
     # --- selection basics ----------------------------------------------------
 
@@ -731,6 +733,62 @@ class TestAffected(unittest.TestCase):
             self.project.ran("--affected"),
             {"tests/test_a_first.py::test_first", "tests/test_b_second.py::test_second"},
         )
+
+    # --- -n and pytest-split (§10, PR 3a) -----------------------------------
+
+    def test_n_records_and_selects(self) -> None:
+        """Workers select on their own and their recordings merge in the controller."""
+        for env in ({}, {"PYTEST_RS_DIST_SPAWN": "1"}):
+            with self.subTest(spawn=bool(env)):
+                data = self.project.base / ".pytest-rs-affected"
+                data.unlink(missing_ok=True)
+                self.assertEqual(self.project.ran("--affected", "-n", "2", env=env), ALL)
+                result = self.project.run("--affected", "-n", "2", env=env)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(self.project.nodeids(result.stdout), set())
+                self.project.edit("app/core.py", "return a * b", "return b * a")
+                self.assertEqual(
+                    self.project.ran("--affected", "-n", "2", env=env),
+                    {"tests/test_mul.py::test_mul"},
+                )
+                self.project.edit("app/core.py", "return b * a", "return a * b")
+                leftovers = [p.name for p in self.project.base.iterdir() if ".worker-" in p.name]
+                self.assertEqual(leftovers, [])
+
+    def test_n_recording_serves_a_serial_run(self) -> None:
+        self.assertEqual(self.project.ran("--affected", "-n", "2"), ALL)
+        self.project.edit("app/core.py", "return a + b", "return b + a")
+        self.assertEqual(
+            self.project.ran("--affected=select"),
+            {"tests/test_add.py::test_add", "tests/test_add.py::test_add_more"},
+        )
+
+    def test_split_divides_the_selected_tests(self) -> None:
+        """Selection runs before pytest-split: the groups split the selected set."""
+        self.record()
+        self.project.edit("app/core.py", "return a + b", "return b + a")
+        self.project.edit("app/core.py", "return a * b", "return b * a")
+        selected = {
+            "tests/test_add.py::test_add",
+            "tests/test_add.py::test_add_more",
+            "tests/test_mul.py::test_mul",
+        }
+        for granularity in ("test", "file"):
+            with self.subTest(granularity=granularity):
+                groups = [
+                    self.project.ran(
+                        "--affected=select",
+                        "--splits",
+                        "2",
+                        "--group",
+                        str(group),
+                        f"--splitting-granularity={granularity}",
+                    )
+                    for group in (1, 2)
+                ]
+                self.assertEqual(groups[0] | groups[1], selected)
+                self.assertEqual(groups[0] & groups[1], set())
+                self.assertTrue(groups[0] and groups[1], groups)
 
     # --- modes (§7) --------------------------------------------------------
 
