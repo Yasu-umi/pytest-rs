@@ -97,6 +97,12 @@ pub struct Recording {
     pub context_inputs: Vec<HashSet<u32>>,
     /// Contexts that started a subprocess.
     pub incomplete: HashSet<usize>,
+    /// The import context of each project module executed through the
+    /// import system: absolute file -> context.
+    pub import_contexts: HashMap<String, usize>,
+    /// (enclosing context, import context) for each module executed: the
+    /// module's import ran while the enclosing context was current.
+    pub nested: Vec<(usize, usize)>,
 }
 
 #[derive(Default)]
@@ -114,6 +120,24 @@ struct State {
     input_index: HashMap<(String, InputKind), u32>,
     context_inputs: Vec<HashSet<u32>>,
     incomplete: HashSet<usize>,
+    /// Modules being executed, innermost last: while one runs, its import
+    /// context is current instead of `current`.
+    import_stack: Vec<usize>,
+    import_contexts: HashMap<String, usize>,
+    nested: Vec<(usize, usize)>,
+}
+
+impl State {
+    /// The context code runs under right now.
+    fn effective(&self) -> usize {
+        self.import_stack.last().copied().unwrap_or(self.current)
+    }
+
+    fn new_context(&mut self) -> usize {
+        self.contexts.push(HashSet::new());
+        self.context_inputs.push(HashSet::new());
+        self.contexts.len() - 1
+    }
 }
 
 #[pyclass]
@@ -167,10 +191,7 @@ impl AffectedCollector {
     /// A fresh, empty context; its index identifies it from then on.
     /// Context 0 is the global one.
     pub fn new_context(&self) -> usize {
-        let mut state = self.lock();
-        state.contexts.push(HashSet::new());
-        state.context_inputs.push(HashSet::new());
-        state.contexts.len() - 1
+        self.lock().new_context()
     }
 
     /// Make `context` current. Re-arms the DISABLEd `PY_START` events so
@@ -199,6 +220,8 @@ impl AffectedCollector {
             inputs: std::mem::take(&mut state.inputs),
             context_inputs: std::mem::take(&mut state.context_inputs),
             incomplete: std::mem::take(&mut state.incomplete),
+            import_contexts: std::mem::take(&mut state.import_contexts),
+            nested: std::mem::take(&mut state.nested),
         }
     }
 
@@ -240,7 +263,7 @@ impl AffectedCollector {
                 index
             }
         };
-        let current = state.current;
+        let current = state.effective();
         state.context_inputs[current].insert(index);
     }
 
@@ -294,6 +317,43 @@ impl AffectedCollector {
 
 #[pymethods]
 impl AffectedCollector {
+    /// Whether the import system should bracket this module's execution
+    /// (`spec.origin`): a project Python file.
+    fn tracks_module(&self, origin: &str) -> bool {
+        self.tracked(origin)
+    }
+
+    /// A project module starts executing (its loader's `exec_module`): its
+    /// own import context becomes current. Returns the stack depth to pass
+    /// to `import_finish`.
+    fn import_start(&self, py: Python<'_>, origin: &str) -> PyResult<usize> {
+        let depth = {
+            let mut state = self.lock();
+            let enclosing = state.effective();
+            let context = match state.import_contexts.get(origin) {
+                Some(&context) => context,
+                None => {
+                    let context = state.new_context();
+                    state.import_contexts.insert(origin.to_string(), context);
+                    context
+                }
+            };
+            state.nested.push((enclosing, context));
+            state.import_stack.push(context);
+            state.import_stack.len()
+        };
+        self.monitoring.bind(py).call_method0("restart_events")?;
+        Ok(depth)
+    }
+
+    /// The module started at `depth` finished (or raised): back to the
+    /// context that was current before it.
+    fn import_finish(&self, py: Python<'_>, depth: usize) -> PyResult<()> {
+        self.lock().import_stack.truncate(depth.saturating_sub(1));
+        self.monitoring.bind(py).call_method0("restart_events")?;
+        Ok(())
+    }
+
     /// The `sys.addaudithook` callback. Filters on the event name before
     /// doing any work.
     fn audit(&self, py: Python<'_>, event: &str, args: Bound<'_, PyTuple>) {
@@ -335,7 +395,7 @@ impl AffectedCollector {
             "subprocess.Popen" | "os.posix_spawn" | "os.exec" | "os.spawn" | "os.system"
             | "os.fork" | "os.forkpty" | "os.startfile" => {
                 let mut state = self.lock();
-                let current = state.current;
+                let current = state.effective();
                 state.incomplete.insert(current);
             }
             _ => {}
@@ -353,7 +413,7 @@ impl AffectedCollector {
             let mut state = self.lock();
             if let Some(entry) = state.classified.get(&key).copied() {
                 if let Some(index) = entry {
-                    let current = state.current;
+                    let current = state.effective();
                     state.contexts[current].insert(index);
                 }
                 return Ok(self.disable.clone_ref(py));
@@ -380,7 +440,7 @@ impl AffectedCollector {
             };
             state.codes.push((file, qualname));
             let index = (state.codes.len() - 1) as u32;
-            let current = state.current;
+            let current = state.effective();
             state.contexts[current].insert(index);
             index
         });
