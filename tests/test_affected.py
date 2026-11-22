@@ -369,6 +369,25 @@ class TestAffected(unittest.TestCase):
         self.project.edit("app/config.py", "MODE = 'a'", "MODE = 'b'")
         self.assertEqual(self.project.ran("--affected"), ALL)
 
+    def test_conftest_import_moved_into_a_fixture(self) -> None:
+        """docs/affected.md: importing the application inside a fixture scopes its import-time code."""
+        self.project.write("app/config.py", "MODE = 'a'\n")
+        self.project.write(
+            "tests/conftest.py",
+            """
+            import pytest
+
+            @pytest.fixture
+            def mode():
+                from app import config
+                return config.MODE
+            """,
+        )
+        self.project.write("tests/test_mode.py", "def test_mode(mode):\n    assert mode\n")
+        self.project.ran("--affected")
+        self.project.edit("app/config.py", "MODE = 'a'", "MODE = 'b'")
+        self.assertEqual(self.project.ran("--affected"), {"tests/test_mode.py::test_mode"})
+
     def test_lazy_import_belongs_to_the_test(self) -> None:
         """§4.3 rule 4: a module first imported inside a test is that test's dependency."""
         self.project.write("app/lazy.py", "FLAG = True\n")

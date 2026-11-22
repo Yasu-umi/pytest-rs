@@ -1,6 +1,6 @@
 # Affected-test selection (testmon-style) — design
 
-Status: **stage 1 (§10 "PR 1") is implemented** in `crates/pytest-rs-affected`. The later stages are still design.
+Status: **stages 1 and 2 (§10 "PR 1", "PR 2") are implemented** in `crates/pytest-rs-affected`; usage is in [affected.md](affected.md). The later stages are still design.
 
 This is an opt-in mode that runs only the tests affected by code that changed since a recorded run, in the spirit of [pytest-testmon](https://github.com/tarpas/pytest-testmon). Without the new options nothing changes. The default run, the conformance suites and every existing option behave exactly as they do today.
 
