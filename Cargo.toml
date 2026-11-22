@@ -25,6 +25,7 @@ pytest-rs-mock = { path = "crates/pytest-rs-mock" }
 pytest-rs-cov = { path = "crates/pytest-rs-cov" }
 pytest-rs-split = { path = "crates/pytest-rs-split" }
 pytest-rs-benchmark = { path = "crates/pytest-rs-benchmark" }
+pytest-rs-affected = { path = "crates/pytest-rs-affected" }
 
 pyo3 = { version = "0.30.1" }
 clap = { version = "4.6", features = ["derive", "string"] }
@@ -35,6 +36,7 @@ toml = "1"
 thiserror = "2"
 regex = "1"
 libc = "0.2"
+siphasher = "1"
 
 ruff_python_parser = { git = "https://github.com/astral-sh/ruff", tag = "0.17.5" }
 ruff_python_ast = { git = "https://github.com/astral-sh/ruff", tag = "0.17.5" }

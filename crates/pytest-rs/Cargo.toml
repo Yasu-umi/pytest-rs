@@ -19,7 +19,7 @@ name = "pytest-rs"
 path = "src/launcher.rs"
 
 [features]
-default = ["asyncio", "anyio", "mock", "cov", "split", "benchmark", "xdist"]
+default = ["asyncio", "anyio", "mock", "cov", "split", "benchmark", "xdist", "affected"]
 asyncio = ["dep:pytest-rs-asyncio"]
 anyio = ["dep:pytest-rs-anyio"]
 xdist = ["pytest-rs-core/xdist"]
@@ -27,6 +27,7 @@ mock = ["dep:pytest-rs-mock"]
 cov = ["dep:pytest-rs-cov"]
 split = ["dep:pytest-rs-split"]
 benchmark = ["dep:pytest-rs-benchmark"]
+affected = ["dep:pytest-rs-affected"]
 
 [dependencies]
 pytest-rs-core = { workspace = true }
@@ -36,6 +37,7 @@ pytest-rs-mock = { workspace = true, optional = true }
 pytest-rs-cov = { workspace = true, optional = true }
 pytest-rs-split = { workspace = true, optional = true }
 pytest-rs-benchmark = { workspace = true, optional = true }
+pytest-rs-affected = { workspace = true, optional = true }
 libc = { workspace = true }
 
 [lints]
