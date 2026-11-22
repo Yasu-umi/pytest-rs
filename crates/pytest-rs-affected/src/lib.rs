@@ -120,6 +120,48 @@ struct State {
     started: Option<std::time::SystemTime>,
 }
 
+/// `pytest-rs --affected-merge A B ... --affected-data OUT`: merge the data
+/// files that sharded runs recorded into one, keeping the newer entry of
+/// each test. Runs no tests. Returns the summary line, or an error message.
+pub fn merge_files(inputs: &[PathBuf], output: &Path) -> Result<String, String> {
+    if inputs.is_empty() {
+        return Err("--affected-merge needs the data files to merge as arguments".into());
+    }
+    let mut merged: Option<Data> = None;
+    for input in inputs {
+        let data = Data::load(input).map_err(|err| match err {
+            LoadError::Missing => format!("{}: not found", input.display()),
+            LoadError::OtherFormat => {
+                format!("{}: written by another data format", input.display())
+            }
+            LoadError::Unreadable => format!("{}: not an --affected data file", input.display()),
+        })?;
+        match &mut merged {
+            None => merged = Some(data),
+            Some(into) => {
+                if let Some(reason) = data.header.mismatch(&into.header) {
+                    return Err(format!(
+                        "{}: cannot merge with {} ({reason})",
+                        input.display(),
+                        inputs[0].display()
+                    ));
+                }
+                into.merge(&data);
+            }
+        }
+    }
+    let merged = merged.expect("at least one input");
+    merged
+        .save(output)
+        .map_err(|e| format!("cannot write {}: {e}", output.display()))?;
+    Ok(format!(
+        "affected: merged {} files ({} tests) into {}",
+        inputs.len(),
+        merged.tests.len(),
+        output.display()
+    ))
+}
+
 pub struct AffectedPlugin {
     state: Mutex<State>,
 }
@@ -784,6 +826,10 @@ impl AffectedPlugin {
             entry.0 |= report.outcome == Outcome::Failed && !report.rerun;
             entry.1 += report.duration.as_secs_f64();
         }
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
         let mut recorded = 0usize;
         for nodeid in &state.to_run {
             let Some(&(failed, duration)) = outcomes.get(nodeid.as_str()) else {
@@ -821,6 +867,7 @@ impl AffectedPlugin {
                     duration,
                     groups: test_groups,
                     incomplete,
+                    recorded: now,
                 },
             );
             recorded += 1;
@@ -863,7 +910,14 @@ impl AffectedPlugin {
                 .map(|nodeid| data.strings.intern(nodeid))
                 .collect();
             let id = data.strings.intern(path);
-            data.file_records.insert(id, FileRecord { groups, nodeids });
+            data.file_records.insert(
+                id,
+                FileRecord {
+                    groups,
+                    nodeids,
+                    recorded: now,
+                },
+            );
         }
         data.global_incomplete = recording.incomplete.contains(&GLOBAL_CONTEXT);
         data.snapshot = match state.snapshot.take() {
@@ -971,6 +1025,11 @@ impl Plugin for AffectedPlugin {
             )
             .with_require_equals(),
         );
+        parser.add_option(OptDef::flag(
+            "--affected-merge",
+            "Merge the --affected data files given as arguments into --affected-data \
+             (sharded CI runs), and run no tests",
+        ));
         parser.add_option(OptDef::value(
             "--affected-data",
             None,

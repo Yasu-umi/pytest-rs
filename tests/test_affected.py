@@ -878,6 +878,74 @@ class TestAffected(unittest.TestCase):
         self.git("checkout", "--", "app/core.py")
         self.assertEqual(self.project.ran("--affected=select"), {"tests/test_mul.py::test_mul"})
 
+    # --- sharded CI and --affected-merge (PR 3c) -----------------------------
+
+    def shard(self, group: int, data: str) -> set[str]:
+        return self.project.ran(
+            "--affected", "--affected-data", data, "--splits", "2", "--group", str(group)
+        )
+
+    def merge(self, *args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [str(BINARY), "--affected-merge", *args],
+            cwd=self.project.base,
+            capture_output=True,
+            text=True,
+        )
+
+    def test_merge_sharded_recordings(self) -> None:
+        """Each shard records its group; the merged data serves every later run."""
+        ran = self.shard(1, "s1.data") | self.shard(2, "s2.data")
+        self.assertEqual(ran, ALL)
+        result = self.merge("s1.data", "s2.data", "--affected-data", ".pytest-rs-affected")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("merged 2 files (4 tests)", result.stdout)
+        self.assertEqual(self.project.ran("--affected=select"), set())
+        self.project.edit("app/core.py", "return a * b", "return b * a")
+        self.assertEqual(self.project.ran("--affected=select"), {"tests/test_mul.py::test_mul"})
+
+    def test_merge_keeps_each_shards_new_entries(self) -> None:
+        """Shards start from the same restored data: the newer entry of a test wins.
+
+        Merging in either order must keep what each shard just recorded, not the
+        stale copy the other shard carried over from the restored data.
+        """
+        self.record()
+        base = (self.project.base / ".pytest-rs-affected").read_bytes()
+        # Both shards fail their test after this edit: the newer entries say
+        # "failed", the restored copies say "passed".
+        self.project.edit("app/core.py", "return a + b", "return a + b + 1")
+        self.project.edit("app/core.py", "return a * b", "return a * b + 1")
+        for group, data in ((1, "s1.data"), (2, "s2.data")):
+            (self.project.base / data).write_bytes(base)
+            self.shard(group, data)
+        self.project.edit("app/core.py", "return a + b + 1", "return a + b")
+        self.project.edit("app/core.py", "return a * b + 1", "return a * b")
+        for order in (("s1.data", "s2.data"), ("s2.data", "s1.data")):
+            with self.subTest(order=order):
+                result = self.merge(*order, "--affected-data", "merged.data")
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                # Every test that failed in its shard reruns.
+                self.assertEqual(
+                    self.project.ran("--affected=select", "--affected-data", "merged.data"),
+                    {
+                        "tests/test_add.py::test_add",
+                        "tests/test_add.py::test_add_more",
+                        "tests/test_mul.py::test_mul",
+                    },
+                )
+
+    def test_merge_usage_errors(self) -> None:
+        self.record()
+        missing_output = self.merge(".pytest-rs-affected")
+        self.assertEqual(missing_output.returncode, 4, missing_output.stderr)
+        self.assertIn("--affected-data", missing_output.stderr)
+        (self.project.base / "junk.data").write_text("junk")
+        junk = self.merge(".pytest-rs-affected", "junk.data", "--affected-data", "out.data")
+        self.assertEqual(junk.returncode, 4, junk.stderr)
+        self.assertIn("junk.data", junk.stderr)
+        self.assertFalse((self.project.base / "out.data").exists())
+
     # --- modes (§7) --------------------------------------------------------
 
     def test_select_mode_does_not_record(self) -> None:
