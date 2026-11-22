@@ -11,7 +11,7 @@ use std::path::Path;
 
 const MAGIC: &[u8] = b"PYTEST-RS-AFFECTED\0";
 /// Bumped on any change to the layout below.
-pub const FORMAT_VERSION: u32 = 2;
+pub const FORMAT_VERSION: u32 = 3;
 
 /// The fields that decide whether stored data is usable at all: any
 /// mismatch means a full run (and, when recording, a fresh file).
@@ -60,6 +60,10 @@ pub struct FileEntry {
     pub content_hash: u64,
     /// None when the file did not parse.
     pub units: Option<Vec<(u32, u64)>>,
+    /// The commit (interned) this state is the clean, tracked content of,
+    /// if it was when recorded: while git reports the file unchanged since
+    /// that commit, the state is reused without reading the file (§5.2).
+    pub commit: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -92,6 +96,8 @@ pub struct SnapEntry {
     pub size: u64,
     pub mtime_ns: i64,
     pub hash: u64,
+    /// As `FileEntry::commit`.
+    pub commit: Option<String>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -260,11 +266,13 @@ impl Data {
                     .map(|(q, c)| (self.strings.intern(other.strings.resolve(*q)), *c))
                     .collect()
             });
+            let commit = entry.commit.map(|c| string(self, c));
             self.files.insert(
                 path,
                 FileEntry {
                     content_hash: entry.content_hash,
                     units,
+                    commit,
                 },
             );
         }
@@ -386,11 +394,13 @@ impl Data {
                         .map(|(qualname, checksum)| (c.string(*qualname), *checksum))
                         .collect()
                 });
+                let commit = entry.commit.map(|commit| c.string(commit));
                 Some((
                     c.string(*old),
                     FileEntry {
                         content_hash: entry.content_hash,
                         units,
+                        commit,
                     },
                 ))
             })
@@ -414,6 +424,7 @@ impl Data {
         files.iter().for_each(|(path, entry)| {
             out.u32(*path);
             out.u64(entry.content_hash);
+            out.u32(entry.commit.unwrap_or(u32::MAX));
             match &entry.units {
                 None => out.u8(0),
                 Some(units) => {
@@ -459,6 +470,7 @@ impl Data {
             out.u64(entry.size);
             out.u64(entry.mtime_ns as u64);
             out.u64(entry.hash);
+            out.str(entry.commit.as_deref().unwrap_or(""));
         });
         out.u8(u8::from(self.global_incomplete));
         out.buf
@@ -487,6 +499,10 @@ impl Data {
         for _ in 0..input.u32()? {
             let path = string_id(input.u32()?)?;
             let content_hash = input.u64()?;
+            let commit = match input.u32()? {
+                u32::MAX => None,
+                id => Some(string_id(id)?),
+            };
             let units = match input.u8()? {
                 0 => None,
                 _ => {
@@ -503,6 +519,7 @@ impl Data {
                 FileEntry {
                     content_hash,
                     units,
+                    commit,
                 },
             );
         }
@@ -556,6 +573,7 @@ impl Data {
                 size: input.u64()?,
                 mtime_ns: input.u64()? as i64,
                 hash: input.u64()?,
+                commit: Some(input.str()?).filter(|c| !c.is_empty()),
             });
         }
         data.global_incomplete = input.u8()? != 0;
@@ -657,6 +675,7 @@ mod tests {
             FileEntry {
                 content_hash: 7,
                 units: Some(vec![(f, 1), (module, 2)]),
+                commit: Some(data.strings.intern("abc123")),
             },
         );
         let shared = data.add_group(vec![Dep {
@@ -700,6 +719,7 @@ mod tests {
             size: 10,
             mtime_ns: -1,
             hash: 9,
+            commit: Some("abc123".into()),
         });
         data
     }
@@ -814,6 +834,7 @@ mod tests {
             FileEntry {
                 content_hash: 1,
                 units: None,
+                commit: None,
             },
         );
         data.add_group(vec![Dep {

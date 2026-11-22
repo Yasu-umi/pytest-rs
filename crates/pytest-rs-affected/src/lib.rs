@@ -9,6 +9,7 @@
 mod collector;
 mod config;
 mod data;
+mod git;
 mod imports;
 mod selection;
 mod snapshot;
@@ -28,6 +29,7 @@ use pytest_rs_core::session::{PendingFinalizer, ScopedSetup};
 use crate::collector::{AffectedCollector, Recording};
 use crate::config::{AffectedConfig, BUILTIN_FULL_RUN_ON, BUILTIN_IGNORE, Globs, Incomplete};
 use crate::data::{Data, Dep, FileEntry, FileRecord, Header, LoadError, SnapEntry, TestEntry};
+use crate::git::{Git, Unchanged};
 use crate::imports::StaticImports;
 use crate::selection::{Plan, Reason};
 use crate::snapshot::Snapshot;
@@ -109,6 +111,13 @@ struct State {
     partial_path: Option<PathBuf>,
     /// `-n` controller: the workers' recordings, with their discard flag.
     partials: Vec<(Data, bool)>,
+    /// The git fast path (§5.2): the repository at configure time, and
+    /// which stored states git vouches for (built with the plan).
+    git: Option<Git>,
+    unchanged: Option<Unchanged>,
+    /// When this session started: a file modified since was not the
+    /// content its recorded state came from.
+    started: Option<std::time::SystemTime>,
 }
 
 pub struct AffectedPlugin {
@@ -327,6 +336,13 @@ impl AffectedPlugin {
     }
 
     fn snapshot(state: &State) -> Vec<SnapEntry> {
+        let vouched =
+            |entry: &SnapEntry| Self::vouched(state, &entry.path, entry.commit.as_deref());
+        // Entries hashed now name HEAD when the file is tracked and clean.
+        let clean: Option<(String, HashSet<String>)> = state
+            .git
+            .as_ref()
+            .and_then(|git| Some((git.head().to_string(), git.clean_at_head()?)));
         let builtin_ignore = Globs::builtin(BUILTIN_IGNORE);
         let builtin_full = Globs::builtin(BUILTIN_FULL_RUN_ON);
         let own = Self::rel(&state.rootdir, &state.data_path)
@@ -345,6 +361,8 @@ impl AffectedPlugin {
                 .chain(state.config.file_triggers.iter().map(|(key, _)| key))
                 .collect(),
             own_files: own,
+            vouched: Some(&vouched),
+            clean_at_head: clean.as_ref().map(|(head, set)| (head.as_str(), set)),
         };
         let previous = state
             .stored
@@ -382,23 +400,84 @@ impl AffectedPlugin {
             && ctx.session.dist_workers_resolved.flatten().is_some()
     }
 
+    /// Which stored states git vouches for: one `git diff` per distinct
+    /// commit they name.
+    fn ensure_unchanged(state: &mut State) {
+        if state.unchanged.is_some() {
+            return;
+        }
+        let commits: Vec<String> = state
+            .stored
+            .as_ref()
+            .map(|data| {
+                data.files
+                    .values()
+                    .filter_map(|e| e.commit.map(|c| data.strings.resolve(c).to_string()))
+                    .chain(data.snapshot.iter().filter_map(|e| e.commit.clone()))
+                    .collect()
+            })
+            .unwrap_or_default();
+        state.unchanged = Some(Unchanged::new(
+            state.git.as_ref(),
+            commits.iter().map(String::as_str),
+        ));
+    }
+
+    fn vouched(state: &State, path: &str, commit: Option<&str>) -> bool {
+        state
+            .unchanged
+            .as_ref()
+            .is_some_and(|u| u.contains(state.git.as_ref(), commit, path))
+    }
+
+    /// The commit (interned) a file state recorded now is the content of:
+    /// HEAD, when git reports the file tracked and clean, HEAD did not move
+    /// during the session, and the file was not modified since it started.
+    fn commit_for(
+        state: &State,
+        end: Option<&(String, HashSet<String>)>,
+        data: &mut Data,
+        rel: &str,
+    ) -> Option<u32> {
+        let (head, clean) = end?;
+        if state.git.as_ref().map(Git::head) != Some(head.as_str()) || !clean.contains(rel) {
+            return None;
+        }
+        let modified = std::fs::metadata(state.rootdir.join(rel))
+            .ok()?
+            .modified()
+            .ok()?;
+        (modified < state.started?).then(|| data.strings.intern(head))
+    }
+
+    /// HEAD and the files clean at it, at the end of a recording session.
+    fn git_at_end(state: &State) -> Option<(String, HashSet<String>)> {
+        state.git.as_ref()?;
+        let git = Git::open(&state.rootdir)?;
+        let clean = git.clean_at_head()?;
+        Some((git.head().to_string(), clean))
+    }
+
     /// Build the selection plan once (needs usable data).
     fn ensure_plan(state: &mut State, ctx: &HookContext) {
         if state.plan.is_some() {
             return;
         }
+        Self::ensure_unchanged(state);
         if state.snapshot.is_none() {
             state.snapshot = Some(Self::snapshot(state));
         }
         let Some(data) = state.stored.as_ref() else {
             return;
         };
+        let vouched = |path: &str, commit: Option<&str>| Self::vouched(state, path, commit);
         let plan = Plan::build(
             data,
             &state.rootdir,
             &state.config,
             state.snapshot.as_deref().unwrap_or_default(),
             Self::explicit_nodeids(ctx),
+            &vouched,
         );
         if plan.full_reason.is_some() {
             // A full-run trigger changed since the stored entries were
@@ -494,6 +573,7 @@ impl AffectedPlugin {
         py: Python<'_>,
         recording: &Recording,
         data: &mut Data,
+        end: Option<&(String, HashSet<String>)>,
     ) -> HashMap<String, u32> {
         let seen: HashMap<&str, &Option<Vec<u8>>> = recording
             .files
@@ -548,10 +628,17 @@ impl AffectedPlugin {
                     units.sort_unstable();
                     units
                 });
-                data.files.entry(sid).or_insert(FileEntry {
-                    content_hash,
-                    units: entry_units,
-                });
+                if !data.files.contains_key(&sid) {
+                    let commit = Self::commit_for(state, end, data, &rel);
+                    data.files.insert(
+                        sid,
+                        FileEntry {
+                            content_hash,
+                            units: entry_units,
+                            commit,
+                        },
+                    );
+                }
                 let (qualname, checksum) =
                     match units.as_ref().and_then(|f| f.units.get(MODULE_UNIT)) {
                         Some(&checksum) => (MODULE_UNIT, checksum),
@@ -599,8 +686,11 @@ impl AffectedPlugin {
                 (sid, units, hash)
             })
             .collect();
+        let end = Self::git_at_end(state);
         for (sid, units, hash) in &file_units {
             let Some(sid) = sid else { continue };
+            let rel = data.strings.resolve(*sid).to_string();
+            let commit = Self::commit_for(state, end.as_ref(), &mut data, &rel);
             let units = units.as_ref().map(|f| {
                 let mut units: Vec<(u32, u64)> = f
                     .units
@@ -615,6 +705,7 @@ impl AffectedPlugin {
                 FileEntry {
                     content_hash: *hash,
                     units,
+                    commit,
                 },
             );
         }
@@ -683,7 +774,8 @@ impl AffectedPlugin {
                 (!deps.is_empty()).then(|| data.add_group(deps))
             })
             .collect();
-        let static_groups = Self::static_import_groups(state, ctx.py, &recording, &mut data);
+        let static_groups =
+            Self::static_import_groups(state, ctx.py, &recording, &mut data, end.as_ref());
 
         // Tests that ran.
         let mut outcomes: HashMap<&str, (bool, f64)> = HashMap::new();
@@ -926,6 +1018,8 @@ impl Plugin for AffectedPlugin {
             },
         }
         state.header = Some(header);
+        state.git = Git::open(&state.rootdir);
+        state.started = Some(std::time::SystemTime::now());
         if mode.records() {
             let cache_dir = ctx
                 .config
