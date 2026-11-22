@@ -23,6 +23,8 @@ A test runs when any of these is true:
 - it is new, it failed last time, or it was named on the command line (`file.py::test_name`);
 - it started a subprocess, whose own dependencies are not recorded (see `incomplete` below).
 
+A subprocess started outside any test makes every test incomplete, so everything runs. This happens when a conftest or plugin starts one at import or at session start. The header line says so; `incomplete = "trust"` relies on the recorded dependencies instead.
+
 A test file whose tests would all be skipped, and whose own import is unaffected, is not imported at all.
 
 Edits that only touch formatting or comments, and newly added functions that no test called, run nothing. `-k`, `-m` and `--lf` still filter on top of the selection.

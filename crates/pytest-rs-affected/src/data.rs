@@ -130,6 +130,10 @@ pub struct Data {
     pub tests: HashMap<u32, TestEntry>,
     pub file_records: HashMap<u32, FileRecord>,
     pub snapshot: Vec<SnapEntry>,
+    /// The latest recording started a subprocess outside every test (a
+    /// conftest or plugin at import or session start): every test it
+    /// recorded is incomplete.
+    pub global_incomplete: bool,
 }
 
 /// Why a data file could not be loaded.
@@ -189,6 +193,7 @@ impl Data {
             tests: HashMap::new(),
             file_records: HashMap::new(),
             snapshot: Vec::new(),
+            global_incomplete: false,
         }
     }
 
@@ -386,6 +391,7 @@ impl Data {
             out.u64(entry.mtime_ns as u64);
             out.u64(entry.hash);
         });
+        out.u8(u8::from(self.global_incomplete));
         out.buf
     }
 
@@ -483,6 +489,7 @@ impl Data {
                 hash: input.u64()?,
             });
         }
+        data.global_incomplete = input.u8()? != 0;
         (input.pos == bytes.len()).then_some(data)
     }
 }
@@ -618,6 +625,7 @@ mod tests {
                 nodeids: vec![a],
             },
         );
+        data.global_incomplete = true;
         data.snapshot.push(SnapEntry {
             path: "pyproject.toml".into(),
             size: 10,
@@ -663,6 +671,7 @@ mod tests {
             ]
         );
         assert_eq!(decoded.snapshot, data.snapshot);
+        assert!(decoded.global_incomplete);
         // Re-encoding is deterministic.
         assert_eq!(decoded.encode(), data.encode());
     }

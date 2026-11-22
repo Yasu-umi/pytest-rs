@@ -609,6 +609,17 @@ class TestAffected(unittest.TestCase):
         self.project.ran("--affected")
         self.assertEqual(self.project.ran("--affected"), {"tests/test_proc.py::test_spawns"})
 
+    def test_subprocess_outside_tests_says_why_everything_runs(self) -> None:
+        """A conftest starting a subprocess at import makes every test incomplete."""
+        self.project.write(
+            "tests/conftest.py",
+            "import subprocess, sys\n\nsubprocess.run([sys.executable, '-c', 'pass'], check=True)\n",
+        )
+        self.record()
+        result = self.project.run("--affected")
+        self.assertEqual(self.project.nodeids(result.stdout), ALL)
+        self.assertIn("a subprocess was started outside any test", result.stdout)
+
     def test_incomplete_trust(self) -> None:
         self.configure('incomplete = "trust"')
         self.project.write(

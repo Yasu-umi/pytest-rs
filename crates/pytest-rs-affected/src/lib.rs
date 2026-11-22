@@ -26,7 +26,7 @@ use pytest_rs_core::report::Outcome;
 use pytest_rs_core::session::{PendingFinalizer, ScopedSetup};
 
 use crate::collector::{AffectedCollector, Recording};
-use crate::config::{AffectedConfig, BUILTIN_FULL_RUN_ON, BUILTIN_IGNORE, Globs};
+use crate::config::{AffectedConfig, BUILTIN_FULL_RUN_ON, BUILTIN_IGNORE, Globs, Incomplete};
 use crate::data::{Data, Dep, FileEntry, FileRecord, Header, LoadError, SnapEntry, TestEntry};
 use crate::imports::StaticImports;
 use crate::selection::{Plan, Reason};
@@ -412,6 +412,15 @@ impl AffectedPlugin {
         if let Some(reason) = &plan.full_reason {
             return Some(format!("running all {} tests ({reason})", items.len()));
         }
+        if data.global_incomplete && state.config.incomplete == Incomplete::Run {
+            // Every test is incomplete: say why instead of listing them as
+            // selected one by one.
+            return Some(format!(
+                "running all {} tests (incomplete deps: a subprocess was started outside \
+                 any test; set incomplete = \"trust\" to rely on the recorded dependencies)",
+                items.len()
+            ));
+        }
         let mut reasons: HashMap<Reason, usize> = HashMap::new();
         let (keep, drop): (Vec<TestItem>, Vec<TestItem>) =
             std::mem::take(items).into_iter().partition(|item| {
@@ -780,6 +789,7 @@ impl AffectedPlugin {
         }
         data.file_records
             .retain(|path, _| rootdir.join(data.strings.resolve(*path)).exists());
+        data.global_incomplete = recording.incomplete.contains(&GLOBAL_CONTEXT);
         data.snapshot = match state.snapshot.take() {
             Some(snapshot) => snapshot,
             None => Self::snapshot(state),
