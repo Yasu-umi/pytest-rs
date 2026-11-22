@@ -121,6 +121,11 @@ ignore = ["docs/**"]
 # (default) or "trust" what was recorded.
 incomplete = "run"
 
+# What a test depends on in the import-time code (module-level statements and
+# class bodies) of the modules it reaches: "module" (default), all of it, or
+# "names", the statements binding the names its code uses (see below).
+import_time = "module"
+
 # A change under the key runs: a list of test globs, "recorded" (trust what tests
 # were seen reading) or "all".
 [tool.pytest-rs.affected.file_triggers]
@@ -159,7 +164,29 @@ def client():
     return create_app().test_client()
 ```
 
-The default deliberately runs too much rather than too little here. Some tests depend on module-level values without calling any function of that module, so dropping this rule would miss them.
+The default deliberately runs too much rather than too little here. Some tests depend on module-level values without calling any function of that module, so dropping this rule would miss them. `import_time = "names"` narrows it instead.
+
+## Narrowing import-time code by name (`import_time = "names"`)
+
+Experimental. With `import_time = "names"`, a test depends only on the module-level statements and class attributes whose names its code uses, not on all the import-time code of the modules it reaches:
+
+- **Units.** Each module-level statement other than `def` and `class` belongs to the names it binds (`X = ...`, `import m`, `from m import x`, names bound inside `if` and `try` blocks). Statements binding no name form one more unit. A class body splits the same way into one unit per attribute and a header: decorators, bases, keywords, the names of its methods and nested classes, and attributes with dunder names. A statement also records how many earlier statements bound each name it reads, so moving a definition across a use changes the user.
+- **What a test depends on.** The units binding the names that are used by the functions it ran (fixtures, the code they call, and code run while importing), by its test file's top-level code, and in turn by those statements (`Y = X * 2`, default arguments, decorators, base classes). Calling a method also adds its class's header. Names resolve to the module that binds them: `X` in its own module, `m.X` through `import m`, `X` through `from m import X`, and names re-exported by star imports (`__all__` included). A test still depends on every function it ran, as before.
+- **Attributes of objects whose type is not followed** (`self.size`, `graph.nodes`) depend on every class attribute and module-level name of that name in the modules the test reaches.
+
+Where a name cannot be followed, more runs:
+
+- These classes count whole for the tests that use them: `Enum`, dataclass, `NamedTuple` and `TypedDict` classes, classes with decorators, keywords, a metaclass or `__init_subclass__`, and classes with a base other than a project class or `object`.
+- Every test that reaches a module depends on these statements in it:
+  - statements that bind no name;
+  - statements that write anything other than a plain name (`m.X = 1`, `d[k] = v`, `setattr`);
+  - statements that call anything other than the standard library or an installed package (`register(Handler)`, `X = make()`);
+  - classes whose definition runs project or third-party code: a decorator or metaclass that is not the standard library's, a base whose `__init_subclass__` runs, a third-party base, or a class body that calls project code.
+- A name the module does not bind (one provided by a module `__getattr__`, `globals()`, or `setattr` from elsewhere), `globals()` itself, and an attribute of a module with a computed name (`getattr(m, name)`, `vars(m)`) make the whole module a dependency.
+- An attribute with a computed name on an object whose type is not followed (`getattr(obj, name)`, `obj.__dict__`, `vars(obj)`) depends on every attribute of every class the test touches: classes it uses by name, and classes whose methods it ran.
+- Test files, `conftest.py` files and files matched by `always_changed` are not narrowed.
+
+Only recording runs use the setting. Entries recorded under either setting can be used and merged together. It costs record time and data size. See [Known gaps](#known-gaps) for what it can miss.
 
 ## In CI
 
@@ -261,6 +288,11 @@ With `--affected=select` on pull requests, the tests are selected first and the 
   - a module no longer in `sys.modules` when the session ends (removed or replaced by a test), whose import statements cannot be resolved to files then.
 
   A module executed with `importlib.util.spec_from_file_location` plus `exec_module`, `runpy` or `exec` is not tracked as a module of its own. Its code counts toward the context that runs it, which is the test, or the module whose import ran it.
+
+With `import_time = "names"`, these are not followed either:
+
+- **Module objects obtained at run time** (`importlib.import_module`, `sys.modules`, a module passed as an argument) and read with a computed attribute name. A literal attribute name is covered by the rule for attributes of objects whose type is not followed.
+- **An edit that makes a module fail to import.** Only the tests that use the edited name run. They fail, or the run stops at a conftest that imports the module. The other tests that import the module are not selected until something they depend on changes.
 
 It can also run more than needed:
 
