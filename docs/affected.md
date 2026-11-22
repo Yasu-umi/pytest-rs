@@ -58,7 +58,9 @@ While recording, an audit hook also notes:
 
 - **files opened for reading** under the rootdir, by their content;
 - **directories listed** with `os.listdir`/`os.scandir` (also through `os.walk`, `glob`, `pathlib`, `pkgutil.iter_modules`), by their entry names;
-- **subprocesses started** (`subprocess`, `os.system`, `os.exec*`, `os.posix_spawn`, `os.fork`): their own dependencies cannot be seen, so the test's dependencies are marked incomplete.
+- **subprocesses started**:
+  - A Python subprocess started with an argument list (`subprocess.run([sys.executable, "-m", "app"])`, or any program named `python*`) records its own dependencies: the project code it runs, the files it reads and the directories it lists. They count toward the test (or setup, or import) that started it. Its own Python subprocesses do the same. A `.pth` file in the environment's site-packages starts the recorder; it does nothing unless an `--affected` run has set it up.
+  - Anything else cannot be seen into, so the dependencies of whatever started it are marked incomplete. That covers other programs, shell command lines (`shell=True`, `os.system`), `os.exec*`, `os.fork` without exec, and Python children that end without writing their record. Children end that way when they call `os._exit`, are killed, are still running when the session ends, or run another Python environment that lacks the `.pth` file.
 
 Reads and listings by Python's import system and by pytest-rs itself are not recorded, nor are `.py`, `.pyc` and extension files, `__pycache__`, the data file and the cache directory.
 
@@ -74,11 +76,11 @@ A test runs when any of these is true:
 - a file it read or a directory it listed changed (a file that disappeared counts as changed);
 - it is new (not in the record);
 - it failed last time (it keeps running until it passes);
-- its dependencies are incomplete (it, or a context it depends on, started a subprocess), unless `incomplete = "trust"`;
+- its dependencies are incomplete (it, or a context it depends on, started a subprocess that cannot be seen into), unless `incomplete = "trust"`;
 - it was named on the command line (`file.py::test_name`), it matches `always_run`, or a changed file matched a `file_triggers` entry that lists it;
 - something changed that means a full run (below).
 
-A subprocess started outside any test makes every test incomplete, so everything runs. This happens when a conftest or plugin starts one at import or at session start. The header line says so, and `incomplete = "trust"` relies on the recorded dependencies instead.
+A subprocess that cannot be seen into, started outside any test, makes every test incomplete, so everything runs. This happens when a conftest or plugin starts one at import or at session start. The header line says so, and `incomplete = "trust"` relies on the recorded dependencies instead.
 
 A test file is not even imported when every test it collected last time would be deselected, and neither the code its import ran nor the file itself changed. A file whose content changed in any way, for example a new test added to it, is imported.
 
@@ -115,7 +117,8 @@ always_run = ["tests/smoke/**"]
 # Never looked at.
 ignore = ["docs/**"]
 
-# Tests that start a subprocess: "run" them always (default) or "trust" what was recorded.
+# Tests that start a subprocess that cannot be seen into: "run" them always
+# (default) or "trust" what was recorded.
 incomplete = "run"
 
 # A change under the key runs: a list of test globs, "recorded" (trust what tests
@@ -248,7 +251,8 @@ With `--affected=select` on pull requests, the tests are selected first and the 
 - **Mocks and autospec.** A test that patches `f` never runs `f`, so a change to `f` does not rerun it, even one that breaks `create_autospec`.
 - **State outside the process**: databases, environment variables, the clock, the network, files written by other tests, test order. Running a subset can expose a hidden dependency between tests as a failure, which is visible rather than missed.
 - **Code not compiled from a file under the rootdir**: `exec` of strings, generated code, C or Cython extensions built in-tree.
-- **Files read by non-Python code**, such as a C library parsing a config file. (Tests that start a subprocess always run, unless `incomplete = "trust"`.)
+- **Files read by non-Python code**, such as a C library parsing a config file. (Tests that start a program other than Python always run, unless `incomplete = "trust"`.)
+- **Edits during the session to files a Python subprocess used.** A subprocess reports which files it ran and read, and they are hashed when the session ends rather than when the subprocess read them. If one is edited in between, the record holds the edited version, so a later run does not select the test for that edit.
 - **Installed packages**: their contents are not tracked, but any change in the set of installed packages or their versions means a full run.
 - **Modules the import hook does not see run.** Module executions are seen through a finder placed first on `sys.meta_path`, and the gaps below come from that. In each case, the module's code still counts toward whatever context runs it, as it always did. What is lost is only its own record, so a test file that reaches the module through a cache hit, or through another module, can miss a change to its import-time code:
   - modules found by a finder that another plugin or conftest inserted ahead of it later;

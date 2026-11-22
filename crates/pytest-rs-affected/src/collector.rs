@@ -95,8 +95,12 @@ pub struct Recording {
     pub inputs: Vec<(String, InputKind, u64)>,
     /// The inputs read under each context.
     pub context_inputs: Vec<HashSet<u32>>,
-    /// Contexts that started a subprocess.
+    /// Contexts that started a subprocess whose dependencies cannot be
+    /// recorded.
     pub incomplete: HashSet<usize>,
+    /// Python subprocesses started under each context: each should come
+    /// back with its own record (the .pth child).
+    pub spawns: HashMap<usize, usize>,
     /// The import context of each project module executed through the
     /// import system: absolute file -> context.
     pub import_contexts: HashMap<String, usize>,
@@ -120,6 +124,7 @@ struct State {
     input_index: HashMap<(String, InputKind), u32>,
     context_inputs: Vec<HashSet<u32>>,
     incomplete: HashSet<usize>,
+    spawns: HashMap<usize, usize>,
     /// Modules being executed, innermost last: while one runs, its import
     /// context is current instead of `current`.
     import_stack: Vec<usize>,
@@ -156,6 +161,10 @@ pub struct AffectedCollector {
     auditing: AtomicBool,
     /// The embedded shim directory (with a trailing separator).
     shim_root: Option<String>,
+    /// Python children record their own dependencies (the .pth child is
+    /// armed): the current context is published in the environment, and
+    /// Python subprocesses are counted instead of marked incomplete.
+    children_armed: AtomicBool,
     state: Mutex<State>,
 }
 
@@ -176,6 +185,7 @@ impl AffectedCollector {
             ignored_inputs,
             auditing: AtomicBool::new(true),
             shim_root,
+            children_armed: AtomicBool::new(false),
             state: Mutex::new(State {
                 contexts: vec![HashSet::new()],
                 context_inputs: vec![HashSet::new()],
@@ -204,7 +214,30 @@ impl AffectedCollector {
             }
             state.current = context;
         }
+        self.publish_context(py)?;
         self.monitoring.bind(py).call_method0("restart_events")?;
+        Ok(())
+    }
+
+    /// Children started from now on record into this session's context
+    /// (`PYTEST_RS_AFFECTED_CONTEXT`, read by the .pth child).
+    pub fn arm_children(&self, py: Python<'_>) -> PyResult<()> {
+        self.children_armed.store(true, Ordering::Relaxed);
+        self.publish_context(py)
+    }
+
+    pub fn disarm_children(&self) {
+        self.children_armed.store(false, Ordering::Relaxed);
+    }
+
+    fn publish_context(&self, py: Python<'_>) -> PyResult<()> {
+        if !self.children_armed.load(Ordering::Relaxed) {
+            return Ok(());
+        }
+        let context = self.lock().effective();
+        py.import("os")?
+            .getattr("environ")?
+            .set_item("PYTEST_RS_AFFECTED_CONTEXT", context.to_string())?;
         Ok(())
     }
 
@@ -220,6 +253,7 @@ impl AffectedCollector {
             inputs: std::mem::take(&mut state.inputs),
             context_inputs: std::mem::take(&mut state.context_inputs),
             incomplete: std::mem::take(&mut state.incomplete),
+            spawns: std::mem::take(&mut state.spawns),
             import_contexts: std::mem::take(&mut state.import_contexts),
             nested: std::mem::take(&mut state.nested),
         }
@@ -289,6 +323,63 @@ impl AffectedCollector {
         })
     }
 
+    /// Whether the audited call comes from the subprocess module.
+    fn raised_by_subprocess(py: Python<'_>) -> bool {
+        py.import("sys")
+            .and_then(|sys| sys.call_method1("_getframe", (0,)))
+            .and_then(|frame| frame.getattr("f_code"))
+            .and_then(|code| code.getattr("co_filename"))
+            .and_then(|f| f.extract::<String>())
+            .is_ok_and(|f| {
+                Path::new(&f)
+                    .file_name()
+                    .is_some_and(|n| n == "subprocess.py")
+            })
+    }
+
+    /// Whether a subprocess runs a Python interpreter directly: an argument
+    /// list (not a shell command line) whose program is `sys.executable` or
+    /// named `python*`.
+    fn starts_python(
+        py: Python<'_>,
+        program: Option<&Bound<'_, PyAny>>,
+        argv: Option<&Bound<'_, PyAny>>,
+    ) -> bool {
+        let fspath = |value: &Bound<'_, PyAny>| -> Option<String> {
+            py.import("os")
+                .ok()?
+                .call_method1("fsdecode", (value,))
+                .ok()?
+                .extract()
+                .ok()
+        };
+        if let Some(argv) = argv
+            && (argv.is_instance_of::<pyo3::types::PyString>()
+                || argv.is_instance_of::<pyo3::types::PyBytes>())
+        {
+            return false;
+        }
+        let program = match program.filter(|p| !p.is_none()) {
+            Some(program) => fspath(program),
+            None => argv
+                .and_then(|argv| argv.get_item(0).ok())
+                .and_then(|first| fspath(&first)),
+        };
+        let Some(program) = program else {
+            return false;
+        };
+        let executable: Option<String> = py
+            .import("sys")
+            .and_then(|sys| sys.getattr("executable"))
+            .and_then(|e| e.extract())
+            .ok();
+        let name = Path::new(&program)
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        executable.as_deref() == Some(program.as_str()) || name.starts_with("python")
+    }
+
     /// Whether an `open` audit event opens for reading only.
     fn opens_for_reading(args: &Bound<'_, PyTuple>) -> bool {
         let mode = args.get_item(1).ok();
@@ -342,6 +433,7 @@ impl AffectedCollector {
             state.import_stack.push(context);
             state.import_stack.len()
         };
+        self.publish_context(py)?;
         self.monitoring.bind(py).call_method0("restart_events")?;
         Ok(depth)
     }
@@ -350,6 +442,7 @@ impl AffectedCollector {
     /// context that was current before it.
     fn import_finish(&self, py: Python<'_>, depth: usize) -> PyResult<()> {
         self.lock().import_stack.truncate(depth.saturating_sub(1));
+        self.publish_context(py)?;
         self.monitoring.bind(py).call_method0("restart_events")?;
         Ok(())
     }
@@ -392,8 +485,33 @@ impl AffectedCollector {
                     self.record_input(path, InputKind::Listing);
                 }
             }
-            "subprocess.Popen" | "os.posix_spawn" | "os.exec" | "os.spawn" | "os.system"
-            | "os.fork" | "os.forkpty" | "os.startfile" => {
+            // A Python child started with an argument list records its own
+            // dependencies (the .pth child) and is counted; anything else
+            // (a shell command line, another program, exec, fork) cannot be
+            // seen into.
+            "subprocess.Popen" | "os.posix_spawn" => {
+                let (program, argv) = if event == "subprocess.Popen" {
+                    (args.get_item(0).ok(), args.get_item(1).ok())
+                } else {
+                    (args.get_item(0).ok(), None)
+                };
+                // subprocess.Popen may start the child through
+                // os.posix_spawn (Linux): that is the same spawn, already
+                // counted by the subprocess.Popen event.
+                if event == "os.posix_spawn" && Self::raised_by_subprocess(py) {
+                    return;
+                }
+                let countable = self.children_armed.load(Ordering::Relaxed)
+                    && Self::starts_python(py, program.as_ref(), argv.as_ref());
+                let mut state = self.lock();
+                let current = state.effective();
+                if countable {
+                    *state.spawns.entry(current).or_default() += 1;
+                } else {
+                    state.incomplete.insert(current);
+                }
+            }
+            "os.exec" | "os.spawn" | "os.system" | "os.fork" | "os.forkpty" | "os.startfile" => {
                 let mut state = self.lock();
                 let current = state.effective();
                 state.incomplete.insert(current);

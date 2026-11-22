@@ -612,8 +612,9 @@ class TestAffected(unittest.TestCase):
         self.project.write("plugins/b.txt", "b")
         self.assertEqual(self.project.ran("--affected"), {"tests/test_plugins.py::test_discovers"})
 
-    def test_subprocess_marks_the_test_incomplete(self) -> None:
-        """a test that starts a subprocess always runs (incomplete = "run")."""
+    def test_python_subprocess_records_its_dependencies(self) -> None:
+        """A Python child started with an argument list records into the test that started it."""
+        self.project.write("app/helpers.py", "def value():\n    return 1\n")
         self.project.write(
             "tests/test_proc.py",
             """
@@ -621,20 +622,76 @@ class TestAffected(unittest.TestCase):
             import sys
 
             def test_spawns():
-                subprocess.run([sys.executable, "-c", "pass"], check=True)
+                code = "from app import helpers; helpers.value()"
+                subprocess.run([sys.executable, "-c", code], check=True)
 
             def test_other():
                 pass
             """,
         )
         self.project.ran("--affected")
+        self.assertEqual(self.project.ran("--affected"), set())
+        self.project.edit("app/helpers.py", "return 1", "return 2")
         self.assertEqual(self.project.ran("--affected"), {"tests/test_proc.py::test_spawns"})
+
+    def test_python_subprocess_under_n(self) -> None:
+        """Each -n worker folds the records of the children its own tests started."""
+        self.project.write("app/helpers.py", "def value():\n    return 1\n")
+        self.project.write(
+            "tests/test_proc.py",
+            """
+            import subprocess
+            import sys
+
+            def test_spawns():
+                code = "from app import helpers; helpers.value()"
+                subprocess.run([sys.executable, "-c", code], check=True)
+            """,
+        )
+        self.project.ran("--affected", "-n", "2")
+        self.assertEqual(self.project.ran("--affected", "-n", "2"), set())
+        self.project.edit("app/helpers.py", "return 1", "return 2")
+        self.assertEqual(
+            self.project.ran("--affected", "-n", "2"), {"tests/test_proc.py::test_spawns"}
+        )
+
+    def test_subprocesses_that_cannot_be_seen_into_keep_the_test_incomplete(self) -> None:
+        """Other programs, shell command lines and children that write no record always run."""
+        cases = {
+            "test_program": 'subprocess.run(["true"], check=True)',
+            "test_shell": 'subprocess.run(f"{sys.executable} -c pass", shell=True, check=True)',
+            "test_no_record": 'subprocess.run([sys.executable, "-c", "import os; os._exit(0)"])',
+            "test_python": 'subprocess.run([sys.executable, "-c", "pass"], check=True)',
+            # A script path: the child opens it with a shallow stack, which
+            # the recorder's audit hook must not trip over.
+            "test_python_script": (
+                'subprocess.run([sys.executable, __file__.replace("test_proc.py", "child_script.py")], '
+                "check=True)"
+            ),
+            "test_python_grandchild": (
+                'subprocess.run([sys.executable, "-c", '
+                "\"import subprocess, sys; subprocess.run([sys.executable, '-c', 'pass'])\"], "
+                "check=True)"
+            ),
+        }
+        body = "".join(f"\ndef {name}():\n    {call}\n" for name, call in cases.items())
+        self.project.write("tests/test_proc.py", "import subprocess\nimport sys\n" + body)
+        self.project.write("tests/child_script.py", "print('ok')\n")
+        self.project.ran("--affected")
+        self.assertEqual(
+            self.project.ran("--affected"),
+            {
+                "tests/test_proc.py::test_program",
+                "tests/test_proc.py::test_shell",
+                "tests/test_proc.py::test_no_record",
+            },
+        )
 
     def test_subprocess_outside_tests_says_why_everything_runs(self) -> None:
         """The rootdir's conftest starting a subprocess at import makes every test incomplete."""
         self.project.write(
             "conftest.py",
-            "import subprocess, sys\n\nsubprocess.run([sys.executable, '-c', 'pass'], check=True)\n",
+            "import subprocess\n\nsubprocess.run(['true'], check=True)\n",
         )
         self.record()
         result = self.project.run("--affected")
@@ -650,7 +707,7 @@ class TestAffected(unittest.TestCase):
             import sys
 
             def test_spawns():
-                subprocess.run([sys.executable, "-c", "pass"], check=True)
+                subprocess.run(["true"], check=True)
             """,
         )
         self.project.ran("--affected")
