@@ -50,6 +50,30 @@ fn preinitialize_python() {
     }
 }
 
+/// `--affected-merge A B ... --affected-data OUT`: no session, no tests.
+#[cfg(feature = "affected")]
+fn affected_merge(config: &Config) -> i32 {
+    let Some(output) = config.get_value("affected-data") else {
+        eprintln!("ERROR: --affected-merge needs --affected-data OUT\n");
+        return pytest_rs_core::report::exit_code::USAGE_ERROR;
+    };
+    let inputs: Vec<std::path::PathBuf> = config
+        .paths
+        .iter()
+        .map(|path| config.invocation_dir.join(path))
+        .collect();
+    match pytest_rs_affected::merge_files(&inputs, &config.invocation_dir.join(output)) {
+        Ok(summary) => {
+            println!("{summary}");
+            pytest_rs_core::report::exit_code::OK
+        }
+        Err(message) => {
+            eprintln!("ERROR: {message}\n");
+            pytest_rs_core::report::exit_code::USAGE_ERROR
+        }
+    }
+}
+
 // libc::_exit below is the one unsafe call; see the comment at the exit site.
 #[allow(unsafe_code)]
 fn main() {
@@ -79,6 +103,11 @@ fn main() {
             std::process::exit(pytest_rs_core::report::exit_code::USAGE_ERROR);
         }
     };
+
+    #[cfg(feature = "affected")]
+    if config.get_flag("affected-merge") {
+        std::process::exit(affected_merge(&config));
+    }
 
     #[cfg(feature = "xdist")]
     if config.get_flag("looponfail") {
