@@ -1,5 +1,5 @@
 //! `[tool.pytest-rs.affected]` in the rootdir's pyproject.toml
-//! (docs/AFFECTED_TESTS.md §6). Kept out of `[tool.pytest.ini_options]`:
+//! (docs/affected.md). Kept out of `[tool.pytest.ini_options]`:
 //! real pytest warns on unknown ini keys.
 
 use std::path::Path;

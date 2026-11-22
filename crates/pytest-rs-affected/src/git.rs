@@ -1,4 +1,4 @@
-//! The git fast path (docs/AFFECTED_TESTS.md §5.2): git only tells which
+//! The git fast path (docs/affected.md): git only tells which
 //! files may have changed, so unchanged ones need not be read. Correctness
 //! never depends on it: a file git cannot vouch for (untracked, ignored,
 //! dirty when recorded, recorded at a commit that is not available, no git

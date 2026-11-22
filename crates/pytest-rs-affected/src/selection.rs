@@ -1,4 +1,4 @@
-//! Deciding what runs (docs/AFFECTED_TESTS.md §5.2, §5.3, §6): which test
+//! Deciding what runs (docs/affected.md): which test
 //! files need importing at all, and which items of the imported files run.
 //!
 //! A test runs when it is forced (explicit node id, `always_run`, a

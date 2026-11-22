@@ -1,7 +1,7 @@
 //! The non-`.py` snapshot: the content hash of every file under the rootdir
-//! that is not Python source (plus Python files listed in a full-run list).
-//! PR 1 has no audit hook, so no such file is a recorded dependency: any
-//! change among them means a full run (docs/AFFECTED_TESTS.md §10, PR 1).
+//! that is not Python source (plus Python files named by a full-run list or
+//! a `file_triggers` key). Changes among them are classified by the rules
+//! in docs/affected.md ("Changed files that are not Python code").
 
 use std::collections::HashMap;
 use std::path::Path;

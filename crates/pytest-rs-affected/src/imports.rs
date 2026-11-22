@@ -1,7 +1,7 @@
-//! Static direct imports of a test file (docs/AFFECTED_TESTS.md §4.3,
-//! rule 3): a module already in `sys.modules` when the test file was
-//! imported ran none of its code then, so the file's own import statements
-//! name it instead.
+//! Static direct imports of a test file (docs/affected.md, "When code
+//! runs"): a module already in `sys.modules` when the test file was imported
+//! ran none of its code then, so the file's own import statements name it
+//! instead.
 
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 

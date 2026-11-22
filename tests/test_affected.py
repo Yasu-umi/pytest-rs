@@ -1,8 +1,8 @@
-"""End-to-end scenarios for --affected (docs/AFFECTED_TESTS.md, PR 1).
+"""End-to-end scenarios for --affected (docs/affected.md).
 
 Each test builds a small project, records a run, edits it, runs again and
 asserts which node ids ran. The rule each scenario covers is named in its
-docstring (§ numbers refer to the design doc).
+docstring.
 """
 
 from __future__ import annotations
@@ -144,10 +144,10 @@ class TestAffected(unittest.TestCase):
     def record(self) -> None:
         self.assertEqual(self.project.ran("--affected"), ALL)
 
-    # --- zero impact and options -------------------------------------------
+    # --- zero impact and options --------------------------------------------
 
     def test_without_option_nothing_is_recorded(self) -> None:
-        """§2: without --affected* no data file is written."""
+        """without --affected* no data file is written."""
         self.assertEqual(self.project.ran(), ALL)
         self.assertFalse((self.project.base / ".pytest-rs-affected").exists())
 
@@ -155,10 +155,10 @@ class TestAffected(unittest.TestCase):
         result = self.project.run("--affected=sometimes")
         self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
 
-    # --- selection basics ----------------------------------------------------
+    # --- selection basics ---------------------------------------------------
 
     def test_nothing_changed_deselects_everything_and_exits_ok(self) -> None:
-        """§7: exit status 5 becomes 0 when everything was deselected."""
+        """exit status 5 becomes 0 when everything was deselected."""
         self.record()
         result = self.project.run("--affected")
         self.assertEqual(result.returncode, 0, result.stdout)
@@ -166,13 +166,13 @@ class TestAffected(unittest.TestCase):
         self.assertIn("2 of 2 test files unchanged, not imported", result.stdout)
 
     def test_select_without_data_runs_everything(self) -> None:
-        """§7: select with no usable data runs everything and says so."""
+        """select with no usable data runs everything and says so."""
         result = self.project.run("--affected=select")
         self.assertEqual(self.project.nodeids(result.stdout), ALL)
         self.assertIn("affected: select, .pytest-rs-affected (no data)", result.stdout)
 
     def test_body_edit_selects_its_callers(self) -> None:
-        """§4.1/§4.2: a function body edit reruns exactly the tests that called it."""
+        """a function body edit reruns exactly the tests that called it."""
         self.record()
         self.project.edit("app/core.py", "return a * b", "return b * a")
         self.assertEqual(self.project.ran("--affected"), {"tests/test_mul.py::test_mul"})
@@ -184,19 +184,19 @@ class TestAffected(unittest.TestCase):
         self.assertEqual(self.project.ran("--affected"), {"tests/test_mul.py::test_box"})
 
     def test_formatting_and_comment_edits_select_nothing(self) -> None:
-        """§4.1: checksums ignore formatting and comments."""
+        """checksums ignore formatting and comments."""
         self.record()
         self.project.edit("app/core.py", "return a + b", "return (a  +  b)  # sum")
         self.assertEqual(self.project.ran("--affected"), set())
 
     def test_new_function_selects_nothing(self) -> None:
-        """§4.1: adding a function changes no existing unit."""
+        """adding a function changes no existing unit."""
         self.record()
         self.project.edit("app/core.py", "def mul", "def sub(a, b):\n    return a - b\n\ndef mul")
         self.assertEqual(self.project.ran("--affected"), set())
 
     def test_module_statement_edit_selects_every_test_using_the_module(self) -> None:
-        """§4.1: a dependency on a function implies its module unit."""
+        """a dependency on a function implies its module unit."""
         self.record()
         self.project.edit("app/core.py", "LIMIT = 10", "LIMIT = 11")
         self.assertEqual(self.project.ran("--affected"), ALL)
@@ -214,21 +214,21 @@ class TestAffected(unittest.TestCase):
         self.project.ran("--affected")
 
     def test_deleted_module_selects_its_dependents(self) -> None:
-        """§6: a deleted .py file removes its units, so their dependents run."""
+        """a deleted .py file removes its units, so their dependents run."""
         self.write_lazy_user()
         (self.project.base / "app/extra.py").unlink()
         self.assertEqual(self.project.ran("--affected"), {"tests/test_extra.py::test_extra"})
 
     def test_unparseable_file_selects_its_dependents(self) -> None:
-        """§6: a file that fails to parse has all of its units changed."""
+        """a file that fails to parse has all of its units changed."""
         self.write_lazy_user()
         self.project.edit("app/extra.py", "return 1", "return (")
         self.assertEqual(self.project.ran("--affected"), {"tests/test_extra.py::test_extra"})
 
-    # --- contexts (§4.2-§4.4) ---------------------------------------------
+    # --- contexts -----------------------------------------------------------
 
     def test_session_fixture_dependencies_belong_to_its_users(self) -> None:
-        """§4.4: a higher-scope fixture's code is a dependency of every test using it."""
+        """a higher-scope fixture's code is a dependency of every test using it."""
         self.project.write(
             "tests/conftest.py",
             """
@@ -270,7 +270,7 @@ class TestAffected(unittest.TestCase):
         )
 
     def test_fixture_finalizer_belongs_to_the_fixture(self) -> None:
-        """§4.4: finalizer code runs at scope end, attributed to the fixture."""
+        """finalizer code runs at scope end, attributed to the fixture."""
         self.project.write(
             "app/resource.py",
             """
@@ -310,7 +310,7 @@ class TestAffected(unittest.TestCase):
         )
 
     def test_xunit_module_setup_belongs_to_every_test_of_the_module(self) -> None:
-        """§4.4: xunit setup_module/teardown_module are treated like module fixtures."""
+        """xunit setup_module/teardown_module are treated like module fixtures."""
         self.project.write(
             "app/helpers.py",
             """
@@ -349,7 +349,7 @@ class TestAffected(unittest.TestCase):
         self.assertEqual(self.project.ran("--affected"), both)
 
     def test_import_time_code_belongs_to_the_importing_test_file(self) -> None:
-        """§4.3 rule 2: code run while importing test file X is a dependency of X's tests."""
+        """code run while importing test file X is a dependency of X's tests."""
         self.project.write("app/settings.py", "VALUE = 1\n")
         self.project.write(
             "tests/test_settings.py",
@@ -365,7 +365,7 @@ class TestAffected(unittest.TestCase):
         self.assertEqual(self.project.ran("--affected"), {"tests/test_settings.py::test_value"})
 
     def test_conftest_import_time_code_belongs_to_every_test(self) -> None:
-        """§4.3 rule 1: code run in the global collection context is a dependency of every test."""
+        """code run in the global collection context is a dependency of every test."""
         self.project.write("app/config.py", "MODE = 'a'\n")
         self.project.write("tests/conftest.py", "from app import config\n")
         self.project.ran("--affected")
@@ -392,7 +392,7 @@ class TestAffected(unittest.TestCase):
         self.assertEqual(self.project.ran("--affected"), {"tests/test_mode.py::test_mode"})
 
     def test_lazy_import_belongs_to_the_test(self) -> None:
-        """§4.3 rule 4: a module first imported inside a test is that test's dependency."""
+        """a module first imported inside a test is that test's dependency."""
         self.project.write("app/lazy.py", "FLAG = True\n")
         self.project.write(
             "tests/test_lazy.py",
@@ -409,7 +409,7 @@ class TestAffected(unittest.TestCase):
         self.project.edit("app/lazy.py", "FLAG = True", "FLAG = 1")
         self.assertEqual(self.project.ran("--affected"), {"tests/test_lazy.py::test_lazy"})
 
-    # --- what always runs (§6) --------------------------------------------
+    # --- what always runs ---------------------------------------------------
 
     def test_failed_tests_rerun_until_they_pass(self) -> None:
         self.project.write("tests/test_flaky.py", "def test_flaky():\n    assert False\n")
@@ -444,7 +444,7 @@ class TestAffected(unittest.TestCase):
         )
 
     def test_k_composes_with_selection(self) -> None:
-        """Decision 2: -k is an extra filter on top of selection."""
+        """-k is an extra filter on top of selection."""
         self.record()
         self.project.edit("app/core.py", "return a + b", "return b + a")
         self.assertEqual(
@@ -474,7 +474,7 @@ class TestAffected(unittest.TestCase):
         self.record()
         self.assertEqual(self.project.ran("--affected"), ALL)
 
-    # --- non-Python files (§4.5, §6) -------------------------------------
+    # --- non-Python files -------------------------------------
 
     def configure(self, toml: str) -> None:
         self.project.edit(
@@ -484,7 +484,7 @@ class TestAffected(unittest.TestCase):
         )
 
     def test_unrecorded_non_python_change_is_ignored(self) -> None:
-        """§6: a file no test read is ignored by default (unknown_files = "ignore")."""
+        """a file no test read is ignored by default (unknown_files = "ignore")."""
         self.record()
         self.project.write("data/values.json", "{}")
         self.assertEqual(self.project.ran("--affected"), set())
@@ -505,7 +505,7 @@ class TestAffected(unittest.TestCase):
         self.assertEqual(self.project.ran("--affected"), set())
 
     def test_builtin_full_run_list(self) -> None:
-        """§6: configuration and environment files always mean a full run."""
+        """configuration and environment files always mean a full run."""
         self.record()
         self.project.write("requirements.txt", "attrs\n")
         self.assertEqual(self.project.ran("--affected"), ALL)
@@ -528,7 +528,7 @@ class TestAffected(unittest.TestCase):
         self.assertEqual(self.project.ran("--affected"), ALL - {"tests/test_mul.py::test_box"})
 
     def test_file_read_by_a_test_is_its_dependency(self) -> None:
-        """§4.5: a file opened for reading under the rootdir is a dependency."""
+        """a file opened for reading under the rootdir is a dependency."""
         self.project.write("data/values.json", '{"a": 1}')
         self.project.write(
             "tests/test_data.py",
@@ -548,7 +548,7 @@ class TestAffected(unittest.TestCase):
         self.assertEqual(self.project.ran("--affected"), {"tests/test_data.py::test_reads"})
 
     def test_file_read_at_collection_belongs_to_the_test_file(self) -> None:
-        """§4.5 + rule 2: parametrize data read while importing a test file."""
+        """parametrize data read while importing a test file."""
         self.project.write("data/cases.json", "[1, 2]")
         self.project.write(
             "tests/test_cases.py",
@@ -576,7 +576,7 @@ class TestAffected(unittest.TestCase):
         )
 
     def test_directory_listing_is_a_dependency(self) -> None:
-        """§4.5: a directory listed with os.listdir/os.scandir is a dependency."""
+        """a directory listed with os.listdir/os.scandir is a dependency."""
         self.project.write("plugins/a.txt", "a")
         self.project.write(
             "tests/test_plugins.py",
@@ -595,7 +595,7 @@ class TestAffected(unittest.TestCase):
         self.assertEqual(self.project.ran("--affected"), {"tests/test_plugins.py::test_discovers"})
 
     def test_subprocess_marks_the_test_incomplete(self) -> None:
-        """§4.5: a test that starts a subprocess always runs (incomplete = "run")."""
+        """a test that starts a subprocess always runs (incomplete = "run")."""
         self.project.write(
             "tests/test_proc.py",
             """
@@ -639,7 +639,7 @@ class TestAffected(unittest.TestCase):
         self.assertEqual(self.project.ran("--affected"), set())
 
     def test_file_triggers_tests(self) -> None:
-        """§6: a change under a file_triggers key runs the listed test globs."""
+        """a change under a file_triggers key runs the listed test globs."""
         self.project.write("migrations/0001.sql", "create table a;")
         self.configure(
             """
@@ -685,7 +685,7 @@ class TestAffected(unittest.TestCase):
         self.project.write("assets/logo.svg", "<svg/>")
         self.assertEqual(self.project.ran("--affected"), ALL)
 
-    # --- pre-import selection (§5.3) and rule 3 -----------------------------
+    # --- pre-import selection and cache-hit imports -----------------------------
 
     def test_unchanged_test_files_are_not_imported(self) -> None:
         marker = self.project.base.parent / f"{self.project.base.name}-imports.log"
@@ -718,7 +718,7 @@ class TestAffected(unittest.TestCase):
         self.assertEqual(self.project.ran("--affected"), {"tests/test_new.py::test_new"})
 
     def test_static_import_of_an_already_imported_module(self) -> None:
-        """§4.3 rule 3: a module another test file imported first is a cache hit."""
+        """a module another test file imported first is a cache hit."""
         self.project.write("app/consts.py", "SIZE = 3\n")
         self.project.write(
             "tests/test_a_first.py",
@@ -735,7 +735,7 @@ class TestAffected(unittest.TestCase):
             {"tests/test_a_first.py::test_first", "tests/test_b_second.py::test_second"},
         )
 
-    # --- -n and pytest-split (§10, PR 3a) -----------------------------------
+    # --- -n and pytest-split -----------------------------------
 
     def test_n_records_and_selects(self) -> None:
         """Workers select on their own and their recordings merge in the controller."""
@@ -802,7 +802,7 @@ class TestAffected(unittest.TestCase):
             set(),
         )
 
-    # --- git fast path (§5.2, PR 3b) ----------------------------------------
+    # --- git fast path ------------------------------------------------------
 
     def git(self, *args: str) -> None:
         subprocess.run(
@@ -878,7 +878,7 @@ class TestAffected(unittest.TestCase):
         self.git("checkout", "--", "app/core.py")
         self.assertEqual(self.project.ran("--affected=select"), {"tests/test_mul.py::test_mul"})
 
-    # --- sharded CI and --affected-merge (PR 3c) -----------------------------
+    # --- sharded CI and --affected-merge -----------------------------
 
     def shard(self, group: int, data: str) -> set[str]:
         return self.project.ran(
@@ -946,7 +946,7 @@ class TestAffected(unittest.TestCase):
         self.assertIn("junk.data", junk.stderr)
         self.assertFalse((self.project.base / "out.data").exists())
 
-    # --- modes (§7) --------------------------------------------------------
+    # --- modes --------------------------------------------------------------
 
     def test_select_mode_does_not_record(self) -> None:
         self.record()

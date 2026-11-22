@@ -1,18 +1,18 @@
-//! The record-time collector (docs/AFFECTED_TESTS.md §4.2): a global
+//! The record-time collector (docs/affected.md): a global
 //! sys.monitoring `PY_START` callback that notes which project code objects
 //! run under the current context. Each code object is classified once
 //! (project file or not) and pinned so its id is never reused; the callback
 //! returns DISABLE, and every context switch calls `restart_events()` so
 //! each function fires once more under the new context.
 //!
-//! In record runs an audit hook (§4.5) adds the non-Python inputs of the
+//! In record runs an audit hook adds the non-Python inputs of the
 //! current context: files opened for reading and directories listed under
 //! the rootdir (hashed at first sight), and whether a subprocess was
 //! started (its dependencies are unknown).
 //!
-//! The alternative the design left open (§3: keep `PY_START` armed and
-//! dedupe in Rust) was measured on public suites and lost: it costs one
-//! callback per call, which call-heavy suites pay heavily for.
+//! Keeping `PY_START` armed and deduplicating in Rust instead was measured
+//! on public suites and lost: it costs one callback per call, which
+//! call-heavy suites pay heavily for.
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};

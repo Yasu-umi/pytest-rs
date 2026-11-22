@@ -1,45 +1,106 @@
 # `--affected`: run only the tests affected by your changes
 
-Experimental. The design and its reasoning are in [AFFECTED_TESTS.md](AFFECTED_TESTS.md).
+Experimental.
 
-`--affected` records which code each test ran. On later runs it uses that record to run only the tests whose code, or the inputs they read, changed since then. Without an `--affected*` option pytest-rs behaves exactly as usual.
+`--affected` records which code each test ran. On later runs it uses that record to run only the tests whose code, or the inputs they read, changed since then. Without an `--affected*` option pytest-rs behaves exactly as usual: nothing is recorded, nothing is monitored, nothing is written.
 
-```sh
-pytest-rs --affected          # select, run, and record what ran (the usual local loop)
-pytest-rs --affected=record   # run as usual and record everything that ran
-pytest-rs --affected=select   # select from the record, write nothing
-```
+## Options
 
-The record lives in `.pytest-rs-affected` in the rootdir. `--affected-data=PATH` puts it elsewhere. Without a usable record (none yet, a different Python, a change in the installed packages or pytest-rs version), everything runs, and the header line says why.
+| Invocation | Selects | Records |
+|---|---|---|
+| `pytest-rs --affected` | yes (everything when there is no record yet) | the tests that ran |
+| `pytest-rs --affected=record` | no: runs whatever the other arguments select | the tests that ran |
+| `pytest-rs --affected=select` | yes | nothing |
+| `pytest-rs --affected-merge A B ... --affected-data OUT` | merges recorded data files into `OUT` and runs no tests | — |
 
-`--affected` works with `-n`: every worker selects on its own and records the tests it ran, and the controller writes one data file. With pytest-split (`--splits`/`--group`), the tests are selected first and the groups divide the selected tests.
+- The usual local loop is `--affected`. In CI, record on the main branch and select on pull requests (see [In CI](#in-ci)).
+- The mode only binds as `--affected=MODE`, so `pytest-rs --affected tests/` still treats `tests/` as a path.
+- The record lives in `.pytest-rs-affected` in the rootdir. `--affected-data=PATH` puts it elsewhere.
+- When everything is deselected, the run exits 0 rather than 5.
 
-In a git checkout, `--affected` records which commit each file's state came from, when the file was tracked and unmodified. Later it skips reading the files git reports unchanged since that commit. Git only saves reading: untracked and ignored files, files that had uncommitted changes, and everything outside a repository are compared by content.
+A record is usable only when it was written by the same pytest-rs version, Python (version, implementation, platform) and set of installed packages (name and version of every distribution). Otherwise, or when there is none yet, everything runs, and the header line says why, for example `affected: select, .pytest-rs-affected (installed packages changed)`. A recording run then starts a fresh record.
+
+## What is recorded
+
+### Code units
+
+Every Python file under the rootdir splits into units, and a test depends on units, not on whole files:
+
+- **function**: one per `def`/`async def`, keyed by its qualified name. It covers the decorators, the signature and the body. A nested `def` or `class` is a unit of its own, and only its name counts in the enclosing function.
+- **class**: the class header and its body statements. Methods and nested classes are units of their own, but their names count in the class, so adding, removing or renaming a method changes the class.
+- **module**: the top-level statements other than `def` and `class`.
+
+A unit's checksum ignores formatting and comments. Docstrings count. Units are keyed by name, not position, so inserting or reordering definitions changes nothing, and adding a function to a module changes no existing unit. Two definitions of the same name (`if X: def f(): ... else: def f(): ...`) form one unit.
+
+Calling a function also makes its enclosing functions and classes, and its module, dependencies of the test. Code whose qualified name matches no unit of its file (generated at run time, for example) makes the whole file a dependency.
+
+### When code runs
+
+Each piece of code is recorded under the context in which it runs:
+
+| Context | Covers | Is a dependency of |
+|---|---|---|
+| the test | its setup (function-scoped fixtures included), call and teardown | that test |
+| a setup that outlives one test | a fixture with a scope above function, or an xunit `setup_module`/`setup_class`, while it is set up and while it is torn down | every test that uses it |
+| a test module's import | importing and collecting one test file, including the project modules it imports for the first time | every test in that file |
+| global | everything else: plugin and conftest imports, hooks, configuration, session start and end | every test |
+
+Code imported once and then cached is covered as follows:
+
+- A module that a test file imports but that was already imported earlier (a cache hit) is still a dependency of that file's tests: the file's own top-level `import` and `from ... import` statements are read, including those under `if TYPE_CHECKING:`.
+- A module first imported inside a test belongs to that test. A later test that calls anything in it depends on it through the function it calls.
+
+Code that runs on another thread is attributed to the test that is running at the time. Over-attributing like this is safe: it only makes more tests run.
+
+### Files, directories and subprocesses
+
+While recording, an audit hook also notes:
+
+- **files opened for reading** under the rootdir, by their content;
+- **directories listed** with `os.listdir`/`os.scandir` (also through `os.walk`, `glob`, `pathlib`, `pkgutil.iter_modules`), by their entry names;
+- **subprocesses started** (`subprocess`, `os.system`, `os.exec*`, `os.posix_spawn`, `os.fork`): their own dependencies cannot be seen, so the test's dependencies are marked incomplete.
+
+Reads and listings by Python's import system and by pytest-rs itself are not recorded, nor are `.py`, `.pyc` and extension files, `__pycache__`, the data file and the cache directory.
+
+### Per test
+
+For each test the record keeps its dependencies (each with the checksum or hash it had when recorded), whether it failed, its duration, whether its dependencies are incomplete, and when it was recorded. Since every test carries its own checksums, entries recorded at different times and on different commits stay valid side by side.
 
 ## What runs
 
 A test runs when any of these is true:
 
-- code it ran has changed: a function it called, the class or module around it, or code run while its file or its fixtures were set up;
-- a file it read or a directory it listed under the rootdir has changed;
-- it is new, it failed last time, or it was named on the command line (`file.py::test_name`);
-- it started a subprocess, whose own dependencies are not recorded (see `incomplete` below).
+- a unit it depends on changed, disappeared, or its file no longer parses or no longer exists;
+- a file it read or a directory it listed changed (a file that disappeared counts as changed);
+- it is new (not in the record);
+- it failed last time (it keeps running until it passes);
+- its dependencies are incomplete (it, or a context it depends on, started a subprocess), unless `incomplete = "trust"`;
+- it was named on the command line (`file.py::test_name`), it matches `always_run`, or a changed file matched a `file_triggers` entry that lists it;
+- something changed that means a full run (below).
 
-A subprocess started outside any test makes every test incomplete, so everything runs. This happens when a conftest or plugin starts one at import or at session start. The header line says so; `incomplete = "trust"` relies on the recorded dependencies instead.
+A subprocess started outside any test makes every test incomplete, so everything runs. This happens when a conftest or plugin starts one at import or at session start. The header line says so, and `incomplete = "trust"` relies on the recorded dependencies instead.
 
-A test file whose tests would all be skipped, and whose own import is unaffected, is not imported at all.
+A test file is not even imported when every test it collected last time would be deselected, and neither the code its import ran nor the file itself changed. A file whose content changed in any way, for example a new test added to it, is imported.
 
-Edits that only touch formatting or comments, and newly added functions that no test called, run nothing. `-k`, `-m` and `--lf` still filter on top of the selection.
+`-k`, `-m`, `--lf` and `--deselect` still filter on top of the selection.
+
+### Changed files that are not Python code
+
+Every selecting run compares the files under the rootdir that are not Python code against the last record. It skips dot-directories, the `norecursedirs` directories, virtual environments, `__pycache__`, `ignore` and a built-in ignore list: `.coverage*`, `.test_durations`, `.DS_Store` and bytecode. For a changed, added or removed file:
+
+1. If it is in the built-in full-run list or in `full_run_on`, everything runs. The built-in list covers files that change tests without being read through Python: `pytest.ini`, `pyproject.toml`, `tox.ini`, `setup.cfg`, `setup.py`, lock and requirements files (`uv.lock`, `poetry.lock`, `Pipfile.lock`, `requirements*.txt`, `constraints*.txt`), native code and its sources (`*.so`, `*.pyd`, `*.dylib`, `*.pyx`, `*.pxd`, `*.c`, `*.cc`, `*.cpp`, `*.h`, `*.rs`) and `*.pth`.
+2. Every `file_triggers` entry whose key matches applies: `"all"` runs everything, a list of globs runs the tests in the matching test files, and `"recorded"` adds nothing.
+3. Otherwise `unknown_files` decides: `"ignore"` (the default) leaves it to the recorded dependencies, which already select the tests that read the file or listed its directory, and `"all"` runs everything.
+
+After a full run caused by such a change, tests that did not run (because of `-k`, for example) lose their entries and run as new next time. The same happens to tests that a `file_triggers` entry selected but that did not run.
 
 ## Configuration
 
-Configuration goes in `pyproject.toml`, under its own table:
+Configuration goes in `pyproject.toml`, under its own table, which real pytest ignores:
 
 ```toml
 [tool.pytest-rs.affected]
-# Any change under these runs everything (adds to a built-in list: pytest.ini,
-# pyproject.toml, tox.ini, setup.cfg, lock and requirements files, setup.py,
-# native code and its sources, *.pth).
+# Any change under these runs everything (adds to the built-in list above).
 full_run_on = ["docker/**", ".python-version"]
 
 # A changed file no test read and no rule matches: "ignore" (default) or "all".
@@ -63,6 +124,14 @@ incomplete = "run"
 "migrations/**" = ["tests/db/**"]
 "data/**" = "recorded"
 ```
+
+Globs are matched against rootdir-relative paths. `*` stays within one directory and `**` spans directories. An unknown key is a usage error.
+
+## With `-n`, pytest-split and git
+
+- **`-n`**: every worker selects on its own and records the tests it ran, and the controller writes one data file. The controller shows how many test files were not imported, not the per-test breakdown.
+- **pytest-split** (`--splits`/`--group`, `--splitting-granularity`): the tests are selected first, and the groups divide the selected tests. Every shard computes the same selection from the same data.
+- **git**: in a git checkout, each recorded file state also notes the commit it was the content of, when the file was tracked and unmodified. A later run skips reading the files git reports unchanged since that commit. Git only saves reading: untracked and ignored files, files that had uncommitted changes, states from commits that are not available, and everything outside a repository are compared by content.
 
 ## Keep application imports out of the conftest's top level
 
@@ -132,8 +201,6 @@ jobs:
           key: affected-${{ runner.os }}-py3.13-${{ github.sha }}
 ```
 
-`--affected` also works with `-n`: the workers' recordings end up in one data file.
-
 ### Sharded runs
 
 When the suite is split over several jobs with `--splits`/`--group`, each shard records its own group into a separate file, and a final job merges them. Merging keeps the newer entry of each test, so shards that started from the same restored data merge correctly in any order. `--affected-merge` takes the files as arguments, writes `--affected-data`, and runs no tests.
@@ -174,12 +241,18 @@ With `--affected=select` on pull requests, the tests are selected first and the 
 
 ## Known gaps
 
-`--affected` cannot see:
+`--affected` can miss a test in these cases. Use `always_changed`, `always_run`, `file_triggers` or `full_run_on` to cover them.
 
-- code that did not run in the recorded run;
-- targets replaced by mocks;
-- state outside the process (databases, environment variables, the clock);
-- files read only by C libraries;
-- changes inside installed packages, except as a full run when their versions change.
+- **Code that did not run in the recorded run.** A function a test did not call is not its dependency. A change to a function the test did call still reruns it.
+- **Reads without calls.** A test that only reads a constant or class attribute of a module first imported by an earlier test, without calling anything in that module.
+- **Mocks and autospec.** A test that patches `f` never runs `f`, so a change to `f` does not rerun it, even one that breaks `create_autospec`.
+- **State outside the process**: databases, environment variables, the clock, the network, files written by other tests, test order. Running a subset can expose a hidden dependency between tests as a failure, which is visible rather than missed.
+- **Code not compiled from a file under the rootdir**: `exec` of strings, generated code, C or Cython extensions built in-tree.
+- **Files read by non-Python code**, such as a C library parsing a config file. (Tests that start a subprocess always run, unless `incomplete = "trust"`.)
+- **Installed packages**: their contents are not tracked, but any change in the set of installed packages or their versions means a full run.
 
-The full list is in [AFFECTED_TESTS.md §8](AFFECTED_TESTS.md#8-known-gaps-documented-and-accepted). Use `always_changed`, `always_run` or `file_triggers` for what it cannot see.
+It can also run more than needed:
+
+- Application code imported by a conftest makes every test depend on the application's import-time code (see above).
+- Code on background threads counts toward whichever test runs at the time.
+- Recording with `--cov` re-arms coverage's line events at every test, which costs about as much as `--cov-context=test`.
