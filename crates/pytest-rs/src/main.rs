@@ -136,3 +136,23 @@ fn main() {
     // takes no action that can be unsound here.
     unsafe { libc::_exit(code) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::build_plugins;
+
+    /// `--affected` starts recording in its pytest_configure: a native
+    /// plugin configured after it must not start subprocesses there (that
+    /// would make every test's dependencies incomplete). Only pytest-split
+    /// follows it, and it must, so the split divides the selected tests.
+    #[test]
+    #[cfg(all(feature = "affected", feature = "split"))]
+    fn affected_is_registered_right_before_split_and_split_is_last() {
+        let names: Vec<String> = build_plugins()
+            .iter()
+            .map(|plugin| plugin.name().to_string())
+            .collect();
+        let n = names.len();
+        assert_eq!(&names[n - 2..], ["affected", "split"], "{names:?}");
+    }
+}
