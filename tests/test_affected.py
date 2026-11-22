@@ -822,8 +822,12 @@ class TestAffected(unittest.TestCase):
     def commit_all(self) -> None:
         # Files modified in the same second the index is written are
         # "racily clean": git re-reads them to compare. Age them first, so
-        # git trusts its stat cache like in a real checkout.
-        past = time.time() - 60
+        # git trusts its stat cache like in a real checkout. Each commit ages
+        # them to a later second than the previous one: git compares mtimes
+        # by the second, so a same-length edit aged to the same second as the
+        # last commit would look unchanged and never be added.
+        self._aged_to = max(getattr(self, "_aged_to", 0.0) + 2, time.time() - 600)
+        past = self._aged_to
         for path in self.project.base.rglob("*"):
             if path.is_file() and ".git" not in path.parts:
                 os.utime(path, (past, past))
