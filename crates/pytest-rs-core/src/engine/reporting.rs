@@ -261,6 +261,23 @@ impl Engine {
         n_collect_errors: usize,
         n_items: usize,
     ) -> i32 {
+        let code = if n_collect_errors > 0 {
+            exit_code::INTERRUPTED
+        } else if n_items == 0 {
+            exit_code::NO_TESTS_COLLECTED
+        } else {
+            exit_code::OK
+        };
+        // Upstream's wrap_session fires pytest_sessionfinish after a
+        // collect-only session too (serial and -n alike), before the
+        // terminal reporter's ERRORS section and closing line: the bundled
+        // plugins' impls (pytest-cov's report, pytest-split's
+        // --store-durations) and the Python ones alike.
+        let fire_sessionfinish = |engine: &mut Self| {
+            if let Err(err) = flush_hook_output(py, || engine.fire_sessionfinish(py, code)) {
+                eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+            }
+        };
         // The --collect-only tree prints natively even in delegated
         // mode: upstream reporter plugins inherit it from the base
         // class rather than reimplementing it.
@@ -293,16 +310,10 @@ impl Engine {
                 // The closing stats line is the replacement reporter's
                 // (upstream collect-only still runs its sessionfinish
                 // wrapper, e.g. pretty's "Results:" table).
-                let code = if n_items == 0 {
-                    exit_code::NO_TESTS_COLLECTED
-                } else {
-                    exit_code::OK
-                };
-                if let Err(err) = flush_hook_output(py, || self.fire_py_sessionfinish(py, code)) {
-                    eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
-                }
+                fire_sessionfinish(self);
                 python::reporter_finish(py, &self.config, code, None);
             } else {
+                fire_sessionfinish(self);
                 // Collection errors still surface their traceback (the
                 // ERRORS section) above the collected-count summary.
                 if n_collect_errors > 0 {
@@ -319,13 +330,9 @@ impl Engine {
                 }
                 self.print_collect_only_summary(started.elapsed(), n_collect_errors);
             }
-        }
-        if n_collect_errors > 0 {
-            exit_code::INTERRUPTED
-        } else if n_items == 0 {
-            exit_code::NO_TESTS_COLLECTED
         } else {
-            exit_code::OK
+            fire_sessionfinish(self);
         }
+        code
     }
 }
