@@ -12,6 +12,7 @@ import re
 import subprocess
 import tempfile
 import textwrap
+import time
 import unittest
 from pathlib import Path
 
@@ -789,6 +790,93 @@ class TestAffected(unittest.TestCase):
                 self.assertEqual(groups[0] | groups[1], selected)
                 self.assertEqual(groups[0] & groups[1], set())
                 self.assertTrue(groups[0] and groups[1], groups)
+
+    def test_split_starts_no_subprocess_after_recording_starts(self) -> None:
+        """pytest-split, configured after --affected starts recording, must not make tests incomplete."""
+        self.assertEqual(
+            self.project.ran("--affected", "--splits", "1", "--group", "1", "--store-durations"),
+            ALL,
+        )
+        self.assertEqual(
+            self.project.ran("--affected", "--splits", "1", "--group", "1", "--store-durations"),
+            set(),
+        )
+
+    # --- git fast path (§5.2, PR 3b) ----------------------------------------
+
+    def git(self, *args: str) -> None:
+        subprocess.run(
+            ["git", *args],
+            cwd=self.project.base,
+            check=True,
+            capture_output=True,
+            env={
+                **os.environ,
+                "GIT_AUTHOR_NAME": "t",
+                "GIT_AUTHOR_EMAIL": "t@example.invalid",
+                "GIT_COMMITTER_NAME": "t",
+                "GIT_COMMITTER_EMAIL": "t@example.invalid",
+            },
+        )
+
+    def commit_all(self) -> None:
+        # Files modified in the same second the index is written are
+        # "racily clean": git re-reads them to compare. Age them first, so
+        # git trusts its stat cache like in a real checkout.
+        past = time.time() - 60
+        for path in self.project.base.rglob("*"):
+            if path.is_file() and ".git" not in path.parts:
+                os.utime(path, (past, past))
+        self.git("add", "-A")
+        self.git("commit", "-qm", "c")
+
+    def setup_repo(self) -> None:
+        (self.project.base / ".gitignore").write_text(".pytest-rs-affected*\ndata/\n")
+        self.git("init", "-q")
+        # chmod (below) changes only the ctime: git must not re-read the
+        # file for it, or it reads it as changed itself.
+        self.git("config", "core.trustctime", "false")
+        self.commit_all()
+
+    def test_git_vouched_files_are_not_read(self) -> None:
+        """A tracked file unchanged since its recorded commit is not read at all."""
+        self.setup_repo()
+        self.record()
+        core = self.project.base / "app" / "core.py"
+        core.chmod(0)
+        try:
+            self.assertEqual(self.project.ran("--affected=select"), set())
+        finally:
+            core.chmod(0o644)
+
+    def test_git_does_not_hide_changes(self) -> None:
+        self.setup_repo()
+        self.record()
+        # Unstaged, then committed: the same change is seen either way.
+        self.project.edit("app/core.py", "return a * b", "return b * a")
+        self.assertEqual(self.project.ran("--affected=select"), {"tests/test_mul.py::test_mul"})
+        self.commit_all()
+        self.assertEqual(self.project.ran("--affected=select"), {"tests/test_mul.py::test_mul"})
+
+    def test_git_ignored_inputs_are_hashed(self) -> None:
+        self.setup_repo()
+        self.project.write("data/values.json", '{"a": 1}')
+        self.project.write(
+            "tests/test_data.py",
+            "def test_reads():\n    assert open('data/values.json').read()\n",
+        )
+        self.commit_all()
+        self.project.ran("--affected")
+        self.project.write("data/values.json", '{"a": 2}')
+        self.assertEqual(self.project.ran("--affected=select"), {"tests/test_data.py::test_reads"})
+
+    def test_git_dirty_files_are_hashed(self) -> None:
+        """A file recorded with uncommitted edits names no commit; reverting it is a change."""
+        self.setup_repo()
+        self.project.edit("app/core.py", "return a * b", "return b * a")
+        self.record()
+        self.git("checkout", "--", "app/core.py")
+        self.assertEqual(self.project.ran("--affected=select"), {"tests/test_mul.py::test_mul"})
 
     # --- modes (§7) --------------------------------------------------------
 
