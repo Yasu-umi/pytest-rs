@@ -227,6 +227,75 @@ impl Data {
         self.tests.get(&self.strings.get(nodeid)?)
     }
 
+    /// Merge `other` into `self`: its test entries and file records replace
+    /// ours for the same node id or path; file states it recorded replace
+    /// ours (they are newer). Each test keeps the groups it was recorded
+    /// with, so entries from different runs stay valid side by side. Used to
+    /// fold `-n` workers' recordings into the controller's data, and by
+    /// `--affected-merge`.
+    pub fn merge(&mut self, other: &Data) {
+        let string = |data: &mut Data, id: u32| data.strings.intern(other.strings.resolve(id));
+        let mut group_map: HashMap<u32, u32> = HashMap::new();
+        let mut group = |data: &mut Data, old: u32| -> u32 {
+            if let Some(&new) = group_map.get(&old) {
+                return new;
+            }
+            let deps: Vec<Dep> = other.groups[old as usize]
+                .iter()
+                .map(|dep| Dep {
+                    file: data.strings.intern(other.strings.resolve(dep.file)),
+                    qualname: data.strings.intern(other.strings.resolve(dep.qualname)),
+                    checksum: dep.checksum,
+                })
+                .collect();
+            let new = data.add_group(deps);
+            group_map.insert(old, new);
+            new
+        };
+        for (path, entry) in &other.files {
+            let path = string(self, *path);
+            let units = entry.units.as_ref().map(|units| {
+                units
+                    .iter()
+                    .map(|(q, c)| (self.strings.intern(other.strings.resolve(*q)), *c))
+                    .collect()
+            });
+            self.files.insert(
+                path,
+                FileEntry {
+                    content_hash: entry.content_hash,
+                    units,
+                },
+            );
+        }
+        for (nodeid, entry) in &other.tests {
+            let nodeid = string(self, *nodeid);
+            let path = string(self, entry.path);
+            let groups = entry.groups.iter().map(|g| group(self, *g)).collect();
+            self.tests.insert(
+                nodeid,
+                TestEntry {
+                    path,
+                    failed: entry.failed,
+                    duration: entry.duration,
+                    groups,
+                    incomplete: entry.incomplete,
+                },
+            );
+        }
+        for (path, record) in &other.file_records {
+            let path = string(self, *path);
+            let groups = record.groups.iter().map(|g| group(self, *g)).collect();
+            let nodeids = record.nodeids.iter().map(|n| string(self, *n)).collect();
+            self.file_records
+                .insert(path, FileRecord { groups, nodeids });
+        }
+        if !other.snapshot.is_empty() {
+            self.snapshot = other.snapshot.clone();
+        }
+        self.global_incomplete |= other.global_incomplete;
+    }
+
     /// Load a data file. None when it is missing, unreadable or malformed
     /// (the caller then runs everything).
     pub fn load(path: &Path) -> Result<Self, LoadError> {
@@ -674,6 +743,51 @@ mod tests {
         assert!(decoded.global_incomplete);
         // Re-encoding is deterministic.
         assert_eq!(decoded.encode(), data.encode());
+    }
+
+    #[test]
+    fn merge_replaces_entries_and_keeps_the_rest() {
+        let mut base = Data::new(header());
+        let file = base.strings.intern("pkg/mod.py");
+        let q = base.strings.intern("f");
+        let old_group = base.add_group(vec![Dep {
+            file,
+            qualname: q,
+            checksum: 1,
+        }]);
+        let test_file = base.strings.intern("tests/test_mod.py");
+        for nodeid in ["tests/test_mod.py::test_a", "tests/test_mod.py::test_c"] {
+            let id = base.strings.intern(nodeid);
+            base.tests.insert(
+                id,
+                TestEntry {
+                    path: test_file,
+                    failed: false,
+                    duration: 1.0,
+                    groups: vec![old_group],
+                    incomplete: false,
+                },
+            );
+        }
+        let other = sample();
+        base.merge(&other);
+        // test_a replaced (other's groups), test_b added, test_c kept.
+        assert_eq!(base.tests.len(), 3);
+        let a = base.test("tests/test_mod.py::test_a").expect("test_a");
+        assert_eq!(a.groups.len(), 2);
+        let c = base.test("tests/test_mod.py::test_c").expect("test_c");
+        assert_eq!(base.group(c.groups[0])[0].checksum, 1);
+        assert!(
+            base.test("tests/test_mod.py::test_b")
+                .expect("test_b")
+                .incomplete
+        );
+        assert!(base.global_incomplete);
+        assert_eq!(base.snapshot, other.snapshot);
+        // The merged data round-trips.
+        let decoded = Data::decode(&base.encode()).expect("decodes");
+        assert_eq!(decoded.tests.len(), 3);
+        assert_eq!(decoded.file_records.len(), 1);
     }
 
     #[test]

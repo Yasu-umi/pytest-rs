@@ -104,6 +104,11 @@ struct State {
     /// id they collected (before any deselection).
     file_modules: HashMap<String, String>,
     file_nodeids: HashMap<String, Vec<String>>,
+    /// `-n` worker: where this worker wrote its recording, for
+    /// `pytest_worker_dump`; and whether a full-run trigger changed.
+    partial_path: Option<PathBuf>,
+    /// `-n` controller: the workers' recordings, with their discard flag.
+    partials: Vec<(Data, bool)>,
 }
 
 pub struct AffectedPlugin {
@@ -370,6 +375,13 @@ impl AffectedPlugin {
             .collect()
     }
 
+    /// The controller of a `-n` run: it runs no tests itself.
+    fn is_dist_controller(ctx: &HookContext) -> bool {
+        !ctx.config.is_worker()
+            && !ctx.config.collect_only
+            && ctx.session.dist_workers_resolved.flatten().is_some()
+    }
+
     /// Build the selection plan once (needs usable data).
     fn ensure_plan(state: &mut State, ctx: &HookContext) {
         if state.plan.is_some() {
@@ -560,13 +572,15 @@ impl AffectedPlugin {
 
     /// Turn the session's recording into data entries, merged into the
     /// stored data (or a fresh file), and write it.
-    fn record(state: &mut State, ctx: &mut HookContext, recording: Recording) -> PyResult<usize> {
-        let header = state.header.clone().expect("header computed at configure");
-        let mut data = match state.stored.take() {
-            Some(data) if !state.discard_stored => data,
-            _ => Data::new(header.clone()),
-        };
-        data.header = header;
+    /// Fold the session's recording into `data` (the stored data, or a fresh
+    /// one) and return it with the number of tests recorded.
+    fn record(
+        state: &mut State,
+        ctx: &mut HookContext,
+        recording: Recording,
+        mut data: Data,
+    ) -> (Data, usize) {
+        data.header = state.header.clone().expect("header computed at configure");
 
         // Files: units at first sight, and the deps each code object implies.
         let file_units: Vec<(Option<u32>, Option<FileUnits>, u64)> = recording
@@ -759,8 +773,20 @@ impl AffectedPlugin {
             let id = data.strings.intern(path);
             data.file_records.insert(id, FileRecord { groups, nodeids });
         }
-        // Tests a file_triggers entry forced but this run left out (-k):
-        // without their entry they run as new next time.
+        data.global_incomplete = recording.incomplete.contains(&GLOBAL_CONTEXT);
+        data.snapshot = match state.snapshot.take() {
+            Some(snapshot) => snapshot,
+            None => Self::snapshot(state),
+        };
+        let ran: HashSet<String> = state.to_run.iter().cloned().collect();
+        Self::drop_stale(state, &mut data, &ran);
+        (data, recorded)
+    }
+
+    /// Before writing: drop the entries tests a file_triggers entry forced
+    /// but this run left out (-k), so they run as new next time, and the
+    /// entries whose test file is gone.
+    fn drop_stale(state: &State, data: &mut Data, ran: &HashSet<String>) {
         if let Some(plan) = &state.plan {
             let left_out: Vec<u32> = data
                 .tests
@@ -768,7 +794,7 @@ impl AffectedPlugin {
                 .filter(|(id, entry)| {
                     let path = data.strings.resolve(entry.path);
                     plan.triggered.iter().any(|g| g.matches(path))
-                        && !state.to_run.contains(data.strings.resolve(**id))
+                        && !ran.contains(data.strings.resolve(**id))
                 })
                 .map(|(id, _)| *id)
                 .collect();
@@ -776,8 +802,7 @@ impl AffectedPlugin {
                 data.tests.remove(&id);
             }
         }
-        // Entries whose test file is gone.
-        let rootdir = state.rootdir.clone();
+        let rootdir = &state.rootdir;
         let gone: Vec<u32> = data
             .tests
             .iter()
@@ -787,19 +812,53 @@ impl AffectedPlugin {
         for id in gone {
             data.tests.remove(&id);
         }
+        let strings = &data.strings;
         data.file_records
-            .retain(|path, _| rootdir.join(data.strings.resolve(*path)).exists());
-        data.global_incomplete = recording.incomplete.contains(&GLOBAL_CONTEXT);
-        data.snapshot = match state.snapshot.take() {
-            Some(snapshot) => snapshot,
-            None => Self::snapshot(state),
-        };
-        data.save(&state.data_path).map_err(|e| {
-            pyo3::exceptions::PyOSError::new_err(format!(
-                "cannot write {}: {e}",
-                state.data_path.display()
-            ))
-        })?;
+            .retain(|path, _| rootdir.join(strings.resolve(*path)).exists());
+    }
+
+    fn save(data: &Data, path: &Path) -> PyResult<()> {
+        data.save(path).map_err(|e| {
+            pyo3::exceptions::PyOSError::new_err(format!("cannot write {}: {e}", path.display()))
+        })
+    }
+
+    /// The stored data to record into, or a fresh one when a full-run
+    /// trigger changed (or there is none).
+    fn base_data(state: &mut State) -> Data {
+        let header = state.header.clone().expect("header computed at configure");
+        match state.stored.take() {
+            Some(data) if !state.discard_stored => data,
+            _ => Data::new(header),
+        }
+    }
+
+    /// The controller of a `-n` run: fold every worker's recording into
+    /// the stored data and write it.
+    fn merge_workers(state: &mut State, ctx: &mut HookContext) -> PyResult<usize> {
+        let partials = std::mem::take(&mut state.partials);
+        if state.plan.is_none() {
+            Self::ensure_plan(state, ctx);
+        }
+        if partials.iter().any(|(_, discard)| *discard) {
+            state.discard_stored = true;
+        }
+        let mut data = Self::base_data(state);
+        data.header = state.header.clone().expect("header computed at configure");
+        let mut ran: HashSet<String> = HashSet::new();
+        let mut recorded = 0;
+        for (partial, _) in &partials {
+            ran.extend(
+                partial
+                    .tests
+                    .keys()
+                    .map(|id| partial.strings.resolve(*id).to_string()),
+            );
+            recorded += partial.tests.len();
+            data.merge(partial);
+        }
+        Self::drop_stale(state, &mut data, &ran);
+        Self::save(&data, &state.data_path)?;
         Ok(recorded)
     }
 }
@@ -833,18 +892,8 @@ impl Plugin for AffectedPlugin {
             .map_err(|msg| pytest_rs_core::python::usage_error(py, &msg))?;
         let mut state = self.lock();
         state.mode = Some(mode);
-        if mode == Mode::Off || ctx.config.is_worker() {
+        if mode == Mode::Off {
             return Ok(());
-        }
-        if ctx
-            .config
-            .numprocesses_spec()
-            .is_some_and(|spec| spec.trim() != "0")
-        {
-            return Err(pytest_rs_core::python::usage_error(
-                py,
-                "--affected with -n is not supported yet",
-            ));
         }
         state.rootdir = ctx.config.rootdir.clone();
         state.data_path = match ctx.config.get_value("affected-data") {
@@ -941,6 +990,17 @@ impl Plugin for AffectedPlugin {
             return Ok(());
         }
         Self::ensure_plan(&mut state, ctx);
+        // A -n controller never sees the workers' selection: with usable
+        // data, an empty run is the selection's doing.
+        if !ctx.config.is_worker()
+            && state.stored.is_some()
+            && ctx
+                .config
+                .numprocesses_spec()
+                .is_some_and(|spec| spec.trim() != "0")
+        {
+            ctx.session.no_tests_ok = true;
+        }
         let state = &mut *state;
         let (Some(data), Some(plan)) = (state.stored.as_ref(), state.plan.as_mut()) else {
             return Ok(());
@@ -1076,6 +1136,34 @@ impl Plugin for AffectedPlugin {
         Ok(())
     }
 
+    fn pytest_worker_dump(&mut self, _ctx: &mut HookContext) -> PyResult<Option<String>> {
+        let state = self.lock();
+        Ok(state.partial_path.as_ref().map(|path| {
+            format!(
+                "{}\n{}",
+                u8::from(state.discard_stored),
+                path.to_string_lossy()
+            )
+        }))
+    }
+
+    fn pytest_worker_load(&mut self, _ctx: &mut HookContext, payload: &str) -> PyResult<()> {
+        let Some((discard, path)) = payload.split_once('\n') else {
+            return Ok(());
+        };
+        let path = PathBuf::from(path);
+        let data = Data::load(&path);
+        let _ = std::fs::remove_file(&path);
+        let data = data.map_err(|_| {
+            pyo3::exceptions::PyOSError::new_err(format!(
+                "cannot read a worker's --affected recording {}",
+                path.display()
+            ))
+        })?;
+        self.lock().partials.push((data, discard == "1"));
+        Ok(())
+    }
+
     fn pytest_sessionfinish(&mut self, ctx: &mut HookContext, _exit_code: i32) -> PyResult<()> {
         let mut state = self.lock();
         let Some(collector) = state.collector.take() else {
@@ -1086,7 +1174,31 @@ impl Plugin for AffectedPlugin {
         monitoring.call_method1("set_events", (state.tool_id, 0))?;
         monitoring.call_method1("free_tool_id", (state.tool_id,))?;
         let recording = collector.borrow(py).take();
-        let recorded = Self::record(&mut state, ctx, recording)?;
+        let recorded = if ctx.config.is_worker() {
+            // A -n worker records only its own tests, for the controller to
+            // merge (pytest_worker_dump).
+            let fresh = Data::new(state.header.clone().expect("header computed at configure"));
+            let (data, recorded) = Self::record(&mut state, ctx, recording, fresh);
+            let path = state.data_path.with_file_name(format!(
+                "{}.worker-{}",
+                state
+                    .data_path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default(),
+                std::process::id()
+            ));
+            Self::save(&data, &path)?;
+            state.partial_path = Some(path);
+            recorded
+        } else if Self::is_dist_controller(ctx) {
+            Self::merge_workers(&mut state, ctx)?
+        } else {
+            let base = Self::base_data(&mut state);
+            let (data, recorded) = Self::record(&mut state, ctx, recording, base);
+            Self::save(&data, &state.data_path)?;
+            recorded
+        };
         if !ctx.config.no_terminal() {
             let path = Self::rel(&state.rootdir, &state.data_path)
                 .unwrap_or_else(|| state.data_path.display().to_string());
