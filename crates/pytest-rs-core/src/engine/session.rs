@@ -305,8 +305,19 @@ impl Engine {
         // parametrization), so saturate against growth.
         self.session.deselected = collected.saturating_sub(n_items);
         // Collection settled: pytest_collection_finish python hooks see the
-        // final item set (sugar's progress total comes from here).
-        if let Err(err) = self.fire_py_collection_finish(py) {
+        // final item set (sugar's progress total comes from here). A -n
+        // controller collects nothing (upstream xdist's DSession returns True
+        // from pytest_collection), so the hook fires on each worker instead.
+        #[cfg(feature = "xdist")]
+        let dist_controller =
+            !self.config.collect_only && self.session.dist_workers_resolved.flatten().is_some();
+        #[cfg(not(feature = "xdist"))]
+        let dist_controller = false;
+        if dist_controller {
+            if let Err(err) = python::set_session_items(py, &self.session.items) {
+                eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+            }
+        } else if let Err(err) = self.fire_py_collection_finish(py) {
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
         }
         if let Err(err) = self.finish_py_collection_wrappers(py) {
