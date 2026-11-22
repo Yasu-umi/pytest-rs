@@ -60,6 +60,9 @@ enum Event {
     Output(String),
     /// A fatal distribution condition, shown as a banner before the summary.
     Banner(String),
+    /// A hook raised during a worker's collection: shown as INTERNALERROR
+    /// lines, and the session ends with exit status 3.
+    InternalError(String),
     /// A worker session was interrupted (KeyboardInterrupt / pytest.exit).
     Interrupted {
         code: i32,
@@ -882,6 +885,23 @@ impl Engine {
                 Event::Banner(message) => {
                     self.session.dist_banner.get_or_insert(message);
                 }
+                Event::InternalError(traceback) => {
+                    // Every worker hits the same hook error: show it once.
+                    if self.session.exit_code_override
+                        != Some(crate::report::exit_code::INTERNAL_ERROR)
+                    {
+                        if line_open {
+                            println!();
+                            line_open = false;
+                        }
+                        for line in traceback.lines() {
+                            println!("INTERNALERROR> {line}");
+                        }
+                        queue.stop();
+                        self.session.exit_code_override =
+                            Some(crate::report::exit_code::INTERNAL_ERROR);
+                    }
+                }
                 Event::Interrupted { code, banner } => {
                     if !maxfail_hit {
                         maxfail_hit = true;
@@ -1610,6 +1630,21 @@ impl WorkerOwner {
                     skips,
                     deselected,
                 }) => break Some((nodeids, xdist_groups, errors, skips, deselected)),
+                Some(WorkerMsg::InternalError { traceback }) => {
+                    // Reported, not a crash: no replacement worker. The empty
+                    // collection unblocks the merge loop.
+                    let _ = self.sender.send(Event::InternalError(traceback));
+                    let _ = self.sender.send(Event::Collection {
+                        worker: self.index,
+                        nodeids: vec![],
+                        xdist_groups: vec![],
+                        errors: vec![],
+                        skips: vec![],
+                        deselected: 0,
+                    });
+                    let _ = proc.handle.wait();
+                    return;
+                }
                 Some(WorkerMsg::Bye) => {
                     // Bye before Collection: treat as empty collection + graceful shutdown.
                     let _ = self.sender.send(Event::Collection {
@@ -1742,8 +1777,9 @@ impl WorkerOwner {
                         graceful_shutdown = true;
                         break 'work;
                     }
-                    Some(WorkerMsg::Collection { .. }) | None => {
-                        // Collection shouldn't arrive during work loop; treat as output.
+                    Some(WorkerMsg::Collection { .. } | WorkerMsg::InternalError { .. }) | None => {
+                        // Collection-phase frames shouldn't arrive during the
+                        // work loop; treat as output.
                         let _ = self.sender.send(Event::Output(line));
                     }
                 }
