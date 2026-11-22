@@ -43,11 +43,12 @@ Each piece of code is recorded under the context in which it runs:
 | the test | its setup (function-scoped fixtures included), call and teardown | that test |
 | a setup that outlives one test | a fixture with a scope above function, or an xunit `setup_module`/`setup_class`, while it is set up and while it is torn down | every test that uses it |
 | a test module's import | importing and collecting one test file, including the project modules it imports for the first time | every test in that file |
-| global | everything else: plugin and conftest imports, hooks, configuration, session start and end | every test |
+| a conftest's import, below the rootdir | importing `dir/conftest.py`, including the project modules it imports for the first time | every test under `dir/` |
+| global | everything else: plugins and the rootdir's conftest, hooks, configuration, session start and end | every test |
 
-Code imported once and then cached is covered as follows:
+Each project module's own execution (its module-level code, class bodies, and whatever they call) is also recorded on its own. A module runs once, inside whichever context imports it first, and its code counts toward that context as above. Its own record serves every other test file that reaches it through imports:
 
-- A module that a test file imports but that was already imported earlier (a cache hit) is still a dependency of that file's tests: the file's own top-level `import` and `from ... import` statements are read, including those under `if TYPE_CHECKING:`.
+- A test file depends on the import-time code of every project module it imports, whether the import runs the module or finds it already imported (a cache hit). It also depends, transitively, on the modules those modules import. The imports are taken from the modules' top-level `import` and `from ... import` statements (including those under `if TYPE_CHECKING:`), and from the imports that actually ran while each module executed.
 - A module first imported inside a test belongs to that test. A later test that calls anything in it depends on it through the function it calls.
 
 Code that runs on another thread is attributed to the test that is running at the time. Over-attributing like this is safe: it only makes more tests run.
@@ -250,6 +251,13 @@ With `--affected=select` on pull requests, the tests are selected first and the 
 - **Code not compiled from a file under the rootdir**: `exec` of strings, generated code, C or Cython extensions built in-tree.
 - **Files read by non-Python code**, such as a C library parsing a config file. (Tests that start a subprocess always run, unless `incomplete = "trust"`.)
 - **Installed packages**: their contents are not tracked, but any change in the set of installed packages or their versions means a full run.
+- **Import-time side effects of a conftest below the rootdir** on tests outside its directory. For example, `tests/api/conftest.py` appends to a registry, or sets an environment variable, that `tests/test_other.py` reads. An edit to that conftest's import-time code only reruns the tests under `tests/api/`. A conftest at the rootdir is global and not affected.
+- **Modules the import hook does not see run.** Module executions are seen through a finder placed first on `sys.meta_path`, and the gaps below come from that. In each case, the module's code still counts toward whatever context runs it, as it always did. What is lost is only its own record, so a test file that reaches the module through a cache hit, or through another module, can miss a change to its import-time code:
+  - modules found by a finder that another plugin or conftest inserted ahead of it later;
+  - modules whose loader class cannot be subclassed (a loader implemented in C, or one without an instance `__dict__`);
+  - a module imported from the cache inside a function body, not at the top level of the importing module.
+
+  A module executed with `importlib.util.spec_from_file_location` plus `exec_module`, `runpy` or `exec` is not tracked as a module of its own. Its code counts toward the context that runs it, which is the test, or the module whose import ran it.
 
 It can also run more than needed:
 
