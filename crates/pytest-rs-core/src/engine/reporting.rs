@@ -270,9 +270,11 @@ impl Engine {
         };
         // Upstream's wrap_session fires pytest_sessionfinish after a
         // collect-only session too (serial and -n alike), before the
-        // terminal reporter's ERRORS section and closing line.
+        // terminal reporter's ERRORS section and closing line: the bundled
+        // plugins' impls (pytest-cov's report, pytest-split's
+        // --store-durations) and the Python ones alike.
         let fire_sessionfinish = |engine: &mut Self| {
-            if let Err(err) = flush_hook_output(py, || engine.fire_py_sessionfinish(py, code)) {
+            if let Err(err) = flush_hook_output(py, || engine.fire_sessionfinish(py, code)) {
                 eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
             }
         };
