@@ -193,7 +193,9 @@ def start():
     def py_start(code, _offset):
         key = id(code)
         if key not in tracked:
-            filename = code.co_filename
+            # `rootdir/.` on sys.path leaves `/./` in file names; coverage.py
+            # normalizes them.
+            filename = os.path.normpath(code.co_filename)
             if code.co_name != "__annotate__" and is_tracked(filename):
                 table = sorted(
                     (start_, end, line if line is not None else -1)

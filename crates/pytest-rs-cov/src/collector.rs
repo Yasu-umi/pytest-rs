@@ -148,6 +148,19 @@ impl LineCollector {
         Ok(())
     }
 
+    /// Lexically drop `.` components (`a/./b` -> `a/b`), as coverage.py's
+    /// `abs_file` does through `os.path.normpath`.
+    fn normalize(filename: &str) -> String {
+        if !filename.contains("/./") && !filename.contains("\\.\\") {
+            return filename.to_string();
+        }
+        std::path::Path::new(filename)
+            .components()
+            .collect::<std::path::PathBuf>()
+            .to_string_lossy()
+            .into_owned()
+    }
+
     fn tracked(&self, filename: &str) -> bool {
         if filename.starts_with('<')
             || filename.starts_with(&self.shim_root)
@@ -303,6 +316,10 @@ impl LineCollector {
             .contains_key(&key);
         if !already_tracked {
             let filename: String = code.getattr("co_filename")?.extract()?;
+            // `sys.path` entries like `rootdir/.` (pytest's `pythonpath =
+            // ["."]`) leave `/./` in file names; coverage.py normalizes them
+            // before matching sources.
+            let filename = Self::normalize(&filename);
             // Like coverage.py: synthesized annotation scopes are not
             // user code.
             let name: String = code.getattr("co_name")?.extract()?;
