@@ -47,8 +47,10 @@ fn glob_rules() -> &'static [GlobRule] {
             // word characters pass through verbatim.
             make(r"[a-zA-Z0-9_-]+", Some(r"\g<0>")),
             make(r"[\[\]]", None),
-            // Anything else is escaped.
-            make(r".", Some(r"\\\g<0>")),
+            // Anything else is escaped (one backslash: `apply_sub` emits
+            // the substitution verbatim, it does not process escapes like
+            // Python's `re.Match.expand`).
+            make(r".", Some(r"\\g<0>")),
         ]
     })
 }
@@ -270,5 +272,15 @@ mod tests {
             .map(&absolute.to_string_lossy())
             .expect("alias maps");
         assert_eq!(mapped, base.join("src").join("mod.py").to_string_lossy());
+    }
+
+    #[test]
+    fn alias_with_a_dot_matches() {
+        let aliases = PathAliases::from_groups(
+            &[vec!["/proj/src".to_string(), "*/site.d/src".to_string()]],
+            Path::new("/proj"),
+        );
+        assert!(aliases.matches("/build/site.d/src/mod.py"));
+        assert!(!aliases.matches("/build/siteXd/src/mod.py"));
     }
 }
