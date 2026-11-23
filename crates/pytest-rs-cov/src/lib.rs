@@ -1217,6 +1217,22 @@ impl CovPlugin {
                     }
                 }
             }
+            // The first line of an if / elif / while / for body is entered
+            // only through its header's true edge, so when it ran, that edge
+            // was taken — whatever the recorded arc looked like (a compound
+            // `and` condition can jump into the body, and jumps are never
+            // resolved to the body above).
+            if self.branch {
+                for (line, dests) in &branches {
+                    if let Some(&body) = dests.first()
+                        && body > 0
+                        && body != i64::from(*line)
+                        && covered.contains(&(body as u32))
+                    {
+                        taken.entry(*line).or_default().insert(body);
+                    }
+                }
+            }
             // [report] partial_branches: a matching branch line's missing
             // destinations do not count (coverage.py's `no_branch`).
             if self.branch && !self.partial_patterns.is_empty() {

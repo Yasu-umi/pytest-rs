@@ -227,6 +227,39 @@ class TestCovConfigKeys(unittest.TestCase):
         assert row is not None
         self.assertEqual((int(row.group(3)), int(row.group(4))), (4, 1))
 
+    def test_compound_condition_in_a_loop_is_not_partial(self) -> None:
+        """A loop's compound `and` test can jump into the body; when the body
+        ran, the branch into it was taken (#106)."""
+        self.write(
+            "app/core.py",
+            """
+            def pick(edges):
+                seen = set()
+                for edge in edges:
+                    u, v = edge
+                    if u not in seen and v not in seen and u != v:
+                        seen.update(edge)
+                return seen
+            """,
+        )
+        self.write(
+            "tests/test_app.py",
+            """
+            from app.core import pick
+
+
+            def test_pick():
+                assert pick([(1, 2), (2, 3), (3, 3), (4, 5)]) == {1, 2, 4, 5}
+            """,
+        )
+        self.pyproject("[tool.coverage.run]\nbranch = true\n")
+        # Name, Stmts, Miss, Branch, BrPart: every branch taken both ways.
+        row = re.search(
+            r"^app/core\.py\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)", self.output(cov="--cov=app"), re.M
+        )
+        assert row is not None
+        self.assertEqual((int(row.group(2)), int(row.group(4))), (0, 0))
+
     def test_missing_source_fails_the_report_unless_ignore_errors(self) -> None:
         self.write("app/gone.py", "def gone():\n    return 3\n")
         self.write(
