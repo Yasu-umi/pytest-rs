@@ -298,4 +298,4 @@ It can also run more than needed:
 
 - Application code imported by a conftest makes every test depend on the application's import-time code (see above).
 - Code on background threads counts toward whichever test runs at the time.
-- Recording with `--cov` re-arms coverage's line events at every test, which costs about as much as `--cov-context=test`.
+- Recording alongside `--cov` re-arms coverage's events at every test. On networkx (6890 tests), adding `--affected=record` to a `--cov` run added 6.4% to its time, and the interaction between the two collectors was about 3% of the `--cov` run. The rest is what recording costs on its own. That is far below `--cov-context=test`, which took six times as long as `--cov` there.
