@@ -1078,14 +1078,14 @@ impl CovPlugin {
     /// `--cov-context=test`: mirrors pytest-cov's `TestContextPlugin.
     /// switch_context` (`f'{item.nodeid}|{when}'`), a no-op unless
     /// `--cov-context=test` is active.
-    fn switch_context(&self, py: Python<'_>, item: &TestItem, when: &str) {
+    fn switch_context(&self, py: Python<'_>, item: &TestItem, when: &str) -> PyResult<()> {
         if self.context_enabled
             && let Some(collector) = &self.collector
         {
-            collector
-                .borrow(py)
-                .set_context(&format!("{}|{when}", item.nodeid));
+            let context = format!("{}|{when}", item.nodeid);
+            collector.borrow(py).set_context(py, &context)?;
         }
+        Ok(())
     }
 }
 
@@ -1556,7 +1556,7 @@ impl Plugin for CovPlugin {
         if !self.enabled {
             return Ok(());
         }
-        self.switch_context(ctx.py, item, "setup");
+        self.switch_context(ctx.py, item, "setup")?;
         if item.get_closest_marker("no_cover").is_none() {
             return Ok(());
         }
@@ -1577,7 +1577,7 @@ impl Plugin for CovPlugin {
 
     fn pytest_runtest_teardown(&self, ctx: &mut HookContext, item: &TestItem) -> PyResult<()> {
         if self.enabled {
-            self.switch_context(ctx.py, item, "teardown");
+            self.switch_context(ctx.py, item, "teardown")?;
         }
         let Some((events, saved_child)) = self
             .no_cover_pause
@@ -1611,7 +1611,7 @@ impl Plugin for CovPlugin {
         _kwargs: &[(String, Py<PyAny>)],
     ) -> HookResult<()> {
         if self.enabled {
-            self.switch_context(ctx.py, item, "run");
+            self.switch_context(ctx.py, item, "run")?;
         }
         Ok(None)
     }

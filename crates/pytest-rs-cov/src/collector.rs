@@ -122,13 +122,19 @@ impl LineCollector {
 
     /// Switches the "current" context: subsequent hits attribute to it
     /// until the next switch. A no-op when `--cov-context` isn't active.
-    pub fn set_context(&self, context: &str) {
+    ///
+    /// Lines return DISABLE after their first hit in a context, so the
+    /// switch re-arms them (`restart_events`): each line then fires once
+    /// per context that runs it, instead of on every execution.
+    pub fn set_context(&self, py: Python<'_>, context: &str) -> PyResult<()> {
         if self.track_contexts {
             *self
                 .current_context
                 .lock()
                 .expect("collector lock poisoned") = Arc::from(context);
+            self.monitoring.bind(py).call_method0("restart_events")?;
         }
+        Ok(())
     }
 
     fn tracked(&self, filename: &str) -> bool {
@@ -310,15 +316,13 @@ impl LineCollector {
     }
 
     /// Local LINE on tracked code: record the hit and DISABLE, so every
-    /// tracked line costs exactly one callback ever — except under
-    /// `--cov-context`, where a line must keep firing for every future
-    /// execution so a *later* invocation (e.g. the next parametrized case,
-    /// running under a different context) still gets recorded. This is the
-    /// same tradeoff coverage.py itself makes: its sys.monitoring core
-    /// doesn't support dynamic contexts at all (core.py: "it doesn't yet
-    /// support dynamic contexts"), falling back to its slower settrace
-    /// tracer specifically because DISABLE-after-first-hit is incompatible
-    /// with per-context attribution.
+    /// tracked line costs exactly one callback ever. Under `--cov-context`
+    /// a later execution in another context (the next parametrized case)
+    /// must still be recorded: `set_context` re-arms every disabled event
+    /// at each switch, so a line costs one callback per context that runs
+    /// it. (coverage.py's sys.monitoring core does not support dynamic
+    /// contexts and falls back to its settrace tracer, which sees every
+    /// execution.)
     fn line(&self, py: Python<'_>, code: Bound<'_, PyAny>, line: u32) -> PyResult<Py<PyAny>> {
         let key = code.as_ptr() as usize;
         let filename = self
@@ -348,7 +352,6 @@ impl LineCollector {
                     .or_default()
                     .insert(line);
                 drop(context);
-                return Ok(py.None());
             }
         }
         Ok(self.disable.clone_ref(py))
