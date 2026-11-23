@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 
 use pyo3::prelude::*;
 
-use crate::files::PathAliases;
+use crate::files::{GlobMatcher, PathAliases};
 
 /// filename -> executed (source line, destination line, direction) arcs.
 pub type ArcMap = HashMap<String, BTreeSet<(u32, i64, u8)>>;
@@ -41,6 +41,12 @@ pub struct LineCollector {
     /// is measured (e.g. a script rsync'd to a worker dir under `*/dir1`),
     /// then remapped to canonical at report time.
     aliases: PathAliases,
+    /// `[run] omit`: never measured.
+    omit: GlobMatcher,
+    /// `[run] include` (only without a source): measured if matched.
+    include: GlobMatcher,
+    /// File name -> what omit / include decided (None: neither applies).
+    filtered: Mutex<HashMap<String, Option<bool>>>,
     /// The embedded shim dir; never measured.
     shim_root: String,
     hits: Mutex<HashMap<String, BTreeSet<u32>>>,
@@ -78,6 +84,8 @@ impl LineCollector {
         rootdir: String,
         sources: Vec<String>,
         aliases: PathAliases,
+        omit: GlobMatcher,
+        include: GlobMatcher,
         shim_root: String,
         branch: bool,
         need_jump_targets: bool,
@@ -91,6 +99,9 @@ impl LineCollector {
             rootdir,
             sources,
             aliases,
+            omit,
+            include,
+            filtered: Mutex::new(HashMap::new()),
             shim_root,
             hits: Mutex::new(HashMap::new()),
             arcs: Mutex::new(HashMap::new()),
@@ -144,6 +155,23 @@ impl LineCollector {
             || filename.contains("/lib/python")
         {
             return false;
+        }
+        if !self.omit.is_empty() || !self.include.is_empty() {
+            let mut decided = self.filtered.lock().expect("collector lock poisoned");
+            let verdict = *decided.entry(filename.to_string()).or_insert_with(|| {
+                let path = std::path::Path::new(filename);
+                if self.omit.matches_path(path) {
+                    Some(false)
+                } else if !self.include.is_empty() {
+                    // [run] include (only without a source): it alone decides.
+                    Some(self.include.matches_path(path))
+                } else {
+                    None
+                }
+            });
+            if let Some(verdict) = verdict {
+                return verdict;
+            }
         }
         if self.sources.is_empty() {
             if filename.starts_with(&self.rootdir) {

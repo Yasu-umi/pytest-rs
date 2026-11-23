@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use collector::{ArcMap, LineCollector};
-use files::PathAliases;
+use files::{GlobMatcher, PathAliases};
 use pytest_rs_core::collect::TestItem;
 use pytest_rs_core::config::{OptDef, OptionParser};
 use pytest_rs_core::hooks::{HookContext, HookResult, Plugin};
@@ -89,6 +89,13 @@ pub struct CovPlugin {
     /// --cov-precision / [report] precision: Cover column decimals.
     precision: usize,
     exclude_patterns: Vec<regex::Regex>,
+    /// `[run] omit` / `[run] include`, as coverage.py's prepped patterns
+    /// (also handed to subprocesses).
+    run_omit: Vec<String>,
+    run_include: Vec<String>,
+    /// `[report] omit` / `[report] include`: files left out of the report.
+    report_omit: GlobMatcher,
+    report_include: GlobMatcher,
     collector: Option<Py<LineCollector>>,
     data: Option<CoverageData>,
     fail_under_message: Option<String>,
@@ -141,6 +148,10 @@ impl CovPlugin {
             fail_under: None,
             precision: 0,
             exclude_patterns: Vec::new(),
+            run_omit: Vec::new(),
+            run_include: Vec::new(),
+            report_omit: GlobMatcher::default(),
+            report_include: GlobMatcher::default(),
             collector: None,
             data: None,
             fail_under_message: None,
@@ -261,36 +272,18 @@ impl CovPlugin {
         Ok(reports)
     }
 
-    /// Effective exclude_lines regexes: from --cov-config / .coveragerc
-    /// ([report] or [coverage:report]) or pyproject.toml
-    /// ([tool.coverage.report]); the default pragma regex otherwise.
+    /// Effective exclusion regexes (coverage.py's `exclude_list`):
+    /// `[report] exclude_lines` (its default when unset) plus
+    /// `[report] exclude_also`, from any of the config files.
     fn load_exclude_patterns(rootdir: &Path, cov_config: Option<&str>) -> Vec<regex::Regex> {
-        let mut patterns: Vec<String> = Vec::new();
-
-        let rc_path = rootdir.join(cov_config.unwrap_or(".coveragerc"));
-        if let Ok(content) = std::fs::read_to_string(&rc_path) {
-            patterns.extend(Self::parse_coveragerc_excludes(&content));
-        }
-        if patterns.is_empty()
-            && let Ok(content) = std::fs::read_to_string(rootdir.join("pyproject.toml"))
-            && let Ok(document) = content.parse::<toml::Table>()
-            && let Some(lines) = document
-                .get("tool")
-                .and_then(|tool| tool.get("coverage"))
-                .and_then(|coverage| coverage.get("report"))
-                .and_then(|report| report.get("exclude_lines"))
-                .and_then(|value| value.as_array())
-        {
-            patterns.extend(
-                lines
-                    .iter()
-                    .filter_map(|line| line.as_str().map(str::to_string)),
-            );
-        }
-
-        if patterns.is_empty() {
-            patterns.push(analysis::DEFAULT_EXCLUDE.to_string());
-        }
+        let mut patterns: Vec<String> =
+            Self::section_option_list(rootdir, cov_config, "report", "exclude_lines", true)
+                .filter(|lines| !lines.is_empty())
+                .unwrap_or_else(|| vec![analysis::DEFAULT_EXCLUDE.to_string()]);
+        patterns.extend(
+            Self::section_option_list(rootdir, cov_config, "report", "exclude_also", true)
+                .unwrap_or_default(),
+        );
         // coverage.py keeps the `if TYPE_CHECKING:` default regardless of a
         // custom exclude_lines (it ships as an always-on default), so apply it
         // unconditionally.
@@ -301,36 +294,82 @@ impl CovPlugin {
             .collect()
     }
 
-    /// `exclude_lines` from an ini-style coverage config ([report] section,
-    /// or the [coverage:report] prefixed form used in setup.cfg/tox.ini).
-    fn parse_coveragerc_excludes(content: &str) -> Vec<String> {
-        let mut patterns = Vec::new();
-        let mut in_report = false;
-        let mut in_exclude = false;
-        for line in content.lines() {
-            let trimmed = line.trim();
-            if trimmed.starts_with('[') {
-                in_report = trimmed == "[report]" || trimmed == "[coverage:report]";
-                in_exclude = false;
+    /// A list option, from the same config files as
+    /// [`Self::section_option_value`]. coverage.py's `getlist` (comma- and
+    /// newline-separated) or, with `regexes`, `getregexlist` (one per line);
+    /// a TOML array as is. None when no config file sets it.
+    fn section_option_list(
+        rootdir: &Path,
+        cov_config: Option<&str>,
+        section: &str,
+        option: &str,
+        regexes: bool,
+    ) -> Option<Vec<String>> {
+        let split = |raw: Vec<String>| -> Vec<String> {
+            raw.iter()
+                .flat_map(|line| {
+                    if regexes {
+                        vec![line.trim().to_string()]
+                    } else {
+                        line.split(',').map(|v| v.trim().to_string()).collect()
+                    }
+                })
+                .filter(|value| !value.is_empty())
+                .collect()
+        };
+        let prefixed = format!("[{section}]");
+        let spelled = format!("[coverage:{section}]");
+        for candidate in [cov_config.unwrap_or(".coveragerc"), "setup.cfg", "tox.ini"] {
+            let Ok(content) = std::fs::read_to_string(rootdir.join(candidate)) else {
                 continue;
-            }
-            if !in_report || trimmed.starts_with('#') || trimmed.starts_with(';') {
-                continue;
-            }
-            if let Some((key, value)) = trimmed.split_once('=') {
-                in_exclude = key.trim() == "exclude_lines";
-                if in_exclude && !value.trim().is_empty() {
-                    patterns.push(value.trim().to_string());
+            };
+            let mut in_section = false;
+            let mut collecting: Option<Vec<String>> = None;
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if let Some(values) = collecting.as_mut() {
+                    if trimmed.is_empty() || trimmed.starts_with(['#', ';']) {
+                        continue;
+                    }
+                    if line.starts_with([' ', '\t']) {
+                        values.push(trimmed.to_string());
+                        continue;
+                    }
+                    break;
                 }
-                continue;
+                if trimmed.starts_with('[') {
+                    in_section = trimmed == prefixed || trimmed == spelled;
+                    continue;
+                }
+                if in_section
+                    && !trimmed.starts_with(['#', ';'])
+                    && let Some((key, value)) = trimmed.split_once('=')
+                    && key.trim() == option
+                {
+                    collecting = Some(vec![value.trim().to_string()]);
+                }
             }
-            if in_exclude && line.starts_with([' ', '\t']) && !trimmed.is_empty() {
-                patterns.push(trimmed.to_string());
-            } else if !trimmed.is_empty() {
-                in_exclude = false;
+            if let Some(values) = collecting {
+                return Some(split(values));
             }
         }
-        patterns
+        let content = std::fs::read_to_string(rootdir.join("pyproject.toml")).ok()?;
+        let document = content.parse::<toml::Table>().ok()?;
+        let value = document
+            .get("tool")?
+            .get("coverage")?
+            .get(section)?
+            .get(option)?;
+        match value {
+            toml::Value::Array(items) => Some(
+                items
+                    .iter()
+                    .filter_map(|item| item.as_str().map(str::to_string))
+                    .collect(),
+            ),
+            toml::Value::String(text) => Some(split(text.lines().map(str::to_string).collect())),
+            _ => None,
+        }
     }
 
     /// Resolve a --cov=VALUE entry the way coverage.py does: VALUE is either a
@@ -943,15 +982,27 @@ impl CovPlugin {
         // tracing started, or never imported), which coverage.py excludes
         // entirely rather than showing as a 0% row.
         let mut files: BTreeSet<PathBuf> = hits.keys().map(PathBuf::from).collect();
+        let run_omit = GlobMatcher::from_prepped(&self.run_omit);
         for source in &self.sources {
             if unmeasured_sources.contains(source) {
                 continue;
             }
-            Self::walk_py_files(source, &mut files);
+            let mut unexecuted = BTreeSet::new();
+            Self::walk_py_files(source, &mut unexecuted);
+            files.extend(
+                unexecuted
+                    .into_iter()
+                    .filter(|path| !run_omit.matches_path(path)),
+            );
         }
 
         let mut rows = Vec::new();
         for path in files {
+            if self.report_omit.matches_path(&path)
+                || (!self.report_include.is_empty() && !self.report_include.matches_path(&path))
+            {
+                continue;
+            }
             let hits = hits.get(&path.to_string_lossy().to_string());
             let Ok(source_text) = std::fs::read_to_string(&path) else {
                 continue;
@@ -1303,6 +1354,19 @@ impl Plugin for CovPlugin {
             });
         self.exclude_patterns =
             Self::load_exclude_patterns(&rootdir, ctx.config.get_value("cov-config"));
+        // omit / include patterns resolve against the current directory,
+        // like coverage.py's `prep_patterns`.
+        let cwd = std::env::current_dir().unwrap_or_else(|_| rootdir.clone());
+        let cwd_canonical = cwd.canonicalize().unwrap_or_else(|_| cwd.clone());
+        let pattern_base: [&Path; 2] = [&cwd, &cwd_canonical];
+        let list = |section: &str, option: &str| {
+            Self::section_option_list(&plain_rootdir, cov_config, section, option, false)
+                .unwrap_or_default()
+        };
+        self.run_omit = GlobMatcher::prep(&list("run", "omit"), &pattern_base);
+        self.run_include = GlobMatcher::prep(&list("run", "include"), &pattern_base);
+        self.report_omit = GlobMatcher::new(&list("report", "omit"), &pattern_base);
+        self.report_include = GlobMatcher::new(&list("report", "include"), &pattern_base);
 
         let separator = std::path::MAIN_SEPARATOR.to_string();
         let with_sep = |path: &Path| {
@@ -1411,6 +1475,13 @@ impl Plugin for CovPlugin {
                 with_sep(&rootdir),
                 self.sources.iter().map(|source| with_sep(source)).collect(),
                 PathAliases::from_groups(&self.path_aliases, &rootdir),
+                GlobMatcher::from_prepped(&self.run_omit),
+                // coverage.py ignores [run] include when a source is given.
+                if self.sources.is_empty() {
+                    GlobMatcher::from_prepped(&self.run_include)
+                } else {
+                    GlobMatcher::default()
+                },
                 with_sep(&pytest_rs_core::python::shim_root()),
                 self.branch,
                 need_jump_targets,
@@ -1467,6 +1538,19 @@ impl Plugin for CovPlugin {
                 .join(":"),
         )?;
         environ.set_item("PYTEST_RS_COV_BRANCH", if self.branch { "1" } else { "0" })?;
+        environ.set_item(
+            "PYTEST_RS_COV_OMIT",
+            serde_json::to_string(&self.run_omit).unwrap_or_default(),
+        )?;
+        let child_include: &[String] = if self.sources.is_empty() {
+            &self.run_include
+        } else {
+            &[]
+        };
+        environ.set_item(
+            "PYTEST_RS_COV_INCLUDE",
+            serde_json::to_string(child_include).unwrap_or_default(),
+        )?;
         // [run] sigterm = true: a subprocess that gets SIGTERM'd (proc.terminate())
         // has no atexit chance to dump — the child shim installs its own
         // SIGTERM handler to save data first, then re-raises SIG_DFL.
@@ -1915,5 +1999,103 @@ mod run_option_tests {
             "{patterns:?}"
         );
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    fn config_dir(name: &str, files: &[(&str, &str)]) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("ptrs-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        for (file, content) in files {
+            std::fs::write(dir.join(file), content).unwrap();
+        }
+        dir
+    }
+
+    #[test]
+    fn exclude_also_adds_to_the_default() {
+        let dir = config_dir(
+            "exclude-also",
+            &[(
+                "pyproject.toml",
+                "[tool.coverage.report]\nexclude_also = ['raise NotImplementedError']\n",
+            )],
+        );
+        let patterns = super::CovPlugin::load_exclude_patterns(&dir, None);
+        assert!(
+            patterns
+                .iter()
+                .any(|re| re.is_match("    raise NotImplementedError"))
+        );
+        assert!(
+            patterns
+                .iter()
+                .any(|re| re.is_match("x = 1  # pragma: no cover"))
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn exclude_lines_from_setup_cfg() {
+        let dir = config_dir(
+            "exclude-setup-cfg",
+            &[(
+                "setup.cfg",
+                "[coverage:report]\nexclude_lines =\n    if DEBUG:\n    # skip me\nexclude_also =\n    def __repr__\n",
+            )],
+        );
+        let patterns = super::CovPlugin::load_exclude_patterns(&dir, None);
+        assert!(patterns.iter().any(|re| re.is_match("if DEBUG:")));
+        assert!(
+            patterns
+                .iter()
+                .any(|re| re.is_match("    def __repr__(self):"))
+        );
+        // A custom exclude_lines replaces the default pragma.
+        assert!(
+            !patterns
+                .iter()
+                .any(|re| re.is_match("x = 1  # pragma: no cover"))
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn list_options_split_like_coverage() {
+        let dir = config_dir(
+            "list-options",
+            &[(
+                ".coveragerc",
+                "[run]\nomit = a/*, b/*\n    c/*\n[report]\ninclude = src/*\n",
+            )],
+        );
+        assert_eq!(
+            super::CovPlugin::section_option_list(&dir, None, "run", "omit", false),
+            Some(vec![
+                "a/*".to_string(),
+                "b/*".to_string(),
+                "c/*".to_string()
+            ])
+        );
+        assert_eq!(
+            super::CovPlugin::section_option_list(&dir, None, "report", "include", false),
+            Some(vec!["src/*".to_string()])
+        );
+        assert_eq!(
+            super::CovPlugin::section_option_list(&dir, None, "report", "omit", false),
+            None
+        );
+        let toml = config_dir(
+            "list-options-toml",
+            &[(
+                "pyproject.toml",
+                "[tool.coverage.run]\nomit = ['*/tests/*', 'conftest.py']\n",
+            )],
+        );
+        assert_eq!(
+            super::CovPlugin::section_option_list(&toml, None, "run", "omit", false),
+            Some(vec!["*/tests/*".to_string(), "conftest.py".to_string()])
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_dir_all(&toml);
     }
 }
