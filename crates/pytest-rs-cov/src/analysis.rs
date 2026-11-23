@@ -31,7 +31,6 @@ struct Walker<'a> {
     lines: BTreeSet<u32>,
     spans: Vec<Span>,
     branches: BTreeMap<u32, Vec<i64>>,
-    loops: BTreeSet<u32>,
     multiline: BTreeMap<u32, u32>,
     /// Lines coverage.py excludes via AST rather than a pragma: leading
     /// docstrings (module/class/function). Merged into `excluded` so an
@@ -73,9 +72,6 @@ pub struct FileAnalysis {
     /// Continuation line -> first line of its statement (coverage.py folds
     /// multi-line statements onto their first line, runtime events too).
     pub multiline: BTreeMap<u32, u32>,
-    /// for/while header lines (their "iterate" jump lands on the header's
-    /// own advance instructions, unlike if fall-throughs).
-    pub loops: BTreeSet<u32>,
     /// Lines excluded via `# pragma: no cover` (kept so observed hits on
     /// excluded lines stay out of the denominator).
     pub excluded: BTreeSet<u32>,
@@ -104,7 +100,6 @@ pub fn analyze(source: &str, excludes: &[regex::Regex]) -> Option<FileAnalysis> 
         lines: BTreeSet::new(),
         spans: Vec::new(),
         branches: BTreeMap::new(),
-        loops: BTreeSet::new(),
         multiline: BTreeMap::new(),
         stub_excluded: BTreeSet::new(),
         stub_candidates: Vec::new(),
@@ -146,7 +141,6 @@ pub fn analyze(source: &str, excludes: &[regex::Regex]) -> Option<FileAnalysis> 
         .collect();
     Some(FileAnalysis {
         executable: walker.lines.difference(&excluded).copied().collect(),
-        loops: walker.loops,
         multiline: walker.multiline,
         excluded,
         branches,
@@ -385,7 +379,6 @@ impl Walker<'_> {
                     && let Some(body_first) = self.first_line(&while_stmt.body)
                 {
                     self.add_branch(line, [body_first, exit_to]);
-                    self.loops.insert(line);
                 }
                 // Falling off the loop body jumps back to the condition.
                 self.visit_body(&while_stmt.body, line as i64);
@@ -399,7 +392,6 @@ impl Walker<'_> {
                 let exit_to = self.first_line(&for_stmt.orelse).unwrap_or(next);
                 if let Some(body_first) = self.first_line(&for_stmt.body) {
                     self.add_branch(line, [body_first, exit_to]);
-                    self.loops.insert(line);
                 }
                 self.visit_body(&for_stmt.body, line as i64);
                 self.visit_body(&for_stmt.orelse, next);

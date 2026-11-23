@@ -16,6 +16,7 @@ import importlib.util
 import os
 import re
 import subprocess
+import sys
 import tempfile
 import textwrap
 import unittest
@@ -51,6 +52,10 @@ def test_used():
 
 
 class TestCovConfigKeys(unittest.TestCase):
+    # Run the binary against this interpreter's packages (`coverage` writes
+    # the data file) when the tests run in a virtualenv.
+    VENV = {"VIRTUAL_ENV": sys.prefix} if sys.prefix != sys.base_prefix else {}
+
     @classmethod
     def setUpClass(cls) -> None:
         if not BINARY.exists():
@@ -80,7 +85,7 @@ class TestCovConfigKeys(unittest.TestCase):
             cwd=self.base,
             capture_output=True,
             text=True,
-            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1", **self.VENV},
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result.stdout
@@ -259,6 +264,90 @@ class TestCovConfigKeys(unittest.TestCase):
         )
         assert row is not None
         self.assertEqual((int(row.group(2)), int(row.group(4))), (0, 0))
+
+    BRANCHY = """
+    def only_true(xs):
+        out = []
+        for x in xs:
+            if x > 0 and x < 10:
+                out.append(x)
+        return out
+
+
+    def tail(x):
+        if x:
+            y = 1
+    """
+
+    def branch_row(self, out: str) -> tuple[int, int, int, int, str]:
+        row = re.search(r"^app/core\.py\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+\S+%\s*(.*)$", out, re.M)
+        assert row is not None, out
+        return (int(row[1]), int(row[2]), int(row[3]), int(row[4]), row[5].strip())
+
+    def test_loop_false_edge_never_taken_is_missing(self) -> None:
+        """The false edge of a loop's `if` goes back to the loop header; when it
+        never happens it is missing, and a function-end `if`'s false edge leaves
+        the function (#106)."""
+        self.write("app/core.py", self.BRANCHY)
+        self.write(
+            "tests/test_app.py",
+            """
+            from app.core import only_true, tail
+
+
+            def test_it():
+                assert only_true([1, 2]) == [1, 2]
+                tail(0)
+            """,
+        )
+        self.pyproject("[tool.coverage.run]\nbranch = true\n")
+        out = self.output("--cov-report=term-missing", cov="--cov=app")
+        self.assertEqual(self.branch_row(out)[3:], (2, "4->3, 11"))
+
+    def test_branch_arcs_of_a_python_subprocess(self) -> None:
+        self.write("app/core.py", self.BRANCHY)
+        self.write(
+            "tests/test_app.py",
+            """
+            import subprocess
+            import sys
+
+
+            def test_it():
+                code = "from app.core import only_true, tail; only_true([1, 2]); tail(0)"
+                subprocess.run([sys.executable, "-c", code], check=True)
+            """,
+        )
+        self.pyproject("[tool.coverage.run]\nbranch = true\n")
+        out = self.output("--cov-report=term-missing", cov="--cov=app")
+        self.assertEqual(self.branch_row(out)[3:], (2, "4->3, 11"))
+
+    @unittest.skipUnless(importlib.util.find_spec("coverage"), "writes need coverage")
+    def test_branch_arcs_in_the_data_file(self) -> None:
+        import coverage
+
+        self.write("app/core.py", self.BRANCHY)
+        self.write(
+            "tests/test_app.py",
+            """
+            from app.core import only_true, tail
+
+
+            def test_it():
+                only_true([1, 2])
+                tail(0)
+            """,
+        )
+        self.pyproject("[tool.coverage.run]\nbranch = true\n")
+        self.output(cov="--cov=app")
+        data = coverage.CoverageData(str(self.base / ".coverage"))
+        data.read()
+        self.assertTrue(data.has_arcs())
+        arcs = set(data.arcs(str(self.base / "app/core.py")) or [])
+        self.assertIn((4, 5), arcs)
+        self.assertIn((10, -9), arcs)
+        self.assertNotIn((4, 3), arcs)
+        self.assertFalse((self.base / ".coverage.pytest-rs-arcs").exists())
 
     def test_missing_source_fails_the_report_unless_ignore_errors(self) -> None:
         self.write("app/gone.py", "def gone():\n    return 3\n")

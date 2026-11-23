@@ -3,6 +3,7 @@
 //! DISABLE), instead of coverage.py's per-line trace overhead.
 
 mod analysis;
+mod arcs;
 mod collector;
 mod files;
 mod report;
@@ -11,7 +12,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use collector::{ArcMap, LineCollector};
+use collector::{ArcMap, ContextArcMap, LineCollector};
 use files::{GlobMatcher, PathAliases};
 use pytest_rs_core::collect::TestItem;
 use pytest_rs_core::config::{OptDef, OptionParser};
@@ -28,6 +29,8 @@ struct CovDump {
     arcs: ArcMap,
     #[serde(default)]
     context_hits: HashMap<String, HashMap<String, BTreeSet<u32>>>,
+    #[serde(default)]
+    context_arcs: ContextArcMap,
 }
 
 /// sys.monitoring's reserved coverage tool slot.
@@ -118,6 +121,8 @@ pub struct CovPlugin {
     worker_hits: HashMap<String, BTreeSet<u32>>,
     /// Parent mode: executed branch arcs merged in from workers.
     worker_arcs: ArcMap,
+    /// Parent mode: per-context arcs merged in from workers.
+    worker_context_arcs: ContextArcMap,
     /// Branch coverage (--cov-branch / [run] branch = true).
     branch: bool,
     /// Dump directory for subprocess coverage (children write, we merge).
@@ -179,6 +184,7 @@ impl CovPlugin {
             dump_payload: None,
             worker_hits: HashMap::new(),
             worker_arcs: HashMap::new(),
+            worker_context_arcs: HashMap::new(),
             branch: false,
             child_out_dir: None,
             path_aliases: Vec::new(),
@@ -831,15 +837,13 @@ impl CovPlugin {
                 rootdir.join(&file).to_string_lossy().to_string()
             };
             hits.entry(absolute.clone()).or_default().extend(lines);
-        }
-        // Previous branch runs' arcs come from the sidecar (the data file
-        // itself only holds lines).
-        let sidecar = Self::arcs_sidecar_path(ctx);
-        if let Ok(text) = std::fs::read_to_string(&sidecar)
-            && let Ok(prior) = serde_json::from_str::<HashMap<String, Vec<(u32, i64, u8)>>>(&text)
-        {
-            for (file, file_arcs) in prior {
-                arcs.entry(file).or_default().extend(file_arcs);
+            // Branch data: the arcs other than the per-line self-arcs.
+            let file_arcs: Option<Vec<(i64, i64)>> =
+                data.call_method1("arcs", (&file,))?.extract()?;
+            if let Some(file_arcs) = file_arcs {
+                arcs.entry(absolute)
+                    .or_default()
+                    .extend(file_arcs.into_iter().filter(|(from, to)| from != to));
             }
         }
         Ok(())
@@ -963,6 +967,7 @@ impl CovPlugin {
         hits: &HashMap<String, BTreeSet<u32>>,
         arcs: &ArcMap,
         context_hits: &HashMap<String, HashMap<String, BTreeSet<u32>>>,
+        context_arcs: &ContextArcMap,
         unexecuted: &[PathBuf],
     ) -> PyResult<()> {
         let py = ctx.py;
@@ -1012,22 +1017,41 @@ impl CovPlugin {
         // exactly (every hit is recorded under whichever context, including
         // `""`, was current when it fired), so this replaces rather than
         // supplements the blanket write.
-        if context_hits.is_empty() {
-            let lines = core_pyo3::types::PyDict::new(py);
-            for (file, hit_lines) in hits {
-                let list: Vec<u32> = hit_lines.iter().copied().collect();
-                lines.set_item(relative_key(file), list)?;
-            }
-            data.call_method1("add_lines", (lines,))?;
-        } else {
-            for (context, file_hits) in context_hits {
-                let lines = core_pyo3::types::PyDict::new(py);
+        // Branch mode writes arcs the way coverage.py's sys.monitoring core
+        // does: a self-arc (L, L) per executed line (the executed lines of
+        // arc data are its arcs' ends) plus every resolved branch arc.
+        let write = |file_hits: &HashMap<String, BTreeSet<u32>>, file_arcs: Option<&ArcMap>| {
+            let table = core_pyo3::types::PyDict::new(py);
+            if self.branch {
+                let empty = ArcMap::new();
+                let file_arcs = file_arcs.unwrap_or(&empty);
+                let files: BTreeSet<&String> = file_hits.keys().chain(file_arcs.keys()).collect();
+                for file in files {
+                    let mut list: BTreeSet<(i64, i64)> = file_hits
+                        .get(file)
+                        .into_iter()
+                        .flatten()
+                        .map(|line| (i64::from(*line), i64::from(*line)))
+                        .collect();
+                    list.extend(file_arcs.get(file).into_iter().flatten().copied());
+                    table.set_item(relative_key(file), list.into_iter().collect::<Vec<_>>())?;
+                }
+                data.call_method1("add_arcs", (table,))?;
+            } else {
                 for (file, hit_lines) in file_hits {
                     let list: Vec<u32> = hit_lines.iter().copied().collect();
-                    lines.set_item(relative_key(file), list)?;
+                    table.set_item(relative_key(file), list)?;
                 }
+                data.call_method1("add_lines", (table,))?;
+            }
+            PyResult::Ok(())
+        };
+        if context_hits.is_empty() {
+            write(hits, Some(arcs))?;
+        } else {
+            for (context, file_hits) in context_hits {
                 data.call_method1("set_context", (context.as_str(),))?;
-                data.call_method1("add_lines", (lines,))?;
+                write(file_hits, context_arcs.get(context))?;
             }
         }
         // Never-imported files under the sources, so reports rendered from
@@ -1040,29 +1064,7 @@ impl CovPlugin {
             data.call_method1("touch_files", (names,))?;
         }
         data.call_method0("write")?;
-        // Branch arcs use an internal representation (src, dst, direction)
-        // that coverage.py's data model cannot hold; a sidecar JSON next to
-        // the data file lets --cov-append restore them.
-        let sidecar = Self::arcs_sidecar_path(ctx);
-        if arcs.values().any(|file_arcs| !file_arcs.is_empty()) {
-            let serializable: HashMap<&String, Vec<(u32, i64, u8)>> = arcs
-                .iter()
-                .map(|(file, file_arcs)| (file, file_arcs.iter().copied().collect()))
-                .collect();
-            if let Ok(text) = serde_json::to_string(&serializable) {
-                let _ = std::fs::write(&sidecar, text);
-            }
-        } else if !append {
-            let _ = std::fs::remove_file(&sidecar);
-        }
         Ok(())
-    }
-
-    /// The branch-arcs sidecar next to the `.coverage` data file.
-    fn arcs_sidecar_path(ctx: &HookContext) -> PathBuf {
-        let mut path = Self::data_file_path(ctx).into_os_string();
-        path.push(".pytest-rs-arcs");
-        PathBuf::from(path)
     }
 
     /// The .py files under the `--cov` sources (never-imported ones show as
@@ -1151,11 +1153,10 @@ impl CovPlugin {
             };
             let mut executable = analysis.executable;
             executable.extend(covered.iter().copied());
-            // Branch mode: reconcile executed bytecode arcs against the
-            // source-level branch map. Arcs whose source line is not a
-            // branch point (asserts, ternaries) are ignored; destinations
-            // with no exact match attribute to EXIT when the branch can
-            // leave the scope.
+            // Branch mode: match the executed line arcs (already resolved
+            // from bytecode offsets, see arcs.rs) against the source-level
+            // branch map. Arcs from lines that are not branch points
+            // (asserts, ternaries) are ignored.
             let branches = if self.branch {
                 analysis.branches
             } else {
@@ -1165,63 +1166,28 @@ impl CovPlugin {
             if self.branch
                 && let Some(file_arcs) = arcs.get(&path.to_string_lossy().to_string())
             {
-                for (src, dst, direction) in file_arcs {
-                    let src = &fold(*src);
-                    let dst = &if *dst > 0 {
-                        i64::from(fold(*dst as u32))
-                    } else {
-                        *dst
-                    };
-                    let Some(dests) = branches.get(src) else {
+                for (from, to) in file_arcs {
+                    let Ok(src) = u32::try_from(*from) else {
                         continue;
                     };
-                    let resolved = match direction {
-                        // Fall-through: into the body. An arc staying on
-                        // the header line is a loop's advance machinery; a
-                        // same-line arc elsewhere is a short-circuit
-                        // (and/or) step, not a branch outcome.
-                        1 => {
-                            if *dst == dests[0] {
-                                Some(dests[0])
-                            } else if *dst == i64::from(*src) {
-                                analysis.loops.contains(src).then(|| dests[0])
-                            } else {
-                                Some(dests[0])
-                            }
-                        }
-                        // Jump: away from the body. Implicit-return
-                        // attribution can make the destination look like a
-                        // body line; never resolve a jump to the body.
-                        2 => dests[1..]
-                            .iter()
-                            .find(|d| *d == dst)
-                            .or_else(|| dests[1..].iter().find(|d| **d == analysis::EXIT))
-                            .or(dests.last())
-                            .copied(),
-                        // Unknown (3.13 without dis info): exact, loop
-                        // advance, then exit.
-                        _ => {
-                            if dests.contains(dst) {
-                                Some(*dst)
-                            } else if *dst == i64::from(*src) && analysis.loops.contains(src) {
-                                Some(dests[0])
-                            } else if dests.contains(&analysis::EXIT) {
-                                Some(analysis::EXIT)
-                            } else {
-                                None
-                            }
-                        }
+                    let src = fold(src);
+                    let Some(dests) = branches.get(&src) else {
+                        continue;
                     };
-                    if let Some(dest) = resolved {
-                        taken.entry(*src).or_default().insert(dest);
+                    // A negative destination leaves the code object.
+                    let dest = if *to < 0 {
+                        analysis::EXIT
+                    } else {
+                        i64::from(fold(*to as u32))
+                    };
+                    if dests.contains(&dest) {
+                        taken.entry(src).or_default().insert(dest);
                     }
                 }
             }
             // The first line of an if / elif / while / for body is entered
             // only through its header's true edge, so when it ran, that edge
-            // was taken — whatever the recorded arc looked like (a compound
-            // `and` condition can jump into the body, and jumps are never
-            // resolved to the body above).
+            // was taken (a safety net for arcs the trail could not resolve).
             if self.branch {
                 for (line, dests) in &branches {
                     if let Some(&body) = dests.first()
@@ -1627,7 +1593,6 @@ impl Plugin for CovPlugin {
         // (independently DISABLEable); 3.13 only the combined BRANCH.
         let mut local_events: i64 = line_event.extract()?;
         let mut branch_events: Vec<(Bound<'_, core_pyo3::PyAny>, &str)> = Vec::new();
-        let mut need_jump_targets = false;
         if self.branch {
             match (
                 events.getattr("BRANCH_LEFT"),
@@ -1642,7 +1607,6 @@ impl Plugin for CovPlugin {
                     let combined = events.getattr("BRANCH")?;
                     local_events |= combined.extract::<i64>()?;
                     branch_events.push((combined, "branch_compat"));
-                    need_jump_targets = true;
                 }
             }
         }
@@ -1674,8 +1638,6 @@ impl Plugin for CovPlugin {
                     GlobMatcher::default()
                 },
                 with_sep(&pytest_rs_core::python::shim_root()),
-                self.branch,
-                need_jump_targets,
                 local_events,
                 disable,
                 monitoring.clone().unbind(),
@@ -1901,7 +1863,16 @@ impl Plugin for CovPlugin {
         monitoring.call_method1("free_tool_id", (self.tool_id,))?;
 
         let mut hits = collector.borrow(py).take_hits();
-        let mut arcs = collector.borrow(py).take_arcs();
+        // Branch events resolve to line arcs against each file's
+        // multi-line statements (continuation lines fold onto the first).
+        let mut multiline = |file: &str| {
+            std::fs::read_to_string(file)
+                .ok()
+                .and_then(|text| analysis::analyze(&text, &[]))
+                .map(|analysis| analysis.multiline)
+                .unwrap_or_default()
+        };
+        let (mut arcs, mut context_arcs) = collector.borrow(py).take_arcs(py, &mut multiline)?;
         let mut context_hits = collector.borrow(py).take_context_hits();
         // Merge subprocess dumps (this process's children, parent or
         // worker alike), then drop the dump dir.
@@ -1944,6 +1915,7 @@ impl Plugin for CovPlugin {
                     hits,
                     arcs,
                     context_hits,
+                    context_arcs,
                 })
                 .map_err(|e| core_pyo3::exceptions::PyValueError::new_err(e.to_string()))?,
             );
@@ -1963,6 +1935,12 @@ impl Plugin for CovPlugin {
                 entry.entry(file).or_default().extend(lines);
             }
         }
+        for (context, file_arcs) in self.worker_context_arcs.drain() {
+            let entry = context_arcs.entry(context).or_default();
+            for (file, arcs) in file_arcs {
+                entry.entry(file).or_default().extend(arcs);
+            }
+        }
         if ctx.config.get_flag("cov-append") {
             self.merge_appended_data(ctx, &mut hits, &mut arcs)?;
         }
@@ -1979,7 +1957,7 @@ impl Plugin for CovPlugin {
             .into_iter()
             .filter(|path| !hits.contains_key(path.to_string_lossy().as_ref()))
             .collect();
-        self.write_data_file(ctx, &hits, &arcs, &context_hits, &unexecuted)?;
+        self.write_data_file(ctx, &hits, &arcs, &context_hits, &context_arcs, &unexecuted)?;
         let rootdir = ctx
             .config
             .rootdir
@@ -2098,6 +2076,12 @@ impl Plugin for CovPlugin {
             let entry = self.worker_context_hits.entry(context).or_default();
             for (file, lines) in file_hits {
                 entry.entry(file).or_default().extend(lines);
+            }
+        }
+        for (context, file_arcs) in dump.context_arcs {
+            let entry = self.worker_context_arcs.entry(context).or_default();
+            for (file, arcs) in file_arcs {
+                entry.entry(file).or_default().extend(arcs);
             }
         }
         Ok(())

@@ -106,6 +106,98 @@ def _compile_path_aliases(raw, base):
     return rules
 
 
+def _multiline_map(filename):
+    """Continuation line -> first line of its logical line (coverage.py's
+    multiline map, from the tokenizer)."""
+    import tokenize
+
+    out = {}
+    skip = {tokenize.NL, tokenize.COMMENT, tokenize.INDENT, tokenize.DEDENT, tokenize.ENCODING}
+    try:
+        with tokenize.open(filename) as fh:
+            first = None
+            for tok in tokenize.generate_tokens(fh.readline):
+                if tok.type == tokenize.NEWLINE:
+                    if first is not None:
+                        for line in range(first + 1, tok.end[0] + 1):
+                            out[line] = first
+                    first = None
+                elif tok.type not in skip and first is None:
+                    first = tok.start[0]
+    except (OSError, SyntaxError, tokenize.TokenError):
+        return {}
+    return out
+
+
+def _resolve_arcs(code, pairs, multiline):
+    """coverage.py's BranchArcResolver: (source, dest) offsets -> line arcs.
+
+    From the destination, follow the instructions (through unconditional
+    jumps) to the first one on another line (the arc), a return (an arc
+    leaving the code object), or another branch (no arc)."""
+    import dis
+
+    opmap = dis.opmap
+    cache = opmap.get("CACHE", -1)
+    extended_arg = opmap["EXTENDED_ARG"]
+    jumps = set(dis.hasjrel) | set(dis.hasjabs)
+    always = {
+        opmap[n]
+        for n in ("JUMP_BACKWARD", "JUMP_BACKWARD_NO_INTERRUPT", "JUMP_FORWARD")
+        if n in opmap
+    }
+    backward = {op for op in jumps if "JUMP_BACKWARD" in dis.opname[op]}
+    returns = {opmap[n] for n in ("RETURN_VALUE", "RETURN_GENERATOR", "RETURN_CONST") if n in opmap}
+    no_fall = {opmap[n] for n in ("RERAISE",) if n in opmap}
+    byte_to_line = {}
+    for start_, end, line in code.co_lines():
+        if line is not None:
+            for offset in range(start_, end, 2):
+                byte_to_line[offset] = line
+    co_code = code.co_code
+    out = set()
+    for source, dest in pairs:
+        from_line = byte_to_line.get(source)
+        if from_line is None:
+            continue
+        from_line = multiline.get(from_line, from_line)
+        offset, ext_arg, seen = dest, 0, set()
+        while 0 <= offset < len(co_code) and offset not in seen:
+            seen.add(offset)
+            op = co_code[offset]
+            if op == cache:
+                offset += 2
+                continue
+            if op == extended_arg:
+                ext_arg = (ext_arg | co_code[offset + 1]) << 8
+                offset += 2
+                continue
+            line = byte_to_line.get(offset)
+            if line is not None:
+                line = multiline.get(line, line)
+                if line and line != from_line:
+                    out.add((from_line, line))
+                    break
+            if op in jumps:
+                if op in always:
+                    arg = ext_arg | co_code[offset + 1]
+                    following = offset + 2
+                    while following < len(co_code) and co_code[following] == cache:
+                        following += 2
+                    offset = following - 2 * arg if op in backward else following + 2 * arg
+                    ext_arg = 0
+                    continue
+                break
+            if op in returns:
+                out.add((from_line, -code.co_firstlineno))
+                break
+            if op in no_fall:
+                break
+            ext_arg = 0
+            offset += 2
+    return out
+
+
 def _compile_globs(raw):
     """coverage.py ``GlobMatcher`` over already-prepped patterns (whole-path
     match), or None when there are none."""
@@ -144,8 +236,9 @@ def start():
         return  # someone else measures this process
 
     hits = {}
-    arcs = {}
-    tracked = {}  # id(code) -> (filename, co_lines table, jump targets)
+    # (id(code), source offset) -> destination offsets; resolved at exit.
+    branches = {}
+    tracked = {}  # id(code) -> (filename, code)
     local_events = mon.events.LINE
     left = getattr(mon.events, "BRANCH_LEFT", None)
     right = getattr(mon.events, "BRANCH_RIGHT", None)
@@ -156,7 +249,6 @@ def start():
         else:
             combined = mon.events.BRANCH
             local_events |= combined
-    seen_dests = {}
 
     def is_tracked(filename):
         if filename.startswith("<") or "site-packages" in filename or "/lib/python" in filename:
@@ -197,35 +289,9 @@ def start():
             # normalizes them.
             filename = os.path.normpath(code.co_filename)
             if code.co_name != "__annotate__" and is_tracked(filename):
-                table = sorted(
-                    (start_, end, line if line is not None else -1)
-                    for start_, end, line in code.co_lines()
-                )
-                jumps = None
-                if combined is not None:
-                    import dis
-
-                    conditional = {
-                        "POP_JUMP_IF_FALSE",
-                        "POP_JUMP_IF_TRUE",
-                        "POP_JUMP_IF_NONE",
-                        "POP_JUMP_IF_NOT_NONE",
-                        "FOR_ITER",
-                    }
-                    jumps = {
-                        i.offset: i.argval
-                        for i in dis.get_instructions(code)
-                        if i.opname in conditional and isinstance(i.argval, int)
-                    }
-                tracked[key] = (_map_alias(filename), table, jumps, code)
+                tracked[key] = (_map_alias(filename), code)
                 mon.set_local_events(tool, code, local_events)
         return mon.DISABLE
-
-    def line_at(table, offset):
-        for start_, end, line in table:
-            if start_ <= offset < end:
-                return line
-        return -1
 
     def line(code, lineno):
         entry = tracked.get(id(code))
@@ -233,39 +299,23 @@ def start():
             hits.setdefault(entry[0], set()).add(lineno)
         return mon.DISABLE
 
-    def record(code, src_offset, dst_offset, direction):
-        entry = tracked.get(id(code))
-        if entry is None:
-            return
-        filename, table, jumps, _ = entry
-        if direction == 0 and jumps is not None:
-            target = jumps.get(src_offset)
-            if target is None:
-                direction = 0
-            elif (target >= src_offset and dst_offset >= target) or (
-                target < src_offset and dst_offset == target
-            ):
-                direction = 2
-            else:
-                direction = 1
-        src = line_at(table, src_offset)
-        if src <= 0:
-            return
-        arcs.setdefault(filename, set()).add((src, line_at(table, dst_offset), direction))
+    def record(code, src_offset, dst_offset):
+        if id(code) not in tracked:
+            return 0
+        dests = branches.setdefault((id(code), src_offset), set())
+        dests.add(dst_offset)
+        return len(dests)
 
     def branch_left(code, src_offset, dst_offset):
-        record(code, src_offset, dst_offset, 1)
+        record(code, src_offset, dst_offset)
         return mon.DISABLE
 
     def branch_right(code, src_offset, dst_offset):
-        record(code, src_offset, dst_offset, 2)
+        record(code, src_offset, dst_offset)
         return mon.DISABLE
 
     def branch_compat(code, src_offset, dst_offset):
-        record(code, src_offset, dst_offset, 0)
-        dests = seen_dests.setdefault((id(code), src_offset), set())
-        dests.add(dst_offset)
-        if len(dests) >= 2:
+        if record(code, src_offset, dst_offset) >= 2:
             return mon.DISABLE
         return None
 
@@ -284,8 +334,19 @@ def start():
             mon.set_events(tool, 0)
         except Exception:
             pass
-        if not hits and not arcs:
+        if not hits and not branches:
             return
+        arcs = {}
+        by_code = {}
+        for (key, source), dests in branches.items():
+            by_code.setdefault(key, []).extend((source, dest) for dest in dests)
+        multiline_maps = {}
+        for key, pairs in by_code.items():
+            filename, code = tracked[key]
+            multiline = multiline_maps.get(filename)
+            if multiline is None:
+                multiline = multiline_maps[filename] = _multiline_map(code.co_filename)
+            arcs.setdefault(filename, set()).update(_resolve_arcs(code, pairs, multiline))
         payload = {
             "hits": {f: sorted(lines) for f, lines in hits.items()},
             "arcs": {f: sorted(list(arc) for arc in file_arcs) for f, file_arcs in arcs.items()},

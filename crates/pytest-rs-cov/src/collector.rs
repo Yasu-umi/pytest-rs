@@ -6,26 +6,30 @@
 //! every fork worker — shrinks from "every line of every dependency" to
 //! "one PY_START per code object".
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::{Arc, Mutex};
 
 use pyo3::prelude::*;
 
+use crate::arcs::{CodeBytes, Opcodes};
 use crate::files::{GlobMatcher, PathAliases};
 
-/// filename -> executed (source line, destination line, direction) arcs.
-pub type ArcMap = HashMap<String, BTreeSet<(u32, i64, u8)>>;
+/// filename -> executed arcs in coverage.py's form: (from line, to line), a
+/// negative destination leaving the code object (`-co_firstlineno`).
+pub type ArcMap = HashMap<String, BTreeSet<(i64, i64)>>;
+
+/// context -> its arcs (`--cov-context`).
+pub type ContextArcMap = HashMap<String, ArcMap>;
+
+/// Branch events as recorded: per context, (code key, source offset) ->
+/// destination offsets. Resolved to line arcs once, at the end.
+type RawBranches = HashMap<Arc<str>, HashMap<(usize, i64), BTreeSet<i64>>>;
 
 struct TrackedCode {
-    /// The pin keeps the code object alive so its id is never reused.
-    _code: Py<PyAny>,
+    /// The pin keeps the code object alive so its id is never reused (and
+    /// its bytecode can be read when the branch events are resolved).
+    code: Py<PyAny>,
     filename: Arc<str>,
-    /// co_lines() as sorted (start, end, line) ranges (line -1 when None),
-    /// for offset -> line lookups; built only in branch mode.
-    lines: Option<Arc<Vec<(i64, i64, i64)>>>,
-    /// 3.13 only: conditional-jump targets by instruction offset (from
-    /// dis), to classify BRANCH event directions.
-    jump_targets: Option<Arc<HashMap<i64, i64>>>,
 }
 
 type TrackedCodes = Mutex<HashMap<usize, TrackedCode>>;
@@ -50,10 +54,10 @@ pub struct LineCollector {
     /// The embedded shim dir; never measured.
     shim_root: String,
     hits: Mutex<HashMap<String, BTreeSet<u32>>>,
-    /// Branch mode: executed (source line, destination line, direction)
-    /// arcs; destination -1 = "no line", direction 1 = fall-through (LEFT),
-    /// 2 = jump (RIGHT), 0 = unknown (3.13 without dis info).
-    arcs: Mutex<ArcMap>,
+    /// Branch mode: the branch events, per context ("" without
+    /// `--cov-context`).
+    branches: Mutex<RawBranches>,
+    no_context: Arc<str>,
     /// `--cov-context=test`: every hit line is ALSO recorded per (context,
     /// file), in addition to the blanket `hits` map used for the coverage
     /// %/table report. `current_context` is updated by CovPlugin's
@@ -62,15 +66,7 @@ pub struct LineCollector {
     context_hits: Mutex<HashMap<String, HashMap<String, BTreeSet<u32>>>>,
     current_context: Mutex<Arc<str>>,
     track_contexts: bool,
-    /// 3.13 single-BRANCH-event fallback: destinations seen per
-    /// (code id, instruction offset). DISABLE there kills both directions,
-    /// so it is only returned once both have been observed.
-    seen_dests: Mutex<HashMap<(usize, i64), BTreeSet<i64>>>,
     tracked_codes: TrackedCodes,
-    branch: bool,
-    /// 3.13: BRANCH events carry no direction; jump targets disassembled
-    /// per code object classify them.
-    need_jump_targets: bool,
     /// The LINE (| BRANCH...) event mask armed per tracked code object.
     local_events: i64,
     disable: Py<PyAny>,
@@ -87,8 +83,6 @@ impl LineCollector {
         omit: GlobMatcher,
         include: GlobMatcher,
         shim_root: String,
-        branch: bool,
-        need_jump_targets: bool,
         local_events: i64,
         disable: Py<PyAny>,
         monitoring: Py<PyAny>,
@@ -104,14 +98,12 @@ impl LineCollector {
             filtered: Mutex::new(HashMap::new()),
             shim_root,
             hits: Mutex::new(HashMap::new()),
-            arcs: Mutex::new(HashMap::new()),
+            branches: Mutex::new(HashMap::new()),
+            no_context: Arc::from(""),
             context_hits: Mutex::new(HashMap::new()),
             current_context: Mutex::new(Arc::from("")),
             track_contexts,
-            seen_dests: Mutex::new(HashMap::new()),
             tracked_codes: Mutex::new(HashMap::new()),
-            branch,
-            need_jump_targets,
             local_events,
             disable,
             monitoring,
@@ -123,8 +115,66 @@ impl LineCollector {
         std::mem::take(&mut self.hits.lock().expect("collector lock poisoned"))
     }
 
-    pub fn take_arcs(&self) -> ArcMap {
-        std::mem::take(&mut self.arcs.lock().expect("collector lock poisoned"))
+    /// The branch events as line arcs: all of them, and per context with
+    /// `--cov-context` (empty otherwise). `multiline(file)` is the file's
+    /// continuation line -> statement first line map.
+    pub fn take_arcs(
+        &self,
+        py: Python<'_>,
+        multiline: &mut dyn FnMut(&str) -> BTreeMap<u32, u32>,
+    ) -> PyResult<(ArcMap, ContextArcMap)> {
+        let raw = std::mem::take(&mut *self.branches.lock().expect("collector lock poisoned"));
+        let mut arcs = ArcMap::new();
+        let mut by_context = ContextArcMap::new();
+        if raw.is_empty() {
+            return Ok((arcs, by_context));
+        }
+        let ops = Opcodes::load(py)?;
+        let codes: HashMap<usize, (Py<PyAny>, Arc<str>)> = self
+            .tracked_codes
+            .lock()
+            .expect("collector lock poisoned")
+            .iter()
+            .map(|(key, entry)| {
+                (
+                    *key,
+                    (entry.code.clone_ref(py), Arc::clone(&entry.filename)),
+                )
+            })
+            .collect();
+        let mut bytes: HashMap<usize, Option<CodeBytes>> = HashMap::new();
+        let mut maps: HashMap<Arc<str>, BTreeMap<u32, u32>> = HashMap::new();
+        for (context, sites) in raw {
+            for ((key, source), dests) in sites {
+                let Some((code, filename)) = codes.get(&key) else {
+                    continue;
+                };
+                let code_bytes = bytes
+                    .entry(key)
+                    .or_insert_with(|| CodeBytes::read(code.bind(py)).ok());
+                let Some(code_bytes) = code_bytes else {
+                    continue;
+                };
+                let map = maps
+                    .entry(Arc::clone(filename))
+                    .or_insert_with(|| multiline(filename));
+                for dest in dests {
+                    let Some(arc) = code_bytes.resolve(&ops, map, source, dest) else {
+                        continue;
+                    };
+                    arcs.entry(filename.to_string()).or_default().insert(arc);
+                    if self.track_contexts {
+                        by_context
+                            .entry(context.to_string())
+                            .or_default()
+                            .entry(filename.to_string())
+                            .or_default()
+                            .insert(arc);
+                    }
+                }
+            }
+        }
+        Ok((arcs, by_context))
     }
 
     pub fn take_context_hits(&self) -> HashMap<String, HashMap<String, BTreeSet<u32>>> {
@@ -202,6 +252,29 @@ impl LineCollector {
         self.aliases.matches(filename)
     }
 
+    /// Record one branch event under the current context; returns how many
+    /// destinations its source has had there.
+    fn record_branch(&self, code_key: usize, src_offset: i64, dst_offset: i64) -> usize {
+        let context = if self.track_contexts {
+            Arc::clone(
+                &self
+                    .current_context
+                    .lock()
+                    .expect("collector lock poisoned"),
+            )
+        } else {
+            Arc::clone(&self.no_context)
+        };
+        let mut branches = self.branches.lock().expect("collector lock poisoned");
+        let dests = branches
+            .entry(context)
+            .or_default()
+            .entry((code_key, src_offset))
+            .or_default();
+        dests.insert(dst_offset);
+        dests.len()
+    }
+
     /// [paths] remap, applied once per code object (`py_start`) so every hit
     /// and arc is stored under the canonical name from the start — letting
     /// workers whose chdir'd copies land under different alias prefixes
@@ -214,86 +287,6 @@ impl LineCollector {
                 .unwrap_or_else(|| filename.to_string()),
         )
     }
-
-    /// Record one executed (source line, destination line, direction) arc.
-    fn record_arc(&self, code_key: usize, src_offset: i64, dst_offset: i64, direction: u8) {
-        let tracked = self.tracked_codes.lock().expect("collector lock poisoned");
-        let Some(entry) = tracked.get(&code_key) else {
-            return;
-        };
-        let Some(lines) = entry.lines.as_ref().map(Arc::clone) else {
-            return;
-        };
-        // 3.13 fallback: classify the direction from the disassembled jump
-        // target. The event's destination can land past the target
-        // (FOR_ITER exhaustion skips the loop cleanup), so a forward jump
-        // is "at or beyond the target".
-        let direction = if direction == 0 {
-            match entry.jump_targets.as_ref().and_then(|t| t.get(&src_offset)) {
-                Some(target)
-                    if (*target >= src_offset && dst_offset >= *target)
-                        || (*target < src_offset && dst_offset == *target) =>
-                {
-                    2
-                }
-                Some(_) => 1,
-                None => 0,
-            }
-        } else {
-            direction
-        };
-        let filename = entry.filename.as_ref().to_string();
-        drop(tracked);
-        let src = line_at(&lines, src_offset);
-        if src <= 0 {
-            return;
-        }
-        let dst = line_at(&lines, dst_offset);
-        self.arcs
-            .lock()
-            .expect("collector lock poisoned")
-            .entry(filename)
-            .or_default()
-            .insert((src as u32, dst, direction));
-    }
-}
-
-/// Conditional-jump targets by instruction offset, via dis (3.13, where
-/// BRANCH events do not tell which direction resolved).
-fn conditional_jump_targets(
-    py: Python<'_>,
-    code: &Bound<'_, PyAny>,
-) -> PyResult<HashMap<i64, i64>> {
-    const CONDITIONAL: [&str; 5] = [
-        "POP_JUMP_IF_FALSE",
-        "POP_JUMP_IF_TRUE",
-        "POP_JUMP_IF_NONE",
-        "POP_JUMP_IF_NOT_NONE",
-        "FOR_ITER",
-    ];
-    let mut targets = HashMap::new();
-    let dis = py.import("dis")?;
-    for instruction in dis.call_method1("get_instructions", (code,))?.try_iter()? {
-        let instruction = instruction?;
-        let opname: String = instruction.getattr("opname")?.extract()?;
-        if CONDITIONAL.contains(&opname.as_str())
-            && let Ok(Some(target)) = instruction.getattr("argval")?.extract::<Option<i64>>()
-        {
-            let offset: i64 = instruction.getattr("offset")?.extract()?;
-            targets.insert(offset, target);
-        }
-    }
-    Ok(targets)
-}
-
-/// The line for a bytecode offset, from sorted co_lines() ranges (-1 when
-/// the offset has no line).
-fn line_at(lines: &[(i64, i64, i64)], offset: i64) -> i64 {
-    lines
-        .iter()
-        .find(|(start, end, _)| *start <= offset && offset < *end)
-        .map(|(_, _, line)| *line)
-        .unwrap_or(-1)
 }
 
 #[pymethods]
@@ -327,32 +320,14 @@ impl LineCollector {
                 self.monitoring
                     .bind(py)
                     .call_method1("set_local_events", (self.tool_id, &code, self.local_events))?;
-                let lines = if self.branch {
-                    let mut table: Vec<(i64, i64, i64)> = Vec::new();
-                    for entry in code.call_method0("co_lines")?.try_iter()? {
-                        let (start, end, line): (i64, i64, Option<i64>) = entry?.extract()?;
-                        table.push((start, end, line.unwrap_or(-1)));
-                    }
-                    table.sort_unstable();
-                    Some(Arc::new(table))
-                } else {
-                    None
-                };
-                let jump_targets = if self.branch && self.need_jump_targets {
-                    Some(Arc::new(conditional_jump_targets(py, &code)?))
-                } else {
-                    None
-                };
                 self.tracked_codes
                     .lock()
                     .expect("collector lock poisoned")
                     .insert(
                         key,
                         TrackedCode {
-                            _code: code.unbind(),
+                            code: code.unbind(),
                             filename: self.canonical_name(&filename),
-                            lines,
-                            jump_targets,
                         },
                     );
             }
@@ -411,7 +386,7 @@ impl LineCollector {
         src_offset: i64,
         dst_offset: i64,
     ) -> PyResult<Py<PyAny>> {
-        self.record_arc(code.as_ptr() as usize, src_offset, dst_offset, 1);
+        self.record_branch(code.as_ptr() as usize, src_offset, dst_offset);
         Ok(self.disable.clone_ref(py))
     }
 
@@ -422,20 +397,15 @@ impl LineCollector {
         src_offset: i64,
         dst_offset: i64,
     ) -> PyResult<Py<PyAny>> {
-        self.record_arc(code.as_ptr() as usize, src_offset, dst_offset, 2);
+        self.record_branch(code.as_ptr() as usize, src_offset, dst_offset);
         Ok(self.disable.clone_ref(py))
     }
 
     /// 3.13 single BRANCH event: DISABLE would silence both directions, so
-    /// it is only returned once both destinations have been observed.
-    ///
-    /// A site that only ever resolves one way therefore stays armed for the
-    /// whole run and fires on every execution — tens of millions of times on
-    /// a branch-heavy suite. Recording an arc is idempotent (the same
-    /// offsets always fold to the same `(src, dst, direction)` triple in a
-    /// set), so only the first sighting of a destination does any work; the
-    /// repeats cost one lock and one set probe instead of three locks, two
-    /// `co_lines` scans and a filename allocation.
+    /// it is only returned once both destinations have been observed (in
+    /// this context: a context switch re-arms every event). A site that only
+    /// ever resolves one way stays armed and fires on every execution, so
+    /// the repeat costs one lock and one set probe.
     fn branch_compat(
         &self,
         py: Python<'_>,
@@ -443,16 +413,7 @@ impl LineCollector {
         src_offset: i64,
         dst_offset: i64,
     ) -> PyResult<Py<PyAny>> {
-        let key = code.as_ptr() as usize;
-        let (fresh, complete) = {
-            let mut seen = self.seen_dests.lock().expect("collector lock poisoned");
-            let dests = seen.entry((key, src_offset)).or_default();
-            (dests.insert(dst_offset), dests.len() >= 2)
-        };
-        if fresh {
-            self.record_arc(key, src_offset, dst_offset, 0);
-        }
-        if complete {
+        if self.record_branch(code.as_ptr() as usize, src_offset, dst_offset) >= 2 {
             Ok(self.disable.clone_ref(py))
         } else {
             Ok(py.None())
