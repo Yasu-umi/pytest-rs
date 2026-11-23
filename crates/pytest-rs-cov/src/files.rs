@@ -1,5 +1,6 @@
 //! coverage.py `[paths]` aliasing: a faithful port of `coverage/files.py`'s
-//! `_glob_to_regex` + `globs_to_regex` + `PathAliases` (add/map).
+//! `_glob_to_regex` + `globs_to_regex` + `PathAliases` (add/map), and its
+//! `prep_patterns` + `GlobMatcher` for `omit` / `include`.
 //!
 //! Two uses:
 //!   - tracked judgment (native `LineCollector` + subprocess `_child.py`):
@@ -47,8 +48,10 @@ fn glob_rules() -> &'static [GlobRule] {
             // word characters pass through verbatim.
             make(r"[a-zA-Z0-9_-]+", Some(r"\g<0>")),
             make(r"[\[\]]", None),
-            // Anything else is escaped.
-            make(r".", Some(r"\\\g<0>")),
+            // Anything else is escaped (one backslash: `apply_sub` emits
+            // the substitution verbatim, it does not process escapes like
+            // Python's `re.Match.expand`).
+            make(r".", Some(r"\\g<0>")),
         ]
     })
 }
@@ -214,6 +217,75 @@ impl PathAliases {
     }
 }
 
+/// coverage.py `GlobMatcher` over `prep_patterns(patterns)`: the file-path
+/// patterns of `[run]` / `[report]` `omit` and `include`. A pattern is used as
+/// is, and also resolved against `base` (coverage.py: the current directory)
+/// unless it starts with a wildcard. The whole path must match.
+#[derive(Debug, Clone, Default)]
+pub struct GlobMatcher {
+    regex: Option<Regex>,
+}
+
+impl GlobMatcher {
+    pub fn new(patterns: &[String], bases: &[&Path]) -> Self {
+        Self::from_prepped(&Self::prep(patterns, bases))
+    }
+
+    /// coverage.py `prep_patterns`. coverage.py canonicalizes both the
+    /// patterns and the measured file names; here the file names are as the
+    /// interpreter reports them, so a relative pattern is resolved against
+    /// each spelling of the base (e.g. a symlinked and a canonical one).
+    pub fn prep(patterns: &[String], bases: &[&Path]) -> Vec<String> {
+        let mut prepped: Vec<String> = Vec::new();
+        for pattern in patterns {
+            prepped.push(pattern.clone());
+            if !pattern.starts_with(['*', '?']) {
+                for base in bases {
+                    let resolved = PathAliases::resolve(pattern, base);
+                    if !prepped.contains(&resolved) {
+                        prepped.push(resolved);
+                    }
+                }
+            }
+        }
+        prepped
+    }
+
+    pub fn from_prepped(prepped: &[String]) -> Self {
+        if prepped.is_empty() {
+            return Self { regex: None };
+        }
+        let alternatives: Vec<String> = prepped.iter().map(|p| glob_to_regex(p)).collect();
+        let rx = format!("^(?:{})\\z", alternatives.join("|"));
+        Self {
+            regex: RegexBuilder::new(&rx)
+                .case_insensitive(cfg!(windows))
+                .build()
+                .ok(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.regex.is_none()
+    }
+
+    pub fn matches(&self, path: &str) -> bool {
+        self.regex.as_ref().is_some_and(|rx| rx.is_match(path))
+    }
+
+    /// Match a file as named, or by its canonical path (coverage.py matches
+    /// canonical file names; the interpreter may report a symlinked one).
+    pub fn matches_path(&self, path: &Path) -> bool {
+        if self.regex.is_none() {
+            return false;
+        }
+        self.matches(&path.to_string_lossy())
+            || path
+                .canonicalize()
+                .is_ok_and(|canonical| self.matches(&canonical.to_string_lossy()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -270,5 +342,40 @@ mod tests {
             .map(&absolute.to_string_lossy())
             .expect("alias maps");
         assert_eq!(mapped, base.join("src").join("mod.py").to_string_lossy());
+    }
+
+    #[test]
+    fn glob_matcher_follows_coverage_omit_rules() {
+        let base: &[&Path] = &[Path::new("/proj")];
+        let omit = GlobMatcher::new(
+            &[
+                "*/tests/*".to_string(),
+                "conftest.py".to_string(),
+                "pkg/gen_*.py".to_string(),
+            ],
+            base,
+        );
+        assert!(omit.matches("/proj/pkg/tests/test_a.py"));
+        assert!(omit.matches("/proj/pkg/tests/sub/test_b.py"));
+        // No separator: a file name anywhere.
+        assert!(omit.matches("/proj/conftest.py"));
+        assert!(omit.matches("/proj/pkg/conftest.py"));
+        // Relative to the base, the whole path must match.
+        assert!(omit.matches("/proj/pkg/gen_x.py"));
+        assert!(!omit.matches("/proj/other/pkg/gen_x.py"));
+        assert!(!omit.matches("/proj/pkg/core.py"));
+        assert!(!omit.matches("/proj/pkg/testsuite.py"));
+        assert!(GlobMatcher::new(&[], base).is_empty());
+        assert!(!GlobMatcher::new(&[], base).matches("/proj/a.py"));
+    }
+
+    #[test]
+    fn alias_with_a_dot_matches() {
+        let aliases = PathAliases::from_groups(
+            &[vec!["/proj/src".to_string(), "*/site.d/src".to_string()]],
+            Path::new("/proj"),
+        );
+        assert!(aliases.matches("/build/site.d/src/mod.py"));
+        assert!(!aliases.matches("/build/siteXd/src/mod.py"));
     }
 }

@@ -14,6 +14,9 @@ Activation contract (all set by the running pytest-rs session):
     PYTEST_RS_COV_PATHS    JSON [paths] groups; an alias prefix tracks a file
                            (e.g. a script rsync'd to a worker dir `*/dir1`)
     PYTEST_RS_COV_SIGTERM  "1" to also dump on SIGTERM ([run] sigterm = true)
+    PYTEST_RS_COV_OMIT     JSON list of [run] omit patterns (prepped)
+    PYTEST_RS_COV_INCLUDE  JSON list of [run] include patterns (prepped; only
+                           set without a source)
 """
 
 import os
@@ -103,6 +106,20 @@ def _compile_path_aliases(raw, base):
     return rules
 
 
+def _compile_globs(raw):
+    """coverage.py ``GlobMatcher`` over already-prepped patterns (whole-path
+    match), or None when there are none."""
+    import json
+
+    try:
+        patterns = json.loads(raw) if raw else []
+    except ValueError:
+        patterns = []
+    if not patterns:
+        return None
+    return _re.compile("(?:" + "|".join(_glob_to_regex(p) for p in patterns) + r")\Z")
+
+
 def start():
     out_dir = os.environ.get("PYTEST_RS_COV_OUT")
     if not out_dir:
@@ -116,6 +133,8 @@ def start():
     branch = os.environ.get("PYTEST_RS_COV_BRANCH") == "1"
     sigterm = os.environ.get("PYTEST_RS_COV_SIGTERM") == "1"
     alias_rules = _compile_path_aliases(os.environ.get("PYTEST_RS_COV_PATHS"), root)
+    omit = _compile_globs(os.environ.get("PYTEST_RS_COV_OMIT"))
+    include = _compile_globs(os.environ.get("PYTEST_RS_COV_INCLUDE"))
 
     mon = sys.monitoring
     tool = mon.COVERAGE_ID
@@ -142,6 +161,13 @@ def start():
     def is_tracked(filename):
         if filename.startswith("<") or "site-packages" in filename or "/lib/python" in filename:
             return False
+        if omit is not None or include is not None:
+            # coverage.py matches canonical file names.
+            names = (filename, os.path.realpath(filename))
+            if omit is not None and any(omit.match(n) for n in names):
+                return False
+            if include is not None:
+                return any(include.match(n) for n in names)
         if sources:
             if any(filename == s.rstrip(os.sep) or filename.startswith(s) for s in sources):
                 return True
