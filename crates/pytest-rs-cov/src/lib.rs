@@ -96,6 +96,19 @@ pub struct CovPlugin {
     /// `[report] omit` / `[report] include`: files left out of the report.
     report_omit: GlobMatcher,
     report_include: GlobMatcher,
+    /// `[report] partial_branches` (+ `partial_also`) and
+    /// `partial_branches_always`: branch lines whose missing destinations
+    /// do not count (coverage.py's `no_branch` lines).
+    partial_patterns: Vec<regex::Regex>,
+    /// `[report] skip_empty`, `sort` (or its error), `ignore_errors`.
+    skip_empty: bool,
+    sort: report::ReportSort,
+    sort_error: Option<String>,
+    ignore_errors: bool,
+    /// `[xml] output`, `[lcov] output`, `[json] output`.
+    xml_output: Option<String>,
+    lcov_output: Option<String>,
+    json_output: Option<String>,
     collector: Option<Py<LineCollector>>,
     data: Option<CoverageData>,
     fail_under_message: Option<String>,
@@ -152,6 +165,14 @@ impl CovPlugin {
             run_include: Vec::new(),
             report_omit: GlobMatcher::default(),
             report_include: GlobMatcher::default(),
+            partial_patterns: Vec::new(),
+            skip_empty: false,
+            sort: report::ReportSort::default(),
+            sort_error: None,
+            ignore_errors: false,
+            xml_output: None,
+            lcov_output: None,
+            json_output: None,
             collector: None,
             data: None,
             fail_under_message: None,
@@ -292,6 +313,56 @@ impl CovPlugin {
             .iter()
             .filter_map(|pattern| regex::Regex::new(pattern).ok())
             .collect()
+    }
+
+    /// coverage.py's `partial_list + partial_always_list`:
+    /// `[report] partial_branches` (default `# pragma: no branch`) plus
+    /// `partial_also`, and `partial_branches_always` (default: constant
+    /// `while` / `if` tests).
+    fn load_partial_patterns(rootdir: &Path, cov_config: Option<&str>) -> Vec<regex::Regex> {
+        let list = |option: &str| {
+            Self::section_option_list(rootdir, cov_config, "report", option, true)
+                .filter(|lines| !lines.is_empty())
+        };
+        let mut patterns: Vec<String> = list("partial_branches").unwrap_or_else(|| {
+            vec![r"#\s*(pragma|PRAGMA)[:\s]?\s*(no|NO)\s*(branch|BRANCH)".to_string()]
+        });
+        patterns.extend(list("partial_also").unwrap_or_default());
+        patterns.extend(list("partial_branches_always").unwrap_or_else(|| {
+            vec![
+                r"^\s*while (True|1|False|0):".to_string(),
+                r"^\s*if (True|1|False|0):".to_string(),
+            ]
+        }));
+        patterns
+            .iter()
+            .filter_map(|pattern| {
+                regex::RegexBuilder::new(pattern)
+                    .multi_line(true)
+                    .build()
+                    .ok()
+            })
+            .collect()
+    }
+
+    /// coverage.py's `lines_matching`: the lines a match spans, mapped to
+    /// the first line of their statement.
+    fn lines_matching(
+        source: &str,
+        patterns: &[regex::Regex],
+        multiline: &std::collections::BTreeMap<u32, u32>,
+    ) -> BTreeSet<u32> {
+        let mut lines = BTreeSet::new();
+        for pattern in patterns {
+            for found in pattern.find_iter(source) {
+                let start = source[..found.start()].matches('\n').count() as u32 + 1;
+                let end = source[..found.end()].matches('\n').count() as u32 + 1;
+                for line in start..=end {
+                    lines.insert(multiline.get(&line).copied().unwrap_or(line));
+                }
+            }
+        }
+        lines
     }
 
     /// A list option, from the same config files as
@@ -693,7 +764,9 @@ impl CovPlugin {
                 }
             }
             ReportKind::Json => {
-                let file = dest.unwrap_or("coverage.json");
+                let file = dest
+                    .or(self.json_output.as_deref())
+                    .unwrap_or("coverage.json");
                 let kwargs = core_pyo3::types::PyDict::new(py);
                 kwargs.set_item("outfile", rootdir.join(file).to_string_lossy().as_ref())?;
                 cov.call_method("json_report", (), Some(&kwargs))?;
@@ -859,11 +932,24 @@ impl CovPlugin {
         result
     }
 
-    /// The `.coverage` data file location (COVERAGE_FILE honored).
+    /// The `.coverage` data file location: COVERAGE_FILE, else `[run]
+    /// data_file`, else `.coverage` (coverage.py's precedence).
     fn data_file_path(ctx: &HookContext) -> PathBuf {
+        let configured = || {
+            Self::section_option_value(
+                &ctx.config.rootdir,
+                ctx.config.get_value("cov-config"),
+                "run",
+                "data_file",
+            )
+            .filter(|value| !value.is_empty())
+        };
         match std::env::var("COVERAGE_FILE") {
             Ok(value) => ctx.config.rootdir.join(value),
-            Err(_) => ctx.config.rootdir.join(".coverage"),
+            Err(_) => ctx
+                .config
+                .rootdir
+                .join(configured().unwrap_or_else(|| ".coverage".to_string())),
         }
     }
 
@@ -877,6 +963,7 @@ impl CovPlugin {
         hits: &HashMap<String, BTreeSet<u32>>,
         arcs: &ArcMap,
         context_hits: &HashMap<String, HashMap<String, BTreeSet<u32>>>,
+        unexecuted: &[PathBuf],
     ) -> PyResult<()> {
         let py = ctx.py;
         let Ok(coverage_mod) = py.import("coverage") else {
@@ -943,6 +1030,15 @@ impl CovPlugin {
                 data.call_method1("add_lines", (lines,))?;
             }
         }
+        // Never-imported files under the sources, so reports rendered from
+        // the data file list them at 0% (coverage.py's touch_files).
+        if !unexecuted.is_empty() {
+            let names: Vec<String> = unexecuted
+                .iter()
+                .map(|path| relative_key(&path.to_string_lossy()))
+                .collect();
+            data.call_method1("touch_files", (names,))?;
+        }
         data.call_method0("write")?;
         // Branch arcs use an internal representation (src, dst, direction)
         // that coverage.py's data model cannot hold; a sidecar JSON next to
@@ -969,34 +1065,46 @@ impl CovPlugin {
         PathBuf::from(path)
     }
 
+    /// The .py files under the `--cov` sources (never-imported ones show as
+    /// 0%), minus `[run] omit` — except a source that was never measured at
+    /// all, which coverage.py leaves out entirely.
+    fn source_files(&self, unmeasured_sources: &[PathBuf]) -> BTreeSet<PathBuf> {
+        let run_omit = GlobMatcher::from_prepped(&self.run_omit);
+        let mut files = BTreeSet::new();
+        for source in &self.sources {
+            if unmeasured_sources.contains(source) {
+                continue;
+            }
+            let mut found = BTreeSet::new();
+            Self::walk_py_files(source, &mut found);
+            files.extend(
+                found
+                    .into_iter()
+                    .filter(|path| !run_omit.matches_path(path)),
+            );
+        }
+        files
+    }
+
     fn build_data(
         &self,
         rootdir: &Path,
         hits: HashMap<String, BTreeSet<u32>>,
         arcs: ArcMap,
         unmeasured_sources: &[PathBuf],
-    ) -> CoverageData {
+    ) -> (CoverageData, Vec<(String, String)>) {
         // Report set: every hit file, plus (with explicit --cov=src) every
         // .py file under the sources, so never-imported files show as 0% —
         // except a source that was never measured at all (imported before
         // tracing started, or never imported), which coverage.py excludes
         // entirely rather than showing as a 0% row.
         let mut files: BTreeSet<PathBuf> = hits.keys().map(PathBuf::from).collect();
-        let run_omit = GlobMatcher::from_prepped(&self.run_omit);
-        for source in &self.sources {
-            if unmeasured_sources.contains(source) {
-                continue;
-            }
-            let mut unexecuted = BTreeSet::new();
-            Self::walk_py_files(source, &mut unexecuted);
-            files.extend(
-                unexecuted
-                    .into_iter()
-                    .filter(|path| !run_omit.matches_path(path)),
-            );
-        }
+        files.extend(self.source_files(unmeasured_sources));
 
         let mut rows = Vec::new();
+        // (report failure message, ignore_errors warning) per file that
+        // cannot be read or parsed.
+        let mut errors: Vec<(String, String)> = Vec::new();
         for path in files {
             if self.report_omit.matches_path(&path)
                 || (!self.report_include.is_empty() && !self.report_include.matches_path(&path))
@@ -1005,10 +1113,19 @@ impl CovPlugin {
             }
             let hits = hits.get(&path.to_string_lossy().to_string());
             let Ok(source_text) = std::fs::read_to_string(&path) else {
+                let problem = format!("No source for code: '{}'.", path.display());
+                errors.push((
+                    problem.clone(),
+                    format!("Couldn't parse '{}': {problem}", path.display()),
+                ));
                 continue;
             };
             let Some(analysis) = analysis::analyze(&source_text, &self.exclude_patterns) else {
-                continue; // unparseable: skip rather than misreport
+                errors.push((
+                    format!("Couldn't parse '{}' as Python source", path.display()),
+                    format!("Couldn't parse Python file '{}'", path.display()),
+                ));
+                continue;
             };
             // Runtime events on continuation lines fold onto the
             // statement's first line (coverage.py's multiline map); the
@@ -1100,6 +1217,17 @@ impl CovPlugin {
                     }
                 }
             }
+            // [report] partial_branches: a matching branch line's missing
+            // destinations do not count (coverage.py's `no_branch`).
+            if self.branch && !self.partial_patterns.is_empty() {
+                for line in
+                    Self::lines_matching(&source_text, &self.partial_patterns, &analysis.multiline)
+                {
+                    if let Some(dests) = branches.get(&line) {
+                        taken.insert(line, dests.iter().copied().collect());
+                    }
+                }
+            }
             // `path` is already canonical here: [paths] aliasing (e.g. a
             // worker's chdir copy matched by `*/dir1`) is applied once, when
             // the hit/arc is first recorded (collector.rs's `canonical_name`,
@@ -1120,10 +1248,15 @@ impl CovPlugin {
             });
         }
         rows.sort_by(|a, b| a.name.cmp(&b.name));
-        CoverageData {
-            rows,
-            branch: self.branch,
-        }
+        (
+            CoverageData {
+                rows,
+                branch: self.branch,
+                skip_empty: self.skip_empty,
+                sort: self.sort,
+            },
+            errors,
+        )
     }
 
     /// `--cov-context=test`: mirrors pytest-cov's `TestContextPlugin.
@@ -1310,6 +1443,27 @@ impl Plugin for CovPlugin {
             .iter()
             .map(|value| Self::resolve_source(py, &rootdir, value))
             .collect();
+        // A bare `--cov` leaves the source to the coverage config, like
+        // pytest-cov: `[run] source` (paths or importable names) and
+        // `[run] source_pkgs` (importable names only).
+        if self.cov_source_names.is_empty() {
+            let cov_config = ctx.config.get_value("cov-config");
+            let config_list = |option: &str| {
+                Self::section_option_list(&ctx.config.rootdir, cov_config, "run", option, false)
+                    .unwrap_or_default()
+            };
+            for name in config_list("source") {
+                self.sources.push(Self::resolve_source(py, &rootdir, &name));
+                self.cov_source_names.push(name);
+            }
+            for name in config_list("source_pkgs") {
+                let source = Self::resolve_import_source(py, &name)
+                    .map(|path| path.canonicalize().unwrap_or(path))
+                    .unwrap_or_else(|| Self::resolve_source(py, &rootdir, &name));
+                self.sources.push(source);
+                self.cov_source_names.push(name);
+            }
+        }
         self.reports = Self::parse_reports(py, ctx.config.get_values("cov-report"))?;
         let cov_config = ctx.config.get_value("cov-config");
         let plain_rootdir = ctx.config.rootdir.clone();
@@ -1367,6 +1521,20 @@ impl Plugin for CovPlugin {
         self.run_include = GlobMatcher::prep(&list("run", "include"), &pattern_base);
         self.report_omit = GlobMatcher::new(&list("report", "omit"), &pattern_base);
         self.report_include = GlobMatcher::new(&list("report", "include"), &pattern_base);
+        self.partial_patterns = Self::load_partial_patterns(&rootdir, cov_config);
+        let truthy_option = |section: &str, option: &str| {
+            Self::section_option_value(&plain_rootdir, cov_config, section, option)
+                .is_some_and(|value| Self::truthy(&value))
+        };
+        self.skip_empty = truthy_option("report", "skip_empty");
+        self.ignore_errors = truthy_option("report", "ignore_errors");
+        let output = |section: &str| {
+            Self::section_option_value(&plain_rootdir, cov_config, section, "output")
+                .filter(|value| !value.is_empty())
+        };
+        self.xml_output = output("xml");
+        self.lcov_output = output("lcov");
+        self.json_output = output("json");
 
         let separator = std::path::MAIN_SEPARATOR.to_string();
         let with_sep = |path: &Path| {
@@ -1380,6 +1548,13 @@ impl Plugin for CovPlugin {
         self.branch = ctx.config.get_flag("cov-branch")
             || Self::branch_enabled(&ctx.config.rootdir, ctx.config.get_value("cov-config"));
         self.context_enabled = ctx.config.get_value("cov-context") == Some("test");
+        match report::ReportSort::parse(
+            Self::section_option_value(&plain_rootdir, cov_config, "report", "sort").as_deref(),
+            self.branch,
+        ) {
+            Ok(sort) => self.sort = sort,
+            Err(message) => self.sort_error = Some(message),
+        }
         self.path_aliases =
             Self::paths_aliases(&ctx.config.rootdir, ctx.config.get_value("cov-config"));
         // An xdist worker runs with a rootdir set to its chdir; the coverage
@@ -1783,13 +1958,39 @@ impl Plugin for CovPlugin {
                 "No data was collected. (no-data-collected)",
             )?;
         }
-        self.write_data_file(ctx, &hits, &arcs, &context_hits)?;
+        let unexecuted: Vec<PathBuf> = self
+            .source_files(&unmeasured_sources)
+            .into_iter()
+            .filter(|path| !hits.contains_key(path.to_string_lossy().as_ref()))
+            .collect();
+        self.write_data_file(ctx, &hits, &arcs, &context_hits, &unexecuted)?;
         let rootdir = ctx
             .config
             .rootdir
             .canonicalize()
             .unwrap_or_else(|_| ctx.config.rootdir.clone());
-        let data = self.build_data(&rootdir, hits, arcs, &unmeasured_sources);
+        let (data, errors) = self.build_data(&rootdir, hits, arcs, &unmeasured_sources);
+
+        // A file that cannot be read or parsed fails the reports, like
+        // coverage.py, unless `[report] ignore_errors` (then a warning);
+        // so does an invalid `[report] sort`.
+        let failure = if self.ignore_errors {
+            for (_, warning) in &errors {
+                Self::emit_warning(py, "CoverageWarning", &format!("{warning} (couldnt-parse)"))?;
+            }
+            None
+        } else {
+            errors.first().map(|(failure, _)| failure.clone())
+        };
+        if let Some(problem) = self.sort_error.clone().or(failure)
+            && !self.reports.is_empty()
+        {
+            let message = format!("Failed to generate report: {problem}");
+            Self::emit_warning(py, "CovReportWarning", &message)?;
+            self.report_messages = Vec::new();
+            self.report_failed_message = Some(message);
+            return Ok(());
+        }
 
         // coverage.py's report_core.get_analysis_to_report: an empty file
         // set (nothing matched any `--cov` source at all) fails every
@@ -1827,9 +2028,15 @@ impl Plugin for CovPlugin {
                 }
                 ReportKind::Term | ReportKind::TermMissing => continue,
             };
+            let configured = match spec.kind {
+                ReportKind::Xml => self.xml_output.clone(),
+                ReportKind::Lcov => self.lcov_output.clone(),
+                _ => None,
+            };
             let dest = spec
                 .dest
                 .clone()
+                .or(configured)
                 .unwrap_or_else(|| default_dest.to_string());
             let path = ctx.config.rootdir.join(&dest);
             std::fs::write(&path, content)

@@ -4,10 +4,15 @@
 - `[report] omit` / `[report] include`: files left out of the report.
 - `[report] exclude_also`: added to the default (or custom) `exclude_lines`.
 - `exclude_lines` / `exclude_also` from `setup.cfg` `[coverage:report]`.
+- `[run] source` / `source_pkgs` for a bare `--cov`, `[run] data_file`.
+- `[report] partial_branches`, `skip_empty`, `sort`, `ignore_errors`.
+- `[xml] output`.
+- File names with `/./` (from `pythonpath = ["."]`) match their source.
 """
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import re
 import subprocess
@@ -68,19 +73,25 @@ class TestCovConfigKeys(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(textwrap.dedent(content).lstrip("\n"))
 
-    def rows(self, *args: str) -> dict[str, tuple[int, int]]:
-        """Report rows: file -> (statements, missing)."""
+    def output(self, *args: str, cov: str = "--cov=.") -> str:
         result = subprocess.run(
-            [str(BINARY), "-p", "no:cacheprovider", "--cov=.", "tests", *args],
+            # The path first: a bare `--cov` would take it as its value.
+            [str(BINARY), "-p", "no:cacheprovider", "tests", cov, *args],
             cwd=self.base,
             capture_output=True,
             text=True,
             env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return result.stdout
+
+    def rows(self, *args: str, cov: str = "--cov=.") -> dict[str, tuple[int, int]]:
+        """Report rows: file -> (statements, missing)."""
         return {
             name: (int(stmts), int(miss))
-            for name, stmts, miss in re.findall(r"^(\S+\.py)\s+(\d+)\s+(\d+)", result.stdout, re.M)
+            for name, stmts, miss in re.findall(
+                r"^(\S+\.py)\s+(\d+)\s+(\d+)", self.output(*args, cov=cov), re.M
+            )
         }
 
     def pyproject(self, toml: str) -> None:
@@ -132,6 +143,111 @@ class TestCovConfigKeys(unittest.TestCase):
         rows = self.rows()
         self.assertNotIn("tests/test_app.py", rows)
         self.assertEqual(rows["app/core.py"], (3, 0))
+
+    def test_source_dir_with_dot_on_sys_path(self) -> None:
+        """`pythonpath = ["."]` puts `rootdir/.` on sys.path, so file names
+        contain `/./`; they still fall under `--cov=app`."""
+        self.pyproject("")
+        rows = self.rows(cov="--cov=app")
+        self.assertEqual(rows["app/core.py"], (4, 1))
+        self.assertNotIn("tests/test_app.py", rows)
+
+    def test_bare_cov_uses_run_source(self) -> None:
+        self.pyproject('[tool.coverage.run]\nsource = ["app"]\n')
+        rows = self.rows(cov="--cov")
+        self.assertIn("app/core.py", rows)
+        self.assertNotIn("tests/test_app.py", rows)
+
+    def test_bare_cov_uses_source_pkgs(self) -> None:
+        self.pyproject('[tool.coverage.run]\nsource_pkgs = ["app.extra"]\n')
+        rows = self.rows(cov="--cov")
+        self.assertIn("app/extra/helper.py", rows)
+        self.assertNotIn("app/core.py", rows)
+
+    @unittest.skipUnless(importlib.util.find_spec("coverage"), "writes need coverage")
+    def test_data_file(self) -> None:
+        self.pyproject('[tool.coverage.run]\ndata_file = "out/covdata"\n')
+        (self.base / "out").mkdir()
+        self.rows()
+        self.assertTrue((self.base / "out/covdata").exists())
+        self.assertFalse((self.base / ".coverage").exists())
+
+    def test_xml_output(self) -> None:
+        self.pyproject('[tool.coverage.xml]\noutput = "reports/cov.xml"\n')
+        (self.base / "reports").mkdir()
+        out = self.output("--cov-report=xml")
+        self.assertIn("Coverage XML written to file reports/cov.xml", out)
+        self.assertTrue((self.base / "reports/cov.xml").exists())
+
+    def test_skip_empty(self) -> None:
+        self.pyproject("[tool.coverage.report]\nskip_empty = true\n")
+        out = self.output()
+        self.assertNotIn("app/__init__.py", out)
+        self.assertIn("2 empty files skipped.", out)
+
+    def test_sort(self) -> None:
+        self.pyproject('[tool.coverage.report]\nsort = "-miss"\n')
+        names = re.findall(r"^(\S+\.py)\s+\d+\s+\d+", self.output(), re.M)
+        self.assertEqual(names[0], "app/core.py")
+
+    def test_invalid_sort_fails_the_report(self) -> None:
+        self.pyproject('[tool.coverage.report]\nsort = "size"\n')
+        self.assertIn("Failed to generate report: Invalid sorting option: 'size'", self.output())
+
+    def test_partial_branches(self) -> None:
+        self.write(
+            "app/core.py",
+            """
+            def used(flag=True):
+                if flag:
+                    return 1
+                return 0
+
+
+            def other(flag=True):
+                if flag:  # pragma: no branch
+                    return 1
+                return 0
+            """,
+        )
+        self.write(
+            "tests/test_app.py",
+            """
+            from app.core import used, other
+
+
+            def test_used():
+                assert used() == 1
+                assert other() == 1
+            """,
+        )
+        self.pyproject("[tool.coverage.run]\nbranch = true\n")
+        # Name, Stmts, Miss, Branch, BrPart: only `used`'s `if` is partial.
+        row = re.search(r"^app/core\.py\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)", self.output(), re.M)
+        assert row is not None
+        self.assertEqual((int(row.group(3)), int(row.group(4))), (4, 1))
+
+    def test_missing_source_fails_the_report_unless_ignore_errors(self) -> None:
+        self.write("app/gone.py", "def gone():\n    return 3\n")
+        self.write(
+            "tests/test_app.py",
+            """
+            import os
+            from app import gone
+
+
+            def test_gone():
+                assert gone.gone() == 3
+                os.remove(gone.__file__)
+            """,
+        )
+        self.pyproject("")
+        self.assertIn("Failed to generate report: No source for code:", self.output())
+        self.write("app/gone.py", "def gone():\n    return 3\n")
+        self.pyproject("[tool.coverage.report]\nignore_errors = true\n")
+        out = self.output()
+        self.assertNotIn("Failed to generate report", out)
+        self.assertIn("app/core.py", out)
 
 
 if __name__ == "__main__":

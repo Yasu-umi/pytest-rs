@@ -66,6 +66,76 @@ pub struct CoverageData {
     pub rows: Vec<FileRow>,
     /// Branch coverage was measured (adds Branch/BrPart columns).
     pub branch: bool,
+    /// `[report] skip_empty`: files without statements are left out.
+    pub skip_empty: bool,
+    /// `[report] sort` (already validated by [`ReportSort::parse`]).
+    pub sort: ReportSort,
+}
+
+/// `[report] sort`: the terminal table's row order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SortColumn {
+    #[default]
+    Name,
+    Stmts,
+    Miss,
+    Branch,
+    BrPart,
+    Cover,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ReportSort {
+    pub column: SortColumn,
+    pub reverse: bool,
+}
+
+impl ReportSort {
+    /// coverage.py's `sort` option: a column name, `-` to reverse, `+`
+    /// allowed; Branch / BrPart only in branch mode. The error is
+    /// coverage.py's message.
+    pub fn parse(value: Option<&str>, branch: bool) -> Result<Self, String> {
+        let Some(raw) = value else {
+            return Ok(Self::default());
+        };
+        let lowered = raw.to_lowercase();
+        let (reverse, name) = match lowered.strip_prefix('-') {
+            Some(rest) => (true, rest),
+            None => (false, lowered.strip_prefix('+').unwrap_or(&lowered)),
+        };
+        let column = match name {
+            "name" => SortColumn::Name,
+            "stmts" => SortColumn::Stmts,
+            "miss" => SortColumn::Miss,
+            "cover" => SortColumn::Cover,
+            "branch" if branch => SortColumn::Branch,
+            "brpart" if branch => SortColumn::BrPart,
+            _ => return Err(format!("Invalid sorting option: '{raw}'")),
+        };
+        Ok(Self { column, reverse })
+    }
+}
+
+/// coverage.py's `human_key`: digit runs compare as numbers.
+fn human_key(text: &str) -> Vec<(u8, u128, String)> {
+    let mut out = Vec::new();
+    let mut rest = text;
+    while !rest.is_empty() {
+        let digits = rest.len() - rest.trim_start_matches(|c: char| c.is_ascii_digit()).len();
+        if digits > 0 {
+            let (number, tail) = rest.split_at(digits);
+            out.push((1, number.parse().unwrap_or(u128::MAX), String::new()));
+            rest = tail;
+        } else {
+            let end = rest
+                .find(|c: char| c.is_ascii_digit())
+                .unwrap_or(rest.len());
+            let (chunk, tail) = rest.split_at(end);
+            out.push((0, 0, chunk.to_string()));
+            rest = tail;
+        }
+    }
+    out
 }
 
 impl CoverageData {
@@ -279,10 +349,42 @@ pub fn render_term(
     out.push_str(&rule);
     out.push('\n');
     let mut skipped = 0usize;
-    for row in &data.rows {
+    let mut empty = 0usize;
+    let mut ordered: Vec<&FileRow> = data.rows.iter().collect();
+    let percent = |row: &FileRow| {
+        let (covered, total) = row.units();
+        if total == 0 {
+            100.0
+        } else {
+            covered as f64 * 100.0 / total as f64
+        }
+    };
+    match data.sort.column {
+        SortColumn::Name => ordered.sort_by_key(|row| human_key(&row.name)),
+        column => ordered.sort_by(|a, b| {
+            let value = |row: &FileRow| match column {
+                SortColumn::Stmts => row.stmts() as f64,
+                SortColumn::Miss => row.miss() as f64,
+                SortColumn::Branch => row.n_branches() as f64,
+                SortColumn::BrPart => row.n_partial() as f64,
+                _ => percent(row),
+            };
+            value(a)
+                .total_cmp(&value(b))
+                .then_with(|| a.name.cmp(&b.name))
+        }),
+    }
+    if data.sort.reverse {
+        ordered.reverse();
+    }
+    for row in ordered {
         let (covered_units, total_units) = row.units();
         if skip_covered && row.stmts() > 0 && covered_units == total_units {
             skipped += 1;
+            continue;
+        }
+        if data.skip_empty && row.stmts() == 0 {
+            empty += 1;
             continue;
         }
         let ranges = missing.then(|| {
@@ -323,6 +425,12 @@ pub fn render_term(
             if skipped == 1 { "" } else { "s" }
         ));
     }
+    if empty > 0 {
+        out.push_str(&format!(
+            "\n{empty} empty file{} skipped.\n",
+            if empty == 1 { "" } else { "s" }
+        ));
+    }
     out
 }
 
@@ -357,7 +465,11 @@ pub fn render_xml(data: &CoverageData, rootdir: &str) -> String {
         xml_escape(rootdir)
     ));
     out.push_str("\t<packages>\n\t\t<package name=\".\">\n\t\t\t<classes>\n");
-    for row in &data.rows {
+    for row in data
+        .rows
+        .iter()
+        .filter(|row| !(data.skip_empty && row.stmts() == 0))
+    {
         let rate = if row.stmts() == 0 {
             1.0
         } else {
@@ -383,7 +495,11 @@ pub fn render_xml(data: &CoverageData, rootdir: &str) -> String {
 /// lcov tracefile format.
 pub fn render_lcov(data: &CoverageData) -> String {
     let mut out = String::new();
-    for row in &data.rows {
+    for row in data
+        .rows
+        .iter()
+        .filter(|row| !(data.skip_empty && row.stmts() == 0))
+    {
         out.push_str("TN:\n");
         out.push_str(&format!("SF:{}\n", row.name));
         for line in &row.executable {
