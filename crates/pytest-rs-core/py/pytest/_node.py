@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from _pytest.config import Config
     from _pytest.nodeid import NodeId
 
+    from pytest import ExitCode
     from pytest._marks import Mark, MarkDecorator
     from pytest._stash import Stash
 
@@ -577,6 +578,7 @@ class Session(Collector):
     if TYPE_CHECKING:
         shouldfail: bool | str
         shouldstop: bool | str
+        exitstatus: int | ExitCode
 
         @property
         def startpath(self) -> pathlib.Path: ...
