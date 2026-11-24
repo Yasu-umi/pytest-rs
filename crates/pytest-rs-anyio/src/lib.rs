@@ -511,6 +511,7 @@ impl Plugin for AnyioPlugin {
                         collector_class: item.collector_class.clone(),
                         func_class: item.func_class.clone(),
                         py_node: None,
+                        node_class: item.node_class.as_ref().map(|cls| cls.clone_ref(py)),
                         max_param_scope: item.max_param_scope,
                         scope_sort_keys: item.scope_sort_keys.clone(),
                     });

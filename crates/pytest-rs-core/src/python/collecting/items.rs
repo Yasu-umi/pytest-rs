@@ -153,6 +153,7 @@ pub(crate) fn introspect_namespace(
                     collector_class: String::new(),
                     func_class: class_name,
                     py_node,
+                    node_class: None,
                     max_param_scope: crate::fixture::Scope::Function,
                     scope_sort_keys: Vec::new(),
                 });
@@ -442,6 +443,7 @@ pub(crate) fn collect_testcase(
             collector_class: String::new(),
             func_class: String::new(),
             py_node: None,
+            node_class: None,
             max_param_scope: crate::fixture::Scope::Function,
             scope_sort_keys: Vec::new(),
         });

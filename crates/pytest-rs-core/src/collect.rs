@@ -55,6 +55,10 @@ pub struct TestItem {
     /// new `Function` so custom subclasses (with overridden `reportinfo` etc.)
     /// and attributes set by wrapper hooks are preserved.
     pub py_node: Option<Py<PyAny>>,
+    /// The node class to build this item with instead of `Function` (a
+    /// native plugin's own item type, e.g. pytest-asyncio's `Coroutine`),
+    /// called like `Function`. `func_class` carries its name.
+    pub node_class: Option<Py<PyAny>>,
     /// Highest parametrize scope across all dimensions (for item reordering).
     pub max_param_scope: crate::fixture::Scope,
     /// Per non-function-scoped parametrized arg: (argname, scope, index). The

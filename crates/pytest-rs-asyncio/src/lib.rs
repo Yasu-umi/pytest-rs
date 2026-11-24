@@ -631,6 +631,31 @@ impl Plugin for AsyncioPlugin {
         Ok(())
     }
 
+    /// Upstream's `pytest_pycollect_makeitem` wrapper: an `async def` test
+    /// the plugin runs is a `Coroutine` item (`str(item)` is
+    /// `<Coroutine test_x>`, which pytest-split's tie-break sorts by), from
+    /// collection on, so the conftest `pytest_collection_modifyitems` hooks
+    /// and `--collect-only` see it too.
+    fn pytest_collection_preexpand(
+        &self,
+        ctx: &mut HookContext,
+        items: &mut Vec<TestItem>,
+    ) -> PyResult<()> {
+        let is_candidate = |item: &TestItem| {
+            item.is_coroutine && item.func_class.is_empty() && self.applicable(item)
+        };
+        if !items.iter().any(is_candidate) {
+            return Ok(());
+        }
+        let py = ctx.py;
+        let coroutine = py.import("pytest_asyncio.plugin")?.getattr("Coroutine")?;
+        for item in items.iter_mut().filter(|item| is_candidate(item)) {
+            item.func_class = "Coroutine".to_string();
+            item.node_class = Some(coroutine.clone().unbind());
+        }
+        Ok(())
+    }
+
     fn pytest_collection_modifyitems(
         &self,
         ctx: &mut HookContext,
@@ -721,6 +746,7 @@ impl Plugin for AsyncioPlugin {
                     collector_class: item.collector_class.clone(),
                     func_class: item.func_class.clone(),
                     py_node: None,
+                    node_class: item.node_class.as_ref().map(|cls| cls.clone_ref(py)),
                     max_param_scope: item.max_param_scope,
                     scope_sort_keys: item.scope_sort_keys.clone(),
                 });
@@ -892,6 +918,7 @@ impl Plugin for AsyncioPlugin {
                     collector_class: item.collector_class.clone(),
                     func_class: item.func_class.clone(),
                     py_node: None,
+                    node_class: item.node_class.as_ref().map(|cls| cls.clone_ref(py)),
                     max_param_scope: item.max_param_scope,
                     scope_sort_keys: item.scope_sort_keys.clone(),
                 });

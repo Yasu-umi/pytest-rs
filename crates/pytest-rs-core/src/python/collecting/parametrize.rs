@@ -202,6 +202,7 @@ pub(crate) fn push_test_items(
             collector_class: String::new(),
             func_class: String::new(),
             py_node: None,
+            node_class: None,
             max_param_scope: variant.max_param_scope,
             scope_sort_keys: variant.scope_sort_keys,
         });

@@ -1705,7 +1705,9 @@ class Function(Node):
         return id(self)
 
     def __repr__(self):
-        return f"<Function {getattr(self, 'name', '')}>"
+        # Upstream Node.__repr__: the node's own class (a plugin's Function
+        # subclass, e.g. pytest-asyncio's `<Coroutine test_x>`).
+        return f"<{type(self).__name__} {getattr(self, 'name', '')}>"
 
     @property
     def location(self):

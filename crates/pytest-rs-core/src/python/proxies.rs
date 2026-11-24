@@ -368,14 +368,21 @@ pub fn make_node(py: Python<'_>, item: &TestItem) -> PyResult<Py<PyAny>> {
         // work with and stays None. Assign the authoritative nodeid Rust
         // already computed (nodeid.setter exists precisely for this).
         n.setattr("nodeid", item.nodeid.as_str())?;
+        // Marks added to the item since the node was built (a native
+        // plugin's pytest_collection_modifyitems, e.g. pytest-asyncio's
+        // implicit asyncio mark) reach the node the hooks keep seeing.
+        n.setattr("own_markers", &marks)?;
         n
     } else {
-        let node_cls = if item.is_doctest {
-            "DoctestNode"
-        } else {
-            "Function"
+        let node_cls = match &item.node_class {
+            Some(cls) => cls.bind(py).clone(),
+            None => py.import("pytest._node")?.getattr(if item.is_doctest {
+                "DoctestNode"
+            } else {
+                "Function"
+            })?,
         };
-        py.import("pytest._node")?.getattr(node_cls)?.call1((
+        node_cls.call1((
             item.nodeid.as_str(),
             name,
             marks,

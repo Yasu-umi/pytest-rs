@@ -705,6 +705,7 @@ pub fn collect_custom_files(
                     collector_class: collector_class.clone(),
                     func_class,
                     py_node: None,
+                    node_class: None,
                     max_param_scope: crate::fixture::Scope::Function,
                     scope_sort_keys: Vec::new(),
                 });
