@@ -31,6 +31,7 @@ struct Walker<'a> {
     lines: BTreeSet<u32>,
     spans: Vec<Span>,
     branches: BTreeMap<u32, Vec<i64>>,
+    withs: BTreeMap<u32, (u32, i64)>,
     multiline: BTreeMap<u32, u32>,
     /// Lines coverage.py excludes via AST rather than a pragma: leading
     /// docstrings (module/class/function). Merged into `excluded` so an
@@ -54,7 +55,13 @@ struct Walker<'a> {
     /// separate `__annotate__` object and coverage.py counts a line only when
     /// the annotation builds a nested code object (a lambda/generator).
     future_annotations: bool,
+    /// Python 3.14+: class-level bare annotations are evaluated lazily.
+    lazy_annotations: bool,
 }
+
+/// A line that is only `...` (and maybe a comment).
+static BARE_ELLIPSIS_RE: std::sync::LazyLock<regex::Regex> =
+    std::sync::LazyLock::new(|| regex::Regex::new(r"^\s*\.\.\.\s*(#|$)").expect("valid regex"));
 
 /// coverage.py's default stub exclusion (one of its DEFAULT_EXCLUDE entries):
 /// a line that is `...`, optionally prefixed by a one-line def signature whose
@@ -79,6 +86,11 @@ pub struct FileAnalysis {
     /// EXIT for leaving the scope), coverage.py's source-level arcs for
     /// if/while/for.
     pub branches: BTreeMap<u32, Vec<i64>>,
+    /// `with` statements: header line -> (last line of the body, where
+    /// execution continues after it). Leaving the body jumps back to the
+    /// header to run `__exit__`; coverage.py presents that jump as going
+    /// on to the next statement.
+    pub withs: BTreeMap<u32, (u32, i64)>,
 }
 
 /// coverage.py's default exclude_lines regex (`# pragma: no cover`).
@@ -92,7 +104,18 @@ pub const DEFAULT_EXCLUDE_TYPE_CHECKING: &str = r"if (typing\.)?TYPE_CHECKING:";
 /// The executable lines of `source`, or None if it does not parse.
 /// `excludes` are the effective exclude_lines regexes: a match on a
 /// statement's header line excludes the whole statement.
+#[cfg(test)]
 pub fn analyze(source: &str, excludes: &[regex::Regex]) -> Option<FileAnalysis> {
+    analyze_for(source, excludes, true)
+}
+
+/// [`analyze`] for a given Python: `lazy_annotations` (3.14+, PEP 649) when
+/// class-level bare annotations compile to no code of their own.
+pub fn analyze_for(
+    source: &str,
+    excludes: &[regex::Regex],
+    lazy_annotations: bool,
+) -> Option<FileAnalysis> {
     let parsed = ruff_python_parser::parse_module(source).ok()?;
     let index = LineIndex::from_source_text(source);
     let mut walker = Walker {
@@ -100,11 +123,13 @@ pub fn analyze(source: &str, excludes: &[regex::Regex]) -> Option<FileAnalysis> 
         lines: BTreeSet::new(),
         spans: Vec::new(),
         branches: BTreeMap::new(),
+        withs: BTreeMap::new(),
         multiline: BTreeMap::new(),
         stub_excluded: BTreeSet::new(),
         stub_candidates: Vec::new(),
         scope: BodyScope::Module,
         future_annotations: module_has_future_annotations(&parsed.syntax().body),
+        lazy_annotations,
     };
     walker.exclude_leading_docstring(&parsed.syntax().body);
     walker.visit_body(&parsed.syntax().body, EXIT);
@@ -124,6 +149,11 @@ pub fn analyze(source: &str, excludes: &[regex::Regex]) -> Option<FileAnalysis> 
         }
     }
     for (lineno, line) in source.lines().enumerate() {
+        // A bare `...` line: coverage.py's default exclusion (its stub
+        // regex) matches it wherever it is, not only in a stub def.
+        if BARE_ELLIPSIS_RE.is_match(line) {
+            excluded.insert((lineno + 1) as u32);
+        }
         if excludes.iter().any(|pattern| pattern.is_match(line)) {
             let line_number = (lineno + 1) as u32;
             excluded.insert(line_number);
@@ -134,16 +164,31 @@ pub fn analyze(source: &str, excludes: &[regex::Regex]) -> Option<FileAnalysis> 
             }
         }
     }
+    // Arcs into excluded lines do not exist for coverage.py, so a branch
+    // left with a single destination is no branch.
     let branches = walker
         .branches
         .into_iter()
         .filter(|(line, _)| !excluded.contains(line))
+        .map(|(line, dests)| {
+            let dests: Vec<i64> = dests
+                .into_iter()
+                .filter(|dest| u32::try_from(*dest).map_or(true, |d| !excluded.contains(&d)))
+                .collect();
+            (line, dests)
+        })
+        .filter(|(_, dests)| dests.len() > 1)
         .collect();
+    let mut multiline = logical_lines(parsed.tokens(), &index);
+    for (line, first) in walker.multiline {
+        multiline.entry(line).or_insert(first);
+    }
     Some(FileAnalysis {
         executable: walker.lines.difference(&excluded).copied().collect(),
-        multiline: walker.multiline,
+        multiline,
         excluded,
         branches,
+        withs: walker.withs,
     })
 }
 
@@ -186,6 +231,21 @@ impl Walker<'_> {
         for (i, stmt) in body.iter().enumerate() {
             let next = self.first_line(&body[i + 1..]).unwrap_or(after);
             self.visit_stmt(stmt, next);
+            // The compiler drops the statements after an unconditional
+            // jump in the same block: no statements (coverage.py reads them
+            // from the bytecode).
+            if matches!(
+                stmt,
+                Stmt::Return(_) | Stmt::Raise(_) | Stmt::Continue(_) | Stmt::Break(_)
+            ) && let (Some(first), Some(last)) = (body.get(i + 1), body.last())
+            {
+                let (first, last) = (
+                    self.line(first.range().start()),
+                    self.line(last.range().end()),
+                );
+                self.stub_excluded.extend(first..=last);
+                break;
+            }
         }
     }
 
@@ -362,7 +422,20 @@ impl Walker<'_> {
                         self.add_branch(*header, [body_first, onward]);
                     }
                 }
-                for (_, _, body) in &headers {
+                for (_, test, body) in &headers {
+                    // `if not __debug__:` compiles to nothing: its body is
+                    // no statement (coverage.py reads statements from the
+                    // bytecode).
+                    if is_debug_test(test) == Some(false) {
+                        if let (Some(first), Some(last)) = (body.first(), body.last()) {
+                            let (first, last) = (
+                                self.line(first.range().start()),
+                                self.line(last.range().end()),
+                            );
+                            self.stub_excluded.extend(first..=last);
+                        }
+                        continue;
+                    }
                     self.visit_body(body, next);
                 }
                 if let Some(else_body) = bare_else {
@@ -397,6 +470,8 @@ impl Walker<'_> {
                 self.visit_body(&for_stmt.orelse, next);
             }
             Stmt::With(with_stmt) => {
+                self.withs
+                    .insert(self.line(start), (self.line(stmt.range().end()), next));
                 self.mark(start);
                 self.record_span(stmt, start);
                 if let Some(last_item) = with_stmt.items.last() {
@@ -445,8 +520,24 @@ impl Walker<'_> {
                 self.mark(start);
                 self.record_span(stmt, start);
                 self.fold_multiline(start, match_stmt.subject.range());
-                for case in &match_stmt.cases {
+                for (i, case) in match_stmt.cases.iter().enumerate() {
                     self.mark(case.range.start());
+                    // A refutable case branches to its body or onward to the
+                    // next case (past the match after the last one); an
+                    // irrefutable one (`case _:`, a bare capture, no guard)
+                    // always enters its body.
+                    let irrefutable = case.guard.is_none()
+                        && matches!(
+                            &case.pattern,
+                            ruff_python_ast::Pattern::MatchAs(m) if m.pattern.is_none()
+                        );
+                    if !irrefutable && let Some(body_first) = self.first_line(&case.body) {
+                        let onward = match_stmt
+                            .cases
+                            .get(i + 1)
+                            .map_or(next, |c| i64::from(self.line(c.range.start())));
+                        self.add_branch(self.line(case.range.start()), [body_first, onward]);
+                    }
                     // Per-case span: a `# pragma` on a `case ...:` line excludes
                     // that case's body (e.g. `case _: assert_never(x)`).
                     let case_line = self.line(case.range.start());
@@ -480,7 +571,8 @@ impl Walker<'_> {
             Stmt::Global(_) | Stmt::Nonlocal(_) => {}
             // A bare annotation (`x: T`, no value). coverage.py counts it:
             //  - at module scope: always;
-            //  - at class scope: under `from __future__ import annotations`
+            //  - at class scope: before Python 3.14 (eagerly stored); on
+            //    3.14+ under `from __future__ import annotations`
             //    (eager string store), or when the annotation builds a nested
             //    code object — a lambda/generator — whose line PEP 649's lazy
             //    `__annotate__` still emits (a plain `x: int` does not);
@@ -489,7 +581,8 @@ impl Walker<'_> {
                 let counts = match self.scope {
                     BodyScope::Module => true,
                     BodyScope::Class => {
-                        self.future_annotations
+                        !self.lazy_annotations
+                            || self.future_annotations
                             || any_over_expr(&ann.annotation, |e| {
                                 matches!(e, Expr::Lambda(_) | Expr::Generator(_))
                             })
@@ -560,7 +653,52 @@ fn is_constant_literal(expr: &Expr) -> bool {
             | Expr::BooleanLiteral(_)
             | Expr::NoneLiteral(_)
             | Expr::EllipsisLiteral(_)
-    )
+    ) || is_debug_test(expr).is_some()
+}
+
+/// `__debug__` / `not __debug__`: constants the compiler folds (True
+/// without -O), so `if not __debug__:` compiles to no code at all.
+fn is_debug_test(expr: &Expr) -> Option<bool> {
+    match expr {
+        Expr::Name(name) if name.id.as_str() == "__debug__" => Some(true),
+        Expr::UnaryOp(op) if op.op == ruff_python_ast::UnaryOp::Not => {
+            is_debug_test(&op.operand).map(|v| !v)
+        }
+        _ => None,
+    }
+}
+
+/// coverage.py's multiline map, from the tokens: every physical line of a
+/// logical line (a statement, a decorator, a header) maps to its first.
+fn logical_lines(
+    tokens: &[ruff_python_ast::token::Token],
+    index: &LineIndex,
+) -> BTreeMap<u32, u32> {
+    use ruff_python_ast::token::TokenKind;
+    let mut map = BTreeMap::new();
+    let mut first: Option<u32> = None;
+    for token in tokens {
+        match token.kind() {
+            TokenKind::Newline => {
+                if let Some(first_line) = first.take() {
+                    let last = index.line_index(token.range().start()).get() as u32;
+                    for line in (first_line + 1)..=last {
+                        map.insert(line, first_line);
+                    }
+                }
+            }
+            TokenKind::NonLogicalNewline
+            | TokenKind::Comment
+            | TokenKind::Indent
+            | TokenKind::Dedent => {}
+            _ => {
+                if first.is_none() {
+                    first = Some(index.line_index(token.range().start()).get() as u32);
+                }
+            }
+        }
+    }
+    map
 }
 
 #[cfg(test)]
@@ -746,5 +884,113 @@ def f() -> None:
         assert!(executable("# just a comment\n").is_empty());
         assert!(executable("\"\"\"Only a module docstring.\"\"\"\n").is_empty());
         assert!(executable("def f() -> int: ...\n").is_empty());
+    }
+
+    #[test]
+    fn continuation_lines_fold_onto_their_logical_line() {
+        let src = "\
+@decorate(
+    a=1,
+    b=2,
+)
+def f(x):
+    if (x
+        and x > 1):
+        return 1
+    return 2
+
+
+class C(
+    Base,
+):
+    pass
+";
+        let analysis = analyze(src, &[]).unwrap();
+        // Each continuation line maps to the first line of its logical line,
+        // so runtime events on them fold away (coverage.py's multiline map).
+        assert_eq!(analysis.multiline.get(&2), Some(&1));
+        assert_eq!(analysis.multiline.get(&4), Some(&1));
+        assert_eq!(analysis.multiline.get(&7), Some(&6));
+        assert_eq!(analysis.multiline.get(&13), Some(&12));
+        assert_eq!(analysis.multiline.get(&5), None);
+    }
+
+    #[test]
+    fn if_not_debug_body_is_no_statement() {
+        let src = "\
+def f():
+    if not __debug__:
+        return
+    x = 1
+    if __debug__:
+        y = 2
+";
+        let analysis = analyze(src, &[]).unwrap();
+        assert!(
+            !analysis.executable.contains(&3),
+            "{:?}",
+            analysis.executable
+        );
+        assert!(analysis.executable.contains(&4));
+        assert!(analysis.executable.contains(&6));
+        // Constant tests are no branches.
+        assert!(analysis.branches.is_empty(), "{:?}", analysis.branches);
+    }
+
+    #[test]
+    fn statements_after_a_return_are_dropped() {
+        let src = "\
+def gen():
+    return
+    yield
+";
+        assert_eq!(executable(src), vec![1, 2]);
+    }
+
+    #[test]
+    fn class_annotations_count_before_python_3_14() {
+        let src = "\
+class C:
+    x: int
+    y: int = 1
+";
+        let eager = analyze_for(src, &[], false).unwrap().executable;
+        let lazy = analyze_for(src, &[], true).unwrap().executable;
+        assert!(eager.contains(&2));
+        assert!(!lazy.contains(&2));
+        assert!(lazy.contains(&3));
+    }
+
+    #[test]
+    fn refutable_cases_branch() {
+        let src = "\
+def f(m):
+    match m:
+        case 1:
+            a = 1
+        case str() if m:
+            a = 2
+        case _:
+            a = 3
+    return a
+";
+        let analysis = analyze(src, &[]).unwrap();
+        assert_eq!(analysis.branches.get(&3), Some(&vec![4, 5]));
+        assert_eq!(analysis.branches.get(&5), Some(&vec![6, 7]));
+        assert_eq!(analysis.branches.get(&7), None);
+    }
+
+    #[test]
+    fn a_branch_into_an_excluded_line_is_no_branch() {
+        let src = "\
+def f(x):
+    if x:
+        y = 1
+    if DEBUG:  # pragma: no cover
+        z = 2
+";
+        let excludes = [regex::Regex::new(DEFAULT_EXCLUDE).unwrap()];
+        let analysis = analyze(src, &excludes).unwrap();
+        assert_eq!(analysis.branches.get(&2), None);
     }
 }

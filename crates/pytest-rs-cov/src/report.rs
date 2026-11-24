@@ -193,21 +193,41 @@ fn percent_exact_units(covered: usize, total: usize) -> f64 {
 }
 
 /// "3, 7-9" style missing-line ranges.
-fn missing_ranges(lines: &[u32]) -> String {
-    let mut parts: Vec<String> = Vec::new();
-    let mut iter = lines.iter().copied().peekable();
-    while let Some(start) = iter.next() {
-        let mut end = start;
-        while iter.peek() == Some(&(end + 1)) {
-            end = iter.next().expect("peeked");
-        }
-        parts.push(if start == end {
-            start.to_string()
+fn missing_ranges(row: &FileRow) -> String {
+    line_ranges(row)
+        .into_iter()
+        .map(|(_, text)| text)
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// coverage.py's `_line_ranges`: runs of missing statements, a run broken
+/// only by an executed statement (lines that are no statement, like blank
+/// lines and comments, do not break it). (first line, "a-b" or "a").
+fn line_ranges(row: &FileRow) -> Vec<(u32, String)> {
+    let mut out = Vec::new();
+    let mut run: Option<(u32, u32)> = None;
+    for line in &row.executable {
+        if row.covered.contains(line) {
+            if let Some((start, end)) = run.take() {
+                out.push((start, range_text(start, end)));
+            }
         } else {
-            format!("{start}-{end}")
-        });
+            run = Some(run.map_or((*line, *line), |(start, _)| (start, *line)));
+        }
     }
-    parts.join(", ")
+    if let Some((start, end)) = run {
+        out.push((start, range_text(start, end)));
+    }
+    out
+}
+
+fn range_text(start: u32, end: u32) -> String {
+    if start == end {
+        start.to_string()
+    } else {
+        format!("{start}-{end}")
+    }
 }
 
 /// Missing lines plus partial-branch arc annotations, coverage.py-style
@@ -215,23 +235,7 @@ fn missing_ranges(lines: &[u32]) -> String {
 /// omitted (the missing line already says it).
 fn missing_with_arcs(row: &FileRow) -> String {
     let missing: BTreeSet<u32> = row.missing_lines().into_iter().collect();
-    let mut items: Vec<(u32, String)> = Vec::new();
-    let lines: Vec<u32> = missing.iter().copied().collect();
-    let mut iter = lines.iter().copied().peekable();
-    while let Some(start) = iter.next() {
-        let mut end = start;
-        while iter.peek() == Some(&(end + 1)) {
-            end = iter.next().expect("peeked");
-        }
-        items.push((
-            start,
-            if start == end {
-                start.to_string()
-            } else {
-                format!("{start}-{end}")
-            },
-        ));
-    }
+    let mut items: Vec<(u32, String)> = line_ranges(row);
     for (line, dests) in &row.branches {
         if !row.covered.contains(line) {
             continue;
@@ -391,7 +395,7 @@ pub fn render_term(
             if branch {
                 missing_with_arcs(row)
             } else {
-                missing_ranges(&row.missing_lines())
+                missing_ranges(row)
             }
         });
         out.push_str(&render_row(
