@@ -51,6 +51,26 @@ impl Drop for FaulthandlerTimeoutGuard<'_> {
     }
 }
 
+/// End the session with INTERNALERROR, like upstream's wrap_session when
+/// an exception escapes pytest_runtestloop: banner to stdout, fire
+/// pytest_internalerror (records junitxml's "internal" testcase and may
+/// raise Exit to override the code). The run loop stops once
+/// `session.internal_error_exit_code` is set.
+pub(crate) fn abort_with_internal_error(
+    py: Python<'_>,
+    session: &mut Session,
+    config: &Config,
+    err: &PyErr,
+) {
+    let msg = python::format_internal_error(py, err, config.get_flag("full-trace"));
+    for line in msg.lines() {
+        println!("INTERNALERROR> {line}");
+    }
+    python::junit_internal_error(py, &msg);
+    let code = python::notify_internal_error(py, err, crate::report::exit_code::INTERNAL_ERROR);
+    session.internal_error_exit_code = Some(code);
+}
+
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub(crate) fn run_one(
     py: Python<'_>,
@@ -154,17 +174,20 @@ pub(crate) fn run_one(
             // handler: banner to stdout, fire pytest_internalerror (records
             // junitxml's "internal" testcase and may raise Exit to override
             // the code), then abort the whole session.
-            let msg = python::format_internal_error(py, &err, config.get_flag("full-trace"));
-            for line in msg.lines() {
-                println!("INTERNALERROR> {line}");
-            }
-            python::junit_internal_error(py, &msg);
-            let code =
-                python::notify_internal_error(py, &err, crate::report::exit_code::INTERNAL_ERROR);
-            session.internal_error_exit_code = Some(code);
+            abort_with_internal_error(py, session, config, &err);
             return vec![];
         }
     };
+    // Upstream's runtestprotocol drops the fixture values once the item is
+    // done (`item.funcargs = None`), so they are not kept alive.
+    if let Ok(node) = item_node(py, item)
+        && node
+            .bind(py)
+            .getattr("funcargs")
+            .is_ok_and(|v| !v.is_none())
+    {
+        let _ = node.bind(py).setattr("funcargs", py.None());
+    }
     if let Err(err) = finish_runtest_py_wrappers(py, &wrappers, None) {
         eprintln!(
             "pytest_runtest_protocol wrapper teardown failed for {}: {}",

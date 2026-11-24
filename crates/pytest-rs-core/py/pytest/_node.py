@@ -478,8 +478,10 @@ def run_custom_item(item):
 
         try:
             item.ihook.pytest_exception_interact(node=item, call=_Call(), report=report)
-        except Exception:
-            pass
+        except Exception as exc:
+            from pytest._internalerror import DeferredInternalError
+
+            DeferredInternalError.defer(exc)
         return str(report.longrepr)
 
     reports = []
@@ -1607,6 +1609,9 @@ class Function(Node):
         if callobj is not None and kwargs.get("function") is None and len(args) < 5:
             kwargs["function"] = callobj
         super().__init__(*args, **kwargs)
+        # Upstream's `_initrequest`: the fixture values by name, filled by
+        # setup and reset to None after the item's protocol.
+        self.funcargs = {}
         if callobj is not None:
             self.obj = callobj
             self.function = callobj

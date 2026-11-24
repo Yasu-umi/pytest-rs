@@ -597,7 +597,12 @@ class TerminalReporter:
             from pytest._pluginmanager import pluginmanager
 
             res = pluginmanager.hook.pytest_report_teststatus(report=report, config=self.config)
-        except Exception:
+        except Exception as exc:
+            # Upstream: an exception from a hookimpl ends the session with
+            # INTERNALERROR (after this item).
+            from pytest._internalerror import DeferredInternalError
+
+            DeferredInternalError.defer(exc)
             res = None
         if not res:
             res = _default_teststatus(report)

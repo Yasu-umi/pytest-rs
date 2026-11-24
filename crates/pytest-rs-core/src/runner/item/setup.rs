@@ -237,6 +237,42 @@ pub(crate) fn build_test_setup(
         )?
         .into_any(),
     };
+    // Upstream's `Function.funcargs`: every fixture of the closure by name
+    // (`request` too), filled by setup (`_fillfixtures`) and read by
+    // plugins in later hooks (`pytest_runtest_makereport`). The closure is
+    // set up above, so each lookup is a cache hit.
+    let funcargs = pyo3::types::PyDict::new(py);
+    for name in &closure {
+        if ignore.contains(name) {
+            continue;
+        }
+        if name == "request" {
+            funcargs.set_item(name, request_for_node.bind(py))?;
+            continue;
+        }
+        let value = match kwargs.iter().find(|(arg, _)| arg == name) {
+            Some((_, value)) => value.clone_ref(py),
+            None => resolve_fixture(
+                py,
+                plugins,
+                session,
+                config,
+                name,
+                item,
+                instance.as_ref(),
+                &mut stack,
+            )?,
+        };
+        funcargs.set_item(name, value)?;
+    }
+    // Direct `@pytest.mark.parametrize` arguments (upstream's pseudo
+    // fixtures); an indirect one is the fixture's value, set above.
+    for (name, value) in &item.callspec {
+        if !funcargs.contains(name)? {
+            funcargs.set_item(name, value.bind(py))?;
+        }
+    }
+    node.bind(py).setattr("funcargs", funcargs)?;
     node.bind(py).setattr("_request", request_for_node)?;
     Ok((callable, kwargs, test_request))
 }
