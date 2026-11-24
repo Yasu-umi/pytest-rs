@@ -145,7 +145,6 @@ class _NodeBase:
     session: Session
     path: pathlib.Path
     own_markers: list[Mark]
-    stash: Stash
 
     if TYPE_CHECKING:
 
@@ -159,6 +158,21 @@ class _NodeBase:
         def listextrakeywords(self) -> set[str]: ...
         def listnames(self) -> list[str]: ...
         def addfinalizer(self, fin: Callable[[], object]) -> None: ...
+
+    @property
+    def stash(self) -> Stash:
+        """Upstream Node.stash, where plugins keep per-node data (logfire's
+        span, pytest-html's extras); created on first use."""
+        stash = self.__dict__.get("_stash")
+        if stash is None:
+            from pytest._stash import Stash
+
+            stash = self.__dict__["_stash"] = Stash()
+        return stash
+
+    @stash.setter
+    def stash(self, value: Stash) -> None:
+        self.__dict__["_stash"] = value
 
     @property
     def extra_keyword_matches(self) -> set[str]:
