@@ -5,7 +5,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::analysis::EXIT;
 
 pub struct FileRow {
-    /// Path relative to rootdir (display name and report key).
+    /// Path relative to the current directory (display name and report key);
+    /// absolute for a file outside it, like coverage.py.
     pub name: String,
     pub executable: BTreeSet<u32>,
     pub covered: BTreeSet<u32>,
@@ -503,8 +504,8 @@ impl FileRow {
 
 /// Cobertura XML, for when the coverage package is not installed (it
 /// renders the report itself otherwise). One package, file names relative
-/// to the rootdir.
-pub fn render_xml(data: &CoverageData, rootdir: &str) -> String {
+/// to the current directory.
+pub fn render_xml(data: &CoverageData, base: &str) -> String {
     let rows: Vec<&FileRow> = data
         .rows
         .iter()
@@ -538,7 +539,7 @@ pub fn render_xml(data: &CoverageData, rootdir: &str) -> String {
     ));
     out.push_str(&format!(
         "\t<sources>\n\t\t<source>{}</source>\n\t</sources>\n",
-        xml_escape(rootdir)
+        xml_escape(base)
     ));
     out.push_str(&format!(
         "\t<packages>\n\t\t<package name=\".\" line-rate=\"{}\" branch-rate=\"{}\" complexity=\"0\">\n\t\t\t<classes>\n",
