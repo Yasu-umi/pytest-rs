@@ -87,6 +87,9 @@ pub struct CovPlugin {
     /// (coverage.py's `warn_unimported_source`/`_warn_about_unmeasured_code`,
     /// keyed by the original name, not the resolved path).
     cov_source_names: Vec<String>,
+    /// Whether `cov_source_names` came from `--cov=X` (not the config's
+    /// `[run] source` for a bare `--cov`).
+    sources_from_cli: bool,
     reports: Vec<ReportSpec>,
     fail_under: Option<f64>,
     /// --cov-precision / [report] precision: Cover column decimals.
@@ -164,6 +167,7 @@ impl CovPlugin {
             enabled: false,
             sources: Vec::new(),
             cov_source_names: Vec::new(),
+            sources_from_cli: false,
             reports: Vec::new(),
             fail_under: None,
             precision: 0,
@@ -746,20 +750,12 @@ impl CovPlugin {
         }
         let kwargs = core_pyo3::types::PyDict::new(py);
         kwargs.set_item("data_file", data_path.to_string_lossy().as_ref())?;
-        // Like pytest-cov: the `--cov` sources (the XML report's <sources>
-        // and the base of its file names come from them) and --cov-config.
-        if !self.sources.is_empty() {
-            let sources: Vec<String> = self
-                .sources
-                .iter()
-                .map(|source| {
-                    source
-                        .to_string_lossy()
-                        .trim_end_matches(std::path::MAIN_SEPARATOR)
-                        .to_string()
-                })
-                .collect();
-            kwargs.set_item("source", sources)?;
+        // Like pytest-cov: the `--cov` values as given (the XML report's
+        // <sources> and the base of its file names come from them, and
+        // `relative_files` keeps them relative) and --cov-config. A bare
+        // `--cov` leaves the source to coverage.py's own config.
+        if self.sources_from_cli {
+            kwargs.set_item("source", &self.cov_source_names)?;
         }
         if let Some(config) = ctx.config.get_value("cov-config") {
             kwargs.set_item(
@@ -1496,7 +1492,8 @@ impl Plugin for CovPlugin {
         // A bare `--cov` leaves the source to the coverage config, like
         // pytest-cov: `[run] source` (paths or importable names) and
         // `[run] source_pkgs` (importable names only).
-        if self.cov_source_names.is_empty() {
+        self.sources_from_cli = !self.cov_source_names.is_empty();
+        if !self.sources_from_cli {
             let cov_config = ctx.config.get_value("cov-config");
             let config_list = |option: &str| {
                 Self::section_option_list(&ctx.config.rootdir, cov_config, "run", option, false)

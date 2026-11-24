@@ -363,6 +363,16 @@ class TestCovConfigKeys(unittest.TestCase):
         self.assertIn("FN:", lcov)
         self.assertIn("BRDA:10,0,return from function 'tail',1\nBRF:6\nBRH:4", lcov)
 
+    @unittest.skipUnless(importlib.util.find_spec("coverage"), "rendered by coverage")
+    def test_xml_with_relative_files(self) -> None:
+        """The `--cov` values reach coverage.py as given, like pytest-cov, so
+        `relative_files` keeps the XML sources relative (#117)."""
+        self.pyproject("[tool.coverage.run]\nrelative_files = true\n")
+        self.output("--cov-report=xml", cov="--cov=app")
+        xml = (self.base / "coverage.xml").read_text()
+        self.assertEqual(re.findall(r"<source>(.*)</source>", xml), ["app"])
+        self.assertIn('filename="core.py"', xml)
+
     def test_native_xml_and_lcov_without_coverage(self) -> None:
         """Without the coverage package, the native reports carry branch data."""
         self.branchy_project()
