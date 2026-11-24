@@ -274,6 +274,15 @@ pub(crate) fn build_test_setup(
     }
     node.bind(py).setattr("funcargs", funcargs)?;
     node.bind(py).setattr("_request", request_for_node)?;
+    // A unittest item's `obj` is the test method bound to the TestCase it
+    // runs on (upstream's TestCaseFunction.setup), not the shim runner.
+    if item.cls.is_none()
+        && let Some(case) = &instance
+        && let Ok(method_name) = item.func.bind(py).getattr("__name__")
+        && let Ok(bound) = case.bind(py).getattr(method_name.str()?)
+    {
+        node.bind(py).setattr("obj", bound)?;
+    }
     Ok((callable, kwargs, test_request))
 }
 
