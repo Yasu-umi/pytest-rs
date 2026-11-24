@@ -224,7 +224,7 @@ wheels = [
 
 [[package]]
 name = "pytest-rs"
-version = "0.0.15"
+version = "0.0.16"
 source = { editable = "." }
 
 [package.dev-dependencies]

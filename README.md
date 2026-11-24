@@ -133,23 +133,23 @@ Startup, collection, fixture orchestration, coverage measurement, and parallel w
 - **`-n` parallel runs** — workers fork off the already-warm parent interpreter by default (unix only), skipping per-worker interpreter/plugin/conftest import cost. Each forked worker still fires its own `pytest_configure` and collects/applies `pytest_collection_modifyitems` independently, so behavior matches a freshly spawned worker. Set `PYTEST_RS_DIST_SPAWN=1` to opt back into spawning a fresh subprocess per worker (upstream xdist's model) instead.
 - **Large collections** — fixture resolution and parametrize expansion run in Rust; suites with thousands of tests see faster collection.
 
-Benchmarks on open-source projects (macOS arm64, median of 3 warm runs), reproducible with [`bench/suites.sh`](bench/README.md) — clones each suite at a pinned tag, installs pytest-rs into its venv, and times both runners.
+Benchmarks on open-source projects (macOS arm64, median of 5 warm runs), reproducible with [`bench/suites.sh`](bench/README.md) — clones each suite at a pinned tag, installs pytest-rs into its venv, and times both runners.
 
 <!-- perf-results:start -->
 | suite (tests) | mode | pytest | pytest-rs | speedup |
 |---|---|---:|---:|---|
-| marshmallow (1119) | `(plain)` | 0.43 s | 0.32 s | **1.3x** |
-| marshmallow (1119) | `--cov` | 0.77 s | 0.34 s | **2.3x** |
-| marshmallow (1119) | `-n 3 --cov` | 0.87 s | 0.29 s | **3.0x** |
-| click (2459) | `(plain)` | 3.24 s | 2.37 s | **1.4x** |
-| click (2459) | `--cov` | 4.57 s | 2.44 s | **1.9x** |
-| click (2459) | `-n 3 --cov` | 3.32 s | 1.26 s | **2.6x** |
-| networkx (6890) | `(plain)` | 30.09 s | 27.86 s | **1.1x** |
-| networkx (6890) | `--cov` | 94.20 s | 33.34 s | **2.8x** |
-| networkx (6890) | `-n 3 --cov` | 36.84 s | 15.48 s | **2.4x** |
+| marshmallow (1119) | `(plain)` | 0.41 s | 0.28 s | **1.5x** |
+| marshmallow (1119) | `--cov` | 0.75 s | 0.31 s | **2.4x** |
+| marshmallow (1119) | `-n 3 --cov` | 0.90 s | 0.28 s | **3.2x** |
+| click (2459) | `(plain)` | 3.12 s | 2.03 s | **1.5x** |
+| click (2459) | `--cov` | 4.73 s | 2.22 s | **2.1x** |
+| click (2459) | `-n 3 --cov` | 3.37 s | 1.32 s | **2.6x** |
+| networkx (6890) | `(plain)` | 30.78 s | 28.71 s | **1.1x** |
+| networkx (6890) | `--cov` | 86.11 s | 31.87 s | **2.7x** |
+| networkx (6890) | `-n 3 --cov` | 34.07 s | 12.68 s | **2.7x** |
 <!-- perf-results:end -->
 
-Small-to-medium suites see a **1.3–1.4x** speedup even without coverage, thanks to lower startup overhead. On large suites where test bodies dominate, the plain-mode gap narrows; the bigger wins come from `--cov` and `-n` parallelism. Try it on your own suite:
+Small-to-medium suites see a **1.5x** speedup even without coverage, thanks to lower startup overhead. On large suites where test bodies dominate, the plain-mode gap narrows; the bigger wins come from `--cov` and `-n` parallelism. Try it on your own suite:
 
 ```sh
 hyperfine -w 1 'pytest -q' 'pytest-rs -q'

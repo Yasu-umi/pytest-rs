@@ -1,6 +1,6 @@
 [package]
 name = "pytest-rs-affected"
-version = "0.0.15"
+version = "0.0.16"
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }

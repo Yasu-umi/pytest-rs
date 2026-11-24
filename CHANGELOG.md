@@ -3,6 +3,81 @@
 Notable changes per release. The release workflow uses the matching section
 as the GitHub release notes (auto-generated notes are the fallback).
 
+## v0.0.16 (2026-11-24)
+
+### Added
+
+- **`--affected` (experimental): run only the tests affected by your
+  changes.** It records which code units (functions, classes, module-level
+  code), files, directories and Python subprocesses each test depends on, and
+  on later runs selects the tests whose dependencies changed. It works with
+  `-n` and before pytest-split's `--splits`, skips reading files that git
+  proves unchanged, and `--affected-merge` combines records from sharded CI
+  runs. Without an `--affected*` option nothing is recorded. See
+  [docs/affected.md](docs/affected.md).
+  - `[tool.pytest-rs.affected] import_time = "names"` (experimental) narrows
+    a test's import-time dependencies to the module-level statements and
+    class attributes whose names its code uses.
+  - A record is used only by the pytest-rs version, Python and installed
+    packages that wrote it, so the first run after upgrading runs everything.
+- **`--splitting-granularity=file`**: pytest-split assigns whole test files to
+  shards before importing them, so each shard imports only its own files.
+- **Native `--cov` reads the rest of the coverage config**, like coverage.py:
+  `[run] omit` / `include`, `[report] omit` / `include` / `exclude_also`,
+  `[run] source` / `source_pkgs` for a bare `--cov`, `[run] data_file`,
+  `[xml]` / `[lcov]` / `[json] output`, `[report] partial_branches` /
+  `partial_also` / `partial_branches_always`, `skip_empty`, `sort` and
+  `ignore_errors`.
+
+### Changed
+
+- **Native `--cov` matches coverage.py's numbers.** Statements and branches
+  are analyzed like coverage.py's parser (multi-line statements, dead code,
+  `__debug__`, class annotations before Python 3.14, `match`/`case`, `with`
+  exits, exclusions), and branch events resolve to line arcs like
+  coverage.py's branch resolver. Against coverage.py 7.17 / pytest-cov 7.1,
+  every report matches on click and marshmallow, and statement and branch
+  counts match on networkx.
+- **XML and LCOV are rendered by coverage.py when it is installed**, like
+  html and json already were. The XML `<source>` entries and file names are
+  now relative to the `--cov` sources, as with pytest-cov, instead of to the
+  rootdir. Without coverage.py, the native XML and LCOV now carry branch data.
+- **In branch mode the `.coverage` file holds coverage.py's arc data**, per
+  context with `--cov-context`; the `.coverage.pytest-rs-arcs` sidecar is no
+  longer written.
+- **`--cov-context=test` is much faster**: a line is reported once per
+  context instead of on every execution (networkx: 248 s → 58 s).
+- A measured file that cannot be read or parsed fails the reports, as in
+  coverage.py, unless `[report] ignore_errors` is set.
+- The assertion-rewrite cache is prefetched only for the files left after
+  `pytest_collection_select_files`.
+
+### Fixed
+
+- **`-n` hooks match pytest-xdist**:
+  - workers fire `pytest_collection_finish` and `pytest_sessionfinish`, and
+    the controller no longer fires `pytest_collection_modifyitems`;
+  - a hook error during a worker's collection is reported as `INTERNALERROR`
+    and exits with status 3;
+  - the summary no longer counts workers' deselected tests.
+- `--collect-only` fires `pytest_sessionfinish`, so pytest-split's
+  `--store-durations` and `--clean-durations` behave as upstream there.
+- Native `--cov`:
+  - a code object compiled under a non-Python file name (a template) no
+    longer fails every report;
+  - a custom `exclude_lines` replaces all of coverage.py's default
+    exclusions (pragma, `...` stubs, `if TYPE_CHECKING:`), and the stub
+    exclusion also matches a signature ending in `]: ...`;
+  - an irrefutable `case` whose body is excluded is excluded too;
+  - with `[run] relative_files`, the XML sources and file names stay
+    relative;
+  - `--cov=DIR` measures files imported through `pythonpath = ["."]`
+    (file names with `/./`);
+  - a loop's compound condition that jumps into the body is no longer
+    reported as a partial branch.
+- pytest-split's `least_duration` breaks ties between equal durations in the
+  same order as pytest-split.
+
 ## v0.0.15 (2026-11-20)
 
 ### Added
