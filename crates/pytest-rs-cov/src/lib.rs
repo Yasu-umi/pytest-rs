@@ -82,6 +82,11 @@ pub struct CovPlugin {
     /// Absolute source roots (dirs get a trailing separator); empty = all
     /// files under rootdir that get executed.
     sources: Vec<PathBuf>,
+    /// The current directory at configure time (canonical): coverage.py
+    /// resolves `--cov` / `[run] source` paths, its config files, the data
+    /// and report files and the report's file names against it, not the
+    /// rootdir (they differ when pytest runs below the rootdir).
+    base_dir: PathBuf,
     /// The raw `--cov=X` values `sources` was resolved from, same order —
     /// for the end-of-session "was this source ever measured?" warnings
     /// (coverage.py's `warn_unimported_source`/`_warn_about_unmeasured_code`,
@@ -166,6 +171,7 @@ impl CovPlugin {
         Self {
             enabled: false,
             sources: Vec::new(),
+            base_dir: PathBuf::new(),
             cov_source_names: Vec::new(),
             sources_from_cli: false,
             reports: Vec::new(),
@@ -310,10 +316,9 @@ impl CovPlugin {
     /// `[report] exclude_lines` (its default list when unset: the pragma,
     /// `...` stubs and `if TYPE_CHECKING:`) plus `[report] exclude_also`,
     /// from any of the config files.
-    fn load_exclude_rules(rootdir: &Path, cov_config: Option<&str>) -> analysis::ExcludeRules {
-        let custom =
-            Self::section_option_list(rootdir, cov_config, "report", "exclude_lines", true)
-                .filter(|lines| !lines.is_empty());
+    fn load_exclude_rules(base: &Path, cov_config: Option<&str>) -> analysis::ExcludeRules {
+        let custom = Self::section_option_list(base, cov_config, "report", "exclude_lines", true)
+            .filter(|lines| !lines.is_empty());
         let default_stubs = custom.is_none();
         let mut patterns = custom.unwrap_or_else(|| {
             vec![
@@ -322,7 +327,7 @@ impl CovPlugin {
             ]
         });
         patterns.extend(
-            Self::section_option_list(rootdir, cov_config, "report", "exclude_also", true)
+            Self::section_option_list(base, cov_config, "report", "exclude_also", true)
                 .unwrap_or_default(),
         );
         analysis::ExcludeRules {
@@ -338,9 +343,9 @@ impl CovPlugin {
     /// `[report] partial_branches` (default `# pragma: no branch`) plus
     /// `partial_also`, and `partial_branches_always` (default: constant
     /// `while` / `if` tests).
-    fn load_partial_patterns(rootdir: &Path, cov_config: Option<&str>) -> Vec<regex::Regex> {
+    fn load_partial_patterns(base: &Path, cov_config: Option<&str>) -> Vec<regex::Regex> {
         let list = |option: &str| {
-            Self::section_option_list(rootdir, cov_config, "report", option, true)
+            Self::section_option_list(base, cov_config, "report", option, true)
                 .filter(|lines| !lines.is_empty())
         };
         let mut patterns: Vec<String> = list("partial_branches").unwrap_or_else(|| {
@@ -389,7 +394,7 @@ impl CovPlugin {
     /// newline-separated) or, with `regexes`, `getregexlist` (one per line);
     /// a TOML array as is. None when no config file sets it.
     fn section_option_list(
-        rootdir: &Path,
+        base: &Path,
         cov_config: Option<&str>,
         section: &str,
         option: &str,
@@ -410,7 +415,7 @@ impl CovPlugin {
         let prefixed = format!("[{section}]");
         let spelled = format!("[coverage:{section}]");
         for candidate in [cov_config.unwrap_or(".coveragerc"), "setup.cfg", "tox.ini"] {
-            let Ok(content) = std::fs::read_to_string(rootdir.join(candidate)) else {
+            let Ok(content) = std::fs::read_to_string(base.join(candidate)) else {
                 continue;
             };
             let mut in_section = false;
@@ -443,7 +448,7 @@ impl CovPlugin {
                 return Some(split(values));
             }
         }
-        let content = std::fs::read_to_string(rootdir.join("pyproject.toml")).ok()?;
+        let content = std::fs::read_to_string(base.join("pyproject.toml")).ok()?;
         let document = content.parse::<toml::Table>().ok()?;
         let value = document
             .get("tool")?
@@ -463,26 +468,56 @@ impl CovPlugin {
     }
 
     /// Resolve a --cov=VALUE entry the way coverage.py does: VALUE is either a
-    /// filesystem path or an importable package/module name. We try a rootdir-
-    /// relative path first (and the dotted-name-as-subdir spelling), then fall
-    /// back to locating the package via the import system — the common case when
-    /// the package is installed (editable or not) or in a src/ layout, so its
-    /// source does not sit directly under rootdir. Canonicalized so prefix
-    /// matching agrees with co_filename (which sees through symlinks like
-    /// macOS /tmp).
-    fn resolve_source(py: Python<'_>, rootdir: &Path, value: &str) -> PathBuf {
-        let as_path = rootdir.join(value);
-        if as_path.exists() {
-            return as_path.canonicalize().unwrap_or(as_path);
+    /// filesystem path or an importable package/module name, and a path is
+    /// relative to the current directory (`base`), not the rootdir. We try a
+    /// path first (and the dotted-name-as-subdir spelling), then locate the
+    /// package via the import system — the common case when the package is
+    /// installed (editable or not) or in a src/ layout. coverage.py matches a
+    /// module name only once the module is imported, so a name that is not
+    /// importable yet (its directory goes on sys.path during collection) is
+    /// looked for as a module file under `base`, then under the rootdir.
+    /// Canonicalized so prefix matching agrees with co_filename (which sees
+    /// through symlinks like macOS /tmp).
+    fn resolve_source(py: Python<'_>, base: &Path, rootdir: &Path, value: &str) -> PathBuf {
+        let as_path = base.join(value);
+        let is_module_name = !value.is_empty()
+            && value.split('.').all(|part| {
+                part.chars()
+                    .next()
+                    .is_some_and(|c| c.is_alphabetic() || c == '_')
+                    && part.chars().all(|c| c.is_alphanumeric() || c == '_')
+            });
+        // `pkg.sub` as `<dir>/pkg/sub` (a package) and `<dir>/pkg/sub.py`.
+        let module_paths = |dir: &Path| -> [Option<PathBuf>; 2] {
+            if !is_module_name {
+                return [None, None];
+            }
+            let module = dir.join(value.replace('.', "/"));
+            let file = module.with_extension("py");
+            [Some(module), Some(file)]
+        };
+        let [base_package, base_file] = module_paths(base);
+        let [root_package, root_file] = module_paths(rootdir);
+        let found = [Some(as_path.clone()), base_package]
+            .into_iter()
+            .flatten()
+            .find(|path| path.exists())
+            .or_else(|| Self::resolve_import_source(py, value))
+            .or_else(|| {
+                [
+                    base_file,
+                    Some(rootdir.join(value)),
+                    root_package,
+                    root_file,
+                ]
+                .into_iter()
+                .flatten()
+                .find(|path| path.exists())
+            });
+        match found {
+            Some(path) => path.canonicalize().unwrap_or(path),
+            None => as_path,
         }
-        let as_module = rootdir.join(value.replace('.', "/"));
-        if as_module.exists() {
-            return as_module.canonicalize().unwrap_or(as_module);
-        }
-        if let Some(path) = Self::resolve_import_source(py, value) {
-            return path.canonicalize().unwrap_or(path);
-        }
-        as_path
     }
 
     /// Locate an importable package/module's source via `importlib.util.find_spec`
@@ -554,23 +589,23 @@ impl CovPlugin {
 
     /// coverage `[run] relative_files`: from --cov-config / .coveragerc /
     /// setup.cfg / tox.ini (ini forms) or pyproject [tool.coverage.run].
-    fn relative_files_enabled(rootdir: &Path, cov_config: Option<&str>) -> bool {
-        Self::run_option_enabled(rootdir, cov_config, "relative_files")
+    fn relative_files_enabled(base: &Path, cov_config: Option<&str>) -> bool {
+        Self::run_option_enabled(base, cov_config, "relative_files")
     }
 
     /// coverage `[run] branch`, same config sources.
-    fn branch_enabled(rootdir: &Path, cov_config: Option<&str>) -> bool {
-        Self::run_option_enabled(rootdir, cov_config, "branch")
+    fn branch_enabled(base: &Path, cov_config: Option<&str>) -> bool {
+        Self::run_option_enabled(base, cov_config, "branch")
     }
 
     /// coverage `[paths]` groups: each is (canonical, aliases) — measured
     /// paths under an alias report as the canonical path. Aliases are globs
     /// (coverage.py `PathAliases` semantics: `*` = non-separator run,
     /// `*/dir`/`**/` = any prefix), compiled in `files::PathAliases`.
-    fn paths_aliases(rootdir: &Path, cov_config: Option<&str>) -> Vec<Vec<String>> {
+    fn paths_aliases(base: &Path, cov_config: Option<&str>) -> Vec<Vec<String>> {
         let mut groups: Vec<Vec<String>> = Vec::new();
         for candidate in [cov_config.unwrap_or(".coveragerc"), "setup.cfg", "tox.ini"] {
-            let Ok(content) = std::fs::read_to_string(rootdir.join(candidate)) else {
+            let Ok(content) = std::fs::read_to_string(base.join(candidate)) else {
                 continue;
             };
             let mut in_paths = false;
@@ -605,7 +640,7 @@ impl CovPlugin {
                 return groups;
             }
         }
-        if let Ok(content) = std::fs::read_to_string(rootdir.join("pyproject.toml"))
+        if let Ok(content) = std::fs::read_to_string(base.join("pyproject.toml"))
             && let Ok(document) = content.parse::<toml::Table>()
             && let Some(paths) = document
                 .get("tool")
@@ -629,15 +664,15 @@ impl CovPlugin {
     }
 
     /// A string `[run]` option, same config sources as run_option_enabled.
-    fn run_option_value(rootdir: &Path, cov_config: Option<&str>, option: &str) -> Option<String> {
-        Self::section_option_value(rootdir, cov_config, "run", option)
+    fn run_option_value(base: &Path, cov_config: Option<&str>, option: &str) -> Option<String> {
+        Self::section_option_value(base, cov_config, "run", option)
     }
 
     /// One option from a coverage config section ([SECTION] in
     /// .coveragerc/setup.cfg/tox.ini — also the [coverage:SECTION]
     /// spelling — or [tool.coverage.SECTION] in pyproject.toml).
     fn section_option_value(
-        rootdir: &Path,
+        base: &Path,
         cov_config: Option<&str>,
         section: &str,
         option: &str,
@@ -645,7 +680,7 @@ impl CovPlugin {
         let prefixed = format!("[{section}]");
         let spelled = format!("[coverage:{section}]");
         for candidate in [cov_config.unwrap_or(".coveragerc"), "setup.cfg", "tox.ini"] {
-            let Ok(content) = std::fs::read_to_string(rootdir.join(candidate)) else {
+            let Ok(content) = std::fs::read_to_string(base.join(candidate)) else {
                 continue;
             };
             let mut in_section = false;
@@ -663,7 +698,7 @@ impl CovPlugin {
                 }
             }
         }
-        if let Ok(content) = std::fs::read_to_string(rootdir.join("pyproject.toml"))
+        if let Ok(content) = std::fs::read_to_string(base.join("pyproject.toml"))
             && let Ok(document) = content.parse::<toml::Table>()
             && let Some(value) = document
                 .get("tool")
@@ -689,7 +724,7 @@ impl CovPlugin {
 
     /// A boolean `[run]` option: from --cov-config / .coveragerc /
     /// setup.cfg / tox.ini (ini forms) or pyproject [tool.coverage.run].
-    fn run_option_enabled(rootdir: &Path, cov_config: Option<&str>, option: &str) -> bool {
+    fn run_option_enabled(base: &Path, cov_config: Option<&str>, option: &str) -> bool {
         let truthy = |value: &str| {
             matches!(
                 value.trim().to_ascii_lowercase().as_str(),
@@ -697,7 +732,7 @@ impl CovPlugin {
             )
         };
         for candidate in [cov_config.unwrap_or(".coveragerc"), "setup.cfg", "tox.ini"] {
-            let Ok(content) = std::fs::read_to_string(rootdir.join(candidate)) else {
+            let Ok(content) = std::fs::read_to_string(base.join(candidate)) else {
                 continue;
             };
             let mut in_run = false;
@@ -715,7 +750,7 @@ impl CovPlugin {
                 }
             }
         }
-        if let Ok(content) = std::fs::read_to_string(rootdir.join("pyproject.toml"))
+        if let Ok(content) = std::fs::read_to_string(base.join("pyproject.toml"))
             && let Ok(document) = content.parse::<toml::Table>()
             && let Some(value) = document
                 .get("tool")
@@ -744,7 +779,7 @@ impl CovPlugin {
         let Ok(coverage_mod) = py.import("coverage") else {
             return Ok(None);
         };
-        let data_path = Self::data_file_path(ctx);
+        let data_path = self.data_file_path(ctx);
         if !data_path.exists() {
             return Ok(None);
         }
@@ -760,16 +795,16 @@ impl CovPlugin {
         if let Some(config) = ctx.config.get_value("cov-config") {
             kwargs.set_item(
                 "config_file",
-                ctx.config.rootdir.join(config).to_string_lossy().as_ref(),
+                self.base_dir.join(config).to_string_lossy().as_ref(),
             )?;
         }
         let cov = coverage_mod.getattr("Coverage")?.call((), Some(&kwargs))?;
         cov.call_method0("load")?;
-        let rootdir = &ctx.config.rootdir;
+        let base = &self.base_dir;
         let message = match kind {
             ReportKind::Html => {
                 let configured = Self::section_option_value(
-                    &ctx.config.rootdir,
+                    base,
                     ctx.config.get_value("cov-config"),
                     "html",
                     "directory",
@@ -780,14 +815,14 @@ impl CovPlugin {
                     .unwrap_or_else(|| "htmlcov".to_string());
                 let dir = dir.as_str();
                 let kwargs = core_pyo3::types::PyDict::new(py);
-                kwargs.set_item("directory", rootdir.join(dir).to_string_lossy().as_ref())?;
+                kwargs.set_item("directory", base.join(dir).to_string_lossy().as_ref())?;
                 cov.call_method("html_report", (), Some(&kwargs))?;
                 format!("Coverage HTML written to dir {dir}")
             }
             ReportKind::Annotate => {
                 let kwargs = core_pyo3::types::PyDict::new(py);
                 if let Some(dir) = dest {
-                    kwargs.set_item("directory", rootdir.join(dir).to_string_lossy().as_ref())?;
+                    kwargs.set_item("directory", base.join(dir).to_string_lossy().as_ref())?;
                 }
                 cov.call_method("annotate", (), Some(&kwargs))?;
                 match dest {
@@ -803,7 +838,7 @@ impl CovPlugin {
                 };
                 let file = dest.or(configured.as_deref()).unwrap_or(default);
                 let kwargs = core_pyo3::types::PyDict::new(py);
-                kwargs.set_item("outfile", rootdir.join(file).to_string_lossy().as_ref())?;
+                kwargs.set_item("outfile", base.join(file).to_string_lossy().as_ref())?;
                 cov.call_method(method, (), Some(&kwargs))?;
                 format!("Coverage {label} written to file {file}")
             }
@@ -812,7 +847,7 @@ impl CovPlugin {
                     .or(self.json_output.as_deref())
                     .unwrap_or("coverage.json");
                 let kwargs = core_pyo3::types::PyDict::new(py);
-                kwargs.set_item("outfile", rootdir.join(file).to_string_lossy().as_ref())?;
+                kwargs.set_item("outfile", base.join(file).to_string_lossy().as_ref())?;
                 cov.call_method("json_report", (), Some(&kwargs))?;
                 format!("Coverage JSON written to file {file}")
             }
@@ -822,7 +857,7 @@ impl CovPlugin {
                 let handle = py.import("builtins")?.call_method1(
                     "open",
                     (
-                        rootdir.join(file).to_string_lossy().as_ref(),
+                        base.join(file).to_string_lossy().as_ref(),
                         if append { "a" } else { "w" },
                     ),
                 )?;
@@ -855,7 +890,7 @@ impl CovPlugin {
         let Ok(coverage_mod) = py.import("coverage") else {
             return Ok(());
         };
-        let data_path = Self::data_file_path(ctx);
+        let data_path = self.data_file_path(ctx);
         if !data_path.exists() {
             return Ok(());
         }
@@ -863,16 +898,15 @@ impl CovPlugin {
             .getattr("CoverageData")?
             .call1((data_path.to_string_lossy().as_ref(),))?;
         data.call_method0("read")?;
-        let rootdir = &ctx.config.rootdir;
         for file in data.call_method0("measured_files")?.try_iter()? {
             let file: String = file?.extract()?;
             let lines: Option<Vec<u32>> = data.call_method1("lines", (&file,))?.extract()?;
             let Some(lines) = lines else { continue };
-            // Data may hold rootdir-relative paths ([run] relative_files).
+            // Data may hold relative paths ([run] relative_files).
             let absolute = if Path::new(&file).is_absolute() {
                 file.clone()
             } else {
-                rootdir.join(&file).to_string_lossy().to_string()
+                self.base_dir.join(&file).to_string_lossy().to_string()
             };
             hits.entry(absolute.clone()).or_default().extend(lines);
             // Branch data: the arcs other than the per-line self-arcs.
@@ -976,10 +1010,10 @@ impl CovPlugin {
 
     /// The `.coverage` data file location: COVERAGE_FILE, else `[run]
     /// data_file`, else `.coverage` (coverage.py's precedence).
-    fn data_file_path(ctx: &HookContext) -> PathBuf {
+    fn data_file_path(&self, ctx: &HookContext) -> PathBuf {
         let configured = || {
             Self::section_option_value(
-                &ctx.config.rootdir,
+                &self.base_dir,
                 ctx.config.get_value("cov-config"),
                 "run",
                 "data_file",
@@ -987,10 +1021,9 @@ impl CovPlugin {
             .filter(|value| !value.is_empty())
         };
         match std::env::var("COVERAGE_FILE") {
-            Ok(value) => ctx.config.rootdir.join(value),
-            Err(_) => ctx
-                .config
-                .rootdir
+            Ok(value) => self.base_dir.join(value),
+            Err(_) => self
+                .base_dir
                 .join(configured().unwrap_or_else(|| ".coverage".to_string())),
         }
     }
@@ -1019,7 +1052,7 @@ impl CovPlugin {
             );
             return Ok(());
         };
-        let data_path = Self::data_file_path(ctx);
+        let data_path = self.data_file_path(ctx);
         let append = ctx.config.get_flag("cov-append") && data_path.exists();
         if !append {
             let _ = std::fs::remove_file(&data_path);
@@ -1030,19 +1063,15 @@ impl CovPlugin {
         if append {
             data.call_method0("read")?;
         }
-        // [run] relative_files: store rootdir-relative paths so coverage
-        // report/combine resolve them like coverage.py would.
+        // [run] relative_files: store paths relative to the current
+        // directory so coverage report/combine resolve them like coverage.py
+        // would.
         let relative =
-            Self::relative_files_enabled(&ctx.config.rootdir, ctx.config.get_value("cov-config"));
-        let rootdir_canon = ctx
-            .config
-            .rootdir
-            .canonicalize()
-            .unwrap_or_else(|_| ctx.config.rootdir.clone());
+            Self::relative_files_enabled(&self.base_dir, ctx.config.get_value("cov-config"));
         let relative_key = |file: &str| -> String {
             if relative {
                 Path::new(file)
-                    .strip_prefix(&rootdir_canon)
+                    .strip_prefix(&self.base_dir)
                     .map(|p| p.to_string_lossy().to_string())
                     .unwrap_or_else(|_| file.to_string())
             } else {
@@ -1135,7 +1164,6 @@ impl CovPlugin {
 
     fn build_data(
         &self,
-        rootdir: &Path,
         hits: HashMap<String, BTreeSet<u32>>,
         arcs: ArcMap,
         unmeasured_sources: &[PathBuf],
@@ -1281,7 +1309,7 @@ impl CovPlugin {
             // collapses onto the same canonical name before it ever reaches
             // this per-file loop.
             let name = path
-                .strip_prefix(rootdir)
+                .strip_prefix(&self.base_dir)
                 .unwrap_or(&path)
                 .to_string_lossy()
                 .to_string();
@@ -1479,6 +1507,9 @@ impl Plugin for CovPlugin {
             .rootdir
             .canonicalize()
             .unwrap_or_else(|_| ctx.config.rootdir.clone());
+        let cwd = std::env::current_dir().unwrap_or_else(|_| rootdir.clone());
+        let base = cwd.canonicalize().unwrap_or_else(|_| cwd.clone());
+        self.base_dir = base.clone();
         self.cov_source_names = cov_values
             .iter()
             .filter(|value| !value.is_empty())
@@ -1487,7 +1518,7 @@ impl Plugin for CovPlugin {
         self.sources = self
             .cov_source_names
             .iter()
-            .map(|value| Self::resolve_source(py, &rootdir, value))
+            .map(|value| Self::resolve_source(py, &base, &rootdir, value))
             .collect();
         // A bare `--cov` leaves the source to the coverage config, like
         // pytest-cov: `[run] source` (paths or importable names) and
@@ -1496,27 +1527,27 @@ impl Plugin for CovPlugin {
         if !self.sources_from_cli {
             let cov_config = ctx.config.get_value("cov-config");
             let config_list = |option: &str| {
-                Self::section_option_list(&ctx.config.rootdir, cov_config, "run", option, false)
+                Self::section_option_list(&base, cov_config, "run", option, false)
                     .unwrap_or_default()
             };
             for name in config_list("source") {
-                self.sources.push(Self::resolve_source(py, &rootdir, &name));
+                self.sources
+                    .push(Self::resolve_source(py, &base, &rootdir, &name));
                 self.cov_source_names.push(name);
             }
             for name in config_list("source_pkgs") {
                 let source = Self::resolve_import_source(py, &name)
                     .map(|path| path.canonicalize().unwrap_or(path))
-                    .unwrap_or_else(|| Self::resolve_source(py, &rootdir, &name));
+                    .unwrap_or_else(|| Self::resolve_source(py, &base, &rootdir, &name));
                 self.sources.push(source);
                 self.cov_source_names.push(name);
             }
         }
         self.reports = Self::parse_reports(py, ctx.config.get_values("cov-report"))?;
         let cov_config = ctx.config.get_value("cov-config");
-        let plain_rootdir = ctx.config.rootdir.clone();
         // [report] show_missing / skip_covered upgrade the term spec like
         // the --cov-report=term-missing:skip-covered spellings.
-        if Self::section_option_value(&plain_rootdir, cov_config, "report", "show_missing")
+        if Self::section_option_value(&base, cov_config, "report", "show_missing")
             .is_some_and(|value| Self::truthy(&value))
         {
             for spec in &mut self.reports {
@@ -1525,7 +1556,7 @@ impl Plugin for CovPlugin {
                 }
             }
         }
-        if Self::section_option_value(&plain_rootdir, cov_config, "report", "skip_covered")
+        if Self::section_option_value(&base, cov_config, "report", "skip_covered")
             .is_some_and(|value| Self::truthy(&value))
         {
             for spec in &mut self.reports {
@@ -1538,9 +1569,7 @@ impl Plugin for CovPlugin {
             .config
             .get_value("cov-precision")
             .map(str::to_string)
-            .or_else(|| {
-                Self::section_option_value(&plain_rootdir, cov_config, "report", "precision")
-            })
+            .or_else(|| Self::section_option_value(&base, cov_config, "report", "precision"))
             .and_then(|value| value.parse().ok())
             .unwrap_or(0);
         // [report] fail_under: --cov-fail-under wins; otherwise .coveragerc
@@ -1550,33 +1579,30 @@ impl Plugin for CovPlugin {
             .get_value("cov-fail-under")
             .and_then(|value| value.parse().ok())
             .or_else(|| {
-                Self::section_option_value(&plain_rootdir, cov_config, "report", "fail_under")
+                Self::section_option_value(&base, cov_config, "report", "fail_under")
                     .and_then(|value| value.parse().ok())
             });
-        self.exclude_rules = Self::load_exclude_rules(&rootdir, ctx.config.get_value("cov-config"));
+        self.exclude_rules = Self::load_exclude_rules(&base, ctx.config.get_value("cov-config"));
         // omit / include patterns resolve against the current directory,
         // like coverage.py's `prep_patterns`.
-        let cwd = std::env::current_dir().unwrap_or_else(|_| rootdir.clone());
-        let cwd_canonical = cwd.canonicalize().unwrap_or_else(|_| cwd.clone());
-        let pattern_base: [&Path; 2] = [&cwd, &cwd_canonical];
+        let pattern_base: [&Path; 2] = [&cwd, &base];
         let list = |section: &str, option: &str| {
-            Self::section_option_list(&plain_rootdir, cov_config, section, option, false)
-                .unwrap_or_default()
+            Self::section_option_list(&base, cov_config, section, option, false).unwrap_or_default()
         };
         self.run_omit = GlobMatcher::prep(&list("run", "omit"), &pattern_base);
         self.run_include = GlobMatcher::prep(&list("run", "include"), &pattern_base);
         self.report_omit = GlobMatcher::new(&list("report", "omit"), &pattern_base);
         self.report_include = GlobMatcher::new(&list("report", "include"), &pattern_base);
-        self.partial_patterns = Self::load_partial_patterns(&rootdir, cov_config);
+        self.partial_patterns = Self::load_partial_patterns(&base, cov_config);
         let truthy_option = |section: &str, option: &str| {
-            Self::section_option_value(&plain_rootdir, cov_config, section, option)
+            Self::section_option_value(&base, cov_config, section, option)
                 .is_some_and(|value| Self::truthy(&value))
         };
         self.skip_empty = truthy_option("report", "skip_empty");
         self.lazy_annotations = py.import("sys")?.getattr("version_info")?.ge((3, 14))?;
         self.ignore_errors = truthy_option("report", "ignore_errors");
         let output = |section: &str| {
-            Self::section_option_value(&plain_rootdir, cov_config, section, "output")
+            Self::section_option_value(&base, cov_config, section, "output")
                 .filter(|value| !value.is_empty())
         };
         self.xml_output = output("xml");
@@ -1593,17 +1619,16 @@ impl Plugin for CovPlugin {
         };
 
         self.branch = ctx.config.get_flag("cov-branch")
-            || Self::branch_enabled(&ctx.config.rootdir, ctx.config.get_value("cov-config"));
+            || Self::branch_enabled(&base, ctx.config.get_value("cov-config"));
         self.context_enabled = ctx.config.get_value("cov-context") == Some("test");
         match report::ReportSort::parse(
-            Self::section_option_value(&plain_rootdir, cov_config, "report", "sort").as_deref(),
+            Self::section_option_value(&base, cov_config, "report", "sort").as_deref(),
             self.branch,
         ) {
             Ok(sort) => self.sort = sort,
             Err(message) => self.sort_error = Some(message),
         }
-        self.path_aliases =
-            Self::paths_aliases(&ctx.config.rootdir, ctx.config.get_value("cov-config"));
+        self.path_aliases = Self::paths_aliases(&base, ctx.config.get_value("cov-config"));
         // An xdist worker runs with a rootdir set to its chdir; the coverage
         // config (rsync'd as a fixture) may not sit on its rootdir resolution
         // path, so `[paths]` parses empty. Fall back to the controller's
@@ -1621,12 +1646,8 @@ impl Plugin for CovPlugin {
         // pytest-cov parity for dynamic_context=test_function in the
         // coverage config: fatal under xdist, a warning otherwise (the
         // --cov-context option is the supported spelling).
-        if Self::run_option_value(
-            &ctx.config.rootdir,
-            ctx.config.get_value("cov-config"),
-            "dynamic_context",
-        )
-        .as_deref()
+        if Self::run_option_value(&base, ctx.config.get_value("cov-config"), "dynamic_context")
+            .as_deref()
             == Some("test_function")
         {
             if ctx.config.get_value("numprocesses").is_some() && !ctx.config.is_worker() {
@@ -1694,7 +1715,7 @@ impl Plugin for CovPlugin {
             LineCollector::new(
                 with_sep(&rootdir),
                 self.sources.iter().map(|source| with_sep(source)).collect(),
-                PathAliases::from_groups(&self.path_aliases, &rootdir),
+                PathAliases::from_groups(&self.path_aliases, &base),
                 GlobMatcher::from_prepped(&self.run_omit),
                 // coverage.py ignores [run] include when a source is given.
                 if self.sources.is_empty() {
@@ -1774,11 +1795,7 @@ impl Plugin for CovPlugin {
         // SIGTERM handler to save data first, then re-raises SIG_DFL.
         environ.set_item(
             "PYTEST_RS_COV_SIGTERM",
-            if Self::run_option_enabled(
-                &ctx.config.rootdir,
-                ctx.config.get_value("cov-config"),
-                "sigterm",
-            ) {
+            if Self::run_option_enabled(&base, ctx.config.get_value("cov-config"), "sigterm") {
                 "1"
             } else {
                 "0"
@@ -2030,12 +2047,7 @@ impl Plugin for CovPlugin {
             .filter(|path| !hits.contains_key(path.to_string_lossy().as_ref()))
             .collect();
         self.write_data_file(ctx, &hits, &arcs, &context_hits, &context_arcs, &unexecuted)?;
-        let rootdir = ctx
-            .config
-            .rootdir
-            .canonicalize()
-            .unwrap_or_else(|_| ctx.config.rootdir.clone());
-        let (data, errors) = self.build_data(&rootdir, hits, arcs, &unmeasured_sources);
+        let (data, errors) = self.build_data(hits, arcs, &unmeasured_sources);
 
         // A file that cannot be read or parsed fails the reports, like
         // coverage.py, unless `[report] ignore_errors` (then a warning);
@@ -2086,7 +2098,7 @@ impl Plugin for CovPlugin {
             let (default_dest, content, label) = match spec.kind {
                 ReportKind::Xml => (
                     "coverage.xml",
-                    report::render_xml(&data, &ctx.config.rootdir.to_string_lossy()),
+                    report::render_xml(&data, &self.base_dir.to_string_lossy()),
                     "XML",
                 ),
                 ReportKind::Lcov => ("coverage.lcov", report::render_lcov(&data), "LCOV"),
@@ -2114,7 +2126,7 @@ impl Plugin for CovPlugin {
                 .clone()
                 .or(configured)
                 .unwrap_or_else(|| default_dest.to_string());
-            let path = ctx.config.rootdir.join(&dest);
+            let path = self.base_dir.join(&dest);
             std::fs::write(&path, content)
                 .map_err(|e| core_pyo3::exceptions::PyOSError::new_err(e.to_string()))?;
             messages.push(format!("Coverage {label} written to file {dest}"));
