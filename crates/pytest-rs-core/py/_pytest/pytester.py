@@ -1,4 +1,8 @@
+from __future__ import annotations
+
 import sys
+from collections.abc import Iterable, Sequence
+from typing import TYPE_CHECKING, Any, Literal, overload
 
 from pytest import LineMatcher, Pytester, RunResult  # noqa: F401
 
@@ -41,18 +45,25 @@ class SysPathsSnapshot:
 
 from pytest._outcomes import fail  # noqa: E402
 
+if TYPE_CHECKING:
+    from pytest import CollectReport, PytestPluginManager, TestReport
+
 
 class RecordedHookCall:
     """A recorded hook call; the hook's kwargs are set as attributes."""
 
-    def __init__(self, name, kwargs):
+    def __init__(self, name: str, kwargs: Any) -> None:
         self.__dict__.update(kwargs)
         self._name = name
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         d = self.__dict__.copy()
         del d["_name"]
         return f"<RecordedHookCall {self._name!r}(**{d!r})>"
+
+    if TYPE_CHECKING:
+        # The attributes are the hook's kwargs, set dynamically (as upstream).
+        def __getattr__(self, key: str) -> Any: ...
 
 
 # Upstream exposes the recorded call under this name in some versions.
@@ -63,10 +74,10 @@ class HookRecorder:
     """Record every hook called through a plugin manager (port of upstream
     pytester.HookRecorder), so tests can introspect what fired."""
 
-    def __init__(self, pluginmanager, *, _ispytest=False):
+    def __init__(self, pluginmanager: PytestPluginManager, *, _ispytest: bool = False) -> None:
         self._pluginmanager = pluginmanager
-        self.calls = []
-        self.ret = None
+        self.calls: list[RecordedHookCall] = []
+        self.ret: int | None = None
 
         def before(hook_name, hook_impls, kwargs):
             self.calls.append(RecordedHookCall(hook_name, kwargs))
@@ -76,15 +87,15 @@ class HookRecorder:
 
         self._undo_wrapping = pluginmanager.add_hookcall_monitoring(before, after)
 
-    def finish_recording(self):
+    def finish_recording(self) -> None:
         self._undo_wrapping()
 
-    def getcalls(self, names):
+    def getcalls(self, names: str | Iterable[str]) -> list[RecordedHookCall]:
         if isinstance(names, str):
             names = names.split()
         return [call for call in self.calls if call._name in names]
 
-    def assert_contains(self, entries):
+    def assert_contains(self, entries: Sequence[tuple[str, str]]) -> None:
         __tracebackhide__ = True
         i = 0
         entries = list(entries)
@@ -102,7 +113,7 @@ class HookRecorder:
             else:
                 fail(f"could not find {name!r} check {check!r}")
 
-    def popcall(self, name):
+    def popcall(self, name: str) -> RecordedHookCall:
         __tracebackhide__ = True
         for i, call in enumerate(self.calls):
             if call._name == name:
@@ -112,20 +123,38 @@ class HookRecorder:
         lines.extend([f"  {x}" for x in self.calls])
         fail("\n".join(lines))
 
-    def getcall(self, name):
+    def getcall(self, name: str) -> RecordedHookCall:
         values = self.getcalls(name)
         assert len(values) == 1, (name, values)
         return values[0]
 
-    def getreports(self, names=("pytest_collectreport", "pytest_runtest_logreport")):
-        return [x.report for x in self.getcalls(names)]
+    @overload
+    def getreports(self, names: Literal["pytest_collectreport"]) -> Sequence[CollectReport]: ...
+
+    @overload
+    def getreports(self, names: Literal["pytest_runtest_logreport"]) -> Sequence[TestReport]: ...
+
+    @overload
+    def getreports(
+        self,
+        names: str | Iterable[str] = (
+            "pytest_collectreport",
+            "pytest_runtest_logreport",
+        ),
+    ) -> Sequence[CollectReport | TestReport]: ...
+
+    def getreports(  # type: ignore[misc]
+        self,
+        names: str | Iterable[str] = ("pytest_collectreport", "pytest_runtest_logreport"),
+    ) -> Sequence[CollectReport | TestReport]:
+        return [x.report for x in self.getcalls(names)]  # type: ignore[attr-defined]
 
     def matchreport(
         self,
-        inamepart="",
-        names=("pytest_runtest_logreport", "pytest_collectreport"),
-        when=None,
-    ):
+        inamepart: str = "",
+        names: str | Iterable[str] = ("pytest_runtest_logreport", "pytest_collectreport"),
+        when: str | None = None,
+    ) -> CollectReport | TestReport:
         values = []
         for rep in self.getreports(names=names):
             if not when and rep.when != "call" and rep.passed:
@@ -142,13 +171,37 @@ class HookRecorder:
             raise ValueError(f"found 2 or more testreports matching {inamepart!r}: {values}")
         return values[0]
 
-    def getfailures(self, names=("pytest_collectreport", "pytest_runtest_logreport")):
+    @overload
+    def getfailures(self, names: Literal["pytest_collectreport"]) -> Sequence[CollectReport]: ...
+
+    @overload
+    def getfailures(self, names: Literal["pytest_runtest_logreport"]) -> Sequence[TestReport]: ...
+
+    @overload
+    def getfailures(
+        self,
+        names: str | Iterable[str] = (
+            "pytest_collectreport",
+            "pytest_runtest_logreport",
+        ),
+    ) -> Sequence[CollectReport | TestReport]: ...
+
+    def getfailures(  # type: ignore[misc]
+        self,
+        names: str | Iterable[str] = ("pytest_collectreport", "pytest_runtest_logreport"),
+    ) -> Sequence[CollectReport | TestReport]:
         return [rep for rep in self.getreports(names) if rep.failed]
 
-    def getfailedcollections(self):
+    def getfailedcollections(self) -> Sequence[CollectReport]:
         return self.getfailures("pytest_collectreport")
 
-    def listoutcomes(self):
+    def listoutcomes(
+        self,
+    ) -> tuple[
+        Sequence[TestReport],
+        Sequence[CollectReport | TestReport],
+        Sequence[CollectReport | TestReport],
+    ]:
         passed = []
         skipped = []
         failed = []
@@ -161,19 +214,19 @@ class HookRecorder:
             else:
                 assert rep.failed, f"Unexpected outcome: {rep!r}"
                 failed.append(rep)
-        return passed, skipped, failed
+        return passed, skipped, failed  # type: ignore[return-value]
 
-    def countoutcomes(self):
+    def countoutcomes(self) -> list[int]:
         return [len(x) for x in self.listoutcomes()]
 
-    def assertoutcome(self, passed=0, skipped=0, failed=0):
+    def assertoutcome(self, passed: int = 0, skipped: int = 0, failed: int = 0) -> None:
         __tracebackhide__ = True
         from _pytest.pytester_assertions import assertoutcome
 
         outcomes = self.listoutcomes()
         assertoutcome(outcomes, passed=passed, skipped=skipped, failed=failed)
 
-    def clear(self):
+    def clear(self) -> None:
         self.calls[:] = []
 
 

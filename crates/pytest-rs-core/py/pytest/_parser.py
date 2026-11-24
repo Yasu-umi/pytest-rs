@@ -7,11 +7,13 @@ wired up yet — unknown flags still error at the Rust argument parser."""
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import shlex
 import textwrap
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, Literal
 
 # Sentinel for "no default passed to addini" — distinct from an explicit
 # default=None (which makes getini return None regardless of type).
@@ -60,6 +62,19 @@ option_specs["version"] = {
 }
 flag_dests["--version"] = "version"
 flag_actions["--version"] = "count"
+
+
+if TYPE_CHECKING:
+    from typing_extensions import TypeForm
+
+type _IniTypeTag = Literal[
+    "string", "paths", "pathlist", "args", "linelist", "bool", "int", "float"
+]
+
+if TYPE_CHECKING:
+    #: The forms accepted by :meth:`Parser.addini` for its ``type`` argument;
+    #: ``None`` means ``"string"``.
+    type _IniTypeArg = _IniTypeTag | TypeForm[bool | int | float | str] | None
 
 
 class Option:
@@ -118,6 +133,19 @@ class OptionGroup:
 
 
 class Parser:
+    if TYPE_CHECKING:
+
+        @property
+        def prog(self) -> str: ...
+        @prog.setter
+        def prog(self, value: str) -> None: ...
+        def parse(
+            self,
+            args: Sequence[str | os.PathLike[str]],
+            namespace: argparse.Namespace | None = None,
+        ) -> argparse.Namespace: ...
+        def processoption(self, option: Any) -> None: ...
+
     def getgroup(self, name: str, description: str = "", after: str | None = None) -> OptionGroup:
         existing = option_groups.get(name)
         if existing is not None:
@@ -132,27 +160,37 @@ class Parser:
         # for --help rendering instead of living only on a throwaway group.
         self.getgroup("").addoption(*opts, **attrs)
 
-    def parse_known_args(self, args, namespace=None):
+    def parse_known_args(
+        self,
+        args: Sequence[str | os.PathLike[str]],
+        namespace: argparse.Namespace | None = None,
+    ) -> argparse.Namespace:
         """argparse-style early parse: a namespace carrying the registered
         option defaults with the CLI `args` applied (pytest-django reads
         options.ds/.dc/.itv/.version/.help here). Unknown tokens are ignored."""
-        ns = namespace if namespace is not None else OptionNamespace()
+        ns: Any = namespace if namespace is not None else OptionNamespace()
         apply_cli_args(ns, [str(a) for a in args])
         return ns
 
-    def parse_known_and_unknown_args(self, args, namespace=None):
-        ns = namespace if namespace is not None else OptionNamespace()
+    def parse_known_and_unknown_args(
+        self,
+        args: Sequence[str | os.PathLike[str]],
+        namespace: argparse.Namespace | None = None,
+    ) -> tuple[argparse.Namespace, list[str]]:
+        ns: Any = namespace if namespace is not None else OptionNamespace()
         unknown = apply_cli_args(ns, [str(a) for a in args])
-        return ns, unknown
+        # NOTE: apply_cli_args returns an (unknown_flags, positionals) pair, so
+        # the second element is a tuple, not the list upstream returns.
+        return ns, unknown  # type: ignore[return-value]
 
     def addini(
         self,
         name: str,
         help: str | None = None,
-        type: str | None = None,
+        type: _IniTypeArg = None,
         default: Any = _UNSET,
         *,
-        aliases: Any = (),
+        aliases: Sequence[str] = (),
     ) -> None:
         aliases = list(aliases)
         type = _normalize_ini_type(name, type)

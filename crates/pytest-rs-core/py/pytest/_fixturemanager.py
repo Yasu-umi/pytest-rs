@@ -21,7 +21,18 @@ not just pytest-bdd's own code — so it must carry the same commonly-read
 attributes as upstream's real `_pytest.fixtures.FixtureDef`, e.g. `argnames`
 (aiohttp's own pytest plugin reads `fixturedef.argnames`)."""
 
+from __future__ import annotations
+
 import inspect
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Generator, Sequence
+
+    from _pytest.config import Config
+    from _pytest.scope import ScopeName
+
+    from pytest._node import Node
 
 
 def _func_argnames(func):
@@ -237,7 +248,14 @@ class SessionFixtureManager(ShimFixtureManager):
 
 
 def register_fixture(
-    *, name, func, node, scope="function", params=None, ids=None, autouse=False
+    *,
+    name: str,
+    func: Callable[..., object] | Callable[..., Generator[object]],
+    node: Node,
+    scope: ScopeName | Callable[[str, Config], ScopeName] = "function",
+    params: Sequence[object] | None = None,
+    ids: tuple[object | None, ...] | Callable[[Any], object | None] | None = None,
+    autouse: bool = False,
 ) -> None:
     """Register a fixture imperatively (pytest 9.1's ``pytest.register_fixture``):
     visible to ``node`` and its descendants."""

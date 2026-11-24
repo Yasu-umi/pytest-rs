@@ -1,8 +1,12 @@
 """pytester LineMatcher (split out of _pytester.py)."""
 
+from __future__ import annotations
+
+import builtins
 import collections.abc
 import fnmatch
 import re
+from collections.abc import Sequence
 
 from pytest._outcomes import fail
 
@@ -15,14 +19,14 @@ class LineMatcher:
     pattern stopped matching and against which lines.
     """
 
-    def __init__(self, lines):
+    def __init__(self, lines: list[builtins.str]) -> None:
         self.lines = lines
-        self._log_output = []
+        self._log_output: list[builtins.str] = []
 
-    def __str__(self):
+    def __str__(self) -> builtins.str:
         return "\n".join(self.lines)
 
-    def str(self):
+    def str(self) -> builtins.str:
         return str(self)
 
     def _getlines(self, lines2):
@@ -34,11 +38,11 @@ class LineMatcher:
             lines2 = lines2.strip().lines
         return lines2
 
-    def fnmatch_lines_random(self, lines2):
+    def fnmatch_lines_random(self, lines2: Sequence[builtins.str]) -> None:
         __tracebackhide__ = True
         self._match_lines_random(lines2, fnmatch.fnmatch)
 
-    def re_match_lines_random(self, lines2):
+    def re_match_lines_random(self, lines2: Sequence[builtins.str]) -> None:
         __tracebackhide__ = True
         self._match_lines_random(lines2, lambda name, pat: bool(re.match(pat, name)))
 
@@ -55,7 +59,7 @@ class LineMatcher:
                 self._log(msg)
                 self._fail(msg)
 
-    def get_lines_after(self, fnline):
+    def get_lines_after(self, fnline: builtins.str) -> Sequence[builtins.str]:
         for i, line in enumerate(self.lines):
             if fnline == line or fnmatch.fnmatch(line, fnline):
                 return self.lines[i + 1 :]
@@ -68,11 +72,11 @@ class LineMatcher:
     def _log_text(self):
         return "\n".join(self._log_output)
 
-    def fnmatch_lines(self, lines2, *, consecutive=False):
+    def fnmatch_lines(self, lines2: Sequence[builtins.str], *, consecutive: bool = False) -> None:
         __tracebackhide__ = True
         self._match_lines(lines2, fnmatch.fnmatch, "fnmatch", consecutive=consecutive)
 
-    def re_match_lines(self, lines2, *, consecutive=False):
+    def re_match_lines(self, lines2: Sequence[builtins.str], *, consecutive: bool = False) -> None:
         __tracebackhide__ = True
         self._match_lines(
             lines2,
@@ -118,13 +122,13 @@ class LineMatcher:
                 msg = f"remains unmatched: {line!r}"
                 self._log(msg)
                 self._fail(msg)
-        self._log_output = []
+        self._log_output: list[builtins.str] = []
 
-    def no_fnmatch_line(self, pat):
+    def no_fnmatch_line(self, pat: builtins.str) -> None:
         __tracebackhide__ = True
         self._no_match_line(pat, fnmatch.fnmatch, "fnmatch")
 
-    def no_re_match_line(self, pat):
+    def no_re_match_line(self, pat: builtins.str) -> None:
         __tracebackhide__ = True
         self._no_match_line(pat, lambda name, pat: bool(re.match(pat, name)), "re.match")
 
@@ -143,10 +147,10 @@ class LineMatcher:
                     self._log("{:>{width}}".format("nomatch:", width=wnick), repr(pat))
                     nomatch_printed = True
                 self._log("{:>{width}}".format("and:", width=wnick), repr(line))
-        self._log_output = []
+        self._log_output: list[builtins.str] = []
 
     def _fail(self, msg):
         __tracebackhide__ = True
         log_text = self._log_text
-        self._log_output = []
+        self._log_output: list[builtins.str] = []
         fail(log_text)

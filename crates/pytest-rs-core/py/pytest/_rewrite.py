@@ -65,7 +65,7 @@ _REGISTERED_MODULES: set = set()
 _PYTHON_FILES_GLOBS: set = set()
 
 
-def register_assert_rewrite(*names):
+def register_assert_rewrite(*names: str) -> None:
     # The meta_path hook only rewrites modules imported *after* registration;
     # a module already in sys.modules by now was loaded unrewritten and stays that way.
     # Exception: a module whose loader is already _RewriteLoader was rewritten

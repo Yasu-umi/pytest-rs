@@ -23,6 +23,9 @@ from _pytest.outcomes import skip
 
 if TYPE_CHECKING:
     import doctest
+    from typing import Self
+
+    from _pytest._code.code import ExceptionInfo, TerminalRepr
 
 # The stdlib `doctest` module is imported lazily inside every function that
 # needs it (as upstream pytest does): importing it also pulls in `pdb`, which a
@@ -762,7 +765,23 @@ class DoctestItem(metaclass=_DoctestItemMeta):
         self.name = name
         self.dtest = dtest
 
-    def reportinfo(self) -> tuple:
+    if TYPE_CHECKING:
+        # Set on each collected item (see the factory below).
+        parent: Any
+
+        @classmethod
+        def from_parent(  # type: ignore[override]
+            cls,
+            parent: DoctestTextfile | DoctestModule,
+            *,
+            name: str,
+            runner: doctest.DocTestRunner,
+            dtest: doctest.DocTest,
+        ) -> Self: ...
+        def runtest(self) -> None: ...
+        def setup(self) -> None: ...
+
+    def reportinfo(self) -> tuple[os.PathLike[str] | str, int | None, str]:
         if self.dtest is not None:
             lineno = self.dtest.lineno
         else:
@@ -795,7 +814,7 @@ class DoctestItem(metaclass=_DoctestItemMeta):
             pass
         return None
 
-    def repr_failure(self, excinfo: Any) -> str:
+    def repr_failure(self, excinfo: ExceptionInfo[BaseException]) -> str | TerminalRepr:
         exc = excinfo.value if hasattr(excinfo, "value") else excinfo
         if isinstance(exc, DoctestFailure):
             return exc.msg

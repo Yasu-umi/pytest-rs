@@ -1,5 +1,7 @@
 """The `request.node` object: a minimal pytest Item surface."""
 
+from __future__ import annotations
+
 import inspect
 import pathlib
 import traceback
@@ -7,7 +9,22 @@ import warnings
 from collections.abc import Generator
 from inspect import Parameter, signature
 from itertools import chain
-from typing import Any
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, overload
+
+if TYPE_CHECKING:
+    import os
+    from collections.abc import Callable, Iterable, Iterator, Sequence
+    from typing import Self
+
+    from _pytest._code.code import ExceptionInfo, TerminalRepr
+    from _pytest.config import Config
+    from _pytest.nodeid import NodeId
+
+    from pytest._marks import Mark, MarkDecorator
+    from pytest._stash import Stash
+
+    _NodeType = TypeVar("_NodeType", bound="_NodeBase")
+    _TracebackStyle = Literal["long", "short", "line", "no", "native", "value", "auto"]
 
 # Marks added at runtime (node.add_marker / request.applymarker) for the
 # currently running item; the engine re-evaluates xfail against these and
@@ -120,30 +137,52 @@ def clear_added_marks():
 class _NodeBase:
     """Shared Node implementation. Use Collector or Item, not this directly."""
 
+    # Declarations only (no runtime effect): upstream's Node attribute types.
+    name: str
+    parent: _NodeBase | None
+    config: Config
+    session: Session
+    path: pathlib.Path
+    own_markers: list[Mark]
+    stash: Stash
+
+    if TYPE_CHECKING:
+
+        def warn(self, warning: Warning) -> None: ...
+        @property
+        def id(self) -> NodeId: ...
+        def iter_parents(self) -> Iterator[_NodeBase]: ...
+        def iter_markers_with_node(
+            self, name: str | None = None
+        ) -> Iterator[tuple[_NodeBase, Mark]]: ...
+        def listextrakeywords(self) -> set[str]: ...
+        def listnames(self) -> list[str]: ...
+        def addfinalizer(self, fin: Callable[[], object]) -> None: ...
+
     @property
-    def extra_keyword_matches(self):
+    def extra_keyword_matches(self) -> set[str]:
         """Extra names ``-k`` matches this node by (upstream Node attribute);
         created on first use."""
         return self.__dict__.setdefault("_extra_keyword_matches", set())
 
     @extra_keyword_matches.setter
-    def extra_keyword_matches(self, value):
+    def extra_keyword_matches(self, value: set[str]) -> None:
         self.__dict__["_extra_keyword_matches"] = value
 
     def __init__(
         self,
-        name=None,
-        parent=None,
-        config=None,
-        session=None,
-        fspath=None,
-        path=None,
-        nodeid=None,
-        **kwargs,
-    ):
+        name: str | None = None,
+        parent: _NodeBase | None = None,
+        config: Config | None = None,
+        session: Session | None = None,
+        fspath: Any = None,
+        path: pathlib.Path | None = None,
+        nodeid: str | None = None,
+        **kwargs: Any,
+    ) -> None:
         self.parent = parent
-        self.config = config if config is not None else getattr(parent, "config", None)
-        self.session = session if session is not None else getattr(parent, "session", None)
+        self.config = config if config is not None else getattr(parent, "config", None)  # type: ignore[assignment]
+        self.session = session if session is not None else getattr(parent, "session", None)  # type: ignore[assignment]
         if path is None and fspath is not None:
             from _pytest.deprecated import NODE_CTOR_FSPATH_ARG
 
@@ -154,7 +193,7 @@ class _NodeBase:
             path = pathlib.Path(str(fspath))
         if path is None and parent is not None:
             path = getattr(parent, "path", None)
-        self.path = pathlib.Path(str(path)) if path is not None else None
+        self.path = pathlib.Path(str(path)) if path is not None else None  # type: ignore[assignment]
         self.name = name if name is not None else (self.path.name if self.path is not None else "")
         self.own_markers = []
         self._nodeid = nodeid if nodeid is not None else self._compute_nodeid()
@@ -169,7 +208,7 @@ class _NodeBase:
         return type.__call__(cls, *k, **kw)
 
     @classmethod
-    def from_parent(cls, parent, **kwargs):
+    def from_parent(cls, parent: Collector, **kwargs: Any) -> Self:
         """Construct a child node under `parent` (pytest's Node.from_parent)."""
         if "session" in kwargs:
             raise TypeError(
@@ -222,7 +261,7 @@ class _NodeBase:
         return self.name
 
     @property
-    def nodeid(self):
+    def nodeid(self) -> str:
         try:
             return self._nodeid
         except AttributeError:
@@ -234,7 +273,7 @@ class _NodeBase:
             return str(node_id)
 
     @nodeid.setter
-    def nodeid(self, value):
+    def nodeid(self, value: str) -> None:
         # Node/Function (engine nodes) subclass this and assign self.nodeid.
         self._nodeid = value
 
@@ -251,49 +290,57 @@ class _NodeBase:
 
         return pluginmanager.hook
 
-    def add_marker(self, marker, append=True):
+    def add_marker(self, marker: str | MarkDecorator, append: bool = True) -> None:
         from pytest._marks import Mark, MarkDecorator
 
         if isinstance(marker, str):
-            marker = Mark(marker)
+            marker = Mark(marker)  # type: ignore[assignment]
         elif isinstance(marker, MarkDecorator):
-            marker = marker.mark
+            marker = marker.mark  # type: ignore[assignment]
         else:
             raise ValueError(f"is not a string or pytest.mark.* Marker object: {marker!r}")
         if append:
-            self.own_markers.append(marker)
+            self.own_markers.append(marker)  # type: ignore[arg-type]
         else:
-            self.own_markers.insert(0, marker)
+            self.own_markers.insert(0, marker)  # type: ignore[arg-type]
 
-    def get_closest_marker(self, name, default=None):
+    @overload
+    def get_closest_marker(self, name: str) -> Mark | None: ...
+
+    @overload
+    def get_closest_marker(self, name: str, default: Mark | MarkDecorator) -> Mark: ...
+
+    def get_closest_marker(
+        self, name: str, default: Mark | MarkDecorator | None = None
+    ) -> Mark | None:
         for marker in self.own_markers:
             if marker.name == name:
                 return marker
         # A MarkDecorator default (``pytest.mark.foo(1)``) yields its Mark.
-        return getattr(default, "mark", default)
+        return getattr(default, "mark", default)  # type: ignore[arg-type]
 
-    def iter_markers(self, name=None):
+    def iter_markers(self, name: str | None = None) -> Iterator[Mark]:
         for marker in self.own_markers:
             if name is None or marker.name == name:
                 yield marker
 
-    def getparent(self, cls):
+    def getparent(self, cls: type[_NodeType]) -> _NodeType | None:
         """Walk up the parent chain and return the first node that is an
         instance of `cls`, or None. Mirrors pytest's Node.getparent."""
         node = self
         while node is not None:
             if isinstance(node, cls):
                 return node
-            node = getattr(node, "parent", None)
+            node = getattr(node, "parent", None)  # type: ignore[assignment]
         return None
 
-    def listchain(self):
+    def listchain(self) -> list[_NodeBase]:
         """Return the chain from the root down to this node (inclusive)."""
         chain = []
         node = self
         while node is not None:
             chain.append(node)
-            node = getattr(node, "parent", None)
+            node = getattr(node, "parent", None)  # type: ignore[assignment]
         chain.reverse()
         return chain
 
@@ -323,6 +370,11 @@ class _NodeBase:
 
 class Collector(_NodeBase):
     """Base for collection nodes (pytest.File, pytest.Class, etc.)."""
+
+    if TYPE_CHECKING:
+
+        def collect(self) -> Iterable[Item | Collector]: ...
+        def repr_failure(self, excinfo: ExceptionInfo[BaseException]) -> str | TerminalRepr: ...
 
     class CollectError(Exception):
         """An error during collection, shown without a traceback."""
@@ -520,15 +572,40 @@ class Session(Collector):
     class Interrupted(KeyboardInterrupt):
         """Signals an interrupted test run (upstream)."""
 
+    if TYPE_CHECKING:
+        shouldfail: bool | str
+        shouldstop: bool | str
+
+        @property
+        def startpath(self) -> pathlib.Path: ...
+        def collect(self) -> Iterator[Item | Collector]: ...
+        def genitems(self, node: Item | Collector) -> Iterator[Item]: ...
+        def isinitpath(
+            self, path: str | os.PathLike[str], *, with_parents: bool = False
+        ) -> bool: ...
+        def gethookproxy(self, fspath: os.PathLike[str]) -> Any: ...
+
     @classmethod
-    def from_config(cls, config):
+    def from_config(cls, config: Config) -> Session:
         rootdir = getattr(config, "rootpath", None) or getattr(config, "rootdir", None)
         rootdir = pathlib.Path(str(rootdir)) if rootdir is not None else pathlib.Path.cwd()
         session = cls(name=rootdir.name or ".", config=config, path=rootdir, nodeid="")
         session.parent = None
         return session
 
-    def perform_collect(self, args=None, genitems=False):
+    @overload
+    def perform_collect(
+        self, args: Sequence[str] | None = ..., genitems: Literal[True] = ...
+    ) -> Sequence[Item]: ...
+
+    @overload
+    def perform_collect(
+        self, args: Sequence[str] | None = ..., genitems: bool = ...
+    ) -> Sequence[Item | Collector]: ...
+
+    def perform_collect(
+        self, args: Sequence[str] | None = None, genitems: bool = False
+    ) -> Sequence[Item | Collector]:
         if not args or args == [self.nodeid] or args == [""]:
             native = take_native_collection()
             if native is not None:
@@ -581,7 +658,7 @@ class Session(Collector):
                     )
                     mid_node.parent = self
                 else:
-                    mid_node = Dir(
+                    mid_node = Dir(  # type: ignore[assignment]
                         name=parent_dir.name,
                         config=self.config,
                         path=parent_dir,
@@ -603,13 +680,22 @@ class Session(Collector):
                     session=self,
                 )
                 mod_node.parent = mid_node
-                results.append(mod_node)
+                results.append(mod_node)  # type: ignore[arg-type]
         return results
 
 
 class Class(Collector):
     """A class collector stand-in for pytest_collectstart: carries .obj (the
     test class) and collects markers via add_marker, propagated to its items."""
+
+    if TYPE_CHECKING:
+
+        def collect(self) -> Iterable[Item | Collector]: ...
+        def newinstance(self) -> Any: ...
+        @classmethod
+        def from_parent(  # type: ignore[override]
+            cls, parent: Any, *, name: Any, obj: Any = None, **kw: Any
+        ) -> Self: ...
 
     def __init__(self, name=None, parent=None, *, obj=None, **kwargs):
         if name is not None:
@@ -634,6 +720,15 @@ class Item(_NodeBase):
     """Base test item for custom collectors. Subclasses override runtest()
     (and optionally setup()/teardown()/repr_failure()/reportinfo())."""
 
+    user_properties: list[tuple[str, object]]
+
+    if TYPE_CHECKING:
+        nextitem: None
+
+        def add_report_section(self, when: str, key: str, content: str) -> None: ...
+        @property
+        def location(self) -> tuple[str, int | None, str]: ...
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._check_item_and_collector_diamond_inheritance()
@@ -657,19 +752,23 @@ class Item(_NodeBase):
                 PytestWarning,
             )
 
-    def setup(self):
+    def setup(self) -> None:
         pass
 
-    def runtest(self):
+    def runtest(self) -> None:
         raise NotImplementedError("custom Item must implement runtest()")
 
-    def teardown(self):
+    def teardown(self) -> None:
         pass
 
-    def reportinfo(self):
+    def reportinfo(self) -> tuple[os.PathLike[str] | str, int | None, str]:
         return (self.path, None, "")
 
-    def repr_failure(self, excinfo, style=None):
+    def repr_failure(
+        self,
+        excinfo: ExceptionInfo[BaseException],
+        style: _TracebackStyle | None = None,
+    ) -> str | TerminalRepr:
         """Failure text (subclasses may override); default is the exception."""
         return str(getattr(excinfo, "value", excinfo))
 
@@ -677,14 +776,20 @@ class Item(_NodeBase):
 class File(Collector):
     """Base file collector. Subclasses override collect() to yield Items."""
 
+    if TYPE_CHECKING:
+        # The imported module on a collected Module (set by the engine).
+        obj: Any
+
     @classmethod
-    def from_parent(cls, parent, *, fspath=None, path=None, **kw):
+    def from_parent(
+        cls, parent: Collector, *, fspath: Any = None, path: pathlib.Path | None = None, **kw: Any
+    ) -> Self:
         """Inject path=None (mirrors FSCollector.from_parent) so non-cooperative
         constructors that lack **kwargs receive a TypeError and the
         cooperative-constructor deprecation warning."""
         return super().from_parent(parent=parent, fspath=fspath, path=path, **kw)
 
-    def collect(self):
+    def collect(self) -> Iterable[Item | Collector]:
         return []
 
 
@@ -703,9 +808,21 @@ class Package(File):
     """Directory-level collector for Python packages (has __init__.py).
     Alias used by upstream isinstance checks (e.g. pytest.Package in test_collection)."""
 
+    if TYPE_CHECKING:
+
+        def setup(self) -> None: ...
+
 
 class Dir(Collector):
     """Directory-level collector for plain directories (no __init__.py)."""
+
+    if TYPE_CHECKING:
+
+        def collect(self) -> Iterable[Item | Collector]: ...
+        @classmethod
+        def from_parent(  # type: ignore[override]
+            cls, parent: Collector, *, path: pathlib.Path
+        ) -> Self: ...
 
 
 def make_default_directory_node(path, parent):
@@ -1627,7 +1744,7 @@ class Function(Node):
         lineno0 = (lineno - 1) if lineno else 0
         return (self.path, lineno0, self.getmodpath())
 
-    def setup(self):
+    def setup(self) -> None:
         if self.module is not None:
             fn = getattr(self.module, "setup_function", None)
             if fn is not None and not hasattr(fn, "_pytestfixturefunction"):
@@ -1641,7 +1758,7 @@ class Function(Node):
         if fill is not None:
             fill()
 
-    def teardown(self):
+    def teardown(self) -> None:
         if self.module is not None:
             fn = getattr(self.module, "teardown_function", None)
             if fn is not None:

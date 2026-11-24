@@ -1,16 +1,21 @@
 """MonkeyPatch and its fixture."""
 
+from __future__ import annotations
+
 import contextlib
 import enum
 import inspect
 import os
 import sys
 import warnings
-from collections.abc import Mapping
-from typing import overload
+from collections.abc import Generator, Mapping
+from typing import Any, TypeVar, overload
 
 from pytest._fixtures import fixture
 from pytest._warning_types import PytestWarning
+
+K = TypeVar("K")
+V = TypeVar("V")
 
 
 class _NotSetType(enum.Enum):
@@ -25,16 +30,16 @@ class _NotSetType(enum.Enum):
 class MonkeyPatch:
     _notset = object()
 
-    def __init__(self):
-        self._setattr = []
-        self._setitem = []
-        self._cwd = None
-        self._savesyspath = None
+    def __init__(self) -> None:
+        self._setattr: list[tuple[Any, Any, Any]] = []
+        self._setitem: list[tuple[Any, Any, Any]] = []
+        self._cwd: str | None = None
+        self._savesyspath: list[str] | None = None
 
     @classmethod
-    def context(cls):
+    def context(cls) -> contextlib._GeneratorContextManager[MonkeyPatch]:
         @contextlib.contextmanager
-        def _context():
+        def _context() -> Generator[MonkeyPatch]:
             m = cls()
             try:
                 yield m
@@ -44,7 +49,7 @@ class MonkeyPatch:
         return _context()
 
     @staticmethod
-    def _resolve(name):
+    def _resolve(name: str) -> object:
         """Import-or-getattr each dotted segment, pytest's monkeypatch
         resolve(): attribute lookup wins, failed imports of submodules get
         an "import error in {path}" message."""
@@ -77,7 +82,13 @@ class MonkeyPatch:
     @overload
     def setattr(self, target: object, name: str, value: object, raising: bool = ...) -> None: ...
 
-    def setattr(self, target, name, value=_notset, raising=True):
+    def setattr(  # type: ignore[misc]
+        self,
+        target: str | object,
+        name: Any,
+        value: object = _notset,
+        raising: bool = True,
+    ) -> None:
         if isinstance(target, str):
             # setattr("module.path.attr", value) form
             if value is self._notset:
@@ -91,22 +102,27 @@ class MonkeyPatch:
         self._setattr.append((target, name, self._old_value(target, name)))
         setattr(target, name, value)
 
-    def delattr(self, target, name=_notset, raising=True):
+    def delattr(
+        self,
+        target: object | str,
+        name: str | _NotSetType = _notset,  # type: ignore[assignment]
+        raising: bool = True,
+    ) -> None:
+        attr: Any = name
         if isinstance(target, str):
-            module_path, _, attr_name = target.rpartition(".")
+            module_path, _, attr = target.rpartition(".")
             target = self._resolve(module_path)
-            name = attr_name
-        if not hasattr(target, name):
+        if not hasattr(target, attr):
             if raising:
-                raise AttributeError(name)
+                raise AttributeError(attr)
             return
-        oldval = self._old_value(target, name)
-        delattr(target, name)
+        oldval = self._old_value(target, attr)
+        delattr(target, attr)
         # Recorded only once the delete succeeded: undo() must not restore
         # an attribute that was never removed.
-        self._setattr.append((target, name, oldval))
+        self._setattr.append((target, attr, oldval))
 
-    def _old_value(self, target, name):
+    def _old_value(self, target: object, name: str) -> object:
         """The restore value: for classes, read the raw __dict__ entry so
         descriptors (staticmethod/classmethod) are not unwrapped. For an
         instance whose attribute isn't a data descriptor, the assignment
@@ -121,7 +137,7 @@ class MonkeyPatch:
         return getattr(target, name, self._notset)
 
     @staticmethod
-    def _is_data_descriptor(cls, name):
+    def _is_data_descriptor(cls: type, name: str) -> bool:
         """True if looking ``name`` up on ``cls`` finds a data descriptor,
         which takes precedence over the instance __dict__."""
         for klass in cls.__mro__:
@@ -130,31 +146,31 @@ class MonkeyPatch:
                 return hasattr(descr_type, "__set__") or hasattr(descr_type, "__delete__")
         return False
 
-    def setitem(self, mapping, name, value):
+    def setitem(self, mapping: Mapping[K, V], name: K, value: V) -> None:
         oldval = mapping.get(name, self._notset)
-        mapping[name] = value
+        mapping[name] = value  # type: ignore[index]
         # Recorded only once the assignment succeeded (e.g. not on a
         # read-only mapping), so undo() doesn't fail on it too.
         self._setitem.append((mapping, name, oldval))
 
-    def delitem(self, mapping, name, raising=True):
+    def delitem(self, mapping: Mapping[K, V], name: K, raising: bool = True) -> None:
         if name not in mapping:
             if raising:
                 raise KeyError(name)
             return
         oldval = mapping[name]
-        del mapping[name]
+        del mapping[name]  # type: ignore[attr-defined]
         self._setitem.append((mapping, name, oldval))
 
     @staticmethod
-    def _warn_if_env_name_is_not_str(name):
+    def _warn_if_env_name_is_not_str(name: object) -> None:
         if not isinstance(name, str):
             warnings.warn(
                 PytestWarning(f"Environment variable name {name!r} should be a str"),
                 stacklevel=3,
             )
 
-    def setenv(self, name, value, prepend=None):
+    def setenv(self, name: str, value: str, prepend: str | None = None) -> None:
         if not isinstance(value, str):
             warnings.warn(
                 PytestWarning(
@@ -169,21 +185,21 @@ class MonkeyPatch:
         self._warn_if_env_name_is_not_str(name)
         self.setitem(os.environ, name, value)
 
-    def delenv(self, name, raising=True):
+    def delenv(self, name: str, raising: bool = True) -> None:
         self._warn_if_env_name_is_not_str(name)
         self.delitem(os.environ, name, raising=raising)
 
-    def syspath_prepend(self, path):
+    def syspath_prepend(self, path: object) -> None:
         if self._savesyspath is None:
             self._savesyspath = sys.path[:]
         sys.path.insert(0, str(path))
 
-    def chdir(self, path):
+    def chdir(self, path: str | os.PathLike[str]) -> None:
         if self._cwd is None:
             self._cwd = os.getcwd()
         os.chdir(path)
 
-    def undo(self):
+    def undo(self) -> None:
         for target, name, old in reversed(self._setattr):
             if old is self._notset:
                 try:
@@ -208,7 +224,7 @@ class MonkeyPatch:
 
 
 @fixture
-def monkeypatch():
+def monkeypatch() -> Generator[MonkeyPatch]:
     """A convenient fixture for monkey-patching.
 
     The fixture provides these methods to modify objects, dictionaries, or

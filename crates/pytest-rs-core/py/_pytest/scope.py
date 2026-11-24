@@ -6,7 +6,8 @@ from typing import Literal
 
 from _pytest.outcomes import fail
 
-_ScopeName = Literal["session", "package", "module", "class", "function"]
+ScopeName = Literal["session", "package", "module", "class", "function"]
+_ScopeName = ScopeName
 
 
 @total_ordering

@@ -353,6 +353,56 @@ async def test_async_auto():
 }
 
 #[test]
+fn asyncio_loop_teardown_cancels_pending_tasks() {
+    // Like asyncio.Runner.close() (upstream's scoped runner): a task left
+    // pending by a test is cancelled before its loop closes, instead of being
+    // finalized by the GC later -- GeneratorExit inside an `async with` turns
+    // into "generator didn't stop after athrow()".
+    let suite = TempSuite::new("asyncio-teardown-cancel");
+    suite.write(
+        "test_leak.py",
+        r#"
+import asyncio
+import contextlib
+
+EVENTS = []
+
+@contextlib.asynccontextmanager
+async def resource():
+    try:
+        yield
+    finally:
+        EVENTS.append("cm-exit")
+
+async def holder(stop):
+    try:
+        async with resource():
+            await stop.wait()
+    except BaseException as e:
+        EVENTS.append(type(e).__name__)
+        raise
+
+async def test_leaks_task():
+    asyncio.get_running_loop().create_task(holder(asyncio.Event()))
+    await asyncio.sleep(0)
+
+def test_after():
+    assert EVENTS == ["cm-exit", "CancelledError"]
+"#,
+    );
+    let output = suite.run(&[
+        "--asyncio-mode",
+        "auto",
+        "-W",
+        "error::pytest.PytestUnraisableExceptionWarning",
+    ]);
+    let out = stdout(&output);
+    assert_eq!(output.status.code(), Some(0), "out: {out}");
+    assert!(out.contains("2 passed"), "out: {out}");
+    assert!(!out.contains("athrow"), "out: {out}");
+}
+
+#[test]
 fn parametrize_expands_items() {
     let suite = TempSuite::new("parametrize");
     suite.write(

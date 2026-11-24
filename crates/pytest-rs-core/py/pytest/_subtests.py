@@ -7,7 +7,8 @@ them into individual reports (upstream pytest's builtin subtests plugin).
 
 import sys
 import time
-from typing import Any
+from collections.abc import Iterable, Mapping
+from typing import Any, Literal
 
 from pytest._fixtures import fixture
 
@@ -105,12 +106,12 @@ class SubtestReport:
     def __init__(
         self,
         nodeid: str | None = None,
-        location: tuple | None = None,
-        keywords: dict | None = None,
-        outcome: str | None = None,
+        location: tuple[str, int | None, str] | None = None,
+        keywords: Mapping[str, Any] | None = None,
+        outcome: Literal["passed", "failed", "skipped"] | None = None,
         when: str | None = None,
         longrepr: Any = None,
-        sections: tuple = (),
+        sections: Iterable[tuple[str, str]] = (),
         duration: float = 0.0,
         context: SubtestContext | None = None,
         **kw: Any,

@@ -1,5 +1,7 @@
 """Marks (@pytest.mark.*) and pytest.param: metadata records only."""
 
+from __future__ import annotations
+
 import enum
 import warnings
 from typing import TYPE_CHECKING, Any, TypeVar, overload
@@ -7,9 +9,12 @@ from typing import TYPE_CHECKING, Any, TypeVar, overload
 from pytest._warning_types import PytestUnknownMarkWarning
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Sequence
+    from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 
+    from _pytest.compat import NotSetType
     from _pytest.scope import _ScopeName
+
+    from pytest._raises_group import AbstractRaises
 
 #: A callable or class being decorated with a mark, returned as-is by
 #: MarkDecorator.__call__ when applied directly (upstream Markable).
@@ -25,37 +30,43 @@ HIDDEN_PARAM = _HiddenParam.token
 
 
 class Mark:
+    name: str
+    args: tuple[Any, ...]
+    kwargs: Mapping[str, Any]
+    _param_ids_from: Mark | None
+    _param_ids_generated: Sequence[str] | None
+
     def __init__(
         self,
-        name,
-        args=(),
-        kwargs=None,
+        name: str,
+        args: tuple[Any, ...] = (),
+        kwargs: Mapping[str, Any] | None = None,
         *,
-        _param_ids_from=None,
-        _param_ids_generated=None,
-        _ispytest=False,
-    ):
+        _param_ids_from: Mark | None = None,
+        _param_ids_generated: Sequence[str] | None = None,
+        _ispytest: bool = False,
+    ) -> None:
         self.name = name
         self.args = tuple(args)
         self.kwargs = dict(kwargs or {})
         self._param_ids_from = _param_ids_from
         self._param_ids_generated = _param_ids_generated
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Mark({self.name!r}, {self.args!r}, {self.kwargs!r})"
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, Mark):
             return NotImplemented
         return (self.name, self.args, self.kwargs) == (other.name, other.args, other.kwargs)
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash((self.name, self.args))
 
-    def _has_param_ids(self):
+    def _has_param_ids(self) -> bool:
         return "ids" in self.kwargs or len(self.args) >= 4
 
-    def combined_with(self, other):
+    def combined_with(self, other: Mark) -> Mark:
         assert self.name == other.name
         param_ids_from = None
         if self.name == "parametrize":
@@ -72,33 +83,39 @@ class Mark:
 
 
 class MarkDecorator:
-    def __init__(self, mark, *, _ispytest=False):
+    mark: Mark
+
+    def __init__(self, mark: Mark, *, _ispytest: bool = False) -> None:
         self.mark = mark
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self.mark.name
 
     @property
-    def args(self):
+    def args(self) -> tuple[Any, ...]:
         return self.mark.args
 
     @property
-    def kwargs(self):
+    def kwargs(self) -> Mapping[str, Any]:
         return self.mark.kwargs
 
-    def __repr__(self):
+    @property
+    def markname(self) -> str:
+        return self.name
+
+    def __repr__(self) -> str:
         return f"MarkDecorator({self.mark!r})"
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, MarkDecorator):
             return self.mark == other.mark
         return NotImplemented
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.mark)
 
-    def with_args(self, *args, **kwargs):
+    def with_args(self, *args: object, **kwargs: object) -> MarkDecorator:
         """Bind arguments without applying — even a lone callable arg is an
         argument, not a decoration target."""
         other = Mark(self.mark.name, args, kwargs)
@@ -110,9 +127,9 @@ class MarkDecorator:
     def __call__(self, arg: Markable) -> Markable: ...  # type: ignore[overload-overlap]
 
     @overload
-    def __call__(self, *args: object, **kwargs: object) -> "MarkDecorator": ...
+    def __call__(self, *args: object, **kwargs: object) -> MarkDecorator: ...
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args: object, **kwargs: object) -> Any:
         if args and not kwargs:
             func = args[0]
             is_class = isinstance(func, type)
@@ -134,22 +151,64 @@ class MarkDecorator:
 
 if TYPE_CHECKING:
 
+    class _SkipMarkDecorator(MarkDecorator):
+        @overload  # type: ignore[override,no-overload-impl]
+        def __call__(self, arg: Markable) -> Markable: ...
+
+        @overload
+        def __call__(self, reason: str = ...) -> MarkDecorator: ...
+
+    class _SkipifMarkDecorator(MarkDecorator):
+        def __call__(  # type: ignore[override]
+            self,
+            condition: str | bool = ...,
+            *conditions: str | bool,
+            reason: str = ...,
+        ) -> MarkDecorator: ...
+
+    class _XfailMarkDecorator(MarkDecorator):
+        @overload  # type: ignore[override,no-overload-impl]
+        def __call__(self, arg: Markable) -> Markable: ...
+
+        @overload
+        def __call__(
+            self,
+            condition: str | bool = True,
+            *conditions: str | bool,
+            reason: str = ...,
+            run: bool = ...,
+            raises: type[BaseException]
+            | tuple[type[BaseException], ...]
+            | AbstractRaises[BaseException]
+            | None = ...,
+            strict: bool = ...,
+        ) -> MarkDecorator: ...
+
     class _ParametrizeMarkDecorator(MarkDecorator):
         def __call__(  # type: ignore[override]
             self,
-            argnames: "str | Sequence[str]",
-            argvalues: "Iterable[ParamSpec | Sequence[object] | object]",
+            argnames: str | Sequence[str],
+            argvalues: Iterable[ParamSpec | Sequence[object] | object],
             *,
-            indirect: "bool | Sequence[str]" = ...,
+            indirect: bool | Sequence[str] = ...,
             ids: (
-                "Iterable[None | str | float | int | bool | _HiddenParam] "
-                "| Callable[[Any], object | None] | None"
+                Iterable[str | float | int | bool | _HiddenParam | None]
+                | Callable[[Any], object | None]
+                | None
             ) = ...,
-            scope: "_ScopeName | None" = ...,
+            scope: _ScopeName | None = ...,
         ) -> MarkDecorator: ...
 
+    class _UsefixturesMarkDecorator(MarkDecorator):
+        def __call__(self, *fixtures: str) -> MarkDecorator:  # type: ignore[override]
+            ...
 
-def get_unpacked_marks(obj, *, consider_mro=True):
+    class _FilterwarningsMarkDecorator(MarkDecorator):
+        def __call__(self, *filters: str) -> MarkDecorator:  # type: ignore[override]
+            ...
+
+
+def get_unpacked_marks(obj: object, *, consider_mro: bool = True) -> list[Mark]:
     """Obtain the unpacked marks that are stored on an object (upstream
     _pytest.mark.structures.get_unpacked_marks).
 
@@ -195,7 +254,7 @@ def get_unpacked_marks(obj, *, consider_mro=True):
     return result
 
 
-def store_mark(obj, mark, *, stacklevel=3):
+def store_mark(obj: Any, mark: Mark, *, stacklevel: int = 3) -> None:
     """Store a Mark on an object (upstream store_mark): reassigns pytestmark
     from the object's OWN marks so inherited lists are never mutated."""
     if hasattr(obj, "_pytestfixturefunction"):
@@ -216,14 +275,22 @@ class MarkGenerator:
     # through _ParametrizeMarkDecorator's precise __call__ (upstream does
     # the same for parametrize/skipif/usefixtures/etc.).
     if TYPE_CHECKING:
+        skip: _SkipMarkDecorator
+        skipif: _SkipifMarkDecorator
+        xfail: _XfailMarkDecorator
         parametrize: _ParametrizeMarkDecorator
+        usefixtures: _UsefixturesMarkDecorator
+        filterwarnings: _FilterwarningsMarkDecorator
 
-    def __init__(self, *, _ispytest=False):
+    # Set by configure_mark_generator only.
+    _strict_parametrization_ids: bool
+
+    def __init__(self, *, _ispytest: bool = False) -> None:
         self._config = None
         self._strict = False
-        self._markers = set()
+        self._markers: set[str] = set()
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> MarkDecorator:
         if name.startswith("_"):
             raise AttributeError(name)
         if self._config is not None:
@@ -255,7 +322,12 @@ class MarkGenerator:
 mark = MarkGenerator()
 
 
-def configure_mark_generator(config, builtin_names, strict, strict_parametrization_ids=False):
+def configure_mark_generator(
+    config: Any,
+    builtin_names: Iterable[str],
+    strict: bool,
+    strict_parametrization_ids: bool = False,
+) -> None:
     """Arm unknown-mark validation once the session config is known."""
     mark._config = config
     mark._strict = strict
@@ -266,16 +338,46 @@ def configure_mark_generator(config, builtin_names, strict, strict_parametrizati
 class ParamSpec:
     """The object returned by pytest.param(): values + per-param marks/id."""
 
-    def __init__(self, values, marks, id):
+    values: Sequence[object | NotSetType]
+    marks: Collection[MarkDecorator | Mark]
+    id: str | _HiddenParam | None
+
+    def __init__(
+        self,
+        values: Iterable[object | NotSetType],
+        marks: Iterable[MarkDecorator | Mark],
+        id: str | _HiddenParam | None,
+    ) -> None:
         self.values = tuple(values)
         self.marks = list(marks)
         self.id = id
 
+    @classmethod
+    def param(
+        cls,
+        *values: object,
+        marks: MarkDecorator | Collection[MarkDecorator | Mark] = (),
+        id: str | _HiddenParam | None = None,
+    ) -> ParamSpec:
+        return param(*values, marks=marks, id=id)
+
+    @classmethod
+    def extract_from(
+        cls,
+        parameterset: ParamSpec | Sequence[object] | object,
+        force_tuple: bool = False,
+    ) -> ParamSpec:
+        if isinstance(parameterset, cls):
+            return parameterset
+        if force_tuple:
+            return cls.param(parameterset)
+        return cls(parameterset, marks=[], id=None)  # type: ignore[arg-type]
+
 
 def param(
     *values: object,
-    marks: "MarkDecorator | Mark | Iterable[MarkDecorator | Mark]" = (),
-    id: "str | _HiddenParam | None" = None,
+    marks: MarkDecorator | Mark | Iterable[MarkDecorator | Mark] = (),
+    id: str | _HiddenParam | None = None,
 ) -> ParamSpec:
     if not isinstance(marks, list | tuple):
         # mypy can't rule out an arbitrary non-list/tuple Iterable here, but

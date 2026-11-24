@@ -4,6 +4,7 @@ import asyncio
 import contextvars
 import functools
 import inspect
+import traceback
 import warnings
 
 
@@ -39,25 +40,45 @@ def set_current_loop(loop):
     asyncio.set_event_loop(loop)
 
 
+_RUNNER_TEARDOWN_WARNING = """\
+An exception occurred during teardown of an asyncio.Runner. \
+The reason is likely that you closed the underlying event loop in a test, \
+which prevents the cleanup of asynchronous generators by the runner.
+This warning will become an error in future versions of pytest-asyncio. \
+Please ensure that your tests don't close the event loop. \
+Here is the traceback of the exception triggered during teardown:
+%s
+"""
+
+
 def close_loop(loop):
+    """Tear the loop down the way upstream's scoped runner does through
+    `asyncio.Runner.close()`: cancel the tasks still pending and wait for
+    them to finish cancelling, shut down async generators, then the default
+    executor, and close the loop.
+
+    Closing without the cancel leaves a pending task for the garbage
+    collector, which throws GeneratorExit into it later and breaks an
+    `async with` it is suspended in. A RuntimeError (typically: the test
+    closed the loop itself) becomes upstream's RuntimeWarning."""
     try:
-        shutdown = loop.shutdown_asyncgens()
-        try:
-            loop.run_until_complete(shutdown)
-        except BaseException:
-            # Suppress the never-awaited warning when the loop is unusable.
-            shutdown.close()
-            raise
-    except Exception as exc:
-        # Upstream surfaces loop-teardown failures as a warning, not an
-        # error (matching asyncio.Runner semantics).
-        warnings.warn(
-            f"An exception occurred during teardown of an asyncio.Runner: {exc!r}",
-            RuntimeWarning,
-        )
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore", ".*BaseEventLoop.shutdown_asyncgens.*", RuntimeWarning
+            )
+            try:
+                try:
+                    asyncio.runners._cancel_all_tasks(loop)  # type: ignore[attr-defined]
+                    loop.run_until_complete(loop.shutdown_asyncgens())
+                    loop.run_until_complete(
+                        loop.shutdown_default_executor(asyncio.constants.THREAD_JOIN_TIMEOUT)
+                    )
+                finally:
+                    asyncio.set_event_loop(None)
+                    loop.close()
+            except RuntimeError:
+                warnings.warn(_RUNNER_TEARDOWN_WARNING % traceback.format_exc(), RuntimeWarning)
     finally:
-        loop.close()
-        asyncio.set_event_loop(None)
         prev = getattr(loop, "_pytest_rs_prev_policy", None)
         if prev is not None:
             with warnings.catch_warnings():

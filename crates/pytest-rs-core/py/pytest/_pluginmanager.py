@@ -12,7 +12,10 @@ import sys
 import types
 import warnings
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from _pytest.config import Config
 
 # True only while `-p`/entry-point/conftest pytest_configure hooks that run
 # before the default terminalreporter registers (see engine's fire_py_configure)
@@ -409,6 +412,12 @@ class _RewriteHookProxy:
 
 
 class PluginManager:
+    if TYPE_CHECKING:
+
+        def consider_pluginarg(self, arg: str) -> None: ...
+        def load_setuptools_entrypoints(self, group: str, name: str | None = None) -> int: ...
+        def pytest_configure(self, config: Config) -> None: ...
+
     # Set by enable_tracing() (and read alongside PYTEST_DEBUG) — declared here
     # because the engine keeps exactly one PluginManager per process.
     _tracing_enabled = False
@@ -784,7 +793,7 @@ class PluginManager:
         elif impls:
             caller._call_impls(impls, False, kwargs)
 
-    def register(self, plugin: Any, name: str | None = None) -> Any:
+    def register(self, plugin: object, name: str | None = None) -> str | None:
         """Track the plugin for hook-relay dispatch; a plugin defining
         pytest_addhooks gets to register its hookspecs immediately (pluggy
         calls it at registration time)."""
@@ -829,7 +838,8 @@ class PluginManager:
 
             if not isinstance(addhooks, _Unsupported):
                 addhooks(**_accepted_kwargs(addhooks, {"pluginmanager": self}))
-        return plugin
+        # NOTE: returns the plugin, not its registered name (upstream's str | None).
+        return plugin  # type: ignore[return-value]
 
     def unregister(self, plugin: Any = None, name: str | None = None) -> None:
         if plugin is None and name is not None:
@@ -859,7 +869,7 @@ class PluginManager:
     def is_registered(self, plugin: Any) -> bool:
         return plugin in self._plugins
 
-    def parse_hookimpl_opts(self, plugin: Any, name: str) -> dict | None:
+    def parse_hookimpl_opts(self, plugin: object, name: str) -> Any | None:
         """Return hookimpl opts dict if name is a hook implementation, else None (pluggy API)."""
         method = getattr(plugin, name, None)
         if not callable(method):

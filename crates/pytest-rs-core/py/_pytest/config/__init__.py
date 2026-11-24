@@ -4,9 +4,18 @@ import enum
 import os
 import pathlib
 import types
-from typing import Any, NoReturn
+from typing import TYPE_CHECKING, Any, NoReturn
 
 from pytest import ExitCode, UsageError  # noqa: F401
+
+if TYPE_CHECKING:
+    from _pytest._code.code import ExceptionInfo
+    from _pytest._io import TerminalWriter
+    from _pytest.nodeid import NodeId
+
+    class _DeprecatedInicfgProxy(collections.abc.MutableMapping[str, Any]):
+        """Compatibility proxy for the deprecated Config.inicfg (typing only)."""
+
 
 _notset = object()
 
@@ -25,6 +34,10 @@ class ConftestImportFailure(Exception):
 class Config:
     """Stub config type (mostly used for annotations upstream); instances
     built by _prepareconfig carry an option namespace for getoption()."""
+
+    if TYPE_CHECKING:
+        # Set by the engine from the pre-parse of the command line.
+        known_args_namespace: argparse.Namespace
 
     VERBOSITY_ASSERTIONS = "assertions"
     VERBOSITY_TEST_CASES = "test_cases"
@@ -62,7 +75,13 @@ class Config:
         this class) — kept for `Config.InvocationParams(...)` construction
         and its args/plugins-cannot-be-None validation."""
 
-        def __init__(self, *, args, plugins, dir):
+        def __init__(
+            self,
+            *,
+            args: collections.abc.Iterable[str],
+            plugins: collections.abc.Sequence[str | object] | None,
+            dir: pathlib.Path,
+        ) -> None:
             self.args = tuple(args)
             self.plugins = plugins
             self.dir = dir
@@ -71,7 +90,9 @@ class Config:
         self.option = option if option is not None else argparse.Namespace()
 
     @classmethod
-    def fromdictargs(cls, option_dict, args):
+    def fromdictargs(
+        cls, option_dict: collections.abc.Mapping[str, Any], args: list[str]
+    ) -> "Config":
         from _pytest.config import _native_prepareconfig
 
         # inifilename steers ini discovery itself (rootdir/inipath), so it
@@ -98,6 +119,13 @@ class Config:
     # what it does not have: on a bare `Config()` each raises and says why, and
     # AttributeError keeps `hasattr(config, "workerinput")` -- the standard way
     # to ask "am I an xdist worker?" -- answering False instead of exploding.
+    if TYPE_CHECKING:
+
+        def cwd_relative_nodeid(self, nodeid: NodeId) -> NodeId: ...
+        def pytest_cmdline_parse(
+            self, pluginmanager: "PytestPluginManager", args: list[str]
+        ) -> "Config": ...
+
     def _from_proxy(self, name: str) -> NoReturn:
         raise AttributeError(
             f"{name}: only the running engine's config provides this "
@@ -126,7 +154,7 @@ class Config:
         self._from_proxy("invocation_params")
 
     @property
-    def inicfg(self) -> collections.abc.Mapping[str, Any]:
+    def inicfg(self) -> "_DeprecatedInicfgProxy":
         self._from_proxy("inicfg")
 
     @property
@@ -182,7 +210,7 @@ class Config:
     def get_verbosity(self, verbosity_type: str | None = None) -> int:
         self._from_proxy("get_verbosity")
 
-    def get_terminal_writer(self) -> Any:
+    def get_terminal_writer(self) -> "TerminalWriter":
         self._from_proxy("get_terminal_writer")
 
     def issue_config_time_warning(self, warning: Warning, stacklevel: int = 2) -> None:
@@ -206,18 +234,20 @@ class Config:
         for module_name, msg in skipped:
             issue(PytestConfigWarning(f"skipped plugin {module_name!r}: {msg}"), stacklevel=1)
 
-    def notify_exception(self, excinfo: Any, option: Any = None) -> None:
+    def notify_exception(
+        self,
+        excinfo: "ExceptionInfo[BaseException]",
+        option: argparse.Namespace | None = None,
+    ) -> None:
         self._from_proxy("notify_exception")
 
-    # Returns the callable it was handed (upstream returns None); annotated as
-    # what it does rather than as what upstream declares.
-    def add_cleanup(self, func: collections.abc.Callable[[], object]) -> Any:
+    def add_cleanup(self, func: collections.abc.Callable[[], None]) -> None:
         self._from_proxy("add_cleanup")
 
     def parse(self, args: list[str], addopts: bool = True) -> None:
         self._from_proxy("parse")
 
-    def getoption(self, name, default=_notset, skip=False):
+    def getoption(self, name: str, default: Any = _notset, skip: bool = False) -> Any:
         name = name.lstrip("-").replace("-", "_")
         try:
             return getattr(self.option, name)

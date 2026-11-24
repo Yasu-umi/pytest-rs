@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+
 class PytestWarning(UserWarning):
     __module__ = "pytest"
 
@@ -57,7 +60,7 @@ class PytestExperimentalApiWarning(PytestWarning, FutureWarning):
     __module__ = "pytest"
 
     @classmethod
-    def simple(cls, apiname):
+    def simple(cls, apiname: str) -> PytestExperimentalApiWarning:
         return cls(f"{apiname} is an experimental api that may change over time")
 
 

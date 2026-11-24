@@ -16,8 +16,16 @@ import sys
 import types as _types
 from collections.abc import Callable as _Callable
 from collections.abc import MutableMapping as _MutableMapping
+from typing import TYPE_CHECKING as _TYPE_CHECKING
 from typing import Any as _Any
 from typing import NoReturn as _NoReturn
+from typing import overload as _overload
+
+if _TYPE_CHECKING:
+    from collections.abc import Sequence as _Sequence
+
+    from pytest._marks import MarkDecorator as _MarkDecorator
+    from pytest._node import Session as _Session
 
 # Defined before the submodule imports below: `_pytest/__init__.py` reads
 # them, and modules such as `_pytest.approx` import `_pytest` while this
@@ -26,6 +34,7 @@ __version__ = "9.2.0"  # pytest API version this shim tracks
 version_tuple = (9, 2, 0)
 
 from pytest import _debugging
+from pytest._approx import Approx as Approx
 from pytest._approx import approx as approx
 from pytest._cache import Cache as Cache
 from pytest._cache import cache as cache
@@ -51,6 +60,7 @@ from pytest._marks import Mark as Mark
 from pytest._marks import MarkDecorator as MarkDecorator
 from pytest._marks import MarkGenerator as MarkGenerator
 from pytest._marks import ParamSpec as ParamSpec
+from pytest._marks import ParamSpec as ParameterSet  # noqa: F401
 from pytest._marks import mark as mark
 from pytest._marks import param as param
 from pytest._monkeypatch import MonkeyPatch as MonkeyPatch
@@ -245,7 +255,12 @@ def _get_prog_name(argv):
     return "pytest"
 
 
-def main(args=None, plugins=None, *, _prog="pytest.main()"):
+def main(
+    args: list[str] | os.PathLike[str] | None = None,
+    plugins: "_Sequence[str | object] | None" = None,
+    *,
+    _prog: str = "pytest.main()",
+) -> "int | ExitCode":
     """Run pytest, returning an integer exit code.
 
     args: list of CLI arg strings, or a single path-like object, or None
@@ -264,7 +279,7 @@ def main(args=None, plugins=None, *, _prog="pytest.main()"):
     elif isinstance(args, pathlib.Path):
         cli = [str(args)]
     else:
-        cli = [str(a) for a in args]
+        cli = [str(a) for a in args]  # type: ignore[union-attr]
 
     # `_native_inline_run` is registered on this very module object at Rust
     # startup (bootstrap.rs::install_shim) — it lives only in the running
@@ -345,12 +360,24 @@ def main(args=None, plugins=None, *, _prog="pytest.main()"):
     return proc.returncode
 
 
-def hookimpl(function=None, **kwargs):
+@_overload
+def hookimpl[F: _Callable[..., object]](function: F, **kwargs: _Any) -> F: ...
+
+
+@_overload
+def hookimpl[F: _Callable[..., object]](
+    function: None = None, **kwargs: _Any
+) -> _Callable[[F], F]: ...
+
+
+def hookimpl[F: _Callable[..., object]](
+    function: F | None = None, **kwargs: _Any
+) -> F | _Callable[[F], F]:
     """Record hook implementation options on the function (inert for now:
     conftest hook functions are not yet called by the runner)."""
 
-    def decorator(func):
-        func.pytest_impl = dict(kwargs)
+    def decorator(func: F) -> F:
+        func.pytest_impl = dict(kwargs)  # type: ignore[attr-defined]
         return func
 
     if function is not None:
@@ -358,9 +385,21 @@ def hookimpl(function=None, **kwargs):
     return decorator
 
 
-def hookspec(function=None, **kwargs):
-    def decorator(func):
-        func.pytest_spec = dict(kwargs)
+@_overload
+def hookspec[F: _Callable[..., object]](function: F, **kwargs: _Any) -> F: ...
+
+
+@_overload
+def hookspec[F: _Callable[..., object]](
+    function: None = None, **kwargs: _Any
+) -> _Callable[[F], F]: ...
+
+
+def hookspec[F: _Callable[..., object]](
+    function: F | None = None, **kwargs: _Any
+) -> F | _Callable[[F], F]:
+    def decorator(func: F) -> F:
+        func.pytest_spec = dict(kwargs)  # type: ignore[attr-defined]
         return func
 
     if function is not None:
@@ -401,7 +440,7 @@ class FixtureRequest:
         self._outside_run("config")
 
     @property
-    def function(self) -> _Callable[..., object]:
+    def function(self) -> _Any:
         self._outside_run("function")
 
     @property
@@ -448,13 +487,16 @@ class FixtureRequest:
         self._outside_run("node")
 
     @property
-    def session(self) -> _Any:
+    def session(self) -> "_Session":
         self._outside_run("session")
+
+    def raiseerror(self, msg: str | None) -> _NoReturn:
+        self._outside_run("raiseerror")
 
     def getfixturevalue(self, argname: str) -> _Any:
         self._outside_run("getfixturevalue")
 
-    def applymarker(self, marker: _Any) -> None:
+    def applymarker(self, marker: "str | _MarkDecorator") -> None:
         self._outside_run("applymarker")
 
     def addfinalizer(self, finalizer: _Callable[[], object]) -> None:
@@ -472,6 +514,7 @@ from _pytest.pytester import RecordedHookCall as RecordedHookCall  # noqa: E402
 from _pytest.reports import CollectReport as CollectReport  # noqa: E402
 from _pytest.reports import TestReport as TestReport  # noqa: E402
 from _pytest.runner import CallInfo as CallInfo  # noqa: E402
+from _pytest.scope import ScopeName as ScopeName  # noqa: E402
 from _pytest.terminal import TerminalProgressPlugin as TerminalProgressPlugin  # noqa: E402
 from _pytest.terminal import TerminalReporter as TerminalReporter  # noqa: E402
 from _pytest.terminal import TestShortLogReport as TestShortLogReport  # noqa: E402

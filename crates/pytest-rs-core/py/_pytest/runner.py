@@ -2,10 +2,14 @@
 upstream runtestprotocol's report shape (setup/call/teardown) with
 skip/xfail mark semantics; no fixtures."""
 
+from __future__ import annotations
+
 import inspect
 import sys
 import time
 import traceback
+from collections.abc import Callable
+from typing import Literal
 
 from pytest._outcomes import Exit, Skipped, XFailed
 from pytest._raises import ExceptionInfo
@@ -16,31 +20,43 @@ from _pytest.reports import _LongRepr as _LR
 from _pytest.skipping import evaluate_skip_marks, evaluate_xfail_marks
 
 
-class CallInfo:
+class CallInfo[TResult]:
     """Result/exception of a single phase call (upstream runner.CallInfo):
     `result` is set only on success, `excinfo` only on failure."""
 
+    excinfo: ExceptionInfo[BaseException] | None
+    start: float
+    stop: float
+    duration: float
+    when: Literal["collect", "setup", "call", "teardown"]
+    result: TResult
+
     def __init__(
         self,
-        result=None,
-        excinfo=None,
+        result: TResult | None = None,
+        excinfo: ExceptionInfo[BaseException] | None = None,
         *,
-        start=0,
-        stop=0,
-        duration=0,
-        when="call",
-        _ispytest=False,
-    ):
+        start: float = 0,
+        stop: float = 0,
+        duration: float = 0,
+        when: Literal["collect", "setup", "call", "teardown"] = "call",
+        _ispytest: bool = False,
+    ) -> None:
         self.when = when
         self.excinfo = excinfo
         self.start = start
         self.stop = stop
         self.duration = duration
         if excinfo is None:
-            self.result = result
+            self.result = result  # type: ignore[assignment]
 
     @classmethod
-    def from_call(cls, func, when, reraise=None):
+    def from_call(
+        cls,
+        func: Callable[[], TResult],
+        when: Literal["collect", "setup", "call", "teardown"],
+        reraise: type[BaseException] | tuple[type[BaseException], ...] | None = None,
+    ) -> CallInfo[TResult]:
         excinfo = None
         result = None
         start = time.time()
