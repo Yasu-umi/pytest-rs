@@ -91,7 +91,7 @@ pub struct CovPlugin {
     fail_under: Option<f64>,
     /// --cov-precision / [report] precision: Cover column decimals.
     precision: usize,
-    exclude_patterns: Vec<regex::Regex>,
+    exclude_rules: analysis::ExcludeRules,
     /// `[run] omit` / `[run] include`, as coverage.py's prepped patterns
     /// (also handed to subprocesses).
     run_omit: Vec<String>,
@@ -167,7 +167,7 @@ impl CovPlugin {
             reports: Vec::new(),
             fail_under: None,
             precision: 0,
-            exclude_patterns: Vec::new(),
+            exclude_rules: analysis::ExcludeRules::default(),
             run_omit: Vec::new(),
             run_include: Vec::new(),
             report_omit: GlobMatcher::default(),
@@ -302,26 +302,32 @@ impl CovPlugin {
         Ok(reports)
     }
 
-    /// Effective exclusion regexes (coverage.py's `exclude_list`):
-    /// `[report] exclude_lines` (its default when unset) plus
-    /// `[report] exclude_also`, from any of the config files.
-    fn load_exclude_patterns(rootdir: &Path, cov_config: Option<&str>) -> Vec<regex::Regex> {
-        let mut patterns: Vec<String> =
+    /// Effective exclusions (coverage.py's `exclude_list`):
+    /// `[report] exclude_lines` (its default list when unset: the pragma,
+    /// `...` stubs and `if TYPE_CHECKING:`) plus `[report] exclude_also`,
+    /// from any of the config files.
+    fn load_exclude_rules(rootdir: &Path, cov_config: Option<&str>) -> analysis::ExcludeRules {
+        let custom =
             Self::section_option_list(rootdir, cov_config, "report", "exclude_lines", true)
-                .filter(|lines| !lines.is_empty())
-                .unwrap_or_else(|| vec![analysis::DEFAULT_EXCLUDE.to_string()]);
+                .filter(|lines| !lines.is_empty());
+        let default_stubs = custom.is_none();
+        let mut patterns = custom.unwrap_or_else(|| {
+            vec![
+                analysis::DEFAULT_EXCLUDE.to_string(),
+                analysis::DEFAULT_EXCLUDE_TYPE_CHECKING.to_string(),
+            ]
+        });
         patterns.extend(
             Self::section_option_list(rootdir, cov_config, "report", "exclude_also", true)
                 .unwrap_or_default(),
         );
-        // coverage.py keeps the `if TYPE_CHECKING:` default regardless of a
-        // custom exclude_lines (it ships as an always-on default), so apply it
-        // unconditionally.
-        patterns.push(analysis::DEFAULT_EXCLUDE_TYPE_CHECKING.to_string());
-        patterns
-            .iter()
-            .filter_map(|pattern| regex::Regex::new(pattern).ok())
-            .collect()
+        analysis::ExcludeRules {
+            patterns: patterns
+                .iter()
+                .filter_map(|pattern| regex::Regex::new(pattern).ok())
+                .collect(),
+            default_stubs,
+        }
     }
 
     /// coverage.py's `partial_list + partial_always_list`:
@@ -1166,7 +1172,7 @@ impl CovPlugin {
                 continue;
             };
             let Some(analysis) =
-                analysis::analyze_for(&source_text, &self.exclude_patterns, self.lazy_annotations)
+                analysis::analyze_for(&source_text, &self.exclude_rules, self.lazy_annotations)
             else {
                 // coverage.py reports a parse failure only for a file that
                 // should be Python; anything else that ran code under its
@@ -1550,8 +1556,7 @@ impl Plugin for CovPlugin {
                 Self::section_option_value(&plain_rootdir, cov_config, "report", "fail_under")
                     .and_then(|value| value.parse().ok())
             });
-        self.exclude_patterns =
-            Self::load_exclude_patterns(&rootdir, ctx.config.get_value("cov-config"));
+        self.exclude_rules = Self::load_exclude_rules(&rootdir, ctx.config.get_value("cov-config"));
         // omit / include patterns resolve against the current directory,
         // like coverage.py's `prep_patterns`.
         let cwd = std::env::current_dir().unwrap_or_else(|_| rootdir.clone());
@@ -1932,7 +1937,13 @@ impl Plugin for CovPlugin {
         let mut multiline = |file: &str| {
             std::fs::read_to_string(file)
                 .ok()
-                .and_then(|text| analysis::analyze_for(&text, &[], lazy_annotations))
+                .and_then(|text| {
+                    analysis::analyze_for(
+                        &text,
+                        &analysis::ExcludeRules::default(),
+                        lazy_annotations,
+                    )
+                })
                 .map(|analysis| analysis.multiline)
                 .unwrap_or_default()
         };
@@ -2272,7 +2283,7 @@ mod run_option_tests {
             "[tool.coverage.report]\nexclude_lines = [\n    'raise NotImplementedError',\n]\n",
         )
         .unwrap();
-        let patterns = super::CovPlugin::load_exclude_patterns(&dir, None);
+        let patterns = super::CovPlugin::load_exclude_rules(&dir, None).patterns;
         assert!(
             patterns
                 .iter()
@@ -2301,7 +2312,7 @@ mod run_option_tests {
                 "[tool.coverage.report]\nexclude_also = ['raise NotImplementedError']\n",
             )],
         );
-        let patterns = super::CovPlugin::load_exclude_patterns(&dir, None);
+        let patterns = super::CovPlugin::load_exclude_rules(&dir, None).patterns;
         assert!(
             patterns
                 .iter()
@@ -2324,19 +2335,21 @@ mod run_option_tests {
                 "[coverage:report]\nexclude_lines =\n    if DEBUG:\n    # skip me\nexclude_also =\n    def __repr__\n",
             )],
         );
-        let patterns = super::CovPlugin::load_exclude_patterns(&dir, None);
+        let patterns = super::CovPlugin::load_exclude_rules(&dir, None).patterns;
         assert!(patterns.iter().any(|re| re.is_match("if DEBUG:")));
         assert!(
             patterns
                 .iter()
                 .any(|re| re.is_match("    def __repr__(self):"))
         );
-        // A custom exclude_lines replaces the default pragma.
+        // A custom exclude_lines replaces the whole default list.
         assert!(
             !patterns
                 .iter()
                 .any(|re| re.is_match("x = 1  # pragma: no cover"))
         );
+        assert!(!patterns.iter().any(|re| re.is_match("if TYPE_CHECKING:")));
+        assert!(!super::CovPlugin::load_exclude_rules(&dir, None).default_stubs);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

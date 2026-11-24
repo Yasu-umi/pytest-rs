@@ -26,6 +26,12 @@ enum BodyScope {
     Function,
 }
 
+/// A `case` clause's pattern lines and body lines (first, last).
+struct CaseLines {
+    pattern: (u32, u32),
+    body: (u32, u32),
+}
+
 struct Walker<'a> {
     index: &'a LineIndex,
     lines: BTreeSet<u32>,
@@ -43,6 +49,12 @@ struct Walker<'a> {
     /// `analyze` (a def whose `...` rides a bracketed return type like
     /// `]: ...` is *not* excluded, matching coverage.py).
     stub_candidates: Vec<(u32, u32, u32)>,
+    /// Whether coverage.py's default `...`-stub exclusion applies (no custom
+    /// `exclude_lines`); without it a `...` statement counts like any other.
+    default_stubs: bool,
+    /// Irrefutable `case` clauses, whose `case` line coverage.py excludes
+    /// along with an entirely excluded body.
+    irrefutable_cases: Vec<CaseLines>,
     /// The immediate scope of the body being walked. Decides whether a bare
     /// annotation (`x: T`, no value) counts: module-level always does;
     /// function-level never does (locals aren't annotated); class-level depends
@@ -101,21 +113,36 @@ pub const DEFAULT_EXCLUDE: &str = r"#\s*(pragma|PRAGMA)[:\s]?\s*(no|NO)\s*(cover
 /// default, is handled structurally in the AST walk instead of as a regex.)
 pub const DEFAULT_EXCLUDE_TYPE_CHECKING: &str = r"if (typing\.)?TYPE_CHECKING:";
 
+/// The effective exclusions: coverage.py's `exclude_list` regexes, and
+/// whether its default list is in force. A custom `exclude_lines` replaces
+/// the whole default list, so the `...`-stub exclusion (applied structurally
+/// here rather than as a regex) goes with it.
+#[derive(Default)]
+pub struct ExcludeRules {
+    pub patterns: Vec<regex::Regex>,
+    pub default_stubs: bool,
+}
+
 /// The executable lines of `source`, or None if it does not parse.
 /// `excludes` are the effective exclude_lines regexes: a match on a
 /// statement's header line excludes the whole statement.
 #[cfg(test)]
 pub fn analyze(source: &str, excludes: &[regex::Regex]) -> Option<FileAnalysis> {
-    analyze_for(source, excludes, true)
+    let rules = ExcludeRules {
+        patterns: excludes.to_vec(),
+        default_stubs: true,
+    };
+    analyze_for(source, &rules, true)
 }
 
 /// [`analyze`] for a given Python: `lazy_annotations` (3.14+, PEP 649) when
 /// class-level bare annotations compile to no code of their own.
 pub fn analyze_for(
     source: &str,
-    excludes: &[regex::Regex],
+    rules: &ExcludeRules,
     lazy_annotations: bool,
 ) -> Option<FileAnalysis> {
+    let excludes = &rules.patterns;
     let parsed = ruff_python_parser::parse_module(source).ok()?;
     let index = LineIndex::from_source_text(source);
     let mut walker = Walker {
@@ -127,6 +154,8 @@ pub fn analyze_for(
         multiline: BTreeMap::new(),
         stub_excluded: BTreeSet::new(),
         stub_candidates: Vec::new(),
+        default_stubs: rules.default_stubs,
+        irrefutable_cases: Vec::new(),
         scope: BodyScope::Module,
         future_annotations: module_has_future_annotations(&parsed.syntax().body),
         lazy_annotations,
@@ -144,14 +173,14 @@ pub fn analyze_for(
     // exclude the whole def, but a bracketed return type ending `]: ...` does
     // not, so that def stays counted.
     for (ellipsis_line, first, end) in &walker.stub_candidates {
-        if STUB_LINE_RE.is_match(line_text(*ellipsis_line)) {
+        if rules.default_stubs && STUB_LINE_RE.is_match(line_text(*ellipsis_line)) {
             excluded.extend(*first..=*end);
         }
     }
     for (lineno, line) in source.lines().enumerate() {
         // A bare `...` line: coverage.py's default exclusion (its stub
         // regex) matches it wherever it is, not only in a stub def.
-        if BARE_ELLIPSIS_RE.is_match(line) {
+        if rules.default_stubs && BARE_ELLIPSIS_RE.is_match(line) {
             excluded.insert((lineno + 1) as u32);
         }
         if excludes.iter().any(|pattern| pattern.is_match(line)) {
@@ -162,6 +191,14 @@ pub fn analyze_for(
                     excluded.extend(span.start..=span.end);
                 }
             }
+        }
+    }
+    // An irrefutable `case` (`case _:`) is the `match` equivalent of an
+    // `else`: when its whole body is excluded, so is the `case` line.
+    for case in &walker.irrefutable_cases {
+        let mut body = walker.lines.range(case.body.0..=case.body.1).peekable();
+        if body.peek().is_some() && body.all(|line| excluded.contains(line)) {
+            excluded.extend(case.pattern.0..=case.pattern.1);
         }
     }
     // Arcs into excluded lines do not exist for coverage.py, so a branch
@@ -285,6 +322,30 @@ impl Walker<'_> {
         let last = self.line(range.end());
         for line in (first + 1)..=last {
             self.multiline.insert(line, first);
+        }
+    }
+
+    /// coverage.py's `_case_is_irrefutable`: no guard, and (through the last
+    /// alternative of an or-pattern and any `as` wrappers) a wildcard or a
+    /// bare capture.
+    fn case_is_irrefutable(case: &ruff_python_ast::MatchCase) -> bool {
+        use ruff_python_ast::Pattern;
+        if case.guard.is_some() {
+            return false;
+        }
+        let mut pattern = &case.pattern;
+        loop {
+            match pattern {
+                Pattern::MatchOr(or) => match or.patterns.last() {
+                    Some(last) => pattern = last,
+                    None => return false,
+                },
+                Pattern::MatchAs(as_) => match &as_.pattern {
+                    Some(inner) => pattern = inner,
+                    None => return true,
+                },
+                _ => return false,
+            }
         }
     }
 
@@ -541,6 +602,20 @@ impl Walker<'_> {
                     // Per-case span: a `# pragma` on a `case ...:` line excludes
                     // that case's body (e.g. `case _: assert_never(x)`).
                     let case_line = self.line(case.range.start());
+                    if Self::case_is_irrefutable(case)
+                        && let (Some(first), Some(last)) = (case.body.first(), case.body.last())
+                    {
+                        self.irrefutable_cases.push(CaseLines {
+                            pattern: (
+                                self.line(case.pattern.range().start()),
+                                self.line(case.pattern.range().end()),
+                            ),
+                            body: (
+                                self.line(first.range().start()),
+                                self.line(last.range().end()),
+                            ),
+                        });
+                    }
                     let case_end = case
                         .body
                         .last()
@@ -561,7 +636,7 @@ impl Walker<'_> {
                 // event for it. Only `...` is exempt (excluded via the stub
                 // regex), and a leading docstring is dropped separately by
                 // exclude_leading_docstring.
-                if !matches!(&*expr_stmt.value, Expr::EllipsisLiteral(_)) {
+                if !self.default_stubs || !matches!(&*expr_stmt.value, Expr::EllipsisLiteral(_)) {
                     self.mark(start);
                     self.record_span(stmt, start);
                     self.fold_multiline(start, stmt.range());
@@ -795,6 +870,58 @@ def e(
     }
 
     #[test]
+    fn custom_exclude_lines_drop_the_stub_defaults() {
+        // A custom exclude_lines replaces coverage.py's whole default list:
+        // a `...` body and a one-line stub are statements again.
+        let src = "\
+class P:
+    def code(self):
+        \"\"\"The code.\"\"\"
+        ...
+
+    def get(self, k): ...
+";
+        let rules = ExcludeRules {
+            patterns: vec![regex::Regex::new("pragma: no cover").unwrap()],
+            default_stubs: false,
+        };
+        let custom: Vec<u32> = analyze_for(src, &rules, true)
+            .unwrap()
+            .executable
+            .into_iter()
+            .collect();
+        assert_eq!(custom, vec![1, 2, 4, 6]);
+        assert_eq!(executable(src), vec![1, 2]);
+    }
+
+    #[test]
+    fn irrefutable_case_with_an_excluded_body_is_excluded() {
+        let src = "\
+def name(x):
+    match x:
+        case 1:
+            return \"one\"
+        case _:
+            raise NotImplementedError
+";
+        let excludes = [regex::Regex::new("raise NotImplementedError").unwrap()];
+        let lines: Vec<u32> = analyze(src, &excludes)
+            .unwrap()
+            .executable
+            .into_iter()
+            .collect();
+        assert_eq!(lines, vec![1, 2, 3, 4]);
+        // A refutable case keeps its line, like an `elif`.
+        let refutable = src.replace("case _:", "case 2:");
+        let lines: Vec<u32> = analyze(&refutable, &excludes)
+            .unwrap()
+            .executable
+            .into_iter()
+            .collect();
+        assert_eq!(lines, vec![1, 2, 3, 4, 5]);
+    }
+
+    #[test]
     fn module_docstring_is_excluded() {
         // coverage.py counts only `X = 1`, not the module docstring.
         assert_eq!(
@@ -954,8 +1081,12 @@ class C:
     x: int
     y: int = 1
 ";
-        let eager = analyze_for(src, &[], false).unwrap().executable;
-        let lazy = analyze_for(src, &[], true).unwrap().executable;
+        let defaults = ExcludeRules {
+            patterns: Vec::new(),
+            default_stubs: true,
+        };
+        let eager = analyze_for(src, &defaults, false).unwrap().executable;
+        let lazy = analyze_for(src, &defaults, true).unwrap().executable;
         assert!(eager.contains(&2));
         assert!(!lazy.contains(&2));
         assert!(lazy.contains(&3));

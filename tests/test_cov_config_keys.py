@@ -437,6 +437,30 @@ class TestCovConfigKeys(unittest.TestCase):
         self.assertNotIn("Failed to generate report", out)
         self.assertIn("app/core.py", out)
 
+    def test_custom_exclude_lines_replace_every_default(self) -> None:
+        # coverage.py's defaults are the pragma, `...` stubs and
+        # `if TYPE_CHECKING:`; a custom exclude_lines replaces all three.
+        self.write(
+            "app/core.py",
+            """
+            from typing import TYPE_CHECKING
+
+            if TYPE_CHECKING:
+                import os
+
+
+            def used():
+                return 1
+
+
+            def stub(): ...
+            """,
+        )
+        self.pyproject("")
+        self.assertEqual(self.rows()["app/core.py"], (3, 0))
+        self.pyproject("[tool.coverage.report]\nexclude_lines = ['pragma: no cover']\n")
+        self.assertEqual(self.rows()["app/core.py"], (6, 1))
+
     def test_code_run_under_a_non_python_name_is_skipped(self) -> None:
         # A template engine compiles a template with its own path as the
         # code's file name; coverage.py skips such a file when it does not
