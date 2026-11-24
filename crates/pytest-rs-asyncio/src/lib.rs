@@ -1228,7 +1228,7 @@ impl Plugin for AsyncioPlugin {
             policy.as_ref(),
         )?;
         let coro = pytest_rs_core::python::call_with_kwargs(py, callable, kwargs)?;
-        helper.getattr("run")?.call1((loop_.bind(py), coro))?;
+        helper.getattr("run_test")?.call1((loop_.bind(py), coro))?;
         Ok(Some(()))
     }
 

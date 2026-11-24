@@ -102,6 +102,24 @@ def run(loop, coro):
     return loop.run_until_complete(task)
 
 
+def run_test(loop, coro):
+    """`run` for the test itself. A failure's traceback starts at the test's
+    own frame, like upstream, which cuts it at the test function's code
+    (`Function._traceback_filter`): the event loop frames under it (this
+    helper, `run_until_complete`) are not the test's."""
+    __tracebackhide__ = True
+    code = getattr(coro, "cr_code", None)
+    try:
+        return run(loop, coro)
+    except BaseException as exc:
+        tb = exc.__traceback__
+        while tb is not None and tb.tb_frame.f_code is not code:
+            tb = tb.tb_next
+        if tb is not None:
+            exc.__traceback__ = tb
+        raise
+
+
 def adopt_context():
     """Adopt a copy of the current item context for subsequent fixture/test
     calls (upstream: contextvars set in an async fixture propagate to the
