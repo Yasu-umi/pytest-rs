@@ -108,6 +108,8 @@ pub struct CovPlugin {
     sort: report::ReportSort,
     sort_error: Option<String>,
     ignore_errors: bool,
+    /// Python 3.14+ (PEP 649): class-level bare annotations are no code.
+    lazy_annotations: bool,
     /// `[xml] output`, `[lcov] output`, `[json] output`.
     xml_output: Option<String>,
     lcov_output: Option<String>,
@@ -175,6 +177,7 @@ impl CovPlugin {
             sort: report::ReportSort::default(),
             sort_error: None,
             ignore_errors: false,
+            lazy_annotations: true,
             xml_output: None,
             lcov_output: None,
             json_output: None,
@@ -1155,7 +1158,9 @@ impl CovPlugin {
                 ));
                 continue;
             };
-            let Some(analysis) = analysis::analyze(&source_text, &self.exclude_patterns) else {
+            let Some(analysis) =
+                analysis::analyze_for(&source_text, &self.exclude_patterns, self.lazy_annotations)
+            else {
                 errors.push((
                     format!("Couldn't parse '{}' as Python source", path.display()),
                     format!("Couldn't parse Python file '{}'", path.display()),
@@ -1208,11 +1213,22 @@ impl CovPlugin {
                         continue;
                     };
                     // A negative destination leaves the code object.
-                    let dest = if *to < 0 {
+                    let mut dest = if *to < 0 {
                         analysis::EXIT
                     } else {
                         i64::from(fold(*to as u32))
                     };
+                    // Leaving a `with` body jumps back to the header (to run
+                    // `__exit__`): coverage.py counts it as going on to the
+                    // next statement, through enclosing `with`s too.
+                    while let Ok(header) = u32::try_from(dest)
+                        && let Some(&(end, after)) = analysis.withs.get(&header)
+                        && src > header
+                        && src <= end
+                        && !dests.contains(&dest)
+                    {
+                        dest = after;
+                    }
                     if dests.contains(&dest) {
                         taken.entry(src).or_default().insert(dest);
                     }
@@ -1542,6 +1558,7 @@ impl Plugin for CovPlugin {
                 .is_some_and(|value| Self::truthy(&value))
         };
         self.skip_empty = truthy_option("report", "skip_empty");
+        self.lazy_annotations = py.import("sys")?.getattr("version_info")?.ge((3, 14))?;
         self.ignore_errors = truthy_option("report", "ignore_errors");
         let output = |section: &str| {
             Self::section_option_value(&plain_rootdir, cov_config, section, "output")
@@ -1898,10 +1915,11 @@ impl Plugin for CovPlugin {
         let mut hits = collector.borrow(py).take_hits();
         // Branch events resolve to line arcs against each file's
         // multi-line statements (continuation lines fold onto the first).
+        let lazy_annotations = self.lazy_annotations;
         let mut multiline = |file: &str| {
             std::fs::read_to_string(file)
                 .ok()
-                .and_then(|text| analysis::analyze(&text, &[]))
+                .and_then(|text| analysis::analyze_for(&text, &[], lazy_annotations))
                 .map(|analysis| analysis.multiline)
                 .unwrap_or_default()
         };
