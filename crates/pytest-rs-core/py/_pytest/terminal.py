@@ -10,6 +10,8 @@ Two consumers:
   inherit.
 """
 
+from __future__ import annotations
+
 import datetime
 import os
 import platform
@@ -20,11 +22,20 @@ import warnings
 from collections.abc import Mapping
 from functools import partial
 from pathlib import Path
-from typing import NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple, TextIO
 
 from _pytest._io import TerminalWriter
 from _pytest._io.wcwidth import wcswidth
 from _pytest.compat import running_on_ci
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from _pytest._code.code import ExceptionInfo, ExceptionRepr
+    from _pytest.config import Config, ExitCode
+    from _pytest.main import Session
+    from _pytest.nodes import Item
+    from _pytest.reports import CollectReport, TestReport
 
 
 def _plugin_nameversions(plugininfo):
@@ -301,21 +312,21 @@ class TerminalReporter:
         verinfo = platform.python_version()
         return f"platform {sys.platform} -- Python {verinfo}, pytest-9.2.0, pluggy-{pluggy}"
 
-    def __init__(self, config, file=None):
+    def __init__(self, config: Config, file: TextIO | None = None) -> None:
         self.config = config
-        self.stats = {}
-        self._session = None
+        self.stats: dict[str, list[Any]] = {}
+        self._session: Session | None = None
         self._numcollected = 0
         self._main_color = None
         self._known_types = None
-        self._showfspath = None
-        self._progress_nodeids_reported = set()
+        self._showfspath: bool | None = None
+        self._progress_nodeids_reported: set[str] = set()
         self._tests_ran = False
         # "times" progress style: node ids already summed into a shown
         # duration, and the report being logged.
-        self._timing_nodeids_reported = set()
-        self._current_logreport = None
-        self._already_displayed_warnings = None
+        self._timing_nodeids_reported: set[str] = set()
+        self._current_logreport: TestReport | None = None
+        self._already_displayed_warnings: int | None = None
         try:
             self.startpath = Path(os.getcwd())
         except OSError:
@@ -329,7 +340,7 @@ class TerminalReporter:
         elif color == "no":
             self._tw.hasmarkup = False
         self._screen_width = self._tw.fullwidth
-        self.currentfspath = None
+        self.currentfspath: str | int | None = None
         self.reportchars = _getreportopt(config)
         self.foldskipped = bool(self._getoption("fold_skipped", True))
         self.hasmarkup = self._tw.hasmarkup
@@ -375,36 +386,36 @@ class TerminalReporter:
         return False
 
     @property
-    def verbosity(self):
+    def verbosity(self) -> int:
         try:
             return int(self._getoption("verbose", 0) or 0)
         except (TypeError, ValueError):
             return 0
 
     @property
-    def showheader(self):
+    def showheader(self) -> bool:
         return self.verbosity >= 0
 
     @property
-    def no_header(self):
+    def no_header(self) -> bool:
         return bool(self._getoption("no_header", False))
 
     @property
-    def no_summary(self):
+    def no_summary(self) -> bool:
         return bool(self._getoption("no_summary", False))
 
     @property
-    def showfspath(self):
+    def showfspath(self) -> bool:
         if self._showfspath is None:
             return self.verbosity >= 0
         return self._showfspath
 
     @showfspath.setter
-    def showfspath(self, value):
+    def showfspath(self, value: bool | None) -> None:
         self._showfspath = value
 
     @property
-    def showlongtestinfo(self):
+    def showlongtestinfo(self) -> bool:
         # Upstream reads config.get_verbosity() (which tests may patch).
         get_verbosity = getattr(self.config, "get_verbosity", None)
         if callable(get_verbosity):
@@ -415,17 +426,17 @@ class TerminalReporter:
         return self.verbosity > 0
 
     @property
-    def reported_progress(self):
+    def reported_progress(self) -> int:
         """The amount of items reported in the progress so far."""
         return len(self._progress_nodeids_reported)
 
-    def hasopt(self, char):
+    def hasopt(self, char: str) -> bool:
         char = {"xfailed": "x", "skipped": "s"}.get(char, char)
         return char in self.reportchars
 
     # ---- writer surface --------------------------------------------------
 
-    def write_fspath_result(self, nodeid, res, **markup):
+    def write_fspath_result(self, nodeid: str, res: str, **markup: bool) -> None:
         fspath = nodeid.split("::")[0]
         if self.currentfspath is None or fspath != self.currentfspath:
             if self.currentfspath is not None and self._show_progress_info:
@@ -435,7 +446,7 @@ class TerminalReporter:
             self._tw.write(fspath + " ")
         self._tw.write(res, flush=True, **markup)
 
-    def write_ensure_prefix(self, prefix, extra="", **kwargs):
+    def write_ensure_prefix(self, prefix: str, extra: str = "", **kwargs: Any) -> None:
         if self.currentfspath != prefix:
             self._tw.line()
             self.currentfspath = prefix
@@ -444,12 +455,20 @@ class TerminalReporter:
             self._tw.write(extra, **kwargs)
             self.currentfspath = -2
 
-    def ensure_newline(self):
+    def ensure_newline(self) -> None:
         if self.currentfspath:
             self._tw.line()
             self.currentfspath = None
 
-    def wrap_write(self, content, *, flush=False, margin=8, line_sep="\n", **markup):
+    def wrap_write(
+        self,
+        content: str,
+        *,
+        flush: bool = False,
+        margin: int = 8,
+        line_sep: str = "\n",
+        **markup: bool,
+    ) -> None:
         """Wrap message with margin for progress info."""
         width_of_current_line = self._tw.width_of_current_line
         wrapped = line_sep.join(
@@ -463,16 +482,16 @@ class TerminalReporter:
         wrapped = wrapped[width_of_current_line:]
         self._tw.write(wrapped, flush=flush, **markup)
 
-    def write(self, content, *, flush=False, **markup):
+    def write(self, content: str, *, flush: bool = False, **markup: bool) -> None:
         self._tw.write(content, flush=flush, **markup)
 
-    def write_raw(self, content, *, flush=False):
+    def write_raw(self, content: str, *, flush: bool = False) -> None:
         self._tw.write_raw(content, flush=flush)
 
-    def flush(self):
+    def flush(self) -> None:
         self._tw.flush()
 
-    def write_line(self, line, **markup):
+    def write_line(self, line: str | bytes, **markup: bool) -> None:
         if not isinstance(line, str):
             import warnings
 
@@ -483,7 +502,7 @@ class TerminalReporter:
         self.ensure_newline()
         self._tw.line(line, **markup)
 
-    def rewrite(self, line, **markup):
+    def rewrite(self, line: str, **markup: bool) -> None:
         """Rewinds the terminal cursor to the beginning and writes the
         given line."""
         erase = markup.pop("erase", False)
@@ -495,15 +514,30 @@ class TerminalReporter:
         line = str(line)
         self._tw.write("\r" + line + fill, **markup)
 
-    def write_sep(self, sep, title=None, fullwidth=None, **markup):
+    def write_sep(
+        self,
+        sep: str,
+        title: str | None = None,
+        fullwidth: int | None = None,
+        **markup: bool,
+    ) -> None:
         self.ensure_newline()
         self._tw.sep(sep, title, fullwidth, **markup)
 
-    def section(self, title, sep="=", **kw):
+    def section(self, title: str, sep: str = "=", **kw: bool) -> None:
         self._tw.sep(sep, title, **kw)
 
-    def line(self, msg, **kw):
+    def line(self, msg: str, **kw: bool) -> None:
         self._tw.line(msg, **kw)
+
+    if TYPE_CHECKING:
+
+        def print_teardown_sections(self, rep: TestReport) -> None: ...
+        def pytest_collection(self) -> None: ...
+        def pytest_keyboard_interrupt(self, excinfo: ExceptionInfo[BaseException]) -> None: ...
+        def pytest_plugin_registered(self, plugin: object) -> None: ...
+        def pytest_report_header(self, config: Config) -> list[str]: ...
+        def pytest_unconfigure(self) -> None: ...
 
     def _add_stats(self, category, items):
         set_main_color = category not in self.stats
@@ -514,19 +548,23 @@ class TerminalReporter:
     # ---- hook methods (driven via pytest._reporter when a replacement is
     # registered; subclasses inherit / override these) ---------------------
 
-    def pytest_internalerror(self, excrepr):
+    def pytest_internalerror(self, excrepr: ExceptionRepr) -> bool:
         for line in str(excrepr).split("\n"):
             self.write_line("INTERNALERROR> " + line)
         return True
 
-    def pytest_warning_recorded(self, warning_message, nodeid):
+    def pytest_warning_recorded(
+        self,
+        warning_message: warnings.WarningMessage,
+        nodeid: str,
+    ) -> None:
         fslocation = (
             getattr(warning_message, "filename", None),
             getattr(warning_message, "lineno", None),
         )
         message = warnings.formatwarning(
-            getattr(warning_message, "message", warning_message),
-            getattr(warning_message, "category", type(warning_message)),
+            getattr(warning_message, "message", warning_message),  # type: ignore[arg-type]
+            getattr(warning_message, "category", type(warning_message)),  # type: ignore[arg-type]
             getattr(warning_message, "filename", "<unknown>"),
             getattr(warning_message, "lineno", 0),
             getattr(warning_message, "line", None),
@@ -536,10 +574,10 @@ class TerminalReporter:
             [WarningReport(message, nodeid=nodeid, fslocation=fslocation)],
         )
 
-    def pytest_deselected(self, items):
+    def pytest_deselected(self, items: Sequence[Item]) -> None:
         self._add_stats("deselected", items)
 
-    def pytest_runtest_logstart(self, nodeid, location):
+    def pytest_runtest_logstart(self, nodeid: str, location: tuple[str, int | None, str]) -> None:
         fspath, lineno, domain = location
         # Ensure that the path is printed before the 1st test of a module
         # starts running.
@@ -565,7 +603,7 @@ class TerminalReporter:
             res = _default_teststatus(report)
         return res
 
-    def pytest_runtest_logreport(self, report):
+    def pytest_runtest_logreport(self, report: TestReport) -> None:
         self._tests_ran = True
         self._current_logreport = report
         rep = report
@@ -598,7 +636,7 @@ class TerminalReporter:
             if self._show_progress_info and not self._is_last_item:
                 self._write_progress_information_if_past_edge()
         else:
-            line = self._locationline(rep.nodeid, *rep.location)
+            line = self._locationline(rep.nodeid, *rep.location)  # type: ignore[misc]
             self.write_ensure_prefix(line, word, **markup)
             if rep.skipped or hasattr(report, "wasxfail"):
                 reason = _get_raw_skip_reason(rep)
@@ -608,7 +646,7 @@ class TerminalReporter:
                 self._write_progress_information_filling_space()
         self.flush()
 
-    def pytest_runtest_logfinish(self, nodeid):
+    def pytest_runtest_logfinish(self, nodeid: str) -> None:
         if self.verbosity <= 0 and self._show_progress_info and self._is_last_item:
             self._write_progress_information_filling_space()
 
@@ -703,14 +741,14 @@ class TerminalReporter:
         """Return the width of the current line."""
         return self._tw.width_of_current_line
 
-    def pytest_collectreport(self, report):
+    def pytest_collectreport(self, report: CollectReport) -> None:
         if report.failed:
             self._add_stats("error", [report])
         elif report.skipped:
             self._add_stats("skipped", [report])
         self._numcollected += len(getattr(report, "result", ()) or ())
 
-    def report_collect(self, final=False):
+    def report_collect(self, final: bool = False) -> None:
         if self.verbosity < 0:
             return
         errors = len(self.stats.get("error", []))
@@ -741,7 +779,7 @@ class TerminalReporter:
                 self.write("collecting ... ", bold=True)
             self.write_line(line)
 
-    def pytest_sessionstart(self, session):
+    def pytest_sessionstart(self, session: Session) -> None:
         self._session = session
         self._sessionstarttime = time.time()
         if not self.showheader:
@@ -782,7 +820,7 @@ class TerminalReporter:
                 for line in line_or_lines:
                     self.write_line(line)
 
-    def pytest_collection_finish(self, session):
+    def pytest_collection_finish(self, session: Session) -> None:
         self.report_collect(True)
         # Upstream: plugins contribute trailing collection lines (e.g.
         # pytest-run-parallel's "Collected N items to run in parallel").
@@ -805,7 +843,7 @@ class TerminalReporter:
         ):
             self._tw.line("")
 
-    def pytest_sessionfinish(self, session, exitstatus):
+    def pytest_sessionfinish(self, session: Session, exitstatus: int | ExitCode) -> None:
         self._tw.line("")
         self.summary_stats()
 
@@ -846,10 +884,10 @@ class TerminalReporter:
     #
     # Summaries for sessionfinish.
     #
-    def getreports(self, name):
+    def getreports(self, name: str) -> Any:
         return [x for x in self.stats.get(name, ()) if not hasattr(x, "_pdbshown")]
 
-    def summary_warnings(self):
+    def summary_warnings(self) -> None:
         if self.hasopt("w"):
             all_warnings = self.stats.get("warnings")
             if not all_warnings:
@@ -864,7 +902,7 @@ class TerminalReporter:
             if not warning_reports:
                 return
 
-            reports_grouped_by_message = {}
+            reports_grouped_by_message: dict[str, list[Any]] = {}
             for wr in warning_reports:
                 reports_grouped_by_message.setdefault(wr.message, []).append(wr)
 
@@ -887,13 +925,13 @@ class TerminalReporter:
                 self._tw.line()
             self._tw.line("-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html")
 
-    def summary_passes(self):
+    def summary_passes(self) -> None:
         self.summary_passes_combined("passed", "PASSES", "P")
 
-    def summary_xpasses(self):
+    def summary_xpasses(self) -> None:
         self.summary_passes_combined("xpassed", "XPASSES", "X")
 
-    def summary_passes_combined(self, which_reports, sep_title, needed_opt):
+    def summary_passes_combined(self, which_reports: str, sep_title: str, needed_opt: str) -> None:
         if self._getoption("tbstyle", "auto") != "no":
             if self.hasopt(needed_opt):
                 reports = self.getreports(which_reports)
@@ -906,16 +944,23 @@ class TerminalReporter:
                         self.write_sep("_", msg, green=True, bold=True)
                         self._outrep_summary(rep)
 
-    def summary_failures(self):
+    def summary_failures(self) -> None:
         style = self._getoption("tbstyle", "auto")
         self.summary_failures_combined("failed", "FAILURES", style=style)
 
-    def summary_xfailures(self):
+    def summary_xfailures(self) -> None:
         show_tb = self._getoption("xfail_tb", False)
         style = self._getoption("tbstyle", "auto") if show_tb else "no"
         self.summary_failures_combined("xfailed", "XFAILURES", style=style)
 
-    def summary_failures_combined(self, which_reports, sep_title, *, style, needed_opt=None):
+    def summary_failures_combined(
+        self,
+        which_reports: str,
+        sep_title: str,
+        *,
+        style: str,
+        needed_opt: str | None = None,
+    ) -> None:
         if style != "no":
             if not needed_opt or self.hasopt(needed_opt):
                 reports = self.getreports(which_reports)
@@ -932,7 +977,7 @@ class TerminalReporter:
                         self.write_sep("_", msg, red=True, bold=True)
                         self._outrep_summary(rep)
 
-    def summary_errors(self):
+    def summary_errors(self) -> None:
         if self._getoption("tbstyle", "auto") != "no":
             reports = self.getreports("error")
             if not reports:
@@ -961,7 +1006,7 @@ class TerminalReporter:
                 content = content[:-1]
             self._tw.line(content)
 
-    def summary_stats(self):
+    def summary_stats(self) -> None:
         if self.verbosity < -1:
             return
 
@@ -998,7 +1043,7 @@ class TerminalReporter:
         else:
             self.write_line(msg, **main_markup)
 
-    def short_test_summary(self):
+    def short_test_summary(self) -> None:
         if not self.reportchars:
             return
 
@@ -1066,11 +1111,11 @@ class TerminalReporter:
             "E": partial(show_simple, stat="error"),
         }
 
-        lines = []
+        lines: list[Any] = []
         for char in self.reportchars:
             action = reportchar_actions.get(char)
             if action:  # skipping e.g. "P" (passed with output) here.
-                action(lines)
+                action(lines)  # type: ignore[operator]
 
         if lines:
             self.write_sep("=", "short test summary info", cyan=True, bold=True)
@@ -1107,7 +1152,7 @@ class TerminalReporter:
         self._known_types = list(KNOWN_TYPES) + unknown_types
         self._main_color = self._determine_main_color(bool(unknown_types))
 
-    def build_summary_stats_line(self):
+    def build_summary_stats_line(self) -> tuple[list[tuple[str, dict[str, bool]]], str]:
         """Build the (text, markup) parts of the final summary line plus its
         main color, like upstream."""
         if self.config.getoption("collectonly"):

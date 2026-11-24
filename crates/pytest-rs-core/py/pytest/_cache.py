@@ -1,6 +1,8 @@
 """The cache: `config.cache` / the `cache` fixture, backed by
 {cache_dir}/v JSON files like pytest's cacheprovider."""
 
+from __future__ import annotations
+
 import errno
 import json
 import os
@@ -10,9 +12,13 @@ import warnings
 from datetime import datetime, timedelta
 from pathlib import Path
 from pprint import pformat
+from typing import TYPE_CHECKING, Any
 
 from pytest._fixtures import fixture
 from pytest._warning_types import PytestCacheWarning
+
+if TYPE_CHECKING:
+    from _pytest.config import Config
 
 README_CONTENT = """\
 # pytest cache directory #
@@ -47,11 +53,11 @@ class Cache:
     # Sub-directory under cache-dir for values created by `set()`.
     _CACHE_PREFIX_VALUES = "v"
 
-    def __init__(self, cachedir, _ispytest=False):
+    def __init__(self, cachedir: str | Path, _ispytest: bool = False) -> None:
         self._cachedir = Path(cachedir)
 
     @staticmethod
-    def default_cache_dir():
+    def default_cache_dir() -> str:
         """$TOX_ENV_DIR/.pytest_cache inside an active tox env, else
         .pytest_cache (pytest's cache_dir ini default)."""
         tox_env_dir = os.environ.get("TOX_ENV_DIR")
@@ -60,32 +66,36 @@ class Cache:
         return ".pytest_cache"
 
     @classmethod
-    def cache_dir_from(cls, rootdir, ini_cache_dir):
+    def cache_dir_from(cls, rootdir: str | Path, ini_cache_dir: str | None) -> str:
         """Resolve the `cache_dir` ini (default .pytest_cache) against the
         rootdir, with ~ and env vars expanded (pytest's resolve_from_str)."""
         value = os.path.expanduser(os.path.expandvars(ini_cache_dir or cls.default_cache_dir()))
         return str(Path(rootdir) / value)
 
     @classmethod
-    def for_config(cls, config, *, _ispytest=False):
+    def for_config(cls, config: Config, *, _ispytest: bool = False) -> Cache:
         return cls(cls.cache_dir_from(str(config.rootpath), config.getini("cache_dir")))
 
-    def clear_cache(self):
+    @classmethod
+    def cache_dir_from_config(cls, config: Config, *, _ispytest: bool = False) -> Path:
+        return Path(cls.cache_dir_from(str(config.rootpath), config.getini("cache_dir")))
+
+    def clear_cache(self) -> None:
         """--cache-clear: drop the value and directory stores."""
         for prefix in (self._CACHE_PREFIX_DIRS, self._CACHE_PREFIX_VALUES):
             d = self._cachedir / prefix
             if d.is_dir():
                 shutil.rmtree(d, ignore_errors=True)
 
-    def warn(self, fmt, *, _ispytest=False, **args):
+    def warn(self, fmt: str, *, _ispytest: bool = False, **args: object) -> None:
         warnings.warn(PytestCacheWarning(fmt.format(**args) if args else fmt), stacklevel=3)
 
-    def _mkdir(self, path):
+    def _mkdir(self, path: Path) -> None:
         self._ensure_cache_dir_and_supporting_files()
         path.mkdir(exist_ok=True, parents=True)
 
     @staticmethod
-    def _join_within(base, name):
+    def _join_within(base: Path, name: str) -> Path:
         """Join ``name`` onto ``base``, keeping the result inside ``base``:
         an absolute ``name`` or ``..`` segments escaping it raise ValueError
         (pytest 9.2), while a ``..`` that cancels out within ``base`` is
@@ -95,17 +105,17 @@ class Cache:
             raise ValueError(f"{name!r} is not allowed to escape the cache directory")
         return path
 
-    def mkdir(self, name):
+    def mkdir(self, name: str) -> Path:
         if len(Path(name).parts) > 1:
             raise ValueError("name is not allowed to contain path separators")
         res = self._join_within(self._cachedir / self._CACHE_PREFIX_DIRS, name)
         self._mkdir(res)
         return res
 
-    def _getvaluepath(self, key):
+    def _getvaluepath(self, key: str) -> Path:
         return self._join_within(self._cachedir / self._CACHE_PREFIX_VALUES, key)
 
-    def get(self, key, default):
+    def get(self, key: str, default: Any) -> Any:
         path = self._getvaluepath(key)
         try:
             with path.open("r", encoding="UTF-8") as f:
@@ -113,7 +123,7 @@ class Cache:
         except (ValueError, OSError):
             return default
 
-    def set(self, key, value):
+    def set(self, key: str, value: object) -> None:
         path = self._getvaluepath(key)
         try:
             self._mkdir(path.parent)
@@ -127,12 +137,12 @@ class Cache:
         except OSError as exc:
             self.warn(f"cache could not write path {path}: {exc}")
 
-    def _ensure_cache_dir_and_supporting_files(self):
+    def _ensure_cache_dir_and_supporting_files(self) -> None:
         if not self._cachedir.is_dir():
             Cache._make_cachedir(self._cachedir)
 
     @staticmethod
-    def _make_cachedir(target):
+    def _make_cachedir(target: Path) -> None:
         """Create the cache dir with its supporting files atomically: fill a
         temporary sibling, then rename it into place. Losing a concurrent
         race just discards the temporary dir; the temporary dir never

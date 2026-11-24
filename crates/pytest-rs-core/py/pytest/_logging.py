@@ -7,6 +7,8 @@ so caplog.at_level(DEBUG) does not leak DEBUG lines into reports). The
 engine drives phases via start_phase()/finish_item().
 """
 
+from __future__ import annotations
+
 import contextlib
 import datetime
 import functools
@@ -18,8 +20,13 @@ import pickle
 import re as _re
 import sys
 import types
+from collections.abc import Generator
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from pytest._fixtures import fixture
+
+if TYPE_CHECKING:
+    from pytest._node import Node
 
 #: pytest's DEFAULT_LOG_FORMAT.
 DEFAULT_LOG_FORMAT = "%(levelname)-8s %(name)s:%(filename)s:%(lineno)s %(message)s"
@@ -636,14 +643,14 @@ def failure_sections():
 class LogCaptureFixture:
     """The object yielded by the caplog fixture."""
 
-    def __init__(self, item):
-        self._item = item
+    def __init__(self, item: Node, *, _ispytest: bool = False) -> None:
+        self._item: Any = item
         # Levels (and the logging.disable level) restored at teardown.
-        self._initial_logger_levels = {}
-        self._initial_handler_level = None
-        self._initial_disabled_logging_level = None
+        self._initial_logger_levels: dict[str | None, int] = {}
+        self._initial_handler_level: int | None = None
+        self._initial_disabled_logging_level: int | None = None
 
-    def _finalize(self):
+    def _finalize(self) -> None:
         if self._initial_handler_level is not None:
             self.handler.setLevel(self._initial_handler_level)
             self._initial_handler_level = None
@@ -655,32 +662,32 @@ class LogCaptureFixture:
             self._initial_disabled_logging_level = None
 
     @property
-    def handler(self):
+    def handler(self) -> LogCaptureHandler:
         return self._item.stash[caplog_handler_key]
 
-    def get_records(self, when):
+    def get_records(self, when: Literal["setup", "call", "teardown"]) -> list[logging.LogRecord]:
         return self._item.stash[caplog_records_key].get(when, [])
 
     @property
-    def records(self):
+    def records(self) -> list[logging.LogRecord]:
         return self.handler.records
 
     @property
-    def text(self):
+    def text(self) -> str:
         return _remove_ansi_escape_sequences(self.handler.stream.getvalue())
 
     @property
-    def messages(self):
+    def messages(self) -> list[str]:
         return [record.getMessage() for record in self.records]
 
     @property
-    def record_tuples(self):
+    def record_tuples(self) -> list[tuple[str, int, str]]:
         return [(r.name, r.levelno, r.getMessage()) for r in self.records]
 
-    def clear(self):
+    def clear(self) -> None:
         self.handler.clear()
 
-    def _force_enable_logging(self, level, logger_obj):
+    def _force_enable_logging(self, level: int | str, logger_obj: logging.Logger) -> int:
         """Un-disable (logging.disable) levels >= the requested capture level.
 
         Returns the original disabled level so callers can restore it.
@@ -700,7 +707,7 @@ class LogCaptureFixture:
 
         return original_disable_level
 
-    def set_level(self, level, logger=None):
+    def set_level(self, level: int | str, logger: str | None = None) -> None:
         logger_obj = logging.getLogger(logger)
         self._initial_logger_levels.setdefault(logger or "", logger_obj.level)
         logger_obj.setLevel(level)
@@ -712,7 +719,7 @@ class LogCaptureFixture:
             self._initial_disabled_logging_level = initial_disabled_logging_level
 
     @contextlib.contextmanager
-    def at_level(self, level, logger=None):
+    def at_level(self, level: int | str, logger: str | None = None) -> Generator[None]:
         logger_obj = logging.getLogger(logger)
         old_logger = logger_obj.level
         old_handler = self.handler.level
@@ -727,7 +734,7 @@ class LogCaptureFixture:
             logging.disable(original_disable_level)
 
     @contextlib.contextmanager
-    def filtering(self, filter_):
+    def filtering(self, filter_: logging.Filter) -> Generator[None]:
         # A filter already on the handler (an outer filtering() block) stays
         # until that block ends (pytest 9.2).
         if filter_ in self.handler.filters:
@@ -741,7 +748,7 @@ class LogCaptureFixture:
 
 
 @fixture
-def caplog():
+def caplog() -> Generator[LogCaptureFixture]:
     """Access and control log capturing.
 
     Captured logs are available through the following properties/methods::
@@ -754,7 +761,7 @@ def caplog():
     """
     # The item proxy snapshots this item's stash (rebound per item by
     # start_phase("setup"), which always precedes fixture setup).
-    capture = LogCaptureFixture(types.SimpleNamespace(stash=state.stash))
+    capture = LogCaptureFixture(cast("Node", types.SimpleNamespace(stash=state.stash)))
     yield capture
     capture._finalize()
 

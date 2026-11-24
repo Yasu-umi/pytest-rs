@@ -12,7 +12,7 @@ import linecache
 from collections.abc import Callable
 from pathlib import Path
 from types import TracebackType
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 try:
     import pluggy
@@ -26,6 +26,21 @@ except ModuleNotFoundError:
 import _pytest
 from _pytest._stub import __getattr__  # noqa: F401
 from _pytest.pathlib import absolutepath
+
+if TYPE_CHECKING:
+    # Names a caller's annotations use (`repr_failure(excinfo) -> str |
+    # TerminalRepr`, `pytest_internalerror(excrepr)`). At runtime the module
+    # __getattr__ above answers them; without these declarations a type
+    # checker sees that __getattr__ and makes every one of them Any.
+    from pytest._raises import ExceptionInfo as ExceptionInfo
+
+    from _pytest._io import TerminalWriter
+
+    class TerminalRepr:
+        def toterminal(self, tw: TerminalWriter) -> None: ...
+
+    # What ExceptionInfo.getrepr() returns here.
+    from pytest._raises import _ExceptionRepr as ExceptionRepr  # noqa: F401
 
 
 class ReprFileLocation:

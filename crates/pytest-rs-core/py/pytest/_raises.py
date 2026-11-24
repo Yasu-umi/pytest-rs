@@ -1,17 +1,31 @@
 """pytest.raises (context manager and callable forms)."""
 
+from __future__ import annotations
+
+import builtins
 import re as _re
 import sys
 import traceback
 import warnings
 from collections.abc import Callable
 from types import TracebackType
-from typing import Any, overload
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, overload
 
 from pytest._outcomes import fail
 
+if TYPE_CHECKING:
+    from _pytest._code.code import Traceback
 
-class ExceptionInfo[E: BaseException]:
+
+_TracebackStyle = Literal["long", "short", "line", "no", "native", "value", "auto"]
+
+
+#: Covariant like upstream: ExceptionInfo only ever hands E out (the
+#: parameter positions below are ignored the same way upstream ignores them).
+E = TypeVar("E", bound=BaseException, covariant=True)
+
+
+class ExceptionInfo(Generic[E]):  # noqa: UP046 (explicit covariance, like upstream)
     # Filled by _set. Held privately and republished as the read-only
     # properties below, which is both what upstream does and what the typing
     # needs: `excinfo.value` must be `E`, not `Any | None`, or every
@@ -27,7 +41,7 @@ class ExceptionInfo[E: BaseException]:
     # setter (upstream's is settable too).
     _traceback: Any
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._set(None, None, None)
 
     @property
@@ -42,45 +56,50 @@ class ExceptionInfo[E: BaseException]:
     def tb(self) -> TracebackType:
         return self._tb
 
-    def _set(self, type_, value, tb):
+    def _set(self, type_: Any, value: Any, tb: Any) -> None:
         self._type = type_
         self._value = value
         self._tb = tb
         self._traceback = None
 
     @classmethod
-    def for_later(cls):
+    def for_later(cls) -> ExceptionInfo[E]:
         """An unfilled ExceptionInfo (upstream API, used by RaisesGroup)."""
         return cls()
 
     @classmethod
-    def from_current(cls):
+    def from_current(cls, exprinfo: str | None = None) -> ExceptionInfo[BaseException]:
         """An ExceptionInfo for the exception currently being handled."""
         self = cls()
         self._set(*sys.exc_info())
-        return self
+        return self  # type: ignore[return-value]
 
     @classmethod
-    def from_exception(cls, exception):
+    def from_exception(cls, exception: E, exprinfo: str | None = None) -> ExceptionInfo[E]:  # type: ignore[misc]
         """An ExceptionInfo wrapping an already-captured exception."""
         self = cls()
         self._set(type(exception), exception, exception.__traceback__)
         return self
 
     @classmethod
-    def from_exc_info(cls, exc_info, _ispytest=False):
+    def from_exc_info(
+        cls,
+        exc_info: tuple[builtins.type[E], E, TracebackType],  # type: ignore[misc]
+        exprinfo: str | None = None,
+        _ispytest: bool = False,
+    ) -> ExceptionInfo[E]:
         """An ExceptionInfo from a (type, value, traceback) triple (upstream
         API; used e.g. by unittest.TestCase result callbacks)."""
         self = cls()
         self._set(*exc_info)
         return self
 
-    def fill_unfilled(self, exc_info):
+    def fill_unfilled(self, exc_info: tuple[builtins.type[E], E, TracebackType]) -> None:  # type: ignore[misc]
         """Fill from a (type, value, traceback) triple."""
         self._set(*exc_info)
 
     @property
-    def _excinfo(self):
+    def _excinfo(self) -> tuple[builtins.type[E], E, TracebackType] | None:
         """The raw (type, value, traceback) triple (upstream's storage
         attribute; some test code reads it directly instead of .type/.value/.tb)."""
         if self.type is None:
@@ -88,11 +107,11 @@ class ExceptionInfo[E: BaseException]:
         return (self.type, self.value, self.tb)
 
     @property
-    def typename(self):
-        return self.type.__name__ if self.type else None
+    def typename(self) -> str:
+        return self.type.__name__ if self.type else None  # type: ignore[return-value]
 
     @property
-    def traceback(self):
+    def traceback(self) -> Traceback:
         """The captured exception's traceback as a _pytest._code.Traceback
         (a list of TracebackEntry), for navigation/filtering by upstream tests.
 
@@ -108,10 +127,16 @@ class ExceptionInfo[E: BaseException]:
         return self._traceback
 
     @traceback.setter
-    def traceback(self, value):
+    def traceback(self, value: Traceback) -> None:
         self._traceback = value
 
-    def group_contains(self, expected_exception, *, match=None, depth=None):
+    def group_contains(
+        self,
+        expected_exception: builtins.type[BaseException] | tuple[builtins.type[BaseException], ...],
+        *,
+        match: str | _re.Pattern[str] | None = None,
+        depth: int | None = None,
+    ) -> bool:
         """Whether the captured exception group contains a matching exception
         (upstream ExceptionInfo.group_contains)."""
         assert isinstance(self.value, BaseExceptionGroup), (
@@ -121,8 +146,13 @@ class ExceptionInfo[E: BaseException]:
         return self._group_contains(self.value, expected_exception, match, depth)
 
     def _group_contains(
-        self, exc_group, expected_exception, match, target_depth=None, current_depth=1
-    ):
+        self,
+        exc_group: BaseExceptionGroup[Any],
+        expected_exception: builtins.type[BaseException] | tuple[builtins.type[BaseException], ...],
+        match: str | _re.Pattern[str] | None,
+        target_depth: int | None = None,
+        current_depth: int = 1,
+    ) -> bool:
         if (target_depth is not None) and (current_depth > target_depth):
             return False
         for exc in exc_group.exceptions:
@@ -142,7 +172,9 @@ class ExceptionInfo[E: BaseException]:
             return True
         return False
 
-    def errisinstance(self, exc):
+    def errisinstance(
+        self, exc: builtins.type[BaseException] | tuple[builtins.type[BaseException], ...]
+    ) -> bool:
         """Whether the captured exception is an instance of exc (or any in a
         tuple) — upstream ExceptionInfo.errisinstance."""
         return self.value is not None and isinstance(self.value, exc)
@@ -156,7 +188,7 @@ class ExceptionInfo[E: BaseException]:
         entry = entries[-1]
         return _ReprFileLocation(entry.filename, entry.lineno, self.exconly(tryshort=True))
 
-    def exconly(self, tryshort=False):
+    def exconly(self, tryshort: bool = False) -> str:
         """The exception's `type: message` line(s), like pytest's exconly.
         With tryshort, the rewritten-assert "AssertionError: " noise is
         stripped (upstream strips a leading striptext)."""
@@ -167,7 +199,7 @@ class ExceptionInfo[E: BaseException]:
                 text = text[len(prefix) :]
         return text
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         if self.value is None:
             return "<ExceptionInfo for raises contextmanager>"
         try:
@@ -177,13 +209,23 @@ class ExceptionInfo[E: BaseException]:
         except Exception:
             shown = repr(self.value)
         tblen = 0
-        tb = self.tb
+        tb: TracebackType | None = self.tb
         while tb is not None:
             tblen += 1
             tb = tb.tb_next
         return f"<{type(self).__name__} {shown} tblen={tblen}>"
 
-    def getrepr(self, showlocals=False, style="long", **kwargs):
+    def getrepr(
+        self,
+        showlocals: bool = False,
+        style: _TracebackStyle = "long",
+        abspath: bool = False,
+        tbfilter: bool | Callable[[ExceptionInfo[BaseException]], Traceback] = True,
+        funcargs: bool = False,
+        truncate_locals: bool = True,
+        truncate_args: bool = True,
+        chain: bool = True,
+    ) -> _ExceptionRepr:
         """A printable traceback representation (str() yields the formatted
         exception). Enough for pytest_internalerror and report longrepr; the
         style/showlocals knobs are accepted but not honored."""
@@ -191,7 +233,7 @@ class ExceptionInfo[E: BaseException]:
             return _ExceptionRepr("")
         text = "".join(traceback.format_exception(self.type, self.value, self.tb)).rstrip("\n")
         path, lineno = "", 0
-        tb = self.tb
+        tb: TracebackType | None = self.tb
         while tb is not None:
             frame = tb.tb_frame
             hidden = frame.f_locals.get("__tracebackhide__") or frame.f_globals.get(
@@ -204,7 +246,7 @@ class ExceptionInfo[E: BaseException]:
         message = "".join(traceback.format_exception_only(self.type, self.value)).strip()
         return _ExceptionRepr(text, path=path, lineno=lineno, message=message)
 
-    def match(self, regexp):
+    def match(self, regexp: str | _re.Pattern[str]) -> Literal[True]:
         __tracebackhide__ = True
         value = str(self.value)
         try:

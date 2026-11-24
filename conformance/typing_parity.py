@@ -16,6 +16,13 @@ reveal_type corpus cannot: nobody writes an assertion for the attribute they
 forgot to declare in the first place (`pytest.FixtureRequest` shipped as an
 empty placeholder for several releases that way).
 
+The `pytest-api` target covers what a corpus can miss: every public name
+`pytest` exports (and each public attribute of the exported classes) goes
+through reveal_type under both MYPYPATHs, and a name whose type holds more
+`Any` under the shim is a gap. Without --strict, calling an unannotated
+method is no error, so the corpus runs above never notice one; a caller's
+`mypy --strict` suite does (`no-untyped-call`, `untyped-decorator`).
+
 Usage:
     uv run python conformance/typing_parity.py                 # report
     uv run python conformance/typing_parity.py --check         # gate on the baseline
@@ -30,10 +37,12 @@ costs a caller nothing.
 """
 
 import argparse
+import ast
 import os
 import re
 import subprocess
 import sys
+import tempfile
 import tomllib
 from pathlib import Path
 
@@ -55,6 +64,7 @@ SHIM_ROOT = ROOT / "crates" / "pytest-rs-core" / "py"
 # purpose: it has no importable API at all (--splits/--group are CLI-only), so
 # there is no typing surface to compare.
 TARGETS = [
+    "pytest-api",
     "pytest",
     "pytest-asyncio",
     "pytest-mock",
@@ -62,6 +72,21 @@ TARGETS = [
     "pytest-xdist",
     "pytest-benchmark",
 ]
+
+# Not a suite: the public names `pytest` exports, probed with reveal_type
+# (see measure_api). An upstream test suite only calls what it happens to
+# test, and without --strict an unannotated callee is no error there, so the
+# corpus runs above can't see a shim method that lost its types.
+API_TARGET = "pytest-api"
+
+# Marks a caller writes as `pytest.mark.<name>`: MarkGenerator declares the
+# builtin ones for type checkers only, and the rest resolve through
+# __getattr__ (asyncio / anyio are plugin marks, `foo` stands for any custom
+# one).
+API_MARKS = ["parametrize", "skip", "skipif", "xfail", "usefixtures", "filterwarnings"]
+API_MARKS += ["asyncio", "anyio", "foo"]
+
+REVEAL_RE = re.compile(r'^[^:]+:(?P<line>\d+): note: Revealed type is "(?P<type>.*)"$')
 
 # "file:line:col: error: message  [code]" -- the column is optional.
 ERROR_RE = re.compile(
@@ -154,6 +179,112 @@ def measure(suite: Suite, pytest_suite: Suite) -> tuple[Findings, Findings]:
     return shim - real, real - shim
 
 
+def _api_probe(real_src: Path) -> list[str]:
+    """The probed expressions: every name in pytest's `__all__` and, for a
+    class, every public attribute its body defines -- read from the real
+    source with ast, so the probe needs none of pytest's runtime deps."""
+    init = ast.parse((real_src / "pytest" / "__init__.py").read_text())
+    origins: dict[str, tuple[str, str]] = {}
+    exported: list[str] = []
+    for node in init.body:
+        if isinstance(node, ast.ImportFrom) and node.module:
+            for alias in node.names:
+                origins[alias.asname or alias.name] = (node.module, alias.name)
+        elif isinstance(node, ast.Assign) and any(
+            isinstance(t, ast.Name) and t.id == "__all__" for t in node.targets
+        ):
+            exported = list(ast.literal_eval(node.value))
+    exprs: list[str] = []
+    for name in sorted(exported):
+        exprs.append(f"pytest.{name}")
+        origin = origins.get(name)
+        if origin is None:
+            continue
+        cls = _find_class(real_src, *origin)
+        if cls is not None:
+            exprs.extend(f"pytest.{name}.{attr}" for attr in sorted(_public_attrs(cls)))
+    exprs.extend(f"pytest.mark.{mark}" for mark in API_MARKS)
+    return exprs
+
+
+def _find_class(real_src: Path, module: str, name: str) -> ast.ClassDef | None:
+    base = real_src.joinpath(*module.split("."))
+    path = base / "__init__.py" if base.is_dir() else base.with_suffix(".py")
+    if not path.is_file():
+        return None
+    for node in ast.parse(path.read_text()).body:
+        if isinstance(node, ast.ClassDef) and node.name == name:
+            return node
+    return None
+
+
+def _public_attrs(cls: ast.ClassDef) -> set[str]:
+    names: set[str] = set()
+    for node in cls.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            names.add(node.name)
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            names.add(node.target.id)
+        elif isinstance(node, ast.Assign):
+            names.update(t.id for t in node.targets if isinstance(t, ast.Name))
+    return {n for n in names if not n.startswith("_")}
+
+
+def _reveal(probe: Path, mypypath: Path) -> dict[int, str]:
+    proc = subprocess.run(
+        [
+            "uv",
+            "run",
+            "--no-sync",
+            "mypy",
+            "--no-error-summary",
+            "--no-incremental",
+            "--config-file",
+            os.devnull,
+            "--no-site-packages",
+            "--python-version",
+            PYTHON_VERSION,
+            str(probe),
+        ],
+        cwd=ROOT,
+        env={**os.environ, "MYPYPATH": str(mypypath)},
+        capture_output=True,
+        text=True,
+    )
+    revealed: dict[int, str] = {}
+    for line in proc.stdout.splitlines():
+        match = REVEAL_RE.match(line)
+        if match is not None:
+            revealed[int(match.group("line"))] = match.group("type")
+    return revealed
+
+
+def measure_api(pytest_suite: Suite) -> tuple[Findings, Findings]:
+    """(shim-only, real-only) findings for pytest's public names.
+
+    A name is a gap when its revealed type holds more `Any` under the shim
+    than under real pytest: an unannotated parameter or return, a module
+    attribute with no declared type, a mark that is an untyped decorator.
+    The revealed types themselves are not compared -- the classes live in
+    different modules (`_pytest.monkeypatch` vs `pytest._monkeypatch`)."""
+    exprs = _api_probe(_real_src(pytest_suite))
+    with tempfile.TemporaryDirectory() as tmp:
+        probe = Path(tmp) / "pytest_api_probe.py"
+        probe.write_text("import pytest\n\n" + "".join(f"reveal_type({e})\n" for e in exprs))
+        real = _reveal(probe, _real_src(pytest_suite))
+        shim = _reveal(probe, SHIM_ROOT)
+    shim_only: Findings = set()
+    real_only: Findings = set()
+    for lineno, expr in enumerate(exprs, start=3):
+        real_any = real.get(lineno, "Any").count("Any")
+        shim_any = shim.get(lineno, "Any").count("Any")
+        if shim_any > real_any:
+            shim_only.add((expr, "reveals more Any than pytest", "api-any"))
+        elif real_any > shim_any:
+            real_only.add((expr, "reveals less Any than pytest", "api-any"))
+    return shim_only, real_only
+
+
 def _format(findings: Findings) -> list[str]:
     return sorted(f"{path}: [{code}] {msg}" for path, msg, code in findings)
 
@@ -178,7 +309,12 @@ def write_baseline(measured: dict[str, tuple[Findings, Findings]]) -> None:
         "# code nothing runs; a caller's own suite reaches none of them. Also",
         "# permanent: `import py`, whose compat module upstream bundles and",
         "# pytest-rs does not, and LEGACY_PATH, which upstream binds to",
-        "# py.path.local -- there is no class here to point it at.",
+        "# py.path.local -- there is no class here to point it at. Private",
+        "# internals upstream's own tests reach into (Config._do_configure,",
+        "# Session._setupstate, ...) and attributes the shim lacks at runtime too",
+        "# (Traceback.cut, Class.cls, ...) are API gaps, not typing ones. Under",
+        "# [pytest-api], the bare class names are constructors whose shim",
+        "# signature differs from upstream's.",
         "#",
         "# real_only entries are the opposite (the shim is more permissive than",
         "# the real library); they cost a caller nothing and never gate.",
@@ -224,9 +360,12 @@ def main() -> int:
     pytest_suite.fetch(use_local=False)
 
     for name in names:
-        (suite,) = load_suites(name)
-        suite.fetch(use_local=False)
-        shim_only, real_only = measure(suite, pytest_suite)
+        if name == API_TARGET:
+            shim_only, real_only = measure_api(pytest_suite)
+        else:
+            (suite,) = load_suites(name)
+            suite.fetch(use_local=False)
+            shim_only, real_only = measure(suite, pytest_suite)
         measured[name] = (shim_only, real_only)
         recorded = set(baseline.get(name, {}).get("shim_only", []))
         actual = set(_format(shim_only))

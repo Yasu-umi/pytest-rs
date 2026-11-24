@@ -1,8 +1,16 @@
 import re as _re
 from collections.abc import Mapping
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from _pytest._code.code import ExceptionChainRepr as _ExceptionChainRepr  # noqa: F401
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator
+
+    from _pytest._io import TerminalWriter
+    from _pytest.nodeid import NodeId
+    from _pytest.nodes import Collector, Item
+    from _pytest.runner import CallInfo
 
 # A local-variable line from pytest._tb._format_locals: "name<padding> = value"
 # (name isn't truncated past 10 chars, so only the leading padding is
@@ -149,7 +157,7 @@ class BaseReport:
     outcome: Literal["passed", "failed", "skipped"]
 
     @property
-    def id(self):
+    def id(self) -> "NodeId":
         """The structured form of :attr:`nodeid` (pytest 9.2's NodeId)."""
         from _pytest.nodeid import coerce_node_id
 
@@ -161,7 +169,7 @@ class BaseReport:
     def _join_sections(self, prefix):
         return "".join(content for (header, content) in self.sections if header.startswith(prefix))
 
-    def get_sections(self, prefix):
+    def get_sections(self, prefix: str) -> "Iterator[tuple[str, str]]":
         """Yield ``(prefix, content)`` for each section whose name starts
         with ``prefix`` (upstream BaseReport.get_sections)."""
         for name, content in self.sections:
@@ -169,39 +177,39 @@ class BaseReport:
                 yield prefix, content
 
     @property
-    def capstdout(self):
+    def capstdout(self) -> str:
         return self._join_sections("Captured stdout")
 
     @property
-    def capstderr(self):
+    def capstderr(self) -> str:
         return self._join_sections("Captured stderr")
 
     @property
-    def caplog(self):
+    def caplog(self) -> str:
         return self._join_sections("Captured log")
 
     @property
-    def passed(self):
+    def passed(self) -> bool:
         return getattr(self, "outcome", None) == "passed"
 
     @property
-    def failed(self):
+    def failed(self) -> bool:
         return getattr(self, "outcome", None) == "failed"
 
     @property
-    def skipped(self):
+    def skipped(self) -> bool:
         return getattr(self, "outcome", None) == "skipped"
 
     @property
-    def count_towards_summary(self):
+    def count_towards_summary(self) -> bool:
         return True
 
     @property
-    def fspath(self):
+    def fspath(self) -> str:
         return getattr(self, "nodeid", "").split("::")[0]
 
     @property
-    def head_line(self):
+    def head_line(self) -> str | None:
         """The FAILURES-section header for this report (upstream derives it
         from the location domain)."""
         location = getattr(self, "location", None)
@@ -210,7 +218,7 @@ class BaseReport:
         return getattr(self, "nodeid", "")
 
     @property
-    def longreprtext(self):
+    def longreprtext(self) -> str:
         """Return the full string representation of longrepr."""
         longrepr = getattr(self, "longrepr", None)
         if longrepr is None:
@@ -222,7 +230,7 @@ class BaseReport:
         except Exception:
             return "<unprintable longrepr>"
 
-    def toterminal(self, tw):
+    def toterminal(self, tw: "TerminalWriter") -> None:
         """Write longrepr to a TerminalWriter (upstream delegates to the
         repr object tree; the shim's longrepr is a formatted string).
         Upstream's first traceback entry opens with a blank line after the
@@ -253,6 +261,11 @@ class TestReport(BaseReport):
     # Prevent collection of an imported `TestReport` as a test class (it has a
     # custom __init__); mirrors _pytest.reports.TestReport.__test__.
     __test__ = False
+
+    if TYPE_CHECKING:
+
+        @classmethod
+        def from_item_and_call(cls, item: Item, call: CallInfo[None]) -> "TestReport": ...
 
     # Narrower than BaseReport's `when` (upstream types the phase this way, and
     # its own typing_checks.py asserts exactly this), plus the timing/keyword
@@ -322,8 +335,14 @@ class CollectReport(BaseReport):
     when = "collect"
 
     def __init__(
-        self, nodeid=None, outcome=None, longrepr=None, result=None, sections=(), **kwargs
-    ):
+        self,
+        nodeid: "str | NodeId | None" = None,
+        outcome: "Literal['passed', 'failed', 'skipped'] | None" = None,
+        longrepr: Any = None,
+        result: "list[Item | Collector] | None" = None,
+        sections: "Iterable[tuple[str, str]]" = (),
+        **kwargs: Any,
+    ) -> None:
         if nodeid is not None:
             kwargs["nodeid"] = nodeid
         if outcome is not None:

@@ -1,9 +1,9 @@
 import functools
 import inspect
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import pytest
 
@@ -69,9 +69,22 @@ class _Subscriptable:
         return cls
 
 
-class FixtureDef(_Subscriptable):
+class FixtureDef[FixtureValue](_Subscriptable):
     """Annotation/typing stand-in for _pytest.fixtures.FixtureDef. pytest-rs
     exposes its own ShimFixtureDef objects through request._fixturemanager."""
+
+    if TYPE_CHECKING:
+        # Typing-only: upstream's public surface, for annotations. Declared
+        # under TYPE_CHECKING so the stand-in's runtime attributes stay as
+        # they were.
+        @property
+        def scope(self) -> Literal["session", "package", "module", "class", "function"]: ...
+        def addfinalizer(self, finalizer: Callable[[], object]) -> None: ...
+        def finish(self, request: FixtureRequest) -> None: ...
+        def execute(self, request: FixtureRequest) -> FixtureValue: ...
+        def cache_key(self, request: FixtureRequest) -> object: ...
+        @property
+        def has_location(self) -> bool: ...
 
 
 class FixtureManager(_Subscriptable):

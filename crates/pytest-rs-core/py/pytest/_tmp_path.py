@@ -1,6 +1,8 @@
 """tmp_path / tmp_path_factory builtin fixtures (upstream _pytest/tmpdir.py
 port: pytest-of-{user} numbered basetemps with lock-driven retention)."""
 
+from __future__ import annotations
+
 import atexit
 import contextlib
 import fnmatch
@@ -13,8 +15,12 @@ import shutil
 import stat
 import tempfile
 import time
+from typing import TYPE_CHECKING, Any, Literal
 
 from pytest._fixtures import fixture
+
+if TYPE_CHECKING:
+    from _pytest.config import Config
 
 _BASETEMP_PREFIX = "pytest-rs-basetemp-"
 # Pre-numbered-dir releases used unique mkdtemp basetemps; killed sessions
@@ -114,14 +120,14 @@ class TempPathFactory:
 
     def __init__(
         self,
-        given_basetemp,
-        retention_count,
-        retention_policy,
-        trace,
-        basetemp=None,
+        given_basetemp: pathlib.Path | None,
+        retention_count: int,
+        retention_policy: Literal["all", "failed", "none"],
+        trace: Any,
+        basetemp: pathlib.Path | None = None,
         *,
-        _ispytest=False,
-    ):
+        _ispytest: bool = False,
+    ) -> None:
         _check_ispytest(_ispytest)
         if given_basetemp is None:
             self._given_basetemp = None
@@ -135,13 +141,13 @@ class TempPathFactory:
         self._basetemp = basetemp
         # Lower-cased prefix -> next number to try, so numbered dirs don't
         # need basetemp listed on every call.
-        self._next_number = {}
+        self._next_number: dict[str, int] = {}
         # Numbered-dir pruning and lock removal run when the session
         # finishes (pytest 9.2); atexit closes it only as a last resort.
         self._exit_stack = contextlib.ExitStack()
 
     @classmethod
-    def from_config(cls, config, *, _ispytest=False):
+    def from_config(cls, config: Config, *, _ispytest: bool = False) -> TempPathFactory:
         """Create a factory according to pytest configuration."""
         _check_ispytest(_ispytest)
         count = int(config.getini("tmp_path_retention_count"))
@@ -169,7 +175,7 @@ class TempPathFactory:
             raise ValueError(f"{basename} is not a normalized and relative path")
         return basename
 
-    def mktemp(self, basename, numbered=True):
+    def mktemp(self, basename: str, numbered: bool = True) -> pathlib.Path:
         """Create a new temporary directory managed by the factory."""
         basename = self._ensure_relative_to_basetemp(str(basename))
         if not numbered:
@@ -217,7 +223,7 @@ class TempPathFactory:
         _tmpdir._force_symlink(root, prefix + "current", path)
         return path
 
-    def getbasetemp(self):
+    def getbasetemp(self) -> pathlib.Path:
         """Return the base temporary directory, creating it if needed."""
         from _pytest.compat import get_user_id
         from _pytest.pathlib import make_numbered_dir_with_cleanup, rm_rf
@@ -558,13 +564,13 @@ def tmpdir(tmp_path):
 class TempdirFactory:
     """Backward-compat wrapper around TempPathFactory (py.path.local)."""
 
-    def __init__(self, tmp_path_factory):
+    def __init__(self, tmp_path_factory: TempPathFactory, *, _ispytest: bool = False) -> None:
         self._tmp_path_factory = tmp_path_factory
 
-    def mktemp(self, basename, numbered=True):
+    def mktemp(self, basename: str, numbered: bool = True) -> LocalPath:
         return LocalPath(self._tmp_path_factory.mktemp(basename, numbered=numbered))
 
-    def getbasetemp(self):
+    def getbasetemp(self) -> LocalPath:
         return LocalPath(self._tmp_path_factory.getbasetemp())
 
 

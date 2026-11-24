@@ -22,7 +22,7 @@ from _pytest.outcomes import fail
 from _pytest.scope import Scope as ScopeEnum
 
 from pytest._idmaker import IdMaker
-from pytest._marks import HIDDEN_PARAM, ParamSpec
+from pytest._marks import HIDDEN_PARAM, Mark, ParamSpec
 from pytest._marks import mark as _mark
 from pytest._node import Collector
 
@@ -235,12 +235,12 @@ class Metafunc:
     def parametrize(
         self,
         argnames: str | Sequence[str],
-        argvalues: Iterable[Any],
+        argvalues: Iterable[ParamSpec | Sequence[object] | object],
         *,
         indirect: bool | Sequence[str] = False,
         ids: Iterable[object | None] | Callable[[Any], object | None] | None = None,
         scope: _ScopeName | None = None,
-        _param_mark: Any = None,
+        _param_mark: Mark | None = None,
     ) -> None:
         if ids is not None and not callable(ids):
             try:
@@ -383,7 +383,8 @@ class Metafunc:
         result: list[str] = []
         for i, ps in enumerate(parametersets):
             if ps.id is not None:
-                result.append(ps.id)
+                # A HIDDEN_PARAM id is resolved by IdMaker before this simple path.
+                result.append(ps.id)  # type: ignore[arg-type]
             elif ids is not None and not callable(ids) and isinstance(ids, (list, tuple)):
                 id_list = list(ids)
                 if i < len(id_list) and id_list[i] is not None:

@@ -155,7 +155,13 @@ def run_makereport(report: Any, node: Any, when: str, exc: Any = None) -> Any:
 
     excinfo = None if exc is None else ExceptionInfo.from_exception(exc)
     duration = getattr(report, "duration", 0) or 0
-    call = CallInfo(None, excinfo, duration=duration, when=when, _ispytest=True)
+    call: CallInfo[None] = CallInfo(
+        None,
+        excinfo,
+        duration=duration,
+        when=when,  # type: ignore[arg-type]
+        _ispytest=True,
+    )
     _makereport_result = report
     try:
         result = pluginmanager.hook.pytest_runtest_makereport(item=node, call=call)

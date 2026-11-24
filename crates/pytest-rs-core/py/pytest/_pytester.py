@@ -1,6 +1,8 @@
 """pytester: run pytest-rs as a child process so upstream test suites can
 exercise the runner itself."""
 
+from __future__ import annotations
+
 import configparser
 import fnmatch
 import importlib.util
@@ -22,9 +24,17 @@ import textwrap
 import threading
 import time
 import warnings
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, TextIO
 
 from pytest._fixtures import fixture
 from pytest._outcomes import fail, importorskip, skip
+
+if TYPE_CHECKING:
+    from _pytest.pytester import HookRecorder
+
+    from pytest import Collector, Config, ExitCode, Item, MonkeyPatch, PytestPluginManager
+    from pytest._tmp_path import LocalPath
 
 # Split-out modules; re-exported so pytest._pytester.<name> keeps resolving
 # for pytest/__init__.py and Pytester's internal references.
@@ -111,7 +121,9 @@ _DURATION_RE = re.compile(r"\d+\.\d\ds")
 
 
 class RunResult:
-    def __init__(self, ret, outlines, errlines, duration):
+    def __init__(
+        self, ret: int | ExitCode, outlines: list[str], errlines: list[str], duration: float
+    ) -> None:
         self.ret = ret
         self.outlines = outlines
         self.errlines = errlines
@@ -119,13 +131,13 @@ class RunResult:
         self.stdout = LineMatcher(outlines)
         self.stderr = LineMatcher(errlines)
 
-    def __enter__(self):
+    def __enter__(self) -> RunResult:
         return self
 
-    def __exit__(self, *_args):
+    def __exit__(self, *_args: Any) -> None:
         pass
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         from pytest import ExitCode
 
         try:
@@ -138,7 +150,7 @@ class RunResult:
         )
 
     @classmethod
-    def parse_summary_nouns(cls, lines):
+    def parse_summary_nouns(cls, lines: Any) -> dict[str, int]:
         """Parse the summary line, normalising to the plural noun pytest
         reports regardless of count (#6505): 1 error -> {"errors": 1}."""
         plural = {"error": "errors", "warning": "warnings"}
@@ -157,20 +169,20 @@ class RunResult:
             "`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`."
         )
 
-    def parseoutcomes(self):
+    def parseoutcomes(self) -> dict[str, int]:
         return self.parse_summary_nouns(self.outlines)
 
     def assert_outcomes(
         self,
-        passed=0,
-        skipped=0,
-        failed=0,
-        errors=0,
-        xpassed=0,
-        xfailed=0,
-        warnings=None,
-        deselected=None,
-    ):
+        passed: int = 0,
+        skipped: int = 0,
+        failed: int = 0,
+        errors: int = 0,
+        xpassed: int = 0,
+        xfailed: int = 0,
+        warnings: int | None = None,
+        deselected: int | None = None,
+    ) -> None:
         __tracebackhide__ = True
         actual = self.parseoutcomes()
         expected = {
@@ -571,12 +583,12 @@ class Pytester:
     # a distinct, valid value (leave stdin inherited) per upstream.
     CLOSE_STDIN = object()
 
-    def __init__(self, path, request_name, request=None):
+    def __init__(self, path: Any, request_name: str, request: Any = None) -> None:
         self.path = pathlib.Path(path)
         self._name = request_name
         self._request = request
-        self._syspaths = []
-        self.plugins = []
+        self._syspaths: list[str] = []
+        self.plugins: list[Any] = []
         # Capture the runner path now (fixture setup, before a test body can
         # mock.patch.dict(os.environ, clear=True) around runpytest). The
         # module-level import runs too early — pytest imports this before the
@@ -619,38 +631,46 @@ class Pytester:
         # pytest returns the first file's path even for multiple files.
         return paths[0]
 
-    def makepyfile(self, *args, **kwargs):
+    def makepyfile(
+        self,
+        *args: tuple[str | bytes, ...] | list[str | bytes] | str | bytes,
+        **kwargs: tuple[str | bytes, ...] | list[str | bytes] | str | bytes,
+    ) -> pathlib.Path:
         return self._makefile(".py", args, kwargs)
 
-    def makeconftest(self, source):
+    def makeconftest(self, source: str) -> pathlib.Path:
         return self._makefile(".py", [], {"conftest": source})
 
-    def maketxtfile(self, *args, **kwargs):
+    def maketxtfile(
+        self,
+        *args: tuple[str | bytes, ...] | list[str | bytes] | str | bytes,
+        **kwargs: tuple[str | bytes, ...] | list[str | bytes] | str | bytes,
+    ) -> pathlib.Path:
         return self._makefile(".txt", args, kwargs)
 
-    def makeini(self, source):
+    def makeini(self, source: str) -> pathlib.Path:
         return self._makefile(".ini", [], {"tox": source})
 
-    def makepyprojecttoml(self, source):
+    def makepyprojecttoml(self, source: str) -> pathlib.Path:
         return self._makefile(".toml", [], {"pyproject": source})
 
-    def maketoml(self, source):
+    def maketoml(self, source: str) -> pathlib.Path:
         """Write a pytest.toml file."""
         return self._makefile(".toml", [], {"pytest": source})
 
-    def makefile(self, ext, *args, **kwargs):
+    def makefile(self, ext: str, *args: str, **kwargs: str) -> pathlib.Path:
         if ext and not ext.startswith("."):
             raise ValueError(
                 f"pytester.makefile expects a file extension, try .{ext} instead of {ext}"
             )
         return self._makefile(ext, args, kwargs)
 
-    def mkdir(self, name):
+    def mkdir(self, name: str | os.PathLike[str]) -> pathlib.Path:
         path = self.path / name
         path.mkdir()
         return path
 
-    def syspathinsert(self, path=None):
+    def syspathinsert(self, path: str | os.PathLike[str] | None = None) -> None:
         entry = str(path if path is not None else self.path)
         # The current process (tests import what they just wrote) and the
         # child runner via PYTHONPATH (runs are subprocesses).
@@ -658,8 +678,13 @@ class Pytester:
         self._syspaths.insert(0, entry)
 
     def runpytest(
-        self, *args, timeout=None, syspathinsert=False, no_reraise_ctrlc=False, plugins=()
-    ):
+        self,
+        *args: str | os.PathLike[str],
+        timeout: float | None = None,
+        syspathinsert: bool = False,
+        no_reraise_ctrlc: bool = False,
+        plugins: Any = (),
+    ) -> RunResult:
         # syspathinsert=True: insert self.path into sys.path so the child can
         # import test-local plugins written to self.path.
         if syspathinsert:
@@ -818,7 +843,9 @@ class Pytester:
             if logger.isEnabledFor(record.levelno):
                 logger.handle(record)
 
-    def runpytest_subprocess(self, *args, timeout=None):
+    def runpytest_subprocess(
+        self, *args: str | os.PathLike[str], timeout: float | None = None
+    ) -> RunResult:
         # Upstream subprocess runs do NOT inherit the outer warning filters.
         __tracebackhide__ = True
         for plugin in self.plugins:
@@ -869,7 +896,9 @@ class Pytester:
             else:
                 os.environ["PYTEST_RS_PROG"] = prog_before
 
-    def runpytest_inprocess(self, *args, timeout=None, plugins=()):
+    def runpytest_inprocess(
+        self, *args: str | os.PathLike[str], timeout: float | None = None, plugins: Any = ()
+    ) -> RunResult:
         """Run pytest in-process (shares sys state with the outer test)."""
         reprec = self._inline_run_inprocess(*args, plugins=plugins)
         result = getattr(reprec, "_result", None)
@@ -878,12 +907,12 @@ class Pytester:
             return result
         return reprec
 
-    def make_hook_recorder(self, pluginmanager):
+    def make_hook_recorder(self, pluginmanager: PytestPluginManager) -> HookRecorder:
         """Attach a HookRecorder to ``pluginmanager`` and finish recording at
         the end of the test (upstream API)."""
         from _pytest.pytester import HookRecorder
 
-        pluginmanager.reprec = reprec = HookRecorder(pluginmanager, _ispytest=True)
+        pluginmanager.reprec = reprec = HookRecorder(pluginmanager, _ispytest=True)  # type: ignore[attr-defined]
         if self._request is not None:
             self._request.addfinalizer(reprec.finish_recording)
         return reprec
@@ -921,8 +950,13 @@ class Pytester:
         return (sys.executable, "-mpytest")
 
     def popen(
-        self, cmdargs, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=CLOSE_STDIN, **kw
-    ):
+        self,
+        cmdargs: Sequence[str | os.PathLike[str]],
+        stdout: int | TextIO = subprocess.PIPE,
+        stderr: int | TextIO = subprocess.PIPE,
+        stdin: Any = CLOSE_STDIN,
+        **kw: Any,
+    ) -> subprocess.Popen[bytes]:
         """Spawn a subprocess. ``stdin`` may be CLOSE_STDIN (close the pipe),
         bytes (written then left open for communicate()), or any value passed
         straight to Popen (e.g. PIPE, None)."""
@@ -941,18 +975,23 @@ class Pytester:
             popen.stdin.write(stdin)
         return popen
 
-    def run(self, *cmdargs, timeout=None, stdin=CLOSE_STDIN):
+    def run(
+        self,
+        *cmdargs: str | os.PathLike[str],
+        timeout: float | None = None,
+        stdin: Any = CLOSE_STDIN,
+    ) -> RunResult:
         """Run a command, capturing stdout/stderr to RunResult. Raises
         ``Pytester.TimeoutExpired`` (== subprocess.TimeoutExpired) on overrun."""
         __tracebackhide__ = True
-        cmdargs = [str(arg) for arg in cmdargs]
+        cmdargs = [str(arg) for arg in cmdargs]  # type: ignore[assignment]
         p1 = self.path / "stdout"
         p2 = self.path / "stderr"
         start = time.perf_counter()
         with open(p1, "w", encoding="utf8") as f1, open(p2, "w", encoding="utf8") as f2:
             popen = self.popen(cmdargs, stdout=f1, stderr=f2, stdin=stdin)
             if isinstance(stdin, bytes):
-                popen.stdin.close()
+                popen.stdin.close()  # type: ignore[union-attr]
             try:
                 ret = popen.wait(timeout)
             except subprocess.TimeoutExpired:
@@ -969,13 +1008,13 @@ class Pytester:
         err = p2.read_text(encoding="utf8").splitlines()
         return RunResult(ret, out, err, duration)
 
-    def chdir(self):
+    def chdir(self) -> None:
         """Cd into the pytester temporary directory. The pytester fixture
         already chdir's here at setup; this restores it after a test that
         wandered elsewhere (upstream API parity)."""
         os.chdir(self.path)
 
-    def parseconfig(self, *args):
+    def parseconfig(self, *args: str | os.PathLike[str]) -> Config:
         """Return an in-process pytest Config built from the given
         command-line args (rootdir discovery, ini reading, option parsing),
         without running a session — upstream's _prepareconfig."""
@@ -1008,7 +1047,7 @@ class Pytester:
                 # --help/--version prints output and exits; tolerate so
                 # callers can still inspect warnings fired before the early
                 # exit.
-                return None
+                return None  # type: ignore[return-value]
             config._mark_as_parsed()
             self._fire_addoption(config, new_args)
             from pytest._parser import parser as _shared_parser
@@ -1137,19 +1176,21 @@ class Pytester:
         except Exception:
             return None
 
-    def parseconfigure(self, *args):
+    def parseconfigure(self, *args: str | os.PathLike[str]) -> Config:
         """Like parseconfig, but also runs the pytest_configure step."""
         config = self.parseconfig(*args)
-        config._do_configure()
+        config._do_configure()  # type: ignore[attr-defined]
         if self._request is not None:
-            self._request.addfinalizer(config._ensure_unconfigure)
+            self._request.addfinalizer(config._ensure_unconfigure)  # type: ignore[attr-defined]
         return config
 
     def _hook_relay_path(self, prefix):
         n = sum(1 for p in self.path.glob(f".{prefix}-*"))
         return self.path / f".{prefix}-{n}"
 
-    def inline_run(self, *args, plugins=()):
+    def inline_run(
+        self, *args: str | os.PathLike[str], plugins: Any = (), no_reraise_ctrlc: bool = False
+    ) -> HookRecorder:
         # Two backends: a subprocess run parsed into a HookRecorder-shaped
         # result (the default, robust for the whole suite) and an in-process
         # nested run that captures live hook-call objects via a real
@@ -1218,11 +1259,11 @@ class Pytester:
             forwarded_filter_marks=forwarded_filter_marks,
         )
 
-    def inline_runsource(self, source, *args):
+    def inline_runsource(self, source: str, *args: Any) -> HookRecorder:
         path = self.makepyfile(source)
         return self.inline_run(*args, path)
 
-    def inline_genitems(self, *args):
+    def inline_genitems(self, *args: Any) -> tuple[list[Item], HookRecorder]:
         """Run collection-only mode and return (items, reprec).
 
         Items are lightweight objects with .nodeid, .name, and .parent attributes.
@@ -1259,7 +1300,7 @@ class Pytester:
             # than relay stubs. Fall back to relay items if it yields nothing.
             inproc, _ = self._genitems_from_dir(self.path, args)
             if inproc:
-                return inproc, reprec
+                return inproc, reprec  # type: ignore[return-value]
             items = []
             for event in hook_events:
                 if event.get("hook") == "pytest_collection_finish":
@@ -1268,7 +1309,7 @@ class Pytester:
                         for it in event.get("session_items", [])
                     ]
                     break
-            return items, reprec
+            return items, reprec  # type: ignore[return-value]
 
         collect_args = path_args
 
@@ -1391,7 +1432,7 @@ class Pytester:
                 # file matches a --doctest-glob pattern; empty/non-matching
                 # files yield nothing.
                 items.extend(_doctest_items(p))
-        return items, reprec
+        return items, reprec  # type: ignore[return-value]
 
     @staticmethod
     def _param_id(val):
@@ -2111,7 +2152,7 @@ class Pytester:
                     return dict(cp.items(section))
         return {}
 
-    def getitems(self, source):
+    def getitems(self, source: str | os.PathLike[str]) -> list[Item]:
         """Collect Function item nodes from the source in-process (a light
         collection: module import + test functions/Test-class methods with
         merged marks — enough for the mark-evaluation tests; no fixtures).
@@ -2122,24 +2163,26 @@ class Pytester:
         if isinstance(source, pathlib.Path):
             path = source if source.is_absolute() else (self.path / source)
         else:
-            path = pathlib.Path(str(self.makepyfile(source)))
+            path = pathlib.Path(str(self.makepyfile(source)))  # type: ignore[arg-type]
         return self._collect_items_from_path(path)
 
-    def getitem(self, source, funcname="test_func"):
+    def getitem(self, source: str | os.PathLike[str], funcname: str = "test_func") -> Item:
         """The single collected item named funcname (upstream getitem)."""
         for item in self.getitems(source):
             if item.name == funcname:
                 return item
         fail(f"{funcname!r} item not found in module:\n{source}")
 
-    def runitem(self, source, funcname="test_func"):
+    def runitem(self, source: str | os.PathLike[str], funcname: str = "test_func") -> Any:
         """Run the single item named funcname in-process and return its
         [setup, call, teardown] reports (upstream Pytester.runitem)."""
         from _pytest.runner import runtestprotocol
 
         return runtestprotocol(self.getitem(source, funcname), log=False)
 
-    def getmodulecol(self, source, *, configargs=(), withinit=False):
+    def getmodulecol(
+        self, source: str | os.PathLike[str], *, configargs: Any = (), withinit: bool = False
+    ) -> Any:
         """An in-process Module collector for the source. Supports .collect()
         (returns Class + Function children) and .module/.cls/.instance attrs."""
         from pytest._marks import get_unpacked_marks
@@ -2176,7 +2219,7 @@ class Pytester:
             try:
                 spec.loader.exec_module(mod)
             except BaseException as exc:  # noqa: BLE001 - re-surfaced on access
-                mod = None
+                mod = None  # type: ignore[assignment]
                 import_error = exc
         else:
             mod = None
@@ -2187,7 +2230,7 @@ class Pytester:
         # Identity cache for direct-parametrize pseudo FixtureDefs at module
         # scope (see _expand_params) — shared by every function/class built
         # below, mirroring upstream's per-Module `name2pseudofixturedef` stash.
-        _module_pseudofixturedefs = {}
+        _module_pseudofixturedefs = {}  # type: ignore[var-annotated]
         # A real Session backs modcol.session.perform_collect (test_modulecol_roundtrip).
         # Resolve collection args relative to the module's own directory, not the
         # outer invocation rootdir (the pytester file lives in a tmp dir).
@@ -2360,7 +2403,7 @@ class Pytester:
 
         return _IPModule()
 
-    def genitems(self, colitems):
+    def genitems(self, colitems: Sequence[Item | Collector]) -> list[Item]:
         """Recursively collect the Item nodes from the given collectors
         (upstream Pytester.genitems): walk each collector's .collect() until a
         Function (leaf Item) is reached."""
@@ -2383,39 +2426,39 @@ class Pytester:
             _rec(col)
         return items
 
-    def collect_by_name(self, modcol, name):
+    def collect_by_name(self, modcol: Collector, name: str) -> Item | Collector | None:
         """Return the first child of modcol whose .name == name, or None.
         Caches the result of modcol.collect() across calls (upstream behaviour)."""
         if not hasattr(self, "_mod_collections"):
-            self._mod_collections = {}
+            self._mod_collections = {}  # type: ignore[var-annotated]
         if modcol not in self._mod_collections:
-            self._mod_collections[modcol] = list(modcol.collect())
+            self._mod_collections[modcol] = list(modcol.collect())  # type: ignore[attr-defined]
         for colitem in self._mod_collections[modcol]:
             if colitem.name == name:
                 return colitem
         return None
 
-    def getnode(self, config, arg):
+    def getnode(self, config: Config, arg: str | os.PathLike[str]) -> Collector | Item:
         """Return the collector/item for `arg` under a fresh Session built from `config`."""
         from pytest._node import Session
 
         session = Session.from_config(config)
         p = pathlib.Path(os.path.abspath(str(arg)))
         results = session.perform_collect([str(p)], genitems=False)
-        return results[0] if results else None
+        return results[0] if results else None  # type: ignore[return-value]
 
-    def getpathnode(self, path):
+    def getpathnode(self, path: str | os.PathLike[str]) -> Collector | Item:
         """Return the collector/item for `path` (parses config from path)."""
         config = self.parseconfigure(path)
         return self.getnode(config, path)
 
-    def mkpydir(self, name):
+    def mkpydir(self, name: str | os.PathLike[str]) -> pathlib.Path:
         path = self.path / name
         path.mkdir(parents=True)
         (path / "__init__.py").touch()
         return path
 
-    def copy_example(self, name=None):
+    def copy_example(self, name: str | None = None) -> pathlib.Path:
         """Copy a file or directory from the suite's example_scripts tree
         into the pytester dir. The example dir is found by walking up from
         the requesting test's file (we don't see the suite's
@@ -2471,7 +2514,7 @@ class Pytester:
         env["PYTHONPATH"] = os.pathsep.join([shim_root, *([existing] if existing else [])])
         return env
 
-    def runpython(self, script):
+    def runpython(self, script: os.PathLike[str]) -> RunResult:
         start = time.perf_counter()
         proc = subprocess.run(
             [sys.executable, str(script)],
@@ -2489,7 +2532,7 @@ class Pytester:
             duration,
         )
 
-    def runpython_c(self, command):
+    def runpython_c(self, command: str) -> RunResult:
         start = time.perf_counter()
         proc = subprocess.run(
             [sys.executable, "-c", command],
@@ -2507,7 +2550,7 @@ class Pytester:
             duration,
         )
 
-    def spawn_pytest(self, string, expect_timeout=10.0):
+    def spawn_pytest(self, string: str, expect_timeout: float = 10.0) -> Any:
         basetemp = self.path / "temp-pexpect"
         basetemp.mkdir(mode=0o700, exist_ok=True)
         exe = os.environ.get("PYTEST_RS_EXE") or _RUNNER_EXE
@@ -2516,7 +2559,7 @@ class Pytester:
         cmd = f"{exe} --basetemp={basetemp} {string}"
         return self.spawn(cmd, expect_timeout=expect_timeout)
 
-    def spawn(self, cmd, expect_timeout=10.0):
+    def spawn(self, cmd: str, expect_timeout: float = 10.0) -> Any:
         pexpect = importorskip("pexpect", "3.0")
         if hasattr(sys, "pypy_version_info") and "64" in platform.machine():
             skip("pypy-64 bit not supported")
@@ -2546,11 +2589,11 @@ class Testdir(Pytester):
     py.path-like LocalPath objects instead of pathlib.Path."""
 
     @property
-    def monkeypatch(self):
-        return self._monkeypatch
+    def monkeypatch(self) -> MonkeyPatch:  # type: ignore[override]
+        return self._monkeypatch  # type: ignore[attr-defined]
 
     @property
-    def tmpdir(self):
+    def tmpdir(self) -> LocalPath:
         from pytest._tmp_path import LocalPath
 
         return LocalPath(self.path)
@@ -2563,7 +2606,7 @@ class Testdir(Pytester):
             return [LocalPath(path) for path in result]
         return LocalPath(result)
 
-    def mkdir(self, name):
+    def mkdir(self, name: str | os.PathLike[str]) -> Any:  # type: ignore[override]
         from pytest._tmp_path import LocalPath
 
         return LocalPath(super().mkdir(name))

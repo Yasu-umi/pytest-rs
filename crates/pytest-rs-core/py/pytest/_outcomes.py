@@ -1,7 +1,7 @@
 """Outcome exceptions and helpers (skip/fail/xfail/importorskip)."""
 
 import importlib
-from typing import ClassVar, NoReturn
+from typing import Any, ClassVar, NoReturn
 
 
 class OutcomeException(BaseException):
@@ -106,7 +106,13 @@ class _Exit:
 exit = _Exit()
 
 
-def importorskip(modname, minversion=None, reason=None, *, exc_type=None):
+def importorskip(
+    modname: str,
+    minversion: str | None = None,
+    reason: str | None = None,
+    *,
+    exc_type: type[ImportError] | None = None,
+) -> Any:
     __tracebackhide__ = True
     # Validate module name: real pytest raises SyntaxError for invalid names
     # (e.g. spaces or = signs that can never be module names).

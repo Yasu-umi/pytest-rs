@@ -1,6 +1,8 @@
 """pytest.warns / recwarn: warning capture and assertion (ported from
 _pytest/recwarn.py)."""
 
+from __future__ import annotations
+
 import re as _re
 import warnings as _warnings
 from pprint import pformat as _pformat
@@ -10,7 +12,8 @@ from pytest._fixtures import fixture
 from pytest._outcomes import Exit, fail
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterator
+    from types import TracebackType
     from typing import Self
 
 
@@ -18,25 +21,25 @@ class WarningsRecorder(_warnings.catch_warnings):
     """A context manager to record raised warnings (adapted from
     `warnings.catch_warnings`)."""
 
-    def __init__(self, *, _ispytest=False):
+    def __init__(self, *, _ispytest: bool = False) -> None:
         super().__init__(record=True)
         self._entered = False
-        self._list = []
+        self._list: list[_warnings.WarningMessage] = []
 
     @property
-    def list(self):
+    def list(self) -> list[_warnings.WarningMessage]:
         return self._list
 
-    def __getitem__(self, i):
+    def __getitem__(self, i: int) -> _warnings.WarningMessage:
         return self._list[i]
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[_warnings.WarningMessage]:
         return iter(self._list)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._list)
 
-    def pop(self, cls=Warning):
+    def pop(self, cls: type[Warning] = Warning) -> _warnings.WarningMessage:
         """Pop the first recorded warning which is an instance of ``cls``,
         but not an instance of a child class of any other match."""
         best_idx = None
@@ -52,19 +55,24 @@ class WarningsRecorder(_warnings.catch_warnings):
         __tracebackhide__ = True
         raise AssertionError(f"{cls!r} not found in warning list")
 
-    def clear(self):
+    def clear(self) -> None:
         self._list[:] = []
 
-    def __enter__(self) -> "Self":  # type: ignore[override]
+    def __enter__(self) -> Self:  # type: ignore[override]
         if self._entered:
             __tracebackhide__ = True
             raise RuntimeError(f"Cannot enter {self!r} twice")
         _list = super().__enter__()
-        self._list = _list
+        self._list = _list  # type: ignore[assignment]
         _warnings.simplefilter("always")
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         if not self._entered:
             __tracebackhide__ = True
             raise RuntimeError(f"Cannot exit {self!r} without entering first")
@@ -162,18 +170,18 @@ class WarningsChecker(WarningsRecorder):
 
 @overload
 def warns(
-    expected_warning: "type[Warning] | tuple[type[Warning], ...]" = ...,
+    expected_warning: type[Warning] | tuple[type[Warning], ...] = ...,
     *,
-    match: "str | _re.Pattern[str] | None" = ...,
+    match: str | _re.Pattern[str] | None = ...,
 ) -> WarningsChecker: ...
 
 
 @overload
 def warns[T, **P](
-    expected_warning: "type[Warning] | tuple[type[Warning], ...]",
-    func: "Callable[P, T]",
-    *args: "P.args",
-    **kwargs: "P.kwargs",
+    expected_warning: type[Warning] | tuple[type[Warning], ...],
+    func: Callable[P, T],
+    *args: P.args,
+    **kwargs: P.kwargs,
 ) -> T: ...
 
 
@@ -196,11 +204,11 @@ def warns(expected_warning=Warning, *args, **kwargs):
 
 
 @overload
-def deprecated_call(*, match: "str | _re.Pattern[str] | None" = ...) -> WarningsRecorder: ...
+def deprecated_call(*, match: str | _re.Pattern[str] | None = ...) -> WarningsRecorder: ...
 
 
 @overload
-def deprecated_call[T, **P](func: "Callable[P, T]", *args: "P.args", **kwargs: "P.kwargs") -> T: ...
+def deprecated_call[T, **P](func: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T: ...
 
 
 def deprecated_call(func=None, *args, **kwargs):

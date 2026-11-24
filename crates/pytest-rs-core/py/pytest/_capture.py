@@ -18,14 +18,15 @@ import io
 import os
 import sys
 import tempfile
-from typing import NamedTuple
+from collections.abc import Generator
+from typing import Any, AnyStr, Generic, NamedTuple
 
 from pytest._fixtures import fixture
 
 
-class CaptureResult(NamedTuple):
-    out: str
-    err: str
+class CaptureResult(NamedTuple, Generic[AnyStr]):  # noqa: UP046
+    out: AnyStr
+    err: AnyStr
 
 
 class EncodedFile(io.TextIOWrapper):
@@ -990,13 +991,13 @@ def reinit_post_fork():
 class CaptureFixture[AnyStr: (str, bytes)]:
     """The capsys/capfd/capsysbinary/capfdbinary backing object."""
 
-    def __init__(self, captureclass, name, *, tee=False):
+    def __init__(self, captureclass: type[CaptureBase], name: str, *, tee: bool = False) -> None:
         self.captureclass = captureclass
         self._name = name
         self._tee = tee
         self._capture = None
-        self._captured_out = captureclass.EMPTY_BUFFER
-        self._captured_err = captureclass.EMPTY_BUFFER
+        self._captured_out: Any = captureclass.EMPTY_BUFFER
+        self._captured_err: Any = captureclass.EMPTY_BUFFER
 
     def _start(self):
         if state.fixture is not None:
@@ -1037,7 +1038,7 @@ class CaptureFixture[AnyStr: (str, bytes)]:
         if self._capture is not None:
             self._capture.resume_capturing()
 
-    def readouterr(self):
+    def readouterr(self) -> CaptureResult[AnyStr]:
         """The captured output so far, resetting the buffers."""
         captured_out, captured_err = self._captured_out, self._captured_err
         if self._capture is not None:
@@ -1049,7 +1050,7 @@ class CaptureFixture[AnyStr: (str, bytes)]:
         return CaptureResult(captured_out, captured_err)
 
     @contextlib.contextmanager
-    def disabled(self):
+    def disabled(self) -> Generator[None]:
         # Suspends every capture layer: output reaches the real terminal.
         with state.globally_disabled():
             yield
