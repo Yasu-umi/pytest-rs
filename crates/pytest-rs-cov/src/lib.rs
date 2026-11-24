@@ -737,6 +737,27 @@ impl CovPlugin {
         }
         let kwargs = core_pyo3::types::PyDict::new(py);
         kwargs.set_item("data_file", data_path.to_string_lossy().as_ref())?;
+        // Like pytest-cov: the `--cov` sources (the XML report's <sources>
+        // and the base of its file names come from them) and --cov-config.
+        if !self.sources.is_empty() {
+            let sources: Vec<String> = self
+                .sources
+                .iter()
+                .map(|source| {
+                    source
+                        .to_string_lossy()
+                        .trim_end_matches(std::path::MAIN_SEPARATOR)
+                        .to_string()
+                })
+                .collect();
+            kwargs.set_item("source", sources)?;
+        }
+        if let Some(config) = ctx.config.get_value("cov-config") {
+            kwargs.set_item(
+                "config_file",
+                ctx.config.rootdir.join(config).to_string_lossy().as_ref(),
+            )?;
+        }
         let cov = coverage_mod.getattr("Coverage")?.call((), Some(&kwargs))?;
         cov.call_method0("load")?;
         let rootdir = &ctx.config.rootdir;
@@ -768,6 +789,18 @@ impl CovPlugin {
                     Some(dir) => format!("Coverage annotated source written to dir {dir}"),
                     None => "Coverage annotated source written next to source".to_string(),
                 }
+            }
+            ReportKind::Xml | ReportKind::Lcov => {
+                let (default, configured, method, label) = if kind == ReportKind::Xml {
+                    ("coverage.xml", &self.xml_output, "xml_report", "XML")
+                } else {
+                    ("coverage.lcov", &self.lcov_output, "lcov_report", "LCOV")
+                };
+                let file = dest.or(configured.as_deref()).unwrap_or(default);
+                let kwargs = core_pyo3::types::PyDict::new(py);
+                kwargs.set_item("outfile", rootdir.join(file).to_string_lossy().as_ref())?;
+                cov.call_method(method, (), Some(&kwargs))?;
+                format!("Coverage {label} written to file {file}")
             }
             ReportKind::Json => {
                 let file = dest
@@ -2001,6 +2034,16 @@ impl Plugin for CovPlugin {
 
         let mut messages = Vec::new();
         for spec in &self.reports {
+            // With the coverage package (and so a data file), XML and LCOV
+            // come from coverage.py itself, like pytest-cov's; the native
+            // renderers are the fallback without it.
+            if matches!(spec.kind, ReportKind::Xml | ReportKind::Lcov)
+                && let Some(message) =
+                    self.coverage_package_report(ctx, spec.kind, spec.dest.as_deref())?
+            {
+                messages.push(message);
+                continue;
+            }
             let (default_dest, content, label) = match spec.kind {
                 ReportKind::Xml => (
                     "coverage.xml",
