@@ -78,14 +78,25 @@ class TestCovConfigKeys(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(textwrap.dedent(content).lstrip("\n"))
 
-    def output(self, *args: str, cov: str = "--cov=.") -> str:
+    def output(
+        self, *args: str, cov: str = "--cov=.", env: dict[str, str | None] | None = None
+    ) -> str:
         result = subprocess.run(
             # The path first: a bare `--cov` would take it as its value.
             [str(BINARY), "-p", "no:cacheprovider", "tests", cov, *args],
             cwd=self.base,
             capture_output=True,
             text=True,
-            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1", **self.VENV},
+            env={
+                key: value
+                for key, value in {
+                    **os.environ,
+                    "PYTHONDONTWRITEBYTECODE": "1",
+                    **self.VENV,
+                    **(env or {}),
+                }.items()
+                if value is not None
+            },
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result.stdout
@@ -321,6 +332,61 @@ class TestCovConfigKeys(unittest.TestCase):
         self.pyproject("[tool.coverage.run]\nbranch = true\n")
         out = self.output("--cov-report=term-missing", cov="--cov=app")
         self.assertEqual(self.branch_row(out)[3:], (2, "4->3, 11"))
+
+    def branchy_project(self) -> None:
+        self.write("app/core.py", self.BRANCHY)
+        self.write(
+            "tests/test_app.py",
+            """
+            from app.core import only_true, tail
+
+
+            def test_it():
+                only_true([1, 2])
+                tail(0)
+            """,
+        )
+        self.pyproject("[tool.coverage.run]\nbranch = true\n")
+
+    @unittest.skipUnless(importlib.util.find_spec("coverage"), "rendered by coverage")
+    def test_xml_and_lcov_from_coverage(self) -> None:
+        """With the coverage package, XML and LCOV are coverage.py's own (#106,
+        #108): sources and file names relative to the `--cov` source, branch
+        data, function records."""
+        self.branchy_project()
+        self.output("--cov-report=xml", "--cov-report=lcov", cov="--cov=app")
+        xml = (self.base / "coverage.xml").read_text()
+        self.assertIn(f"<source>{self.base / 'app'}</source>", xml)
+        self.assertIn('filename="core.py"', xml)
+        self.assertIn('branch="true" condition-coverage="50% (1/2)"', xml)
+        lcov = (self.base / "coverage.lcov").read_text()
+        self.assertIn("FN:", lcov)
+        self.assertIn("BRDA:10,0,return from function 'tail',1\nBRF:6\nBRH:4", lcov)
+
+    def test_native_xml_and_lcov_without_coverage(self) -> None:
+        """Without the coverage package, the native reports carry branch data."""
+        self.branchy_project()
+        hide = self.base / "no-coverage"
+        (hide / "coverage").mkdir(parents=True)
+        (hide / "coverage" / "__init__.py").write_text("raise ImportError('hidden')\n")
+        self.output(
+            "--cov-report=xml",
+            "--cov-report=lcov",
+            cov="--cov=app",
+            # Outside the virtualenv, and with an import of coverage that fails.
+            env={"PYTHONPATH": str(hide), "VIRTUAL_ENV": None},
+        )
+        xml = (self.base / "coverage.xml").read_text()
+        self.assertIn('branches-covered="4" branches-valid="6"', xml)
+        self.assertIn(
+            '<line number="4" hits="1" branch="true" condition-coverage="50% (1/2)" '
+            'missing-branches="3"/>',
+            xml,
+        )
+        lcov = (self.base / "coverage.lcov").read_text()
+        self.assertIn("BRDA:4,0,line 3,0\nBRDA:4,0,line 5,1\n", lcov)
+        self.assertIn("BRDA:10,0,line 11,0\nBRDA:10,0,exit,1\n", lcov)
+        self.assertIn("BRF:6\nBRH:4\n", lcov)
 
     @unittest.skipUnless(importlib.util.find_spec("coverage"), "writes need coverage")
     def test_branch_arcs_in_the_data_file(self) -> None:

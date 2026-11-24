@@ -443,48 +443,130 @@ fn xml_escape(value: &str) -> String {
         .replace('\'', "&apos;")
 }
 
-/// Minimal Cobertura XML (line coverage only; branch coverage deferred).
-pub fn render_xml(data: &CoverageData, rootdir: &str) -> String {
-    let valid = data.total_stmts();
-    let covered = valid - data.total_miss();
-    let line_rate = if valid == 0 {
-        1.0
+/// coverage.py's `rate`: "1" for nothing to cover or everything covered,
+/// "0" for nothing covered, otherwise four significant digits that never
+/// round to 0 or 1.
+fn rate(hit: usize, num: usize) -> String {
+    if num == 0 || hit == num {
+        "1".to_string()
+    } else if hit == 0 {
+        "0".to_string()
     } else {
-        covered as f64 / valid as f64
+        // Python's `f"{frac:.4g}"` for 0.0001 <= frac < 1: four significant
+        // digits, trailing zeros dropped.
+        let frac = (hit as f64 / num as f64).clamp(0.0001, 0.9999);
+        let exponent = frac.log10().floor() as i32;
+        let decimals = (3 - exponent).max(0) as usize;
+        let text = format!("{frac:.decimals$}");
+        text.trim_end_matches('0').trim_end_matches('.').to_string()
+    }
+}
+
+impl FileRow {
+    /// Branch line -> (destinations, taken), coverage.py's `branch_stats`.
+    fn branch_stats(&self) -> BTreeMap<u32, (usize, usize)> {
+        self.branches
+            .iter()
+            .map(|(line, dests)| {
+                let taken = if self.covered.contains(line) {
+                    self.taken_at(*line)
+                } else {
+                    0
+                };
+                (*line, (dests.len(), taken))
+            })
+            .collect()
+    }
+
+    /// The destinations of a branch line not taken ("exit" for leaving).
+    fn missing_dests(&self, line: u32) -> Vec<String> {
+        let taken = self.taken.get(&line);
+        self.branches
+            .get(&line)
+            .into_iter()
+            .flatten()
+            .filter(|dest| !taken.is_some_and(|t| t.contains(dest)))
+            .map(|dest| {
+                if *dest == EXIT {
+                    "exit".to_string()
+                } else {
+                    dest.to_string()
+                }
+            })
+            .collect()
+    }
+}
+
+/// Cobertura XML, for when the coverage package is not installed (it
+/// renders the report itself otherwise). One package, file names relative
+/// to the rootdir.
+pub fn render_xml(data: &CoverageData, rootdir: &str) -> String {
+    let rows: Vec<&FileRow> = data
+        .rows
+        .iter()
+        .filter(|row| !(data.skip_empty && row.stmts() == 0))
+        .collect();
+    let valid: usize = rows.iter().map(|row| row.stmts()).sum();
+    let covered: usize = rows.iter().map(|row| row.stmts() - row.miss()).sum();
+    let (br_valid, br_covered) = if data.branch {
+        rows.iter()
+            .flat_map(|row| row.branch_stats().into_values())
+            .fold((0, 0), |(v, c), (total, taken)| (v + total, c + taken))
+    } else {
+        (0, 0)
+    };
+    let branch_rate = |hit, num| {
+        if data.branch {
+            rate(hit, num)
+        } else {
+            "0".to_string()
+        }
     };
     let mut out = String::new();
     out.push_str("<?xml version=\"1.0\" ?>\n");
     out.push_str(&format!(
         "<coverage version=\"pytest-rs-cov {}\" lines-valid=\"{valid}\" lines-covered=\"{covered}\" \
-         line-rate=\"{line_rate:.4}\" branches-covered=\"0\" branches-valid=\"0\" \
-         branch-rate=\"0\" complexity=\"0\">\n",
+         line-rate=\"{}\" branches-covered=\"{br_covered}\" branches-valid=\"{br_valid}\" \
+         branch-rate=\"{}\" complexity=\"0\">\n",
         env!("CARGO_PKG_VERSION"),
+        rate(covered, valid),
+        branch_rate(br_covered, br_valid),
     ));
     out.push_str(&format!(
         "\t<sources>\n\t\t<source>{}</source>\n\t</sources>\n",
         xml_escape(rootdir)
     ));
-    out.push_str("\t<packages>\n\t\t<package name=\".\">\n\t\t\t<classes>\n");
-    for row in data
-        .rows
-        .iter()
-        .filter(|row| !(data.skip_empty && row.stmts() == 0))
-    {
-        let rate = if row.stmts() == 0 {
-            1.0
-        } else {
-            (row.stmts() - row.miss()) as f64 / row.stmts() as f64
-        };
+    out.push_str(&format!(
+        "\t<packages>\n\t\t<package name=\".\" line-rate=\"{}\" branch-rate=\"{}\" complexity=\"0\">\n\t\t\t<classes>\n",
+        rate(covered, valid),
+        branch_rate(br_covered, br_valid),
+    ));
+    for row in rows {
+        let stats = row.branch_stats();
+        let (total, taken) = stats.values().fold((0, 0), |(v, c), (t, k)| (v + t, c + k));
         out.push_str(&format!(
-            "\t\t\t\t<class name=\"{0}\" filename=\"{0}\" line-rate=\"{rate:.4}\">\n\
+            "\t\t\t\t<class name=\"{0}\" filename=\"{0}\" complexity=\"0\" line-rate=\"{1}\" branch-rate=\"{2}\">\n\
              \t\t\t\t\t<methods/>\n\t\t\t\t\t<lines>\n",
             xml_escape(&row.name),
+            rate(row.stmts() - row.miss(), row.stmts()),
+            branch_rate(taken, total),
         ));
         for line in &row.executable {
             let hits = u32::from(row.covered.contains(line));
-            out.push_str(&format!(
-                "\t\t\t\t\t\t<line number=\"{line}\" hits=\"{hits}\"/>\n"
-            ));
+            let mut attrs = format!("number=\"{line}\" hits=\"{hits}\"");
+            if data.branch
+                && let Some((total, taken)) = stats.get(line)
+            {
+                attrs.push_str(&format!(
+                    " branch=\"true\" condition-coverage=\"{}% ({taken}/{total})\"",
+                    100 * taken / total
+                ));
+                let missing = row.missing_dests(*line);
+                if !missing.is_empty() {
+                    attrs.push_str(&format!(" missing-branches=\"{}\"", missing.join(",")));
+                }
+            }
+            out.push_str(&format!("\t\t\t\t\t\t<line {attrs}/>\n"));
         }
         out.push_str("\t\t\t\t\t</lines>\n\t\t\t\t</class>\n");
     }
@@ -492,7 +574,10 @@ pub fn render_xml(data: &CoverageData, rootdir: &str) -> String {
     out
 }
 
-/// lcov tracefile format.
+/// lcov tracefile, for when the coverage package is not installed. Branch
+/// records name a destination by its line ("exit" for leaving the code
+/// object); coverage.py's own report describes them in words and adds
+/// function records.
 pub fn render_lcov(data: &CoverageData) -> String {
     let mut out = String::new();
     for row in data
@@ -500,15 +585,60 @@ pub fn render_lcov(data: &CoverageData) -> String {
         .iter()
         .filter(|row| !(data.skip_empty && row.stmts() == 0))
     {
-        out.push_str("TN:\n");
         out.push_str(&format!("SF:{}\n", row.name));
         for line in &row.executable {
             let hits = u32::from(row.covered.contains(line));
             out.push_str(&format!("DA:{line},{hits}\n"));
         }
-        out.push_str(&format!("LF:{}\n", row.stmts()));
-        out.push_str(&format!("LH:{}\n", row.stmts() - row.miss()));
+        if row.stmts() > 0 {
+            out.push_str(&format!("LF:{}\n", row.stmts()));
+            out.push_str(&format!("LH:{}\n", row.stmts() - row.miss()));
+        }
+        if data.branch {
+            let stats = row.branch_stats();
+            for (line, (_, taken)) in &stats {
+                let mut dests: Vec<i64> = row.branches[line].clone();
+                // Exits after the other destinations, like coverage.py.
+                dests.sort_by_key(|dest| (*dest < 0, *dest));
+                for dest in dests {
+                    let name = if dest == EXIT {
+                        "exit".to_string()
+                    } else {
+                        format!("line {dest}")
+                    };
+                    let hit = if *taken == 0 {
+                        "-"
+                    } else if row.taken.get(line).is_some_and(|t| t.contains(&dest)) {
+                        "1"
+                    } else {
+                        "0"
+                    };
+                    out.push_str(&format!("BRDA:{line},0,{name},{hit}\n"));
+                }
+            }
+            let (brf, brh) = stats.values().fold((0, 0), |(v, c), (t, k)| (v + t, c + k));
+            if brf > 0 {
+                out.push_str(&format!("BRF:{brf}\nBRH:{brh}\n"));
+            }
+        }
         out.push_str("end_of_record\n");
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::rate;
+
+    #[test]
+    fn rate_matches_coverage_py() {
+        assert_eq!(rate(0, 0), "1");
+        assert_eq!(rate(3, 3), "1");
+        assert_eq!(rate(0, 3), "0");
+        assert_eq!(rate(1, 3), "0.3333");
+        assert_eq!(rate(1, 2), "0.5");
+        assert_eq!(rate(1, 30), "0.03333");
+        assert_eq!(rate(1, 100000), "0.0001");
+        assert_eq!(rate(99999, 100000), "0.9999");
+    }
 }
