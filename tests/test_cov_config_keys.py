@@ -437,6 +437,30 @@ class TestCovConfigKeys(unittest.TestCase):
         self.assertNotIn("Failed to generate report", out)
         self.assertIn("app/core.py", out)
 
+    def test_code_run_under_a_non_python_name_is_skipped(self) -> None:
+        # A template engine compiles a template with its own path as the
+        # code's file name; coverage.py skips such a file when it does not
+        # parse instead of failing the report.
+        self.write("app/hello.html", "Hello {{ name }}!\n")
+        self.write(
+            "tests/test_app.py",
+            """
+            from pathlib import Path
+
+            import app
+
+
+            def test_render():
+                name = str(Path(app.__file__).with_name("hello.html"))
+                exec(compile("x = 1", name, "exec"), {})
+            """,
+        )
+        self.pyproject("")
+        out = self.output()
+        self.assertNotIn("Failed to generate report", out)
+        self.assertNotIn("hello.html", out)
+        self.assertIn("app/core.py", out)
+
 
 if __name__ == "__main__":
     unittest.main()

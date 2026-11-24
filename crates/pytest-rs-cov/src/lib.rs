@@ -1124,6 +1124,13 @@ impl CovPlugin {
         files
     }
 
+    /// coverage.py's `PythonFileReporter.should_be_python`: no extension,
+    /// or one starting with `.py`.
+    fn should_be_python(path: &Path) -> bool {
+        path.extension()
+            .is_none_or(|ext| ext.to_string_lossy().starts_with("py"))
+    }
+
     fn build_data(
         &self,
         rootdir: &Path,
@@ -1161,6 +1168,12 @@ impl CovPlugin {
             let Some(analysis) =
                 analysis::analyze_for(&source_text, &self.exclude_patterns, self.lazy_annotations)
             else {
+                // coverage.py reports a parse failure only for a file that
+                // should be Python; anything else that ran code under its
+                // name (a compiled template) is skipped.
+                if !Self::should_be_python(&path) {
+                    continue;
+                }
                 errors.push((
                     format!("Couldn't parse '{}' as Python source", path.display()),
                     format!("Couldn't parse Python file '{}'", path.display()),
