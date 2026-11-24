@@ -363,6 +363,16 @@ class TestCovConfigKeys(unittest.TestCase):
         self.assertIn("FN:", lcov)
         self.assertIn("BRDA:10,0,return from function 'tail',1\nBRF:6\nBRH:4", lcov)
 
+    @unittest.skipUnless(importlib.util.find_spec("coverage"), "rendered by coverage")
+    def test_xml_with_relative_files(self) -> None:
+        """The `--cov` values reach coverage.py as given, like pytest-cov, so
+        `relative_files` keeps the XML sources relative (#117)."""
+        self.pyproject("[tool.coverage.run]\nrelative_files = true\n")
+        self.output("--cov-report=xml", cov="--cov=app")
+        xml = (self.base / "coverage.xml").read_text()
+        self.assertEqual(re.findall(r"<source>(.*)</source>", xml), ["app"])
+        self.assertIn('filename="core.py"', xml)
+
     def test_native_xml_and_lcov_without_coverage(self) -> None:
         """Without the coverage package, the native reports carry branch data."""
         self.branchy_project()
@@ -435,6 +445,54 @@ class TestCovConfigKeys(unittest.TestCase):
         self.pyproject("[tool.coverage.report]\nignore_errors = true\n")
         out = self.output()
         self.assertNotIn("Failed to generate report", out)
+        self.assertIn("app/core.py", out)
+
+    def test_custom_exclude_lines_replace_every_default(self) -> None:
+        # coverage.py's defaults are the pragma, `...` stubs and
+        # `if TYPE_CHECKING:`; a custom exclude_lines replaces all three.
+        self.write(
+            "app/core.py",
+            """
+            from typing import TYPE_CHECKING
+
+            if TYPE_CHECKING:
+                import os
+
+
+            def used():
+                return 1
+
+
+            def stub(): ...
+            """,
+        )
+        self.pyproject("")
+        self.assertEqual(self.rows()["app/core.py"], (3, 0))
+        self.pyproject("[tool.coverage.report]\nexclude_lines = ['pragma: no cover']\n")
+        self.assertEqual(self.rows()["app/core.py"], (6, 1))
+
+    def test_code_run_under_a_non_python_name_is_skipped(self) -> None:
+        # A template engine compiles a template with its own path as the
+        # code's file name; coverage.py skips such a file when it does not
+        # parse instead of failing the report.
+        self.write("app/hello.html", "Hello {{ name }}!\n")
+        self.write(
+            "tests/test_app.py",
+            """
+            from pathlib import Path
+
+            import app
+
+
+            def test_render():
+                name = str(Path(app.__file__).with_name("hello.html"))
+                exec(compile("x = 1", name, "exec"), {})
+            """,
+        )
+        self.pyproject("")
+        out = self.output()
+        self.assertNotIn("Failed to generate report", out)
+        self.assertNotIn("hello.html", out)
         self.assertIn("app/core.py", out)
 
 

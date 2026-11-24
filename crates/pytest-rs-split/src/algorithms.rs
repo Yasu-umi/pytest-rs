@@ -77,26 +77,28 @@ pub fn duration_based_chunks_of(splits: usize, item_durations: &[f64]) -> Vec<Te
     groups
 }
 
-/// Greedy LPT: largest test goes to the currently-smallest group.
+/// Greedy LPT: largest test goes to the currently-smallest group. `names`
+/// (the items' reprs, as upstream sorts by `str(item)`) break ties.
 pub fn least_duration(
     splits: usize,
     nodeids: &[String],
+    names: &[String],
     durations: &HashMap<String, f64>,
 ) -> Vec<TestGroup> {
-    least_duration_of(splits, nodeids, &items_with_durations(nodeids, durations))
+    least_duration_of(splits, names, &items_with_durations(nodeids, durations))
 }
 
 /// `least_duration` over units whose durations are already resolved;
-/// `nodeids` only break ties.
+/// `names` only break ties.
 pub fn least_duration_of(
     splits: usize,
-    nodeids: &[String],
+    names: &[String],
     item_durations: &[f64],
 ) -> Vec<TestGroup> {
-    // Sort by nodeid for cross-node determinism, then by duration
+    // Sort by name for cross-node determinism, then by duration
     // descending (both stable, matching upstream).
-    let mut order: Vec<usize> = (0..nodeids.len()).collect();
-    order.sort_by(|&a, &b| nodeids[a].cmp(&nodeids[b]));
+    let mut order: Vec<usize> = (0..names.len()).collect();
+    order.sort_by(|&a, &b| names[a].cmp(&names[b]));
     order.sort_by(|&a, &b| {
         item_durations[b]
             .partial_cmp(&item_durations[a])
@@ -129,4 +131,27 @@ pub fn least_duration_of(
         group.selected.sort_unstable();
     }
     groups
+}
+
+#[cfg(test)]
+mod tests {
+    use super::least_duration_of;
+
+    #[test]
+    fn ties_break_by_name_like_upstream() {
+        // Upstream sorts by `str(item)` (`<Function name>`, no module), then
+        // stably by duration: with equal durations the groups alternate in
+        // name order, not node id order.
+        let names: Vec<String> = [
+            "<Function test_c>",
+            "<Function test_d>",
+            "<Function test_e>",
+            "<Function test_a>",
+        ]
+        .map(String::from)
+        .to_vec();
+        let groups = least_duration_of(2, &names, &[1.0; 4]);
+        assert_eq!(groups[0].selected, vec![1, 3]);
+        assert_eq!(groups[1].selected, vec![0, 2]);
+    }
 }

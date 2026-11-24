@@ -38,6 +38,22 @@ pub struct SplitPlugin {
 }
 
 impl SplitPlugin {
+    /// `str(item)` in pytest: `<Function test_name[params]>`, the node's
+    /// class and its name (the node id's last part).
+    fn item_repr(item: &TestItem) -> String {
+        let nodeid = item.nodeid.as_str();
+        let before_params = nodeid.find('[').unwrap_or(nodeid.len());
+        let name = nodeid[..before_params]
+            .rfind("::")
+            .map_or(nodeid, |i| &nodeid[i + 2..]);
+        let class = if item.func_class.is_empty() {
+            "Function"
+        } else {
+            &item.func_class
+        };
+        format!("<{class} {name}>")
+    }
+
     pub fn new() -> Self {
         Self {
             splits: None,
@@ -52,13 +68,19 @@ impl SplitPlugin {
         }
     }
 
-    fn split(&self, splits: usize, nodeids: &[String]) -> Vec<algorithms::TestGroup> {
+    /// `names` are the items' reprs, which break duration ties.
+    fn split(
+        &self,
+        splits: usize,
+        nodeids: &[String],
+        names: &[String],
+    ) -> Vec<algorithms::TestGroup> {
         match self.algorithm {
             Algorithm::DurationBasedChunks => {
                 algorithms::duration_based_chunks(splits, nodeids, &self.cached_durations)
             }
             Algorithm::LeastDuration => {
-                algorithms::least_duration(splits, nodeids, &self.cached_durations)
+                algorithms::least_duration(splits, nodeids, names, &self.cached_durations)
             }
         }
     }
@@ -86,6 +108,7 @@ impl SplitPlugin {
         file_groups: &HashMap<String, usize>,
         file_duration: f64,
         nodeids: &[String],
+        names: &[String],
     ) -> (Vec<usize>, f64) {
         let mut keep = Vec::new();
         let mut rest = Vec::new();
@@ -100,7 +123,8 @@ impl SplitPlugin {
         let mut duration = file_duration;
         if !rest.is_empty() {
             let rest_ids: Vec<String> = rest.iter().map(|&i| nodeids[i].clone()).collect();
-            let groups = self.split(splits, &rest_ids);
+            let rest_names: Vec<String> = rest.iter().map(|&i| names[i].clone()).collect();
+            let groups = self.split(splits, &rest_ids, &rest_names);
             let selected = &groups[group - 1];
             keep.extend(selected.selected.iter().map(|&i| rest[i]));
             duration += selected.duration;
@@ -303,12 +327,13 @@ impl Plugin for SplitPlugin {
             return Ok(());
         };
         let nodeids: Vec<String> = items.iter().map(|item| item.nodeid.clone()).collect();
+        let names: Vec<String> = items.iter().map(Self::item_repr).collect();
         let (selected, duration) = match &self.file_groups {
             Some((file_groups, file_duration)) => {
-                self.select_by_file(splits, group, file_groups, *file_duration, &nodeids)
+                self.select_by_file(splits, group, file_groups, *file_duration, &nodeids, &names)
             }
             None => {
-                let mut groups = self.split(splits, &nodeids);
+                let mut groups = self.split(splits, &nodeids, &names);
                 let selected = groups.swap_remove(group - 1);
                 (selected.selected, selected.duration)
             }

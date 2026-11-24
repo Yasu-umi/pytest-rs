@@ -87,11 +87,14 @@ pub struct CovPlugin {
     /// (coverage.py's `warn_unimported_source`/`_warn_about_unmeasured_code`,
     /// keyed by the original name, not the resolved path).
     cov_source_names: Vec<String>,
+    /// Whether `cov_source_names` came from `--cov=X` (not the config's
+    /// `[run] source` for a bare `--cov`).
+    sources_from_cli: bool,
     reports: Vec<ReportSpec>,
     fail_under: Option<f64>,
     /// --cov-precision / [report] precision: Cover column decimals.
     precision: usize,
-    exclude_patterns: Vec<regex::Regex>,
+    exclude_rules: analysis::ExcludeRules,
     /// `[run] omit` / `[run] include`, as coverage.py's prepped patterns
     /// (also handed to subprocesses).
     run_omit: Vec<String>,
@@ -164,10 +167,11 @@ impl CovPlugin {
             enabled: false,
             sources: Vec::new(),
             cov_source_names: Vec::new(),
+            sources_from_cli: false,
             reports: Vec::new(),
             fail_under: None,
             precision: 0,
-            exclude_patterns: Vec::new(),
+            exclude_rules: analysis::ExcludeRules::default(),
             run_omit: Vec::new(),
             run_include: Vec::new(),
             report_omit: GlobMatcher::default(),
@@ -302,26 +306,32 @@ impl CovPlugin {
         Ok(reports)
     }
 
-    /// Effective exclusion regexes (coverage.py's `exclude_list`):
-    /// `[report] exclude_lines` (its default when unset) plus
-    /// `[report] exclude_also`, from any of the config files.
-    fn load_exclude_patterns(rootdir: &Path, cov_config: Option<&str>) -> Vec<regex::Regex> {
-        let mut patterns: Vec<String> =
+    /// Effective exclusions (coverage.py's `exclude_list`):
+    /// `[report] exclude_lines` (its default list when unset: the pragma,
+    /// `...` stubs and `if TYPE_CHECKING:`) plus `[report] exclude_also`,
+    /// from any of the config files.
+    fn load_exclude_rules(rootdir: &Path, cov_config: Option<&str>) -> analysis::ExcludeRules {
+        let custom =
             Self::section_option_list(rootdir, cov_config, "report", "exclude_lines", true)
-                .filter(|lines| !lines.is_empty())
-                .unwrap_or_else(|| vec![analysis::DEFAULT_EXCLUDE.to_string()]);
+                .filter(|lines| !lines.is_empty());
+        let default_stubs = custom.is_none();
+        let mut patterns = custom.unwrap_or_else(|| {
+            vec![
+                analysis::DEFAULT_EXCLUDE.to_string(),
+                analysis::DEFAULT_EXCLUDE_TYPE_CHECKING.to_string(),
+            ]
+        });
         patterns.extend(
             Self::section_option_list(rootdir, cov_config, "report", "exclude_also", true)
                 .unwrap_or_default(),
         );
-        // coverage.py keeps the `if TYPE_CHECKING:` default regardless of a
-        // custom exclude_lines (it ships as an always-on default), so apply it
-        // unconditionally.
-        patterns.push(analysis::DEFAULT_EXCLUDE_TYPE_CHECKING.to_string());
-        patterns
-            .iter()
-            .filter_map(|pattern| regex::Regex::new(pattern).ok())
-            .collect()
+        analysis::ExcludeRules {
+            patterns: patterns
+                .iter()
+                .filter_map(|pattern| regex::Regex::new(pattern).ok())
+                .collect(),
+            default_stubs,
+        }
     }
 
     /// coverage.py's `partial_list + partial_always_list`:
@@ -740,20 +750,12 @@ impl CovPlugin {
         }
         let kwargs = core_pyo3::types::PyDict::new(py);
         kwargs.set_item("data_file", data_path.to_string_lossy().as_ref())?;
-        // Like pytest-cov: the `--cov` sources (the XML report's <sources>
-        // and the base of its file names come from them) and --cov-config.
-        if !self.sources.is_empty() {
-            let sources: Vec<String> = self
-                .sources
-                .iter()
-                .map(|source| {
-                    source
-                        .to_string_lossy()
-                        .trim_end_matches(std::path::MAIN_SEPARATOR)
-                        .to_string()
-                })
-                .collect();
-            kwargs.set_item("source", sources)?;
+        // Like pytest-cov: the `--cov` values as given (the XML report's
+        // <sources> and the base of its file names come from them, and
+        // `relative_files` keeps them relative) and --cov-config. A bare
+        // `--cov` leaves the source to coverage.py's own config.
+        if self.sources_from_cli {
+            kwargs.set_item("source", &self.cov_source_names)?;
         }
         if let Some(config) = ctx.config.get_value("cov-config") {
             kwargs.set_item(
@@ -1124,6 +1126,13 @@ impl CovPlugin {
         files
     }
 
+    /// coverage.py's `PythonFileReporter.should_be_python`: no extension,
+    /// or one starting with `.py`.
+    fn should_be_python(path: &Path) -> bool {
+        path.extension()
+            .is_none_or(|ext| ext.to_string_lossy().starts_with("py"))
+    }
+
     fn build_data(
         &self,
         rootdir: &Path,
@@ -1159,8 +1168,14 @@ impl CovPlugin {
                 continue;
             };
             let Some(analysis) =
-                analysis::analyze_for(&source_text, &self.exclude_patterns, self.lazy_annotations)
+                analysis::analyze_for(&source_text, &self.exclude_rules, self.lazy_annotations)
             else {
+                // coverage.py reports a parse failure only for a file that
+                // should be Python; anything else that ran code under its
+                // name (a compiled template) is skipped.
+                if !Self::should_be_python(&path) {
+                    continue;
+                }
                 errors.push((
                     format!("Couldn't parse '{}' as Python source", path.display()),
                     format!("Couldn't parse Python file '{}'", path.display()),
@@ -1477,7 +1492,8 @@ impl Plugin for CovPlugin {
         // A bare `--cov` leaves the source to the coverage config, like
         // pytest-cov: `[run] source` (paths or importable names) and
         // `[run] source_pkgs` (importable names only).
-        if self.cov_source_names.is_empty() {
+        self.sources_from_cli = !self.cov_source_names.is_empty();
+        if !self.sources_from_cli {
             let cov_config = ctx.config.get_value("cov-config");
             let config_list = |option: &str| {
                 Self::section_option_list(&ctx.config.rootdir, cov_config, "run", option, false)
@@ -1537,8 +1553,7 @@ impl Plugin for CovPlugin {
                 Self::section_option_value(&plain_rootdir, cov_config, "report", "fail_under")
                     .and_then(|value| value.parse().ok())
             });
-        self.exclude_patterns =
-            Self::load_exclude_patterns(&rootdir, ctx.config.get_value("cov-config"));
+        self.exclude_rules = Self::load_exclude_rules(&rootdir, ctx.config.get_value("cov-config"));
         // omit / include patterns resolve against the current directory,
         // like coverage.py's `prep_patterns`.
         let cwd = std::env::current_dir().unwrap_or_else(|_| rootdir.clone());
@@ -1919,7 +1934,13 @@ impl Plugin for CovPlugin {
         let mut multiline = |file: &str| {
             std::fs::read_to_string(file)
                 .ok()
-                .and_then(|text| analysis::analyze_for(&text, &[], lazy_annotations))
+                .and_then(|text| {
+                    analysis::analyze_for(
+                        &text,
+                        &analysis::ExcludeRules::default(),
+                        lazy_annotations,
+                    )
+                })
                 .map(|analysis| analysis.multiline)
                 .unwrap_or_default()
         };
@@ -2259,7 +2280,7 @@ mod run_option_tests {
             "[tool.coverage.report]\nexclude_lines = [\n    'raise NotImplementedError',\n]\n",
         )
         .unwrap();
-        let patterns = super::CovPlugin::load_exclude_patterns(&dir, None);
+        let patterns = super::CovPlugin::load_exclude_rules(&dir, None).patterns;
         assert!(
             patterns
                 .iter()
@@ -2288,7 +2309,7 @@ mod run_option_tests {
                 "[tool.coverage.report]\nexclude_also = ['raise NotImplementedError']\n",
             )],
         );
-        let patterns = super::CovPlugin::load_exclude_patterns(&dir, None);
+        let patterns = super::CovPlugin::load_exclude_rules(&dir, None).patterns;
         assert!(
             patterns
                 .iter()
@@ -2311,19 +2332,21 @@ mod run_option_tests {
                 "[coverage:report]\nexclude_lines =\n    if DEBUG:\n    # skip me\nexclude_also =\n    def __repr__\n",
             )],
         );
-        let patterns = super::CovPlugin::load_exclude_patterns(&dir, None);
+        let patterns = super::CovPlugin::load_exclude_rules(&dir, None).patterns;
         assert!(patterns.iter().any(|re| re.is_match("if DEBUG:")));
         assert!(
             patterns
                 .iter()
                 .any(|re| re.is_match("    def __repr__(self):"))
         );
-        // A custom exclude_lines replaces the default pragma.
+        // A custom exclude_lines replaces the whole default list.
         assert!(
             !patterns
                 .iter()
                 .any(|re| re.is_match("x = 1  # pragma: no cover"))
         );
+        assert!(!patterns.iter().any(|re| re.is_match("if TYPE_CHECKING:")));
+        assert!(!super::CovPlugin::load_exclude_rules(&dir, None).default_stubs);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
