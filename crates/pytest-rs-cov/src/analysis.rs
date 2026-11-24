@@ -46,8 +46,7 @@ struct Walker<'a> {
     /// `...`-body defs as `(ellipsis_line, first_line, end_line)`. coverage.py
     /// excludes the whole def (decorators..body) only when the source line of
     /// the `...` matches its stub regex — resolved against the source in
-    /// `analyze` (a def whose `...` rides a bracketed return type like
-    /// `]: ...` is *not* excluded, matching coverage.py).
+    /// `analyze_for`.
     stub_candidates: Vec<(u32, u32, u32)>,
     /// Whether coverage.py's default `...`-stub exclusion applies (no custom
     /// `exclude_lines`); without it a `...` statement counts like any other.
@@ -76,11 +75,11 @@ static BARE_ELLIPSIS_RE: std::sync::LazyLock<regex::Regex> =
     std::sync::LazyLock::new(|| regex::Regex::new(r"^\s*\.\.\.\s*(#|$)").expect("valid regex"));
 
 /// coverage.py's default stub exclusion (one of its DEFAULT_EXCLUDE entries):
-/// a line that is `...`, optionally prefixed by a one-line def signature whose
-/// parameter list closes with `)` on that same line. Matches `def f(): ...`,
-/// `) -> int: ...`, and a bare `...`; does NOT match `]: ...`.
+/// a line that is `...`, optionally prefixed by the end of a signature
+/// closing with `)` or `]` on that same line. Matches `def f(): ...`,
+/// `) -> int: ...`, `]: ...` and a bare `...`.
 static STUB_LINE_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
-    regex::Regex::new(r"^\s*(((async )?def .*?)?\)(\s*->.*?)?:\s*)?\.\.\.\s*(#|$)").unwrap()
+    regex::Regex::new(r"^\s*(((async )?def .*?)?[\])]+(\s*->.*?)?:\s*)?\.\.\.\s*(#|$)").unwrap()
 });
 
 /// Branch destination for "control leaves the enclosing scope".
@@ -169,9 +168,9 @@ pub fn analyze_for(
     let mut excluded: BTreeSet<u32> = walker.stub_excluded.clone();
     // A `...`-body def is excluded (decorators through body) only when the
     // source line of its `...` matches coverage.py's stub regex, mirroring
-    // coverage.py exactly: `def f(): ...`, `) -> int: ...` and a bare `...`
-    // exclude the whole def, but a bracketed return type ending `]: ...` does
-    // not, so that def stays counted.
+    // coverage.py exactly: `def f(): ...`, `) -> int: ...`, `]: ...` and a
+    // bare `...` exclude the whole def; a `...` the regex does not match
+    // (after a docstring on the same line, say) leaves it counted.
     for (ellipsis_line, first, end) in &walker.stub_candidates {
         if rules.default_stubs && STUB_LINE_RE.is_match(line_text(*ellipsis_line)) {
             excluded.extend(*first..=*end);
@@ -842,10 +841,9 @@ class Base:
 
     #[test]
     fn multiline_stub_excluded_only_when_ellipsis_line_matches() {
-        // `d` ends `) -> int: ...` (matches coverage.py's stub regex) -> the
-        // whole def is excluded. `e` ends `]: ...` (a bracketed return type,
-        // which does NOT match) -> the def line stays counted, like
-        // coverage.py. Only line 1 (import) and line 5 (`def e(`) count.
+        // `d` ends `) -> int: ...` and `e` ends `]: ...` (a bracketed return
+        // type): both match coverage.py's stub regex, so the whole def is
+        // excluded and only line 1 (import) counts.
         let src = "\
 from typing import overload
 
@@ -866,7 +864,7 @@ def e(
     int,
 ]: ...
 ";
-        assert_eq!(executable(src_e), vec![1, 4]);
+        assert_eq!(executable(src_e), vec![1]);
     }
 
     #[test]
