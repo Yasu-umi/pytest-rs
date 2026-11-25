@@ -328,7 +328,11 @@ def maybe_interact(item_proxy, exc, longrepr="") -> None:
 
         if isinstance(e, Exit):
             os._exit(e.returncode if e.returncode is not None else 1)
-        pass
+        # Upstream: any other exception from a hookimpl ends the session
+        # with INTERNALERROR.
+        from pytest._internalerror import DeferredInternalError
+
+        DeferredInternalError.defer(e)
 
 
 def configure(config) -> None:

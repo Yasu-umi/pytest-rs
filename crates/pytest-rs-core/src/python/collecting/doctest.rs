@@ -209,6 +209,7 @@ pub fn collect_doctests_from_module(
             collector_class: String::new(),
             func_class: String::new(),
             py_node: None,
+            node_class: None,
             max_param_scope: crate::fixture::Scope::Function,
             scope_sort_keys: Vec::new(),
         });
@@ -257,6 +258,7 @@ pub fn collect_doctests_from_textfile(
             collector_class: String::new(),
             func_class: String::new(),
             py_node: None,
+            node_class: None,
             max_param_scope: crate::fixture::Scope::Function,
             scope_sort_keys: Vec::new(),
         });

@@ -297,6 +297,40 @@ pub fn notify_internal_error(py: Python<'_>, err: &PyErr, default_code: i32) -> 
     }
 }
 
+/// Hand a hookimpl's exception to the run loop, which ends the session
+/// with INTERNALERROR once the current item is done (see
+/// `pytest/_internalerror.py`). Returns false when it is no internal error
+/// (`pytest.exit()`, `KeyboardInterrupt`); the caller then keeps its own
+/// handling.
+pub fn defer_internal_error(py: Python<'_>, err: &PyErr) -> bool {
+    py.import("pytest._internalerror")
+        .and_then(|m| m.getattr("DeferredInternalError"))
+        .and_then(|cls| cls.call_method1("defer", (err.value(py),)))
+        .and_then(|deferred| deferred.extract::<bool>())
+        .unwrap_or(false)
+}
+
+/// [`defer_internal_error`], or print the error like before when it is
+/// not one.
+pub fn defer_or_print_internal_error(py: Python<'_>, err: &PyErr) {
+    if !defer_internal_error(py, err) {
+        eprintln!("INTERNAL ERROR: {}", format_exception(py, err));
+    }
+}
+
+/// The exception a hookimpl deferred with [`defer_internal_error`], if any.
+pub fn take_internal_error(py: Python<'_>) -> Option<PyErr> {
+    let exc = py
+        .import("pytest._internalerror")
+        .and_then(|m| m.getattr("DeferredInternalError"))
+        .and_then(|cls| cls.call_method0("take"))
+        .ok()?;
+    if exc.is_none() {
+        return None;
+    }
+    Some(PyErr::from_value(exc))
+}
+
 /// Classify a module-import error as a module-level skip.
 /// Some(Ok(reason)): the whole module skips (allow_module_level=True or
 /// unittest.SkipTest). Some(Err(message)): pytest.skip misused at module

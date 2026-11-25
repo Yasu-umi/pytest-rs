@@ -164,11 +164,15 @@ pub(crate) fn build_test_setup(
     let closure = session
         .registry
         .getfixtureclosure(&item.nodeid, &initialnames, &ignore);
+    // Upstream's `Function.funcargs`: every fixture of the closure by name
+    // (`request` too, added below), filled by setup (`_fillfixtures`) and
+    // read by plugins in later hooks (`pytest_runtest_makereport`).
+    let funcargs = pyo3::types::PyDict::new(py);
     for name in &closure {
         if name == "request" || ignore.contains(name) {
             continue;
         }
-        resolve_fixture(
+        let value = resolve_fixture(
             py,
             plugins,
             session,
@@ -178,6 +182,7 @@ pub(crate) fn build_test_setup(
             instance.as_ref(),
             &mut stack,
         )?;
+        funcargs.set_item(name, value)?;
     }
     // The values passed to the test, in its signature order (now cached).
     let mut kwargs = Vec::new();
@@ -237,7 +242,27 @@ pub(crate) fn build_test_setup(
         )?
         .into_any(),
     };
+    if closure.iter().any(|name| name == "request") {
+        funcargs.set_item("request", request_for_node.bind(py))?;
+    }
+    // Direct `@pytest.mark.parametrize` arguments (upstream's pseudo
+    // fixtures); an indirect one is the fixture's value, set above.
+    for (name, value) in &item.callspec {
+        if !funcargs.contains(name)? {
+            funcargs.set_item(name, value.bind(py))?;
+        }
+    }
+    node.bind(py).setattr("funcargs", funcargs)?;
     node.bind(py).setattr("_request", request_for_node)?;
+    // A unittest item's `obj` is the test method bound to the TestCase it
+    // runs on (upstream's TestCaseFunction.setup), not the shim runner.
+    if item.cls.is_none()
+        && let Some(case) = &instance
+        && let Ok(method_name) = item.func.bind(py).getattr("__name__")
+        && let Ok(bound) = case.bind(py).getattr(method_name.str()?)
+    {
+        node.bind(py).setattr("obj", bound)?;
+    }
     Ok((callable, kwargs, test_request))
 }
 

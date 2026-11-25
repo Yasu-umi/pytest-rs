@@ -209,6 +209,10 @@ impl Engine {
             crate::tw::GREEN
         };
         println!();
+        // Upstream's summary_stats prints nothing below -q (-qq, -qqq).
+        if self.config.global_verbosity() < -1 {
+            return;
+        }
         if self.config.quiet {
             // -q: the bare summary line, no banner.
             println!("{}", crate::tw::markup(&body, &[color]));

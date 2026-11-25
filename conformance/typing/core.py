@@ -106,3 +106,10 @@ def check_deprecated_call_cm_form() -> None:
 
 def check_monkeypatch_setattr(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("os.path.join", lambda *a: "x")
+
+
+# Session.exitstatus (`int | ExitCode`, which mypy joins to `int`): a conftest
+# pytest_sessionfinish may override the exit code through it.
+def check_session_exitstatus(session: pytest.Session) -> None:
+    reveal_type(session.exitstatus)  # revealed: int
+    session.exitstatus = pytest.ExitCode.TESTS_FAILED

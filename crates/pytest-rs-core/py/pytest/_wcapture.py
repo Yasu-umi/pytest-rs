@@ -67,8 +67,12 @@ def _fire_warning_recorded(wm, location=None) -> None:
             nodeid=nodeid,
             location=location,
         )
-    except Exception:
-        pass
+    except Exception as exc:
+        # Upstream: an exception from a hookimpl ends the session with
+        # INTERNALERROR.
+        from pytest._internalerror import DeferredInternalError
+
+        DeferredInternalError.defer(exc)
     finally:
         _in_hook_dispatch = False
 

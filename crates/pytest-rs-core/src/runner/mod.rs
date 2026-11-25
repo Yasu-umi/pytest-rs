@@ -106,6 +106,25 @@ pub(crate) use teardown::setup_show_active;
 pub(crate) use teardown::*;
 
 impl Engine {
+    /// A reporting hookimpl raised during the item just run (deferred by
+    /// `python::defer_internal_error`): end the session with INTERNALERROR,
+    /// like upstream. An xdist worker keeps printing it (the controller owns
+    /// the exit code, see `run_one`).
+    fn abort_on_deferred_internal_error(
+        py: Python<'_>,
+        session: &mut Session,
+        config: &crate::config::Config,
+    ) {
+        let Some(err) = python::take_internal_error(py) else {
+            return;
+        };
+        if config.is_worker() {
+            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+            return;
+        }
+        abort_with_internal_error(py, session, config, &err);
+    }
+
     pub(crate) fn run_items(&mut self, py: Python<'_>) {
         let Self {
             plugins,
@@ -467,8 +486,10 @@ impl Engine {
                     }
                 },
             );
+            Self::abort_on_deferred_internal_error(py, session, config);
             if session.internal_error_exit_code.is_some() {
-                // A replacing pytest_runtest_protocol hookimpl raised: the
+                // A replacing pytest_runtest_protocol hookimpl raised (or a
+                // reporting hookimpl did, see abort_on_deferred_internal_error): the
                 // banner/junit/pytest_internalerror dispatch already ran in
                 // run_one. Upstream's pytest_runtestloop has no try/except
                 // around this hook call, so the exception blows straight
@@ -605,9 +626,18 @@ impl Engine {
             if session.live_logging {
                 python::log_set_live_when(py, "finish");
             }
-            let _ = fire_runtest_py_hooks(py, session, item, None, "pytest_runtest_logfinish");
+            if let Err(err) =
+                fire_runtest_py_hooks(py, session, item, None, "pytest_runtest_logfinish")
+            {
+                python::defer_or_print_internal_error(py, &err);
+            }
             if !config.is_worker() {
                 python::reporter_logfinish(py, item);
+            }
+            Self::abort_on_deferred_internal_error(py, session, config);
+            if session.internal_error_exit_code.is_some() {
+                session.items = items;
+                return;
             }
             if stepwise && item_failed {
                 sw_failed_items += 1;

@@ -170,7 +170,7 @@ pub fn reporter_logreport(py: Python<'_>, report: &Bound<'_, PyAny>) {
         Ok(())
     })();
     if let Err(err) = result {
-        eprintln!("INTERNAL ERROR: {}", format_exception(py, &err));
+        defer_or_print_internal_error(py, &err);
     }
 }
 
@@ -254,7 +254,7 @@ pub fn reporter_logfinish(py: Python<'_>, item: &TestItem) {
         Ok(())
     })();
     if let Err(err) = result {
-        eprintln!("INTERNAL ERROR: {}", format_exception(py, &err));
+        defer_or_print_internal_error(py, &err);
     }
 }
 

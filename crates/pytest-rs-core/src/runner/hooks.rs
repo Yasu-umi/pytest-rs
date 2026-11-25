@@ -67,7 +67,7 @@ pub(crate) fn fire_logreport_hooks(
     );
     for func in &funcs {
         if let Err(err) = python::call_py_hook(py, func, &[("report", proxy.clone_ref(py))]) {
-            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+            python::defer_or_print_internal_error(py, &err);
         }
     }
     // When the protocol was delegated (e.g. pytest-rerunfailures), the plugin
@@ -205,7 +205,7 @@ pub(crate) fn fire_makereport(
                         .push((report.nodeid.clone(), report.phase, result));
                 });
             }
-            Err(err) => eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err)),
+            Err(err) => python::defer_or_print_internal_error(py, &err),
         }
     }
 }
@@ -292,7 +292,7 @@ pub(crate) fn report_teststatus(
         ) {
             Ok(result) => result,
             Err(err) => {
-                eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+                python::defer_or_print_internal_error(py, &err);
                 continue;
             }
         };
@@ -368,7 +368,17 @@ pub(crate) fn fire_pyfunc_call_hooks(
         return Ok(false);
     }
     let node = super::item_node(py, item)?;
-    let funcargs = pyo3::types::PyDict::new(py);
+    // Setup already filled `funcargs` with the whole closure; make sure
+    // the test's own arguments are there.
+    let funcargs = match node
+        .bind(py)
+        .getattr("funcargs")
+        .ok()
+        .and_then(|existing| existing.cast_into::<pyo3::types::PyDict>().ok())
+    {
+        Some(existing) => existing,
+        None => pyo3::types::PyDict::new(py),
+    };
     for (name, value) in kwargs {
         funcargs.set_item(name, value.bind(py))?;
     }

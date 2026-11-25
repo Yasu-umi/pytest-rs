@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from _pytest.config import Config
     from _pytest.nodeid import NodeId
 
+    from pytest import ExitCode
     from pytest._marks import Mark, MarkDecorator
     from pytest._stash import Stash
 
@@ -144,7 +145,6 @@ class _NodeBase:
     session: Session
     path: pathlib.Path
     own_markers: list[Mark]
-    stash: Stash
 
     if TYPE_CHECKING:
 
@@ -158,6 +158,21 @@ class _NodeBase:
         def listextrakeywords(self) -> set[str]: ...
         def listnames(self) -> list[str]: ...
         def addfinalizer(self, fin: Callable[[], object]) -> None: ...
+
+    @property
+    def stash(self) -> Stash:
+        """Upstream Node.stash, where plugins keep per-node data (logfire's
+        span, pytest-html's extras); created on first use."""
+        stash = self.__dict__.get("_stash")
+        if stash is None:
+            from pytest._stash import Stash
+
+            stash = self.__dict__["_stash"] = Stash()
+        return stash
+
+    @stash.setter
+    def stash(self, value: Stash) -> None:
+        self.__dict__["_stash"] = value
 
     @property
     def extra_keyword_matches(self) -> set[str]:
@@ -478,8 +493,10 @@ def run_custom_item(item):
 
         try:
             item.ihook.pytest_exception_interact(node=item, call=_Call(), report=report)
-        except Exception:
-            pass
+        except Exception as exc:
+            from pytest._internalerror import DeferredInternalError
+
+            DeferredInternalError.defer(exc)
         return str(report.longrepr)
 
     reports = []
@@ -575,6 +592,7 @@ class Session(Collector):
     if TYPE_CHECKING:
         shouldfail: bool | str
         shouldstop: bool | str
+        exitstatus: int | ExitCode
 
         @property
         def startpath(self) -> pathlib.Path: ...
@@ -1607,6 +1625,9 @@ class Function(Node):
         if callobj is not None and kwargs.get("function") is None and len(args) < 5:
             kwargs["function"] = callobj
         super().__init__(*args, **kwargs)
+        # Upstream's `_initrequest`: the fixture values by name, filled by
+        # setup and reset to None after the item's protocol.
+        self.funcargs = {}
         if callobj is not None:
             self.obj = callobj
             self.function = callobj
@@ -1700,7 +1721,9 @@ class Function(Node):
         return id(self)
 
     def __repr__(self):
-        return f"<Function {getattr(self, 'name', '')}>"
+        # Upstream Node.__repr__: the node's own class (a plugin's Function
+        # subclass, e.g. pytest-asyncio's `<Coroutine test_x>`).
+        return f"<{type(self).__name__} {getattr(self, 'name', '')}>"
 
     @property
     def location(self):

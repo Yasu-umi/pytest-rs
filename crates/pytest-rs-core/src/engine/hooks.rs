@@ -467,6 +467,7 @@ impl Engine {
                     collector_class: String::new(),
                     func_class: String::new(),
                     py_node: None,
+                    node_class: None,
                     max_param_scope: crate::fixture::Scope::Function,
                     scope_sort_keys: Vec::new(),
                 });
@@ -485,15 +486,12 @@ impl Engine {
                     });
                 }
                 item.marks = marks;
-                // A hook may add -k keywords to the item itself
-                // (node.extra_keyword_matches): keep that node, which
-                // keyword_match_names reads them from.
-                if item.py_node.is_none()
-                    && node
-                        .getattr("extra_keyword_matches")
-                        .and_then(|extra| extra.len())
-                        .is_ok_and(|n| n > 0)
-                {
+                // Keep the node the hook saw: upstream runs these very
+                // objects, so a plugin that holds on to one (to read its
+                // `funcargs` or stash later) sees the same item in later
+                // hooks; keyword_match_names also reads -k keywords a hook
+                // added to it (node.extra_keyword_matches).
+                if item.py_node.is_none() {
                     item.py_node = Some(node.clone().unbind());
                 }
                 // A hook may mutate node.fixturenames in place (e.g.
@@ -731,6 +729,7 @@ impl Engine {
                     collector_class: String::new(),
                     func_class: String::new(),
                     py_node: None,
+                    node_class: None,
                     max_param_scope: crate::fixture::Scope::Function,
                     scope_sort_keys: Vec::new(),
                 });

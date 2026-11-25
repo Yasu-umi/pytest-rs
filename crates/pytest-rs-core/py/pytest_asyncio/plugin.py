@@ -64,6 +64,36 @@ def fixture(fixture_function=None, *, loop_scope=None, **kwargs):
     return apply
 
 
+class PytestAsyncioFunction(pytest.Function):
+    """Base class for all test functions managed by pytest-asyncio.
+
+    The native plugin builds asyncio-marked `async def` tests as
+    `Coroutine` items, like upstream's `pytest_pycollect_makeitem` wrapper,
+    so `str(item)` is `<Coroutine test_x>` and plugins can isinstance-check
+    them; running them stays native."""
+
+    @classmethod
+    def item_subclass_for(cls, item: pytest.Function, /) -> "type[PytestAsyncioFunction] | None":
+        for subclass in cls.__subclasses__():
+            if subclass._can_substitute(item):
+                return subclass
+        return None
+
+    @staticmethod
+    def _can_substitute(item: pytest.Function) -> bool:
+        raise NotImplementedError()
+
+
+class Coroutine(PytestAsyncioFunction):
+    """Pytest item created by a coroutine"""
+
+    @staticmethod
+    def _can_substitute(item: pytest.Function) -> bool:
+        import inspect
+
+        return inspect.iscoroutinefunction(item.obj)
+
+
 def is_async_test(item):
     """True for items the asyncio plugin will run (marked async tests)."""
     return item.get_closest_marker("asyncio") is not None
