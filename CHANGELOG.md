@@ -3,6 +3,65 @@
 Notable changes per release. The release workflow uses the matching section
 as the GitHub release notes (auto-generated notes are the fallback).
 
+## v0.0.17 (2026-11-26)
+
+### Added
+
+- `item.funcargs` like pytest: every fixture of the item's closure by name
+  (autouse, transitive, `request`, direct `parametrize` arguments), filled at
+  setup and reset to `None` after the item.
+- pytest-asyncio's `asyncio: mode=...` header line, and the header's
+  `plugins:` line lists the built-in plugins a run uses as
+  `rs-<name>-<version>` (`rs-cov-0.0.17`): cov with `--cov`, asyncio with an
+  `asyncio_*` setting, xdist with `-n`, split with `--splits`, benchmark with
+  a `--benchmark-*` option, anyio with `anyio_mode`, mock with
+  `mock_use_standalone_module`.
+
+### Changed
+
+- **Hook exceptions end the session like pytest.** An exception from a
+  reporting or collection hookimpl (`pytest_runtest_makereport`,
+  `pytest_runtest_logreport`, `pytest_report_teststatus`,
+  `pytest_runtest_logfinish`, `pytest_warning_recorded`, `pytest_collection`,
+  `pytest_collection_modifyitems`, `pytest_itemcollected`,
+  `pytest_deselected`, `pytest_collection_finish`, `pytest_runtestloop`) is an
+  `INTERNALERROR` with exit status 3, printed once and followed by the stats
+  line, instead of going to stderr and being ignored. A
+  `pytest_pycollect_makeitem` exception is a collection error of the module.
+- **Collection hooks are called like pytest.** `pytest_collectstart`,
+  `pytest_make_collect_report` and `pytest_collectreport` fire for every
+  collector (session, directories, packages, modules, classes) through the
+  plugin manager, also for conftests and plugins in a normal run;
+  `pytest_pycollect_makeitem` gets the real `Module` / `Class` collector
+  (`istestfunction`, `funcnamefilter`, `newinstance()`, ...) and is called
+  for class members too; `pytest_exception_interact` fires for every failed
+  phase, also without `--pdb`.
+- Hooks get the same item objects `pytest_collection_modifyitems` got; every
+  node has a `stash`; a unittest item's `obj` is the bound test method.
+- pytest-asyncio: async tests it runs are `pytest_asyncio.plugin.Coroutine`
+  items (`<Coroutine test_x>`, which pytest-split's `least_duration` sorts
+  ties by); a failing async test's traceback starts at the test's frame;
+  pending tasks are cancelled, then async generators and the default executor
+  shut down before the loop closes, like `asyncio.Runner`.
+- Native `--cov` resolves `--cov` values, `[run] source`, report file names,
+  the coverage config and its data/report files against the current
+  directory like coverage.py, not the rootdir.
+- The header's `benchmark:` line is printed only when a `--benchmark-*`
+  option is given.
+
+### Fixed
+
+- `--collect-only -qq` prints no closing `N tests collected` line.
+- The short test summary for an import failure is the bare `ERROR path`;
+  under `--collect-only` no blank line before the count after collection
+  errors, and no `Interrupted` banner with `--continue-on-collection-errors`.
+- The native `--cov` header names the platform by `sys.platform` (`darwin`,
+  `win32`).
+- The blank line after "collected N items" and a file's header are written
+  when its first test starts, as pytest does.
+- Typing: pytest's types on the shim's public API (`mypy --strict` passes
+  where it passes with pytest), and `Session.exitstatus`.
+
 ## v0.0.16 (2026-11-24)
 
 ### Added
