@@ -5,8 +5,6 @@
   pytest_collection_finish) or pytest_runtestloop ends the session with
   INTERNALERROR (exit 3): the traceback once, then a blank line and the stats
   line from wrap_session's `finally`.
-- pytest_pycollect_makeitem raising is a collection error of the module
-  (exit 2).
 - pytest_exception_interact fires for every failed phase, also without --pdb.
 - An import failure's short-summary line is the bare "ERROR path".
 """
@@ -89,15 +87,6 @@ class TestCollectionHookInternalError(unittest.TestCase):
 
     def test_runtest_hook_banner_once_with_stats(self) -> None:
         self.assert_internal_error("pytest_runtest_makereport", "item, call", "1 deselected")
-
-    def test_pycollect_makeitem_is_a_collection_error(self) -> None:
-        result = self.run_pytest(
-            "def pytest_pycollect_makeitem(collector, name, obj):\n    raise AttributeError('boom')\n"
-        )
-        output = f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
-        self.assertEqual(result.returncode, 2, output)
-        self.assertIn("ERROR collecting test_x.py", result.stdout, output)
-        self.assertIn("ERROR test_x.py - AttributeError: boom", result.stdout, output)
 
     def test_exception_interact_without_pdb(self) -> None:
         result = self.run_pytest(

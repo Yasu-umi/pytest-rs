@@ -275,7 +275,13 @@ pub fn report_internal_error(
             .call_method1("from_exc_info", ((exc_type, exc_value, exc_tb), true))?;
         let style_kwargs = pyo3::types::PyDict::new(py);
         style_kwargs.set_item("style", if fulltrace { "long" } else { "native" })?;
-        let excrepr = excinfo.call_method("getrepr", (), Some(&style_kwargs))?;
+        let excrepr = py
+            .import("pytest._internalerror")?
+            .getattr("InternalErrorRepr")?
+            .call1((
+                msg.trim_end_matches('\n'),
+                excinfo.call_method("getrepr", (), Some(&style_kwargs))?,
+            ))?;
         let hook_caller = py
             .import("pytest._pluginmanager")?
             .getattr("pluginmanager")?
