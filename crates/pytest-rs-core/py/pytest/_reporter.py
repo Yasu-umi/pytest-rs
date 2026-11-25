@@ -301,7 +301,33 @@ def deselected(items: list) -> None:
     _call(reporter, "pytest_deselected", items=items)
 
 
+class PendingHeader:
+    """An item's leading terminal output (the blank line after the collected
+    line, the file header) held back while a plugin's pytest_runtest_protocol
+    impl drives the item: upstream writes it from pytest_runtest_logstart, so
+    an impl that raises before logstart leaves none of it."""
+
+    text = ""
+
+    @classmethod
+    def set(cls, text: str) -> None:
+        cls.text = text
+
+    @classmethod
+    def flush(cls) -> None:
+        stream = sys.__stdout__
+        if cls.text and stream is not None:
+            stream.write(cls.text)
+            stream.flush()
+        cls.text = ""
+
+    @classmethod
+    def discard(cls) -> None:
+        cls.text = ""
+
+
 def logstart(nodeid: str, location: tuple) -> None:
+    PendingHeader.flush()
     reporter = replacement()
     if reporter is not None:
         _call(reporter, "pytest_runtest_logstart", nodeid=nodeid, location=location)

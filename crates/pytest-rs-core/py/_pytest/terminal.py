@@ -578,6 +578,10 @@ class TerminalReporter:
         self._add_stats("deselected", items)
 
     def pytest_runtest_logstart(self, nodeid: str, location: tuple[str, int | None, str]) -> None:
+        # The engine's held-back lead for an item a plugin's protocol drives.
+        from pytest._reporter import PendingHeader
+
+        PendingHeader.flush()
         fspath, lineno, domain = location
         # Ensure that the path is printed before the 1st test of a module
         # starts running.

@@ -149,6 +149,22 @@ pub(crate) fn item_location<'py>(py: Python<'py>, item: &TestItem) -> PyResult<B
         .into_any())
 }
 
+/// Hold an item's leading output for the shim's logstart (see
+/// `pytest._reporter.PendingHeader`).
+pub fn reporter_pending_header(py: Python<'_>, action: &str, text: Option<&str>) {
+    let result = (|| -> PyResult<()> {
+        let cls = py.import("pytest._reporter")?.getattr("PendingHeader")?;
+        match text {
+            Some(text) => cls.call_method1(action, (text,))?,
+            None => cls.call_method0(action)?,
+        };
+        Ok(())
+    })();
+    if let Err(err) = result {
+        eprintln!("INTERNAL ERROR: {}", format_exception(py, &err));
+    }
+}
+
 /// Drive the replacement reporter's pytest_runtest_logstart.
 pub fn reporter_logstart(py: Python<'_>, item: &TestItem) {
     let result = (|| -> PyResult<()> {
