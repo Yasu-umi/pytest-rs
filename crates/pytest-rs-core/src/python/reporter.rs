@@ -103,17 +103,13 @@ pub fn reporter_sessionstart(
 }
 
 /// Drive the replacement reporter's pytest_collection_finish ("collected N
-/// items" line). `numcollected` includes deselected items.
-pub fn reporter_collection_finish(
-    py: Python<'_>,
-    config: &crate::config::Config,
-    numcollected: usize,
-) {
+/// items" line; its count comes from the delivered collectreports).
+pub fn reporter_collection_finish(py: Python<'_>, config: &crate::config::Config) {
     let result = (|| -> PyResult<()> {
         let session = make_session_proxy(py, config)?;
         py.import("pytest._reporter")?
             .getattr("collection_finish")?
-            .call1((session, numcollected))?;
+            .call1((session,))?;
         Ok(())
     })();
     if let Err(err) = result {
@@ -274,63 +270,22 @@ pub fn reporter_logfinish(py: Python<'_>, item: &TestItem) {
     }
 }
 
-/// Feed a collection error to the replacement reporter as a failed
-/// CollectReport (sugar prints these instantly; the base records stats).
-pub fn reporter_collect_error(py: Python<'_>, nodeid: &str, longrepr: &str) {
-    let result = (|| -> PyResult<()> {
-        let kwargs = PyDict::new(py);
-        kwargs.set_item("nodeid", nodeid)?;
-        kwargs.set_item("outcome", "failed")?;
-        kwargs.set_item("longrepr", longrepr)?;
-        let file = nodeid.split("::").next().unwrap_or(nodeid);
-        kwargs.set_item("location", (file, py.None(), file))?;
-        kwargs.set_item("result", pyo3::types::PyList::empty(py))?;
-        kwargs.set_item("sections", pyo3::types::PyList::empty(py))?;
-        let report = py
-            .import("_pytest.reports")?
-            .getattr("CollectReport")?
-            .call((), Some(&kwargs))?;
-        // In a nested run, surface the failed collection to the HookRecorder
-        // (getfailedcollections / assertoutcome read pytest_collectreport).
-        crate::python::record_hook(
-            py,
-            "pytest_collectreport",
-            &[("report", report.clone().unbind())],
-        );
-        py.import("pytest._reporter")?
-            .getattr("collectreport")?
-            .call1((report,))?;
-        Ok(())
-    })();
-    if let Err(err) = result {
-        eprintln!("INTERNAL ERROR: {}", format_exception(py, &err));
-    }
-}
-
-/// In a nested run, surface a skipped collection (e.g. a DoctestModule that
-/// could not import under --doctest-ignore-import-errors) to the HookRecorder
-/// as a skipped CollectReport, matching upstream's collect-time Skipped.
-/// No-op on the outer run.
-pub fn record_collect_skip(py: Python<'_>, nodeid: &str, longrepr: &str) {
-    if !crate::engine::inprocess::recording() {
-        return;
-    }
-    let result = (|| -> PyResult<()> {
-        let kwargs = PyDict::new(py);
-        kwargs.set_item("nodeid", nodeid)?;
-        kwargs.set_item("outcome", "skipped")?;
-        kwargs.set_item("longrepr", longrepr)?;
-        let file = nodeid.split("::").next().unwrap_or(nodeid);
-        kwargs.set_item("location", (file, py.None(), file))?;
-        kwargs.set_item("result", pyo3::types::PyList::empty(py))?;
-        kwargs.set_item("sections", pyo3::types::PyList::empty(py))?;
-        let report = py
-            .import("_pytest.reports")?
-            .getattr("CollectReport")?
-            .call((), Some(&kwargs))?;
-        crate::python::record_hook(py, "pytest_collectreport", &[("report", report.unbind())]);
-        Ok(())
-    })();
+/// A -n controller's pytest_collectreport for a worker's failed or
+/// skipped collection (xdist's DSession.worker_collectreport): every
+/// pytest_collectreport implementation (a replacement reporter, conftests,
+/// plugins) receives it through the shim pluginmanager.
+/// A skip passes its reason as `longrepr` and its "file:line" `location`.
+pub fn deliver_collect_report(
+    py: Python<'_>,
+    nodeid: &str,
+    outcome: &str,
+    longrepr: &str,
+    location: Option<&str>,
+) {
+    let result = py
+        .import("pytest._collectreport")
+        .and_then(|m| m.getattr("CollectReportDispatch"))
+        .and_then(|d| d.call_method1("deliver", (nodeid, outcome, longrepr, location)));
     if let Err(err) = result {
         eprintln!("INTERNAL ERROR: {}", format_exception(py, &err));
     }

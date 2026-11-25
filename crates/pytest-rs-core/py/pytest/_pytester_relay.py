@@ -291,6 +291,7 @@ class InlineRunResult:
     def _build_calls(hook_events):
         """Convert relay events to _RelayHookCall list, synthesizing collection hooks."""
         calls = []
+        real_collect = any(event.get("hook") == "pytest_collectstart" for event in hook_events)
         for event in hook_events:
             if event.get("hook") != "pytest_collection_finish":
                 calls.append(_RelayHookCall._from_event(event))
@@ -330,174 +331,193 @@ class InlineRunResult:
                     files_to_items[key] = (file_path, [])
                 files_to_items[key][1].append(it)
 
-            if session_path is not None:
-                # Session-level collectstart
-                calls.append(
-                    _RelayHookCall(
-                        "pytest_collectstart",
-                        {
-                            "collector": _RelayCollector(
-                                str(session_path), "Session", str(session_path)
-                            )
-                        },
-                    )
-                )
-                # Session-level make_collect_report
-                calls.append(
-                    _RelayHookCall(
-                        "pytest_make_collect_report",
-                        {
-                            "collector": _RelayCollector(
-                                str(session_path), "Session", str(session_path)
-                            )
-                        },
-                    )
-                )
-            _MODULE_CLASSES = {"", "NoneType", "Function", "Node", "Module"}
-            for key, (file_path, file_items) in files_to_items.items():
-                file_path_str = str(file_path) if file_path else ""
-                session_path_str2 = str(session_path) if session_path else ""
-                file_nodeid = (
-                    file_items[0].get("nodeid", "").split("::")[0] if file_items else file_path_str
-                )
-                # Separate custom-collector items (parent_class != Module) from Module items
-                from collections import OrderedDict as _OD
-
-                custom_groups = _OD()
-                module_items = []
-                for it in file_items:
-                    pc = it.get("parent_class", "")
-                    if pc and pc not in _MODULE_CLASSES:
-                        custom_groups.setdefault(pc, []).append(it)
-                    else:
-                        module_items.append(it)
-                # Custom collectors: collectstart + make_collect_report + collectreport
-                for parent_cls, custom_items in custom_groups.items():
+            # A child that ran the collection hooks for real (they reach the
+            # relay plugin through the pluginmanager) recorded them already.
+            if not real_collect:
+                if session_path is not None:
+                    # Session-level collectstart
                     calls.append(
                         _RelayHookCall(
                             "pytest_collectstart",
                             {
                                 "collector": _RelayCollector(
-                                    file_path_str, parent_cls, session_path_str2
+                                    str(session_path), "Session", str(session_path)
                                 )
                             },
                         )
                     )
+                    # Session-level make_collect_report
                     calls.append(
                         _RelayHookCall(
                             "pytest_make_collect_report",
                             {
                                 "collector": _RelayCollector(
-                                    file_path_str, parent_cls, session_path_str2
+                                    str(session_path), "Session", str(session_path)
                                 )
                             },
                         )
                     )
-                    custom_nodeid = custom_items[0].get("nodeid", "").split("::")[0]
-                    custom_result = [
+                _MODULE_CLASSES = {"", "NoneType", "Function", "Node", "Module"}
+                for key, (file_path, file_items) in files_to_items.items():
+                    file_path_str = str(file_path) if file_path else ""
+                    session_path_str2 = str(session_path) if session_path else ""
+                    file_nodeid = (
+                        file_items[0].get("nodeid", "").split("::")[0]
+                        if file_items
+                        else file_path_str
+                    )
+                    # Separate custom-collector items (parent_class != Module) from Module items
+                    from collections import OrderedDict as _OD
+
+                    custom_groups = _OD()
+                    module_items = []
+                    for it in file_items:
+                        pc = it.get("parent_class", "")
+                        if pc and pc not in _MODULE_CLASSES:
+                            custom_groups.setdefault(pc, []).append(it)
+                        else:
+                            module_items.append(it)
+                    # Custom collectors: collectstart + make_collect_report + collectreport
+                    for parent_cls, custom_items in custom_groups.items():
+                        calls.append(
+                            _RelayHookCall(
+                                "pytest_collectstart",
+                                {
+                                    "collector": _RelayCollector(
+                                        file_path_str, parent_cls, session_path_str2
+                                    )
+                                },
+                            )
+                        )
+                        calls.append(
+                            _RelayHookCall(
+                                "pytest_make_collect_report",
+                                {
+                                    "collector": _RelayCollector(
+                                        file_path_str, parent_cls, session_path_str2
+                                    )
+                                },
+                            )
+                        )
+                        custom_nodeid = custom_items[0].get("nodeid", "").split("::")[0]
+                        custom_result = [
+                            _RelayItemResult(
+                                it.get("name", ""), it.get("nodeid", ""), it.get("path", "")
+                            )
+                            for it in custom_items
+                        ]
+                        calls.append(
+                            _RelayHookCall(
+                                "pytest_collectreport",
+                                {
+                                    "report": _RelayCollectReport(
+                                        custom_nodeid, "passed", "", custom_result
+                                    )
+                                },
+                            )
+                        )
+                    # Module-level collectstart
+                    calls.append(
+                        _RelayHookCall(
+                            "pytest_collectstart",
+                            {
+                                "collector": _RelayCollector(
+                                    file_path_str, "Module", session_path_str2
+                                )
+                            },
+                        )
+                    )
+                    # Module-level make_collect_report
+                    calls.append(
+                        _RelayHookCall(
+                            "pytest_make_collect_report",
+                            {
+                                "collector": _RelayCollector(
+                                    file_path_str, "Module", session_path_str2
+                                )
+                            },
+                        )
+                    )
+                    # pycollect_makeitem only for Module-collected items
+                    for it in module_items:
+                        item_name = it.get("name", "")
+                        calls.append(
+                            _RelayHookCall(
+                                "pytest_pycollect_makeitem",
+                                {
+                                    "name": item_name,
+                                    "collector": _RelayCollector(
+                                        file_path_str, "Module", session_path_str2
+                                    ),
+                                },
+                            )
+                        )
+                    # collectreport for module items
+                    module_nodeid = (
+                        module_items[0].get("nodeid", "").split("::")[0]
+                        if module_items
+                        else file_nodeid
+                    )
+                    module_result = [
                         _RelayItemResult(
                             it.get("name", ""), it.get("nodeid", ""), it.get("path", "")
                         )
-                        for it in custom_items
+                        for it in module_items
                     ]
-                    calls.append(
-                        _RelayHookCall(
-                            "pytest_collectreport",
-                            {
-                                "report": _RelayCollectReport(
-                                    custom_nodeid, "passed", "", custom_result
-                                )
-                            },
-                        )
-                    )
-                # Module-level collectstart
-                calls.append(
-                    _RelayHookCall(
-                        "pytest_collectstart",
-                        {"collector": _RelayCollector(file_path_str, "Module", session_path_str2)},
-                    )
-                )
-                # Module-level make_collect_report
-                calls.append(
-                    _RelayHookCall(
-                        "pytest_make_collect_report",
-                        {"collector": _RelayCollector(file_path_str, "Module", session_path_str2)},
-                    )
-                )
-                # pycollect_makeitem only for Module-collected items
-                for it in module_items:
-                    item_name = it.get("name", "")
-                    calls.append(
-                        _RelayHookCall(
-                            "pytest_pycollect_makeitem",
-                            {
-                                "name": item_name,
-                                "collector": _RelayCollector(
-                                    file_path_str, "Module", session_path_str2
-                                ),
-                            },
-                        )
-                    )
-                # collectreport for module items
-                module_nodeid = (
-                    module_items[0].get("nodeid", "").split("::")[0]
-                    if module_items
-                    else file_nodeid
-                )
-                module_result = [
-                    _RelayItemResult(it.get("name", ""), it.get("nodeid", ""), it.get("path", ""))
-                    for it in module_items
-                ]
-                report = _RelayCollectReport(module_nodeid, "passed", "", module_result)
-                calls.append(_RelayHookCall("pytest_collectreport", {"report": report}))
+                    report = _RelayCollectReport(module_nodeid, "passed", "", module_result)
+                    calls.append(_RelayHookCall("pytest_collectreport", {"report": report}))
 
-            # Synthesize Session + skipped-module + Dir collectreports when
-            # all collected items are module-level skips (0 normal items).
-            raw_skipped = event.get("skipped_modules", [])
-            if raw_skipped and not raw_items and session_path is not None:
-                # Session collectreport (passed)
-                calls.append(
-                    _RelayHookCall(
-                        "pytest_collectreport",
-                        {"report": _RelayCollectReport("", "passed", "")},
-                    )
-                )
-                # One collectreport per skipped module
-                dirs_seen: set = set()
-                for sm in raw_skipped:
-                    sm_nodeid = sm.get("nodeid", "")
-                    sm_reason = sm.get("reason", "")
-                    sm_location = sm.get("location", "")
-                    # Parse location "file:lineno" into (path, lineno)
-                    loc_file, lineno = sm_nodeid, 1
-                    if sm_location:
-                        colon_idx = sm_location.rfind(":")
-                        if colon_idx >= 0:
-                            loc_file = sm_location[:colon_idx]
-                            try:
-                                lineno = int(sm_location[colon_idx + 1 :])
-                            except ValueError:
-                                pass
-                    longrepr_tuple = (loc_file, lineno, f"Skipped: {sm_reason}")
+                # Synthesize Session + skipped-module + Dir collectreports when
+                # all collected items are module-level skips (0 normal items).
+                raw_skipped = event.get("skipped_modules", [])
+                if raw_skipped and not raw_items and session_path is not None:
+                    # Session collectreport (passed)
                     calls.append(
                         _RelayHookCall(
                             "pytest_collectreport",
-                            {"report": _RelayCollectReport(sm_nodeid, "skipped", longrepr_tuple)},
+                            {"report": _RelayCollectReport("", "passed", "")},
                         )
                     )
-                    # Track dirs for Dir-level collectreports
-                    sm_dir = str(pathlib.Path(sm_nodeid).parent)
-                    if sm_dir == ".":
-                        sm_dir = ""
-                    dirs_seen.add(sm_dir)
-                # Dir collectreport (passed) for each unique dir
-                for d in dirs_seen:
-                    calls.append(
-                        _RelayHookCall(
-                            "pytest_collectreport",
-                            {"report": _RelayCollectReport(d, "passed", "", [])},
+                    # One collectreport per skipped module
+                    dirs_seen: set = set()
+                    for sm in raw_skipped:
+                        sm_nodeid = sm.get("nodeid", "")
+                        sm_reason = sm.get("reason", "")
+                        sm_location = sm.get("location", "")
+                        # Parse location "file:lineno" into (path, lineno)
+                        loc_file, lineno = sm_nodeid, 1
+                        if sm_location:
+                            colon_idx = sm_location.rfind(":")
+                            if colon_idx >= 0:
+                                loc_file = sm_location[:colon_idx]
+                                try:
+                                    lineno = int(sm_location[colon_idx + 1 :])
+                                except ValueError:
+                                    pass
+                        longrepr_tuple = (loc_file, lineno, f"Skipped: {sm_reason}")
+                        calls.append(
+                            _RelayHookCall(
+                                "pytest_collectreport",
+                                {
+                                    "report": _RelayCollectReport(
+                                        sm_nodeid, "skipped", longrepr_tuple
+                                    )
+                                },
+                            )
                         )
-                    )
+                        # Track dirs for Dir-level collectreports
+                        sm_dir = str(pathlib.Path(sm_nodeid).parent)
+                        if sm_dir == ".":
+                            sm_dir = ""
+                        dirs_seen.add(sm_dir)
+                    # Dir collectreport (passed) for each unique dir
+                    for d in dirs_seen:
+                        calls.append(
+                            _RelayHookCall(
+                                "pytest_collectreport",
+                                {"report": _RelayCollectReport(d, "passed", "", [])},
+                            )
+                        )
 
             # Synthesize pytest_itemcollected (one per collected item)
             for it in raw_items:

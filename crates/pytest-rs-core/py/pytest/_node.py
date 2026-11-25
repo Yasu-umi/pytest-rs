@@ -603,6 +603,18 @@ class Session(Collector):
         ) -> bool: ...
         def gethookproxy(self, fspath: os.PathLike[str]) -> Any: ...
 
+    @property
+    def _fixturemanager(self) -> Any:
+        """The collection-time fixture manager, unless perform_collect set
+        the native collection's (collectors reported through
+        pytest._collectreport hang off this Session)."""
+        fixturemanager = self.__dict__.get("_rs_fixturemanager")
+        return fixturemanager if fixturemanager is not None else session_fixturemanager()
+
+    @_fixturemanager.setter
+    def _fixturemanager(self, value: Any) -> None:
+        self.__dict__["_rs_fixturemanager"] = value
+
     @classmethod
     def from_config(cls, config: Config) -> Session:
         rootdir = getattr(config, "rootpath", None) or getattr(config, "rootdir", None)

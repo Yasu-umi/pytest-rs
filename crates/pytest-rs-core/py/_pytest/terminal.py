@@ -755,7 +755,10 @@ class TerminalReporter:
             self._add_stats("error", [report])
         elif report.skipped:
             self._add_stats("skipped", [report])
-        self._numcollected += len(getattr(report, "result", ()) or ())
+        from pytest._collectreport import CollectReportDispatch
+
+        items = [x for x in getattr(report, "result", ()) or () if CollectReportDispatch.is_item(x)]
+        self._numcollected += len(items)
 
     def report_collect(self, final: bool = False) -> None:
         if self.verbosity < 0:

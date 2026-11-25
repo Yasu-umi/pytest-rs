@@ -309,7 +309,7 @@ impl Engine {
         // backend-parametrization expansion, pytest-split's group slicing,
         // pytest-order's reordering) are silently ignored under -n, since
         // this whole file never calls collect()'s equivalent pipeline.
-        if let Err(err) = self.apply_worker_selection(py, &mut collection) {
+        if let Err(err) = self.apply_worker_selection(py, &mut collection, &collect_errors) {
             send(&WorkerMsg::InternalError {
                 traceback: python::format_exception(py, &err),
             });
@@ -1066,9 +1066,13 @@ impl Engine {
         &mut self,
         py: Python<'_>,
         collection: &mut WorkerCollection,
+        collect_errors: &[(String, String)],
     ) -> PyResult<()> {
         self.session.items = std::mem::take(&mut collection.items);
         let result = (|| -> PyResult<()> {
+            // Every xdist worker runs its own collection, hooks included
+            // (the controller only relays failed/skipped reports).
+            self.dispatch_collect_reports(py, collect_errors)?;
             self.apply_deselect()
                 .map_err(pyo3::exceptions::PyRuntimeError::new_err)?;
             self.fire_collection_modifyitems(py)?;

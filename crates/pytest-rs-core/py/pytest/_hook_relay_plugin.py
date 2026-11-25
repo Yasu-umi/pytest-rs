@@ -51,6 +51,12 @@ class _HookRelayPlugin:
             }
         )
 
+    def _rs_record_hook(self, name, kwargs):
+        """A call pytest-rs reports without dispatching it (its
+        implementations already ran natively), see pytest._collectreport."""
+        if name == "pytest_pycollect_makeitem":
+            self.pytest_pycollect_makeitem(**kwargs)
+
     def pytest_pycollect_makeitem(self, collector, name, obj):
         self._events.append(
             {
@@ -61,13 +67,15 @@ class _HookRelayPlugin:
         )
 
     def pytest_collectreport(self, report):
+        from pytest._collectreport import CollectReportDispatch
+
         result_items = getattr(report, "result", []) or []
         result = [
             {
                 "name": getattr(i, "name", ""),
                 "nodeid": getattr(i, "nodeid", ""),
                 "path": str(getattr(i, "path", "") or ""),
-                "is_item": not hasattr(i, "collect"),
+                "is_item": CollectReportDispatch.is_item(i),
             }
             for i in result_items
             if hasattr(i, "name")

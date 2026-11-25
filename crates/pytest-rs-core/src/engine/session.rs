@@ -226,6 +226,45 @@ impl Engine {
             return exit_code::OK;
         }
 
+        // pytest_collectstart / pytest_make_collect_report /
+        // pytest_collectreport for every collector, before the collection
+        // errors are handled (their failed reports are part of it). A -n
+        // controller collects nothing: its workers fire them, and it
+        // relays their failed/skipped reports (dist.rs).
+        #[cfg(feature = "xdist")]
+        let dist_collects_elsewhere =
+            !self.config.collect_only && self.session.dist_workers_resolved.flatten().is_some();
+        #[cfg(not(feature = "xdist"))]
+        let dist_collects_elsewhere = false;
+        if !dist_collects_elsewhere {
+            let errors: Vec<(String, String)> = collect_errors
+                .iter()
+                .map(|(path, err)| {
+                    let nodeid = crate::collect::file_nodeid(
+                        &self.config.rootdir,
+                        path,
+                        &self.session.initial_paths,
+                    );
+                    (nodeid, err.clone())
+                })
+                .collect();
+            if let Err(err) = self.dispatch_collect_reports(py, &errors) {
+                let reported: Option<usize> = err
+                    .value(py)
+                    .getattr("_rs_numcollected")
+                    .and_then(|n| n.extract())
+                    .ok();
+                self.session.itemcollected_before_error = reported;
+                let collected = self.session.items.len();
+                return self.collection_internal_error(
+                    py,
+                    &err,
+                    started,
+                    collected,
+                    n_collect_errors,
+                );
+            }
+        }
         let collect_code = self.handle_collection_errors(py, collect_errors, started);
         // Explicit node-id args that matched nothing force USAGE_ERROR even
         // when collection errors were reported (and even when there were

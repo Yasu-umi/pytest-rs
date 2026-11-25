@@ -192,6 +192,10 @@ pub struct Session {
     /// `pytest.skip()`. Their parent Dir collectreport should be "skipped".
     /// Each entry is (nodeid, reason).
     pub collect_file_skips: Vec<(String, String)>,
+    /// Files whose Module failed to import while their DoctestModule
+    /// skipped (--doctest-ignore-import-errors): (nodeid, longrepr) of the
+    /// DoctestModule's skipped collectreport.
+    pub doctest_collect_skips: Vec<(String, String)>,
     /// Set when --maxfail/-x stopped the run, with the failure count, for
     /// the "stopping after N failures" banner.
     pub stopped_after: Option<usize>,
@@ -283,6 +287,7 @@ impl Session {
             skipped_modules: Vec::new(),
             skipped_conftest_dirs: Vec::new(),
             collect_file_skips: Vec::new(),
+            doctest_collect_skips: Vec::new(),
             stopped_after: None,
             shouldfail: None,
             custom_reporter: None,

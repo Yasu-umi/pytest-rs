@@ -27,10 +27,6 @@ impl Engine {
                 self.session
                     .collect_errors
                     .push((nodeid.clone(), err.clone()));
-                // Delegated mode: replacement reporter sees a failed CollectReport
-                // (sugar prints them instantly). Native mode: instance plugins
-                // (e.g., relay plugin) still need to observe collect errors.
-                python::reporter_collect_error(py, &nodeid, &err);
                 let reprcrash_message = super::crash_message(&err);
                 self.session.reports.push(crate::report::TestReport {
                     nodeid,
@@ -81,10 +77,7 @@ impl Engine {
                 let no_summary = self.config.get_flag("no-summary");
                 if self.session.custom_reporter.is_some() {
                     let _ = self.apply_selection(py);
-                    let n_items = self.session.items.len();
-                    let deselected = self.session.deselected_items.len();
-                    let collected = n_items + deselected;
-                    python::reporter_collection_finish(py, &self.config, collected);
+                    python::reporter_collection_finish(py, &self.config);
                 }
                 if !self.config.no_terminal() {
                     #[cfg(feature = "xdist")]
@@ -197,7 +190,7 @@ impl Engine {
     ) {
         // The replacement reporter prints its own "collected N items" line.
         if self.session.custom_reporter.is_some() {
-            python::reporter_collection_finish(py, &self.config, collected);
+            python::reporter_collection_finish(py, &self.config);
         }
         if !self.config.quiet && !self.config.no_terminal() {
             let deselected = self.session.deselected;

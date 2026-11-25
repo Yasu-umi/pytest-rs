@@ -241,6 +241,10 @@ class SessionFixtureManager(ShimFixtureManager):
                 self._nodeid_autousenames.setdefault(nodeid, []).append(name)
         else:
             baseid = ""
+        # The rootdir's Dir collector (nodeid ".", e.g. from
+        # pytest_collectstart) scopes to everything under it.
+        if baseid == ".":
+            baseid = ""
         self._pending.append((name, func, baseid, scope, params, ids, autouse))
         return super()._register_fixture(
             name=name, func=func, nodeid=baseid, scope=scope, params=params
