@@ -2205,7 +2205,11 @@ impl Plugin for CovPlugin {
             _ => None,
         });
         if !self.reports.is_empty() {
-            let version_info = ctx.py.import("sys")?.getattr("version_info")?;
+            let sys = ctx.py.import("sys")?;
+            let version_info = sys.getattr("version_info")?;
+            // pytest-cov's node description: `sys.platform` (darwin, linux,
+            // win32), not the OS family name.
+            let platform: String = sys.getattr("platform")?.extract()?;
             let python_version = format!(
                 "{}.{}.{}-{}-{}",
                 version_info.getattr("major")?,
@@ -2214,7 +2218,7 @@ impl Plugin for CovPlugin {
                 version_info.getattr("releaselevel")?,
                 version_info.getattr("serial")?,
             );
-            out.push_str(&report::render_header(&python_version));
+            out.push_str(&report::render_header(&platform, &python_version));
         }
         if let Some((missing, skip_covered)) = term_spec {
             out.push_str(&report::render_term(
