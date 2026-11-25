@@ -593,7 +593,10 @@ impl Engine {
                                     "unable to import module PosixPath('{}')",
                                     file.display()
                                 );
-                                python::record_collect_skip(py, &nodeid, &longrepr);
+                                // Its DoctestModule's skipped collectreport.
+                                self.session
+                                    .doctest_collect_skips
+                                    .push((nodeid.clone(), longrepr.clone()));
                                 self.session.reports.push(crate::report::TestReport {
                                     nodeid: nodeid.clone(),
                                     phase: crate::report::Phase::Setup,

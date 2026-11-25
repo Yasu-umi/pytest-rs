@@ -235,6 +235,24 @@ class HookCaller:
                 impls.append(func)
         return self._call_impls(impls, firstresult, kwargs)
 
+    def call_for_node(self, exclude, extra, **kwargs: Any) -> Any:
+        """Call the hook as a collection node's ihook would (upstream's
+        FSHookProxy): without the implementations of the plugins in
+        `exclude` (conftests out of the node's scope), plus the `extra`
+        functions (the default implementation, ordered by their own
+        `pytest_impl` opts), observed by the call monitors like __call__."""
+        kwargs = self._fix_path_args(kwargs)
+        firstresult = self._pm._specs.get(self._name, {}).get("firstresult", False)
+        impls = self._pm._reversed_impls(self._name)
+        if exclude:
+            excluded = [getattr(plugin, self._name, None) for plugin in exclude]
+            impls = [impl for impl in impls if not any(impl == other for other in excluded)]
+        impls = [*impls, *extra]
+        monitors = self._pm._call_monitors
+        if monitors:
+            return self._call_monitored(monitors, impls, firstresult, kwargs)
+        return self._call_impls(impls, firstresult, kwargs)
+
     def call_historic(self, func=None, kwargs=None, proc=None) -> None:
         """Simplified call_historic: fire hook for current registered plugins.
         (No replay to future plugins — sufficient for pytest_warning_recorded.)"""
@@ -548,6 +566,7 @@ class PluginManager:
             "pytest_collect_directory": {"firstresult": True},
             "pytest_pycollect_makemodule": {"firstresult": True},
             "pytest_pycollect_makeitem": {"firstresult": True},
+            "pytest_make_collect_report": {"firstresult": True},
             "pytest_pyfunc_call": {"firstresult": True},
             "pytest_make_parametrize_id": {"firstresult": True},
             "pytest_cmdline_main": {"firstresult": True},

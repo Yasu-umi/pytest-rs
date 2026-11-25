@@ -668,6 +668,13 @@ impl Engine {
                         if !seen_skips.insert(nodeid.clone()) {
                             continue;
                         }
+                        crate::python::deliver_collect_report(
+                            py,
+                            &nodeid,
+                            "skipped",
+                            &reason,
+                            Some(&location),
+                        );
                         self.session.skipped_modules.push((
                             nodeid.clone(),
                             reason.clone(),
@@ -696,7 +703,7 @@ impl Engine {
                         self.session
                             .collect_errors
                             .push((nodeid.clone(), err.clone()));
-                        crate::python::reporter_collect_error(py, &nodeid, &err);
+                        crate::python::deliver_collect_report(py, &nodeid, "failed", &err, None);
                         reports.push(TestReport {
                             nodeid,
                             phase: Phase::Setup,

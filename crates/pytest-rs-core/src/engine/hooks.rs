@@ -192,12 +192,10 @@ impl Engine {
         self.pending_modifyitems_wrapper_hooks = Vec::new();
         self.pending_modifyitems_list = None;
         let itemcollected_funcs = hook_for("pytest_itemcollected");
-        let collectstart_funcs = hook_for("pytest_collectstart");
         let recording = crate::engine::inprocess::recording();
         if hook_funcs.is_empty()
             && wrapper_instance_funcs.is_empty()
             && itemcollected_funcs.is_empty()
-            && collectstart_funcs.is_empty()
             && !recording
         {
             return Ok(());
@@ -209,102 +207,6 @@ impl Engine {
             .map(|item| python::make_node(py, item))
             .collect::<PyResult<_>>()?;
         let node_list = pyo3::types::PyList::new(py, nodes.iter().map(|n| n.bind(py)))?;
-
-        // pytest_collectstart: fire for Session proxy first (even with 0
-        // items), then per distinct test class.
-        if !collectstart_funcs.is_empty() {
-            let node_mod = py.import("pytest._node")?;
-            let proxy_cls = node_mod.getattr("_CollectorProxy")?;
-            let rootdir_str = self.config.rootdir.to_string_lossy().to_string();
-            let py_config = python::existing_py_config(py);
-            let session_node = node_mod.getattr("_NodeSession")?.call1((py_config,))?;
-            let session_collector = proxy_cls.call1((
-                "",
-                "",
-                rootdir_str.as_str(),
-                session_node,
-                py.None(),
-                "Session",
-            ))?;
-            for func in &collectstart_funcs {
-                python::call_py_hook(
-                    py,
-                    func,
-                    &[("collector", session_collector.clone().unbind())],
-                )?;
-            }
-            // Then each Module collector, in collection order (upstream
-            // fires pytest_collectstart for every collector it collects).
-            let mut seen_modules: Vec<String> = Vec::new();
-            for item in items.iter() {
-                let module_nodeid = item
-                    .nodeid
-                    .split("::")
-                    .next()
-                    .unwrap_or(&item.nodeid)
-                    .to_string();
-                if item.is_doctest || seen_modules.contains(&module_nodeid) {
-                    continue;
-                }
-                seen_modules.push(module_nodeid.clone());
-                let name = module_nodeid
-                    .rsplit('/')
-                    .next()
-                    .unwrap_or(&module_nodeid)
-                    .to_string();
-                let path = item.path.to_string_lossy().to_string();
-                let module_collector = proxy_cls.call1((
-                    name,
-                    module_nodeid.as_str(),
-                    path.as_str(),
-                    session_collector.getattr("session")?,
-                    &session_collector,
-                    "Module",
-                ))?;
-                for func in &collectstart_funcs {
-                    python::call_py_hook(
-                        py,
-                        func,
-                        &[("collector", module_collector.clone().unbind())],
-                    )?;
-                }
-            }
-            let class_cls = node_mod.getattr("Class")?;
-            let mut seen_cls: Vec<Py<pyo3::PyAny>> = Vec::new();
-            for node in node_list.iter() {
-                let cls = node.getattr("cls").ok().filter(|c| !c.is_none());
-                let Some(cls) = cls else { continue };
-                if seen_cls.iter().any(|c| c.bind(py).is(&cls)) {
-                    continue;
-                }
-                seen_cls.push(cls.clone().unbind());
-                let kw = pyo3::types::PyDict::new(py);
-                kw.set_item("obj", &cls)?;
-                kw.set_item("config", config_proxy.clone_ref(py))?;
-                kw.set_item("name", cls.getattr("__name__").ok())?;
-                let collector = class_cls.call((), Some(&kw))?;
-                for func in &collectstart_funcs {
-                    python::call_py_hook(py, func, &[("collector", collector.clone().unbind())])?;
-                }
-                // Propagate the collector's markers to this class's items.
-                let class_marks: Vec<Py<pyo3::PyAny>> = collector
-                    .getattr("own_markers")?
-                    .try_iter()?
-                    .filter_map(|m| m.ok().map(|m| m.unbind()))
-                    .collect();
-                if !class_marks.is_empty() {
-                    for item_node in node_list.iter() {
-                        let item_cls = item_node.getattr("cls").ok().filter(|c| !c.is_none());
-                        if item_cls.is_some_and(|c| c.is(&cls)) {
-                            let own = item_node.getattr("own_markers")?;
-                            for mark in &class_marks {
-                                own.call_method1("append", (mark.bind(py),))?;
-                            }
-                        }
-                    }
-                }
-            }
-        }
 
         // pytest_itemcollected per item (Django method tags -> marks).
         for func in &itemcollected_funcs {
@@ -363,16 +265,10 @@ impl Engine {
             )?;
         }
 
-        // In a nested run, surface the collector tree, per-item itemcollected,
-        // and the single modifyitems call to the HookRecorder so that
+        // In a nested run, surface per-item itemcollected and the single
+        // modifyitems call to the HookRecorder so that
         // getcalls/getreports work as they do in real pytest.
         if recording {
-            if let Err(err) = self.record_collector_tree(py, items) {
-                eprintln!(
-                    "INTERNAL ERROR: record_collector_tree: {}",
-                    python::format_exception(py, &err)
-                );
-            }
             for node in node_list.iter() {
                 python::record_hook(
                     py,
@@ -784,428 +680,117 @@ impl Engine {
         Ok(())
     }
 
-    /// Emit pytest_collectstart + pytest_make_collect_report +
-    /// pytest_collectreport triples for the full collector tree to the
-    /// in-process HookRecorder.  Called only when recording() is true
-    /// (inside a nested run).
-    ///
-    /// Uses `_CollectorProxy` objects so hook callers see real collector
-    /// attributes (path, session, parent chain, __class__.__name__).
-    /// The failed-module collectreport is already in the recorder (emitted
-    /// by `reporter_collect_error` in handle_collection_errors), so we only
-    /// emit its collectstart here.
-    fn record_collector_tree(
-        &self,
+    /// pytest_collectstart / pytest_make_collect_report /
+    /// pytest_collectreport for every collector of the native collection,
+    /// replayed depth-first in upstream's order by
+    /// `pytest._collectreport.CollectReportDispatch` through the shim
+    /// pluginmanager — the one path conftests, plugins, a replacement
+    /// reporter and a pytester HookRecorder all receive them from. Runs once
+    /// collection settled and before collection errors are handled, so a
+    /// failed or skipped file's report is delivered even when the errors
+    /// abort the session. `errors` are the collection errors as (nodeid,
+    /// longrepr). Markers hooks added to collectors (pytest-django's Class
+    /// tags in pytest_collectstart) are added to the items below them.
+    /// Nothing is built unless something would receive a call.
+    pub(crate) fn dispatch_collect_reports(
+        &mut self,
         py: Python<'_>,
-        items: &[crate::collect::TestItem],
+        errors: &[(String, String)],
     ) -> PyResult<()> {
-        use pyo3::types::{PyDict, PyList};
-        let collect_report_cls = py.import("_pytest.reports")?.getattr("CollectReport")?;
-        let simple_ns = py.import("types")?.getattr("SimpleNamespace")?;
-        let node_mod = py.import("pytest._node")?;
-        let proxy_cls = node_mod.getattr("_CollectorProxy")?;
-        let pathlib_path = py.import("pathlib")?.getattr("Path")?;
-
-        let py_config = python::existing_py_config(py);
-        let session_proxy: Py<PyAny> = node_mod
-            .getattr("_NodeSession")?
-            .call1((py_config.as_ref().map(|c| c.bind(py).clone()),))?
-            .unbind();
-
-        // ── Helpers ──────────────────────────────────────────────────────
-
-        let make_proxy = |name: &str,
-                          nodeid: &str,
-                          path_str: &str,
-                          parent: Py<PyAny>,
-                          class_name: &str|
-         -> PyResult<Py<PyAny>> {
-            let py_path = pathlib_path
-                .call1((path_str,))?
-                .call_method0("resolve")
-                .unwrap_or_else(|_| pathlib_path.call1((path_str,)).unwrap());
-            proxy_cls
-                .call1((
-                    name,
-                    nodeid,
-                    py_path,
-                    session_proxy.clone_ref(py),
-                    parent,
-                    class_name,
-                ))
-                .map(|b| b.unbind())
-        };
-
-        let dir_key = |file: &str| -> String {
-            match std::path::Path::new(file).parent() {
-                Some(p) if p.as_os_str().is_empty() => ".".to_string(),
-                Some(p) => p.to_string_lossy().into_owned(),
-                None => ".".to_string(),
-            }
-        };
-
-        let make_report = |nodeid: &str,
-                           outcome: &str,
-                           longrepr: Py<PyAny>,
-                           result: &Bound<'_, PyList>|
-         -> PyResult<Py<PyAny>> {
-            let kw = PyDict::new(py);
-            kw.set_item("nodeid", nodeid)?;
-            kw.set_item("outcome", outcome)?;
-            kw.set_item("longrepr", longrepr)?;
-            let file = nodeid.split("::").next().unwrap_or(nodeid);
-            kw.set_item("location", (file, py.None(), file))?;
-            kw.set_item("result", result)?;
-            kw.set_item("sections", PyList::empty(py))?;
-            kw.set_item("when", "collect")?;
-            collect_report_cls.call((), Some(&kw)).map(|b| b.unbind())
-        };
-
-        let fire_collector = |collector: &Py<PyAny>, report: Py<PyAny>| {
-            python::record_hook(
-                py,
-                "pytest_collectstart",
-                &[("collector", collector.clone_ref(py))],
-            );
-            python::record_hook(
-                py,
-                "pytest_make_collect_report",
-                &[
-                    ("collector", collector.clone_ref(py)),
-                    ("report", report.clone_ref(py)),
-                ],
-            );
-            python::record_hook(py, "pytest_collectreport", &[("report", report)]);
-        };
-
-        let item_stub = |nodeid: &str, name: &str| -> PyResult<Py<PyAny>> {
-            let ns = PyDict::new(py);
-            ns.set_item("name", name)?;
-            ns.set_item("nodeid", nodeid)?;
-            ns.set_item("fspath", py.None())?;
-            ns.set_item("path", py.None())?;
-            simple_ns.call((), Some(&ns)).map(|b| b.unbind())
-        };
-
-        // ── Data collection ──────────────────────────────────────────────
-
-        let mut passing_modules: Vec<String> = Vec::new();
-        {
-            let mut seen: std::collections::HashSet<String> = Default::default();
-            for item in items {
-                let file = item
-                    .nodeid
-                    .split("::")
-                    .next()
-                    .unwrap_or(&item.nodeid)
-                    .to_string();
-                if seen.insert(file.clone()) {
-                    passing_modules.push(file);
-                }
-            }
+        use pyo3::types::PyList;
+        let dispatcher = py
+            .import("pytest._collectreport")?
+            .getattr("CollectReportDispatch")?;
+        if !dispatcher.call_method0("wanted")?.extract::<bool>()? {
+            return Ok(());
         }
-
-        let failing_modules: Vec<&str> = self
+        let config = python::make_py_config(py, &self.config)?;
+        let items = PyList::empty(py);
+        for item in &self.session.items {
+            let kind = if python::is_custom_item(py, &item.func) {
+                "custom"
+            } else if item.is_doctest {
+                "doctest"
+            } else {
+                ""
+            };
+            items.append((item.nodeid.as_str(), python::make_node(py, item)?, kind))?;
+        }
+        let skipped_dirs: Vec<&str> = self
             .session
-            .collect_errors
+            .skipped_conftest_dirs
             .iter()
-            .map(|(nodeid, _)| nodeid.as_str())
+            .map(|(_, nodeid, ..)| nodeid.as_str())
             .collect();
-
-        let skipped_modules: Vec<(&str, &str, &str)> = self
+        let skips: Vec<(&str, &str, &str, bool)> = self
             .session
             .skipped_modules
             .iter()
-            .map(|(nodeid, reason, loc)| (nodeid.as_str(), reason.as_str(), loc.as_str()))
+            .map(|(nodeid, reason, location)| {
+                (
+                    nodeid.as_str(),
+                    reason.as_str(),
+                    location.as_str(),
+                    skipped_dirs.contains(&nodeid.as_str()),
+                )
+            })
             .collect();
-
-        let collect_file_skips: Vec<(String, &str)> = self
-            .session
-            .collect_file_skips
-            .iter()
-            .map(|(nodeid, reason)| (dir_key(nodeid.as_str()), reason.as_str()))
-            .collect();
-
-        let mut dirs: Vec<String> = Vec::new();
-        {
-            let mut seen: std::collections::HashSet<String> = Default::default();
-            // Only the runs that actually visit the rootdir as a collection
-            // root (no args, or an explicit "." / rootdir arg) get a Dir(".")
-            // collectreport, matching upstream's Session.collect(): passing a
-            // narrower directory (e.g. "tests") never constructs a collector
-            // for the rootdir itself.
-            let rootdir_canon =
-                crate::collect::canonicalize_preserving_symlinks(self.config.rootdir.as_path());
-            if self.session.initial_paths.contains(&rootdir_canon) {
-                seen.insert(".".to_string());
-                dirs.push(".".to_string());
-            }
-            let all_files = passing_modules
-                .iter()
-                .map(|s| s.as_str())
-                .chain(failing_modules.iter().copied())
-                .chain(skipped_modules.iter().map(|(nodeid, _, _)| *nodeid));
-            for file in all_files {
-                let dir = dir_key(file);
-                if seen.insert(dir.clone()) {
-                    dirs.push(dir);
-                }
-            }
-            for (dir, _) in &collect_file_skips {
-                if seen.insert(dir.clone()) {
-                    dirs.push(dir.clone());
-                }
+        let added_marks = dispatcher.call_method1(
+            "dispatch",
+            (
+                config,
+                self.config.rootdir.to_string_lossy().as_ref(),
+                self.collect_arg_nodeids(),
+                items,
+                errors.to_vec(),
+                skips,
+                self.session.doctest_collect_skips.clone(),
+                self.session.collect_file_skips.clone(),
+            ),
+        )?;
+        for entry in added_marks.try_iter()? {
+            let (index, marks): (usize, Vec<Bound<'_, PyAny>>) = entry?.extract()?;
+            let Some(item) = self.session.items.get_mut(index) else {
+                continue;
+            };
+            for mark in marks {
+                item.marks.push(crate::collect::MarkData {
+                    name: mark.getattr("name")?.extract()?,
+                    obj: mark.unbind(),
+                });
             }
         }
-
-        let skipped_dirs: std::collections::HashMap<String, String> = {
-            let mut dir_has_items: std::collections::HashSet<String> = Default::default();
-            for file in &passing_modules {
-                dir_has_items.insert(dir_key(file.as_str()));
-            }
-            for nodeid in &failing_modules {
-                dir_has_items.insert(dir_key(nodeid));
-            }
-            let mut skip_map: std::collections::HashMap<String, String> = Default::default();
-            for (dir, reason) in &collect_file_skips {
-                if !dir_has_items.contains(dir.as_str()) {
-                    skip_map
-                        .entry(dir.clone())
-                        .or_insert_with(|| reason.to_string());
-                }
-            }
-            skip_map
-        };
-
-        let mut classes: Vec<String> = Vec::new();
-        {
-            let mut seen: std::collections::HashSet<String> = Default::default();
-            for item in items {
-                let mut parts = item.nodeid.splitn(3, "::");
-                if let (Some(file), Some(cls), Some(_)) = (parts.next(), parts.next(), parts.next())
-                {
-                    let key = format!("{}::{}", file, cls);
-                    if seen.insert(key.clone()) {
-                        classes.push(key);
-                    }
-                }
-            }
-        }
-
-        // ── Build proxies (Vec for deterministic order) ──────────────────
-
-        let rootdir_str = self.config.rootdir.to_string_lossy().to_string();
-        let session: Py<PyAny> = make_proxy("", "", &rootdir_str, py.None(), "Session")?;
-
-        let mut dir_proxies: Vec<(String, Py<PyAny>)> = Vec::new();
-        for dir in &dirs {
-            if let Ok(d) = make_proxy(dir, dir, dir, session.clone_ref(py), "Dir") {
-                dir_proxies.push((dir.clone(), d));
-            }
-        }
-
-        let mut mod_proxies: Vec<(String, Py<PyAny>)> = Vec::new();
-        for file in &passing_modules {
-            let pk = dir_key(file.as_str());
-            let parent = dir_proxies
-                .iter()
-                .find(|(k, _)| *k == pk)
-                .map(|(_, p)| p.clone_ref(py))
-                .unwrap_or_else(|| session.clone_ref(py));
-            let name = std::path::Path::new(file)
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or(file);
-            if let Ok(m) = make_proxy(name, file, file, parent, "Module") {
-                mod_proxies.push((file.clone(), m));
-            }
-        }
-
-        let mut class_proxies: Vec<(String, Py<PyAny>)> = Vec::new();
-        for key in &classes {
-            let (file_part, cls_name) = key.split_once("::").unwrap_or((key, ""));
-            let parent = mod_proxies
-                .iter()
-                .find(|(k, _)| *k == file_part)
-                .map(|(_, p)| p.clone_ref(py))
-                .unwrap_or_else(|| session.clone_ref(py));
-            if let Ok(c) = make_proxy(cls_name, key, ".", parent, "Class") {
-                class_proxies.push((key.clone(), c));
-            }
-        }
-
-        // ── Emit collector tree ──────────────────────────────────────────
-
-        // Session: collectstart + make_collect_report + collectreport
-        {
-            let children = PyList::empty(py);
-            for (_, dp) in &dir_proxies {
-                let _ = children.append(dp.bind(py));
-            }
-            let report = make_report("", "passed", py.None(), &children)?;
-            let _ = report.bind(py).setattr("collector", session.bind(py));
-            fire_collector(&session, report);
-        }
-
-        // Classes: collectstart + make_collect_report + collectreport
-        for (key, cp) in &class_proxies {
-            let children = PyList::empty(py);
-            let prefix = format!("{}::", key);
-            for item in items {
-                if let Some(tail) = item.nodeid.strip_prefix(prefix.as_str())
-                    && !tail.contains("::")
-                    && let Ok(s) = item_stub(&item.nodeid, tail)
-                {
-                    let _ = children.append(s.bind(py));
-                }
-            }
-            let report = make_report(key, "passed", py.None(), &children)?;
-            let _ = report.bind(py).setattr("collector", cp.bind(py));
-            fire_collector(cp, report);
-        }
-
-        // Passing modules: collectstart + make_collect_report + pycollect_makeitem* + collectreport
-        for (file, mp) in &mod_proxies {
-            let children = PyList::empty(py);
-            let mut makeitem_names: Vec<String> = Vec::new();
-            for (key, cp) in &class_proxies {
-                if key.split_once("::").map(|(f, _)| f) == Some(file.as_str()) {
-                    let _ = children.append(cp.bind(py));
-                    if let Some(cls_name) = key.split_once("::").map(|(_, c)| c) {
-                        makeitem_names.push(cls_name.to_string());
-                    }
-                }
-            }
-            for item in items {
-                let item_file = item.nodeid.split("::").next().unwrap_or("");
-                if item_file == file.as_str() {
-                    let parts: Vec<_> = item.nodeid.splitn(3, "::").collect();
-                    if parts.len() < 3 {
-                        let nm = item.nodeid.rsplit("::").next().unwrap_or(&item.nodeid);
-                        if let Ok(s) = item_stub(&item.nodeid, nm) {
-                            let _ = children.append(s.bind(py));
-                        }
-                        makeitem_names.push(nm.to_string());
-                    }
-                }
-            }
-            let report = make_report(file, "passed", py.None(), &children)?;
-            let _ = report.bind(py).setattr("collector", mp.bind(py));
-            python::record_hook(
-                py,
-                "pytest_collectstart",
-                &[("collector", mp.clone_ref(py))],
-            );
-            python::record_hook(
-                py,
-                "pytest_make_collect_report",
-                &[
-                    ("collector", mp.clone_ref(py)),
-                    ("report", report.clone_ref(py)),
-                ],
-            );
-            for name in &makeitem_names {
-                let name_py: Py<PyAny> = pyo3::types::PyString::new(py, name).into_any().unbind();
-                python::record_hook(
-                    py,
-                    "pytest_pycollect_makeitem",
-                    &[
-                        ("collector", mp.clone_ref(py)),
-                        ("name", name_py),
-                        ("obj", py.None()),
-                    ],
-                );
-            }
-            python::record_hook(py, "pytest_collectreport", &[("report", report)]);
-        }
-
-        // Skipped modules: collectstart + make_collect_report + collectreport(skipped)
-        for (nodeid, reason, location) in &skipped_modules {
-            let pk = dir_key(nodeid);
-            let parent = dir_proxies
-                .iter()
-                .find(|(k, _)| *k == pk)
-                .map(|(_, p)| p.clone_ref(py))
-                .unwrap_or_else(|| session.clone_ref(py));
-            let name = std::path::Path::new(nodeid)
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or(nodeid);
-            if let Ok(mp) = make_proxy(name, nodeid, nodeid, parent, "Module") {
-                let (loc_file, lineno) = if let Some(colon) = location.rfind(':') {
-                    let f = &location[..colon];
-                    let ln: u64 = location[colon + 1..].parse().unwrap_or(1);
-                    (f, ln)
-                } else {
-                    (*location, 1u64)
-                };
-                let skip_reason = format!("Skipped: {reason}");
-                let longrepr: Py<PyAny> = pyo3::types::PyTuple::new(
-                    py,
-                    [
-                        loc_file.into_pyobject(py)?.into_any().unbind(),
-                        lineno.into_pyobject(py)?.into_any().unbind(),
-                        skip_reason.into_pyobject(py)?.into_any().unbind(),
-                    ],
-                )?
-                .unbind()
-                .into();
-                let report = make_report(nodeid, "skipped", longrepr, &PyList::empty(py))?;
-                let _ = report.bind(py).setattr("collector", mp.bind(py));
-                fire_collector(&mp, report);
-            }
-        }
-
-        // Failing modules: only collectstart (report already emitted).
-        for nodeid in &failing_modules {
-            let pk = dir_key(nodeid);
-            let parent = dir_proxies
-                .iter()
-                .find(|(k, _)| *k == pk)
-                .map(|(_, p)| p.clone_ref(py))
-                .unwrap_or_else(|| session.clone_ref(py));
-            let name = std::path::Path::new(nodeid)
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or(nodeid);
-            if let Ok(mp) = make_proxy(name, nodeid, nodeid, parent, "Module") {
-                python::record_hook(py, "pytest_collectstart", &[("collector", mp)]);
-            }
-        }
-
-        // Dirs: collectstart + make_collect_report + collectreport
-        for (dk, dp) in &dir_proxies {
-            let children = PyList::empty(py);
-            for (file, mp) in &mod_proxies {
-                if dir_key(file.as_str()) == *dk {
-                    let _ = children.append(mp.bind(py));
-                }
-            }
-            if let Some(reason) = skipped_dirs.get(dk.as_str()) {
-                let longrepr: Py<PyAny> = pyo3::types::PyTuple::new(
-                    py,
-                    [
-                        dk.as_str().into_pyobject(py)?.into_any().unbind(),
-                        1u64.into_pyobject(py)?.into_any().unbind(),
-                        format!("Skipped: {reason}")
-                            .into_pyobject(py)?
-                            .into_any()
-                            .unbind(),
-                    ],
-                )?
-                .unbind()
-                .into();
-                let report = make_report(dk, "skipped", longrepr, &children)?;
-                let _ = report.bind(py).setattr("collector", dp.bind(py));
-                fire_collector(dp, report);
-            } else {
-                let report = make_report(dk, "passed", py.None(), &children)?;
-                let _ = report.bind(py).setattr("collector", dp.bind(py));
-                fire_collector(dp, report);
-            }
-        }
-
         Ok(())
+    }
+
+    /// The node ids the command-line arguments name ("." for the rootdir),
+    /// whose nodes are the Session collectreport's result. Empty (the
+    /// rootdir is the match) without arguments or when one is not a path
+    /// (`--pyargs`).
+    fn collect_arg_nodeids(&self) -> Vec<String> {
+        let rootdir = crate::collect::canonicalize_preserving_symlinks(&self.config.rootdir);
+        let mut out = Vec::new();
+        for arg in &self.config.paths {
+            let (path_arg, names) = match arg.split_once("::") {
+                Some((path, names)) => (path, Some(names)),
+                None => (arg.as_str(), None),
+            };
+            let path = self.config.invocation_dir.join(path_arg);
+            if !path.exists() {
+                return Vec::new();
+            }
+            let path = crate::collect::canonicalize_preserving_symlinks(&path);
+            let mut nodeid =
+                crate::collect::file_nodeid(&rootdir, &path, &self.session.initial_paths);
+            if nodeid.is_empty() {
+                nodeid = ".".to_string();
+            }
+            if let Some(names) = names {
+                nodeid = format!("{nodeid}::{names}");
+            }
+            out.push(nodeid);
+        }
+        out
     }
 
     /// pytest_deselected conftest/plugin hooks: called once with every item

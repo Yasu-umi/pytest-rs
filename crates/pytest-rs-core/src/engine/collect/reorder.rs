@@ -47,7 +47,6 @@ impl Engine {
                                 "unable to import module PosixPath('{}')",
                                 extra_file.display()
                             );
-                            python::record_collect_skip(py, &nodeid, &longrepr);
                             self.session.skipped_modules.push((
                                 nodeid.clone(),
                                 longrepr.clone(),

@@ -282,15 +282,14 @@ def sessionstart(session: Any, native_header_lines: list[str] | None = None) -> 
     _call(reporter, "pytest_sessionstart", session=session)
 
 
-def collection_finish(session: Any, numcollected: int) -> None:
+def collection_finish(session: Any) -> None:
     """The 'collected N items' line: the replacement's
-    pytest_collection_finish (the base report_collect needs _numcollected,
-    which native collection never fed it)."""
+    pytest_collection_finish (its count comes from the collectreports
+    pytest._collectreport delivered)."""
     reporter = replacement()
     if reporter is None:
         return
     reporter._session = session
-    reporter._numcollected = numcollected
     _call(reporter, "pytest_collection_finish", session=session)
 
 
@@ -356,18 +355,6 @@ def logfinish(nodeid: str, location: tuple) -> None:
     for impl in instance_hook_impls("pytest_runtest_logfinish"):
         try:
             impl(nodeid=nodeid, location=location)
-        except Exception:
-            pass
-
-
-def collectreport(report: Any) -> None:
-    reporter = replacement()
-    if reporter is not None:
-        _call(reporter, "pytest_collectreport", report=report)
-    # Also dispatch to instance-registered plugins (e.g., relay plugin).
-    for impl in instance_hook_impls("pytest_collectreport"):
-        try:
-            impl(report=report)
         except Exception:
             pass
 
