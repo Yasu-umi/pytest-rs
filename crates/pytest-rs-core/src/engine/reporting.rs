@@ -253,7 +253,11 @@ impl Engine {
                 && n_items > 0
                 && (self.config.collect_only || self.config.test_case_verbosity() >= 0)
             {
-                println!();
+                if self.config.collect_only {
+                    println!();
+                } else {
+                    self.session.first_item_blank_pending = true;
+                }
             }
         }
     }

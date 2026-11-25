@@ -424,6 +424,9 @@ impl Engine {
             Some(workers) => {
                 // In dist mode workers collect themselves — n_items may be 0 here.
                 if !loop_replaced {
+                    if std::mem::take(&mut self.session.first_item_blank_pending) {
+                        println!();
+                    }
                     self.run_dist(py, workers);
                 }
             }

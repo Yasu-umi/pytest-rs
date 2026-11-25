@@ -88,6 +88,46 @@ class TestCollectionHookInternalError(unittest.TestCase):
     def test_runtest_hook_banner_once_with_stats(self) -> None:
         self.assert_internal_error("pytest_runtest_makereport", "item, call", "1 deselected")
 
+    def lines_before_banner(self, hook: str, args: str, *flags: str) -> list[str]:
+        """The output between the session header and the INTERNALERROR lines."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)
+            (path / "conftest.py").write_text(
+                f"def {hook}({args}):\n    raise AttributeError('boom')\n"
+            )
+            (path / "test_x.py").write_text(textwrap.dedent(TESTS))
+            out = subprocess.run(
+                [str(BINARY), "-p", "no:cacheprovider", "-p", "no:benchmark", *flags],
+                cwd=path,
+                capture_output=True,
+                text=True,
+            ).stdout
+        lines = out.split("\n")
+        start = next(i for i, line in enumerate(lines) if line.startswith("rootdir:")) + 1
+        end = next(i for i, line in enumerate(lines) if "INTERNALERROR>" in line)
+        return lines[start : end + 1]
+
+    def test_runtestloop_banner_follows_the_collected_line(self) -> None:
+        """Upstream's blank line after "collected N items" comes from the first
+        item's logstart, so it is not there when pytest_runtestloop raises."""
+        self.assertEqual(
+            self.lines_before_banner("pytest_runtestloop", "session"),
+            ["collected 3 items", "INTERNALERROR> Traceback (most recent call last):"],
+        )
+
+    def test_raising_protocol_impl_prints_no_file_header(self) -> None:
+        for flags in ((), ("-v",)):
+            lines = self.lines_before_banner("pytest_runtest_protocol", "item", *flags)
+            self.assertEqual(lines[-1], "INTERNALERROR> Traceback (most recent call last):", flags)
+            self.assertNotIn("", lines, flags)
+            self.assertFalse(any("test_x.py" in line for line in lines), (flags, lines))
+
+    def test_collection_error_under_v_continues_the_collecting_line(self) -> None:
+        lines = self.lines_before_banner("pytest_collection", "session", "-v")
+        self.assertEqual(
+            lines[-1], "collecting ... INTERNALERROR> Traceback (most recent call last):"
+        )
+
     def test_exception_interact_without_pdb(self) -> None:
         result = self.run_pytest(
             """

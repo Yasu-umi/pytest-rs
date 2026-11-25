@@ -240,6 +240,14 @@ pub struct Session {
     /// How many items a raising `pytest_itemcollected` impl let through
     /// (upstream's "collected N items" counts only those).
     pub itemcollected_before_error: Option<usize>,
+    /// The blank line after "collected N items", printed with the first
+    /// item's output (upstream's logstart writes it), not before
+    /// pytest_runtestloop.
+    pub first_item_blank_pending: bool,
+    /// The current item's leading output (that blank line, its file header)
+    /// was handed to the shim's logstart: a replacing pytest_runtest_protocol
+    /// impl that raises before logstart prints none of it, like upstream.
+    pub header_pending: bool,
 }
 
 impl Session {
@@ -285,6 +293,8 @@ impl Session {
             cmdline_main_exit: None,
             internal_error_exit_code: None,
             itemcollected_before_error: None,
+            first_item_blank_pending: false,
+            header_pending: false,
         }
     }
 

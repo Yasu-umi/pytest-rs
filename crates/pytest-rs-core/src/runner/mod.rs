@@ -148,6 +148,14 @@ impl Engine {
 
         let _mock_clock = TimeMark::use_mock_clock_if_patched(py);
         let items = std::mem::take(&mut session.items);
+        // Where a plugin's plain pytest_runtest_protocol impl may drive items
+        // (see the item's lead below).
+        let protocol_hook_baseids: Vec<String> = session
+            .py_hooks
+            .iter()
+            .filter(|hook| hook.name == "pytest_runtest_protocol")
+            .map(|hook| hook.baseid.clone())
+            .collect();
         let total = items.len().max(1);
         // Per-test progress display level (pytest's VERBOSITY_TEST_CASES):
         // >=1 → a line per test, ==0 → chars grouped under a file header,
@@ -400,6 +408,13 @@ impl Engine {
                 .split_once("::")
                 .map(|(f, _)| f.to_string())
                 .unwrap_or_else(|| item.nodeid.clone());
+            // The item's leading output: the blank line after the collected
+            // line (first item only) and a new file's header.
+            let mut lead = if std::mem::take(&mut session.first_item_blank_pending) {
+                "\n".to_string()
+            } else {
+                String::new()
+            };
             if tc == 0 && !config.no_terminal() && !session.live_logging && file != current_file {
                 if !current_file.is_empty() {
                     if setup_show_active(config) {
@@ -430,9 +445,24 @@ impl Engine {
                     &item.path,
                 );
                 line = format!("{display_file} ");
-                print!("{line}");
-                let _ = std::io::stdout().flush();
+                lead.push_str(&line);
                 current_file = file;
+            }
+            if !lead.is_empty() {
+                let _ = std::io::stdout().flush();
+                // A plugin's plain pytest_runtest_protocol impl drives this
+                // item: its logstart writes the lead (upstream's), so an impl
+                // that raises first leaves none of it.
+                if protocol_hook_baseids
+                    .iter()
+                    .any(|baseid| item.nodeid.starts_with(baseid.as_str()))
+                {
+                    python::reporter_pending_header(py, "set", Some(&lead));
+                    session.header_pending = true;
+                } else {
+                    print!("{lead}");
+                    let _ = std::io::stdout().flush();
+                }
             }
 
             // With -v and no capture, print "nodeid " before the test runs so
@@ -478,6 +508,10 @@ impl Engine {
                 items.get(idx + 1),
                 None,
                 |py, session, config, item| {
+                    // The native protocol's logstart: the held-back lead.
+                    if std::mem::take(&mut session.header_pending) {
+                        python::reporter_pending_header(py, "flush", None);
+                    }
                     // log_cli: the item header prints on its own line up front
                     // so live log records appear under it; pytest_runtest_logstart
                     // hooks log under a "live log start" section. Only reached
@@ -499,6 +533,17 @@ impl Engine {
                     }
                 },
             );
+            // The protocol impl neither ran the native path nor wrote the lead
+            // through logstart: drop it when it raised (upstream printed
+            // nothing), print it otherwise.
+            if std::mem::take(&mut session.header_pending) {
+                if python::internal_error_pending(py) {
+                    python::reporter_pending_header(py, "discard", None);
+                    line.clear();
+                } else {
+                    python::reporter_pending_header(py, "flush", None);
+                }
+            }
             Self::abort_on_deferred_internal_error(
                 py,
                 session,

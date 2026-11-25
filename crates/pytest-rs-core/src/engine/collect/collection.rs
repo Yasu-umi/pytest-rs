@@ -206,6 +206,12 @@ impl Engine {
             .start_py_collection_wrappers(py)
             .and_then(|()| self.fire_py_collection_plain(py))
         {
+            // -v: upstream's terminal has already written the live
+            // "collecting ... " prefix the INTERNALERROR lines continue.
+            if self.config.verbose > 0 && !self.config.quiet && !self.config.no_terminal() {
+                print!("collecting ... ");
+                let _ = std::io::Write::flush(&mut std::io::stdout());
+            }
             let code = python::report_internal_error(
                 py,
                 &err,
