@@ -245,19 +245,24 @@ pub fn exit_msg(py: Python<'_>, err: &PyErr) -> String {
         .unwrap_or_default()
 }
 
-/// Fire the `pytest_internalerror` hook for an unhandled exception during the
-/// session lifecycle — upstream's `wrap_session`'s `except BaseException`
-/// branch calling `config.notify_exception(excinfo, option)`. Callers already
-/// print the "INTERNALERROR> ..." banner themselves (the terminal reporter
-/// isn't a real registered hookimpl in pytest-rs, see `_pytest/terminal.py`),
-/// so this only dispatches to conftest/plugin-registered `pytest_internalerror`
-/// hookimpls and resolves the final exit code exactly like `wrap_session`
-/// does around that call: unchanged, unless a hookimpl raises `Exit` (prints
-/// "Exit: {msg}" to stderr and overrides the code when one was given), or the
-/// original exception was itself `SystemExit` and no `Exit` was raised
-/// (prints "mainloop: caught unexpected SystemExit!").
-pub fn notify_internal_error(py: Python<'_>, err: &PyErr, default_code: i32) -> i32 {
-    let dispatch: PyResult<()> = (|| {
+/// Upstream's `Config.notify_exception` for an exception that ends the
+/// session (`wrap_session`'s `except BaseException` branch): record junit's
+/// "internal" testcase, fire `pytest_internalerror` (the terminal reporter's
+/// impl prints the `INTERNALERROR>` lines and returns True), print them here
+/// only when no impl did, and resolve the exit code: `default_code`, unless a
+/// hookimpl raises `Exit` (prints "Exit: {msg}" to stderr and overrides the
+/// code when one was given), or the original exception was itself
+/// `SystemExit` and no `Exit` was raised (prints "mainloop: caught unexpected
+/// SystemExit!").
+pub fn report_internal_error(
+    py: Python<'_>,
+    err: &PyErr,
+    fulltrace: bool,
+    default_code: i32,
+) -> i32 {
+    let msg = format_internal_error(py, err, fulltrace);
+    super::junit_internal_error(py, &msg);
+    let dispatch: PyResult<bool> = (|| {
         let exc_type = err.get_type(py);
         let exc_value = err.value(py).clone();
         let exc_tb = match err.traceback(py) {
@@ -268,7 +273,9 @@ pub fn notify_internal_error(py: Python<'_>, err: &PyErr, default_code: i32) -> 
             .import("pytest._raises")?
             .getattr("ExceptionInfo")?
             .call_method1("from_exc_info", ((exc_type, exc_value, exc_tb), true))?;
-        let excrepr = excinfo.call_method0("getrepr")?;
+        let style_kwargs = pyo3::types::PyDict::new(py);
+        style_kwargs.set_item("style", if fulltrace { "long" } else { "native" })?;
+        let excrepr = excinfo.call_method("getrepr", (), Some(&style_kwargs))?;
         let hook_caller = py
             .import("pytest._pluginmanager")?
             .getattr("pluginmanager")?
@@ -277,18 +284,31 @@ pub fn notify_internal_error(py: Python<'_>, err: &PyErr, default_code: i32) -> 
         let kwargs = pyo3::types::PyDict::new(py);
         kwargs.set_item("excrepr", &excrepr)?;
         kwargs.set_item("excinfo", &excinfo)?;
-        hook_caller.call((), Some(&kwargs))?;
-        Ok(())
+        let results = hook_caller.call((), Some(&kwargs))?;
+        Ok(results
+            .try_iter()
+            .map(|mut it| it.any(|r| r.is_ok_and(|r| r.is_truthy().unwrap_or(false))))
+            .unwrap_or_else(|_| results.is_truthy().unwrap_or(false)))
     })();
+    let print_fallback = || {
+        super::reporter_ensure_newline(py);
+        for line in msg.lines() {
+            println!("INTERNALERROR> {line}");
+        }
+    };
     match dispatch {
         Err(hook_err) => {
+            print_fallback();
             if let Some(code) = exit_returncode(py, &hook_err) {
                 eprintln!("Exit: {}", exit_msg(py, &hook_err));
                 return code.unwrap_or(default_code);
             }
             default_code
         }
-        Ok(()) => {
+        Ok(handled) => {
+            if !handled {
+                print_fallback();
+            }
             if err.is_instance_of::<pyo3::exceptions::PySystemExit>(py) {
                 eprintln!("mainloop: caught unexpected SystemExit!");
             }
@@ -316,6 +336,15 @@ pub fn defer_or_print_internal_error(py: Python<'_>, err: &PyErr) {
     if !defer_internal_error(py, err) {
         eprintln!("INTERNAL ERROR: {}", format_exception(py, err));
     }
+}
+
+/// Whether a hookimpl deferred an exception the run loop has not taken yet.
+pub fn internal_error_pending(py: Python<'_>) -> bool {
+    py.import("pytest._internalerror")
+        .and_then(|m| m.getattr("DeferredInternalError"))
+        .and_then(|cls| cls.call_method0("pending"))
+        .and_then(|pending| pending.extract::<bool>())
+        .unwrap_or(false)
 }
 
 /// The exception a hookimpl deferred with [`defer_internal_error`], if any.

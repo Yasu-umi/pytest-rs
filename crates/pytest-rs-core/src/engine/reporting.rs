@@ -193,6 +193,7 @@ impl Engine {
         n_collect_errors: usize,
         n_collect_skips: usize,
         n_items: usize,
+        run_follows: bool,
     ) {
         // The replacement reporter prints its own "collected N items" line.
         if self.session.custom_reporter.is_some() {
@@ -246,7 +247,12 @@ impl Engine {
             // directly under "collected N items"); --collect-only keeps it.
             // With zero items the run never starts; the blank line belongs
             // to handle_no_tests / finish_session (before the summary).
-            if n_items > 0 && (self.config.collect_only || self.config.test_case_verbosity() >= 0) {
+            // An INTERNALERROR right after collection (`run_follows` false)
+            // has no run to separate.
+            if run_follows
+                && n_items > 0
+                && (self.config.collect_only || self.config.test_case_verbosity() >= 0)
+            {
                 println!();
             }
         }

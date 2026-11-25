@@ -308,8 +308,12 @@ impl Engine {
 
         // pytest_itemcollected per item (Django method tags -> marks).
         for func in &itemcollected_funcs {
-            for node in node_list.iter() {
-                python::call_py_hook(py, func, &[("item", node.clone().unbind())])?;
+            for (index, node) in node_list.iter().enumerate() {
+                if let Err(err) = python::call_py_hook(py, func, &[("item", node.clone().unbind())])
+                {
+                    self.session.itemcollected_before_error = Some(index);
+                    return Err(err);
+                }
             }
         }
 
@@ -592,6 +596,31 @@ impl Engine {
                 Err(err) if err.is_instance_of::<pyo3::exceptions::PyStopIteration>(py) => {}
                 Err(err) => return Err(err),
             }
+        }
+        Ok(())
+    }
+
+    /// The plain (non-wrapper) `pytest_collection` impls of conftests and
+    /// plugin modules, called for their side effects. Upstream's hook is
+    /// firstresult and an impl returning a value replaces the default
+    /// collection; pytest-rs always collects natively, so a returned value is
+    /// ignored (like a plain pytest_runtest_protocol impl's).
+    pub(crate) fn fire_py_collection_plain(&mut self, py: Python<'_>) -> PyResult<()> {
+        let funcs: Vec<Py<pyo3::PyAny>> = self
+            .session
+            .py_hooks
+            .iter()
+            .filter(|hook| hook.name == "pytest_collection")
+            .map(|hook| hook.func.clone_ref(py))
+            .filter(|func| !Self::modifyitems_hookimpl_is_wrapper(py, func))
+            .collect();
+        if funcs.is_empty() {
+            return Ok(());
+        }
+        let session = python::make_session_proxy(py, &self.config)?;
+        // pluggy: the last registered (the conftests) runs first.
+        for func in funcs.iter().rev() {
+            python::call_py_hook(py, func, &[("session", session.clone_ref(py))])?;
         }
         Ok(())
     }

@@ -91,6 +91,10 @@ thread_local! {
     /// `pytest_runtest_logreport` (or a delegated `runtestprotocol`) takes them.
     static MAKEREPORT_RESULTS: std::cell::RefCell<Vec<(String, Phase, Py<PyAny>)>> =
         const { std::cell::RefCell::new(Vec::new()) };
+    /// The phase exceptions makereport consumed, kept for
+    /// `pytest_exception_interact` (fired once the report is logged).
+    static INTERACT_EXCEPTIONS: std::cell::RefCell<Vec<(String, Phase, Py<PyAny>)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
 }
 
 /// Forget the previous item's recorded phase exceptions and unlogged
@@ -98,6 +102,7 @@ thread_local! {
 pub(crate) fn reset_makereport_state() {
     PHASE_EXCEPTIONS.with(|cell| cell.borrow_mut().clear());
     MAKEREPORT_RESULTS.with(|cell| cell.borrow_mut().clear());
+    INTERACT_EXCEPTIONS.with(|cell| cell.borrow_mut().clear());
 }
 
 /// Record the exception a phase of `nodeid` raised, for that phase's
@@ -174,6 +179,12 @@ pub(crate) fn fire_makereport(
                 .position(|(id, p, _)| id == &report.nodeid && *p == report.phase)
                 .map(|pos| entries.remove(pos).2)
         });
+        if let Some(exc) = &exc {
+            INTERACT_EXCEPTIONS.with(|cell| {
+                cell.borrow_mut()
+                    .push((report.nodeid.clone(), report.phase, exc.clone_ref(py)));
+            });
+        }
         let result = (|| -> PyResult<Py<PyAny>> {
             let proxy = python::make_report_proxy(py, report, Some(item.lineno))?;
             let node = super::item_node(py, item)?;
@@ -207,6 +218,53 @@ pub(crate) fn fire_makereport(
             }
             Err(err) => python::defer_or_print_internal_error(py, &err),
         }
+    }
+}
+
+/// Upstream's `call_and_report`: after a phase that raised is logged,
+/// `pytest_exception_interact(node, call, report)` fires (unless the
+/// exception was expected or a skip). With `--pdb` the debugging shim fires it
+/// itself (`maybe_interact`). An exception from a hookimpl ends the session
+/// with INTERNALERROR, like the reporting hooks.
+pub(crate) fn fire_exception_interact(
+    py: Python<'_>,
+    config: &crate::config::Config,
+    session: &Session,
+    item: &TestItem,
+    report: &TestReport,
+) {
+    if config.get_flag("pdb") || report.nodeid != item.nodeid || report.subtest_desc.is_some() {
+        return;
+    }
+    let take = |cell: &std::cell::RefCell<Vec<(String, Phase, Py<PyAny>)>>| {
+        let mut entries = cell.borrow_mut();
+        entries
+            .iter()
+            .position(|(id, p, _)| id == &report.nodeid && *p == report.phase)
+            .map(|pos| entries.remove(pos).2)
+    };
+    let Some(exc) = INTERACT_EXCEPTIONS
+        .with(take)
+        .or_else(|| PHASE_EXCEPTIONS.with(take))
+    else {
+        return;
+    };
+    let hooked = session.py_hooks.iter().any(|h| {
+        h.name == "pytest_exception_interact" && item.nodeid.starts_with(h.baseid.as_str())
+    }) || !python::instance_hook_funcs(py, "pytest_exception_interact").is_empty();
+    if !hooked {
+        return;
+    }
+    let result = (|| -> PyResult<()> {
+        let proxy = python::make_report_proxy(py, report, Some(item.lineno))?;
+        let node = super::item_node(py, item)?;
+        py.import("pytest._reporter")?
+            .getattr("run_exception_interact")?
+            .call1((proxy.bind(py), node, phase_name(report.phase), exc.bind(py)))?;
+        Ok(())
+    })();
+    if let Err(err) = result {
+        python::defer_or_print_internal_error(py, &err);
     }
 }
 

@@ -114,6 +114,8 @@ impl Engine {
         py: Python<'_>,
         session: &mut Session,
         config: &crate::config::Config,
+        line: &mut String,
+        verbose_prefix: Option<&str>,
     ) {
         let Some(err) = python::take_internal_error(py) else {
             return;
@@ -121,6 +123,17 @@ impl Engine {
         if config.is_worker() {
             eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
             return;
+        }
+        // -v: upstream's logstart already wrote the item's "nodeid " prefix.
+        if let Some(prefix) = verbose_prefix {
+            *line = format!("{prefix} ");
+            print!("{line}");
+        }
+        // Upstream's terminal writes the banner on a line of its own when a
+        // file's (or -v item's) line is open, not after bare -q progress chars.
+        if !line.is_empty() && config.test_case_verbosity() >= 0 {
+            println!();
+            line.clear();
         }
         abort_with_internal_error(py, session, config, &err);
     }
@@ -486,7 +499,14 @@ impl Engine {
                     }
                 },
             );
-            Self::abort_on_deferred_internal_error(py, session, config);
+            Self::abort_on_deferred_internal_error(
+                py,
+                session,
+                config,
+                &mut line,
+                (tc >= 1 && !pre_printed_id && !config.no_terminal() && !reports.is_empty())
+                    .then_some(item.nodeid.as_str()),
+            );
             if session.internal_error_exit_code.is_some() {
                 // A replacing pytest_runtest_protocol hookimpl raised (or a
                 // reporting hookimpl did, see abort_on_deferred_internal_error): the
@@ -519,7 +539,14 @@ impl Engine {
             done += 1;
             last_nodeid = Some(item.nodeid.clone());
             let mut item_failed = false;
+            // Whether -v already wrote this item's line (an INTERNALERROR
+            // after it needs no "nodeid " prefix of its own).
+            let mut item_shown = false;
             for (i, report) in reports.into_iter().enumerate() {
+                // A pytest_exception_interact impl raised on an earlier report.
+                if python::internal_error_pending(py) {
+                    break;
+                }
                 let is_teardown = report.phase == Phase::Teardown;
                 if !is_teardown {
                     fire_logreport_hooks(
@@ -530,6 +557,12 @@ impl Engine {
                         Some(item),
                         delegated,
                     );
+                    // A logreport hookimpl raised: upstream's exception
+                    // leaves this report (and the item's later ones)
+                    // unrecorded by the terminal.
+                    if python::internal_error_pending(py) {
+                        break;
+                    }
                 }
                 // A "rerun" report is a retried attempt: shown as 'R', never
                 // counted as a failure or charged against --maxfail.
@@ -564,6 +597,7 @@ impl Engine {
                         );
                     }
                 } else if tc >= 1 {
+                    item_shown = true;
                     python::reporter_ensure_newline(py);
                     print_verbose_report_line(
                         py,
@@ -618,10 +652,25 @@ impl Engine {
                         line.clear();
                     }
                 }
+                if !delegated {
+                    fire_exception_interact(py, config, session, item, &report);
+                }
                 if is_teardown {
                     pending_teardown = Some((session.reports.len(), item.lineno, idx, delegated));
                 }
                 session.reports.push(report);
+            }
+            if python::internal_error_pending(py) {
+                Self::abort_on_deferred_internal_error(
+                    py,
+                    session,
+                    config,
+                    &mut line,
+                    (tc >= 1 && !pre_printed_id && !config.no_terminal() && !item_shown)
+                        .then_some(item.nodeid.as_str()),
+                );
+                session.items = items;
+                return;
             }
             if session.live_logging {
                 python::log_set_live_when(py, "finish");
@@ -634,7 +683,7 @@ impl Engine {
             if !config.is_worker() {
                 python::reporter_logfinish(py, item);
             }
-            Self::abort_on_deferred_internal_error(py, session, config);
+            Self::abort_on_deferred_internal_error(py, session, config, &mut line, None);
             if session.internal_error_exit_code.is_some() {
                 session.items = items;
                 return;

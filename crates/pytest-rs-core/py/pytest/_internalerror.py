@@ -30,6 +30,10 @@ class DeferredInternalError:
         return True
 
     @classmethod
+    def pending(cls) -> bool:
+        return cls._pending is not None
+
+    @classmethod
     def take(cls) -> BaseException | None:
         exc, cls._pending = cls._pending, None
         return exc

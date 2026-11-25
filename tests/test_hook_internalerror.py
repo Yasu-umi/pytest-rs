@@ -54,7 +54,8 @@ class TestHookInternalError(unittest.TestCase):
         output = f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
         self.assertEqual(result.returncode, 3, output)
         self.assertIn("INTERNALERROR> AttributeError: boom in hook", result.stdout, output)
-        self.assertNotIn("passed", result.stdout, output)
+        # wrap_session's `finally`: a blank line, then the stats line.
+        self.assertRegex(result.stdout, r"AttributeError: boom in hook\n\n.* in [\d.]+s\n$")
 
     def test_makereport(self) -> None:
         self.assert_internal_error("pytest_runtest_makereport", "item, call")

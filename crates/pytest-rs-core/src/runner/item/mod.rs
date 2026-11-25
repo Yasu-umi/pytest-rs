@@ -62,12 +62,12 @@ pub(crate) fn abort_with_internal_error(
     config: &Config,
     err: &PyErr,
 ) {
-    let msg = python::format_internal_error(py, err, config.get_flag("full-trace"));
-    for line in msg.lines() {
-        println!("INTERNALERROR> {line}");
-    }
-    python::junit_internal_error(py, &msg);
-    let code = python::notify_internal_error(py, err, crate::report::exit_code::INTERNAL_ERROR);
+    let code = python::report_internal_error(
+        py,
+        err,
+        config.get_flag("full-trace"),
+        crate::report::exit_code::INTERNAL_ERROR,
+    );
     session.internal_error_exit_code = Some(code);
 }
 
@@ -174,7 +174,11 @@ pub(crate) fn run_one(
             // handler: banner to stdout, fire pytest_internalerror (records
             // junitxml's "internal" testcase and may raise Exit to override
             // the code), then abort the whole session.
-            abort_with_internal_error(py, session, config, &err);
+            // The run loop reports it once the item is done (it ends an open
+            // progress line first); `pytest.exit()` is no internal error.
+            if !python::defer_internal_error(py, &err) {
+                abort_with_internal_error(py, session, config, &err);
+            }
             return vec![];
         }
     };
