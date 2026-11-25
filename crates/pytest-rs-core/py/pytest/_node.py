@@ -1861,6 +1861,7 @@ def fire_makeitem_for_function(
     if not _pycollect_makeitem_hooks:
         return None
 
+    __tracebackhide__ = True
     func_node_name = nodeid.rsplit("::", 1)[-1]
 
     kwargs = {
@@ -1874,13 +1875,15 @@ def fire_makeitem_for_function(
         opts = getattr(func, "pytest_impl", None) or {}
         is_wrapper = bool(opts.get("wrapper") or opts.get("hookwrapper"))
         old_style = bool(opts.get("hookwrapper"))
+        # Upstream's Module.collect() calls the hook unguarded: an exception
+        # from a hookimpl is a collection error of the module.
+        try:
+            sig_params = set(inspect.signature(func).parameters)
+        except (TypeError, ValueError):
+            continue
+        call_kw = {k: v for k, v in kwargs.items() if k in sig_params}
         if is_wrapper:
-            try:
-                sig_params = set(inspect.signature(func).parameters)
-                call_kw = {k: v for k, v in kwargs.items() if k in sig_params}
-                gen = func(**call_kw)
-            except Exception:
-                continue
+            gen = func(**call_kw)
             if not inspect.isgenerator(gen):
                 continue
             try:
@@ -1890,15 +1893,10 @@ def fire_makeitem_for_function(
             wrappers.append((gen, old_style))
         else:
             # plain firstresult impl — may return a custom node
-            try:
-                sig_params = set(inspect.signature(func).parameters)
-                call_kw = {k: v for k, v in kwargs.items() if k in sig_params}
-                res = func(**call_kw)
-                if res is not None:
-                    plain_result = res
-                    break
-            except Exception:
-                continue
+            res = func(**call_kw)
+            if res is not None:
+                plain_result = res
+                break
 
     if not wrappers and plain_result is None:
         return None
