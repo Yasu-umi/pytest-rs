@@ -345,12 +345,24 @@ pub fn defer_or_print_internal_error(py: Python<'_>, err: &PyErr) {
 }
 
 /// Whether a hookimpl deferred an exception the run loop has not taken yet.
+/// Checked after every report, so it reads the class attribute through a
+/// cached class object instead of importing and calling into Python.
 pub fn internal_error_pending(py: Python<'_>) -> bool {
-    py.import("pytest._internalerror")
-        .and_then(|m| m.getattr("DeferredInternalError"))
-        .and_then(|cls| cls.call_method0("pending"))
-        .and_then(|pending| pending.extract::<bool>())
-        .unwrap_or(false)
+    thread_local! {
+        static DEFERRED_CLASS: std::cell::OnceCell<Option<Py<PyAny>>> =
+            const { std::cell::OnceCell::new() };
+    }
+    DEFERRED_CLASS.with(|cell| {
+        cell.get_or_init(|| {
+            py.import("pytest._internalerror")
+                .and_then(|m| m.getattr("DeferredInternalError"))
+                .ok()
+                .map(Bound::unbind)
+        })
+        .as_ref()
+        .and_then(|cls| cls.bind(py).getattr("_pending").ok())
+        .is_some_and(|pending| !pending.is_none())
+    })
 }
 
 /// The exception a hookimpl deferred with [`defer_internal_error`], if any.
