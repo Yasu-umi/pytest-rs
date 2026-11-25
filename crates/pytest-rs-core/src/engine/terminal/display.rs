@@ -274,6 +274,9 @@ impl Engine {
     pub(crate) fn print_header(&mut self, py: Python<'_>) {
         if self.print_header_start(py) {
             self.print_header_terminal_lines();
+            if let Err(err) = self.print_tryfirst_header_lines(py) {
+                eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+            }
         }
     }
 
@@ -364,10 +367,34 @@ impl Engine {
             println!("testpaths: {joined}");
         }
         // plugins: dist-backed third-party plugins that autoloaded (pytest's
-        // _plugin_nameversions). Omitted when none loaded — the natively
-        // replaced plugins (pytest-cov, etc.) never appear.
-        if !self.session.plugin_distinfo.is_empty() {
-            println!("plugins: {}", self.session.plugin_distinfo.join(", "));
+        // _plugin_nameversions), then the built-in reimplementations this
+        // run uses (`rs-cov-<pytest-rs version>`), where upstream lists the
+        // installed plugin (`cov-7.1.0`). Omitted when the list is empty.
+        let version = env!("CARGO_PKG_VERSION");
+        let xdist = self
+            .config
+            .numprocesses_spec()
+            .is_some_and(|spec| spec.trim() != "0")
+            || self
+                .config
+                .get_value("dist")
+                .is_some_and(|dist| dist != "no")
+            || self.config.get_flag("looponfail");
+        let builtins = self
+            .plugins
+            .iter()
+            .filter_map(|plugin| plugin.header_plugin_name(&self.config))
+            .chain(xdist.then_some("xdist"))
+            .map(|name| format!("rs-{name}-{version}"));
+        let plugins: Vec<String> = self
+            .session
+            .plugin_distinfo
+            .iter()
+            .cloned()
+            .chain(builtins)
+            .collect();
+        if !plugins.is_empty() {
+            println!("plugins: {}", plugins.join(", "));
         }
         // --traceconfig: show registered plugins (minimal list; mirrors what
         // real pytest's _pytest.helpconfig shows in pytest_report_header).

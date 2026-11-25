@@ -1354,6 +1354,10 @@ impl Default for CovPlugin {
 }
 
 impl Plugin for CovPlugin {
+    fn header_plugin_name(&self, _config: &pytest_rs_core::config::Config) -> Option<&'static str> {
+        self.enabled.then_some("cov")
+    }
+
     fn name(&self) -> &str {
         "cov"
     }

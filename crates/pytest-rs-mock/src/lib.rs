@@ -52,6 +52,13 @@ impl Default for MockPlugin {
 }
 
 impl Plugin for MockPlugin {
+    fn header_plugin_name(&self, config: &pytest_rs_core::config::Config) -> Option<&'static str> {
+        config
+            .get_ini("mock_use_standalone_module")
+            .is_some()
+            .then_some("mock")
+    }
+
     fn name(&self) -> &str {
         "mock"
     }

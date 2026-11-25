@@ -179,7 +179,14 @@ impl Engine {
         // otherwise the native header plus pytest_report_header lines
         // (e.g. pytest-timeout's "timeout: 1.0s" block).
         if self.session.custom_reporter.is_some() {
-            let native_lines = self.native_plugin_header_lines(py).unwrap_or_default();
+            let mut native_lines = self.native_plugin_header_lines(py).unwrap_or_default();
+            let mut ctx = crate::hooks::HookContext {
+                py,
+                session: &mut self.session,
+                config: &self.config,
+            };
+            native_lines
+                .extend(Self::tryfirst_header_lines(&self.plugins, &mut ctx).unwrap_or_default());
             python::reporter_sessionstart(py, &self.config, &native_lines);
         } else {
             if self.print_header_start(py) {
@@ -187,6 +194,9 @@ impl Engine {
                     errors.push((rootdir.to_path_buf(), python::format_exception(py, &err)));
                 }
                 self.print_header_terminal_lines();
+                if let Err(err) = self.print_tryfirst_header_lines(py) {
+                    errors.push((rootdir.to_path_buf(), python::format_exception(py, &err)));
+                }
             }
         }
         // --markers: list registered markers (configure hooks above already

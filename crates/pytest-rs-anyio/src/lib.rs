@@ -202,6 +202,10 @@ impl AnyioPlugin {
 }
 
 impl Plugin for AnyioPlugin {
+    fn header_plugin_name(&self, config: &pytest_rs_core::config::Config) -> Option<&'static str> {
+        config.get_ini("anyio_mode").is_some().then_some("anyio")
+    }
+
     fn name(&self) -> &str {
         "anyio"
     }

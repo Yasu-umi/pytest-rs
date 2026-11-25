@@ -166,6 +166,10 @@ impl Default for SplitPlugin {
 }
 
 impl Plugin for SplitPlugin {
+    fn header_plugin_name(&self, config: &pytest_rs_core::config::Config) -> Option<&'static str> {
+        config.get_value("splits").is_some().then_some("split")
+    }
+
     fn name(&self) -> &str {
         "split"
     }

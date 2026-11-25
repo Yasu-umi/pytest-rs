@@ -470,6 +470,10 @@ impl BenchmarkPlugin {
 }
 
 impl Plugin for BenchmarkPlugin {
+    fn header_plugin_name(&self, config: &pytest_rs_core::config::Config) -> Option<&'static str> {
+        Self::in_use(&config.effective_args).then_some("benchmark")
+    }
+
     fn name(&self) -> &str {
         "benchmark"
     }
