@@ -282,16 +282,23 @@ fn push_custom_items(
     value: &Bound<'_, PyAny>,
 ) {
     for (class_name, node_name, py_node) in custom {
-        // Resolve fixture names from the original callobj so the runner can
-        // fill fixtures even when a custom node class was returned by the
-        // hook (the custom node may have an empty fixturenames list here).
-        let (fixture_names, _) = param_names_with_positional_only(py, value).unwrap_or_default();
+        // The item runs the node's own `obj` (upstream's), e.g. a method a
+        // plugin bound to `collector.newinstance()`; else the member itself.
+        let callobj = py_node
+            .as_ref()
+            .and_then(|node| node.bind(py).getattr("obj").ok())
+            .filter(|obj| obj.is_callable())
+            .unwrap_or_else(|| value.clone());
+        // Resolve fixture names from that callable so the runner can fill
+        // fixtures even when a custom node class was returned by the hook
+        // (the custom node may have an empty fixturenames list here).
+        let (fixture_names, _) = param_names_with_positional_only(py, &callobj).unwrap_or_default();
         items.push(TestItem {
             nodeid: format!("{nodeid_base}::{node_name}"),
             path: path.to_path_buf(),
             module_name: module_name.to_string(),
             func_name: node_name,
-            func: value.clone().unbind(),
+            func: callobj.unbind(),
             cls: None,
             is_coroutine: false,
             is_doctest: false,

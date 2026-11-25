@@ -1930,6 +1930,9 @@ PyModuleCollector.__name__ = PyModuleCollector.__qualname__ = "Module"
 class PyClassCollector(PyCollectorMixin, Class):
     """A test class's Class collector, for pytest_pycollect_makeitem."""
 
+    def newinstance(self) -> Any:
+        return self.obj()
+
     @classmethod
     def build(cls, parent: PyModuleCollector, obj: Any, name: str, marks: list) -> PyClassCollector:
         node = cls._create(name=name, parent=parent, nodeid=f"{parent.nodeid}::{name}", obj=obj)
@@ -2017,13 +2020,14 @@ def fire_makeitem_for_function(
     #   Function node (so wrapper hooks that iterate the result can attach
     #   extra attributes like _some123);
     # - else pass None — wrappers that check ``if result:`` will skip it.
+    synthesized = None
     if plain_result is not None:
         result = plain_result
     elif is_test_func:
         plain_node = Function(
             nodeid, func_node_name, [], [], callobj, pathlib.Path(path_str), lineno
         )
-        result = [plain_node]
+        result = synthesized = [plain_node]
     else:
         result = None
 
@@ -2051,6 +2055,10 @@ def fire_makeitem_for_function(
         except Exception:
             pass
 
+    # A class member the wrappers left at its default node: the engine
+    # collects it (bound to its class), not as a stand-alone custom item.
+    if result is synthesized and isinstance(collector, PyClassCollector):
+        return None
     return result
 
 
