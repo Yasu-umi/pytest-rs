@@ -1838,6 +1838,111 @@ def take_native_collection() -> tuple | None:
     return result
 
 
+class PyCollectorMixin:
+    """Upstream PyCollector's API on the collectors pytest_pycollect_makeitem
+    receives (`collector`): the name filters plugins use (anyio's
+    `istestfunction`, aiohttp's `funcnamefilter`) and `_genfunctions`, whose
+    items are the engine's own collection of that member."""
+
+    obj: Any
+    config: Config
+
+    #: What `_genfunctions` yields: "collect this member the default way".
+    DEFAULT_COLLECTION = object()
+
+    def _matches_prefix_or_glob_option(self, option_name: str, name: str) -> bool:
+        import fnmatch
+
+        for option in self.config.getini(option_name):
+            if name.startswith(option):
+                return True
+            if ("*" in option or "?" in option or "[" in option) and fnmatch.fnmatch(name, option):
+                return True
+        return False
+
+    def funcnamefilter(self, name: str) -> bool:
+        return self._matches_prefix_or_glob_option("python_functions", name)
+
+    def classnamefilter(self, name: str) -> bool:
+        return self._matches_prefix_or_glob_option("python_classes", name)
+
+    def isnosetest(self, obj: object) -> bool:
+        try:
+            return getattr(obj, "__test__", False) is True
+        except Exception:
+            return False
+
+    def istestfunction(self, obj: object, name: str) -> bool:
+        if self.funcnamefilter(name) or self.isnosetest(obj):
+            if isinstance(obj, staticmethod | classmethod):
+                obj = getattr(obj, "__func__", False)
+            return callable(obj) and getattr(obj, "_pytestfixturefunction", None) is None
+        return False
+
+    def istestclass(self, obj: object, name: str) -> bool:
+        if not (self.classnamefilter(name) or self.isnosetest(obj)):
+            return False
+        return not inspect.isabstract(obj)
+
+    def _genfunctions(self, name: str, funcobj: object) -> Iterator[object]:
+        yield PyCollectorMixin.DEFAULT_COLLECTION
+
+    @property
+    def module(self) -> Any:
+        node: Any = self
+        while node is not None and not isinstance(node, PyModuleCollector):
+            node = node.parent
+        return None if node is None else node.obj
+
+    @property
+    def cls(self) -> Any:
+        return self.obj if isinstance(self, PyClassCollector) else None
+
+    @property
+    def instance(self) -> None:
+        return None
+
+
+class PyModuleCollector(PyCollectorMixin, File):
+    """The Module collector of a test module, for pytest_pycollect_makeitem."""
+
+    @classmethod
+    def build(
+        cls, module: Any, nodeid: str, path: str, marks: list, config: Any
+    ) -> PyModuleCollector:
+        session = _NodeSession(config)
+        node = cls._create(
+            name=pathlib.Path(path).name,
+            parent=session,
+            config=config,
+            session=session,
+            path=pathlib.Path(path),
+            nodeid=nodeid,
+        )
+        node.obj = module
+        node.own_markers = list(marks)
+        return node
+
+
+PyModuleCollector.__name__ = PyModuleCollector.__qualname__ = "Module"
+
+
+class PyClassCollector(PyCollectorMixin, Class):
+    """A test class's Class collector, for pytest_pycollect_makeitem."""
+
+    def newinstance(self) -> Any:
+        return self.obj()
+
+    @classmethod
+    def build(cls, parent: PyModuleCollector, obj: Any, name: str, marks: list) -> PyClassCollector:
+        node = cls._create(name=name, parent=parent, nodeid=f"{parent.nodeid}::{name}", obj=obj)
+        node.own_markers = list(marks)
+        return node
+
+
+PyClassCollector.__name__ = PyClassCollector.__qualname__ = "Class"
+
+
 def fire_makeitem_for_function(
     nodeid: str,
     func_name: str,
@@ -1845,6 +1950,7 @@ def fire_makeitem_for_function(
     path_str: str,
     lineno: int,
     is_test_func: bool = True,
+    collector: object = None,
 ) -> object | None:
     """Fire pytest_pycollect_makeitem hookwrappers for a collected member.
 
@@ -1861,12 +1967,13 @@ def fire_makeitem_for_function(
     if not _pycollect_makeitem_hooks:
         return None
 
+    __tracebackhide__ = True
     func_node_name = nodeid.rsplit("::", 1)[-1]
 
     kwargs = {
         "name": func_name,
         "obj": callobj,
-        "collector": None,
+        "collector": collector,
     }
     wrappers: list[tuple[Generator[Any, Any, Any], bool]] = []
     plain_result = None
@@ -1874,13 +1981,15 @@ def fire_makeitem_for_function(
         opts = getattr(func, "pytest_impl", None) or {}
         is_wrapper = bool(opts.get("wrapper") or opts.get("hookwrapper"))
         old_style = bool(opts.get("hookwrapper"))
+        # Upstream's PyCollector.collect() calls the hook unguarded: an
+        # exception from a hookimpl is a collection error of the module.
+        try:
+            sig_params = set(inspect.signature(func).parameters)
+        except (TypeError, ValueError):
+            continue
+        call_kw = {k: v for k, v in kwargs.items() if k in sig_params}
         if is_wrapper:
-            try:
-                sig_params = set(inspect.signature(func).parameters)
-                call_kw = {k: v for k, v in kwargs.items() if k in sig_params}
-                gen = func(**call_kw)
-            except Exception:
-                continue
+            gen = func(**call_kw)
             if not inspect.isgenerator(gen):
                 continue
             try:
@@ -1890,16 +1999,18 @@ def fire_makeitem_for_function(
             wrappers.append((gen, old_style))
         else:
             # plain firstresult impl — may return a custom node
-            try:
-                sig_params = set(inspect.signature(func).parameters)
-                call_kw = {k: v for k, v in kwargs.items() if k in sig_params}
-                res = func(**call_kw)
-                if res is not None:
-                    plain_result = res
-                    break
-            except Exception:
-                continue
+            res = func(**call_kw)
+            if res is not None:
+                plain_result = res
+                break
 
+    # `collector._genfunctions(...)` items: the engine's own collection.
+    if isinstance(plain_result, list | tuple) and all(
+        entry is PyCollectorMixin.DEFAULT_COLLECTION for entry in plain_result
+    ):
+        plain_result = None
+    if plain_result is PyCollectorMixin.DEFAULT_COLLECTION:
+        plain_result = None
     if not wrappers and plain_result is None:
         return None
 
@@ -1909,13 +2020,14 @@ def fire_makeitem_for_function(
     #   Function node (so wrapper hooks that iterate the result can attach
     #   extra attributes like _some123);
     # - else pass None — wrappers that check ``if result:`` will skip it.
+    synthesized = None
     if plain_result is not None:
         result = plain_result
     elif is_test_func:
         plain_node = Function(
             nodeid, func_node_name, [], [], callobj, pathlib.Path(path_str), lineno
         )
-        result = [plain_node]
+        result = synthesized = [plain_node]
     else:
         result = None
 
@@ -1943,6 +2055,10 @@ def fire_makeitem_for_function(
         except Exception:
             pass
 
+    # A class member the wrappers left at its default node: the engine
+    # collects it (bound to its class), not as a stand-alone custom item.
+    if result is synthesized and isinstance(collector, PyClassCollector):
+        return None
     return result
 
 

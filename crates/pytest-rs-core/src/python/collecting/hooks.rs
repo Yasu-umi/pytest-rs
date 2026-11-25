@@ -324,6 +324,47 @@ pub fn fire_cmdline_main(py: Python<'_>) -> PyResult<Option<i32>> {
 /// this member, so the default Rust collection path applies.
 type MakeItemResult = Vec<(String, String, Option<Py<PyAny>>)>;
 
+/// The Module collector `pytest_pycollect_makeitem` receives for a test
+/// module's members (`pytest._node.PyModuleCollector`).
+pub fn module_collector<'py>(
+    py: Python<'py>,
+    module: &Bound<'py, PyAny>,
+    nodeid: &str,
+    path: &Path,
+    marks: &[crate::collect::MarkData],
+) -> PyResult<Bound<'py, PyAny>> {
+    let marks: Vec<Bound<'py, PyAny>> =
+        marks.iter().map(|mark| mark.obj.bind(py).clone()).collect();
+    let config = crate::python::existing_py_config(py).unwrap_or_else(|| py.None());
+    py.import("pytest._node")?
+        .getattr("PyModuleCollector")?
+        .call_method1(
+            "build",
+            (
+                module,
+                nodeid,
+                path.to_string_lossy().as_ref(),
+                marks,
+                config,
+            ),
+        )
+}
+
+/// The Class collector for a test class's members, under `parent`.
+pub fn class_collector<'py>(
+    py: Python<'py>,
+    parent: &Bound<'py, PyAny>,
+    cls: &Bound<'py, PyAny>,
+    name: &str,
+    marks: &[crate::collect::MarkData],
+) -> PyResult<Bound<'py, PyAny>> {
+    let marks: Vec<Bound<'py, PyAny>> =
+        marks.iter().map(|mark| mark.obj.bind(py).clone()).collect();
+    py.import("pytest._node")?
+        .getattr("PyClassCollector")?
+        .call_method1("build", (parent, cls, name, marks))
+}
+
 #[allow(clippy::type_complexity)]
 pub fn fire_pycollect_makeitem(
     py: Python<'_>,
@@ -332,7 +373,8 @@ pub fn fire_pycollect_makeitem(
     name: &str,
     obj: &Bound<'_, PyAny>,
     is_test_func: bool,
-) -> Option<MakeItemResult> {
+    collector: &Bound<'_, PyAny>,
+) -> PyResult<Option<MakeItemResult>> {
     // Delegate to pytest._node.fire_makeitem_for_function which:
     // 1. Builds a plain Function node as the "inner result" (only when
     //    is_test_func=True so that wrapper hooks receive a node to attach
@@ -341,28 +383,28 @@ pub fn fire_pycollect_makeitem(
     // 2. Runs wrapper hooks so they receive the node (and can attach attrs)
     // 3. Runs firstresult plain impls that may return a custom node/class
     // This mirrors what pytest's Module.collect() does via pluggy.
+    // An exception from a hookimpl is a collection error of the module, as
+    // upstream's PyCollector.collect() calls the hook unguarded.
     let nodeid = format!("{nodeid_base}::{name}");
     let result = py
-        .import("pytest._node")
-        .and_then(|m| m.getattr("fire_makeitem_for_function"))
-        .and_then(|f| {
-            f.call1((
-                nodeid.as_str(),
-                name,
-                obj,
-                path.to_string_lossy().as_ref(),
-                0i32,
-                is_test_func,
-            ))
-        })
-        .ok()?;
+        .import("pytest._node")?
+        .getattr("fire_makeitem_for_function")?
+        .call1((
+            nodeid.as_str(),
+            name,
+            obj,
+            path.to_string_lossy().as_ref(),
+            0i32,
+            is_test_func,
+            collector,
+        ))?;
     if result.is_none() {
-        return None;
+        return Ok(None);
     }
     // Result may be a single node or a list/tuple of nodes.
     let nodes: Vec<Bound<'_, PyAny>> =
         if result.hasattr("__iter__").unwrap_or(false) && result.try_iter().is_ok() {
-            result.try_iter().ok()?.collect::<PyResult<_>>().ok()?
+            result.try_iter()?.collect::<PyResult<_>>()?
         } else {
             vec![result]
         };
@@ -386,7 +428,7 @@ pub fn fire_pycollect_makeitem(
         let py_node = Some(node.unbind());
         out.push((class_name, node_name, py_node));
     }
-    if out.is_empty() { None } else { Some(out) }
+    Ok(if out.is_empty() { None } else { Some(out) })
 }
 
 /// Custom collectors: fire `pytest_collect_file(file_path, parent)` for each
