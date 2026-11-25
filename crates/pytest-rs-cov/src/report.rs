@@ -270,16 +270,12 @@ fn missing_with_arcs(row: &FileRow) -> String {
 
 /// The "tests coverage" section header (printed whenever any coverage
 /// report was requested, table or not — pytest-cov does the same).
-pub fn render_header(python_version: &str) -> String {
+pub fn render_header(platform: &str, python_version: &str) -> String {
     let mut out = String::new();
     out.push_str(&pytest_rs_core::engine::center_with("tests coverage", '='));
     out.push('\n');
     out.push_str(&pytest_rs_core::engine::center_with(
-        &format!(
-            "coverage: platform {}, python {}",
-            std::env::consts::OS,
-            python_version,
-        ),
+        &format!("coverage: platform {platform}, python {python_version}",),
         '_',
     ));
     out.push('\n');
