@@ -166,13 +166,12 @@ impl Engine {
             // (exit 3), not a collection error (exit 2). Print the banner, fire
             // pytest_internalerror (a hookimpl may raise Exit to override the
             // exit code), and hand the caller the already-resolved code.
-            let msg = python::format_internal_error(py, &err, self.config.get_flag("full-trace"));
-            for line in msg.lines() {
-                println!("INTERNALERROR> {line}");
-            }
-            python::junit_internal_error(py, &msg);
-            let code =
-                python::notify_internal_error(py, &err, crate::report::exit_code::INTERNAL_ERROR);
+            let code = python::report_internal_error(
+                py,
+                &err,
+                self.config.get_flag("full-trace"),
+                crate::report::exit_code::INTERNAL_ERROR,
+            );
             return Err(format!("\x00INTERNAL_DONE\x00{code}"));
         }
         // The session header: the replacement reporter's pytest_sessionstart
@@ -199,9 +198,21 @@ impl Engine {
             return Ok(true);
         }
         // pytest_collection runs after pytest_sessionstart: its wrappers
-        // advance to their yield before any file is collected.
-        if let Err(err) = self.start_py_collection_wrappers(py) {
-            errors.push((rootdir.to_path_buf(), python::format_exception(py, &err)));
+        // advance to their yield before any file is collected, then its
+        // plain impls run. Upstream's `_main` calls it unguarded, so an
+        // exception from either is an INTERNALERROR; the session then
+        // finishes (wrap_session's `finally`).
+        if let Err(err) = self
+            .start_py_collection_wrappers(py)
+            .and_then(|()| self.fire_py_collection_plain(py))
+        {
+            let code = python::report_internal_error(
+                py,
+                &err,
+                self.config.get_flag("full-trace"),
+                crate::report::exit_code::INTERNAL_ERROR,
+            );
+            return Err(format!("\x00INTERNAL_FINISH\x00{code}"));
         }
         Ok(false)
     }
@@ -475,14 +486,10 @@ impl Engine {
                     // the banner, fire pytest_internalerror (a hookimpl may
                     // raise Exit to override the exit code), and hand the
                     // caller the already-resolved code.
-                    let msg = python::format_exception(py, err);
-                    for line in msg.lines() {
-                        println!("INTERNALERROR> {line}");
-                    }
-                    python::junit_internal_error(py, &msg);
-                    let code = python::notify_internal_error(
+                    let code = python::report_internal_error(
                         py,
                         err,
+                        false,
                         crate::report::exit_code::INTERNAL_ERROR,
                     );
                     return Err(format!("\x00INTERNAL_DONE\x00{code}"));

@@ -104,6 +104,13 @@ impl Engine {
                 if let Some(code) = message.strip_prefix("\x00INTERNAL_DONE\x00") {
                     return code.parse().unwrap_or(exit_code::INTERNAL_ERROR);
                 }
+                // "\x00INTERNAL_FINISH\x00{code}": the same, from a hook that
+                // runs once the session started (pytest_collection), so
+                // wrap_session's `finally` (sessionfinish, the stats line) follows.
+                if let Some(code) = message.strip_prefix("\x00INTERNAL_FINISH\x00") {
+                    let code = code.parse().unwrap_or(exit_code::INTERNAL_ERROR);
+                    return self.finish_after_internal_error(py, started, code);
+                }
                 // Sentinel "\x00INTERNAL_STDERR\x00": unexpected exception in
                 // pytest_configure — print INTERNALERROR to stderr (upstream
                 // routes configure failures to stderr, vs sessionstart on
@@ -268,7 +275,7 @@ impl Engine {
                 // needs that line; pytest-order's --fail-all-on-failed-ordering
                 // tests check both).
                 let n_items = self.session.items.len();
-                self.print_collection_count(py, collected, n_collect_errors, 0, n_items);
+                self.print_collection_count(py, collected, n_collect_errors, 0, n_items, true);
                 let summary = crate::runner::summary_line(
                     &[],
                     0,
@@ -287,12 +294,7 @@ impl Engine {
                 python::print_usage_error(py, &err);
                 return exit_code::USAGE_ERROR;
             }
-            // Upstream pytest_internalerror: the traceback goes to the
-            // terminal (stdout), each line prefixed "INTERNALERROR> ".
-            for line in python::format_exception(py, &err).lines() {
-                println!("INTERNALERROR> {line}");
-            }
-            return exit_code::INTERNAL_ERROR;
+            return self.collection_internal_error(py, &err, started, collected, n_collect_errors);
         }
         if let Some(cache) = &mut self.cache {
             cache.modify_items(
@@ -302,12 +304,10 @@ impl Engine {
             );
         }
         if let Err(err) = self.fire_deferred_modifyitems_wrappers(py) {
-            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
-            return exit_code::INTERNAL_ERROR;
+            return self.collection_internal_error(py, &err, started, collected, n_collect_errors);
         }
         if let Err(err) = self.fire_py_deselected(py) {
-            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
-            return exit_code::INTERNAL_ERROR;
+            return self.collection_internal_error(py, &err, started, collected, n_collect_errors);
         }
 
         let n_items = self.session.items.len();
@@ -323,10 +323,10 @@ impl Engine {
                 eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
             }
         } else if let Err(err) = self.fire_py_collection_finish(py) {
-            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+            return self.collection_internal_error(py, &err, started, collected, n_collect_errors);
         }
         if let Err(err) = self.finish_py_collection_wrappers(py) {
-            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+            return self.collection_internal_error(py, &err, started, collected, n_collect_errors);
         }
         // pytest.register_fixture calls made by collection hooks.
         if let Err(err) = python::register_pending_fixtures(py, &mut self.session.registry) {
@@ -358,7 +358,14 @@ impl Engine {
         let in_dist_mode = false;
 
         if !in_dist_mode {
-            self.print_collection_count(py, collected, n_collect_errors, n_collect_skips, n_items);
+            self.print_collection_count(
+                py,
+                collected,
+                n_collect_errors,
+                n_collect_skips,
+                n_items,
+                true,
+            );
         }
 
         // --fixtures / --fixtures-per-test: like --collect-only, collect then
@@ -393,8 +400,14 @@ impl Engine {
         let loop_replaced = match flush_hook_output(py, || self.fire_py_runtestloop(py)) {
             Ok(replaced) => replaced,
             Err(err) => {
-                eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
-                false
+                // Upstream's `_main` calls it unguarded: an INTERNALERROR.
+                let code = python::report_internal_error(
+                    py,
+                    &err,
+                    self.config.get_flag("full-trace"),
+                    exit_code::INTERNAL_ERROR,
+                );
+                return self.finish_after_internal_error(py, started, code);
             }
         };
 
@@ -436,19 +449,79 @@ impl Engine {
         }
 
         if let Some(code) = self.session.internal_error_exit_code {
-            // A replacing pytest_runtest_protocol hookimpl raised mid-run
-            // (INTERNALERROR): the banner, pytest_internalerror dispatch, and
-            // junit "internal" node already ran in run_one. Mirror
-            // wrap_session's finally block (end capture, write --junitxml,
-            // run unconfigure) but skip the normal pass/fail terminal summary
-            // — upstream's terminal reporter prints no stats line here either.
-            python::capture_session_end(py);
-            self.write_junit_xml(py);
-            let _ = flush_hook_output(py, || self.fire_py_hooks_simple(py, "pytest_unconfigure"));
-            return code;
+            // A hookimpl raised mid-run (INTERNALERROR): the banner,
+            // pytest_internalerror dispatch, and junit "internal" node
+            // already ran.
+            return self.finish_after_internal_error(py, started, code);
         }
 
         self.finish_session(py, started)
+    }
+
+    /// An exception from a collection-phase hookimpl (pytest_collection_modifyitems,
+    /// pytest_itemcollected, pytest_deselected, pytest_collection_finish, a
+    /// pytest_collection wrapper): upstream's terminal has reported the
+    /// collection ("collected N items ..."), the exception reaches
+    /// wrap_session as an INTERNALERROR, and its `finally` follows.
+    pub(crate) fn collection_internal_error(
+        &mut self,
+        py: Python<'_>,
+        err: &PyErr,
+        started: Instant,
+        collected: usize,
+        n_collect_errors: usize,
+    ) -> i32 {
+        // A pytest_itemcollected impl that raised stopped upstream's count
+        // at the items reported before it.
+        let collected = self
+            .session
+            .itemcollected_before_error
+            .take()
+            .unwrap_or(collected);
+        let n_items = self.session.items.len().min(collected);
+        self.session.deselected = collected.saturating_sub(n_items);
+        self.print_collection_count(py, collected, n_collect_errors, 0, n_items, false);
+        let code = python::report_internal_error(
+            py,
+            err,
+            self.config.get_flag("full-trace"),
+            exit_code::INTERNAL_ERROR,
+        );
+        self.finish_after_internal_error(py, started, code)
+    }
+
+    /// wrap_session's `finally` after an INTERNALERROR (already reported):
+    /// pytest_sessionfinish runs, then the terminal's own sessionfinish
+    /// prints a blank line and the stats line (no terminal summary sections:
+    /// exit code 3 is not one of its summary codes), then --junitxml and
+    /// pytest_unconfigure.
+    pub(crate) fn finish_after_internal_error(
+        &mut self,
+        py: Python<'_>,
+        started: Instant,
+        code: i32,
+    ) -> i32 {
+        python::capture_session_end(py);
+        if let Err(err) = flush_hook_output(py, || self.fire_py_sessionfinish(py, code)) {
+            eprintln!("INTERNAL ERROR: {}", python::format_exception(py, &err));
+        }
+        if !self.config.no_terminal() {
+            let warning_count = python::warning_count(py) + self.session.worker_warning_count;
+            let summary = crate::runner::summary_line(
+                &self.session.reports,
+                self.session.deselected,
+                warning_count,
+                started.elapsed(),
+                self.config.global_verbosity(),
+            );
+            println!();
+            if !summary.is_empty() {
+                println!("{summary}");
+            }
+        }
+        self.write_junit_xml(py);
+        let _ = flush_hook_output(py, || self.fire_py_hooks_simple(py, "pytest_unconfigure"));
+        code
     }
 
     /// Records collection-error reports and, when collection must abort

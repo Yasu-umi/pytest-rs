@@ -237,6 +237,9 @@ pub struct Session {
     /// (run_one); this carries the resolved exit code up so run_items breaks
     /// out of the loop and run_session short-circuits with it.
     pub internal_error_exit_code: Option<i32>,
+    /// How many items a raising `pytest_itemcollected` impl let through
+    /// (upstream's "collected N items" counts only those).
+    pub itemcollected_before_error: Option<usize>,
 }
 
 impl Session {
@@ -281,6 +284,7 @@ impl Session {
             dist_workers_resolved: None,
             cmdline_main_exit: None,
             internal_error_exit_code: None,
+            itemcollected_before_error: None,
         }
     }
 

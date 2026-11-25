@@ -208,7 +208,11 @@ impl Engine {
         } else {
             crate::tw::GREEN
         };
-        println!();
+        // After collection errors (their short summary, and the
+        // "!!! Interrupted ... !!!" banner) the count line follows directly.
+        if errors == 0 {
+            println!();
+        }
         // Upstream's summary_stats prints nothing below -q (-qq, -qqq).
         if self.config.global_verbosity() < -1 {
             return;

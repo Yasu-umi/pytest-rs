@@ -30,6 +30,26 @@ class DeferredInternalError:
         return True
 
     @classmethod
+    def pending(cls) -> bool:
+        return cls._pending is not None
+
+    @classmethod
     def take(cls) -> BaseException | None:
         exc, cls._pending = cls._pending, None
         return exc
+
+
+class InternalErrorRepr:
+    """The `excrepr` handed to pytest_internalerror: prints as pytest-rs's
+    own INTERNALERROR traceback (the frames it shows match upstream's), and
+    otherwise behaves like the ExceptionInfo repr it wraps."""
+
+    def __init__(self, text: str, excrepr: object) -> None:
+        self._text = text
+        self._excrepr = excrepr
+
+    def __str__(self) -> str:
+        return self._text
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(self._excrepr, name)

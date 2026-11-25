@@ -71,6 +71,19 @@ mod selection;
 mod session;
 mod terminal;
 
+/// The short-summary message of an error's longrepr. Upstream wraps an import
+/// failure, an import file mismatch and a SyntaxError of a test module in a
+/// `CollectError` whose longrepr is plain text: no `reprcrash`, so its
+/// summary line is the bare "ERROR path".
+fn crash_message(longrepr: &str) -> Option<String> {
+    if longrepr.starts_with("ImportError while importing test module")
+        || longrepr.starts_with("import file mismatch")
+    {
+        return None;
+    }
+    short_message(longrepr).filter(|message| !message.starts_with("SyntaxError:"))
+}
+
 /// E-prefixed explanation line, else the exception line.
 fn short_message(longrepr: &str) -> Option<String> {
     let from_e_line = longrepr.lines().find_map(|line| {

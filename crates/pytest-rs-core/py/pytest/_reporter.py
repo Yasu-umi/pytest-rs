@@ -170,6 +170,30 @@ def run_makereport(report: Any, node: Any, when: str, exc: Any = None) -> Any:
     return report if result is None else result
 
 
+def run_exception_interact(report: Any, node: Any, when: str, exc: BaseException) -> None:
+    """Fire pytest_exception_interact for a phase that raised, once its report
+    is logged (upstream's call_and_report / check_interactive_exception): not
+    for an expected exception (xfail) or a skip."""
+    import bdb
+    import unittest
+
+    from _pytest.runner import CallInfo
+
+    from pytest._outcomes import Skipped
+    from pytest._raises import ExceptionInfo
+
+    if hasattr(report, "wasxfail") or isinstance(exc, Skipped | bdb.BdbQuit | unittest.SkipTest):
+        return
+    call: CallInfo[None] = CallInfo(
+        None,
+        ExceptionInfo.from_exception(exc),
+        duration=getattr(report, "duration", 0) or 0,
+        when=when,  # type: ignore[arg-type]
+        _ispytest=True,
+    )
+    pluginmanager.hook.pytest_exception_interact(node=node, call=call, report=report)
+
+
 def setup(config: Any) -> None:
     """Register the default terminalreporter (called before the engine
     fires pytest_configure into Python plugins)."""
