@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 
 use super::super::Engine;
 use super::super::center_banner;
-use super::super::short_message;
+use super::super::crash_message;
 use super::{format_g, format_trimmed, running_on_ci};
 use crate::hooks::HookContext;
 use crate::python;
@@ -219,13 +219,7 @@ impl Engine {
                         .reprcrash_message
                         .as_deref()
                         .map(str::to_string)
-                        .or_else(|| {
-                            report
-                                .longrepr
-                                .as_deref()
-                                .and_then(short_message)
-                                .filter(|message| !message.starts_with("SyntaxError:"))
-                        })
+                        .or_else(|| report.longrepr.as_deref().and_then(crash_message))
                 };
                 if let Some(message) = crash_msg {
                     // pytest's _get_line_with_reprcrash_message: failure/error

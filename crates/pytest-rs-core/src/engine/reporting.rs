@@ -31,8 +31,7 @@ impl Engine {
                 // (sugar prints them instantly). Native mode: instance plugins
                 // (e.g., relay plugin) still need to observe collect errors.
                 python::reporter_collect_error(py, &nodeid, &err);
-                let reprcrash_message = super::short_message(&err)
-                    .filter(|message| !message.starts_with("SyntaxError:"));
+                let reprcrash_message = super::crash_message(&err);
                 self.session.reports.push(crate::report::TestReport {
                     nodeid,
                     phase: Phase::Setup,
@@ -319,14 +318,18 @@ impl Engine {
                 if n_collect_errors > 0 {
                     self.print_collect_errors(true);
                     self.print_short_summary(py);
-                    let banner = format!(
-                        "Interrupted: {n_collect_errors} error{} during collection",
-                        if n_collect_errors == 1 { "" } else { "s" }
-                    );
-                    println!(
-                        "{}",
-                        crate::tw::markup(&center_with(&banner, '!'), &[crate::tw::RED],)
-                    );
+                    // --continue-on-collection-errors does not interrupt the
+                    // session (upstream sets no shouldfail then).
+                    if !self.config.get_flag("continue-on-collection-errors") {
+                        let banner = format!(
+                            "Interrupted: {n_collect_errors} error{} during collection",
+                            if n_collect_errors == 1 { "" } else { "s" }
+                        );
+                        println!(
+                            "{}",
+                            crate::tw::markup(&center_with(&banner, '!'), &[crate::tw::RED],)
+                        );
+                    }
                 }
                 self.print_collect_only_summary(started.elapsed(), n_collect_errors);
             }
