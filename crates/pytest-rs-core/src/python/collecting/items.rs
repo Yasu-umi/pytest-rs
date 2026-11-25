@@ -79,6 +79,19 @@ pub(crate) fn introspect_namespace(
     // Module dicts preserve definition order in CPython; keep it. Iterate a
     // snapshot: collection can add to the module dict (warn_explicit_for's
     // __warningregistry__).
+    // The Module collector pytest_pycollect_makeitem receives (built only
+    // when a hookimpl exists).
+    let module_collector = if makeitem_hook {
+        Some(super::hooks::module_collector(
+            py,
+            module.as_any(),
+            nodeid_base,
+            path,
+            &module_marks,
+        )?)
+    } else {
+        None
+    };
     for pair in dict.items().iter() {
         let (key, value): (Bound<'_, PyAny>, Bound<'_, PyAny>) = pair.extract()?;
         let Ok(name) = key.extract::<String>() else {
@@ -117,7 +130,7 @@ pub(crate) fn introspect_namespace(
         // `MyFunction.from_parent(name=name, parent=collector)`. Honor it so the
         // tree renders `<MyFunction some>`; otherwise fall through to the
         // default Rust collection path.
-        if makeitem_hook
+        if let Some(collector) = &module_collector
             && let Some(custom) = fire_pycollect_makeitem(
                 py,
                 nodeid_base,
@@ -125,39 +138,10 @@ pub(crate) fn introspect_namespace(
                 &name,
                 &value,
                 filters.matches_function(&name),
-            )
+                collector,
+            )?
         {
-            for (class_name, node_name, py_node) in custom {
-                // Resolve fixture names from the original callobj so the
-                // runner can fill fixtures even when a custom node class was
-                // returned by the hook (the custom node may have an empty
-                // fixturenames list at this point).
-                let (fixture_names, _) =
-                    param_names_with_positional_only(py, &value).unwrap_or_default();
-                items.push(TestItem {
-                    nodeid: format!("{nodeid_base}::{node_name}"),
-                    path: path.to_path_buf(),
-                    module_name: module_name.to_string(),
-                    func_name: node_name,
-                    func: value.clone().unbind(),
-                    cls: None,
-                    is_coroutine: false,
-                    is_doctest: false,
-                    fixture_names,
-                    extra_fixture_names: Vec::new(),
-                    injected_fixture_names: Vec::new(),
-                    marks: Vec::new(),
-                    callspec: Vec::new(),
-                    fixture_params: Vec::new(),
-                    lineno: 0,
-                    collector_class: String::new(),
-                    func_class: class_name,
-                    py_node,
-                    node_class: None,
-                    max_param_scope: crate::fixture::Scope::Function,
-                    scope_sort_keys: Vec::new(),
-                });
-            }
+            push_custom_items(py, items, custom, nodeid_base, module_name, path, &value);
             continue;
         }
         // Wrap isclass in try-catch: objects with __class__ = property(raises)
@@ -219,6 +203,7 @@ pub(crate) fn introspect_namespace(
                         generate_hook.as_ref(),
                         filters,
                         plugins,
+                        module_collector.as_ref(),
                     )?;
                 }
             }
@@ -282,6 +267,49 @@ pub(crate) fn introspect_namespace(
         )?;
     }
     Ok(())
+}
+
+/// The items a `pytest_pycollect_makeitem` hookimpl returned for a member
+/// (a custom node, or a list of them), collected as leaf items under
+/// `nodeid_base` with the custom class label (e.g. `<MyFunction some>`).
+fn push_custom_items(
+    py: Python<'_>,
+    items: &mut Vec<TestItem>,
+    custom: Vec<(String, String, Option<Py<PyAny>>)>,
+    nodeid_base: &str,
+    module_name: &str,
+    path: &Path,
+    value: &Bound<'_, PyAny>,
+) {
+    for (class_name, node_name, py_node) in custom {
+        // Resolve fixture names from the original callobj so the runner can
+        // fill fixtures even when a custom node class was returned by the
+        // hook (the custom node may have an empty fixturenames list here).
+        let (fixture_names, _) = param_names_with_positional_only(py, value).unwrap_or_default();
+        items.push(TestItem {
+            nodeid: format!("{nodeid_base}::{node_name}"),
+            path: path.to_path_buf(),
+            module_name: module_name.to_string(),
+            func_name: node_name,
+            func: value.clone().unbind(),
+            cls: None,
+            is_coroutine: false,
+            is_doctest: false,
+            fixture_names,
+            extra_fixture_names: Vec::new(),
+            injected_fixture_names: Vec::new(),
+            marks: Vec::new(),
+            callspec: Vec::new(),
+            fixture_params: Vec::new(),
+            lineno: 0,
+            collector_class: String::new(),
+            func_class: class_name,
+            py_node,
+            node_class: None,
+            max_param_scope: crate::fixture::Scope::Function,
+            scope_sort_keys: Vec::new(),
+        });
+    }
 }
 
 pub(crate) fn clone_marks(py: Python<'_>, marks: &[MarkData]) -> Vec<MarkData> {
@@ -467,6 +495,7 @@ pub(crate) fn collect_class(
     generate_hook: Option<&Bound<'_, PyAny>>,
     filters: &NameFilters,
     plugins: &[Box<dyn Plugin>],
+    module_collector: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<()> {
     // Test classes with a custom __init__/__new__ can't be instantiated for
     // collection: pytest warns and skips them (handled in the Python shim so
@@ -607,7 +636,34 @@ pub(crate) fn collect_class(
             )?;
         }
     }
+    // The Class collector pytest_pycollect_makeitem receives for the class's
+    // members (upstream calls the hook for every member a Class collects).
+    let class_collector = match module_collector {
+        Some(parent) => Some(super::hooks::class_collector(
+            py,
+            parent,
+            cls,
+            cls_name,
+            &class_marks,
+        )?),
+        None => None,
+    };
     for (name, value, is_static) in entries {
+        if let Some(collector) = &class_collector
+            && let Some(custom) = fire_pycollect_makeitem(
+                py,
+                &class_nodeid,
+                path,
+                &name,
+                &value,
+                filters.matches_function(&name)
+                    && !value.hasattr("_pytestfixturefunction").unwrap_or(false),
+                collector,
+            )?
+        {
+            push_custom_items(py, items, custom, &class_nodeid, module_name, path, &value);
+            continue;
+        }
         if value.hasattr("_pytestfixturefunction")? {
             continue;
         }
