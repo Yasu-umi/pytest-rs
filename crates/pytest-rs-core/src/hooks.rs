@@ -214,6 +214,21 @@ pub trait Plugin: Send {
         Ok(Vec::new())
     }
 
+    /// Header lines of a `tryfirst` pytest_report_header impl (pytest-asyncio's
+    /// "asyncio: mode=..."): pluggy calls it first, and the terminal prints
+    /// the results in reverse, so they follow the `plugins:` line.
+    fn pytest_report_header_tryfirst(&self, _ctx: &mut HookContext) -> PyResult<Vec<String>> {
+        Ok(Vec::new())
+    }
+
+    /// The built-in plugin's name on the header's `plugins:` line (written
+    /// `rs-<name>-<pytest-rs version>`), when this run uses it — decided
+    /// from options and ini only, as the header comes before collection.
+    /// `None`: not in use, or no plugin of upstream's to stand for.
+    fn header_plugin_name(&self, _config: &crate::config::Config) -> Option<&'static str> {
+        None
+    }
+
     /// A fully-rendered `--help` section this plugin's own CLI options
     /// belong under (upstream's `parser.getgroup("name")`, e.g.
     /// pytest-benchmark's own `"benchmark:"` heading) — `None` when the

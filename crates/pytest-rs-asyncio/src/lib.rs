@@ -508,6 +508,49 @@ impl Default for AsyncioPlugin {
 }
 
 impl Plugin for AsyncioPlugin {
+    /// In use (as far as the header can tell) when its mode, debug or a
+    /// default loop scope is set on the command line or in the ini.
+    fn header_plugin_name(&self, config: &pytest_rs_core::config::Config) -> Option<&'static str> {
+        let configured = config.get_value("--asyncio-mode").is_some()
+            || config.get_flag("asyncio-debug")
+            || [
+                "asyncio_mode",
+                "asyncio_debug",
+                "asyncio_default_fixture_loop_scope",
+                "asyncio_default_test_loop_scope",
+            ]
+            .iter()
+            .any(|key| config.get_ini(key).is_some());
+        configured.then_some("asyncio")
+    }
+
+    /// pytest-asyncio's header line, when the plugin is in use (a tryfirst
+    /// impl upstream, so it follows the `plugins:` line).
+    fn pytest_report_header_tryfirst(&self, ctx: &mut HookContext) -> PyResult<Vec<String>> {
+        if self.header_plugin_name(ctx.config).is_none() {
+            return Ok(Vec::new());
+        }
+        let ini = |key: &str, default: &str| {
+            ctx.config
+                .get_ini(key)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .unwrap_or(default)
+                .to_string()
+        };
+        Ok(vec![format!(
+            "asyncio: mode={}, debug={}, asyncio_default_fixture_loop_scope={}, \
+             asyncio_default_test_loop_scope={}",
+            match self.mode {
+                Mode::Strict => "Mode.STRICT",
+                Mode::Auto => "Mode.AUTO",
+            },
+            if self.debug { "True" } else { "False" },
+            ini("asyncio_default_fixture_loop_scope", "None"),
+            ini("asyncio_default_test_loop_scope", "function"),
+        )])
+    }
+
     fn name(&self) -> &str {
         "asyncio"
     }

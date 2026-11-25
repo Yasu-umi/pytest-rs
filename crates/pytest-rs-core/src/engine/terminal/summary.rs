@@ -512,6 +512,35 @@ impl Engine {
         Ok(lines)
     }
 
+    /// The native plugins' tryfirst header lines (see
+    /// `Plugin::pytest_report_header_tryfirst`).
+    pub(crate) fn tryfirst_header_lines(
+        plugins: &[Box<dyn crate::hooks::Plugin>],
+        ctx: &mut HookContext,
+    ) -> PyResult<Vec<String>> {
+        let mut lines = Vec::new();
+        for plugin in plugins {
+            for block in plugin.pytest_report_header_tryfirst(ctx)? {
+                lines.extend(block.split('\n').map(str::to_string));
+            }
+        }
+        Ok(lines)
+    }
+
+    /// Print the native plugins' tryfirst header lines, after the terminal's
+    /// own (rootdir, configfile, plugins).
+    pub(crate) fn print_tryfirst_header_lines(&mut self, py: Python<'_>) -> PyResult<()> {
+        let mut ctx = HookContext {
+            py,
+            session: &mut self.session,
+            config: &self.config,
+        };
+        for line in Self::tryfirst_header_lines(&self.plugins, &mut ctx)? {
+            println!("{line}");
+        }
+        Ok(())
+    }
+
     /// pytest_report_header py hooks (conftest-registered): each returns a
     /// str or list of str, printed under the session header. Native
     /// plugins' own contributions print earlier, from print_header (see
