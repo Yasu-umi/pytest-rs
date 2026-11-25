@@ -125,7 +125,7 @@ pub(crate) fn introspect_namespace(
                 &name,
                 &value,
                 filters.matches_function(&name),
-            )?
+            )
         {
             for (class_name, node_name, py_node) in custom {
                 // Resolve fixture names from the original callobj so the

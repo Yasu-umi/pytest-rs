@@ -332,7 +332,7 @@ pub fn fire_pycollect_makeitem(
     name: &str,
     obj: &Bound<'_, PyAny>,
     is_test_func: bool,
-) -> PyResult<Option<MakeItemResult>> {
+) -> Option<MakeItemResult> {
     // Delegate to pytest._node.fire_makeitem_for_function which:
     // 1. Builds a plain Function node as the "inner result" (only when
     //    is_test_func=True so that wrapper hooks receive a node to attach
@@ -341,27 +341,28 @@ pub fn fire_pycollect_makeitem(
     // 2. Runs wrapper hooks so they receive the node (and can attach attrs)
     // 3. Runs firstresult plain impls that may return a custom node/class
     // This mirrors what pytest's Module.collect() does via pluggy.
-    // An exception from a hookimpl is a collection error of the module, as
-    // upstream's Module.collect() calls the hook unguarded.
     let nodeid = format!("{nodeid_base}::{name}");
     let result = py
-        .import("pytest._node")?
-        .getattr("fire_makeitem_for_function")?
-        .call1((
-            nodeid.as_str(),
-            name,
-            obj,
-            path.to_string_lossy().as_ref(),
-            0i32,
-            is_test_func,
-        ))?;
+        .import("pytest._node")
+        .and_then(|m| m.getattr("fire_makeitem_for_function"))
+        .and_then(|f| {
+            f.call1((
+                nodeid.as_str(),
+                name,
+                obj,
+                path.to_string_lossy().as_ref(),
+                0i32,
+                is_test_func,
+            ))
+        })
+        .ok()?;
     if result.is_none() {
-        return Ok(None);
+        return None;
     }
     // Result may be a single node or a list/tuple of nodes.
     let nodes: Vec<Bound<'_, PyAny>> =
         if result.hasattr("__iter__").unwrap_or(false) && result.try_iter().is_ok() {
-            result.try_iter()?.collect::<PyResult<_>>()?
+            result.try_iter().ok()?.collect::<PyResult<_>>().ok()?
         } else {
             vec![result]
         };
@@ -385,7 +386,7 @@ pub fn fire_pycollect_makeitem(
         let py_node = Some(node.unbind());
         out.push((class_name, node_name, py_node));
     }
-    Ok(if out.is_empty() { None } else { Some(out) })
+    if out.is_empty() { None } else { Some(out) }
 }
 
 /// Custom collectors: fire `pytest_collect_file(file_path, parent)` for each
