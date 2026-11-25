@@ -461,6 +461,14 @@ impl Default for BenchmarkPlugin {
     }
 }
 
+impl BenchmarkPlugin {
+    /// Whether the run uses the built-in benchmark plugin, as far as the
+    /// header can tell: any `--benchmark-*` option.
+    pub fn in_use(args: &[String]) -> bool {
+        args.iter().any(|arg| arg.starts_with("--benchmark-"))
+    }
+}
+
 impl Plugin for BenchmarkPlugin {
     fn name(&self) -> &str {
         "benchmark"
@@ -972,6 +980,13 @@ impl Plugin for BenchmarkPlugin {
     }
 
     fn pytest_report_header(&self, ctx: &mut HookContext) -> PyResult<Vec<String>> {
+        // pytest-benchmark's line shows where the plugin is in use; for the
+        // built-in one that is a `--benchmark-*` option on the command line
+        // or in addopts (the header is written before collection, so a test
+        // merely requesting the `benchmark` fixture cannot count).
+        if !Self::in_use(&ctx.config.effective_args) {
+            return Ok(Vec::new());
+        }
         let py = ctx.py;
         let timer_name: String = self
             .helper
